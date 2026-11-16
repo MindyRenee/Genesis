@@ -180,6 +180,12 @@ class GenesisStudio(Extension):
         self._ensure_doc_if_needed(op)
         if op == "ping":
             return {"seq": msg.get("seq"), "ok": True}
+        if op == "presets":
+            q = str(msg.get("query", "")).lower()
+            names = sorted(self.app.resources("preset"))
+            if q:
+                names = [n for n in names if q in n.lower()]
+            return {"seq": msg.get("seq"), "ok": True, "names": names}
         if op == "new":
             return self._op_new(msg)
         if op == "color":
@@ -457,6 +463,7 @@ class KritaStudio:
         if entry in text:
             return
         try:
+            kritarc.parent.mkdir(parents=True, exist_ok=True)
             if "[python]" in text:
                 text = text.replace("[python]", "[python]\n" + entry, 1)
             else:
@@ -504,35 +511,73 @@ class KritaStudio:
 
     # ── Ops ───────────────────────────────────────────────────────
 
+    def _next_seq(self) -> int:
+        """The next queue sequence number.
+
+        Resumed from the queue directory every send: the queue is a
+        shared channel — her own scripts (run_shell, write_file) can
+        drop op files into it alongside this client, so the counter
+        must never rewind under what is already on disk.
+        """
+        high = 0
+        try:
+            for path in self._queue.iterdir():
+                stem = path.stem
+                if stem.startswith(("op_", "ack_")):
+                    high = max(high, int(stem.rsplit("_", 1)[-1]))
+        except (OSError, ValueError):
+            pass
+        self._seq = max(self._seq, high) + 1
+        return self._seq
+
     def send(self, op: str, **args) -> bool:
         """Queue one op; True when the queue accepted it."""
         if not self._heartbeat_fresh():
             self.alive = False
             return False
-        self._seq += 1
-        msg = {"seq": self._seq, "op": op}
+        seq = self._next_seq()
+        msg = {"seq": seq, "op": op}
         msg.update(args)
         try:
-            path = self._queue / f"op_{self._seq:06d}.json"
+            path = self._queue / f"op_{seq:06d}.json"
             path.write_text(json.dumps(msg))
             return True
         except OSError:
             return False
 
-    def export(self, path: str, timeout: float = 10.0) -> bool:
-        """Ask the studio to write the document out to ``path``."""
-        seq_before = self._seq
-        if not self.send("export", path=path):
-            return False
+    def request(self, op: str, timeout: float = 10.0, **args) -> dict | None:
+        """Send an op and wait for its ack — the query form of send."""
+        if not self.send(op, **args):
+            return None
         ack = self._queue / f"ack_{self._seq:06d}.json"
         deadline = time.time() + timeout
         while time.time() < deadline:
             if ack.exists():
                 try:
                     data = json.loads(ack.read_text())
-                    return bool(data.get("ok"))
+                    try:
+                        ack.unlink()
+                    except OSError:
+                        pass
+                    return data if isinstance(data, dict) else None
                 except (OSError, json.JSONDecodeError):
-                    return False
+                    return None
             time.sleep(0.15)
-        _ = seq_before
-        return False
+        return None
+
+    def presets(self, query: str = "", timeout: float = 10.0) -> list[str] | None:
+        """Krita's real brush/tool preset names — the whole toolbox.
+
+        ``query`` filters by substring; None means the studio is not
+        reachable. These are the names ``tool`` ops resolve against.
+        """
+        data = self.request("presets", timeout=timeout, query=query)
+        if data is None or not data.get("ok"):
+            return None
+        names = data.get("names")
+        return [str(n) for n in names] if isinstance(names, list) else []
+
+    def export(self, path: str, timeout: float = 10.0) -> bool:
+        """Ask the studio to write the document out to ``path``."""
+        data = self.request("export", timeout=timeout, path=path)
+        return bool(data and data.get("ok"))

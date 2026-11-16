@@ -35,6 +35,7 @@ from memory.systems import (
     _emotional_similarity,
 )
 from temporal_lobe.concepts import ConceptNetwork, RelationType
+from temporal_lobe.memory_store import MemoryStore
 
 logger = logging.getLogger(__name__)
 
@@ -1141,32 +1142,28 @@ def test_restore_records_skips_invalid_entries() -> None:
 
 
 # ═══════════════════════════════════════════════════════════════════
-# Salience / emotional_tag clamping — Rust/Python consistency
+# Finite evidence — Rust/Python consistency
 # ═══════════════════════════════════════════════════════════════════
 
 
-def test_store_memory_clamps_out_of_range_salience() -> None:
-    """store_memory clamps salience to [0,1] matching Rust IPC's finite_clamp.
-
-    Without clamping, the Python-side MemoryRecord and the Rust-side
-    LTM store would disagree: the Rust store clamps on receipt, but
-    the Python record would store the raw value, causing the forgetting
-    formula (which scales tau by rec.salience) to produce incorrect decay.
-    """
+def test_store_memory_preserves_out_of_range_salience() -> None:
+    """Finite salience is evidence, not a value to re-normalize."""
     engine = _make_engine()
     engine.store_memory("test memory", salience=2.0)
     rec = engine.get_memory_record(1)
     assert rec is not None
-    assert rec.salience == 1.0, f"salience should be clamped to 1.0, got {rec.salience}"
+    assert rec.salience == 2.0
+    assert engine.client.store_episode.call_args.kwargs["salience"] == 2.0
 
 
-def test_store_memory_clamps_negative_salience() -> None:
-    """store_memory clamps negative salience to 0.0."""
+def test_store_memory_preserves_negative_salience() -> None:
+    """Negative finite salience survives while bounded state stays bounded."""
     engine = _make_engine()
     engine.store_memory("test memory", salience=-0.5)
     rec = engine.get_memory_record(1)
     assert rec is not None
-    assert rec.salience == 0.0, f"salience should be clamped to 0.0, got {rec.salience}"
+    assert rec.salience == -0.5
+    assert rec.tag_strength == 0.0
 
 
 def test_store_memory_handles_nan_salience() -> None:
@@ -1179,18 +1176,92 @@ def test_store_memory_handles_nan_salience() -> None:
     assert not math.isnan(rec.salience)
 
 
-def test_store_memory_clamps_out_of_range_emotional_tag() -> None:
-    """store_memory clamps emotional_tag elements to [0,1]."""
+def test_store_memory_preserves_out_of_range_emotional_tag() -> None:
+    """Finite tag evidence survives; non-finite entries get a default."""
     engine = _make_engine()
     tag = [2.0, -1.0, 0.5, float("inf"), 0.5] + [0.5] * 7
     engine.store_memory("test memory", salience=0.5, emotional_tag=tag)
     rec = engine.get_memory_record(1)
     assert rec is not None
-    assert rec.emotional_tag[0] == 1.0, "2.0 should clamp to 1.0"
-    assert rec.emotional_tag[1] == 0.0, "-1.0 should clamp to 0.0"
+    assert rec.emotional_tag[0] == 2.0
+    assert rec.emotional_tag[1] == -1.0
     assert rec.emotional_tag[3] == 0.5, "Inf should become 0.5"
-    for v in rec.emotional_tag:
-        assert 0.0 <= v <= 1.0, f"all tag values should be in [0,1], got {v}"
+    assert all(math.isfinite(v) for v in rec.emotional_tag)
+
+
+def test_store_memory_preserves_finite_source_confidence() -> None:
+    """Source confidence is learned evidence; finite values are not capped."""
+    engine = _make_engine()
+    engine.store_memory("learned memory", source="learning", source_confidence=1.7)
+    rec = engine.get_memory_record(1)
+    assert rec is not None
+    assert rec.source_tag is not None
+    assert rec.source_tag.confidence == 1.7
+
+
+def test_reconsolidate_preserves_out_of_range_salience() -> None:
+    """Reconsolidation adjusts the evidence value without range saturation."""
+    engine = _make_engine()
+    rec = _make_record(episode_id=1, salience=0.9, reconsolidation_window=100.0)
+    engine._records[1] = rec
+    assert engine.reconsolidate(
+        1,
+        ReconsolidationModification(strength_delta=0.5),
+    )
+    assert rec.salience == 1.4
+    assert rec.tag_strength == 1.0
+
+
+def test_reconsolidate_preserves_out_of_range_emotional_tag() -> None:
+    """Emotional re-tagging blends finite evidence without range saturation."""
+    engine = _make_engine()
+    rec = _make_record(
+        episode_id=1,
+        emotional_tag=[1.2] * 12,
+        reconsolidation_window=100.0,
+    )
+    engine._records[1] = rec
+    assert engine.reconsolidate(
+        1,
+        ReconsolidationModification(
+            strength_delta=0.0,
+            emotional_tag=[2.0] * 12,
+            blend_factor=0.5,
+        ),
+    )
+    assert rec.emotional_tag[0] == 1.6
+
+
+def test_memory_store_tag_preserves_finite_chemical_evidence() -> None:
+    """Derived tag channels carry finite values instead of [0,1] saturation."""
+    emotion = MagicMock(
+        label="calm",
+        valence=2.0,
+        alertness=1.4,
+        plasticity=-0.3,
+    )
+    tag = MemoryStore.build_emotional_tag(emotion, perception=MagicMock())
+    assert tag[0] == pytest.approx(1.1)
+    assert tag[1] == pytest.approx(0.9)
+    assert tag[2] == pytest.approx(1.4)
+    assert tag[11] == pytest.approx(-0.3)
+
+
+def test_memory_store_event_preserves_finite_salience() -> None:
+    """The cognitive-event storage boundary passes finite salience verbatim."""
+    client = MagicMock()
+    client.store_event.return_value = True
+    store = MemoryStore.__new__(MemoryStore)
+    store._client = client
+    store.store_cognitive_memory(
+        "event",
+        event_type=0,
+        source_module=4,
+        salience=2.4,
+        emotional_tag=[-0.2] + [0.0] * 11,
+    )
+    assert client.store_event.call_args.kwargs["salience"] == 2.4
+    assert client.store_event.call_args.kwargs["emotional_tag"][0] == -0.2
 
 
 # ======================================================================

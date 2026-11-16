@@ -7,14 +7,14 @@ from types import SimpleNamespace
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from games import sight
+from games.arcade import Arcade
+from games.directions import directions
+from games.memory import GameMemory
+from games.official import Board, GameOffer, GamesUnavailable, board_from_observation
 from genesis_client.protocol import CHEM_DOPAMINE
-from outer_world.games import sight
-from outer_world.games.arcade import Arcade
-from outer_world.games.directions import directions
-from outer_world.games.memory import GameMemory
-from outer_world.games.official import Board, GameOffer, GamesUnavailable, board_from_observation
-from outer_world.world import OuterWorld
 from tools.framework import ToolRegistry
+from workstation.environment import OuterEnvironment
 
 
 class _Session:
@@ -67,7 +67,7 @@ class _Games:
 def _arcade():
     """An arcade in a world that records impulses and waves."""
     impulses, waves = [], []
-    world = OuterWorld(neuro_impulse=lambda c, a: impulses.append((c, a)))
+    world = OuterEnvironment(neuro_impulse=lambda c, a: impulses.append((c, a)))
     events = []
     world.on_external_event = events.append
     arcade = Arcade(
@@ -117,7 +117,7 @@ def test_closed_arcade_says_why():
         def offers(self):
             raise GamesUnavailable("offline")
 
-    arcade = Arcade(OuterWorld(), games=Closed())
+    arcade = Arcade(OuterEnvironment(), games=Closed())
     assert "closed" in arcade.play()
 
 

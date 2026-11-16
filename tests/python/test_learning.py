@@ -5,7 +5,7 @@ plasticity, three-factor STDP.
 """
 
 import logging
-import time
+from unittest.mock import Mock
 
 import numpy as np
 import pytest
@@ -419,106 +419,104 @@ def test_learner_learns_short_wordnet_definition() -> None:
     assert "metre" in result.concepts_learned
 
 
+def test_learn_once_runs_one_bounded_cycle_without_worker() -> None:
+    """Self-directed mode can learn synchronously without a live thread."""
+    learner = _make_learner(get_emotion=lambda: _make_emotion("curious", valence=0.3))
+    learner._update_posture = Mock()
+    learner._theta_dominant = Mock(return_value=False)
+    learner._sources = Mock(is_offline=False)
+    learner._learn_about = Mock()
+    learner._next_topic = Mock(return_value="rust")
+
+    assert learner.learn_once()
+
+    learner._learn_about.assert_called_once_with("rust")
+    assert not hasattr(learner, "_thread")
+    assert not learner._running
+    assert not learner._volition_granted
+
+
+def test_learn_once_respects_pause() -> None:
+    """A synchronous cycle still honors the same pause gate."""
+    learner = _make_learner()
+    learner.pause()
+    learner._learn_about = Mock()
+
+    assert not learner.learn_once()
+    learner._learn_about.assert_not_called()
+
+
 # ─── Lifecycle tests (start/stop/restart) ──────────────────────
 
 
-def _make_blocked_learner() -> AutonomousLearner:
-    """Create a learner whose _run loop blocks on the state-event wait.
-
-    With a 'stressed' emotion, _should_learn() returns False, so the
-    loop enters the _state_event.wait(timeout=60) branch — it does
-    no network I/O and no topic processing. This lets us test the
-    thread lifecycle (start/stop/restart) deterministically without
-    mocking the source registry or network layer.
-    """
+def _make_state_learner() -> AutonomousLearner:
+    """Create a learner with no network work for lifecycle checks."""
     return _make_learner(get_emotion=lambda: _make_emotion("stressed", valence=-0.5))
 
 
-def test_learner_start_creates_one_thread() -> None:
-    """start() creates exactly one background thread."""
-    learner = _make_blocked_learner()
+def test_learner_start_opens_state_without_worker() -> None:
+    """start() opens the learner state machine; it creates no thread."""
+    learner = _make_state_learner()
+    learner.start()
     try:
-        learner.start()
-        assert learner._thread is not None
-        assert learner._thread.is_alive()
         assert learner._running
+        assert not learner._stop_event.is_set()
+        assert not hasattr(learner, "_thread")
     finally:
         learner.stop()
-    # After stop, the thread should no longer be running.
     assert not learner._running
 
 
-def test_learner_stop_wakes_blocked_thread() -> None:
-    """stop() wakes a thread blocked on _state_event.wait and exits it."""
-    learner = _make_blocked_learner()
+def test_learner_stop_closes_state_without_worker() -> None:
+    """stop() is a state transition, not a join."""
+    learner = _make_state_learner()
     learner.start()
-    # Give the thread time to enter the _state_event.wait branch.
-    time.sleep(0.2)
-    assert learner._thread is not None
-    assert learner._thread.is_alive()
     learner.stop()
-    # The thread should have exited within the join timeout (5s).
-    assert learner._thread is not None
-    assert not learner._thread.is_alive()
+    assert not learner._running
+    assert learner._stop_event.is_set()
 
 
-def test_learner_rapid_restart_no_duplicate_threads() -> None:
-    """Rapid stop→start does not leave two learner threads running.
-
-    This is the lifecycle race the start() join-on-stale-thread guard
-    prevents: if stop()'s 5s join times out (thread in a long wait),
-    start() must join the stale thread before starting a new one so
-    the old thread doesn't observe _running=True and resume its loop
-    alongside the new thread.
-    """
-    learner = _make_blocked_learner()
+def test_learner_rapid_restart_no_duplicate_workers() -> None:
+    """Rapid stop→start leaves exactly one synchronous learner state."""
+    learner = _make_state_learner()
     learner.start()
-    time.sleep(0.1)
     learner.stop()
-    # Immediately restart — start() must join any stale thread first.
     learner.start()
     try:
-        assert learner._thread is not None
-        assert learner._thread.is_alive()
         assert learner._running
+        assert not hasattr(learner, "_thread")
     finally:
         learner.stop()
-    # After the final stop, the thread must be dead.
-    assert learner._thread is not None
-    assert not learner._thread.is_alive()
+    assert not learner._running
 
 
 def test_learner_double_start_is_idempotent() -> None:
-    """Calling start() twice does not spawn a second thread."""
-    learner = _make_blocked_learner()
+    """Calling start() twice does not alter the active state."""
+    learner = _make_state_learner()
     try:
         learner.start()
-        first_thread = learner._thread
-        learner.start()  # no-op — already running
-        assert learner._thread is first_thread
+        learner.start()
+        assert learner._running
     finally:
         learner.stop()
 
 
 def test_learner_stop_when_not_running_is_safe() -> None:
     """stop() on a learner that was never started does not raise."""
-    learner = _make_blocked_learner()
+    learner = _make_state_learner()
     learner.stop()  # must not raise
 
 
-def test_learner_start_after_stop_restarts_cleanly() -> None:
-    """A full stop→start cycle produces a fresh, working learner thread."""
-    learner = _make_blocked_learner()
+def test_learner_start_after_stop_reopens_cleanly() -> None:
+    """A full stop→start cycle reopens the same synchronous learner."""
+    learner = _make_state_learner()
     learner.start()
-    time.sleep(0.1)
     learner.stop()
     assert not learner._running
-    # Second cycle — a brand-new thread should be created.
     learner.start()
     try:
         assert learner._running
-        assert learner._thread is not None
-        assert learner._thread.is_alive()
+        assert not learner._stop_event.is_set()
     finally:
         learner.stop()
 
@@ -1158,7 +1156,9 @@ def test_restore_old_save_without_traces(network_td_learning) -> None:
     }
     restore_td_learner(td, old_data)
     assert td.get_weight("tree") == 1.5
-    assert td.lam == 0.0  # falls back to default when key absent
+    # An absent key preserves the configured value rather than silently
+    # rewriting it to a synthetic default.
+    assert td.lam == 0.8
     assert td.get_trace("tree") == 0.0
 
 

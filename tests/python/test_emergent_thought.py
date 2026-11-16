@@ -834,23 +834,15 @@ class TestZeroWeightDreamNoise:
         assert len(pool) >= 12
 
 
-def test_start_refuses_second_worker_while_predecessor_alive(monkeypatch) -> None:
-    """start() finding the predecessor still alive after its join must
-    not spawn a second thought generator — clearing _stop_event and
-    starting beside it is exactly the sequence that resurrected the
-    old loop as a phantom second g-inner-life worker."""
-    import threading
-
-    monkeypatch.setattr(InnerLife, "_START_JOIN_TIMEOUT_S", 0.05)
+def test_inner_life_start_reopens_state_without_worker() -> None:
+    """start() opens the metronome-advanced state; it never spawns a thread."""
     il = _make_inner_life()
-    hold = threading.Event()
-    zombie = threading.Thread(target=hold.wait, daemon=True)
-    zombie.start()
-    il._thread = zombie
+    il.start()
     try:
-        il.start()
-        assert il._thread is zombie
-        assert not il._running
+        assert il._running
+        assert not il._stop_event.is_set()
+        assert not hasattr(il, "_thread")
     finally:
-        hold.set()
-        zombie.join(timeout=5)
+        il.stop()
+    assert not il._running
+    assert il._stop_event.is_set()

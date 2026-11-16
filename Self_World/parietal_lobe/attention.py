@@ -59,6 +59,7 @@ References:
 from __future__ import annotations
 
 import logging
+import math
 import time
 from dataclasses import dataclass, field
 from enum import Enum
@@ -70,6 +71,16 @@ if TYPE_CHECKING:
 __all__ = ["AttentionFocus", "AttentionSystem", "AttentionType"]
 
 logger = logging.getLogger(__name__)
+
+
+def _finite_or(value: float, default: float) -> float:
+    """Return finite floats; malformed/non-finite inputs use ``default``."""
+    try:
+        result = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return default
+    return result if math.isfinite(result) else default
+
 
 # Function words that should not capture executive attention when a goal
 # is parsed into concept-like words. These carry no semantic weight for
@@ -262,7 +273,7 @@ class AttentionSystem:
         Returns:
             The AttentionFocus that was established.
         """
-        intensity = max(0.0, min(1.0, intensity))
+        intensity = max(0.0, min(1.0, _finite_or(intensity, 1.0)))
 
         # Enforce capacity — remove weakest if at max
         if target not in self._foci and len(self._foci) >= self.max_foci:
@@ -296,7 +307,7 @@ class AttentionSystem:
 
         Args:
             target: The stimulus capturing attention.
-            drive: Bottom-up salience drive in [0,1] — the externally
+            drive: Finite bottom-up salience drive — the externally
                 computed competition signal (novelty, prediction error,
                 affective intensity, NE gain already folded in).
 
@@ -304,7 +315,7 @@ class AttentionSystem:
             The captured AttentionFocus, or None when the drive lost
             the competition to the incumbent set.
         """
-        drive = max(0.0, min(1.0, drive))
+        drive = _finite_or(drive, 0.0)
 
         if target in self._foci:
             focus = self._foci[target]

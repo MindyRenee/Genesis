@@ -1445,6 +1445,31 @@ def test_self_sleep_urge_respects_user_wake():
 # ======================================================================
 
 
+def test_sleep_desync_uses_the_same_body_snapshot():
+    """The metronome compares mind and body on one observation.
+
+    A second GET_PHASE between the state read and the desync decision can
+    race the body's own transition; the joined state must come from the
+    CoreState snapshot this cycle already holds.
+    """
+    import time as _time
+
+    from brainstem.thresholds import WAKE_DESYNC_GRACE_SECONDS
+
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _make_wake_readiness_mind(data_dir, adenosine=0.1, phase="nrem")
+        mind._wake_time = _time.time() - WAKE_DESYNC_GRACE_SECONDS - 1.0
+
+        def _stale_second_read():
+            raise AssertionError("sleep desync made a second phase read")
+
+        mind.client.get_phase = _stale_second_read  # type: ignore[method-assign]
+
+        mind._check_sleep_sync()
+
+        assert mind.is_sleeping
+
+
 def test_mind_stays_asleep_while_body_sleeps():
     """A sleeping mind does not wake on drained adenosine alone.
 
@@ -1699,10 +1724,10 @@ def _nrem_summary(arousal: float = 0.15) -> NeuroSummary:
 
 def test_lucid_probability_rem_boost_from_tracker():
     """The tracker's is_rem should boost lucid probability even when the
-    daemon arousal is low (NREM clamp 0.10-0.25).
+    daemon arousal is low (NREM settles near ~0.21).
 
     Before the fix, lucid_dream_probability used summary.arousal as the
-    sole REM marker. During NREM, arousal is clamped to 0.10-0.25, so
+    sole REM marker. During NREM, arousal sits near ~0.21, so
     the probability was ~0.05 + 0.025 = 0.075 — too low for lucid
     dreaming to occur in practice. With the fix, the tracker's is_rem
     provides a +0.10 boost, giving ~0.15+ even with low daemon arousal.
@@ -2030,7 +2055,7 @@ def test_sleep_processes_close_on_stage_leave():
     from unittest.mock import MagicMock
 
     from brain_waves import SleepStage
-    from sleep.sleep import SleepMixin
+    from self.sleep import SleepMixin
 
     def _proc():
         yield {"a": 1}
@@ -2069,7 +2094,7 @@ def _gate_mind(headless: bool, sleeping: bool, hypnagogic: object, stage=None):
     from types import SimpleNamespace
     from unittest.mock import MagicMock
 
-    from sleep.sleep import SleepMixin
+    from self.sleep import SleepMixin
 
     mind = SleepMixin.__new__(SleepMixin)
     mind._headless = headless
@@ -2167,6 +2192,8 @@ def _thought_gen_life(*, phase_name: str, fold=None, fold_channel: bool = True):
     il._generate_hypnagogic_thought = lambda emotion: None
     il._sleep_inertia = SleepInertia()
     il._should_think = lambda emotion: False
+    il._waking_chain = None
+    il._dream_chain = None
     return il
 
 

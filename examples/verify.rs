@@ -49,7 +49,7 @@ fn main() {
         // It is a metabolic accumulator, not a phasic signal: sleep is
         // what removes it (glymphatic), and the cholinergic rebound
         // that gates REM only fires once it has fallen. Injecting it for
-        // the whole run pins it at the 1.0 clamp, which forces sleep
+        // the whole run pins it at the 1.0 ceiling, which forces sleep
         // through the exhaustion override and leaves clearance nothing
         // to remove, so Process S never relaxes and REM can never
         // occur. Driving it for the opening bout and then coasting is
@@ -65,17 +65,19 @@ fn main() {
             ms += 100;
             let pre = post;
             if crh > 0.0 {
-                nv.apply_impulse_capped(NeurochemicalId::CRH, crh, ms);
+                nv.apply_impulse(NeurochemicalId::CRH, crh, ms);
             }
             if ne > 0.0 {
-                nv.apply_impulse_capped(NeurochemicalId::Norepinephrine, ne, ms);
+                nv.apply_impulse(NeurochemicalId::Norepinephrine, ne, ms);
             }
             if adn > 0.0 && step < adn_bout {
-                nv.apply_impulse_capped(NeurochemicalId::Adenosine, adn, ms);
+                nv.apply_impulse(NeurochemicalId::Adenosine, adn, ms);
             }
             if label == "flow drive" {
-                nv.apply_impulse_capped(NeurochemicalId::Acetylcholine, 0.006, ms);
-                nv.apply_impulse_capped(NeurochemicalId::Dopamine, 0.006, ms);
+                nv.apply_impulse(NeurochemicalId::Acetylcholine, 0.006, ms);
+                nv.get_mut(NeurochemicalId::Dopamine)
+                    .expect("Dopamine is a valid NeurochemicalId")
+                    .apply_impulse(0.006, ms);
             }
             nv.tick_with_params(&p);
             post.copy_from_slice(&nv.effective_levels);

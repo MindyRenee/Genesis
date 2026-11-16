@@ -15,7 +15,8 @@ move semantic representations.
 from __future__ import annotations
 
 import math
-import threading
+
+from inhibition import RecurrentInhibition
 
 __all__ = ["SynapticStore"]
 
@@ -34,7 +35,7 @@ class SynapticStore:
 
     def __init__(self) -> None:
         self._weights: dict[tuple[str, str], float] = {}
-        self._lock = threading.RLock()
+        self._lock = RecurrentInhibition()
 
     def get_weight(self, pre: str, post: str) -> float:
         """Return synaptic efficacy, or zero when no learned connection exists."""

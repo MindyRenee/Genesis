@@ -66,6 +66,16 @@ def test_selector_vetoes_when_brake_exceeds_the_winner() -> None:
     assert result.effective_threshold > max(result.disinhibition.values())
 
 
+def test_selector_preserves_finite_out_of_range_bid_salience() -> None:
+    """Bid salience is evidence; channel drives remain bounded state."""
+    result = BasalGanglia(hyperdirect_gain=0.0).select(
+        [ActionBid("answer", 1.7), ActionBid("ask", 0.2)],
+    )
+
+    assert result.salience["answer"] == 1.7
+    assert result.d1_drive["answer"] <= BasalGanglia().max_drive
+
+
 def test_positive_rpe_favors_direct_drive_without_changing_salience() -> None:
     selector = BasalGanglia(hyperdirect_gain=0.0)
     neutral = selector.select(

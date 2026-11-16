@@ -44,9 +44,12 @@ import sys
 from pathlib import Path
 from typing import Any
 
+_REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path[:0] = [
-    str(Path(__file__).resolve().parent.parent / "python"),
-    str(Path(__file__).resolve().parent.parent),
+    str(_REPO_ROOT / "Self_World"),
+    str(_REPO_ROOT / "Inner_World"),
+    str(_REPO_ROOT / "Outer_World"),
+    str(_REPO_ROOT),
 ]
 
 from infrastructure.config import default_data_dir  # noqa: E402

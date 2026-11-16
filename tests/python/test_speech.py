@@ -13,6 +13,7 @@ import subprocess
 from typing import Any
 
 import pytest
+import temporal_lobe.speech as speech
 from temporal_lobe.speech import Voice, _thermal_strain
 
 
@@ -53,6 +54,35 @@ def test_thermal_strain_ramp() -> None:
     assert _thermal_strain(75.0) == pytest.approx(0.5)
     assert _thermal_strain(85.0) == pytest.approx(1.0)
     assert _thermal_strain(95.0) == pytest.approx(1.0)
+
+
+def test_voice_input_uses_local_vosk(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    """Auto mode selects Vosk when the local model exists."""
+    (tmp_path / speech.VOSK_MODEL_NAME).mkdir()
+    monkeypatch.setattr(speech, "VOSK_MODEL_DIR", tmp_path)
+
+    mic = speech.VoiceInput(lazy=True)
+
+    assert mic.available
+    assert mic.backend_name == "vosk"
+
+
+def test_voice_input_missing_vosk_does_not_fall_back(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    """A missing local model must not silently switch to a remote recognizer."""
+    monkeypatch.setattr(speech, "VOSK_MODEL_DIR", tmp_path)
+
+    mic = speech.VoiceInput(lazy=True)
+
+    assert not mic.available
+    assert mic.backend_name == "none"
+
+
+def test_voice_input_rejects_remote_backend() -> None:
+    """The online fallback is removed rather than merely deprioritised."""
+    with pytest.raises(ValueError, match=r"auto.*vosk"):
+        speech.VoiceInput(backend="google", lazy=True)
 
 
 def test_piper_fever_flags(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:

@@ -516,6 +516,89 @@ class ArchivalMixin:
 
         return spilled
 
+    def merge_concepts(self, winner: str, loser: str) -> bool:
+        """Merge two concepts into one, preserving everything learned.
+
+        Near-duplicate concepts — one idea learned under two surface
+        forms ("rust language" / "rust lang") — split each other's
+        neighborhood: edges accumulate on both, embeddings dilute, and
+        every sweep treats them as distinct. This consolidates the
+        loser into the winner:
+
+        1. The loser and its edges are archived first — archive-backed
+           forgetting, never deletion.
+        2. Its edges retarget onto the winner; winner↔loser edges
+           become self-loops and drop; genuine overlaps strengthen
+           through ``add_edge``'s dedup.
+        3. The loser's names (its canonical id and aliases) absorb
+           into the winner so every learned surface form still
+           resolves.
+        4. Confidence takes the max; missing winner properties fill
+           from the loser.
+
+        Returns False when either name fails to resolve to a live
+        concept, when both resolve to the same node, or when no
+        archive is attached — merging without one would be outright
+        deletion, and this system archives, it never silently drops
+        knowledge.
+        """
+        win = self._resolve(winner)
+        lose = self._resolve(loser)
+        if not win or not lose or win == lose:
+            return False
+        win_c = self._concepts.get(win)
+        lose_c = self._concepts.get(lose)
+        if win_c is None or lose_c is None or self._archive is None:
+            return False
+
+        # Snapshot the loser's neighborhood before anything moves.
+        loser_edges = [e for e in self._edges if e.source == lose or e.target == lose]
+
+        # Archive first — the loser's record and the structure it
+        # carried survive even as working memory reorganizes around
+        # the winner. A failed archive write aborts the merge rather
+        # than degrading it into deletion.
+        try:
+            archived = self._archive.archive_concepts_batch(
+                [(lose, self._concept_to_dict(lose_c), set(lose_c.aliases) | {lose})]
+            )
+        except (sqlite3.Error, RuntimeError) as e:
+            logger.warning("merge_concepts could not archive %s: %s", lose, e)
+            return False
+        if archived <= 0:
+            return False
+        if not self._archive_spilled_edges({lose}):
+            return False
+
+        # Evict the loser and its stale edges in one pass; the archived
+        # copies just written are preserved.
+        self.remove_concepts_batch({lose}, preserve_archived_edges=True)
+
+        # Retarget the loser's neighborhood onto the winner. Edges that
+        # ran winner↔loser become self-loops and are dropped; add_edge
+        # dedups and strengthens genuine overlaps.
+        for e in loser_edges:
+            new_src = win if e.source == lose else e.source
+            new_tgt = win if e.target == lose else e.target
+            if new_src == new_tgt:
+                continue
+            self.add_edge(new_src, new_tgt, e.relation, weight=e.weight, origin=e.origin)
+
+        # Absorb the loser's names — the merged surface form still
+        # resolves to the winner, which is the point of the merge.
+        for alias in set(lose_c.aliases) | {lose}:
+            win_c.aliases.add(alias)
+            self._add_alias(alias, win)
+
+        # The winner keeps the stronger record: confidence is the max,
+        # and missing properties fill in from the loser so a definition
+        # it alone carried is not lost to the merge.
+        win_c.confidence = max(win_c.confidence, lose_c.confidence)
+        for key, value in lose_c.properties.items():
+            win_c.properties.setdefault(key, value)
+
+        return True
+
     def _concept_to_dict(self, concept: Concept) -> dict[str, Any]:
         """Serialize a Concept to a dict for archiving."""
         return {

@@ -17,10 +17,9 @@ import time
 
 # Add the world directories and the repo root to the path
 _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path[:0] = [
-    os.path.join(_root, w)
-    for w in ("Self_World", "Inner_Non_Physical_World", "Outer_Physical_World")
-] + [_root]
+sys.path[:0] = [os.path.join(_root, w) for w in ("Self_World", "Inner_World", "Outer_World")] + [
+    _root
+]
 
 import logging  # noqa: E402
 

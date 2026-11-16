@@ -625,11 +625,13 @@ _CHEMICAL_KEYS = (
 )
 
 
-def _finite(x: float, lo: float, hi: float) -> float:
-    """Clamp to [lo, hi]; non-finite becomes the in-range neutral."""
-    if not math.isfinite(x):
-        return 0.0 if lo <= 0.0 <= hi else lo
-    return min(max(x, lo), hi)
+def _finite_or(x: float, default: float = 0.0) -> float:
+    """Return finite values unchanged; malformed/non-finite becomes ``default``."""
+    try:
+        value = float(x)
+    except (TypeError, ValueError, OverflowError):
+        return default
+    return value if math.isfinite(value) else default
 
 
 def _affect_features(
@@ -641,26 +643,26 @@ def _affect_features(
 ) -> dict[str, float]:
     """Build the measured feature vector the field is evaluated over."""
     f: dict[str, float] = {
-        "arousal": _finite(summary.arousal, 0.0, 1.0),
-        "valence": _finite(summary.valence, -1.0, 1.0),
-        "plasticity": _finite(summary.plasticity_gate, 0.0, 1.0),
+        "arousal": _finite_or(summary.arousal),
+        "valence": _finite_or(summary.valence),
+        "plasticity": _finite_or(summary.plasticity_gate),
         "ctx": 1.0 if context is not None else 0.0,
     }
     chemicals = chemicals or {}
     for k in _CHEMICAL_KEYS:
-        f[k] = _finite(chemicals.get(k, 0.0), 0.0, 2.0)
+        f[k] = _finite_or(chemicals.get(k, 0.0))
     if context is not None:
-        f["social_isolation"] = _finite(context.social_isolation, 0.0, 1.0)
-        f["social_drive"] = _finite(context.social_drive, 0.0, 2.0)
-        f["boundary_strain"] = _finite(context.boundary_strain, 0.0, 2.0)
-        f["prediction_error"] = _finite(context.prediction_error, 0.0, 1.0)
-        f["curiosity"] = _finite(context.curiosity, 0.0, 1.0)
+        f["social_isolation"] = _finite_or(context.social_isolation)
+        f["social_drive"] = _finite_or(context.social_drive)
+        f["boundary_strain"] = _finite_or(context.boundary_strain)
+        f["prediction_error"] = _finite_or(context.prediction_error)
+        f["curiosity"] = _finite_or(context.curiosity)
         ne_tp = (context.tonic_phasic or {}).get("norepinephrine")
         f["ne_phasic"] = 1.0 if getattr(ne_tp, "mode", None) == "phasic" else 0.0
     if waves is not None:
         powers: dict[str, float] = {}
         for k, v in (getattr(waves, "powers", None) or {}).items():
-            powers[getattr(k, "value", str(k))] = _finite(v, 0.0, 1.0)
+            powers[getattr(k, "value", str(k))] = _finite_or(v)
         for name in (
             "delta",
             "theta",
@@ -676,17 +678,17 @@ def _affect_features(
             f["w_" + name] = powers.get(name, 0.0)
         # Fast/slow aggregates — the literature's affect groupings.
         f["w_fast"] = f["w_beta2"] + f["w_beta3"] + f["w_gamma"] + f["w_epsilon"]
-        f["w_focus"] = _finite(getattr(waves, "focus", 0.0), 0.0, 1.0)
-        f["w_integration"] = _finite(getattr(waves, "integration", 0.0), 0.0, 1.0)
-        f["w_plv"] = _finite(getattr(waves, "gamma_plv", 0.0) or 0.0, 0.0, 1.0)
+        f["w_focus"] = _finite_or(getattr(waves, "focus", 0.0))
+        f["w_integration"] = _finite_or(getattr(waves, "integration", 0.0))
+        f["w_plv"] = _finite_or(getattr(waves, "gamma_plv", 0.0) or 0.0)
     if field_state is not None:
         # The latent field's own coherence readout — measured, not
         # inferred: the Fréchet variance of her major systems about
         # their shared barycenter, and how far that center has
         # drifted from nominal. Absent → the terms drop out, like
         # an unread wave channel.
-        f["disagreement"] = _finite(getattr(field_state, "disagreement", 0.0), 0.0, 1.0)
-        f["center_displacement"] = _finite(getattr(field_state, "consensus_norm", 0.0), 0.0, 1.0)
+        f["disagreement"] = _finite_or(getattr(field_state, "disagreement", 0.0))
+        f["center_displacement"] = _finite_or(getattr(field_state, "consensus_norm", 0.0))
     return f
 
 
@@ -1218,7 +1220,7 @@ def _phase_values(
     """(mode, verbosity, openness, caution, creativity) for a phase state."""
     mode, verbosity, openness, caution, cr = _PHASE_PROFILE[cat]
     if cat is EmotionCategory.STRESSED:
-        cr = max(base_cr - 0.3, 0.1)
+        cr = base_cr - 0.3
     elif cr is None:
         cr = base_cr
     return (mode, verbosity, openness, caution, cr)
@@ -1280,7 +1282,7 @@ def _resolve_state(
         cr = i * (spec.creativity if spec.creativity is not None else base_cr) + (1.0 - i) * rcr
 
     # Formality tracks arousal — the same linear map as before.
-    formality = max(0.1, min(0.9, 0.5 - (f["arousal"] - 0.5) * 0.2))
+    formality = _finite_or(0.5 - (f["arousal"] - 0.5) * 0.2, 0.5)
 
     cause_category = _derive_cause_category(
         winner, f["arousal"], f["valence"], f["plasticity"], phase, f["cortisol"]

@@ -105,6 +105,8 @@ class Presence:
         """What it calls them — their name if known, else their kind."""
         if self.name:
             return self.name
+        if self.kind == PresenceKind.USER and self.presence_id != "user":
+            return self.presence_id
         return {
             PresenceKind.USER: "the user",
             PresenceKind.VOICE: "a voice",

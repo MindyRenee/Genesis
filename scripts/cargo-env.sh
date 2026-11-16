@@ -1,46 +1,39 @@
 #!/bin/sh
-# Rust build environment for hosts with no system C toolchain.
+# Rust build environment for Genesis.
 #
-# Genesis needs `cc` (to link) and `libclang` (for v4l2-sys-mit's
-# bindgen). Where no system compiler exists, Zig ships a working clang;
-# this shims `cc`/`c++`/`ar`/`ranlib` to it and points bindgen at Zig's
-# libc headers.
+# Genesis needs a C toolchain (to link) and libclang (for v4l2-sys-mit's
+# bindgen). This host now provides both through the system LLVM/Clang
+# packages, so no Zig shims or custom bindgen include paths are needed.
 #
 # Usage:  . ./scripts/cargo-env.sh && cargo test --release
-#
-# Verified on this host with Zig 0.16.0 under ~/tools. Substitute the two
-# roots below if yours differ; everything else is mechanical. See the
-# Toolchain section of AGENTS.md.
-ZIG_ROOT=${ZIG_ROOT:-$HOME/tools/zig-x86_64-linux-0.16.0}
-LIBCLANG_ROOT=${LIBCLANG_ROOT:-$HOME/tools/libclang/clang/native}
-ZIG=$ZIG_ROOT/zig
-SHIM=${SHIM_DIR:-/tmp/zigshim}
 
-if [ ! -x "$ZIG" ]; then
-    echo "cargo-env.sh: zig not found at $ZIG" >&2
+if ! command -v clang >/dev/null 2>&1; then
+    echo "cargo-env.sh: clang not found" >&2
     return 1 2>/dev/null || exit 1
 fi
 
-mkdir -p "$SHIM"
-for t in cc c++ ar ranlib; do
-    case $t in
-        cc) sub=cc ;;
-        c++) sub=c++ ;;
-        *) sub=$t ;;
-    esac
-    printf '#!/bin/sh\nexec %s %s "$@"\n' "$ZIG" "$sub" > "$SHIM/$t"
-    chmod +x "$SHIM/$t"
-done
+CC=${CC:-clang}
+CXX=${CXX:-clang++}
+AR=${AR:-ar}
+RANLIB=${RANLIB:-ranlib}
+export CC CXX AR RANLIB
 
-PATH="$SHIM:$PATH"
-export PATH
-LIBCLANG_PATH="$LIBCLANG_ROOT"
-export LIBCLANG_PATH
+# bindgen needs the directory containing libclang. Prefer the installed
+# LLVM config; keep an explicit LIBCLANG_PATH override working.
+if [ -z "${LIBCLANG_PATH:-}" ]; then
+    LLVM_CONFIG=${LLVM_CONFIG:-}
+    if [ -z "$LLVM_CONFIG" ]; then
+        LLVM_CONFIG=$(command -v llvm-config 2>/dev/null || command -v llvm-config-18 2>/dev/null || true)
+    fi
+    if [ -n "$LLVM_CONFIG" ]; then
+        LIBCLANG_PATH=$("$LLVM_CONFIG" --libdir)
+        export LIBCLANG_PATH
+    fi
+fi
 
-# bindgen's include set must match `zig cc -E -v -x c /dev/null` exactly --
-# a partial set fails on __STD_TYPE inside stddef.h.
-Z="$ZIG_ROOT/lib"
-BINDGEN_EXTRA_CLANG_ARGS="-I$Z/include \
--I$Z/libc/include/x86-linux-gnu -I$Z/libc/include/generic-glibc \
--I$Z/libc/include/x86-linux-any -I$Z/libc/include/any-linux-any"
-export BINDGEN_EXTRA_CLANG_ARGS
+if [ -z "${LIBCLANG_PATH:-}" ] || [ ! -d "$LIBCLANG_PATH" ]; then
+    echo "cargo-env.sh: libclang directory not found; install libclang-dev or set LIBCLANG_PATH" >&2
+    return 1 2>/dev/null || exit 1
+fi
+
+unset BINDGEN_EXTRA_CLANG_ARGS

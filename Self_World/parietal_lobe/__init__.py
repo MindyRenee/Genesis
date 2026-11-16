@@ -396,8 +396,8 @@ Top-level modules used by this subsystem:
         The dorsal spatial substrate: Grid (the 2-D cell structure
         imagery and embodiment share), perceive()/Scene (object
         segmentation + spatial relations), grounding of perceived
-        scenes into checkable relations, PairDelta/TaskDelta
-        (perceive_pair/perceive_task — before/after structure
+        scenes into checkable relations, ChangeDelta/ChangeProfile
+        (perceive_change/perceive_changes — before/after structure
         deltas), and the transformation operators (gravity
         direction, recolor maps, shifts, fills) that spatial
         imagery composes.

@@ -237,6 +237,69 @@ fn test_emotional_tag_preserved() {
     cleanup(&path);
 }
 
+#[test]
+fn test_finite_evidence_preserved() {
+    let path = temp_path("finite_evidence");
+    let rb = RingBuffer::create(&path, 4).expect("create");
+
+    let mut tag = make_emotional_tag();
+    tag[0] = 1.7;
+    tag[6] = -0.25;
+
+    rb.push(RingBufferEntry::new(
+        1000,
+        EventType::Internal,
+        0,
+        1.35,
+        tag,
+        "finite out-of-range evidence",
+    ));
+    rb.push(RingBufferEntry::new(
+        1001,
+        EventType::Internal,
+        0,
+        -0.4,
+        tag,
+        "negative finite evidence",
+    ));
+
+    let high = rb.peek(0).expect("high-salience entry");
+    assert_eq!(high.salience, 1.35);
+    assert_eq!(high.emotional_tag[0], 1.7);
+    assert_eq!(high.emotional_tag[6], -0.25);
+    let low = rb.peek(1).expect("negative-salience entry");
+    assert_eq!(low.salience, -0.4);
+
+    drop(rb);
+    cleanup(&path);
+}
+
+#[test]
+fn test_nonfinite_evidence_gets_defaults() {
+    let path = temp_path("nonfinite_evidence");
+    let rb = RingBuffer::create(&path, 4).expect("create");
+
+    let mut tag = make_emotional_tag();
+    tag[0] = f32::NAN;
+    tag[6] = f32::INFINITY;
+    rb.push(RingBufferEntry::new(
+        1000,
+        EventType::Internal,
+        0,
+        f32::NAN,
+        tag,
+        "malformed evidence",
+    ));
+
+    let read = rb.peek(0).expect("entry");
+    assert_eq!(read.salience, 0.0);
+    assert_eq!(read.emotional_tag[0], 0.0);
+    assert_eq!(read.emotional_tag[6], 0.0);
+
+    drop(rb);
+    cleanup(&path);
+}
+
 // ─── Text truncation ──────────────────────────────────────────
 
 #[test]

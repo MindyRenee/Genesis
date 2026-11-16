@@ -369,7 +369,7 @@ class DecisionMaker:
         ``TDLearner.average_reward_rate()``. ``None`` resets to no
         vigor modulation.
         """
-        self._vigor = 0.0 if level is None else max(0.0, min(1.0, level))
+        self._vigor = 0.0 if level is None else max(0.0, level)
 
     # ─── Public API ───────────────────────────────────────────────
 

@@ -65,7 +65,7 @@ fn ticks_to_excess(id: NeurochemicalId, target_excess: f32, max_ticks: u32) -> u
         ..NeuroTickParams::DEFAULT
     };
     let mut nv = NeurochemicalVector::new(0);
-    nv.apply_impulse_capped(id, 0.3, 0);
+    nv.apply_impulse(id, 0.3, 0);
     let base = baseline(&nv, id);
     for t in 1..=max_ticks {
         nv.tick_with_params(&params);
@@ -137,7 +137,7 @@ fn melatonin_half_life_is_measured_plasma_value() {
     };
     let mut nv = NeurochemicalVector::new(0);
     nv.set_circadian_phase(0.5); // biological day — AANAT drive ~0
-    nv.apply_impulse_capped(NeurochemicalId::Melatonin, 0.4, 0);
+    nv.apply_impulse(NeurochemicalId::Melatonin, 0.4, 0);
     let start = level(&nv, NeurochemicalId::Melatonin);
     let half = start / 2.0;
     let mut ticks = 0u32;
@@ -284,7 +284,7 @@ fn vasopressin_potentiates_acth_via_v1b() {
     };
     let acth_with = |vp_level: f32| -> f32 {
         let mut nv = NeurochemicalVector::new(0);
-        nv.apply_impulse_capped(NeurochemicalId::CRH, 0.5, 0);
+        nv.apply_impulse(NeurochemicalId::CRH, 0.5, 0);
         for _ in 0..600 {
             // Exogenous AVP infusion: hold the pool at the test level
             // so the measurement isolates the pituitary gain rather
@@ -314,7 +314,7 @@ fn oxytocin_attenuates_hpa_via_social_buffering() {
     };
     let acth_with = |oxy_level: f32| -> f32 {
         let mut nv = NeurochemicalVector::new(0);
-        nv.apply_impulse_capped(NeurochemicalId::CRH, 0.5, 0);
+        nv.apply_impulse(NeurochemicalId::CRH, 0.5, 0);
         for _ in 0..600 {
             if let Some(c) = nv.get_mut(NeurochemicalId::Oxytocin) {
                 c.level = oxy_level;
@@ -344,8 +344,8 @@ fn glutamate_excess_clears_faster_than_plain_spring() {
         ..NeuroTickParams::DEFAULT
     };
     let mut nv = NeurochemicalVector::new(0);
-    nv.apply_impulse_capped(NeurochemicalId::Glutamate, 0.2, 0);
-    nv.apply_impulse_capped(NeurochemicalId::Dopamine, 0.2, 0);
+    nv.apply_impulse(NeurochemicalId::Glutamate, 0.2, 0);
+    nv.apply_impulse(NeurochemicalId::Dopamine, 0.2, 0);
     for _ in 0..200 {
         nv.tick_with_params(&params);
     }
@@ -424,8 +424,8 @@ fn hormone_pools_bounded_under_sustained_stress() {
     for t in 0..20_000u64 {
         // Repeated CRH + sympathetic drive.
         if t % 100 == 0 {
-            nv.apply_impulse_capped(NeurochemicalId::CRH, 0.1, t * 100);
-            nv.apply_impulse_capped(NeurochemicalId::Epinephrine, 0.1, t * 100);
+            nv.apply_impulse(NeurochemicalId::CRH, 0.1, t * 100);
+            nv.apply_impulse(NeurochemicalId::Epinephrine, 0.1, t * 100);
         }
         nv.tick_with_params(&params);
     }

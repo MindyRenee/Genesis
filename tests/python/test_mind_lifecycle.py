@@ -6,6 +6,7 @@ import sys
 import tempfile
 import time
 from pathlib import Path
+from unittest.mock import Mock
 
 import pytest
 from mind import Mind
@@ -20,6 +21,19 @@ logger = logging.getLogger(__name__)
 # ======================================================================
 
 logger = logging.getLogger(__name__)
+
+
+def test_explicit_data_dir_decouples_state_from_socket(tmp_path):
+    """A custom daemon socket must not move Genesis's state tree."""
+    state_dir = tmp_path / "state"
+    state_dir.mkdir()
+    socket_path = tmp_path / "elsewhere" / "genesis.sock"
+
+    mind = Mind(str(socket_path), data_dir=state_dir)
+
+    assert mind.data_dir == str(state_dir)
+    assert mind.user_profile.data_path == state_dir / "user_profile.json"
+    assert mind.canvas._data_dir == state_dir / "drawings"
 
 
 def test_mind_lifecycle_learner_persistence():
@@ -334,6 +348,56 @@ def _make_mind(data_dir: str) -> Mind:
     mind = Mind(socket_path)
     mind.client = _MockClient()  # type: ignore[assignment]
     return mind
+
+
+def test_self_directed_start_suppresses_cognitive_workers(tmp_path):
+    """Self-directed mode leaves worker loops stopped but modules live."""
+    mind = Mind(str(tmp_path / "genesis.sock"), self_directed=True)
+    mind.client = Mock()
+    mind.learner.start = Mock()
+    mind.inner_life.start = Mock()
+    mind.regulator.start = Mock()
+
+    mind._start_autonomous_subsystems()
+
+    mind.learner.start.assert_not_called()
+    mind.inner_life.start.assert_not_called()
+    mind.regulator.start.assert_not_called()
+    assert mind.client.update_module_status.call_count == len(mind._registered_modules())
+
+
+def test_learn_urge_uses_synchronous_cycle(tmp_path):
+    """A learn urge performs one bounded cycle when no worker exists."""
+    mind = Mind(str(tmp_path / "genesis.sock"))
+    mind._emit_volition_thought = Mock()
+    mind.learner.learn_once = Mock(return_value=True)
+    mind.learner.volition_grant = Mock()
+
+    mind._perform_learn()
+
+    mind.learner.learn_once.assert_called_once_with()
+    mind.learner.volition_grant.assert_not_called()
+
+
+def test_metronome_pumps_sleep_only(tmp_path):
+    """Sleep work moves onto the metronome without waking thoughts."""
+    mind = Mind(str(tmp_path / "genesis.sock"))
+    now = time.time()
+    mind._is_sleeping = True
+    mind.world.tick = Mock()
+    mind.inner_life.feed_social_drive = Mock()
+    mind.inner_life.sleep_tick = Mock()
+    mind.heart.tick = Mock()
+    mind._check_sleep_sync = Mock()
+    mind._cycle_feed_executive = Mock()
+    mind._cycle_volition = Mock()
+    mind.warn = Mock()
+    mind.brain.frontal.tick = Mock()
+
+    mind._cycle_final_steps(now)
+
+    mind.inner_life.sleep_tick.assert_called_once_with(now)
+    mind._cycle_volition.assert_called_once_with()
 
 
 def test_enter_teaching_mode_sets_flag():
@@ -973,28 +1037,16 @@ def test_engage_restored_sleep_noop_when_awake():
         )
 
 
-def test_inner_life_gets_a_shutdown_budget_matching_its_longest_phase() -> None:
-    """Inner life must not be declared hung while finishing an N3 pass.
-
-    It drives sleep-stage transitions synchronously and an N3
-    consolidation takes ~20 s. The default 5 s join could not succeed
-    during one, so stopping her mid-consolidation always logged "InnerLife
-    thread did not exit during shutdown" — a false alarm that trained us
-    to ignore shutdown warnings. The budget is per-subsystem and bounded,
-    so a real hang still surfaces.
-    """
+def test_cognitive_subsystems_shutdown_without_worker_joins() -> None:
+    """Learner, inner life, and regulator are state machines at shutdown."""
     import inspect
 
     from brainstem.lifecycle import LifecycleMixin
 
-    budgets = LifecycleMixin._SUBSYSTEM_STOP_TIMEOUTS
-    assert budgets["InnerLife"] >= 30.0, (
-        "the inner-life budget must exceed an N3 consolidation pass"
-    )
     src = inspect.getsource(LifecycleMixin._stop_subsystems)
-    # And the default must stay short, so other subsystems are not given
-    # slack they never needed.
-    assert ".get(name, 5.0)" in src, "the 5 s default must be preserved"
+    assert "_thread" not in src
+    assert "join" not in src
+    assert not hasattr(LifecycleMixin, "_SUBSYSTEM_STOP_TIMEOUTS")
 
 
 def test_shutdown_warning_reports_how_long_it_waited() -> None:
@@ -1031,54 +1083,122 @@ def test_act_on_volition_refuses_when_suppressed(tmp_path):
     assert mind._act_on_volition(["speech"]) == []
 
 
-def test_run_volition_action_dropped_when_stopping(tmp_path):
-    """A worker admitted as stop() began drops its action, not the slot.
+def test_act_on_volition_runs_one_action_inline(tmp_path):
+    """A selected urge performs its act synchronously on the metronome."""
+    import threading
+    from types import SimpleNamespace
+    from unittest.mock import Mock
 
-    The action must not run (it would act through teardown), but the
-    semaphore and the active-set bookkeeping must still be released or
-    the drain in stop() waits on a slot nobody holds.
-    """
     mind = Mind(str(tmp_path / "genesis.sock"))
-    assert mind._volition_sem.acquire(blocking=False)
-    mind._volition_active.add("probe")
-    mind._running = False  # stop() in progress
+    mind._running = True
+    speech = Mock()
+    improve = Mock()
+    mind._perform_speech = speech
+    mind._perform_improve = improve
+    mind.volition.get = Mock(
+        side_effect=lambda name: SimpleNamespace(value={"speech": 0.2, "improve": 0.9}[name])
+    )
+    before = {t.name for t in threading.enumerate()}
 
-    ran = []
-    mind._run_volition_action("probe", lambda: ran.append(True))
+    selected = mind._act_on_volition(["speech", "improve"])
 
-    assert ran == []
-    assert "probe" not in mind._volition_active
-    assert mind._volition_sem.acquire(blocking=False)  # slot released
+    assert selected == ["improve"]
+    improve.assert_called_once_with()
+    speech.assert_not_called()
+    assert {t.name for t in threading.enumerate()} == before
+    assert not hasattr(mind, "_volition_sem")
+    assert not hasattr(mind, "_volition_refractory")
 
 
-def test_run_volition_action_dropped_when_suppressed(tmp_path):
+def test_drain_shutdown_workers_waits_only_for_bounded_think(tmp_path):
+    """Shutdown has no cognitive-worker drain beyond the bounded thinker."""
+    import threading
+
     mind = Mind(str(tmp_path / "genesis.sock"))
-    assert mind._volition_sem.acquire(blocking=False)
-    mind._volition_active.add("probe")
-    mind._suppress_volition = True
-
-    ran = []
-    mind._run_volition_action("probe", lambda: ran.append(True))
-
-    assert ran == []
-    assert "probe" not in mind._volition_active
-
-
-def test_drain_shutdown_workers_names_pending_volition(tmp_path, caplog):
-    """A volition worker that never clears is reported, not hidden.
-
-    The drain used to give up after 5 s and say only "did not clear" —
-    during a Ctrl+C teardown that reads as a hang. It must wait its real
-    budget and name what it was waiting for.
-    """
-    mind = Mind(str(tmp_path / "genesis.sock"))
-    mind._VOLITION_DRAIN_TIMEOUT_S = 0.2
-    mind._volition_active.add("stuck-probe")
-
-    with caplog.at_level(logging.WARNING):
+    mind._THINK_WORKER_JOIN_TIMEOUT_S = 0.05
+    hold = threading.Event()
+    worker = threading.Thread(target=hold.wait, daemon=True)
+    worker.start()
+    mind._active_think_worker = worker
+    try:
         assert not mind._drain_shutdown_workers()
+    finally:
+        hold.set()
+        worker.join(timeout=5)
+    assert not hasattr(mind, "_volition_refractory")
 
-    assert "stuck-probe" in caplog.text
+
+def test_cycle_volition_consumes_only_the_selected_urge(tmp_path):
+    """Ready urges that lose winner-take-all keep their accumulated drive."""
+    mind = Mind(str(tmp_path / "genesis.sock"))
+    mind._wake_time = 0.0
+    mind.volition.tick = Mock(return_value=["speech", "improve"])
+    mind.volition.consume = Mock()
+    mind._volition_context = Mock(return_value={})
+    mind._act_on_volition = Mock(return_value=["improve"])
+
+    mind._cycle_volition()
+
+    mind._act_on_volition.assert_called_once_with(["speech", "improve"])
+    mind.volition.consume.assert_called_once_with("improve")
+
+
+def test_meditation_expires_on_metronome_tick(tmp_path):
+    """A finite sit exits when its metronome deadline arrives."""
+    mind = Mind(str(tmp_path / "genesis.sock"))
+    now = time.monotonic()
+    mind._is_meditating = True
+    mind._meditation_due_at = now - 0.1
+    mind._meditation_next_impulse_at = now - 0.2
+    mind.emit_meditation_impulses = Mock()
+    mind.wake_from_meditation = Mock()
+
+    mind._advance_meditation(now)
+
+    mind.emit_meditation_impulses.assert_not_called()
+    mind.wake_from_meditation.assert_called_once_with()
+
+
+def test_meditation_impulses_advance_on_metronome_tick(tmp_path):
+    """Each due calming impulse is one bounded metronome step."""
+    mind = Mind(str(tmp_path / "genesis.sock"))
+    now = time.monotonic()
+    mind._is_meditating = True
+    mind._meditation_due_at = now + 60.0
+    mind._meditation_next_impulse_at = now - 0.1
+    mind.emit_meditation_impulses = Mock()
+    mind.wake_from_meditation = Mock()
+
+    mind._advance_meditation(now)
+
+    mind.emit_meditation_impulses.assert_called_once_with()
+    mind.wake_from_meditation.assert_not_called()
+    assert mind._meditation_next_impulse_at > now
+
+
+def test_eye_rest_expires_on_metronome_tick(tmp_path):
+    """Voluntary eye rest is a deadline, not a sleeping helper."""
+    mind = Mind(str(tmp_path / "genesis.sock"))
+    mind._running = True
+    mind._eyes_rest_until = time.monotonic() - 0.1
+    mind.open_eyes = Mock()
+
+    mind._advance_volitional_state()
+
+    assert mind._eyes_rest_until == 0.0
+    mind.open_eyes.assert_called_once_with()
+
+
+def test_dream_residue_restores_on_post_wake_metronome_tick(tmp_path):
+    """Post-wake memory work is pending state, not a helper thread."""
+    mind = Mind(str(tmp_path / "genesis.sock"))
+    mind._dream_residue_restore_pending = True
+    mind._restore_dream_residues_after_wake = Mock()
+
+    mind._advance_sleep_housekeeping()
+
+    assert not mind._dream_residue_restore_pending
+    mind._restore_dream_residues_after_wake.assert_called_once_with()
 
 
 def test_introduction_claims_empty_profile_name(tmp_path):

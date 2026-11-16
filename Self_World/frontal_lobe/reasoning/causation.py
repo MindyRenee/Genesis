@@ -4,7 +4,7 @@ Lewis's analysis: *c* causes *e* iff there is a chain of
 counterfactual dependencies from c to e — causation is the ancestral
 (transitive closure) of counterfactual dependence. Dependence: had c
 not occurred, e would not have occurred — evaluated at the closest
-¬c-outer_world.
+¬c-world.
 
 The evaluation needs more than belief revision: a Ramsey-style
 minimal mutilation of a flat belief set leaves *e* standing when its

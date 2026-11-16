@@ -593,14 +593,14 @@ Modules homed in or used by this subsystem:
 
     events.py, presence.py (the former
     world/ package's brain-side halves)
-        The external world itself — ``OuterWorld`` — lives in
-        ``outer_world.world`` (environment-side, not brain tissue);
+        The external environment itself — ``OuterEnvironment`` — lives in
+        ``environment`` (environment-side, not brain tissue);
         this package consumes it because the remembered,
         relational structure it holds IS the hippocampal–entorhinal
         cognitive map plus the superior temporal sulcus's social
         perception. The world also holds her channel — the public
         page where she posts and, when an ear exists, hears; the
-        page object itself is environment-side (``outer_world.channel``),
+        page object itself is environment-side (``discord.channel``),
         not a mind organ. The neuroanatomical
         substrate is the hippocampal–entorhinal cognitive map plus
         the superior temporal sulcus's social perception: a map of

@@ -1333,7 +1333,7 @@ class QuestionHandler:
         # chance, 64 = completely different). A threshold of 20
         # admits only clearly related memories — well below the
         # ~32-bit random baseline — so unrelated memories don't leak
-        # into responses. salience is [0..1] (higher = more
+        # into responses. salience is finite evidence (higher = more
         # important); 0.4 filters out low-importance noise.
         if best.salience < 0.4 or best.hamming_distance > 20:
             return thought

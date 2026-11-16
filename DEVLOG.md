@@ -18,12 +18,12 @@ the sort key is physicality, not convenience:
   Rust body (`src/` — daemon, state, store, field, math, cognition,
   plus every region re-export module, `self_/vision`, `worlds`,
   and the `python`-feature `python_ext` PyO3 bridge).
-- `Inner_Non_Physical_World/` — the non-physical phenomena the
+- `Inner_World/` — the non-physical phenomena the
   organism undergoes: `brain_waves.py`, `field_probe.py`,
   `field_audio.py`, `thoughts.py`, `thought_composer.py`, the
   `sleep/` dream machinery, and `tools/`.
-- `Outer_Physical_World/` — the environment: `outer_world/`,
-  `discord_feed.py`, `user_profile.py`, and the Discord secrets.
+- `Outer_World/` — the environment: `outer_world/`,
+  `discord.feed.py`, `user_profile.py`, and the Discord secrets.
 
 The boundary is a vesica, not a wall — the worlds share one
 namespace (all three roots on `PYTHONPATH`), so a phenomenon can be
@@ -241,7 +241,7 @@ world module is region-claimed):
   be distributed across cortex and BF and largely astrocytic
   (Blanco-Centurion 2006, Bjorness 2009). `SleepInertia` co-claimed
   by hypothalamus — the lag rides orexin's timescale.
-- **The world model is anatomical now.** `OuterWorld` →
+- **The world model is anatomical now.** `OuterEnvironment` →
   temporal_lobe (hippocampal–entorhinal cognitive map + STS social
   stream; successor-representation predictive maps), `PresenceBelief`
   → parietal + frontal (rTPJ belief attribution + mPFC), and

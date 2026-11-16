@@ -24,10 +24,10 @@
     {
       "name": "uncertain",
       "selected_policy": "calm",
-      "selected_policy_efe": 0.975378,
-      "precision": 0.737972,
-      "surprise": 0.010817,
-      "free_energy": 0.000962,
+      "selected_policy_efe": 0.979179,
+      "precision": 0.731406,
+      "surprise": 0.011229,
+      "free_energy": 0.001170,
       "model_maturity": 0.000000
     }
   ]

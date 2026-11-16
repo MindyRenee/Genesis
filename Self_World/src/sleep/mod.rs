@@ -1,6 +1,6 @@
 //! Sleep — the body's sleep–wake machinery.
 //!
-//! Mirrors `Inner_Non_Physical_World/sleep/` on the mind side (dreaming, inner life).
+//! Mirrors `Inner_World/sleep/` on the mind side (dreaming, inner life).
 //! Anatomy: the circadian clock that decides *when* sleep happens is
 //! the suprachiasmatic nucleus in the hypothalamus, and the wake
 //! drive is as bodily as heartbeat. The daemon owns the body's side

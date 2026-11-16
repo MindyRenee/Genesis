@@ -23,8 +23,8 @@
 //! drop request  := [u8 name_len] [name utf8]
 //! ```
 
+use crate::inhibition::{Inhibition, Innate};
 use std::collections::HashMap;
-use std::sync::{Mutex, OnceLock};
 
 /// Element dtypes shared across the wire. The codes are part of the
 /// protocol — `python/genesis_client/tensor.py` mirrors them.
@@ -251,11 +251,11 @@ impl TensorSlab {
 }
 
 /// The shared slab instance.
-static SLAB: OnceLock<Mutex<TensorSlab>> = OnceLock::new();
+static SLAB: Innate<Inhibition<TensorSlab>> = Innate::new();
 
 /// Access the daemon's tensor slab.
-pub fn slab() -> &'static Mutex<TensorSlab> {
-    SLAB.get_or_init(|| Mutex::new(TensorSlab::default()))
+pub fn slab() -> &'static Inhibition<TensorSlab> {
+    SLAB.get_or_init(|| Inhibition::new(TensorSlab::default()))
 }
 
 /// Parse `[u8 name_len][name]` from the front of `buf`; returns the

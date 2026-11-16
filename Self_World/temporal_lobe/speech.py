@@ -1,4 +1,4 @@
-"""Voice for Genesis — text-to-speech (Piper) and speech-to-text (Vosk/Google).
+"""Voice for Genesis — text-to-speech (Piper) and speech-to-text (Vosk).
 
 This module provides two classes:
 
@@ -6,7 +6,7 @@ This module provides two classes:
   available (offline, high quality), falling back to espeak-ng.
 
   ``VoiceInput`` — speech-to-text (STT). Uses Vosk (offline) when
-  a model is installed, falling back to Google Web Speech API.
+  a model is installed.
 
 Usage::
 
@@ -27,10 +27,7 @@ import logging
 import os
 import subprocess
 import sys
-import tempfile
-import threading
 import time
-import wave
 from pathlib import Path
 from typing import Any
 
@@ -38,6 +35,7 @@ from genesis_client.threads import call_on_named_thread, named_thread
 from infrastructure.config import VOSK_MODEL_NAME, vosk_model_dir
 from infrastructure.text import is_blank
 from infrastructure.text import sentences as _sentences
+from inhibition import InhibitoryGate
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +62,7 @@ def _find_voices_dir() -> Path:
     # Voices live in Self_World/, which is a sibling of this file's
     # own world — walking straight up never reaches it, so probe each
     # ancestor for a voices/ dir both directly and inside each world.
-    worlds = ("Self_World", "Inner_Non_Physical_World", "Outer_Physical_World")
+    worlds = ("Self_World", "Inner_World", "Outer_World")
     for parent in Path(__file__).resolve().parents:
         candidates = [parent / "voices"]
         candidates += [parent / w / "voices" for w in worlds]
@@ -188,9 +186,9 @@ class Voice:
         self._piper_proc: subprocess.Popen | None = None
         self._play_proc: subprocess.Popen | None = None
         self._all_procs: list[subprocess.Popen] = []  # track all spawned procs
-        self._procs_lock = threading.Lock()
+        self._procs_lock = InhibitoryGate()
         self._speaking_count = 0
-        self._speaking_lock = threading.Lock()
+        self._speaking_lock = InhibitoryGate()
         self._last_spoke_time = 0.0
         self._speech_tail = 0.3  # keep mic muted for 300ms after TTS ends
         # Speech queue: when speech is in progress, new utterances are
@@ -200,7 +198,7 @@ class Voice:
         self._speech_queue: collections.deque[
             tuple[str, float, float, float, float, float | None]
         ] = collections.deque(maxlen=3)
-        self._queue_lock = threading.Lock()
+        self._queue_lock = InhibitoryGate()
 
     def _check_piper(self) -> bool:
         """Check if Piper binary exists and is executable."""
@@ -587,53 +585,41 @@ class Voice:
 
 
 # ═══════════════════════════════════════════════════════════════════
-#  Speech-to-Text (Vosk / Google)
+#  Speech-to-Text (Vosk)
 # ═══════════════════════════════════════════════════════════════════
 
 
 class VoiceInput:
     """Speech-to-text from the microphone.
 
-    Automatically selects the best available backend:
-    - Vosk if a model is installed (offline, no latency)
-    - Google Web Speech API as fallback (online, high accuracy)
+    Uses the local Vosk model. There is deliberately no online fallback:
+    unavailable local weights mean unavailable voice input, not a silent
+    switch to a remote recognizer.
 
     Audio capture uses ``sounddevice`` which ships pre-built wheels.
     """
 
     def __init__(self, backend: str = "auto", sample_rate: int = 16000, lazy: bool = False) -> None:
         """Initialize speech-to-text with optional lazy model loading."""
+        if backend not in ("auto", "vosk"):
+            raise ValueError("backend must be 'auto' or 'vosk'")
         self.sample_rate = sample_rate
         self._backend: str | None = None
         self._vosk_model: Any = None
-        self._sr_recognizer: Any = None
-        self._lock = threading.Lock()
+        self._lock = InhibitoryGate()
 
         if lazy:
             # Defer model loading until the user actually uses /voice.
             # This saves several seconds of startup time in normal typing mode.
-            if backend in ("auto", "vosk") and self._can_use_vosk():
+            if self._can_use_vosk():
                 self._backend = "vosk"
                 return
-            if backend in ("auto", "google") and self._can_use_google():
-                self._backend = "google"
-                return
-        else:
-            if backend in ("auto", "vosk"):
-                if self._init_vosk():
-                    self._backend = "vosk"
-                    logger.info("Voice input: using Vosk (offline)")
-                    return
+        elif self._init_vosk():
+            self._backend = "vosk"
+            logger.info("Voice input: using Vosk (offline)")
+            return
 
-            if backend in ("auto", "google"):
-                if self._init_google():
-                    self._backend = "google"
-                    logger.info("Voice input: using Google Web Speech API (online)")
-                    return
-
-        logger.warning(
-            "Voice input: no backend available. Install vosk model or check internet connection."
-        )
+        logger.warning("Voice input: Vosk model unavailable; microphone input disabled")
 
     def _can_use_vosk(self) -> bool:
         """Check whether Vosk *could* be used, without loading the model."""
@@ -644,18 +630,10 @@ class VoiceInput:
 
         return importlib.util.find_spec("vosk") is not None
 
-    def _can_use_google(self) -> bool:
-        """Check whether the Google SR module is available."""
-        import importlib.util
-
-        return importlib.util.find_spec("speech_recognition") is not None
-
     def _ensure_loaded(self) -> bool:
         """If lazy-loaded, actually initialize the backend now."""
         if self._backend == "vosk" and self._vosk_model is None:
             return self._init_vosk()
-        if self._backend == "google" and self._sr_recognizer is None:
-            return self._init_google()
         return self._backend is not None
 
     def _init_vosk(self) -> bool:
@@ -672,19 +650,6 @@ class VoiceInput:
             return True
         except Exception as e:  # noqa: BLE001
             logger.debug(f"Vosk init failed: {e}")
-            return False
-
-    def _init_google(self) -> bool:
-        """Try to initialize Google Web Speech API."""
-        try:
-            import speech_recognition as sr
-
-            self._sr_recognizer = sr.Recognizer()
-            self._sr_recognizer.energy_threshold = 300
-            self._sr_recognizer.dynamic_energy_threshold = True
-            return True
-        except Exception as e:  # noqa: BLE001
-            logger.debug(f"Google init failed: {e}")
             return False
 
     @property
@@ -717,8 +682,6 @@ class VoiceInput:
         with self._lock:
             if self._backend == "vosk":
                 return self._listen_vosk(timeout, phrase_limit)
-            elif self._backend == "google":
-                return self._listen_google(timeout, phrase_limit)
         return None
 
     def _listen_vosk(self, timeout: float | None, phrase_limit: float) -> str | None:
@@ -809,91 +772,6 @@ class VoiceInput:
         final = json.loads(final_recognizer.FinalResult())
         text = final.get("text", "").strip()
         return text if text else None
-
-    def _listen_google(self, timeout: float | None, phrase_limit: float) -> str | None:
-        """Listen using Google Web Speech API (online).
-
-        Captures audio with sounddevice, saves to a temp WAV,
-        then transcribes with speech_recognition.
-        """
-        import numpy as np
-        import sounddevice as sd
-        import speech_recognition as sr
-
-        audio_chunks: list[np.ndarray] = []
-        silence_frames = 0
-        speech_started = False
-        chunk_duration = 0.1
-        chunk_samples = int(self.sample_rate * chunk_duration)
-        silence_threshold = 500
-        max_silence = int(1.5 / chunk_duration)
-        import time as _time
-
-        def callback(indata: Any, frames: int, time_info: object, status: object) -> None:
-            """Capture audio chunks and track speech/silence via RMS energy."""
-            nonlocal silence_frames, speech_started
-            audio_chunks.append(indata.copy())
-            rms = np.sqrt(np.mean(indata.astype(np.float32) ** 2))
-            if rms > silence_threshold:
-                speech_started = True
-                silence_frames = 0
-            elif speech_started:
-                silence_frames += 1
-
-        def _open_google_stream() -> Any:
-            s = sd.InputStream(
-                samplerate=self.sample_rate,
-                blocksize=chunk_samples,
-                dtype="int16",
-                channels=1,
-                callback=callback,
-            )
-            s.start()
-            return s
-
-        stream = call_on_named_thread("mic-io", _open_google_stream, comm="g-mic-io")
-        try:
-            start = _time.time()
-            while True:
-                _time.sleep(0.05)
-                elapsed = _time.time() - start
-                if timeout and elapsed > timeout and not speech_started:
-                    return None
-                if elapsed > phrase_limit:
-                    break
-                if speech_started and silence_frames > max_silence:
-                    break
-        finally:
-            stream.close()
-
-        if not audio_chunks or not speech_started:
-            return None
-
-        audio = np.concatenate(audio_chunks, axis=0).astype(np.int16)
-
-        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-            tmp_path = tmp.name
-            with wave.open(tmp_path, "w") as w:
-                w.setnchannels(1)
-                w.setsampwidth(2)
-                w.setframerate(self.sample_rate)
-                w.writeframes(audio.tobytes())
-
-        try:
-            with sr.AudioFile(tmp_path) as source:
-                audio_data = self._sr_recognizer.record(source)
-            text = self._sr_recognizer.recognize_google(audio_data)
-            return text.strip() if text else None
-        except sr.UnknownValueError:
-            return None
-        except sr.RequestError as e:
-            logger.warning(f"Google Speech API error: {e}")
-            return None
-        finally:
-            try:
-                os.unlink(tmp_path)
-            except OSError as e:
-                logger.debug(repr(e))
 
     def listen_interactive(self, prompt: str = "Listening...") -> str | None:
         """Listen with a prompt printed to stdout.

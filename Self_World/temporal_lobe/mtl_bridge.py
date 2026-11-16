@@ -243,7 +243,16 @@ class MemoryBridge:
         positive = [
             ex
             for ex in self._examples
-            if ex.correct and ex.concept_name in self._concept_embeddings
+            if ex.correct
+            and ex.concept_name in self._concept_embeddings
+            # Row widths must be uniform to form a matrix: a restored
+            # example can carry a vtc_vector from a different vtc_dim
+            # era (or none), and an injected embedding provider can
+            # answer with a width that isn't embedding_dim. One ragged
+            # row turns np.array() into the ragged-array error.
+            and ex.vtc_vector is not None
+            and len(ex.vtc_vector) == self.vtc_dim
+            and len(self._concept_embeddings[ex.concept_name]) == self.embedding_dim
         ]
         if not positive:
             return

@@ -64,8 +64,7 @@ def test_package_imports_cleanly() -> None:
 
     env = dict(os.environ)
     worlds = os.pathsep.join(
-        str(_ROOT / d)
-        for d in ("Self_World", "Inner_Non_Physical_World", "Outer_Physical_World", ".")
+        str(_ROOT / d) for d in ("Self_World", "Inner_World", "Outer_World", ".")
     )
     env["PYTHONPATH"] = worlds + os.pathsep + env.get("PYTHONPATH", "")
     result = subprocess.run(

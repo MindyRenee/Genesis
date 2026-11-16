@@ -16,9 +16,11 @@ from pathlib import Path
 
 import numpy as np
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+for _world in ("Self_World", "Inner_World", "Outer_World"):
+    sys.path.insert(0, str(_REPO_ROOT / _world))
 
-from infrastructure._npz_io import load_npz, save_npz
+from infrastructure._npz_io import load_npz, save_npz  # noqa: E402
 
 
 def main() -> int:

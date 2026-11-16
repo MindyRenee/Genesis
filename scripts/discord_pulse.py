@@ -38,7 +38,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from discord_feed import DiscordFeed
+from discord.feed import KIND_PULSE, DiscordFeed
 from infrastructure.config import default_data_dir
 
 logger = logging.getLogger("discord_pulse")
@@ -280,7 +280,7 @@ def run_once(data_dir: Path, feed: DiscordFeed) -> None:
     if ipc.get("ticks"):
         state["ticks"] = int(ipc["ticks"])
     _save_state(data_dir, state)
-    feed.post(msg)
+    feed.post(msg, kind=KIND_PULSE)
     logger.info("pulse posted (%d chars)", len(msg))
 
 

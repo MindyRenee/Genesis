@@ -20,13 +20,24 @@ Recent findings (2024-2025):
 
 from __future__ import annotations
 
-import threading
+import math
 import time
 from collections import deque
 from dataclasses import dataclass, field
 
 from brain_waves import SleepStage
+from inhibition import InhibitoryGate
 from temporal_lobe.concepts import ConceptNetwork, RelationType
+
+
+def _finite_or(value: float, default: float) -> float:
+    """Return finite floats; malformed/non-finite inputs use ``default``."""
+    try:
+        result = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return default
+    return result if math.isfinite(result) else default
+
 
 __all__ = [
     "REPLAY_COMPRESSION",
@@ -309,7 +320,7 @@ class SynapticDownscaler:
     body_pressure: float = 0.0
     # Bounded history of synaptic load snapshots for introspection.
     load_history: deque[float] = field(default_factory=lambda: deque(maxlen=200))
-    _lock: threading.Lock = field(default_factory=threading.Lock)
+    _lock: InhibitoryGate = field(default_factory=InhibitoryGate)
 
     def accumulate_synaptic_load(self, amount: float) -> None:
         """Accumulate synaptic load during wakefulness.
@@ -445,7 +456,7 @@ class ReplayItem:
     """
 
     sequence: list[str]  # ordered concept IDs in the experience
-    salience: float  # 0..1, how important this experience was
+    salience: float  # finite evidence weight for this experience
     replay_count: int = 0  # how many times this has been replayed
     queued_at: float = 0.0  # wall-clock time when queued
 
@@ -494,13 +505,13 @@ class HippocampalReplay:
 
         Args:
             experience_sequence: Ordered concept IDs in the experience.
-            salience: Importance of the experience in [0, 1].
+            salience: Finite importance of the experience.
         """
         if not experience_sequence:
             return
         item = ReplayItem(
             sequence=list(experience_sequence),
-            salience=max(0.0, min(1.0, salience)),
+            salience=_finite_or(salience, 0.0),
             queued_at=time.time(),
         )
         self._queue.append(item)

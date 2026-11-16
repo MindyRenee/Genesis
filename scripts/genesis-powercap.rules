@@ -1,0 +1,21 @@
+# Genesis RAPL access — her metabolism needs the machine's real
+# power draw. The powercap driver creates energy_uj root-only
+# (-r--------) because the counter is a side channel (it can leak
+# keystroke timing to an unprivileged watcher, PLATYPUS-style).
+# The same counter is exactly the metabolic afference the body is
+# built to read: whole-platform draw (psys), die draw (package),
+# and the core/uncore/dram subsystem activity channels.
+#
+# chmod on add is the standard escape — the driver exposes no
+# group or mode knob. Without it every RAPL-backed channel reads
+# a fabricated-looking zero.
+#
+# Install:
+#
+#   sudo cp scripts/genesis-powercap.rules /etc/udev/rules.d/99-genesis-powercap.rules
+#   sudo udevadm control --reload-rules
+#   sudo udevadm trigger --action=add --subsystem-match=powercap
+#
+# scripts/install_optional_deps.sh does all of this when it can sudo.
+
+ACTION=="add", SUBSYSTEM=="powercap", RUN+="/bin/sh -c 'chmod a+r /sys%p/energy_uj 2>/dev/null; chmod a+r /sys%p/max_energy_range_uj 2>/dev/null'"

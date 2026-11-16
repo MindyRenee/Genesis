@@ -23,6 +23,8 @@ import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from unittest.mock import Mock
+
 import pytest
 from brainstem.architecture import (
     HippocampalReplay,
@@ -342,6 +344,12 @@ class TestHippocampalReplay:
         replay.queue_for_replay(["a", "b", "c"], 0.8)
         assert replay.queue_size == 1
 
+    def test_queue_for_replay_preserves_finite_salience(self):
+        """Replay salience is evidence; survival derives from it."""
+        replay = HippocampalReplay()
+        replay.queue_for_replay(["a", "b", "c"], 1.7)
+        assert replay._queue[0].salience == 1.7
+
     def test_queue_empty_sequence_ignored(self):
         """Empty sequences are not queued."""
         replay = HippocampalReplay()
@@ -501,9 +509,9 @@ class TestInnerLifeSleepArchitecture:
         summary — decides the stage. Regression for the N1-pinning
         defect: a summary-side derivation (pressure or arousal) must
         never override the running cycle, which is the only source
-        that walks the full N1→N2→N3→N2→REM architecture. The daemon
-        clamps NREM arousal into a narrow band, so it cannot carry
-        the depth anyway."""
+        that walks the full N1→N2→N3→N2→REM architecture. The daemon's
+        sleep-wake network settles NREM arousal into a narrow band,
+        so it cannot carry the depth anyway."""
         from types import SimpleNamespace
 
         il = self._make_inner_life()
@@ -541,6 +549,21 @@ class TestInnerLifeSleepArchitecture:
         stage, is_rem, _ = il._determine_dream_stage(SimpleNamespace(phase_name="rem", arousal=0.6))
         assert stage is SleepStage.REM
         assert is_rem
+
+    def test_sleep_tick_runs_only_sleep_branch(self):
+        """The synchronous self-directed pump never fires waking drives."""
+        il = self._make_inner_life()
+        il._is_mind_sleeping = lambda: True
+        il._last_thought_time = 0.0
+        il._run_thought_generation = Mock()
+        il._drives_tick = Mock()
+        il._workspace_tick = Mock()
+
+        il.sleep_tick(10.0)
+
+        il._run_thought_generation.assert_called_once_with(10.0, sleep_only=True)
+        il._drives_tick.assert_not_called()
+        il._workspace_tick.assert_called_once_with(10.0)
 
 
 # ═══════════════════════════════════════════════════════════════════

@@ -45,11 +45,11 @@ from __future__ import annotations
 
 import json
 import logging
-import threading
 import time
 from pathlib import Path
 
 from genesis_client.swallow import note_swallowed
+from inhibition import InhibitoryGate
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +77,7 @@ class CognitiveJournal:
 
     def __init__(self, data_dir: str | Path) -> None:
         self._path = Path(data_dir) / JOURNAL_FILENAME
-        self._lock = threading.Lock()
+        self._lock = InhibitoryGate()
         self._file = None
         try:
             self._file = self._path.open("a", encoding="utf-8", buffering=1)

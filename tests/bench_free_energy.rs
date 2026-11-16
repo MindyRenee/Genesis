@@ -145,7 +145,7 @@ fn run_benchmark() -> Vec<DataPoint> {
 
         // Apply a cortisol impulse every 10 ticks during perturbation
         if tick % 10 == 0 {
-            neuro.apply_impulse_capped(NeurochemicalId::Cortisol, 0.15, 0);
+            neuro.apply_impulse(NeurochemicalId::Cortisol, 0.15, 0);
         }
 
         neuro.tick_with_params(&params);

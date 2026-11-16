@@ -757,3 +757,103 @@ class TestPruneLtm:
 
         with_fn = dict(sc.compress_steps(net, ltm_client=client, release_fn=lambda e: False))
         assert "prune_ltm" in with_fn
+
+
+class _MockEmbeddingStore:
+    """Returns a fixed nearest neighbor for selected queries."""
+
+    def __init__(self, twins: dict[str, tuple[str, float]]) -> None:
+        self._twins = twins
+
+    def get_concept_matrix(self):
+        import numpy as np
+
+        return np.zeros((0, 4), dtype=np.float32), []
+
+    def find_similar_to_text(self, name, k=1, threshold=0.0, exclude=None):
+        hit = self._twins.get(name)
+        if hit is None or hit[0] == exclude:
+            return []
+        return [hit]
+
+
+class TestDedupPhase:
+    """Near-duplicate merge: high-precision twins consolidate, cousins don't."""
+
+    def _net_with_archive(self, tmp_path):
+        from temporal_lobe.concepts import open_archive
+
+        net = ConceptNetwork()
+        net.attach_archive(open_archive(str(tmp_path)))
+        return net
+
+    def test_twins_merge(self, tmp_path):
+        """Two names for one idea collapse to the better-connected node."""
+        from temporal_lobe.concepts import RelationType
+
+        net = self._net_with_archive(tmp_path)
+        for n in ["rust language", "rust lang", "compiler", "systems"]:
+            net.add_concept(n)
+        net.add_edge("rust language", "compiler", RelationType.RELATED_TO)
+        net.add_edge("rust language", "systems", RelationType.RELATED_TO)
+        net.add_edge("compiler", "rust lang", RelationType.RELATED_TO)
+
+        emb = _MockEmbeddingStore({"rust lang": ("rust language", 0.95)})
+        sc = SleepCompressor(data_dir=str(tmp_path))
+        stats = sc._phase_dedup(net, emb)
+
+        assert stats["dedup_merged"] == 1
+        assert "rust lang" not in net.concept_ids
+        assert net._archive.has_concept("rust lang")
+
+    def test_budget_bounds_merges(self, tmp_path):
+        """The per-night cap holds even with more twins than budget."""
+        net = self._net_with_archive(tmp_path)
+        pairs = [
+            ("mercury", "quick silver"),
+            ("venus", "evening star"),
+            ("mars", "red planet"),
+            ("jupiter", "jove"),
+            ("saturn", "ringed giant"),
+        ]
+        twins = {}
+        for a, b in pairs:
+            net.add_concept(a)
+            net.add_concept(b)
+            twins[a] = (b, 0.95)
+        sc = SleepCompressor(data_dir=str(tmp_path), max_merges_per_sweep=2)
+        stats = sc._phase_dedup(net, _MockEmbeddingStore(twins))
+        assert stats["dedup_merged"] == 2
+
+    def test_cousins_do_not_merge(self, tmp_path):
+        """Concepts below the twin threshold stay separate — similarity
+        is not identity."""
+        net = self._net_with_archive(tmp_path)
+        net.add_concept("dog")
+        net.add_concept("cat")
+        emb = _MockEmbeddingStore({})
+        sc = SleepCompressor(data_dir=str(tmp_path))
+        stats = sc._phase_dedup(net, emb)
+        assert stats["dedup_merged"] == 0
+        assert net.size == 2
+
+    def test_self_twin_ignored(self, tmp_path):
+        """A concept that resolves to itself is never a merge pair —
+        the candidate must be a distinct node."""
+        net = self._net_with_archive(tmp_path)
+        net.add_concept("joy")
+        net.add_concept("happiness")
+        emb = _MockEmbeddingStore({"joy": ("joy", 0.99)})
+        sc = SleepCompressor(data_dir=str(tmp_path))
+        stats = sc._phase_dedup(net, emb)
+        assert stats["dedup_merged"] == 0
+        assert net.size == 2
+
+    def test_dedup_step_runs_only_with_embeddings(self, tmp_path):
+        """The step list carries dedup iff an embedding store exists."""
+        net = ConceptNetwork()
+        sc = SleepCompressor(data_dir=str(tmp_path))
+        without = dict(sc.compress_steps(net, embeddings=None)).keys()
+        assert "dedup" not in without
+        with_emb = dict(sc.compress_steps(net, embeddings=_MockEmbeddingStore({}))).keys()
+        assert "dedup" in with_emb

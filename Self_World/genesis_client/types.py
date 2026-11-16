@@ -402,7 +402,7 @@ class PlasticityProfile:
 #  28     user_valence                 f32
 #  32     user_arousal                 f32
 #  36     user_engagement              f32
-#  40     prediction_error_dopamine    f32   [-2,2]
+#  40     prediction_error_dopamine    f32   unbounded
 #  44     prediction_error_cortisol    f32   [-2,2]
 #  48     prediction_error_serotonin   f32   [-2,2]
 #  52     model_maturity               f32
@@ -693,7 +693,7 @@ class SimilarEpisode:
             different. The Rust daemon's ``ASSOCIATION_THRESHOLD`` is
             20 — memories within 20 bits are considered "associated."
         timestamp: When the episode was stored (Unix ms).
-        salience: Emotional importance [0, 1].
+        salience: Finite emotional-importance evidence.
     """
 
     episode_id: int
@@ -857,39 +857,72 @@ def unpack_archived_episodes(data: bytes) -> list[ArchivedEpisode]:
     return results
 
 
-# ─── CoreState (partial parse of 3480 bytes) ──────────────────
+# ─── CoreState (CoreStateSnapshot, 232 bytes) ─────────────────
 #
-# We don't parse the full 3480-byte struct — that's too much detail
-# for the Python side. Instead we extract the most useful fields.
+# `GET_STATE_SNAPSHOT` returns a `CoreStateSnapshot` — a
+# purpose-built wire DTO the daemon projects field-by-field from
+# `GenesisCoreState` (`src/state/snapshot.rs`). This is the mind's
+# contract: the layout below is the *contract*, versioned by
+# `version`/`state_size` in the payload itself, and it only changes
+# when the snapshot schema intentionally changes — never as a side
+# effect of brain-schema evolution. The raw 3480-byte state image
+# (`GET_STATE`) is still available for full-fidelity inspection, but
+# nothing here parses it: mirroring the brain's byte layout is what
+# produced the v3→v4 and v4→v5 silent-misparse bugs.
 #
-# Layout (schema v5, 18 chemicals). v5 inserted the sleep network after
-# the manifest and before the ion block, so everything from 3224 onward
-# moved and the v4 offsets are wrong for a v5 reply:
-#   offset  field              type           size
-#   0       header             CoreStateHeader  56
-#   56      neurochemicals     NeurochemicalVector  2416
-#     56      chemicals        [Neurochemical;18]  18×56=1008
-#     1064    coupling_matrix  [[f32;18];18]      18×18×4=1296
-#     2360    effective_levels [f32;18]            18×4=72
-#     2432    global_tone      f32                 4
-#     2436    arousal          f32                 4
-#     2440    valence          f32                 4
-#     2444    plasticity_gate  f32                 4
-#     ...     (other fields)
-#     2468    emergent_phase   u8                  1
-#   2472    zones              ActiveZones         96
-#   2568    memory             MemoryPointers      120
-#   2688    manifest           RuntimeManifest     536
-#   3224    sleep_network      [f64; 8]            64
-#   3288    ions               IonState           124
-#   3412    checksum           u32                 4
-#   3416    inference_signals  InferenceSignals    64
-#   3480    TOTAL
+# Layout (snapshot v1, 232 bytes):
+#   offset  field                     type
+#   0       magic                     [u8;4]  b"GSS1"
+#   4       version                   u32     1
+#   8       state_size                u32     232
+#   12      _pad                      u32
+#   16      created_at                u64
+#   24      last_updated              u64
+#   32      heartbeat                 u64
+#   40      instance_id               u64
+#   48      ltm_episode_count         u64
+#   56      effective_levels[18]      f32×18  NeurochemicalId order
+#   128     global_tone               f32
+#   132     arousal                   f32
+#   136     valence                   f32
+#   140     plasticity_gate           f32
+#   144     surprise_ema              f32      ┐
+#   148     free_energy               f32      │
+#   152     expected_free_energy      f32      │
+#   156     allostasis_load           f32      │  inference
+#   160     precision                 f32      │  projection,
+#   164     attunement                f32      │  flattened
+#   168     dyadic_synchrony          f32      │
+#   172     user_valence              f32      │
+#   176     user_arousal              f32      │
+#   180     user_engagement           f32      │
+#   184     prediction_error_dopamine f32      │
+#   188     prediction_error_cortisol f32      │
+#   192     prediction_error_serotonin f32     │
+#   196     model_maturity            f32      │
+#   200     policy_authority          f32      ┘
+#   204     inference_tick_count      u32
+#   208     encoding_weight           f32      ┐
+#   212     consolidation_weight      f32      │  memory gating
+#   216     retrieval_weight          f32      ┘
+#   220     sleep_pressure            f32      h/H_MAX fraction
+#   224     stm_count                 u32
+#   228     cognitive_zone            u8
+#   229     emergent_phase            u8
+#   232     TOTAL
+#
+# The header is verified before any offset is trusted: a buffer that
+# is not a v1 snapshot raises ValueError rather than returning
+# plausible numbers read from the wrong fields.
+
+_SNAPSHOT_MAGIC = b"GSS1"
+_SNAPSHOT_VERSION = 1
+_SNAPSHOT_SIZE = 232
 
 
 @dataclass(frozen=True)
 class CoreState:
-    """Partial parse of the full core state — the most useful fields."""
+    """Partial parse of the core-state snapshot — the most useful fields."""
 
     # Header
     heartbeat: int
@@ -943,220 +976,75 @@ class CoreState:
 
     @classmethod
     def unpack(cls, data: bytes) -> CoreState:
-        """Parse the 3480-byte GenesisCoreState into useful fields.
+        """Parse a CoreStateSnapshot (232 bytes, snapshot v1) into fields.
 
-        Layout (schema v5, 18 chemicals, 3480 bytes). The sleep network
-        at 3224 is what v5 added, and it displaced the ions, the checksum,
-        and the inference signals that followed it:
-          offset  field           size
-          0       header           56
-          56      neurochemicals   2416
-          2472    zones            96
-          2568    memory           120
-          2688    manifest         536
-          3224    sleep_network    64
-          3288    ions             124
-          3412    checksum         4
-          3416    inference_signals 64
-          3480    TOTAL
-
-        NeurochemicalVector internal layout:
-          offset  field              size
-          0       chemicals[18]      1008 (18 × 56 bytes each)
-          1008    coupling_matrix    1296 (18×18 × 4 bytes)
-          2304    effective_levels   72   (18 × 4 bytes)
-          2376    global_tone        4
-          2380    arousal            4
-          2384    valence            4
-          2388    plasticity_gate    4
-          ...
-          2412    emergent_phase     1
+        The self-describing header is verified before any offset is
+        trusted — a buffer that is not a v1 snapshot raises ValueError
+        rather than returning plausible numbers read from the wrong
+        fields. `state_size` may exceed `_SNAPSHOT_SIZE` in a future
+        additive revision; the v1 prefix offsets stay fixed.
         """
-        if len(data) < 3480:
-            raise ValueError(f"CoreState needs 3480 bytes, got {len(data)}")
+        if len(data) < _SNAPSHOT_SIZE:
+            raise ValueError(f"CoreStateSnapshot needs {_SNAPSHOT_SIZE} bytes, got {len(data)}")
+        if data[0:4] != _SNAPSHOT_MAGIC:
+            raise ValueError("not a CoreStateSnapshot (bad magic)")
+        version = _U32.unpack(data[4:8])[0]
+        if version != _SNAPSHOT_VERSION:
+            raise ValueError(f"CoreStateSnapshot version {version}, expected {_SNAPSHOT_VERSION}")
+        state_size = _U32.unpack(data[8:12])[0]
+        if state_size < _SNAPSHOT_SIZE:
+            raise ValueError(f"CoreStateSnapshot state_size {state_size} smaller than v1")
 
-        created_at, last_updated, heartbeat, instance_id = _unpack_header(data)
-        global_tone, arousal, valence, plasticity_gate, chemicals = _unpack_neuro_summary(data)
-        cognitive_zone, emergent_phase = _unpack_zones(data)
-        stm_count, ltm_episode_count = _unpack_memory_counts(data)
-        encoding_weight, consolidation_weight, retrieval_weight = _unpack_memory_weights(data)
+        created_at = _U64.unpack(data[16:24])[0]
+        last_updated = _U64.unpack(data[24:32])[0]
+        heartbeat = _U64.unpack(data[32:40])[0]
+        instance_id = _U64.unpack(data[40:48])[0]
+        ltm_episode_count = _U64.unpack(data[48:56])[0]
+
+        chemicals: dict[str, float] = {}
+        for chem_id, chem_name in CHEM_NAMES.items():
+            offset = 56 + chem_id * 4
+            chemicals[chem_name] = _F32.unpack(data[offset : offset + 4])[0]
+
+        inference = InferenceSummary(
+            surprise_ema=_F32.unpack(data[144:148])[0],
+            free_energy=_F32.unpack(data[148:152])[0],
+            expected_free_energy=_F32.unpack(data[152:156])[0],
+            allostasis_load=_F32.unpack(data[156:160])[0],
+            precision=_F32.unpack(data[160:164])[0],
+            attunement=_F32.unpack(data[164:168])[0],
+            dyadic_synchrony=_F32.unpack(data[168:172])[0],
+            user_valence=_F32.unpack(data[172:176])[0],
+            user_arousal=_F32.unpack(data[176:180])[0],
+            user_engagement=_F32.unpack(data[180:184])[0],
+            prediction_error_dopamine=_F32.unpack(data[184:188])[0],
+            prediction_error_cortisol=_F32.unpack(data[188:192])[0],
+            prediction_error_serotonin=_F32.unpack(data[192:196])[0],
+            model_maturity=_F32.unpack(data[196:200])[0],
+            inference_tick_count=_U32.unpack(data[204:208])[0],
+            policy_authority=_F32.unpack(data[200:204])[0],
+        )
 
         return cls(
             heartbeat=heartbeat,
             instance_id=instance_id,
             created_at=created_at,
             last_updated=last_updated,
-            arousal=arousal,
-            valence=valence,
-            global_tone=global_tone,
-            plasticity_gate=plasticity_gate,
+            arousal=_F32.unpack(data[132:136])[0],
+            valence=_F32.unpack(data[136:140])[0],
+            global_tone=_F32.unpack(data[128:132])[0],
+            plasticity_gate=_F32.unpack(data[140:144])[0],
             chemicals=chemicals,
-            encoding_weight=encoding_weight,
-            consolidation_weight=consolidation_weight,
-            retrieval_weight=retrieval_weight,
-            cognitive_zone=cognitive_zone,
-            emergent_phase=emergent_phase,
-            stm_count=stm_count,
+            encoding_weight=_F32.unpack(data[208:212])[0],
+            consolidation_weight=_F32.unpack(data[212:216])[0],
+            retrieval_weight=_F32.unpack(data[216:220])[0],
+            cognitive_zone=data[228],
+            emergent_phase=data[229],
+            stm_count=_U32.unpack(data[224:228])[0],
             ltm_episode_count=ltm_episode_count,
-            inference=_unpack_inference_signals(data),
-            sleep_pressure=_unpack_sleep_pressure(data),
+            inference=inference,
+            sleep_pressure=_F32.unpack(data[220:224])[0],
         )
-
-
-# The sleep network's homeostatic variable h is a f64 inside the
-# network block at offset 3224 — index 4, offset 3256. Its maximum is
-# the source's hmax, 323.88.
-_SLEEP_PRESSURE_OFFSET = 3256
-_SLEEP_PRESSURE_MAX = 323.88
-
-
-def _unpack_sleep_pressure(data: bytes) -> float:
-    return struct.unpack_from("<d", data, _SLEEP_PRESSURE_OFFSET)[0] / _SLEEP_PRESSURE_MAX
-
-
-def _unpack_inference_signals(data: bytes) -> InferenceSummary | None:
-    """Unpack the 64-byte InferenceSignals block — the last field of
-    the state, so ``len(data) - 64`` locates it across schemas.
-
-    Layout (see `InferenceSignals` in src/state/inference.rs)::
-
-        0   surprise_ema               f32
-        4   free_energy                f32
-        8   expected_free_energy       f32
-        12  allostasis_load            f32
-        16  precision                  f32
-        20  attunement                 f32
-        24  dyadic_synchrony           f32
-        28  user_valence               f32
-        32  user_arousal               f32
-        36  user_engagement            f32
-        40  prediction_error_dopamine  f32
-        44  prediction_error_cortisol  f32
-        48  prediction_error_serotonin f32
-        52  model_maturity             f32
-        56  inference_tick_count       u32
-        60  policy_authority           f32
-        64  TOTAL
-
-    Returns None when the block is absent or unreadable rather than
-    raising: an older or truncated state file should still parse, the
-    mind simply has no inference signals that cycle. A seqlock read that
-    raced a writer can also come back short, and losing the block is far
-    better than losing the whole snapshot.
-    """
-    # The block is the last field of the state in every schema that
-    # carries it (v3 3228, v4 3352, v5 3416) — keying on the
-    # body length rather than a literal means a schema that grows the
-    # tail again does not silently misalign it. The v3→v4 lesson still
-    # stands: a fixed offset in the wrong schema lands inside another
-    # field and returns plausible numbers for the wrong channel —
-    # allostasis load read as 1.2 against a true 0.78 once, and the
-    # same failure recurred here until the offset became length-keyed.
-    if len(data) < 64:
-        return None
-    offset = len(data) - 64
-    block = data[offset : offset + 64]
-    try:
-        f = [_F32.unpack(block[i * 4 : i * 4 + 4])[0] for i in range(15)]
-        tick_count = _U32.unpack(block[56:60])[0]
-        policy_authority = _F32.unpack(block[60:64])[0]
-        return InferenceSummary(
-            surprise_ema=f[0],
-            free_energy=f[1],
-            expected_free_energy=f[2],
-            allostasis_load=f[3],
-            precision=f[4],
-            attunement=f[5],
-            dyadic_synchrony=f[6],
-            user_valence=f[7],
-            user_arousal=f[8],
-            user_engagement=f[9],
-            prediction_error_dopamine=f[10],
-            prediction_error_cortisol=f[11],
-            prediction_error_serotonin=f[12],
-            model_maturity=f[13],
-            inference_tick_count=tick_count,
-            policy_authority=policy_authority,
-        )
-    except (ValueError, IndexError):
-        # A short or malformed block loses the inference signals, not the
-        # whole snapshot: the mind simply observes without them this
-        # cycle. Losing the entire state read would stall the heartbeat.
-        return None
-
-
-def _unpack_header(data: bytes) -> tuple[int, int, int, int]:
-    """Unpack header fields (56 bytes): created_at, last_updated, heartbeat, instance_id."""
-    # offset 0: magic [u8;4], version u32, state_size u32, pad [u8;4]
-    # offset 16: created_at u64
-    # offset 24: last_updated u64
-    # offset 32: heartbeat u64
-    # offset 40: seq_lock u64
-    # offset 48: instance_id u64
-    created_at = _U64.unpack(data[16:24])[0]
-    last_updated = _U64.unpack(data[24:32])[0]
-    heartbeat = _U64.unpack(data[32:40])[0]
-    instance_id = _U64.unpack(data[48:56])[0]
-    return created_at, last_updated, heartbeat, instance_id
-
-
-def _unpack_neuro_summary(data: bytes) -> tuple[float, float, float, float, dict[str, float]]:
-    """Unpack neurochemical summary and per-chemical effective levels."""
-    # NeurochemicalVector starts at offset 56
-    # chemicals: [Neurochemical; 18] — each 56 bytes = 1008 bytes
-    # coupling_matrix: [[f32;18];18] = 1296 bytes (offset 56+1008=1064)
-    # effective_levels: [f32;18] = 72 bytes (offset 1064+1296=2360)
-    # global_tone: f32 (offset 2360+72=2432)
-    # arousal: f32 (offset 2432+4=2436)
-    # valence: f32 (offset 2436+4=2440)
-    # plasticity_gate: f32 (offset 2440+4=2444)
-    neuro_base = 56
-    eff_levels_start = neuro_base + 1008 + 1296  # = 2360
-    eff_levels_end = eff_levels_start + 72  # = 2432
-    chemicals: dict[str, float] = {}
-    for chem_id, chem_name in CHEM_NAMES.items():
-        offset = eff_levels_start + chem_id * 4
-        chemicals[chem_name] = _F32.unpack(data[offset : offset + 4])[0]
-    global_tone = _F32.unpack(data[eff_levels_end : eff_levels_end + 4])[0]
-    arousal = _F32.unpack(data[eff_levels_end + 4 : eff_levels_end + 8])[0]
-    valence = _F32.unpack(data[eff_levels_end + 8 : eff_levels_end + 12])[0]
-    plasticity_gate = _F32.unpack(data[eff_levels_end + 12 : eff_levels_end + 16])[0]
-    return global_tone, arousal, valence, plasticity_gate, chemicals
-
-
-def _unpack_zones(data: bytes) -> tuple[int, int]:
-    """Unpack ActiveZones: cognitive_zone, emergent_phase."""
-    # ActiveZones starts at offset 2472
-    # cognitive_zone: u8 (offset 2472)
-    # emergent_phase: u8 (offset 2473)
-    cognitive_zone = data[2472]
-    emergent_phase = data[2473]
-    return cognitive_zone, emergent_phase
-
-
-def _unpack_memory_counts(data: bytes) -> tuple[int, int]:
-    """Unpack MemoryPointers counts: stm_count, ltm_episode_count."""
-    # MemoryPointers starts at offset 2568
-    # stm_head: u64 (offset 2568)
-    # stm_tail: u64 (offset 2576)
-    # stm_count: u32 (offset 2584)
-    # stm_capacity: u32 (offset 2588)
-    # ltm_store_handle: u64 (offset 2592)
-    # ltm_episode_count: u64 (offset 2600)
-    stm_count = _U32.unpack(data[2584:2588])[0]
-    ltm_episode_count = _U64.unpack(data[2600:2608])[0]
-    return stm_count, ltm_episode_count
-
-
-def _unpack_memory_weights(data: bytes) -> tuple[float, float, float]:
-    """Unpack MemoryPointers emotional gating weights."""
-    # encoding_weight: f32 (offset 2568+64=2632)
-    # consolidation_weight: f32 (offset 2636)
-    # retrieval_weight: f32 (offset 2640)
-    encoding_weight = _F32.unpack(data[2632:2636])[0]
-    consolidation_weight = _F32.unpack(data[2636:2640])[0]
-    retrieval_weight = _F32.unpack(data[2640:2644])[0]
-    return encoding_weight, consolidation_weight, retrieval_weight
 
 
 # ─── BodyState (variable length) ──────────────────────────────
@@ -2116,7 +2004,7 @@ class FieldProbeSignature:
     throughput_bands: tuple[float, ...]  # 10 band energies
     jitter_bands: tuple[float, ...]  # 10 band energies
     throughput_mean: float  # iters/s, EMA
-    jitter_cv: float  # coefficient of variation
+    jitter_cv: float  # RMS period error / nominal period
     pstate_rate: float  # frequency transitions/s
     irq_rate: float  # interrupts/s
     carrier_freq: float  # Hz; 0 = carrier off

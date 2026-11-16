@@ -299,6 +299,17 @@ use crate::state::zones::MentalPhase;
 /// The dimensionality of the state vector (18 neurochemicals).
 const DIM: usize = NEUROCHEMICAL_COUNT;
 
+/// Sanitize one effective-level coordinate for the generative model.
+/// Dopamine is finite but unclamped; every other channel retains the
+/// neurochemical system's [0, 2] effective-level contract.
+fn effective_coordinate(index: usize, value: f32) -> f32 {
+    if index == NeurochemicalId::Dopamine as usize {
+        crate::state::sanitize::finite_or(value, 0.0)
+    } else {
+        crate::state::sanitize::finite_clamp(value, 0.0, 2.0)
+    }
+}
+
 /// Dyadic affective signals projected into the inference signals.
 ///
 /// Groups the five dyadic-model outputs so `update_signals` stays
@@ -1223,13 +1234,10 @@ impl ActiveInferenceEngine {
     /// learned transition matrix to predict where the neurochemical
     /// state will move on the next tick.
     ///
-    /// The prediction is clamped to [0, 2] to match the effective
-    /// level range of the neurochemical system. GABA allosteric
-    /// modulation, dopamine D1 phasic bursts, and serotonin 5-HT2A
-    /// phasic bursts can push effective signaling above 1.0 (up to
-    /// 2.0). Clamping at 1.0 would make the model unable to predict
-    /// high DA/SRT/GABA states, producing spurious positive prediction
-    /// errors and false dopamine reward impulses.
+    /// Non-dopamine predictions are clamped to [0, 2], matching the
+    /// effective-level contract for those channels. Dopamine remains
+    /// finite but unclamped so D1-weighted and phasic signals can move
+    /// through the generative model without being flattened.
     pub fn predict(&self, current: &[f32; DIM]) -> [f32; DIM] {
         self.predict_with_action(current, &[0.0; DIM])
     }
@@ -1247,8 +1255,8 @@ impl ActiveInferenceEngine {
     /// conflating the two and corrupting the endogenous dynamics
     /// estimate.
     ///
-    /// The prediction is clamped to [0, 2] to match the effective
-    /// level range (see [`predict`] for rationale).
+    /// Dopamine predictions are unclamped; other channels retain the
+    /// effective-level range (see [`predict`] for rationale).
     fn predict_with_action(&self, current: &[f32; DIM], action: &[f32; DIM]) -> [f32; DIM] {
         let mut predicted = [0.0f32; DIM];
         for (i, pred) in predicted.iter_mut().enumerate() {
@@ -1259,10 +1267,9 @@ impl ActiveInferenceEngine {
             for (j, &act) in action.iter().enumerate() {
                 sum += self.action_matrix[i][j] * act;
             }
-            // Use finite_clamp: if the matrix or bias was corrupted
-            // (e.g., from a partially-written model file), the sum
-            // could be NaN or inf. Native clamp passes NaN through.
-            *pred = crate::state::sanitize::finite_clamp(sum, 0.0, 2.0);
+            // Keep the prediction finite even if a persisted matrix or
+            // bias is corrupted. Dopamine is not range-limited.
+            *pred = effective_coordinate(i, sum);
         }
         predicted
     }
@@ -1421,8 +1428,8 @@ impl ActiveInferenceEngine {
         let mut post = [0.0f32; DIM];
         let mut target = [0.0f32; DIM];
         for i in 0..DIM {
-            pre[i] = crate::state::sanitize::finite_clamp(pre_tick[i], 0.0, 2.0);
-            post[i] = crate::state::sanitize::finite_clamp(post_tick[i], 0.0, 2.0);
+            pre[i] = effective_coordinate(i, pre_tick[i]);
+            post[i] = effective_coordinate(i, post_tick[i]);
             // The free energy is computed against what she *prefers*,
             // not against where she currently is.
             //
@@ -1437,7 +1444,7 @@ impl ActiveInferenceEngine {
             // defaults — but it is a seed, not a fixed goal, and
             // `adapt_preference` moves it as she learns.
             let _ = &baselines;
-            target[i] = crate::state::sanitize::finite_clamp(self.preferred[i], 0.0, 2.0);
+            target[i] = effective_coordinate(i, self.preferred[i]);
         }
         // Validate dt at the dynamics boundary. The IPC handler clamps
         // dt, but this method can be called from other paths. A NaN or
@@ -1520,12 +1527,10 @@ impl ActiveInferenceEngine {
         }
 
         // Surprise: normalized L2 norm. sqrt(sum_sq / DIM) gives the
-        // RMS error. Predicted and actual are both clamped to [0, 2]
-        // (effective levels can exceed 1.0 under phasic bursts /
-        // allosteric modulation), so the max error per dimension is
-        // 2.0 and the RMS can reach 2.0. We clamp to [0, 1] to
-        // normalize the signal for the downstream precision,
-        // allostatic, and free-energy computations.
+        // RMS error. Dopamine may exceed its former [0, 2] range, so
+        // the unbounded error is folded into the bounded downstream
+        // telemetry signal here rather than saturating the dopamine
+        // coordinate itself.
         // Use finite_clamp: if error_sum_sq is NaN (shouldn't happen
         // after input sanitization, but defense-in-depth), the sqrt
         // would be NaN and native clamp would pass it through.
@@ -1931,11 +1936,7 @@ impl ActiveInferenceEngine {
             let prior_v = self.prior_var[i];
             let gain = prior_v / (prior_v + obs_var);
             let innovation = post[i] - predicted_belief[i];
-            self.belief_mean[i] = crate::state::sanitize::finite_clamp(
-                predicted_belief[i] + gain * innovation,
-                0.0,
-                2.0,
-            );
+            self.belief_mean[i] = effective_coordinate(i, predicted_belief[i] + gain * innovation);
             self.belief_var[i] =
                 crate::state::sanitize::finite_clamp((1.0 - gain) * prior_v, 1e-8, 1.0);
         }
@@ -2840,7 +2841,7 @@ impl ActiveInferenceEngine {
         signals.user_arousal = crate::state::sanitize::finite_clamp(dyadic.user_arousal, 0.0, 1.0);
         signals.user_engagement =
             crate::state::sanitize::finite_clamp(dyadic.user_engagement, 0.0, 1.0);
-        signals.prediction_error_dopamine = crate::state::sanitize::finite_clamp(da_pe, -2.0, 2.0);
+        signals.prediction_error_dopamine = crate::state::sanitize::finite_or(da_pe, 0.0);
         signals.prediction_error_cortisol =
             crate::state::sanitize::finite_clamp(cort_pe, -2.0, 2.0);
         signals.prediction_error_serotonin =
@@ -2994,7 +2995,7 @@ impl ActiveInferenceEngine {
             ) {
                 continue;
             }
-            let level = crate::state::sanitize::finite_clamp(levels[i], 0.0, 2.0);
+            let level = effective_coordinate(i, levels[i]);
             let current = self.preferred[i];
             self.preferred[i] = crate::state::sanitize::finite_clamp(
                 current + (level - current) * adapt + (seed[i] - current) * restore,
@@ -3211,7 +3212,7 @@ impl ActiveInferenceEngine {
         // The engine will update them on the next cycle.
         if version >= 2 {
             // belief_mean
-            for cell in engine.belief_mean.iter_mut().take(DIM) {
+            for (i, cell) in engine.belief_mean.iter_mut().take(DIM).enumerate() {
                 let mut bytes = [0u8; 4];
                 if file.read_exact(&mut bytes).is_err() {
                     // A versioned model is only valid when its complete
@@ -3220,7 +3221,7 @@ impl ActiveInferenceEngine {
                     // causing later fields to be decoded from the wrong bytes.
                     return Self::new();
                 }
-                *cell = crate::state::sanitize::finite_clamp(f32::from_le_bytes(bytes), 0.0, 2.0);
+                *cell = effective_coordinate(i, f32::from_le_bytes(bytes));
             }
             // belief_var
             for cell in engine.belief_var.iter_mut().take(DIM) {
@@ -3580,7 +3581,7 @@ pub fn apply_inference_feedback(
         // it against the substrate's measured gain so it displaces the
         // level by roughly what it says, identically per simulated
         // second at any tick rate. See `impulse_offset_to_rate_scale`.
-        neuro.apply_impulse_capped(id, magnitude * offset_to_rate, now_ms);
+        neuro.apply_impulse(id, magnitude * offset_to_rate, now_ms);
     }
 
     // Apply cortisol baseline adjustment (allostatic regulation).

@@ -87,9 +87,6 @@ class UrgeConfig:
 class VolitionConfig:
     """All parameters for the volition/urge subsystem."""
 
-    # Maximum volition actions that may run concurrently.
-    max_concurrent_volitions: int = 3
-
     # Normalization denominator for idle seconds in volition stimuli.
     idle_normalization_seconds: float = 300.0
 

@@ -188,7 +188,7 @@ impl EventType {
 ///   9     source_module      u8         ModuleId that produced this
 ///  10     flags              u8         bit 0: consolidated to LTM
 ///  11     _pad               u8         alignment
-///  12     salience           f32        computed importance [0,1]
+///  12     salience           f32        finite evidence value
 ///  16     emotional_tag      [f32;12]   effective neurochemical levels
 ///  64     text_len           u16        length of text payload
 ///  66     _pad2              [u8;2]     alignment
@@ -208,7 +208,7 @@ pub struct RingBufferEntry {
     pub flags: u8,
     /// Alignment padding.
     pub _pad: u8,
-    /// Computed at insertion time from the neurochemical state.
+    /// Finite evidence recorded by the producing module.
     /// Higher = more important. Used by consolidation to prioritise.
     pub salience: f32,
     /// Snapshot of effective neurochemical levels at insertion time.
@@ -257,12 +257,12 @@ impl RingBufferEntry {
             source_module,
             flags: 0,
             _pad: 0,
-            salience: crate::state::sanitize::finite_clamp(salience, 0.0, 1.0),
+            salience: crate::state::sanitize::finite_or(salience, 0.0),
             // Sanitise the tag here rather than relying on every call
             // site: the value is persisted, and a NaN in it silently
             // poisons the SDR/SimHash encoding used by LTM associative
             // retrieval, with no error anywhere downstream.
-            emotional_tag: emotional_tag.map(|v| crate::state::sanitize::finite_clamp(v, 0.0, 1.0)),
+            emotional_tag: emotional_tag.map(|v| crate::state::sanitize::finite_or(v, 0.0)),
             text_len: len as u16,
             _pad2: [0; 2],
             text: text_buf,
@@ -456,7 +456,7 @@ pub struct RingBuffer {
     /// `.expect("access_lock poisoned: mmap may be inconsistent")` the guard and intentionally panic the daemon in
     /// that case — crashing is safer than continuing with a torn
     /// in-memory event log.
-    access_lock: std::sync::Mutex<()>,
+    access_lock: crate::inhibition::Inhibition<()>,
 }
 
 // SAFETY (Send/Sync): all access to the mapped region goes through
@@ -590,7 +590,7 @@ impl RingBuffer {
             fd,
             capacity,
             file_len: mmap_len,
-            access_lock: std::sync::Mutex::new(()),
+            access_lock: crate::inhibition::Inhibition::new(()),
         })
     }
 
@@ -753,7 +753,7 @@ impl RingBuffer {
             fd,
             capacity,
             file_len: final_mmap_len,
-            access_lock: std::sync::Mutex::new(()),
+            access_lock: crate::inhibition::Inhibition::new(()),
         })
     }
 

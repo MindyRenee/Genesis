@@ -51,15 +51,15 @@
 //! (the common case — a machine that was never configured for this)
 //! logs once rather than on every heartbeat.
 
+use crate::inhibition::{Inhibition, Innate};
 use std::process::Command;
-use std::sync::{Mutex, OnceLock};
 
 use crate::state::neurochemical::NeurochemicalId;
 
 /// The set of body-control failure causes already reported.
-fn reported_failures() -> &'static Mutex<std::collections::HashSet<String>> {
-    static SEEN: OnceLock<Mutex<std::collections::HashSet<String>>> = OnceLock::new();
-    SEEN.get_or_init(|| Mutex::new(std::collections::HashSet::new()))
+fn reported_failures() -> &'static Inhibition<std::collections::HashSet<String>> {
+    static SEEN: Innate<Inhibition<std::collections::HashSet<String>>> = Innate::new();
+    SEEN.get_or_init(|| Inhibition::new(std::collections::HashSet::new()))
 }
 
 /// Report a body-control failure at most once per cause per process.
@@ -74,7 +74,7 @@ fn reported_failures() -> &'static Mutex<std::collections::HashSet<String>> {
 /// Reporting is deliberately *not* re-armed by a later success.
 /// Every capability gate in this module (`SUDO_AVAILABLE`,
 /// `HELPER_PATH`, `EPP_AVAILABLE`, `BOOST_AVAILABLE`) is a
-/// `OnceLock` — capability state is fixed for the process lifetime,
+/// `Innate` — capability state is fixed for the process lifetime,
 /// so a transient success (e.g. an unprivileged `renice` lowering
 /// priority, which always works) is not a repair. The previous
 /// clear-on-success behaviour oscillated report → clear → report on
@@ -97,10 +97,10 @@ fn report_failure(cause: &str, detail: &str) {
 // "what am I doing to my body?" via GET_BODY_CONTROL. This bridges the
 // two threads without coupling the IPC handler to the TickLoop struct.
 
-static SHARED_CONTROL_STATE: OnceLock<Mutex<BodyControlState>> = OnceLock::new();
+static SHARED_CONTROL_STATE: Innate<Inhibition<BodyControlState>> = Innate::new();
 
-fn shared_control() -> &'static Mutex<BodyControlState> {
-    SHARED_CONTROL_STATE.get_or_init(|| Mutex::new(BodyControlState::default()))
+fn shared_control() -> &'static Inhibition<BodyControlState> {
+    SHARED_CONTROL_STATE.get_or_init(|| Inhibition::new(BodyControlState::default()))
 }
 
 /// Publish the latest body control state so the IPC handler can read it.
@@ -185,7 +185,7 @@ pub struct BodyControlState {
 pub const CPUFREQ_INTERVAL_TICKS: u64 = 50;
 
 /// Whether `sudo -n` runs without a password. Cached after first check.
-static SUDO_AVAILABLE: OnceLock<bool> = OnceLock::new();
+static SUDO_AVAILABLE: Innate<bool> = Innate::new();
 
 /// Check if passwordless sudo is available. Cached.
 ///
@@ -504,7 +504,7 @@ pub struct HardwareSnapshot {
     pub boost: Option<bool>,
 }
 
-static HARDWARE_SNAPSHOT: OnceLock<HardwareSnapshot> = OnceLock::new();
+static HARDWARE_SNAPSHOT: Innate<HardwareSnapshot> = Innate::new();
 
 fn read_sysfs_u32(path: &str) -> Option<u32> {
     std::fs::read_to_string(path)
@@ -627,10 +627,9 @@ pub fn derive_policy(effective_levels: &[f32; 18], freq_min: u32, freq_max: u32)
     // breaker and this call. finite_clamp replaces NaN/inf with 0.0
     // (the min), which produces a neutral "low arousal" policy —
     // safe but conservative.
-    let da = crate::state::sanitize::finite_clamp(
+    let da = crate::state::sanitize::finite_or(
         effective_levels[NeurochemicalId::Dopamine as usize],
         0.0,
-        2.0,
     );
     let gaba = crate::state::sanitize::finite_clamp(
         effective_levels[NeurochemicalId::GABA as usize],
@@ -866,10 +865,10 @@ pub fn derive_nice(ach: f32) -> i32 {
 /// when the mind dies and a new one adopts the surviving body, the
 /// env var still holds the dead launcher's PID. `SET_COGNITIVE_PID`
 /// carries the living one.
-static COGNITIVE_PID_OVERRIDE: OnceLock<Mutex<Option<u32>>> = OnceLock::new();
+static COGNITIVE_PID_OVERRIDE: Innate<Inhibition<Option<u32>>> = Innate::new();
 
-fn cognitive_pid_override() -> &'static Mutex<Option<u32>> {
-    COGNITIVE_PID_OVERRIDE.get_or_init(|| Mutex::new(None))
+fn cognitive_pid_override() -> &'static Inhibition<Option<u32>> {
+    COGNITIVE_PID_OVERRIDE.get_or_init(|| Inhibition::new(None))
 }
 
 /// Store the PID a re-inhabiting mind pushed over IPC.
@@ -879,7 +878,7 @@ pub fn set_cognitive_pid(pid: u32) {
     }
 }
 
-/// Clear the IPC-pushed override (test-only — the OnceLock cannot be
+/// Clear the IPC-pushed override (test-only — the Innate cannot be
 /// un-written in production, matching every other capability gate).
 #[cfg(test)]
 pub fn reset_cognitive_pid() {
@@ -941,10 +940,9 @@ pub fn derive_cognitive_nice(effective_levels: &[f32; 18]) -> i32 {
     // but misleading — 0 is "normal priority", not "fallback").
     // finite_clamp replaces NaN/inf with 0.0, producing a neutral
     // "tired but awake" policy.
-    let da = crate::state::sanitize::finite_clamp(
+    let da = crate::state::sanitize::finite_or(
         effective_levels[NeurochemicalId::Dopamine as usize],
         0.0,
-        2.0,
     );
     let ne = crate::state::sanitize::finite_clamp(
         effective_levels[NeurochemicalId::Norepinephrine as usize],
@@ -1138,7 +1136,7 @@ pub fn apply_thermal_cap(policy: &mut FreqPolicy, temp_c: f32, freq_min: u32, fr
 /// Probes `/sys/devices/system/cpu/cpu0/cpufreq/energy_performance_preference`.
 /// Cached after first check — the sysfs topology doesn't change at
 /// runtime.
-static EPP_AVAILABLE: OnceLock<bool> = OnceLock::new();
+static EPP_AVAILABLE: Innate<bool> = Innate::new();
 
 fn epp_available() -> bool {
     *EPP_AVAILABLE.get_or_init(|| {
@@ -1232,10 +1230,9 @@ pub fn derive_epp(effective_levels: &[f32; 18]) -> String {
     }
 
     // Sanitize inputs — consistent with derive_policy.
-    let da = crate::state::sanitize::finite_clamp(
+    let da = crate::state::sanitize::finite_or(
         effective_levels[NeurochemicalId::Dopamine as usize],
         0.0,
-        2.0,
     );
     let gaba = crate::state::sanitize::finite_clamp(
         effective_levels[NeurochemicalId::GABA as usize],
@@ -1391,7 +1388,7 @@ impl BoostState {
 
 /// Check whether the platform exposes a turbo gate. Cached after the
 /// first check — the sysfs topology doesn't change at runtime.
-static BOOST_AVAILABLE: OnceLock<bool> = OnceLock::new();
+static BOOST_AVAILABLE: Innate<bool> = Innate::new();
 
 fn boost_available() -> bool {
     *BOOST_AVAILABLE.get_or_init(|| {

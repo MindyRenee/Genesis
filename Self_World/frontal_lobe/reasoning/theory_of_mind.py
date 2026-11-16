@@ -70,7 +70,13 @@ from typing import Any
 from limbic_system.sentiment import analyze_sentiment
 from occipital_lobe.perception.core import is_plausible_name
 
-__all__ = ["KnowledgeLevel", "TheoryOfMind", "UserBelief", "UserModel"]
+__all__ = [
+    "AttributedModel",
+    "KnowledgeLevel",
+    "TheoryOfMind",
+    "UserBelief",
+    "UserModel",
+]
 
 # Words/phrases that indicate a statement is addressed to Genesis or
 # is a conversational response, not a genuine preference/self-concept.
@@ -120,11 +126,40 @@ class UserBelief:
 
 
 @dataclass(slots=True)
+class AttributedModel:
+    """Second-order attribution — the user's model of her mind.
+
+    First-order theory of mind tracks what the user believes about
+    the world: B_user(x). Second-order tracks what the user believes
+    about *her*: B_user(B_g(x)) — Dennett's intentional stance
+    iterated once. The same three channels, now pointed back at the
+    modeler: what the user thinks she knows, what the user thinks
+    she believes, and what the user thinks she can do.
+
+    The value of holding it: a misattribution is actionable. "You
+    know this" about a thing never covered is a false second-order
+    belief — the signature that lets her correct the user's model
+    of her rather than silently confirming a wrong expectation.
+    """
+
+    # What the user thinks she knows — the same lattice as the
+    # first-order `knowledge` map, pointed inward.
+    knowledge: dict[str, KnowledgeLevel] = field(default_factory=dict)
+    # What the user thinks she believes ("you think X", "you said X").
+    beliefs: dict[str, UserBelief] = field(default_factory=dict)
+    # What the user thinks she can do — asserted vs denied, the
+    # opposite pair ("you can" ↔ "you can't").
+    capabilities: dict[str, bool] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
 class UserModel:
     """A snapshot of the user's mental state.
 
     This is what ``get_user_model()`` returns — a complete picture of
-    what Genesis thinks the user knows, wants, believes, and feels.
+    what Genesis thinks the user knows, wants, believes, and feels —
+    including ``attributed``: the user's model of *her*, the
+    second-order layer.
     """
 
     beliefs: dict[str, UserBelief] = field(default_factory=dict)
@@ -139,6 +174,8 @@ class UserModel:
     asked_about: set[str] = field(default_factory=set)
     # Concepts the user has explained or demonstrated knowledge of
     demonstrated_knowledge: set[str] = field(default_factory=set)
+    # The user's model of her — second-order intentionality.
+    attributed: AttributedModel = field(default_factory=AttributedModel)
 
 
 # ─── Emotion inference ───────────────────────────────────────────────
@@ -358,6 +395,10 @@ class TheoryOfMind:
         # Extract user beliefs/preferences (e.g., "I like X", "I want Y")
         self._extract_beliefs(text)
 
+        # Second-order extraction — what the user says about *her*
+        # mind ("you know X", "you forgot", "you can't") — B_u(B_g(·)).
+        self._extract_attributions(text, lower)
+
         return self._model
 
     def get_user_model(self) -> UserModel:
@@ -511,6 +552,31 @@ class TheoryOfMind:
             return False
         return belief.value.lower().strip() != our_value.lower().strip()
 
+    def attributed_knowledge(self, concept: str) -> KnowledgeLevel | None:
+        """What the user thinks *she* knows about a concept, if attributed."""
+        return self._model.attributed.knowledge.get(concept.lower().strip())
+
+    def user_thinks_i_know(self, concept: str) -> bool:
+        """Whether the user has attributed knowledge of a concept to her."""
+        level = self.attributed_knowledge(concept)
+        return level in (KnowledgeLevel.FAMILIAR, KnowledgeLevel.EXPERT)
+
+    def has_divergent_attribution(self, concept: str, actual_known: bool) -> bool:
+        """Whether the user's model of her diverges from reality.
+
+        The false-attribution check, second-order mirror of
+        ``has_divergent_belief``: the user thinks she knows a thing
+        she does not, or thinks she does not know a thing she does.
+        A misattribution she can correct rather than silently
+        confirm. ``actual_known`` is supplied by the caller, which
+        owns access to her concept graph.
+        """
+        level = self.attributed_knowledge(concept)
+        if level is None:
+            return False
+        attributed_known = level in (KnowledgeLevel.FAMILIAR, KnowledgeLevel.EXPERT)
+        return attributed_known != actual_known
+
     def _extract_beliefs(self, text: str) -> None:
         """Extract user beliefs, preferences, and stated identity.
 
@@ -579,6 +645,70 @@ class TheoryOfMind:
         # Extract name, goals, facts, and topics into the user profile.
         if self._user_profile is not None:
             self._populate_user_profile(lower)
+
+    # ── Second-order intentionality ─────────────────────────────
+    # Dennett's orders: first-order ToM is "the user believes x";
+    # second-order is "the user believes that I believe x". The
+    # extraction below listens for the user attributing mental
+    # states back to her — "you know X" / "you forgot" / "you
+    # can't" — and records them in `attributed`, her model nested
+    # inside the user's model.
+
+    # Asserted knowledge — "you know", "you remember", "you saw".
+    _ATTRIB_KNOWS = re.compile(
+        r"\byou (?:know|knew|remember|recall|understand|noticed|saw|figured out)\b"
+    )
+    # Denied knowledge — "you don't know", "you forgot". (Checked
+    # first: the denial contains the assertion's verb.)
+    _ATTRIB_DENIED = re.compile(
+        r"\byou (?:don't know|do not know|dont know|forgot|don't remember|"
+        r"do not remember|dont remember|missed|lost|don't understand|"
+        r"do not understand|dont understand)\b"
+    )
+    # Attributed belief — "you think", "you said", "you told me".
+    _ATTRIB_BELIEF = re.compile(
+        r"\byou (?:think|believe|said|told me|claimed|thought|figured)\b\s*(.+?)(?:[.!?]|$)"
+    )
+    # Capability — the opposite pair "you can" ↔ "you can't".
+    _ATTRIB_CANT = re.compile(r"\byou (?:can't|cannot|couldn't|can not)\b")
+    _ATTRIB_CAN = re.compile(r"\byou can\b")
+
+    def _extract_attributions(self, text: str, lower: str) -> None:
+        """Record what the user says about *her* mental states.
+
+        First-order ToM hears what the user believes about the
+        world; second-order hears what the user believes about
+        *her*. Attributions of knowledge and its opposite (denial)
+        feed the `knowledge` lattice; "you think/believe/said"
+        carries the attributed content verbatim; capability pairs
+        record the asserted vs denied ability.
+        """
+        # The attribution's subject ("you", address words) is the
+        # grammatical target, not a topic — attribution attaches to
+        # the content words only.
+        _SELF_WORDS = _ADDRESS_WORDS | {"you", "your", "yourself"}
+        topics = [t for t in self._extract_topics(text) if t not in _SELF_WORDS]
+        att = self._model.attributed
+        if self._ATTRIB_DENIED.search(lower):
+            for t in topics:
+                att.knowledge[t] = KnowledgeLevel.NOVICE
+        elif self._ATTRIB_KNOWS.search(lower):
+            for t in topics:
+                att.knowledge[t] = KnowledgeLevel.FAMILIAR
+        belief_match = self._ATTRIB_BELIEF.search(lower)
+        if belief_match is not None:
+            content = belief_match.group(1).strip()
+            if content and len(content) <= 80:
+                for t in topics or ["self"]:
+                    att.beliefs[t] = UserBelief(
+                        concept=t, value=content, confidence=0.6
+                    )
+        if self._ATTRIB_CANT.search(lower):
+            for t in topics:
+                att.capabilities[t] = False
+        elif self._ATTRIB_CAN.search(lower):
+            for t in topics:
+                att.capabilities[t] = True
 
     def _populate_user_profile(self, lower: str) -> None:
         """Extract name, goals, facts, and topics into the user profile."""

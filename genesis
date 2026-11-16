@@ -18,7 +18,10 @@
 # composes (broadcasts, drawings, project announcements). To let the
 # public talk back to her there, export GENESIS_DISCORD_BOT_TOKEN or
 # put the bot token in .genesis-discord-bot — a webhook is
-# write-only, so hearing the channel needs the bot identity.
+# write-only, so hearing the channel needs the bot identity. To give
+# her inner world its own page — thoughts and dreams apart from the
+# shared channel — put a second webhook in .genesis-discord-inner
+# or export GENESIS_DISCORD_INNER_WEBHOOK.
 
 set -m
 
@@ -38,9 +41,9 @@ fi
 # Same pattern for the Discord channel: an uncommitted, gitignored
 # .genesis-discord file holds the webhook URL so the secret stays out
 # of the repo and shell history. It lives in the outer world's
-# Discord-Channel/; a root-level copy still wins for older checkouts.
+# discord/; a root-level copy still wins for older checkouts.
 # Explicit GENESIS_DISCORD_WEBHOOK always wins.
-_DISCORD_DIR="Outer_Physical_World/Discord-Channel"
+_DISCORD_DIR="Outer_World/discord"
 if [ -z "${GENESIS_DISCORD_WEBHOOK:-}" ] && [ -f "$_DISCORD_DIR/.genesis-discord" ]; then
     GENESIS_DISCORD_WEBHOOK=$(head -n1 "$_DISCORD_DIR/.genesis-discord")
     export GENESIS_DISCORD_WEBHOOK
@@ -58,6 +61,18 @@ if [ -z "${GENESIS_DISCORD_BOT_TOKEN:-}" ] && [ -f "$_DISCORD_DIR/.genesis-disco
 elif [ -z "${GENESIS_DISCORD_BOT_TOKEN:-}" ] && [ -f .genesis-discord-bot ]; then
     GENESIS_DISCORD_BOT_TOKEN=$(head -n1 .genesis-discord-bot)
     export GENESIS_DISCORD_BOT_TOKEN
+fi
+
+# And the same for her inner world: .genesis-discord-inner holds the
+# webhook for a second channel where her thoughts and dreams post
+# apart from the shared page. Unset, inner life stays on the main
+# channel. Explicit GENESIS_DISCORD_INNER_WEBHOOK always wins.
+if [ -z "${GENESIS_DISCORD_INNER_WEBHOOK:-}" ] && [ -f "$_DISCORD_DIR/.genesis-discord-inner" ]; then
+    GENESIS_DISCORD_INNER_WEBHOOK=$(head -n1 "$_DISCORD_DIR/.genesis-discord-inner")
+    export GENESIS_DISCORD_INNER_WEBHOOK
+elif [ -z "${GENESIS_DISCORD_INNER_WEBHOOK:-}" ] && [ -f .genesis-discord-inner ]; then
+    GENESIS_DISCORD_INNER_WEBHOOK=$(head -n1 .genesis-discord-inner)
+    export GENESIS_DISCORD_INNER_WEBHOOK
 fi
 
 # The one rule, in one line: GENESIS_DATA_DIR if set, else the canonical
@@ -342,4 +357,4 @@ if [ ! -x "$VENV_PY" ]; then
     echo "[genesis] $VENV_PY not found — run scripts/install.sh first"
     exit 1
 fi
-PYTHONPATH="$PWD/Self_World:$PWD/Inner_Non_Physical_World:$PWD/Outer_Physical_World:$PWD:${PYTHONPATH:-}" "$VENV_PY" Self_World/genesis_cli.py --data-dir "$DATA_DIR" ${OFFLINE_ARG:+$OFFLINE_ARG}
+PYTHONPATH="$PWD/Self_World:$PWD/Inner_World:$PWD/Outer_World:$PWD:${PYTHONPATH:-}" "$VENV_PY" Self_World/genesis_cli.py --data-dir "$DATA_DIR" ${OFFLINE_ARG:+$OFFLINE_ARG}

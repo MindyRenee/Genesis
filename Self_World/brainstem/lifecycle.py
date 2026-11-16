@@ -8,7 +8,7 @@ import logging
 import os
 import threading
 import time
-from typing import TYPE_CHECKING, Any, ClassVar, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from genesis_client.protocol import (
     CHEM_CRH,
@@ -134,20 +134,6 @@ def _warm_nltk() -> None:
 
 class LifecycleMixin:
     """Mixin for :class:`Mind` — see module docstring."""
-
-    # Per-subsystem shutdown budgets — matched to the longest
-    # uninterruptible phase each can legitimately be in (InnerLife's
-    # synchronous N3 consolidation pass takes ~20 s). Anything not
-    # listed joins with the default timeout.
-    _SUBSYSTEM_STOP_TIMEOUTS: ClassVar[dict[str, float]] = {"InnerLife": 45.0}
-
-    # Budget for in-flight volition actions to finish once suppression
-    # and the abort hooks have made just-admitted work return early.
-    # What remains (a compile+test, a paint, a tool call) can't be
-    # checkpointed mid-call, so it gets a bounded window to wrap —
-    # beyond it the stores close anyway and the worker's late writes
-    # land on closed files. The old 5 s drained nothing real.
-    _VOLITION_DRAIN_TIMEOUT_S: ClassVar[float] = 30.0
 
     if TYPE_CHECKING:
         # Attributes and cross-mixin methods are provided by the
@@ -337,13 +323,14 @@ class LifecycleMixin:
         # never reach sleep onset, and no sleep meant no dreams.
 
     def _start_autonomous_subsystems(self) -> None:
-        """Start autonomous learning, inner life, and emotional regulation."""
-        # Start autonomous learning in the background
-        self.learner.start()
-        # Start inner life — spontaneous thoughts
-        self.inner_life.start()
-        # Start emotional self-regulation — it controls its state
-        self.regulator.start()
+        """Open the metronome-advanced cognitive subsystems."""
+        # These are state transitions, not worker spawns. Self-directed
+        # mode leaves them closed while volition remains live; chosen
+        # actions can still invoke bounded steps directly.
+        if not self._self_directed:
+            self.learner.start()
+            self.inner_life.start()
+            self.regulator.start()
         # Registration claimed `Starting`; the subsystems are now live,
         # so the modules are genuinely working. The metronome takes over
         # the status from here, reporting `Running` with measured load
@@ -860,7 +847,7 @@ class LifecycleMixin:
         # budget; the wait is interruptible for exactly this reason.
         self._cycle_stop.set()
         self._suppress_volition = True
-        # Latched once — deferred resume timers consult this, not
+        # Latched once — deferred resume state consults this, not
         # _running, so an unstarted mind's resume paths still work.
         self._stop_latched = True
         clean_shutdown = True
@@ -951,20 +938,7 @@ class LifecycleMixin:
         return clean
 
     def _stop_subsystems(self) -> bool:
-        """Stop the autonomous learner, inner life, and regulator, then
-        join whatever threads they leave behind.
-
-        Subsystems get a shutdown budget matched to the longest
-        uninterruptible phase they can legitimately be in. Inner life
-        drives sleep-stage transitions synchronously, and an N3
-        consolidation pass takes ~20 s — longer than the default 5 s
-        join. Interrupting one mid-pass is the thing to avoid, since it
-        is writing to the concept network, the edge log, and the
-        archive at the same time. So it is given room to finish what it
-        started, and the wait is bounded so a genuine hang still
-        surfaces rather than blocking shutdown forever.
-        """
-        clean = True
+        """Close the metronome-advanced cognitive subsystems."""
         try:
             self.learner.stop()
             self.inner_life.stop()
@@ -974,51 +948,18 @@ class LifecycleMixin:
                 "mind.lifecycle.stop",
                 e,
             )  # user pressed Ctrl+C — still try to save
-            clean = False
-        for subsystem in (self.learner, self.inner_life, self.regulator):
-            name = type(subsystem).__name__
-            clean &= self._join_shutdown_thread(
-                getattr(subsystem, "_thread", None),
-                name,
-                timeout=self._SUBSYSTEM_STOP_TIMEOUTS.get(name, 5.0),
-            )
-        return clean
+            return False
+        return True
 
     def _drain_shutdown_workers(self) -> bool:
-        """Wait out the tracked workers — volition bids, the
-        sleep-stage worker, and any in-flight think — before the state
-        save and archive close.
+        """Wait for bounded infrastructure work before closing stores.
 
-        Volition workers are tracked only by name; suppression prevents
-        new urges from starting, and the wait for in-flight actions is
-        bounded so a worker that never clears cannot hang shutdown
-        forever. The sleep-stage worker drains whatever it already
-        accepted: an N3 pass writes the concept network, the canonical
-        edge log and the SQLite archive at once, and letting one run
-        into those being closed underneath it is exactly the torn
-        state this ordering exists to prevent.
+        Volition, inner life, learning, and regulation are synchronous
+        metronome phases, so they finish with the metronome join above.
+        The remaining think worker is a bounded response-timeout
+        boundary and still gets a drain join.
         """
-        clean = True
-        _volition_deadline = time.monotonic() + self._VOLITION_DRAIN_TIMEOUT_S
-        announced = False
-        while True:
-            with self._volition_lock:
-                pending = sorted(self._volition_active)
-            if not pending or time.monotonic() >= _volition_deadline:
-                break
-            if not announced:
-                logger.info("waiting for volition workers: %s", ", ".join(pending))
-                announced = True
-            time.sleep(0.05)
-        if pending:
-            logger.warning(
-                "volition workers did not clear during shutdown; continuing: %s",
-                ", ".join(pending),
-            )
-            clean = False
-
-        clean &= self._join_shutdown_thread(self._active_think_worker, "think")
-        return clean
+        return self._join_shutdown_thread(self._active_think_worker, "think")
 
     def _persist_shutdown_state(self) -> bool:
         """Save cognitive state, then close the archive and edge log.

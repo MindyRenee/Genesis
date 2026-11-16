@@ -49,8 +49,8 @@ def _region(*parts: str) -> str:
 
 def _worldfile(*parts: str) -> str:
     """A real file inside whichever world dir holds it — the three
-    worlds are separate package roots, so ``self`` and ``outer_world``
-    resolve beside the region tree, not inside it."""
+    worlds are separate package roots, so ``self`` and the outer
+    environment's packages resolve beside the region tree."""
     for wd in module_sampler._WORLD_DIRS:
         path = os.path.join(wd, *parts)
         if os.path.exists(path):
@@ -103,10 +103,9 @@ def test_region_directory_attribution():
         (("insula", "somatic.py"), MODULE_EMOTION),
         (("basal_forebrain", "adenosine.py"), MODULE_EMOTION),
         (("basal_forebrain", "acetylcholine.py"), MODULE_EMOTION),
-        # The world model — the table used to key a nonexistent
-        # ``world/`` dir while the live package is ``outer_world/``.
-        (("outer_world", "world.py"), MODULE_REASONING),
-        (("outer_world", "board.py"), MODULE_REASONING),
+        # The outer environment's domain folders attribute by function.
+        (("workstation", "environment.py"), MODULE_REASONING),
+        (("discord", "board.py"), MODULE_SENSORY),
     )
     for parts, expected in cases:
         assert _module_of_filename(_worldfile(*parts)) == expected, parts

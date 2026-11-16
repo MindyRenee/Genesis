@@ -47,9 +47,12 @@ import sys
 import time
 from pathlib import Path
 
+_REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path[:0] = [
-    str(Path(__file__).resolve().parent.parent / "python"),
-    str(Path(__file__).resolve().parent.parent),
+    str(_REPO_ROOT / "Self_World"),
+    str(_REPO_ROOT / "Inner_World"),
+    str(_REPO_ROOT / "Outer_World"),
+    str(_REPO_ROOT),
 ]
 
 from genesis_client.ltm_index import scan_ltm_index  # noqa: E402

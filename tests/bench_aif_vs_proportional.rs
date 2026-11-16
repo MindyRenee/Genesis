@@ -106,8 +106,8 @@ fn run_genesis() -> Vec<ComparisonPoint> {
     for tick in 0..PERTURB_TICKS {
         let pre = neuro.effective_levels;
         if tick % 10 == 0 {
-            neuro.apply_impulse_capped(NeurochemicalId::Cortisol, 0.15, 0);
-            neuro.apply_impulse_capped(NeurochemicalId::CRH, 0.10, 0);
+            neuro.apply_impulse(NeurochemicalId::Cortisol, 0.15, 0);
+            neuro.apply_impulse(NeurochemicalId::CRH, 0.10, 0);
         }
         neuro.tick_with_params(&params);
         let post = neuro.effective_levels;
@@ -146,8 +146,8 @@ fn run_genesis() -> Vec<ComparisonPoint> {
     for tick in 0..PERTURB_TICKS {
         let pre = neuro.effective_levels;
         if tick % 10 == 0 {
-            neuro.apply_impulse_capped(NeurochemicalId::Cortisol, 0.15, 0);
-            neuro.apply_impulse_capped(NeurochemicalId::CRH, 0.10, 0);
+            neuro.apply_impulse(NeurochemicalId::Cortisol, 0.15, 0);
+            neuro.apply_impulse(NeurochemicalId::CRH, 0.10, 0);
         }
         neuro.tick_with_params(&params);
         let post = neuro.effective_levels;
@@ -229,8 +229,8 @@ fn run_controller() -> Vec<ComparisonPoint> {
     // Phase 2: Perturbation 1
     for tick in 0..PERTURB_TICKS {
         if tick % 10 == 0 {
-            neuro.apply_impulse_capped(NeurochemicalId::Cortisol, 0.15, 0);
-            neuro.apply_impulse_capped(NeurochemicalId::CRH, 0.10, 0);
+            neuro.apply_impulse(NeurochemicalId::Cortisol, 0.15, 0);
+            neuro.apply_impulse(NeurochemicalId::CRH, 0.10, 0);
         }
         for (chem, &baseline) in neuro
             .chemicals
@@ -285,8 +285,8 @@ fn run_controller() -> Vec<ComparisonPoint> {
     // Phase 4: Perturbation 2
     for tick in 0..PERTURB_TICKS {
         if tick % 10 == 0 {
-            neuro.apply_impulse_capped(NeurochemicalId::Cortisol, 0.15, 0);
-            neuro.apply_impulse_capped(NeurochemicalId::CRH, 0.10, 0);
+            neuro.apply_impulse(NeurochemicalId::Cortisol, 0.15, 0);
+            neuro.apply_impulse(NeurochemicalId::CRH, 0.10, 0);
         }
         for (chem, &baseline) in neuro
             .chemicals

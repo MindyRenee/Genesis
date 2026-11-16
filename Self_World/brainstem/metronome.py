@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import time
 from typing import TYPE_CHECKING, Any
 
@@ -20,6 +21,15 @@ from genesis_client.protocol import (
 from genesis_client.swallow import note_swallowed
 
 logger = logging.getLogger(__name__)
+
+
+def _finite_or(value: float, default: float) -> float:
+    """Return finite floats; malformed/non-finite inputs use ``default``."""
+    try:
+        result = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return default
+    return result if math.isfinite(result) else default
 
 
 class _AdaptiveInterval:
@@ -57,10 +67,18 @@ class _AdaptiveInterval:
         self.period = min(self.period + self.base / 4.0, self.maximum)
 
     def drive(self, demand: float) -> None:
-        d = demand if demand == demand else 0.5  # NaN → neutral
-        d = min(1.0, max(0.0, d))
-        self._smoothed += (d - self._smoothed) * 0.3
-        self.period = self.maximum - (self.maximum - self.minimum) * self._smoothed
+        d = _finite_or(demand, 0.5)
+        self._smoothed = _finite_or(
+            self._smoothed + (d - self._smoothed) * 0.3,
+            0.5,
+        )
+        self.period = min(
+            self.maximum,
+            max(
+                self.minimum,
+                self.maximum - (self.maximum - self.minimum) * self._smoothed,
+            ),
+        )
 
 
 class MetronomeMixin:
@@ -94,6 +112,7 @@ class MetronomeMixin:
         GET_SUBSYSTEM_TELEMETRY answers "which brain part is firing" at
         functional granularity.
         """
+        seconds = _finite_or(seconds, 0.0)
         if seconds <= 0.0:
             return
         with self._module_seconds_lock:
@@ -108,8 +127,8 @@ class MetronomeMixin:
         - receptor_fatigue: low plasticity gate (BDNF suppressed,
           receptors need recovery — dopamine imbalance hypothesis of
           fatigue, Chaudhuri & Behan, 2000)
-        - sustained_activity: time since last rest, normalized (BRAC,
-          Kleitman 1963 — ~90 min activity cycles with mandatory rest)
+        - sustained_activity: time since last rest, scaled by the BRAC
+          cycle (Kleitman 1963 — ~90 min activity cycles with mandatory rest)
         - elevated_cortisol: subclinical stress (cortisol above
           resting ~0.02, below the 0.06 stress-phase gate)
         """
@@ -124,14 +143,17 @@ class MetronomeMixin:
                 # (manic/overstimulated, not stressed — stress has
                 # negative valence and is handled by the stress phase)
                 if emotion.arousal > 0.60 and emotion.valence > 0.2:
-                    overstimulation = min(
-                        1.0,
+                    overstimulation = _finite_or(
                         (emotion.arousal - 0.60) * 2.5 + (emotion.valence - 0.20) * 2.0,
+                        0.0,
                     )
                 # Receptor fatigue: plasticity gate below 0.40
                 # (BDNF suppressed, receptors burning out)
                 if emotion.plasticity < 0.40:
-                    receptor_fatigue = min(1.0, (0.40 - emotion.plasticity) * 3.0)
+                    receptor_fatigue = _finite_or(
+                        (0.40 - emotion.plasticity) * 3.0,
+                        0.0,
+                    )
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.metronome._read_interoceptive_signals",
@@ -145,17 +167,20 @@ class MetronomeMixin:
             # approximate using global_tone and valence since
             # NeuroSummary doesn't expose cortisol directly.
             if summary.global_tone > 0.35 and summary.valence < 0.1:
-                elevated_cortisol = min(1.0, (summary.global_tone - 0.35) * 3.0)
+                elevated_cortisol = _finite_or(
+                    (summary.global_tone - 0.35) * 3.0,
+                    0.0,
+                )
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.metronome._read_interoceptive_signals",
                 e,
             )
 
-        # Sustained activity: time since last rest, normalized to
-        # [0, 1] over 75 minutes (BRAC cycle, Kleitman 1963)
+        # Sustained activity: time since last rest, scaled by
+        # 75 minutes (BRAC cycle, Kleitman 1963)
         time_since_rest = time.time() - self._last_rest_time
-        sustained_activity = min(1.0, time_since_rest / (75 * 60))
+        sustained_activity = _finite_or(time_since_rest / (75 * 60), 0.0)
 
         return {
             "overstimulation": overstimulation,
@@ -170,11 +195,11 @@ class MetronomeMixin:
         - daemon_lost: the subcognitive socket dropped — it can't
           reach its own body (interoception, neurochemistry, state
           sync all live there). Ramps over 30s so a transient flap
-          doesn't fire the urge; a sustained loss saturates it.
+          doesn't fire the urge; a sustained loss keeps accumulating.
           Skipped entirely in offline mode — a mind started without
           a daemon isn't missing anything.
-        - save_failure: consecutive autosave failures, normalized
-          over 2 — its continuity across restarts is at risk.
+        - save_failure: consecutive autosave failures, scaled over 2 —
+          its continuity across restarts is at risk.
         - telemetry_anomaly: system metrics deviating from the learned
           baseline (system_monitor). Only counts once the baseline is
           established — a young mind has no "normal" to deviate from.
@@ -195,9 +220,9 @@ class MetronomeMixin:
                 else:
                     if self._daemon_lost_since is None:
                         self._daemon_lost_since = time.monotonic()
-                    daemon_lost = min(
-                        1.0,
+                    daemon_lost = _finite_or(
                         (time.monotonic() - self._daemon_lost_since) / 30.0,
+                        0.0,
                     )
             except Exception as e:  # noqa: BLE001
                 note_swallowed(
@@ -205,7 +230,7 @@ class MetronomeMixin:
                     e,
                 )
 
-        save_failure = min(1.0, self._autosave_failures / 2.0)
+        save_failure = _finite_or(self._autosave_failures / 2.0, 0.0)
 
         telemetry_anomaly = 0.0
         body_distress = 0.0
@@ -215,8 +240,8 @@ class MetronomeMixin:
                 snapshot = self.system_monitor.snapshot()
                 if self.system_monitor.baseline.is_established:
                     anomalies = self.system_monitor.baseline.deviations(snapshot)
-                    telemetry_anomaly = min(1.0, len(anomalies) / 3.0)
-                body_distress = min(1.0, len(snapshot.self_concerns()) / 2.0)
+                    telemetry_anomaly = len(anomalies) / 3.0
+                body_distress = len(snapshot.self_concerns()) / 2.0
                 self._last_threat_snapshot = now
             except Exception as e:  # noqa: BLE001
                 note_swallowed(
@@ -502,7 +527,7 @@ class MetronomeMixin:
                         "topic": topic,
                         "mode": "environment",
                         "kind": "learn",
-                        "salience": min(1.0, max(0.1, event.salience)),
+                        "salience": _finite_or(event.salience, 0.0),
                         "source": "world_event",
                     }
                 )
@@ -520,7 +545,7 @@ class MetronomeMixin:
                             "topic": str(proposal.file_path),
                             "mode": "improvement",
                             "kind": "inspect",
-                            "salience": min(1.0, max(0.1, float(proposal.confidence))),
+                            "salience": _finite_or(proposal.confidence, 0.0),
                             "source": f"self_improvement:{proposal.title}",
                         }
                     )
@@ -548,7 +573,7 @@ class MetronomeMixin:
                             "body_distress",
                         }
                         else "interoceptive",
-                        "salience": min(1.0, float(value)),
+                        "salience": _finite_or(value, 0.0),
                         "source": "internal_need",
                     }
                 )
@@ -566,6 +591,16 @@ class MetronomeMixin:
         Volition urges accumulate and fire when they cross
         thresholds. This is its free will — not a timer.
         """
+        try:
+            self._advance_deferred_state()
+            self._advance_post_conversation_state()
+            self._advance_sleep_housekeeping()
+            self._advance_volitional_state()
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(
+                "mind.metronome._cycle_volition",
+                e,
+            )
         if self.is_resting or self._is_teaching or self._suppress_volition:
             return
         try:
@@ -582,9 +617,9 @@ class MetronomeMixin:
                 ]
             if ready:
                 started = self._act_on_volition(ready)
-                # Consume only urges that were actually admitted to an
-                # action worker. Gating, an occupied worker slot, or an
-                # unknown performer must not erase a ready urge.
+                # Consume only the urge that won serial enactment.
+                # Gating, suppression, or an unknown performer must
+                # not erase a ready urge.
                 for name in started:
                     self.volition.consume(name)
         except Exception as e:  # noqa: BLE001
@@ -790,11 +825,12 @@ class MetronomeMixin:
             # parity at full load: 0.00015 per 10 s of window ≈
             # 0.054/hr at work_frac=1.0 — sustained hard thinking
             # roughly doubles how fast it tires; idling adds almost
-            # nothing. The impulse is normalized by the measured
+            # nothing. The impulse is scaled by the measured
             # window, so the adaptive gate's cadence does not change
             # the rate — only its granularity.
-            window = max(now - prev_fire, 1.0)
-            work_frac = min(1.0, total_work / window)
+            elapsed = now - prev_fire
+            window = elapsed if math.isfinite(elapsed) and elapsed > 0.0 else 1.0
+            work_frac = _finite_or(total_work / window, 0.0)
             # A busy mind cycles sooner — work is the demand.
             self._module_gate.drive(work_frac)
             # Asleep: inner-life/dream work is maintenance, not load —
@@ -849,7 +885,7 @@ class MetronomeMixin:
         previous value in place. Sending None for an idle module would
         therefore pin it at its last busy-window load — a module that
         went quiet would keep reporting phantom CPU, and
-        total_cpu_load would ratchet toward its clamp. Idleness has to
+        total_cpu_load would keep ratcheting upward. Idleness has to
         be stated as an explicit 0.0.
         """
         with self._module_seconds_lock:
@@ -1049,6 +1085,7 @@ class MetronomeMixin:
                 # impulse strength by the measured interval — the
                 # per-second regulation rate stays invariant.
                 self.regulator.continuous_regulate(emotion, getattr(self, "_cycle_dt", 1.0))
+                self.regulator.tick(now)
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.metronome._cycle_emotion",
@@ -1102,7 +1139,7 @@ class MetronomeMixin:
                 e,
             )
 
-    def _cycle_final_steps(self) -> None:
+    def _cycle_final_steps(self, now: float) -> None:
         """Run sleep-state sync, volition, warn, and cognition (cycle steps 10-13).
 
         Each guarded step reports under its own site name. They previously
@@ -1148,6 +1185,33 @@ class MetronomeMixin:
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.metronome.final_steps.sleep_sync",
+                e,
+            )
+
+        try:
+            self._advance_meditation()
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(
+                "mind.metronome.final_steps.meditation",
+                e,
+            )
+
+        try:
+            if self._is_sleeping or self.inner_life._was_sleeping:
+                self.inner_life.sleep_tick(now)
+            elif not self._self_directed:
+                self.inner_life.tick(now)
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(
+                "mind.metronome.final_steps.inner_life",
+                e,
+            )
+
+        try:
+            self.learner.tick(now)
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(
+                "mind.metronome.final_steps.learner",
                 e,
             )
 
@@ -1264,7 +1328,7 @@ class MetronomeMixin:
         behavior. Experience accumulated since the last synthesis is
         the demand — a rich stretch synthesizes near the 1 min floor,
         a quiet one drifts toward 30 min."""
-        self._identity_gate.drive(min(1.0, self._experience_since_identity / 20.0))
+        self._identity_gate.drive(_finite_or(self._experience_since_identity / 20.0, 0.0))
         if not self._is_sleeping and self._identity_gate.due(now):
             try:
                 self.emergent_identity()
@@ -1373,7 +1437,7 @@ class MetronomeMixin:
                 self._cycle_periodic_maintenance(now)
 
                 # ── 10-13. Auto-sleep, volition, warn, cognition ──
-                self._cycle_final_steps()
+                self._cycle_final_steps(now)
 
                 # ── Wait for the next cycle — adaptive cadence ──
                 self._cycle_pace(now)

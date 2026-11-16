@@ -56,10 +56,10 @@ patterns into long-term structure.
 
 from __future__ import annotations
 
-import threading
 from typing import TYPE_CHECKING, ClassVar
 
 import numpy as np
+from inhibition import InhibitoryGate
 
 from temporal_lobe.concepts import RelationType
 
@@ -120,7 +120,7 @@ class HebbianPlasticity:
 
         # Co-occurrence buffer — (concept_a, concept_b, strength)
         self._co_occurrences: list[tuple[str, str, float]] = []
-        self._co_occurrence_lock = threading.Lock()
+        self._co_occurrence_lock = InhibitoryGate()
 
         # Update counters — separate for waking vs sleep
         # Sleep processes orders of magnitude more updates, so a shared
@@ -132,10 +132,10 @@ class HebbianPlasticity:
         # Hebb's rule alone is correlation learning (Δw ∝ pre·post);
         # biologically, long-term plasticity is a THREE-factor rule
         # (Fremaux & Gerstner, 2016): the pre/post product is gated by
-        # a neuromodulator. Here the DA signal is stored signed in
-        # [-1,1] and mapped to a nonnegative rate gain 1+DA: a
-        # positive RPE doubles plasticity, a full dip silences it
-        # (LTD-suppression), zero RPE is the neutral baseline.
+        # a neuromodulator. Here the signed DA signal is stored
+        # uncapped and mapped to a nonnegative rate gain 1+DA:
+        # positive RPE increases plasticity, a dip at or below −1
+        # silences it, and zero RPE is the neutral baseline.
         self._modulator = 0.0
 
         # Statistics
@@ -144,10 +144,10 @@ class HebbianPlasticity:
         self.total_repelled = 0
 
     def set_modulator(self, modulator: float) -> None:
-        """Set the signed dopamine third-factor signal in [-1, 1]."""
+        """Set the finite signed dopamine third-factor signal."""
         if not np.isfinite(modulator):
             return
-        self._modulator = max(-1.0, min(1.0, float(modulator)))
+        self._modulator = float(modulator)
 
     def get_modulator(self) -> float:
         """Return the current signed third-factor signal."""
@@ -441,8 +441,9 @@ class HebbianPlasticity:
             count = self._waking_update_count
             decay = self.WAKING_LR_DECAY
         # Three-factor gate: the Robbins-Monro rate is scaled by the
-        # dopaminergic third factor (1 + DA). DA = +1 → 2× plasticity,
-        # DA = −1 → full suppression, DA = 0 → neutral baseline.
+        # dopaminergic third factor (1 + DA). Positive DA increases
+        # plasticity without an upper cap; DA ≤ −1 suppresses it; DA = 0
+        # is the neutral baseline.
         gain = max(0.0, 1.0 + self._modulator)
         return (base_lr / (1.0 + count / decay)) * gain
 

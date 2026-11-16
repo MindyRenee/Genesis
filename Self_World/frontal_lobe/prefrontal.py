@@ -49,13 +49,13 @@ to the <Subsystem> subsystem.`` docstrings throughout this file).
 """
 
 from __future__ import annotations
+from inhibition import RecurrentInhibition
 
 import heapq
 import logging
 import math
 import random
 import re
-import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -166,6 +166,15 @@ if TYPE_CHECKING:
     from parietal_lobe.system_monitor import SystemMonitor
 
 logger = logging.getLogger(__name__)
+
+
+def _finite_or(value: float, default: float) -> float:
+    """Return finite floats; malformed/non-finite inputs use ``default``."""
+    try:
+        result = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return default
+    return result if math.isfinite(result) else default
 
 
 __all__ = ["CognitiveState", "FrontalLobe", "Goal"]
@@ -592,7 +601,7 @@ class FrontalLobe:
         # (spreading-activation maps, episodic stores, the concept
         # network), so think() serializes on it — the console worker
         # and heartbeat-delivered heard turns must never overlap.
-        self._think_mutex = threading.RLock()
+        self._think_mutex = RecurrentInhibition()
 
     def _init_intelligence(
         self,
@@ -766,13 +775,14 @@ class FrontalLobe:
             counterfactual=self.counterfactual_reasoning,
         )
 
-        # Spatial reasoner — the solver behind her grid games. Where
-        # semantic reasoning traverses relations between concepts,
-        # this perceives objects and relations in grid input and
-        # searches transformation space for the rule explaining them.
-        # It shares the competence substrate so every game she plays
-        # adds to one skill memory (procedural learning is shared,
-        # not per-game).
+        # Spatial reasoner — perceptual induction: where semantic
+        # reasoning traverses relations between concepts, this
+        # perceives objects and relations in spatial input and induces
+        # the transformation program explaining observed changes
+        # (Bayesian program induction under an MDL prior — the
+        # frontoparietal counterpart to the DNF rule induction below).
+        # It shares the competence substrate so every problem she works
+        # adds to one skill memory (procedural learning is shared).
         from parietal_lobe.spatial import SpatialReasoner
 
         self.spatial_reasoner = SpatialReasoner(self.network, task_competence=self.task_competence)
@@ -785,6 +795,18 @@ class FrontalLobe:
         from .dlpfc import DorsolateralPFC
 
         self.dlpfc = DorsolateralPFC()
+
+        # Exclusion — reasoning by elimination over an option space.
+        # The first logical organ humans grow (preverbal infants run
+        # the disjunctive syllogism — Cesana-Arlotti et al. 2018);
+        # the flat hypothesis space whose options dlpfc's DNF grammar
+        # later articulates into compositional rules. Per-problem
+        # contents — working memory, not storage. A contradicted or
+        # impossible outcome drives the LC phasic burst (the infant's
+        # pupil dilation) through the noradrenergic impulse channel.
+        from .exclusion import OptionSpace
+
+        self.exclusion = OptionSpace(on_surprise=self._exclusion_surprise)
 
         from frontal_lobe.reasoning import CriticalThinker
 
@@ -1068,6 +1090,71 @@ class FrontalLobe:
                 e,
             )
 
+    def _exclusion_surprise(self, surprisal: float, impossible: bool) -> None:
+        """LC phasic burst on a violated option space.
+
+        The infant's pupil dilation: when the world reveals an
+        outcome the standing hypothesis space did not expect, the
+        locus coeruleus fires. Magnitude scales with surprisal
+        (−log₂ P, so an excluded-or-unentertained outcome saturates
+        the burst), and it is gated like the other noradrenergic
+        drives — no arousal cascade when already aroused, and the LC
+        is near-silent in NREM.
+        """
+        try:
+            phase = self.client.get_phase(timeout=2.0).phase
+            if phase == PHASE_NREM:
+                return
+            emotion_now = self._build_meta_emotion()
+            if emotion_now.alertness >= 0.8:
+                return
+            bits = min(surprisal, 6.0)
+            magnitude = 0.02 + bits * 0.005
+            self.client.neuro_impulse(CHEM_NOREPINEPHRINE, magnitude)
+        except (OSError, ConnectionError, RuntimeError, AttributeError) as e:
+            note_swallowed(
+                "frontal_lobe.prefrontal._exclusion_surprise",
+                e,
+            )
+
+    def _resolve_referent_space(self, user_input: str) -> None:
+        """Settle a pending referent space if this utterance realizes it.
+
+        An ambiguous reference left an option space of candidates
+        open. Centering's rule for the next utterance: the
+        backward-looking center is the highest-ranked realized
+        forward center — the user's reply reveals the referent.
+        Exactly one candidate realized → the revealing observation
+        (the organ's ``on_surprise`` drives the LC phasic burst, and
+        the survivor binds as the discourse focus so the anaphora
+        chain — "it", "that" — resolves against what was just
+        established). None realized → the ambiguity was abandoned;
+        the space closes. Several → still contending; it stays open.
+        """
+        if len(self.exclusion) < 2:
+            return
+        realized = [
+            c
+            for c in self.exclusion.posterior()
+            if isinstance(c, str)
+            and re.search(rf"\b{re.escape(c)}\b", user_input, re.IGNORECASE)
+        ]
+        if not realized:
+            self.exclusion.reset()
+            return
+        if len(realized) > 1:
+            return
+        obs = self.exclusion.observe(realized[0])
+        try:
+            self.working_memory.central_executive.direct_attention(
+                {}, [str(obs.resolved)]
+            )
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(
+                "frontal_lobe.prefrontal._resolve_referent_space",
+                e,
+            )
+
     def _init_cognitive_systems(self, data_dir: str | None = None) -> None:
         """Initialize new cognitive systems wired into the think() loop."""
         # RNG must be initialized before systems that use it.
@@ -1103,7 +1190,7 @@ class FrontalLobe:
                 return None
 
         self.memory.somatic_provider = _somatic_snapshot
-        # Latest bounded reading of the substrate's ion layer. Neutral
+        # Latest finite reading of the substrate's ion layer. Neutral
         # until the first successful read, so a daemon that predates the
         # ion opcode leaves cognition unchanged rather than guessing.
         self._last_ion_context: IonCognitiveContext = IonCognitiveContext.neutral()
@@ -2098,6 +2185,15 @@ class FrontalLobe:
                     if name not in interrogatives
                 )
             )
+            # Open the option space — the candidates are the
+            # inquisitive alternatives the pronoun's reference hangs
+            # on. Priors follow the centering Cf ranking: salience is
+            # an order (subject > object > other; first-mention
+            # advantage), so a geometric ρ^rank maps rank to mass
+            # without inventing metric content the theory lacks.
+            self.exclusion.reset()
+            for rank, entity in enumerate(entities):
+                self.exclusion.entertain(entity, 0.5 ** rank)
             return Thought(
                 content="reference",
                 intent="unknown",
@@ -3488,6 +3584,11 @@ class FrontalLobe:
         have *you* learned"), and anaphora resolution replaces "you"
         with "Genesis", breaking those patterns.
         """
+        # Referent resolution first — a pending option space of
+        # referent candidates (opened by the ambiguity route) may be
+        # settled by this very utterance, before it counts as a new
+        # speech act at all.
+        self._resolve_referent_space(user_input)
         early: tuple[str, CognitiveState] | None = None
         if perception.intent == Intent.QUESTION_ANSWER:
             early = self._process_question_answer(user_input)
@@ -4256,7 +4357,7 @@ class FrontalLobe:
                 ),
                 event_type=4,  # cognitive event
                 source_module=5,  # predictive coding
-                salience=min(1.0, prediction_error.magnitude),
+                salience=_finite_or(prediction_error.magnitude, 0.0),
             )
         return perception, prediction_error
 
@@ -4331,16 +4432,15 @@ class FrontalLobe:
             ne = 0.3
             core = self._last_core_state
             if core is not None:
-                ne = float(core.chemicals.get("norepinephrine", 0.3))
-            ne = max(0.0, min(1.0, ne))
-            dodson = 4.0 * ne * (1.0 - ne)
-            raw_drive = 0.7 * prediction_error.magnitude + 0.3 * abs(
-                getattr(perception, "sentiment", 0.0)
+                ne = _finite_or(core.chemicals.get("norepinephrine", 0.3), 0.3)
+            dodson = _finite_or(4.0 * ne * (1.0 - ne), 0.0)
+            raw_drive = 0.7 * _finite_or(prediction_error.magnitude, 0.0) + 0.3 * abs(
+                _finite_or(getattr(perception, "sentiment", 0.0), 0.0)
             )
-            capture_drive = raw_drive * (0.5 + dodson)
+            capture_drive = _finite_or(raw_drive * (0.5 + dodson), 0.0)
             self.attention.capture(
                 prediction_error.unexpected_concepts[0],
-                drive=min(1.0, capture_drive),
+                drive=capture_drive,
             )
 
     def _read_neuro_summary(self) -> NeuroSummary:
@@ -4372,7 +4472,7 @@ class FrontalLobe:
 
     @property
     def ion_context(self) -> IonCognitiveContext:
-        """The latest bounded interpretation of the substrate's ion state."""
+        """The latest finite interpretation of the substrate's ion state."""
         ctx = getattr(self, "_last_ion_context", None)
         return ctx if isinstance(ctx, IonCognitiveContext) else IonCognitiveContext.neutral()
 
@@ -4399,7 +4499,7 @@ class FrontalLobe:
         return summary
 
     def _modulate_brain_waves_by_ions(self, brain_waves: BrainWaveState) -> BrainWaveState:
-        """Apply bounded electrochemical gates to oscillator-derived state.
+        """Apply electrochemical gates to oscillator-derived state.
 
         Chloride efficacy and membrane excitability modulate selective
         attention; gradient/ATP integrity modulates integration and
@@ -4865,8 +4965,8 @@ class FrontalLobe:
         self.executive.form_intention(
             f"{kind}:{target}",
             reason="prediction_error",
-            priority=min(1.0, 0.55 + 0.4 * prediction_error.magnitude),
-            confidence=max(0.1, 1.0 - prediction_error.magnitude),
+            priority=_finite_or(0.55 + 0.4 * prediction_error.magnitude, 0.55),
+            confidence=_finite_or(1.0 - prediction_error.magnitude, 0.5),
             expected_outcome="prediction mismatch reduced or explanation learned",
         )
         self.attention.set_goal(target)
@@ -4921,14 +5021,21 @@ class FrontalLobe:
         not overconfidence — the boost is small and weighted by
         the habit's success rate.
         """
-        base_confidence = thought.confidence * 0.7 + ddm_result.confidence * 0.3
+        base_confidence = _finite_or(
+            _finite_or(thought.confidence, 0.0) * 0.7
+            + _finite_or(ddm_result.confidence, 0.0) * 0.3,
+            _finite_or(thought.confidence, 0.0),
+        )
         if habit_bias is not None and habit_bias.confidence_boost > 0:
-            base_confidence = min(0.98, base_confidence + habit_bias.confidence_boost)
+            base_confidence = _finite_or(
+                base_confidence + habit_bias.confidence_boost,
+                base_confidence,
+            )
         # Self-esteem modulates confidence: high self-esteem makes
         # it more assertive, low self-esteem more hedging. The
         # modifier is in [0.5, 1.5] so it scales without flipping.
-        se_mod = self.self_model.self_esteem.confidence_modifier()
-        base_confidence = max(0.0, min(1.0, base_confidence * se_mod))
+        se_mod = _finite_or(self.self_model.self_esteem.confidence_modifier(), 1.0)
+        base_confidence = _finite_or(base_confidence * se_mod, base_confidence)
         return Thought(
             content=thought.content,
             intent=thought.intent,
@@ -5134,16 +5241,19 @@ class FrontalLobe:
             "acknowledge": "acknowledge",
         }
         expected_intent = action_intent_map.get(selected_action, "")
-        confidence = thought.confidence
+        confidence = _finite_or(thought.confidence, 0.0)
         if expected_intent and thought.intent == expected_intent:
             # Agreement — boost confidence, weighted by plan quality.
-            confidence = min(0.98, confidence + 0.05 + plan.expected_value * 0.05)
+            confidence = _finite_or(
+                confidence + 0.05 + _finite_or(plan.expected_value, 0.0) * 0.05,
+                confidence,
+            )
         elif expected_intent == "ask" and thought.intent in ("inform", "answer"):
             # Executive wants clarification but we're answering — reduce.
-            confidence = max(0.1, confidence - 0.1)
+            confidence = _finite_or(confidence - 0.1, confidence)
         elif expected_intent and thought.intent != expected_intent:
             # Mild divergence — slight reduction.
-            confidence = max(0.1, confidence - 0.03)
+            confidence = _finite_or(confidence - 0.03, confidence)
         return Thought(
             content=thought.content,
             intent=thought.intent,
@@ -5338,7 +5448,7 @@ class FrontalLobe:
                 ),
                 event_type=4,  # cognitive event
                 source_module=6,  # decision making
-                salience=max(0.0, min(1.0, ddm_result.confidence)),
+                salience=_finite_or(ddm_result.confidence, 0.0),
                 emotional_tag=self._build_emotional_tag(emotion, perception),
             )
 
@@ -5951,7 +6061,7 @@ class FrontalLobe:
                 ),
                 event_type=4,  # cognitive event
                 source_module=8,  # error monitoring
-                salience=max(0.0, min(1.0, caution)),
+                salience=_finite_or(caution, 0.0),
                 emotional_tag=self._build_emotional_tag(emotion, perception),
             )
         return insights
@@ -6117,7 +6227,11 @@ class FrontalLobe:
         concept = self.network.get_concept(pending_concept)
         if concept and store_as_definition:
             concept.properties["definition"] = answer_text
-            concept.confidence = min(1.0, concept.confidence + 0.3)
+            current_confidence = _finite_or(concept.confidence, 0.7)
+            concept.confidence = _finite_or(
+                current_confidence + 0.3,
+                current_confidence,
+            )
             logger.info(f"Learned answer for '{pending_concept}': {answer_text[:80]}")
         elif store_as_definition:
             self.network.add_concept(
@@ -7155,7 +7269,7 @@ class FrontalLobe:
                 da = float(core.chemicals.get("dopamine", 0.45))
             except (TypeError, ValueError):
                 da = 0.45
-            da = max(0.0, min(1.0, da))
+            da = max(0.0, da)
             stability = 1.0 / (1.0 + math.exp(-10.0 * (da - 0.45)))
             depth = max(1, round(depth * (0.75 + 0.5 * stability)))
             max_topics = max(1, round(max_topics * (1.25 - 0.5 * stability)))
@@ -7713,9 +7827,10 @@ class FrontalLobe:
         # (norepinephrine) and dopamine state at encoding decide
         # whether a verified episode proceduralizes into a skill or
         # stays merely episodic.
-        salience = max(
+        salience = _finite_or(
+            0.5 * _finite_or(emotion.arousal, 0.0)
+            + 0.5 * _finite_or(self._get_dopamine_level(), 0.0),
             0.0,
-            min(1.0, 0.5 * emotion.arousal + 0.5 * self._get_dopamine_level()),
         )
         math_result = try_math(
             perception.raw_text,
@@ -8491,9 +8606,9 @@ class FrontalLobe:
                 "frontal_lobe.prefrontal._competence_salience",
                 e,
             )
-        return max(
+        return _finite_or(
+            0.5 * _finite_or(arousal, 0.0) + 0.5 * _finite_or(self._get_dopamine_level(), 0.0),
             0.0,
-            min(1.0, 0.5 * arousal + 0.5 * self._get_dopamine_level()),
         )
 
     def _build_emotional_tag(

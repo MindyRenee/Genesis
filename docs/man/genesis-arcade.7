@@ -69,6 +69,46 @@ is the \fB"random"\fR policy by default or any
 into the int grid her sight renders; one match counts as one "level".
 No key and no network are needed \(em the shelf is always open when the
 packages are installed.
+.SH HER TOOLS
+The \fBarcade_*\fR family registered in her tool registry \(em how
+she plays. Arguments arrive as strings; each returns a
+\fIToolResult\fR (see
+.BR genesis-tools (7)).
+.TP
+.B arcade_directions
+Read the directions she is given for the games \(em the rules text
+that says she cannot know the instructions and must explore.
+.TP
+.B arcade_offers
+List the games the arcade offers \(em every title on both shelves,
+\fIarena:\fR-prefixed and bare.
+.TP
+.BR arcade_enter " \fI[game_id]\fR"
+Go to a game: sit down at \fIgame_id\fR, or let her pick one
+herself when no id is given. Opens with her sight's first read of
+the board.
+.TP
+.BR arcade_see " \fI[how]\fR"
+Look at the open board: \fItext\fR (the default), \fIimage\fR,
+\fIchange\fR, or \fIobjects\fR.
+.TP
+.BR arcade_act " \fImove\fR"
+Make one move in the open game \(em e.g. \fBACTION1\fR, or
+\fBACTION6@row,col\fR for a click on a cell. Replies with what
+changed and the new state/level.
+.TP
+.BR arcade_play " \fI[moves]\fR"
+Play a bout of the open (or chosen) game \(em a run of moves
+(default \fBBOUT_MOVES\fR) rather than a single act.
+.TP
+.B arcade_leave
+Step away from the game \(em the sitting ends; what she remembers
+of it is kept.
+.TP
+.B arcade_status
+Report what she remembers of every game \(em the same report
+\fB/arcade\fR shows.
+
 .SH INSTALL
 .nf
 \fBuv sync --extra arc\fR          arc-agi==0.9.9, game-arena, kaggle-environments
@@ -137,6 +177,72 @@ https://github.com/google-deepmind/game_arena the open-sourced harness
 https://github.com/Kaggle/kaggle-environments the environments stack
 https://www.kaggle.com/docs/api               Kaggle API reference
 .fi
+.SH GLOSSARY
+.TP
+.B arcade
+The place in her outer world that offers games \(em offers, not
+assignments: she chooses whether to play, and play feeds memory,
+emotion, and chemistry like any other act.
+.TP
+.B shelf / catalogue
+One source of games. \fBCombinedGames\fR merges the two shelves
+(official ARC-AGI-3 and the local arena) into one offer list;
+\fBarena:\fR-prefixed ids route to the arena, bare ids to the
+official API.
+.TP
+.B ARC-AGI-3
+The official interactive puzzle benchmark: grid-based levels with
+no stated instructions \(em she must explore, remember, and carry
+what each level teaches to the next.
+.TP
+.B arena
+The local shelf running on \fBpyspiel\fR \(em the same engine the
+Kaggle Game Arena harness evaluates on. Six games, seat 0, a
+\fI(state, player, rng) -> action\fR opponent policy.
+.TP
+.B policy
+A callable that picks a move for a seat given the state \(em her
+default opponent is the \fB"random"\fR policy.
+.TP
+.B scorecard
+The official server's account of a run \(em reached only in
+\fIonline\fR mode; local normal-mode play doesn't count there.
+.TP
+.B replay / recording
+The saved trace of a game under \fI<data_dir>/arcade/recordings\fR
+\(em including her \fIreasoning\fR field, the \fIwhy\fR she sent
+with each move.
+.TP
+.B reasoning field
+The free-text \fIwhy\fR attached to each \fBenv.step\fR \(em her
+thinking travels onto the official recording and scorecard.
+.TP
+.B gestalt
+The scene summary her sight emits when a board opens
+.RI ( "scene | dim warm red" " plus regional colors" )
+\(em the same record shape her episodic memory stores for camera
+scenes.
+.TP
+.B sight
+The mapping from board cells to perception: 16-colour palette
+indices through RGB to the V1 \fBname_color\fR vocabulary her
+camera path uses \(em boards reach her as colors and objects, not
+pixels.
+.TP
+.B observation planes
+The int-grid layers an arena game exposes (pieces, board state)
+folded into the grid her sight renders.
+.TP
+.B level
+One playable unit \(em one ARC level, or one arena match.
+.TP
+.B seat
+A player slot in an arena game \(em she plays seat 0.
+.TP
+.B pyspiel
+The OpenSpiel game engine the arena runs on \(em the same stack
+Kaggle Simulations contests and the open-sourced harness use.
+
 .SH SEE ALSO
 .BR genesis (1),
 .BR genesis-cli (1),

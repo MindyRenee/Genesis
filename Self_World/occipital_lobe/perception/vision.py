@@ -54,6 +54,7 @@ the language engine — it doesn't recite a template.
 from __future__ import annotations
 
 import logging
+import math
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -93,6 +94,16 @@ if TYPE_CHECKING:
     from limbic_system.emotion import EmotionalState
 
 logger = logging.getLogger(__name__)
+
+
+def _finite_or(value: float, default: float) -> float:
+    """Return finite floats; malformed/non-finite inputs use ``default``."""
+    try:
+        result = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return default
+    return result if math.isfinite(result) else default
+
 
 # Below this relay gain the thalamus is blocking sensory transmission
 # (TRN inhibition in NREM; the near-block of REM). NREM sits near 0.02,
@@ -949,11 +960,11 @@ class Vision:
         two_view: TwoViewReport | None = None,
     ) -> float:
         """Compute overall scene salience from color, V1, objects, and faces."""
-        mean_saturation = color_info.mean_saturation
-        v1_salience = field.salience if field is not None else 0.0
-        color_salience = min(
-            1.0,
-            0.25 + 0.35 * color_info.brightness + 0.4 * mean_saturation,
+        mean_saturation = _finite_or(color_info.mean_saturation, 0.0)
+        v1_salience = _finite_or(field.salience if field is not None else 0.0, 0.0)
+        color_salience = _finite_or(
+            0.25 + 0.35 * _finite_or(color_info.brightness, 0.0) + 0.4 * mean_saturation,
+            0.0,
         )
         salience = max(v1_salience, color_salience)
         if two_view is not None and two_view.moved:
@@ -965,12 +976,12 @@ class Vision:
             # a large object dominating the frame is more salient than
             # a tiny object in the corner. area_ratio is the fraction
             # of the frame the object occupies (0-1).
-            max_area = max((o.area_ratio for o in objects), default=0.0)
-            object_salience = min(1.0, 0.4 + max_area * 2.0)
+            max_area = max((_finite_or(o.area_ratio, 0.0) for o in objects), default=0.0)
+            object_salience = _finite_or(0.4 + max_area * 2.0, 0.0)
             salience = max(salience, object_salience)
         if face_names:
             salience = max(salience, 0.8)
-        return salience
+        return _finite_or(salience, 0.0)
 
     def _modulate_vision_chemistry(
         self,
@@ -1660,19 +1671,20 @@ def _emotional_tag(emotion: EmotionalState | None) -> list[float] | None:
     if emotion is None:
         return None
     tag = [0.5] * EMOTIONAL_TAG_SIZE
-    # Dopamine (0)
-    tag[0] = max(0.0, min(1.0, 0.5 + emotion.valence * 0.3))
+    # Dopamine (0), finite and uncapped
+    valence = _finite_or(emotion.valence, 0.0)
+    tag[0] = _finite_or(0.5 + valence * 0.3, 0.5)
     # Serotonin (1)
-    tag[1] = max(0.0, min(1.0, 0.5 + emotion.valence * 0.2))
+    tag[1] = _finite_or(0.5 + valence * 0.2, 0.5)
     # Norepinephrine (2)
-    tag[2] = emotion.alertness
+    tag[2] = _finite_or(emotion.alertness, 0.5)
     # Cortisol (6)
     if emotion.label in ("stressed", "anxious", "overwhelmed"):
         tag[6] = 0.7
-    elif emotion.valence < -0.2:
+    elif valence < -0.2:
         tag[6] = 0.6
     else:
         tag[6] = 0.2
     # BDNF / plasticity (11)
-    tag[11] = emotion.plasticity
+    tag[11] = _finite_or(emotion.plasticity, 0.5)
     return tag

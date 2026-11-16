@@ -24,6 +24,7 @@ from genesis_client.protocol import (
     CHEM_NAMES,
     CHEM_SEROTONIN,
     DT_NOMINAL_STEP,
+    EMOTIONAL_TAG_SIZE,
     GET_FIELD_PROBE,
     GET_FOLD_MARGINS,
     GET_ION_SUMMARY,
@@ -61,6 +62,7 @@ from genesis_client.protocol import (
     SET_FOCUS,
     SET_LID,
     SET_OPTIC_GAIN,
+    SET_POLICY_AUTHORITY,
     SET_WAKE_ALARM,
     SHUTDOWN,
     STORE_EPISODE,
@@ -340,6 +342,155 @@ def test_protocol_version():
     # by the schema bump that added the ion layer (schema v4 lives in
     # the state file, not the IPC framing).
     assert PROTOCOL_VERSION == 3
+
+
+def test_emotional_tag_wire_width_is_twelve():
+    """STORE_* tags use the daemon's fixed [f32; 12] slot.
+
+    The full neurochemical state has 18 levels, but the emotional tag
+    contract predates that expansion. Sending 18 floats shifts text_len
+    out of the daemon's byte-62 slot and silently truncates the memory.
+    """
+    assert EMOTIONAL_TAG_SIZE == 12
+
+
+def test_store_episode_packs_twelve_float_tag():
+    """The LTM request must place text_len immediately after 48 tag bytes."""
+    client, sock = _client_with_socket()
+    tag = [i / 10.0 for i in range(EMOTIONAL_TAG_SIZE)]
+    stamped = [0.25] * EMOTIONAL_TAG_SIZE
+    response = b"\x01" + struct.pack("<Q", 42) + struct.pack(f"<{EMOTIONAL_TAG_SIZE}f", *stamped)
+
+    with (
+        patch("genesis_client.client.write_message") as send,
+        patch(
+            "genesis_client.client.read_message",
+            return_value=(STORE_EPISODE, response),
+        ),
+    ):
+        episode_id, stamped_tag = client.store_episode(1000, 0, 4, 0.8, tag, "memory text")
+
+    assert episode_id == 42
+    assert stamped_tag == stamped
+    assert send.call_count == 1
+    assert send.call_args.args[:2] == (sock, STORE_EPISODE)
+    payload = send.call_args.args[2]
+    fixed_header = 8 + 1 + 1 + 4 + EMOTIONAL_TAG_SIZE * 4 + 2
+    assert len(payload) == fixed_header + len("memory text")
+    assert struct.unpack("<H", payload[62:64])[0] == len("memory text")
+    assert payload[64:] == b"memory text"
+
+
+def test_store_event_packs_twelve_float_tag():
+    """The STM request uses the same fixed tag/text_len layout."""
+    client, sock = _client_with_socket()
+    tag = [i / 10.0 for i in range(EMOTIONAL_TAG_SIZE)]
+    stamped = [0.5] * EMOTIONAL_TAG_SIZE
+    response = b"\x01" + struct.pack(f"<{EMOTIONAL_TAG_SIZE}f", *stamped)
+
+    with (
+        patch("genesis_client.client.write_message") as send,
+        patch(
+            "genesis_client.client.read_message",
+            return_value=(STORE_EVENT, response),
+        ),
+    ):
+        assert client.store_event(1000, 0, 4, 0.8, tag, "event text")
+
+    assert send.call_count == 1
+    assert send.call_args.args[:2] == (sock, STORE_EVENT)
+    payload = send.call_args.args[2]
+    fixed_header = 8 + 1 + 1 + 4 + EMOTIONAL_TAG_SIZE * 4 + 2
+    assert len(payload) == fixed_header + len("event text")
+    assert struct.unpack("<H", payload[62:64])[0] == len("event text")
+    assert payload[64:] == b"event text"
+
+
+def test_store_commands_reject_eighteen_float_tag():
+    """Regression: the 18-chemical state array must not be reused as a tag."""
+    client, _ = _client_with_socket()
+    with pytest.raises(ValueError, match="12 elements, got 18"):
+        client.store_event(1000, 0, 4, 0.8, [0.0] * 18, "event")
+    with pytest.raises(ValueError, match="12 elements, got 18"):
+        client.store_episode(1000, 0, 4, 0.8, [0.0] * 18, "memory")
+
+
+def test_store_event_preserves_finite_out_of_range_evidence():
+    """Finite salience/tag values are packed verbatim on the memory wire."""
+    client, _ = _client_with_socket()
+    tag = [-1.25] + [0.0] * (EMOTIONAL_TAG_SIZE - 1)
+    response = b"\x01" + b"\x00" * (EMOTIONAL_TAG_SIZE * 4)
+
+    with (
+        patch("genesis_client.client.write_message") as send,
+        patch(
+            "genesis_client.client.read_message",
+            return_value=(STORE_EVENT, response),
+        ),
+    ):
+        assert client.store_event(1000, 0, 4, 2.5, tag, "event")
+
+    payload = send.call_args.args[2]
+    assert struct.unpack("<f", payload[10:14])[0] == pytest.approx(2.5)
+    assert struct.unpack("<f", payload[14:18])[0] == pytest.approx(-1.25)
+
+
+def test_store_episode_replaces_non_finite_evidence_before_packing():
+    """Malformed values get explicit defaults rather than NaN on the wire."""
+    client, _ = _client_with_socket()
+    tag = [float("nan")] + [0.0] * (EMOTIONAL_TAG_SIZE - 1)
+    response = b"\x01" + b"\x00" * 8 + b"\x00" * (EMOTIONAL_TAG_SIZE * 4)
+
+    with (
+        patch("genesis_client.client.write_message") as send,
+        patch(
+            "genesis_client.client.read_message",
+            return_value=(STORE_EPISODE, response),
+        ),
+    ):
+        episode_id, _ = client.store_episode(1000, 0, 4, float("inf"), tag, "memory")
+
+    assert episode_id == 0
+    payload = send.call_args.args[2]
+    assert struct.unpack("<f", payload[10:14])[0] == 0.0
+    assert struct.unpack("<f", payload[14:18])[0] == 0.0
+
+
+def test_policy_authority_preserves_finite_out_of_range_value():
+    """The authority payload carries finite evidence verbatim."""
+    client, _ = _client_with_socket()
+    with (
+        patch("genesis_client.client.write_message") as send,
+        patch(
+            "genesis_client.client.read_message",
+            return_value=(SET_POLICY_AUTHORITY, b"\x01"),
+        ),
+    ):
+        assert client.set_policy_authority(1.7)
+
+    assert send.call_args.args[1] == SET_POLICY_AUTHORITY
+    assert struct.unpack("<f", send.call_args.args[2])[0] == pytest.approx(1.7)
+
+
+def test_update_module_status_preserves_finite_cpu_share():
+    """Measured module work above the historical fraction survives."""
+    client, _ = _client_with_socket()
+    with (
+        patch("genesis_client.client.write_message") as send,
+        patch(
+            "genesis_client.client.read_message",
+            return_value=(UPDATE_MODULE_STATUS, b"\x01"),
+        ),
+    ):
+        assert client.update_module_status(
+            MODULE_SENSORY,
+            MODULE_STATUS_RUNNING,
+            cpu_share=1.4,
+        )
+
+    payload = send.call_args.args[2]
+    assert payload[:2] == bytes((MODULE_SENSORY, MODULE_STATUS_RUNNING))
+    assert struct.unpack("<f", payload[2:6])[0] == pytest.approx(1.4)
 
 
 def _client_with_socket():

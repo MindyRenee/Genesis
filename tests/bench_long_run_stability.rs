@@ -72,8 +72,8 @@ fn run_stability_test() -> Vec<Checkpoint> {
     for tick in 0..TOTAL_TICKS {
         // Apply periodic perturbation.
         let phase = if tick % PERTURB_INTERVAL == 0 && tick > 0 {
-            neuro.apply_impulse_capped(NeurochemicalId::Cortisol, 0.3, 0);
-            neuro.apply_impulse_capped(NeurochemicalId::Dopamine, 0.2, 0);
+            neuro.apply_impulse(NeurochemicalId::Cortisol, 0.3, 0);
+            neuro.apply_impulse(NeurochemicalId::Dopamine, 0.2, 0);
             neuro.recompute_derived();
             "perturbation"
         } else {

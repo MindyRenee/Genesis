@@ -14,12 +14,12 @@ The timing rule is followed by a three-factor neuromodulatory gate.
 
 from __future__ import annotations
 
-import threading
 from collections import deque
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
+from inhibition import RecurrentInhibition
 
 from .synapses import SynapticStore
 
@@ -100,7 +100,7 @@ class STDP:
         self._spike_history: dict[str, deque[float]] = {}
         self._max_history = 50
         self._pending: list[tuple[str, str, float, float]] = []
-        self._lock = threading.RLock()
+        self._lock = RecurrentInhibition()
         self._modulator = 1.0
 
         self.total_potentiated = 0

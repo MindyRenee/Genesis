@@ -83,6 +83,7 @@ __all__ = [
     "GET_RECENT_EPISODES",
     "GET_SENSOR_PRESENCE",
     "GET_STATE",
+    "GET_STATE_SNAPSHOT",
     "GET_SUBSYSTEM_TELEMETRY",
     "GET_TENSOR",
     "GET_ZONE_TRANSITIONS",
@@ -214,8 +215,9 @@ GET_ION_SUMMARY = 40
 # with STORE_EVENT / STORE_EPISODE. Fixed by the wire layout: the
 # daemon reads ``[f32; 12]`` (see ``STORE_EPISODE`` in src/daemon/ipc.rs)
 # and passes the values through positionally, so sender and receiver
-# must agree on the width or the tag is silently truncated.
-EMOTIONAL_TAG_SIZE = 18
+# must agree on the width or the tag is silently truncated. This is
+# distinct from the 18-chemical full state array.
+EMOTIONAL_TAG_SIZE = 12
 
 # ─── Command IDs ──────────────────────────────────────────────
 
@@ -275,8 +277,8 @@ GET_SUBSYSTEM_TELEMETRY = 33
 SET_WAKE_ALARM = 34
 
 # Set how much authority the inference engine has to choose its own
-# policy on Genesis's behalf. Request: [f32 authority] in [0,1].
-# Response: [u8 ack] + [f32 applied].
+# policy on Genesis's behalf. Request: [f32 authority]; finite values
+# are applied verbatim. Response: [u8 ack] + [f32 applied].
 SET_POLICY_AUTHORITY = 35
 
 # Retired — never reuse this wire number. Volitional pushes onto the
@@ -456,6 +458,17 @@ GET_FOLD_MARGINS = 62
 # Reply: [u8 ack]. Additive: PROTOCOL_VERSION stays 3.
 SET_FIELD_PULSE = 63
 
+# The mind's contract for core state — a 232-byte CoreStateSnapshot:
+# a self-describing header (magic b"GSS1", version, size) followed by
+# the fields the mind consumes, mapped field-by-field on the daemon.
+# This is what GET_STATE should have been: GET_STATE stays the raw
+# brain image for full-fidelity inspection, while the mind parses a
+# versioned DTO instead of mirroring the schema-v5 byte layout — a
+# brain-schema bump can no longer silently re-encode the wire.
+# Additive: PROTOCOL_VERSION stays 3 — an older daemon rejects the
+# unknown opcode loudly rather than misparsing it.
+GET_STATE_SNAPSHOT = 64
+
 # Which optional hardware sensors this machine actually has.
 # Response: [u16 mask] — a bitmask of SENSOR_* below. A set bit means
 # the matching BodyState field carries a real reading; a clear bit
@@ -584,7 +597,7 @@ _ERROR_NAMES = {
     ERROR_VERSION_MISMATCH: "version mismatch",
     ERROR_INTERNAL_ERROR: "internal error",
     ERROR_INVALID_VALUE: "invalid value",
-    ERROR_READ_FAILED: "read failed (seqlock contention or corrupt state)",
+    ERROR_READ_FAILED: "read failed (corrupt state)",
 }
 
 

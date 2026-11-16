@@ -139,6 +139,66 @@ Starts her nested desktop: \fBXephyr :10\fR at 1280x800 running
 .TP
 .I firefox(1) / google-chrome(1)
 The system's manual for the browser binary itself.
+.SH GLOSSARY
+.TP
+.B WebDriver BiDi
+The bidirectional browser-automation protocol Firefox speaks:
+commands and events over a websocket
+(\fBbrowsingContext.navigate\fR, \fBscript.evaluate\fR,
+\fBinput.performActions\fR, \fBsession.subscribe\fR).
+.TP
+.B CDP
+The Chrome DevTools Protocol \(em the Chromium family's equivalent
+transport (\fBPage.navigate\fR, \fBRuntime.evaluate\fR,
+\fBInput.dispatchKeyEvent\fR). Chosen automatically by which
+binary resolved.
+.TP
+.B transport
+The protocol layer carrying her acts and percepts to the real
+browser \(em BiDi or CDP; she never drives by pixels and hope.
+.TP
+.B headless / headed
+Two run modes: \fIheadless\fR (default \(em no window) and
+\fIheaded\fR, which renders on \fBGENESIS_DISPLAY\fR (her nested
+desktop on :10) else the session's \fBDISPLAY\fR.
+.TP
+.B profile
+The browser's persistent memory of the web \(em cookies, site
+state, history \(em kept under \fI<data_dir>/browser/\fR so what
+she learns survives restarts. Never a tempdir, never the host's
+own profile.
+.TP
+.B singleton lock
+The browser's own single-instance guard: Firefox's
+\fI.parentlock\fR (an fcntl byte-range lock owned by the kernel)
+and Chromium's \fISingletonLock\fR family \(em how one profile is
+kept to one writer.
+.TP
+.B engine plan
+The ordered list of search engines \fBweb_search\fR tries
+(google, bing, brave, mojeek), advancing past captchas and consent
+walls rather than pretending the web was empty.
+.TP
+.B interstitial
+A captcha, consent wall, or bot challenge detected before the real
+page \(em the refusal names every engine that walled.
+.TP
+.B curiosity chaining
+The up-to-five canonical related links \fBweb_fetch\fR returns
+\(em deduped on scheme://host/path so fragment and tracking
+variants never repeat \(em so one page can lead her to the next.
+.TP
+.B Xephyr / :10
+Her nested X server \(em a desktop inside the host's desktop \(em
+running Openbox at 1280x800 so headed browsing can render where
+she works without taking over the screen.
+.TP
+.B \fBbrowser_close\fR contract
+The browser is asked, never forced: \fBbrowser.close\fR over the
+session flushes the profile (memory) before exit; the spawned
+child then gets SIGTERM and a bounded wait. She must call it when
+done browsing \(em the open instance is her responsibility.
+
 .SH SEE ALSO
 .BR genesis (1),
 .BR genesis-cli (1),

@@ -106,7 +106,7 @@ fn run_trial(impulse: f32) -> Trial {
 
     // Apply the dopamine impulse.
     if impulse.abs() > 1e-6 {
-        neuro.apply_impulse_capped(NeurochemicalId::Dopamine, impulse, 0);
+        neuro.apply_impulse(NeurochemicalId::Dopamine, impulse, 0);
     }
     neuro.recompute_derived();
 

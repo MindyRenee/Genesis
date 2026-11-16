@@ -43,7 +43,7 @@ fi
 # These invocations mirror the toolchain documented in AGENTS.md.
 # A missing tool warns loudly instead of silently passing — a skipped
 # check is a false pass.
-PY_DEPS="Self_World/ Inner_Non_Physical_World/ Outer_Physical_World/"
+PY_DEPS="Self_World/ Inner_World/ Outer_World/"
 
 if command -v ruff >/dev/null 2>&1; then
     if ! ruff_out="$(ruff check 2>&1)"; then
@@ -76,6 +76,13 @@ if python3 -m mypy --version >/dev/null 2>&1; then
 else
     echo "❌ mypy not found — check cannot be verified. Install: pip install -r requirements-dev.txt"
     SKIPPED=1
+fi
+
+# ─── Man pages ──────────────────────────────────────────────────
+if ! bash "$SCRIPT_DIR/check_man_pages.sh" >/dev/null; then
+    echo "❌ Man-page drift detected."
+    bash "$SCRIPT_DIR/check_man_pages.sh"
+    exit 1
 fi
 
 if [ "$SKIPPED" -ne 0 ]; then

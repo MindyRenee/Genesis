@@ -43,6 +43,16 @@ from dataclasses import dataclass, field, replace
 
 from genesis_client.protocol import DT_MAX
 
+
+def _finite_or(value: float, default: float) -> float:
+    """Return finite floats; malformed/non-finite inputs use ``default``."""
+    try:
+        result = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return default
+    return result if math.isfinite(result) else default
+
+
 # Trace depth per urge — the volition tick runs at heartbeat cadence
 # (~1 Hz), so 900 samples keep roughly a quarter-hour of buildup
 # history for the readiness record without unbounded growth.
@@ -79,16 +89,19 @@ class Urge:
         rng: random.Random | None = None,
     ) -> None:
         """Update the urge value based on time and stimuli."""
+        dt = max(0.0, _finite_or(dt, 0.0))
         change = self.growth * dt
         for signal, weight in self.stimuli.items():
-            raw = context.get(signal, 0.0)
-            if isinstance(raw, (int, float)):
-                change += float(raw) * weight * dt
+            raw = _finite_or(context.get(signal, 0.0), 0.0)
+            weight = _finite_or(weight, 0.0)
+            change += raw * weight * dt
         if self.update_fn:
-            change += self.update_fn(self.name, context, dt)
+            change += _finite_or(self.update_fn(self.name, context, dt), 0.0)
         if self.noise > 0.0 and rng is not None and dt > 0.0:
             change += self.noise * math.sqrt(dt) * rng.gauss(0.0, 1.0)
-        self.value = max(0.0, min(1.0, self.value + change - self.decay * dt))
+        change = _finite_or(change, 0.0)
+        value = _finite_or(self.value + change - self.decay * dt, self.value)
+        self.value = max(0.0, min(1.0, value))
 
     def is_ready(self) -> bool:
         """Whether the urge is above threshold and off cooldown."""

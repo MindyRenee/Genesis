@@ -30,6 +30,9 @@ Subsystems:
     ManPagesMixin — her man pages are part of her self-model: she
         learns them at boot, and the installed copies stay synced to
         the versioned sources
+    SleepMixin — the self's sleep–wake cycle: engaging the body's
+        flip-flop, tracking the phase, and doing stage-gated
+        consolidation work
 """
 
 from __future__ import annotations

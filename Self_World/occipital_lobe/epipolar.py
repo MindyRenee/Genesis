@@ -68,10 +68,10 @@ to the rest of the mind.
 from __future__ import annotations
 
 import math
-import threading
 from dataclasses import dataclass
 
 import numpy as np
+from inhibition import InhibitoryGate
 
 __all__ = [
     "EpipolarProcessor",
@@ -958,7 +958,7 @@ class EpipolarProcessor:
         self._rng = np.random.default_rng(seed)
         self._prev: np.ndarray | None = None
         self._prev_pts: np.ndarray | None = None
-        self._lock = threading.Lock()
+        self._lock = InhibitoryGate()
 
     def reset(self) -> None:
         """Drop the previous view — the next look opens a new pair."""

@@ -23,11 +23,12 @@ there the traffic fans out to the structures that own each dimension:
         ``update_from_body_state`` — the felt InternalState the
         homeostat regulates from — which runs in parallel to this
         relay and owns the HPA (CRH→cortisol) axis.
-    lamina I → catecholamine cell groups (A1/A5/A6)
-        Afferent drive on the monoamine source nuclei themselves —
-        the LC (NE), the raphe (5-HT), the adrenal-medullary axis
-        (EPI). This is the relay's own impulse arm: source-level
-        modulation the hypothalamic evaluator does not own.
+    lamina I → catecholamine cell groups (A1/A5/A6/A7)
+        Afferent drive on the arousal systems themselves — LC/NE
+        drive under strain and withdrawal of NE, orexin, and
+        histamine during measured rest. This is the relay's own
+        impulse arm: source-level modulation the hypothalamic
+        evaluator does not own.
     NTS/PBN → VMpo/VMb thalamus → posterior → anterior insula → OFC
         The cortical image of the body (primary interoceptive
         cortex → subjective feeling → hedonic valence). Carried by
@@ -49,17 +50,16 @@ No impulse magnitude here is a constant the body obeys blindly. Each
 raw rate is re-scaled at send time by the live level of the very
 chemical it targets:
 
-    positive impulse  ×  (1 − level)   headroom under the ceiling —
-                                       autoreceptor-style saturation:
+    positive impulse  ×  (1 − level)   autoreceptor-style modulation:
                                        the nearer the level already
                                        is, the weaker the push
-    negative impulse  ×  level         tone withdrawn only from tone
-                                       that exists
+    negative impulse  ×  level         tone withdrawn in proportion to
+                                       the live tone
 
 The values therefore set themselves from Genesis's own chemistry on
-every call; the daemon's ``apply_impulse_capped`` stays the hard
-bound. Rates mirror the daemon's spec so the reflex is identical at
-both levels of the organism.
+every call; the IPC boundary remains responsible for transport safety.
+The daemon keeps the cortex-free fallback form of the same reflex
+pattern when the mind's lease expires.
 """
 
 from __future__ import annotations
@@ -69,16 +69,10 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from genesis_client.protocol import (
-    CHEM_ACETYLCHOLINE,
-    CHEM_ENDOCANNABINOID,
-    CHEM_EPINEPHRINE,
-    CHEM_GABA,
-    CHEM_GLUTAMATE,
     CHEM_HISTAMINE,
     CHEM_NAMES,
     CHEM_NOREPINEPHRINE,
     CHEM_OREXIN,
-    CHEM_SEROTONIN,
 )
 
 if TYPE_CHECKING:
@@ -90,21 +84,17 @@ logger = logging.getLogger(__name__)
 _EPSILON = 1e-6
 
 
-def _clamp(x: float, lo: float, hi: float) -> float:
-    return lo if x < lo else hi if x > hi else x
-
-
 def _intensity(x: float, lo: float, span: float) -> float:
-    """Signal strength scaled into [0, 1] over a rising threshold band."""
-    return _clamp((x - lo) / span, 0.0, 1.0)
+    """Signal strength scaled over a rising threshold band."""
+    return (x - lo) / span
 
 
 class InteroceptiveRelay:
     """NTS/PBN — the first relay for body afferents.
 
     Reads the published BodyState, forwards threat channels to the
-    limbic low road (PBN→CeA), and modulates the monoamine source
-    nuclei directly (lamina I → catecholamine groups). Impulse
+    limbic low road (PBN→CeA), and modulates arousal systems directly
+    (lamina I → catecholamine groups). Impulse
     magnitudes are self-set: each offer is scaled by the live level
     of its own target chemical, so nothing here is a fixed constant.
 
@@ -142,7 +132,7 @@ class InteroceptiveRelay:
         if self._neuro_impulse is None or raw == 0.0:
             return
         level = levels.get(CHEM_NAMES.get(chem, ""), 0.0)
-        mag = raw * _clamp(1.0 - level, 0.0, 1.0) if raw > 0.0 else raw * _clamp(level, 0.0, 1.0)
+        mag = raw * (1.0 - level) if raw > 0.0 else raw * level
         if abs(mag) <= _EPSILON:
             return
         try:
@@ -174,7 +164,6 @@ class InteroceptiveRelay:
         sent: list[tuple[int, float]] = []
 
         threats, peak = self._sympathetic_arm(body, presence, levels, sent)
-        self._vigilance_arm(body, levels, sent)
         self._parasympathetic_arm(body, presence, levels, sent)
 
         # PBN→CeA: all active threat channels, one aversive US.
@@ -207,7 +196,6 @@ class InteroceptiveRelay:
         the caller hands both to the CeA low road as one US."""
         threats: list[str] = []
         peak = self._drive_channels(body, threats, levels, sent)
-        peak = max(peak, self._pressure_channels(body, threats, levels, sent))
         peak = max(peak, self._power_thermal_channels(body, presence, threats))
         return threats, peak
 
@@ -230,69 +218,16 @@ class InteroceptiveRelay:
             threats.append("body:heat")
             peak = max(peak, i)
             self._push(CHEM_NOREPINEPHRINE, 0.003 * i, levels, sent)
-        # Sustained overload → adrenal-medullary surge + LC drive.
+        # Sustained overload engages the sympathetic arousal arm.
         if body.stress_load > 1.0:
             i = _intensity(body.stress_load, 1.0, 0.5)
             threats.append("body:overload")
             peak = max(peak, i)
             self._push(CHEM_NOREPINEPHRINE, 0.004 * i, levels, sent)
-            self._push(CHEM_EPINEPHRINE, 0.003 * i, levels, sent)
         elif body.stress_load > 0.5:
             # Effort is sustainable work — LC drive, no threat cue.
             i = _intensity(body.stress_load, 0.5, 0.5)
             self._push(CHEM_NOREPINEPHRINE, 0.003 * i, levels, sent)
-        # Memory pressure → overwhelm cue; GABA is the brake it asks for.
-        if body.cognitive_load > 0.70:
-            i = _intensity(body.cognitive_load, 0.70, 0.30)
-            threats.append("body:memory_pressure")
-            peak = max(peak, i)
-            self._push(CHEM_GABA, 0.004 * i, levels, sent)
-        return peak
-
-    def _pressure_channels(
-        self,
-        body: BodyState,
-        threats: list[str],
-        levels: dict[str, float],
-        sent: list,
-    ) -> float:
-        """Host contention and memory stalls — the PSI stall cues.
-
-        Returns this group's peak threat intensity (0 when nothing fired)."""
-        peak = 0.0
-        # Host contention — PSI "some" is the kernel's own stall
-        # accounting: the share of time tasks waited on a resource.
-        # It is the honest signal the occupancy fields can't give —
-        # the machine is straining, not merely occupied. It arrives
-        # as a felt cue like heat: she reads it, weighs it, and
-        # answers through her own drives and gates — nothing here
-        # acts on her.
-        if body.psi_cpu > 0.25:
-            i = _intensity(body.psi_cpu, 0.25, 0.35)
-            threats.append("body:contention")
-            peak = max(peak, i)
-            self._push(CHEM_NOREPINEPHRINE, 0.004 * i, levels, sent)
-            self._push(CHEM_EPINEPHRINE, 0.002 * i, levels, sent)
-        elif body.psi_cpu > 0.10:
-            i = _intensity(body.psi_cpu, 0.10, 0.15)
-            self._push(CHEM_NOREPINEPHRINE, 0.002 * i, levels, sent)
-        if body.psi_io > 0.30:
-            i = _intensity(body.psi_io, 0.30, 0.30)
-            if "body:contention" not in threats:
-                threats.append("body:contention")
-            peak = max(peak, i)
-            self._push(CHEM_NOREPINEPHRINE, 0.002 * i, levels, sent)
-        # Memory stalls are the pressure the RSS share only
-        # approximates — tasks are actually waiting on memory.
-        if body.psi_mem > 0.20:
-            i = _intensity(body.psi_mem, 0.20, 0.30)
-            if "body:memory_pressure" not in threats:
-                threats.append("body:memory_pressure")
-            peak = max(peak, i)
-            self._push(CHEM_GABA, 0.004 * i, levels, sent)
-        elif body.psi_mem > 0.08:
-            i = _intensity(body.psi_mem, 0.08, 0.12)
-            self._push(CHEM_GABA, 0.002 * i, levels, sent)
         return peak
 
     def _power_thermal_channels(
@@ -301,18 +236,18 @@ class InteroceptiveRelay:
         presence: SensorPresence | None,
         threats: list[str],
     ) -> float:
-        """Power and cooling survival cues — no chemical push, only the
-        cue itself (a failing rail is evidence, not a drive request).
+        """Energy and thermoregulatory cues — evidence forwarded to the
+        low road without direct chemical drive.
 
         Returns this group's peak threat intensity (0 when nothing fired)."""
         peak = 0.0
-        # Energy reserve below threshold off AC → survival cue.
+        # Energy reserve below threshold off external supply → survival cue.
         if not body.on_ac_power and body.energy_reserve < 0.30:
             i = _intensity(0.30 - body.energy_reserve, 0.0, 0.30)
-            threats.append("body:battery")
+            threats.append("body:energy_reserve")
             peak = max(peak, i)
-        # Cooling failure: hot silicon, fan silent (sensor-gated —
-        # absence of a fan sensor is not evidence of a stopped fan).
+        # Cooling failure: hot body, cooling response silent (sensor-gated —
+        # absence of a sensor is not evidence of failure).
         if (
             self._verified(presence, "fan PWM")
             and body.thermoregulatory_effort < 0.05
@@ -333,47 +268,7 @@ class InteroceptiveRelay:
                     _intensity(body.cpu_temp_c, 75.0, 15.0),
                 ),
             )
-        # Critically low rail voltage → survival cue (raw electrical
-        # reality, stronger evidence than the reserve estimate).
-        if not body.on_ac_power and 0.0 < body.supply_voltage < 10.8:
-            threats.append("body:battery_rail")
-            peak = max(peak, _intensity(10.8 - body.supply_voltage, 0.0, 0.8))
-        # Metabolic strain: burning hard AND hot.
-        if body.metabolic_rate > 0.7 and body.cpu_temp_c > 75.0:
-            threats.append("body:metabolic_strain")
-            peak = max(
-                peak,
-                min(
-                    _intensity(body.metabolic_rate, 0.7, 0.3),
-                    _intensity(body.cpu_temp_c, 75.0, 15.0),
-                ),
-            )
         return peak
-
-    def _vigilance_arm(
-        self,
-        body: BodyState,
-        levels: dict[str, float],
-        sent: list,
-    ) -> None:
-        """Work that is not yet distress — LC/ACh alerting pushes."""
-        if body.io_activity > 0.10:
-            i = _intensity(body.io_activity, 0.10, 0.40)
-            self._push(CHEM_NOREPINEPHRINE, 0.003 * i, levels, sent)
-        if body.core_activity > 0.40:
-            i = _intensity(body.core_activity, 0.40, 0.60)
-            self._push(CHEM_NOREPINEPHRINE, 0.002 * i, levels, sent)
-        # DRAM switching = memory traffic → ACh (encoding/retrieval).
-        if body.dram_activity > 0.30:
-            i = _intensity(body.dram_activity, 0.30, 0.70)
-            self._push(CHEM_ACETYLCHOLINE, 0.003 * i, levels, sent)
-        # Hardware prediction errors → small LC orienting pulses.
-        if body.branch_miss_rate > 0.08:
-            i = _intensity(body.branch_miss_rate, 0.08, 0.12)
-            self._push(CHEM_NOREPINEPHRINE, 0.002 * i, levels, sent)
-        if body.cache_miss_rate > 0.15:
-            i = _intensity(body.cache_miss_rate, 0.15, 0.25)
-            self._push(CHEM_NOREPINEPHRINE, 0.002 * i, levels, sent)
 
     def _parasympathetic_arm(
         self,
@@ -382,34 +277,9 @@ class InteroceptiveRelay:
         levels: dict[str, float],
         sent: list,
     ) -> None:
-        """Vagal arm: rest is evidence — calming pushes and
-        alerting-tone withdrawal."""
-        # cpuidle residency is the machine's vagal signal — a core
-        # parked in a real C-state is positive evidence of a
-        # hypometabolic substrate. Gated on the sensor: absence of
-        # the measurement is not evidence of calm.
-        rested = self._verified(presence, "cpuidle state counters") and body.rest > 0.0
-        if rested and body.rest > 0.5 and body.cpu_temp_c < 60.0 and body.stress_load < 0.25:
-            self._push(CHEM_SEROTONIN, 0.002, levels, sent)
-            self._push(CHEM_GABA, 0.001, levels, sent)
-            # eCB — the homeostatic brake; the documented stress-
-            # termination signal (Hill et al. 2011).
-            self._push(CHEM_ENDOCANNABINOID, 0.002, levels, sent)
-        if rested and body.rest > 0.7:
-            # Deepest rest withdraws alerting tone — reciprocal
-            # autonomic antagonism, not silence. Scaled by level:
-            # tone can only be withdrawn where it exists.
+        """Measured rest withdraws the arousal systems' tone."""
+        rested = self._verified(presence, "cpuidle state counters") and body.rest > 0.7
+        if rested:
             self._push(CHEM_NOREPINEPHRINE, -0.002, levels, sent)
-            self._push(CHEM_GLUTAMATE, -0.001, levels, sent)
             self._push(CHEM_OREXIN, -0.001, levels, sent)
             self._push(CHEM_HISTAMINE, -0.001, levels, sent)
-        # Cooling after strain → eCB (glucocorticoid feedback
-        # terminates stress responses by mobilizing endocannabinoids,
-        # Evanson et al. 2010). Sensor-gated on a real thermometer.
-        if self._verified(presence, "temperature") and body.temp_trend < -0.15:
-            self._push(CHEM_ENDOCANNABINOID, 0.002, levels, sent)
-
-        # Contentment: low load + cool — the healthy-body baseline.
-        if body.stress_load < 0.25 and body.cpu_temp_c < 60.0 and body.cognitive_load < 0.60:
-            self._push(CHEM_SEROTONIN, 0.002, levels, sent)
-            self._push(CHEM_GABA, 0.001, levels, sent)

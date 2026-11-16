@@ -4,9 +4,9 @@
 //!
 //! The organism is organized into three worlds —
 //! `Self_World/` (this crate: the physical self — brain regions,
-//! neurochemistry, the body), `Inner_Non_Physical_World/` (the
+//! neurochemistry, the body), `Inner_World/` (the
 //! non-physical phenomena — field, waves, dreams, thoughts), and
-//! `Outer_Physical_World/` (the environment). `Self_World/src/`
+//! `Outer_World/` (the environment). `Self_World/src/`
 //! presents the body's anatomy the same way.
 //! The implementation lives in `daemon`, `state`, `store`,
 //! `cognition`, `field`, and `math`; the region modules
@@ -53,6 +53,7 @@ pub mod cognition;
 pub mod daemon;
 pub mod data_dir;
 pub mod field;
+pub mod inhibition;
 pub mod math;
 #[cfg(feature = "python")]
 pub mod python_ext;
@@ -64,5 +65,6 @@ pub use field::{
     BraidTrajectory, FieldError, GaugeTransport, GlobalField, StereographicSphere, SubsystemLayer,
     SystemEngine, SystemFiber, Vector,
 };
+pub use inhibition::{Inhibition, Innate};
 pub use state::GenesisCoreState;
 pub use store::{MmapState, StateFileError};

@@ -32,13 +32,13 @@ References:
 from __future__ import annotations
 
 import logging
-import threading
 import time
 from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from genesis_client.swallow import note_swallowed
+from inhibition import InhibitoryGate
 
 logger = logging.getLogger(__name__)
 
@@ -100,7 +100,7 @@ class NotificationQueue:
         self._get_neuro_summary = get_neuro_summary
         self._get_recent_episodes = get_recent_episodes
         self._queue: deque[Notification] = deque(maxlen=max_size)
-        self._lock = threading.Lock()
+        self._lock = InhibitoryGate()
 
         # State tracking for change detection.
         self._last_phase: str = ""

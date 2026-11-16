@@ -31,9 +31,10 @@ anyone reading the journal at all.
 from __future__ import annotations
 
 import logging
-import threading
 import time
 from collections.abc import Callable, Iterator
+
+from inhibition import InhibitoryGate
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +81,7 @@ _TAIL_STRIDE = 4096
 # trustworthy rather than merely bounded.
 _TAIL_SECONDS = 300.0
 
-_lock = threading.Lock()
+_lock = InhibitoryGate()
 _counts: dict[str, int] = {}
 _reported_upto: dict[str, int] = {}
 _reported_at: dict[str, float] = {}

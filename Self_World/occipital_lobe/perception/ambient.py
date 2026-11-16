@@ -41,6 +41,7 @@ from collections.abc import Callable
 from typing import Any
 
 from genesis_client.threads import call_on_named_thread, named_thread
+from inhibition import InhibitoryGate
 
 __all__ = ["AmbientListener", "contains_wake_word", "strip_wake_word"]
 
@@ -149,14 +150,14 @@ class AmbientListener:
         # Serializes start/stop — without it a start racing a stop
         # loses the old thread's handle while the old loop resumes on
         # the cleared flag, leaving a phantom second listener alive.
-        self._lifecycle_lock = threading.Lock()
+        self._lifecycle_lock = InhibitoryGate()
         self._vosk_model = None
         self._initialized = False
         self._init_error: str | None = None
 
         # Recent utterance log (for debugging / the caller to inspect)
         self._recent: deque[str] = deque(maxlen=20)
-        self._recent_lock = threading.Lock()
+        self._recent_lock = InhibitoryGate()
 
     def _init_vosk(self) -> bool:
         """Load the Vosk model. Returns True on success."""

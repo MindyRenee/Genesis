@@ -11,8 +11,8 @@ from an alternative source:
   - an HTTP MJPEG stream (e.g. a surveillance daemon's localhost feed)
 
 ffmpeg decodes to packed RGB24 frames; the relay writes them into the
-/genesis_optic_nerve segment using the same 28-byte header + seqlock
-protocol the capture limb publishes, so the body's subcortical read and
+/genesis_optic_nerve segment using the same 28-byte header + frame
+counter the capture limb publishes, so the body's subcortical read and
 the mind's optics layer see an ordinary eye.
 
 Usage:
@@ -196,11 +196,33 @@ def main() -> int:
 
     Parses ``source`` and ``shm_name`` from argv, creates the POSIX
     shared memory with the capture limb's header layout, and loops:
-    read one RGB24 frame from ffmpeg's stdout, seqlock-write it.
+    read one RGB24 frame from ffmpeg's stdout, publish it.
     """
     source = sys.argv[1] if len(sys.argv) > 1 else "/dev/video2"
     shm_name = sys.argv[2] if len(sys.argv) > 2 else "genesis_optic_nerve"
     shm_path = f"/dev/shm/{shm_name}"
+
+    # One writer per segment — sensed through the nerve itself, not
+    # a sidecar lock or pidfile. A live nerve pulses: its frame
+    # counter advances at capture rate (~30 Hz). Attach and listen;
+    # if the counter moves, another relay already owns the eye and
+    # there is no reason for us to exist — exit rather than unlink
+    # a live segment out from under its writer. A silent counter
+    # (dead writer, stale segment) is ours to re-open.
+    if Path(shm_path).exists():
+        try:
+            fd0 = os.open(shm_path, os.O_RDONLY)
+            seg0 = mmap.mmap(fd0, HEADER_SIZE, mmap.MAP_SHARED, prot=mmap.PROT_READ)
+            os.close(fd0)
+            seq_a = struct.unpack_from("<Q", seg0, 0)[0]
+            time.sleep(0.1)
+            seq_b = struct.unpack_from("<Q", seg0, 0)[0]
+            seg0.close()
+            if seq_b != seq_a:
+                print(f"optic-relay: {shm_path} is live, exiting", file=sys.stderr)
+                return 0
+        except (OSError, ValueError):
+            pass  # unreadable or undersized — stale, we take it over
 
     # Own the segment like the capture limb does: drop any stale
     # object, create fresh, keep it alive for readers while we run.
@@ -240,9 +262,7 @@ def main() -> int:
                 _stop()
             time.sleep(0.05)
             continue
-        # Seqlock: odd = write in progress, even = committed.
-        seq += 1
-        struct.pack_into("<Q", seg, 0, seq)
+        # Publish: frame bytes first, then bump the frame counter.
         seg[HEADER_SIZE : HEADER_SIZE + FRAME_SIZE] = frame
         seq += 1
         struct.pack_into("<Q", seg, 0, seq)

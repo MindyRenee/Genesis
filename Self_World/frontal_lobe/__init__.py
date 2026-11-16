@@ -534,6 +534,15 @@ level and are referenced by this subsystem.
         Hypothesis generation during rule acquisition; disengages
         once the rule is acquired (Crescentini et al. 2011).
 
+    exclusion.py (in this package)
+        OptionSpace — reasoning by elimination: a working-memory
+        hypothesis space, pruned by negation with warrant transfer
+        across the residue (the disjunctive syllogism). The first
+        logical organ humans grow (preverbal infants,
+        Cesana-Arlotti et al. 2018); the flat space whose options
+        dlpfc's grammar later articulates into rules. Violated
+        expectations report surprisal for the LC-NE impulse.
+
     (subpackage, in this package) reasoning/
         Reasoner — deductive, inductive, analogical reasoning.
         Primarily PFC but involves parietal (attention) and temporal
@@ -617,12 +626,13 @@ level and are referenced by this subsystem.
         explore its own filesystem. Curiosity-driven exploration
         (PFC + limbic curiosity + parietal spatial navigation).
 
-    canvas.py / painting.py (in this package)
+    canvas.py / krita_studio.py (in this package)
         Canvas — a paint program: paper, color, and a parameterized
-        brush she dials herself; an optional Krita bridge mirrors
-        her ops into the real drawing app. Painter — her side of the
-        program: free, exploratory mark-making steered only by her
-        memory of what she has made. Creative expression is
+        brush she dials herself; the Krita bridge runs her ops inside
+        the real drawing app on her desktop when it is reachable. The
+        program's controls are registered as ``studio_*`` tools
+        (Inner_World/studio.py) so she operates it herself — every sheet,
+        color, preset, and path is her call. Creative expression is
         prefrontal (DLPFC) + limbic (emotional drive, which moves
         her the way feelings move a person) + occipital (visual
         output). Multi-subsystem.

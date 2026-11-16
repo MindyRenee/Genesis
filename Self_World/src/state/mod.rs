@@ -13,7 +13,7 @@
 //! │  ┌──────────────┐  ┌────────────────────────────────────────┐ │
 //! │  │   Header      │  │  NeurochemicalVector (2416 bytes)      │ │
 //! │  │  magic, ver,  │  │  18 chemicals × 56 bytes = 1008        │ │
-//! │  │  seqlock, hb  │  │  18×18 coupling matrix = 1296          │ │
+//! │  │  reserved, hb  │  │  18×18 coupling matrix = 1296          │ │
 //! │  └──────────────┘  │  effective levels, arousal, valence     │ │
 //! │                    │  plasticity gate, emergent phase        │ │
 //! │                    │  ACTH (HPA cascade), tonic/phasic       │ │
@@ -63,6 +63,7 @@ pub mod neurochemical;
 pub mod phase_partition;
 pub mod sanitize;
 pub mod sleep_network;
+pub mod snapshot;
 pub mod zones;
 
 // Re-export the primary types.
@@ -79,6 +80,7 @@ pub use neurochemical::{
     WC_SELF_EXCITATION, WC_SELF_EXCITATION_SLOPE,
 };
 pub use sanitize::{finite_clamp, finite_or, sanitize_array_f32, sanitize_matrix_f32};
+pub use snapshot::{CoreStateSnapshot, SNAPSHOT_MAGIC, SNAPSHOT_VERSION};
 pub use zones::{
     ActiveZones, CognitiveZone, MAX_SUBCOGNITIVE_TASKS, MentalPhase, subcognitive_flag,
 };

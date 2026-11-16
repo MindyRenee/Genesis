@@ -67,7 +67,6 @@ system. It has its own drive to understand.
 from __future__ import annotations
 
 import logging
-import threading
 import time
 from collections import deque
 from dataclasses import dataclass, field
@@ -77,6 +76,7 @@ from typing import Any
 
 from brain_waves import BrainWave, BrainWaveState
 from frontal_lobe.reasoning import Reasoner, ReasoningResult, ReasoningType
+from inhibition import RecurrentInhibition
 from temporal_lobe.concepts import QUALITY_THRESHOLD, ConceptNetwork, RelationType, is_world_concept
 
 from .emotion import EmotionalState
@@ -206,7 +206,7 @@ class Curiosity:
         # autonomous learner, the conversation path, and the global
         # workspace (receive_broadcast) — and a plain deque iteration
         # raises RuntimeError if another thread appends mid-loop.
-        self._lock = threading.RLock()
+        self._lock = RecurrentInhibition()
         # Track recently asked questions to avoid repeating them.
         # The full deque holds 500 entries; _is_novel checks against
         # all of them (not just the last 20) so questions don't expire

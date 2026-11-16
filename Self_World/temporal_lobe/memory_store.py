@@ -22,6 +22,7 @@ Dependencies (passed to ``__init__``):
 from __future__ import annotations
 
 import logging
+import math
 import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
@@ -41,6 +42,15 @@ if TYPE_CHECKING:
 __all__ = ["MemoryStore"]
 
 logger = logging.getLogger(__name__)
+
+
+def _finite_or(value: float, default: float) -> float:
+    """Return finite floats; malformed/non-finite inputs use ``default``."""
+    try:
+        result = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return default
+    return result if math.isfinite(result) else default
 
 
 class MemoryStore:
@@ -197,10 +207,10 @@ class MemoryStore:
         base = 0.5
         summary = self._last_summary_getter()
         if summary is not None:
-            base = max(0.0, min(1.0, 0.5 + summary.valence * 0.25))
-        td_signal = self._td_learner.get_dopamine_signal()
+            base = _finite_or(0.5 + _finite_or(summary.valence, 0.0) * 0.25, base)
+        td_signal = _finite_or(self._td_learner.get_dopamine_signal(), 0.0)
         if abs(td_signal) > 0.001:
-            base = max(0.0, min(1.0, base + td_signal * 0.15))
+            base = _finite_or(base + td_signal * 0.15, base)
         return base
 
     # ─── Emotional tag ───────────────────────────────────────────
@@ -216,25 +226,26 @@ class MemoryStore:
         """
         tag = [0.5] * EMOTIONAL_TAG_SIZE
 
-        # Dopamine (0) — from valence
-        tag[0] = max(0.0, min(1.0, 0.5 + emotion.valence * 0.3))
+        # Dopamine (0) — from valence, finite and uncapped
+        valence = _finite_or(emotion.valence, 0.0)
+        tag[0] = _finite_or(0.5 + valence * 0.3, 0.5)
 
         # Serotonin (1) — from global tone
-        tag[1] = max(0.0, min(1.0, 0.5 + emotion.valence * 0.2))
+        tag[1] = _finite_or(0.5 + valence * 0.2, 0.5)
 
         # Norepinephrine (2) — from alertness
-        tag[2] = max(0.0, min(1.0, emotion.alertness))
+        tag[2] = _finite_or(emotion.alertness, 0.5)
 
         # Cortisol (6) — from stress/negative valence
         if emotion.label in ("stressed", "anxious", "overwhelmed"):
             tag[6] = 0.7
-        elif emotion.valence < -0.2:
+        elif valence < -0.2:
             tag[6] = 0.6
         else:
             tag[6] = 0.2
 
         # BDNF (11) — from plasticity
-        tag[11] = max(0.0, min(1.0, emotion.plasticity))
+        tag[11] = _finite_or(emotion.plasticity, 0.5)
 
         return tag
 
@@ -260,7 +271,7 @@ class MemoryStore:
                 timestamp=int(time.time() * 1000),
                 event_type=event_type,
                 source_module=source_module,
-                salience=max(0.0, min(1.0, salience)),
+                salience=_finite_or(salience, 0.0),
                 emotional_tag=emotional_tag,
                 text=text[:188],
             )

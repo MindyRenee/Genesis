@@ -12,7 +12,7 @@
       "meta_size": 704,
       "bundles_size": 802816,
       "total_size": 804389,
-      "retrieve_latency_us": 160
+      "retrieve_latency_us": 56
     },
     {
       "episode_count": 100,
@@ -20,7 +20,7 @@
       "meta_size": 6464,
       "bundles_size": 802816,
       "total_size": 817984,
-      "retrieve_latency_us": 400
+      "retrieve_latency_us": 80
     },
     {
       "episode_count": 500,
@@ -28,7 +28,7 @@
       "meta_size": 32064,
       "bundles_size": 802816,
       "total_size": 878873,
-      "retrieve_latency_us": 457
+      "retrieve_latency_us": 89
     },
     {
       "episode_count": 1000,
@@ -36,7 +36,7 @@
       "meta_size": 64064,
       "bundles_size": 802816,
       "total_size": 955098,
-      "retrieve_latency_us": 378
+      "retrieve_latency_us": 89
     }
   ]
 }

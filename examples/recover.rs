@@ -21,8 +21,8 @@ fn main() {
     let mmap = match MmapState::open(&state_file) {
         Ok(m) => {
             println!(
-                "  Opened existing state (seq_lock={})",
-                m.read().header.seq_lock
+                "  Opened existing state (heartbeat={})",
+                m.read().header.heartbeat
             );
             m
         }

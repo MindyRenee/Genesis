@@ -223,6 +223,50 @@ def test_round_trip_narrative():
         assert len(fresh_narr.chapters) >= 1
 
 
+def test_restore_temporal_link_preserves_finite_weight():
+    """Temporal-link weights are not range-limited during restore."""
+    narr = _make_narrative()
+    restore_narrative(
+        narr,
+        {
+            "chapters": [
+                {
+                    "title": "Chapter",
+                    "theme": "test",
+                    "start_time": 1000,
+                    "events": [
+                        {
+                            "id": "event-1",
+                            "timestamp": 1000,
+                            "summary": "first",
+                            "significance": 0.5,
+                            "emotion_at_time": {},
+                        },
+                        {
+                            "id": "event-2",
+                            "timestamp": 1001,
+                            "summary": "second",
+                            "significance": 0.5,
+                            "emotion_at_time": {},
+                        },
+                    ],
+                }
+            ],
+            "temporal_links": [
+                {
+                    "source_id": "event-1",
+                    "target_id": "event-2",
+                    "link_type": "led_to",
+                    "weight": 1.7,
+                }
+            ],
+        },
+    )
+
+    assert len(narr._temporal_links) == 1
+    assert narr._temporal_links[0].weight == 1.7
+
+
 def test_round_trip_self_model():
     """Self-model survives save/load round-trip."""
     with tempfile.TemporaryDirectory() as d:
@@ -627,30 +671,26 @@ def test_allostatic_load_round_trip():
     assert fresh.get_state().substrate_connected is False
 
 
-def test_allostatic_restore_clamps_corrupt_load():
-    """A corrupt saved load must not invert the regulatory response.
-
-    The load feeds `_regulation_effectiveness` via `1 - load * 0.5`. An
-    unclamped negative value amplifies every regulatory impulse
-    (load -3.0 -> effectiveness 2.5) rather than dampening it, so a
-    hand-edited or corrupted save file would have made the regulator
-    louder precisely when it was most worn down.
-    """
+def test_allostatic_restore_preserves_finite_load():
+    """Finite saved loads restore verbatim; malformed values do not."""
     from infrastructure.persistence import restore_allostatic_load
     from limbic_system.emotional_regulator import AllostaticLoadTracker
 
-    for bad in (-3.0, 50.0, float("nan"), float("inf")):
+    for saved in (-3.0, 0.5, 50.0):
         tracker = AllostaticLoadTracker()
         restore_allostatic_load(
             tracker,
-            {"state": {"allostatic_load": bad, "is_chronic": False}},
+            {"state": {"allostatic_load": saved, "is_chronic": False}},
         )
-        load = tracker.get_allostatic_load()
-        assert 0.0 <= load <= 1.0, f"restored load {bad} -> {load} out of range"
+        assert tracker.get_allostatic_load() == saved
 
-        # And the effectiveness it implies must stay in [0.3, 1.0].
-        effectiveness = max(0.3, 1.0 - load * 0.5)
-        assert 0.3 <= effectiveness <= 1.0, f"restored load {bad} -> effectiveness {effectiveness}"
+    for malformed in (float("nan"), float("inf"), "not-a-number"):
+        tracker = AllostaticLoadTracker()
+        restore_allostatic_load(
+            tracker,
+            {"state": {"allostatic_load": malformed, "is_chronic": False}},
+        )
+        assert tracker.get_allostatic_load() == 0.0
 
 
 def test_allostatic_restore_tolerates_corrupt_duration():
@@ -762,6 +802,303 @@ def test_cognitive_map_save_load_round_trip():
     rctx = restored.contexts[0]
     assert rctx.transitions[(1, "move")] == Counter({2: 3, 5: 1})
     assert rctx.contents[1] == Counter({7: 2})
+
+
+def test_predictive_coding_intent_marginal_round_trip():
+    """The global intent prior must persist with the learned models."""
+    from cerebellum.predictive import PredictiveCodingLayer
+    from infrastructure.persistence import (
+        _serialize_predictive_coding,
+        restore_predictive_coding,
+    )
+
+    predictive = PredictiveCodingLayer()
+    predictive._intent_marginal["question"] = 1.25
+    payload = _serialize_predictive_coding(predictive)
+
+    restored = PredictiveCodingLayer()
+    restore_predictive_coding(restored, payload)
+
+    assert restored._intent_marginal["question"] == 1.25
+
+
+def test_restore_reflection_replaces_stale_and_keeps_latest_pattern():
+    """Restore is a replacement, and pattern dedupe keeps the newest item."""
+    reflection = _make_reflection()
+    restore_reflection(
+        reflection,
+        {
+            "insights": [
+                {
+                    "type": "pattern",
+                    "content": "Overusing 'inform' (7/10)",
+                    "confidence": 0.6,
+                },
+                {
+                    "type": "pattern",
+                    "content": "Overusing 'inform' (8/10)",
+                    "confidence": 0.7,
+                },
+            ]
+        },
+    )
+
+    assert [i.content for i in reflection.insights] == ["Overusing 'inform' (8/10)"]
+
+
+def test_restore_narrative_replaces_constructor_seed_state():
+    """A staged/fresh Narrator's seed snapshot and hierarchy cannot leak in."""
+    narrative = _make_narrative()
+    restore_narrative(
+        narrative,
+        {
+            "chapters": [],
+            "personality_snapshots": [],
+            "event_counter": 0,
+            "hierarchy": {},
+            "life_script": [],
+            "temporal_links": [],
+        },
+    )
+
+    assert narrative._personality_snapshots == []
+    assert all(not nodes for nodes in narrative._hierarchy.values())
+    assert narrative._temporal_links == []
+    assert narrative._links_out == {}
+    assert narrative._links_in == {}
+    assert narrative.life_script.milestones == []
+
+
+def test_restore_procedural_memory_replaces_stale_skills():
+    """Skills absent from the save must not survive restore."""
+    from infrastructure.persistence import restore_procedural_memory
+    from memory import ProceduralMemory
+
+    memory = ProceduralMemory()
+    memory.learn_skill("stale", "old trigger")
+    restore_procedural_memory(
+        memory,
+        {
+            "skills": [
+                {
+                    "name": "saved",
+                    "trigger_condition": "new trigger",
+                    "strategy": {"cognitive_route": "general"},
+                }
+            ]
+        },
+    )
+
+    assert set(memory._skills) == {"saved"}
+    assert memory._trigger_index == {"new trigger": ["saved"]}
+
+
+def test_restore_spaced_repetition_replaces_and_preserves_zero():
+    """Zero is a meaningful saved value, not a missing-value sentinel."""
+    from infrastructure.persistence import restore_spaced_repetition
+    from memory import ReviewRecord, SpacedRepetitionScheduler
+
+    scheduler = SpacedRepetitionScheduler(_make_network())
+    scheduler._records["stale"] = ReviewRecord(concept="stale", stability=1.0)
+    restore_spaced_repetition(
+        scheduler,
+        {
+            "records": [
+                {
+                    "concept": "saved",
+                    "stability": 0.0,
+                    "review_count": 2,
+                    "success_count": 1,
+                    "last_review": 0.0,
+                    "ease_factor": 0.0,
+                }
+            ]
+        },
+    )
+
+    assert set(scheduler._records) == {"saved"}
+    record = scheduler._records["saved"]
+    assert record.stability == 0.0
+    assert record.last_review == 0.0
+    assert record.ease_factor == 0.0
+
+
+def test_restore_td_learner_replaces_history_and_enforces_cap():
+    """TD restore must not append saved transitions to staged history."""
+    from basal_ganglia.td import TDLearner, TDTransition
+    from infrastructure.persistence import restore_td_learner
+
+    learner = TDLearner(_make_network())
+    learner._history.append(
+        TDTransition(state=["stale"], reward=0.0, next_state=[], rpe=0.0, timestamp=0)
+    )
+    history = [
+        {
+            "state": [f"state-{i}"],
+            "reward": 0.0,
+            "next_state": [],
+            "rpe": 0.0,
+            "timestamp": i,
+        }
+        for i in range(learner._max_history + 1)
+    ]
+    restore_td_learner(learner, {"history": history})
+
+    assert len(learner._history) == learner._max_history
+    assert learner._history[0].state == ["state-1"]
+    assert "stale" not in learner._history[0].state
+
+
+def test_restore_emotional_memory_replaces_stale_memories():
+    """Emotional memories absent from the save must not survive restore."""
+    from infrastructure.persistence import restore_emotional_memory
+    from memory import EmotionalMemory, EmotionalMemorySystem
+
+    memory = EmotionalMemorySystem()
+    memory._memories["stale"] = EmotionalMemory(stimulus="stale")
+    restore_emotional_memory(
+        memory,
+        {
+            "memories": [
+                {
+                    "stimulus": "saved",
+                    "emotional_tag": [0.5] * 12,
+                    "association_strength": 0.7,
+                }
+            ]
+        },
+    )
+
+    assert set(memory._memories) == {"saved"}
+    assert memory._memories["saved"].association_strength == 0.7
+
+
+def test_restore_attractor_replaces_patterns_and_missing_weights():
+    """An old save without weights resets the matrix instead of keeping stale weights."""
+    from infrastructure.persistence import restore_attractor
+    from memory import AttractorNetwork, AttractorPattern
+
+    attractor = AttractorNetwork(size=4)
+    attractor._patterns["stale"] = AttractorPattern(id="stale", vector=[1] * 4)
+    attractor._weights[0][1] = 0.9
+    restore_attractor(
+        attractor,
+        {
+            "size": 4,
+            "patterns": [{"id": "saved", "vector": [1, -1, 1, -1]}],
+        },
+    )
+
+    assert set(attractor._patterns) == {"saved"}
+    assert attractor._weights == [[0.0] * 4 for _ in range(4)]
+
+
+def test_restore_error_monitor_replaces_stale_monitoring_state():
+    """Error history, last error, and channel demand are replace-on-restore."""
+    from infrastructure.persistence import restore_error_monitor
+    from self.reflection import ErrorMonitor
+
+    monitor = ErrorMonitor()
+    monitor.record_prediction("yes", "no")
+    assert monitor._errors
+    restore_error_monitor(
+        monitor,
+        {
+            "error_count": 0,
+            "cumulative_error_signal": 0.0,
+            "errors": [],
+            "channel_demand": {"decision": 1.25},
+        },
+    )
+
+    assert monitor._errors == deque()
+    assert monitor._last_error is None
+    assert monitor._channel_demand == {"decision": 1.25}
+
+
+def test_restore_hpa_axis_clears_transient_delay_state():
+    """HPA delay buffers and onset bookkeeping cannot leak across restore."""
+    from infrastructure.persistence import restore_hpa_axis
+    from limbic_system.emotional_regulator import HPAAxis
+
+    axis = HPAAxis()
+    axis.trigger_stress(0.8)
+    axis.tick(1.0)
+    restore_hpa_axis(axis, {"state": {"crh_level": 0.4, "stress_active": True}})
+
+    assert axis._state.crh_level == 0.4
+    assert not axis._crh_history
+    assert not axis._acth_history
+    assert axis._stress_onset_time is None
+    assert axis._peak_reached is False
+    assert axis._avg_dt == 1.0
+
+
+def test_restore_self_model_replaces_stale_self_knowledge():
+    """Self-knowledge keys absent from the save must not survive restore."""
+    model = _make_self_model()
+    restore_self_model(
+        model,
+        {
+            "self_knowledge": [{"key": "saved_key", "value": "saved_value"}],
+        },
+    )
+
+    assert model.self_knowledge == {"saved_key": "saved_value"}
+
+
+def test_restore_self_directed_learner_replaces_learning_log():
+    """The learning log is a serialized collection, not a merge target."""
+    from self.learning import LearningEvent
+
+    learner = SelfDirectedLearner(_make_network())
+    learner._learning_log.append(LearningEvent("stale", "stale event"))
+    restore_self_directed_learner(learner, {"learning_log": []})
+
+    assert list(learner._learning_log) == []
+
+
+def test_restore_network_sanitizes_malformed_numeric_fields():
+    """Malformed learned numbers cannot poison a restored network."""
+    network = ConceptNetwork()
+    restore_network(
+        network,
+        {
+            "concepts": [
+                {
+                    "id": "saved",
+                    "activation": float("nan"),
+                    "confidence": "bad",
+                }
+            ],
+            "edges": [
+                {
+                    "source": "saved",
+                    "target": "saved",
+                    "relation": "related_to",
+                    "weight": float("inf"),
+                }
+            ],
+        },
+    )
+
+    concept = network.get_concept("saved")
+    assert concept.activation == 0.0
+    assert concept.confidence == 0.5
+    assert network._edges[0].weight == 0.5
+
+
+def test_restore_td_learner_preserves_finite_lam():
+    """λ is a persisted value, not a range-limited one."""
+    from basal_ganglia.td import TDLearner
+    from infrastructure.persistence import restore_td_learner
+
+    learner = TDLearner(_make_network())
+    restore_td_learner(learner, {"lam": 1.5})
+    assert learner.lam == 1.5
+
+    restore_td_learner(learner, {"lam": float("nan")})
+    assert learner.lam == 1.5
 
 
 def run_all():

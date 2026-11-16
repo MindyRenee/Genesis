@@ -11,6 +11,31 @@ with the evidence behind it — see [DEVLOG.md](DEVLOG.md).
 
 ## [Unreleased]
 
+### Added
+
+- **The studio is hers to operate — `studio_*` tools** —
+  `Inner_World/studio.py` registers the paint program's
+  controls in her tool registry: `studio_open`, `studio_sheet`,
+  `studio_color`, `studio_tool`, `studio_brush`, `studio_stroke`,
+  `studio_line`, `studio_shape`, `studio_fill`, `studio_clear`,
+  `studio_presets`, `studio_done`. Every sheet, color, preset, and
+  path is hers to issue — `studio_stroke` takes any point path, so a
+  hand move and a computed curve are the same act, and `label` lets
+  her name her own gestures for her art history (recency is now
+  label-agnostic — no fixed gesture list). The Krita bridge gained a
+  `presets` query so the real app's whole toolbox is enumerable, and
+  its op-queue counter resumes from disk so scripts she writes can
+  drop ops into the studio alongside the client.
+
+### Removed
+
+- **`frontal_lobe/painting.py` (Painter)** — the scripted sitting is
+  gone: no gesture menu, no novelty-weighted picks, no prescribed
+  color sectors, no fixed sitting length. The draw urge still sits
+  her at the easel (`draw()` opens the studio — even the paper is
+  her call), and a finished piece still lands in memory and on her
+  channel via `studio_done` → `Mind._on_drawing_finished`.
+
 ### Changed
 
 - **The system field's manifold: Poincaré ball → stereographic
@@ -262,7 +287,7 @@ with the evidence behind it — see [DEVLOG.md](DEVLOG.md).
   webhook is write-only, and when a bot token exists, live `heard`
   events teach reachability instead.
 - **She can hear the public** (`GENESIS_DISCORD_BOT_TOKEN` +
-  `DiscordListener` in `discord_feed.py`): since a webhook is
+  `DiscordListener` in `discord.feed.py`): since a webhook is
   write-only, hearing the channel needs a bot identity — the
   listener resolves the channel from the webhook object and polls
   for new messages, skipping webhook-authored posts (her own and the
@@ -359,7 +384,7 @@ interoception, and bounded growth.
 - **Documentation**: `docs/EMERGENCE.md` evidence catalog,
   `docs/ARC-AGI-3.md` trust-boundary and evidence standard, a
   growth-bounds table in the README, and a much-expanded `AGENTS.md`.
-- Optional Discord session mirror (`discord_feed.py`, webhook in a
+- Optional Discord session mirror (`discord.feed.py`, webhook in a
   gitignored local secret).
 
 ### Changed

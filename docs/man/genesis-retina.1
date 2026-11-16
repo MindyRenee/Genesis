@@ -77,6 +77,43 @@ and by startup adoption of a surviving process.
 .I $DATA_DIR/retina.log
 Capture log; rotated by the launcher at 5 MiB (two compressed
 backups).
+.SH GLOSSARY
+.TP
+.B retina
+The eye as its own organ \(em this process: a standalone carrier
+of the capture limb, preferred over the daemon's embedded limb
+when installed.
+.TP
+.B capture limb
+The camera-owning implementation (\fBOpticCapture\fR) shared by
+this process and the daemon \(em one limb, two carriers; exactly
+one holds the device at a time.
+.TP
+.B optic nerve
+The POSIX shared-memory segment \fI/genesis_optic_nerve\fR this
+process publishes frames into \(em RAM-backed, streamed live,
+never persisted. See
+.BR genesis-vision (7).
+.TP
+.B subcortical channels
+The scalar signals the nerve carries instead of pixels \(em SCN
+illuminance, collicular transients, pretectal/pupil signals \(em
+the same things anatomical fibres carry.
+.TP
+.B frame counter
+The sequence number in the segment header that arbitrates
+ownership: while it advances under a retina, the daemon's embedded
+limb stays closed; if it stalls the daemon takes the camera.
+.TP
+.B EBUSY
+The device-busy condition a relaunched retina backs off on \(em
+after a daemon takeover it rests rather than fighting for the eye.
+.TP
+.B segfault-safe naming
+On SIGINT/SIGTERM the segment's name is unlinked so a dead eye
+never publishes stale frames under a live name; readers holding
+the mapping keep it until they detach.
+
 .SH SEE ALSO
 .BR genesis (1),
 .BR genesis-cli (1),

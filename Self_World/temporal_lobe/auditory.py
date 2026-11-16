@@ -67,6 +67,7 @@ from dataclasses import dataclass
 
 import numpy as np
 from genesis_client.threads import call_on_named_thread, named_thread
+from inhibition import InhibitoryGate
 
 __all__ = ["AuditoryCortex", "SoundEvent"]
 
@@ -401,11 +402,11 @@ class AuditoryCortex:
         # Serializes start/stop — without it a start racing a stop
         # loses the old thread's handle while the old loop resumes on
         # the cleared flag, leaving a phantom second listener alive.
-        self._lifecycle_lock = threading.Lock()
+        self._lifecycle_lock = InhibitoryGate()
 
         # Recent sound events (for debugging / inspection)
         self._recent: deque[SoundEvent] = deque(maxlen=50)
-        self._recent_lock = threading.Lock()
+        self._recent_lock = InhibitoryGate()
 
         # Event segmentation state — aggregated incrementally (sums,
         # peak, consecutive-block flux) rather than storing every

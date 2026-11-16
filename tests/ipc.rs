@@ -74,7 +74,7 @@ impl IpcTestSystem {
         let mmap = std::sync::Arc::new(MmapState::open(&self.state_path).expect("open state"));
         let stm = std::sync::Arc::new(RingBuffer::open(&self.stm_path).expect("open stm"));
         let ltm = LtmStore::open(&self.ltm_base).expect("open ltm");
-        let ltm = std::sync::Arc::new(std::sync::Mutex::new(ltm));
+        let ltm = std::sync::Arc::new(genesis::inhibition::Inhibition::new(ltm));
         let socket_path = self.socket_path.clone();
 
         let server = IpcServer::new(&socket_path);
@@ -167,6 +167,88 @@ fn test_get_state() {
     assert_eq!(state.header.version, genesis::state::header::SCHEMA_VERSION);
 }
 
+#[test]
+fn test_get_state_snapshot() {
+    // GET_STATE_SNAPSHOT is the mind's contract: a CoreStateSnapshot
+    // DTO projected field-by-field from GenesisCoreState. The client
+    // verifies the self-describing header; here we check the
+    // projection actually carries the live body's values.
+    let mut sys = IpcTestSystem::new("statesnap");
+    sys.start_server();
+
+    let mut client = sys.client();
+    let snap = client.get_state_snapshot().expect("get_state_snapshot");
+
+    snap.verify().expect("snapshot header should verify");
+    assert_eq!(snap.magic, genesis::state::SNAPSHOT_MAGIC);
+    assert_eq!(snap.version, genesis::state::SNAPSHOT_VERSION);
+    assert_eq!(
+        snap.state_size as usize,
+        core::mem::size_of::<CoreStateSnapshot>()
+    );
+
+    // The projection must agree with the authoritative state — read
+    // it back through the raw channel and compare field-by-field.
+    let state = client.get_state().expect("get_state");
+    assert_eq!(snap.heartbeat, state.header.heartbeat);
+    assert_eq!(snap.created_at, state.header.created_at);
+    assert_eq!(snap.instance_id, state.header.instance_id);
+    assert_eq!(snap.cognitive_zone, state.zones.cognitive_zone);
+    assert_eq!(snap.emergent_phase, state.zones.emergent_phase);
+    assert_eq!(snap.stm_count, state.memory.stm_count);
+    assert_eq!(snap.ltm_episode_count, state.memory.ltm_episode_count);
+    assert_eq!(
+        snap.effective_levels, state.neurochemicals.effective_levels,
+        "effective levels must project verbatim"
+    );
+    assert_eq!(snap.arousal, state.neurochemicals.arousal);
+    assert_eq!(snap.valence, state.neurochemicals.valence);
+    assert_eq!(snap.global_tone, state.neurochemicals.global_tone);
+    assert_eq!(snap.plasticity_gate, state.neurochemicals.plasticity_gate);
+    assert_eq!(
+        snap.inference_tick_count,
+        state.inference_signals.inference_tick_count
+    );
+    assert_eq!(snap.free_energy, state.inference_signals.free_energy);
+    assert_eq!(snap.encoding_weight, state.memory.encoding_weight);
+    assert_eq!(snap.consolidation_weight, state.memory.consolidation_weight);
+    assert_eq!(snap.retrieval_weight, state.memory.retrieval_weight);
+    // sleep_pressure is h/H_MAX — the normalized discharge gauge.
+    let expected_pressure = (state.sleep_network[4] / genesis::state::sleep_network::H_MAX) as f32;
+    assert!(
+        (snap.sleep_pressure - expected_pressure).abs() < 1e-6,
+        "sleep_pressure {} vs expected {}",
+        snap.sleep_pressure,
+        expected_pressure
+    );
+}
+
+#[test]
+fn test_state_snapshot_reports_preexisting_ltm_count() {
+    // The persisted LTM can contain episodes while a fresh core-state
+    // file still has ltm_episode_count = 0. Startup must mirror the
+    // authoritative store count before serving snapshot requests.
+    let mut sys = IpcTestSystem::new("statesnap_preexisting_ltm");
+    {
+        let mut ltm = LtmStore::open(&sys.ltm_base).expect("open ltm");
+        ltm.store(
+            1000,
+            0.5,
+            [0.5f32; 12],
+            [0.4, 0.3, 0.2, 0.5],
+            0,
+            4,
+            "persisted before IPC startup",
+        )
+        .expect("seed ltm");
+    }
+    sys.start_server();
+
+    let mut client = sys.client();
+    let snap = client.get_state_snapshot().expect("get_state_snapshot");
+    assert_eq!(snap.ltm_episode_count, 1);
+}
+
 // ─── Get neuro summary ────────────────────────────────────────
 
 #[test]
@@ -221,29 +303,32 @@ fn test_get_plasticity_profile() {
 }
 
 #[test]
-fn test_plasticity_profile_after_stress() {
-    let mut sys = IpcTestSystem::new("plasticity_stress");
+fn test_neuro_impulse_preserves_finite_out_of_range() {
+    let mut sys = IpcTestSystem::new("impulse_out_of_range");
     sys.start_server();
 
     let mut client = sys.client();
+    let idx = NeurochemicalId::Acetylcholine as usize;
+    let before = client
+        .get_state()
+        .expect("state before impulse")
+        .neurochemicals
+        .chemicals[idx]
+        .level;
 
-    // Apply a strong cortisol impulse to mimic acute stress
     client
-        .neuro_impulse(NeurochemicalId::Cortisol, 0.8)
-        .expect("cortisol impulse");
+        .neuro_impulse(NeurochemicalId::Acetylcholine, 2.5)
+        .expect("finite out-of-range impulse");
 
-    // Let the dynamics settle slightly
-    std::thread::sleep(Duration::from_millis(100));
-
-    let profile = client
-        .get_plasticity_profile()
-        .expect("get_plasticity_profile");
-
-    // After a cortisol impulse, cortisol effective should be elevated
+    let after = client
+        .get_state()
+        .expect("state after impulse")
+        .neurochemicals
+        .chemicals[idx]
+        .level;
     assert!(
-        profile.cortisol_effective > 0.3,
-        "cortisol should be elevated after impulse, got {}",
-        profile.cortisol_effective
+        after > before + 1.0,
+        "finite impulses must not be limited to ±1: before={before}, after={after}"
     );
 }
 
@@ -264,6 +349,57 @@ fn test_store_event() {
     let stats = client.request(cmd::GET_MEMORY_STATS, &[]).expect("stats");
     let stm_count = u64::from_le_bytes(stats[0..8].try_into().unwrap());
     assert!(stm_count > 0, "STM should have entries after store_event");
+
+    let state = client.get_state().expect("raw state");
+    assert_eq!(
+        state.memory.stm_count as u64, stm_count,
+        "STORE_EVENT must mirror the live STM count into core state"
+    );
+    let snapshot = client.get_state_snapshot().expect("state snapshot");
+    assert_eq!(
+        snapshot.stm_count as u64, stm_count,
+        "snapshot must report the live STM count, not a stale pointer"
+    );
+}
+
+#[test]
+fn test_store_rejects_truncated_declared_text() {
+    let mut sys = IpcTestSystem::new("store_truncated_text");
+    sys.start_server();
+
+    let mut client = sys.client();
+    for command in [cmd::STORE_EVENT, cmd::STORE_EPISODE] {
+        let mut payload = Vec::with_capacity(64);
+        payload.extend_from_slice(&1000u64.to_le_bytes());
+        payload.push(0u8);
+        payload.push(4u8);
+        payload.extend_from_slice(&0.8f32.to_le_bytes());
+        for v in [0.5f32; 12] {
+            payload.extend_from_slice(&v.to_le_bytes());
+        }
+        // Declares 10 text bytes but sends none. The daemon must reject
+        // the malformed frame rather than silently storing an empty text.
+        payload.extend_from_slice(&10u16.to_le_bytes());
+
+        let resp = client.request(command, &payload).expect("request");
+        assert_eq!(
+            resp[0],
+            genesis::daemon::ipc::error::PAYLOAD_TOO_SHORT,
+            "command {command} must reject a declared text length beyond the payload"
+        );
+    }
+
+    let stats = client.request(cmd::GET_MEMORY_STATS, &[]).expect("stats");
+    assert_eq!(
+        u64::from_le_bytes(stats[0..8].try_into().unwrap()),
+        0,
+        "rejected STORE_EVENT must not mutate STM"
+    );
+    assert_eq!(
+        u64::from_le_bytes(stats[8..16].try_into().unwrap()),
+        0,
+        "rejected STORE_EPISODE must not mutate LTM"
+    );
 }
 
 // ─── Set zone ─────────────────────────────────────────────────
@@ -771,6 +907,12 @@ fn test_archive_episode() {
         .expect("retrieve after archive");
     assert_eq!(resp[0], 1, "archived episode should still be retrievable");
 
+    let snapshot = client.get_state_snapshot().expect("state snapshot");
+    assert_eq!(
+        snapshot.ltm_episode_count, 0,
+        "ARCHIVE_EPISODE must mirror the reduced active count"
+    );
+
     // Archiving a non-existent episode should return 0 (not error)
     let resp = client
         .request(cmd::ARCHIVE_EPISODE, &999_999u64.to_le_bytes())
@@ -838,6 +980,12 @@ fn test_deep_recall_and_unarchive() {
         .request(cmd::UNARCHIVE_EPISODE, &ep_id.to_le_bytes())
         .expect("unarchive");
     assert_eq!(resp[0], 1, "unarchive should succeed");
+
+    let snapshot = client.get_state_snapshot().expect("state snapshot");
+    assert_eq!(
+        snapshot.ltm_episode_count, 1,
+        "UNARCHIVE_EPISODE must mirror the restored active count"
+    );
 
     // …and the active index sees it again.
     let resp = client
@@ -939,6 +1087,17 @@ fn test_store_episode_bypasses_stm() {
         "STM should be empty (store_episode bypasses STM)"
     );
     assert!(ltm_count > 0, "LTM should have the episode");
+
+    let state = client.get_state().expect("raw state");
+    assert_eq!(
+        state.memory.ltm_episode_count, ltm_count,
+        "STORE_EPISODE must mirror the live LTM count into core state"
+    );
+    let snapshot = client.get_state_snapshot().expect("state snapshot");
+    assert_eq!(
+        snapshot.ltm_episode_count, ltm_count,
+        "snapshot must report the live LTM count after a direct store"
+    );
 }
 
 #[test]
@@ -1401,7 +1560,7 @@ fn test_get_body_state() {
         arousal_freq: 0.3,
         cognitive_load: 0.92,
         io_activity: 0.05,
-        stress_load: 1.5,
+        stress_load: 2.5,
         energy_reserve: 0.15,
         on_ac_power: false,
         num_cores: 4,
@@ -1445,13 +1604,12 @@ fn test_get_body_state() {
     assert!(resp3.distressed);
     assert!((resp3.cpu_temp_c - 92.0).abs() < 0.01);
     assert!(!resp3.on_ac_power);
-    // stress_load = 1.5 (overloaded) must survive the wire intact.
-    // The interoceptor produces [0,2] and the IPC serialization must
-    // not clamp to [0,1] — otherwise the cognitive mind never sees
-    // the "severely overloaded" signal that triggers distress.
+    // stress_load = 2.5 is finite but above the transport ceiling the
+    // old serializer used. IPC must preserve it verbatim so the mind
+    // sees the actual overload signal.
     assert!(
-        (resp3.stress_load - 1.5).abs() < 0.01,
-        "stress_load should be 1.5 (overloaded), got {} — IPC must not clamp to [0,1]",
+        (resp3.stress_load - 2.5).abs() < 0.01,
+        "stress_load should be 2.5 (overloaded), got {} — IPC must not clamp finite values",
         resp3.stress_load
     );
     // Distressed autonomic state must round-trip — high autonomic
@@ -1751,7 +1909,7 @@ fn test_ipc_bind_failure_signals_shutdown() {
     let stm =
         std::sync::Arc::new(RingBuffer::create(temp_path("ipc-bind-stm", "bin"), 4).expect("stm"));
     let ltm_base = temp_base("ipc-bind-ltm");
-    let ltm = std::sync::Arc::new(std::sync::Mutex::new(
+    let ltm = std::sync::Arc::new(genesis::inhibition::Inhibition::new(
         LtmStore::create(&ltm_base, 64).expect("ltm"),
     ));
 
@@ -1777,7 +1935,7 @@ fn test_ipc_shutdown_waits_for_active_handler() {
 
     let mmap = Arc::new(MmapState::create(&state_path, 1, 1000).expect("create state"));
     let stm = Arc::new(RingBuffer::create(&stm_path, 16).expect("create stm"));
-    let ltm = Arc::new(std::sync::Mutex::new(
+    let ltm = Arc::new(genesis::inhibition::Inhibition::new(
         LtmStore::create(&ltm_base, 64).expect("create ltm"),
     ));
 

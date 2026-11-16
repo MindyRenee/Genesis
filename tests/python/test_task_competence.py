@@ -38,6 +38,12 @@ def _context(
 
 
 class TestTaskCompetence:
+    def test_ambient_salience_preserves_finite_evidence(self):
+        competence = TaskCompetence(salience_getter=lambda: 1.7)
+        assert competence._ambient_salience() == 1.7
+        competence.salience_getter = lambda: float("nan")
+        assert competence._ambient_salience() == 1.0
+
     def test_recognizes_novel_then_similar_task(self):
         competence = TaskCompetence()
         first = _context(competence, position=1)

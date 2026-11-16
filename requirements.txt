@@ -1,51 +1,53 @@
 # Genesis — Python runtime dependencies
-# Pinned for reproducibility. Update with intent.
+# Versions float — bare names only. No pins, no bounds, no
+# lockfiles, no Dependabot — see CONTRIBUTING.md.
 
 # Core
-numpy==2.5.3
-nltk==3.10.4
+numpy
+nltk
 # nltk's import chain pulls scipy.stats (collocations → metrics.
 # association → fisher_exact), so scipy is a hard runtime dep — a
 # stale system-site scipy built for numpy 1.x cannot substitute.
-scipy==1.16.3
-orjson==3.12.0
-psutil==7.2.2
+scipy
+orjson
+psutil
 
 # Symbolic mathematics is an optional capability: symbolic.py imports
-# sympy lazily and degrades without it. Pinned in requirements-dev.txt
+# sympy lazily and degrades without it. Listed in requirements-dev.txt
 # so dev/CI still exercises it, or install the "math" extra.
 # Image processing (visual cortex + canvas)
-Pillow==13.0.0
-opencv-python-headless==5.0.0.93
-pycairo==1.29.1
+Pillow
+opencv-python-headless
+pycairo
 
 # Browser transport — WebDriver BiDi (Firefox) and Chrome DevTools
 # Protocol (Chromium) both ride one websocket session.
-websockets==15.0.1
+websockets
 
 # Test runner — runtime dep: her tools call it through
 # `sys.executable -m pytest` (project creation, proposal
 # verification, self-checks), not just the dev suite.
-pytest==9.1.1
+pytest
 
 # Optional: voice / ambient listening (Vosk offline STT + microphone,
 # Piper TTS). Install separately if you want voice:
-#   vosk==0.3.45
-#   sounddevice==0.5.2
-#   speechrecognition==3.14.2
-#   piper-tts==1.8.0
+#   vosk
+#   sounddevice
+#   speechrecognition
+#   piper-tts
 
 # Optional: virtual HID — her hand on the machine's input bus
 # (tools/hid.py). Source build (needs a C compiler); at runtime it
 # needs write access to /dev/uinput — see scripts/genesis-uinput.rules.
-#   evdev==2.0.0
+#   evdev
 
 # Optional: official ARC-AGI-3 games (worlds/games/official.py) plus
 # the local Game Arena shelf (worlds/games/arena.py — game-arena
 # pulls pyspiel, the engine Kaggle's arena evaluates on). ARC imports
 # lazily; needs ARC_API_KEY from https://three.arcprize.org for full
 # online access (anonymous offers fewer; the arena shelf is local and
-# needs no key). arc-agi held at 0.9.9 (accepts Pillow>=12.1.1, so 13 satisfies it); 0.9.10 is still too fresh to pin.
-#   arc-agi==0.9.9
-#   game-arena>=0.1.0
-#   kaggle-environments>=1.33.3
+# needs no key). arc-agi 0.9.9 was the last release validated
+# against her; newer releases should be checked before relying on them.
+#   arc-agi
+#   game-arena
+#   kaggle-environments

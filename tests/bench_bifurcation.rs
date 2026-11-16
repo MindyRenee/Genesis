@@ -109,7 +109,7 @@ fn run_at_parameter(homeostatic_rate: f32) -> BifurcationPoint {
     let pre_da = neuro.chemicals[NeurochemicalId::Dopamine as usize].level;
 
     // Apply perturbation.
-    neuro.apply_impulse_capped(NeurochemicalId::Dopamine, PERTURB_MAG, 0);
+    neuro.apply_impulse(NeurochemicalId::Dopamine, PERTURB_MAG, 0);
     neuro.recompute_derived();
 
     let post_perturb_da = neuro.chemicals[NeurochemicalId::Dopamine as usize].level;

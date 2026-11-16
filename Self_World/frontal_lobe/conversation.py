@@ -15,6 +15,7 @@ from genesis_client.protocol import (
 )
 from genesis_client.swallow import note_swallowed
 from genesis_client.threads import named_thread
+from inhibition import InhibitoryGate
 from parietal_lobe.grid import Grid
 from parietal_lobe.grounding import ground_scene
 from parietal_lobe.scene import Scene
@@ -131,17 +132,18 @@ class ConversationMixin:
         _active_think_worker: threading.Thread | None
         _think_recovery_active: bool
         _think_wedged_since: float | None
-        _think_worker_lock: threading.Lock
+        _think_worker_lock: InhibitoryGate
 
         def __getattr__(self, name: str) -> Any: ...
 
     def add_live_thought_listener(self, listener) -> None:
         """Register a listener for Genesis's spontaneous thoughts.
 
-        The listener is called as ``listener(kind: str, content: str)``
-        from background threads, where ``kind`` is ``"thought"`` (a
-        spontaneous inner-life thought) or ``"learning"`` (something
-        it learned autonomously). Must be thread-safe.
+        The listener is called as ``listener(kind: str, content: str)``,
+        where ``kind`` is ``"thought"`` (a spontaneous inner-life
+        thought) or ``"learning"`` (something it learned autonomously).
+        It may arrive from the metronome or an infrastructure callback;
+        listeners must be thread-safe.
         """
         self._live_thought_listeners.append(listener)
 
@@ -170,13 +172,10 @@ class ConversationMixin:
         consistent with the brain-wave gating already applied to
         perception and inner_life broadcasts.
 
-        Thread-safe: volition actions run in background threads, and
-        the workspace uses an internal lock.
+        Thread-safe: emissions may arrive from the metronome or
+        infrastructure callbacks, and the workspace uses an internal
+        lock.
         """
-        # The channel board's "last" line reads this — what she most
-        # recently emitted, kind and words, verbatim.
-        self._last_emitted = (kind, content)
-
         # Journal the event first — the durable record of its inner
         # life. The journal swallows its own errors; it can never block
         # or break the broadcast and listeners below.
@@ -312,21 +311,45 @@ class ConversationMixin:
                 return
             self._speech_queue.append(text)
 
-    def _defer(self, delay: float, callback: Callable[[], None]) -> threading.Timer:
-        """Schedule ``callback`` after ``delay`` seconds on a daemon timer.
+    def _defer(self, delay: float, callback: Callable[[], None]) -> None:
+        """Schedule ``callback`` as metronome-advanced deferred state.
 
-        ``threading.Timer`` inherits its daemon flag from the creating
-        thread. Timers created from the main thread (``respond()``,
-        ``wake()``) are non-daemon, so interpreter shutdown would block
-        until they fire — a pending ``Timer(60, ...)`` after wake would
-        make /quit hang for up to a minute. Daemon timers die with the
-        process; the callbacks (resume learner/inner life) are no-ops
-        after ``stop()``.
+        Conversation resumes are timing state, not timer threads. The
+        metronome drains due callbacks serially; callbacks scheduled
+        after ``stop()`` remain queued and inert with the mind.
         """
-        timer = threading.Timer(delay, callback)
-        timer.daemon = True
-        timer.start()
-        return timer
+        due_at = time.monotonic() + delay
+        with self._deferred_callbacks_lock:
+            self._deferred_callbacks.append((due_at, callback))
+
+    def _advance_deferred_state(self) -> None:
+        """Run deferred conversation transitions whose deadlines arrived."""
+        now = time.monotonic()
+        due: list[Callable[[], None]] = []
+        pending: list[tuple[float, Callable[[], None]]] = []
+        with self._deferred_callbacks_lock:
+            for due_at, callback in self._deferred_callbacks:
+                (due if due_at <= now else pending).append(
+                    callback if due_at <= now else (due_at, callback)
+                )
+            self._deferred_callbacks = pending
+        for callback in due:
+            try:
+                callback()
+            except Exception as e:  # noqa: BLE001
+                note_swallowed(
+                    "mind.conversation._advance_deferred_state",
+                    e,
+                )
+
+    def _advance_post_conversation_state(self) -> None:
+        """Run the deferred post-turn self-invocation check once."""
+        if not self._post_conversation_self_invoke_pending:
+            return
+        self._post_conversation_self_invoke_pending = False
+        if not self._running or self._suppress_volition or self.is_resting:
+            return
+        self._check_post_conversation_self_invoke()
 
     def _on_spontaneous_thought(self, thought) -> None:
         """Callback for when Genesis has a spontaneous thought."""
@@ -410,7 +433,7 @@ class ConversationMixin:
         world's noise. Salient events become episodic memories and are
         queued for dream replay: its sleep processes what happened in
         its world. This is the coupling between its outer and inner
-        outer_world.
+        worlds.
 
         Outbound events (its own utterances and acts) are already in
         its cognitive field through the paths that produced them, so
@@ -931,13 +954,10 @@ class ConversationMixin:
         # An answer that drained the queue ends the session — the
         # exchange it existed for is complete.
         self.end_question_session_if_done()
-        # Check if it should self-invoke a command based on its
-        # post-conversation state.
-        named_thread(
-            "post-conv-self-invoke",
-            self._check_post_conversation_self_invoke,
-            comm="g-post-conv",
-        ).start()
+        # Check whether the completed turn should self-invoke a command
+        # on a later metronome cycle — a pending state transition, not
+        # a helper worker.
+        self._post_conversation_self_invoke_pending = True
 
     def _said(self, text: str) -> str:
         """Record an outbound utterance in its external world.
@@ -1198,8 +1218,8 @@ class ConversationMixin:
         # exchange is the only thing she's doing until it ends.
         if self._is_teaching or self._answering_questions:
             return
-        # Deferred resume timer firing during teardown — the pauses
-        # it would lift belong to threads already joined.
+        # Deferred resume state firing during teardown — the pauses
+        # it would lift belong to subsystems already closed.
         if self._stop_latched:
             return
         if self.is_hypnagogic:

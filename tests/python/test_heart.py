@@ -170,7 +170,7 @@ def test_disarm_restores_static_depth():
 
 def test_meditation_takes_up_the_pulse_and_waking_releases_it():
     """The keep rides the sit: /meditate arms it, wake disarms it."""
-    from sleep.sleep import SleepMixin
+    from sleep.meditation import MeditationMixin
 
     heart_client = _FakeClient(probe=_probe())
     heart = _heart(heart_client)
@@ -188,12 +188,12 @@ def test_meditation_takes_up_the_pulse_and_waking_releases_it():
         _learner_neuro_impulse=lambda c, v: None,
         heart=heart,
     )
-    SleepMixin.meditate(mind)
+    MeditationMixin.meditate(mind)
     assert mind._is_meditating
     assert heart.state.pulse_armed
     assert heart_client.pulse_calls == [(_PULSE_BASE, _PULSE_MOD_HZ, _PULSE_MOD_DEPTH)]
 
-    SleepMixin.wake_from_meditation(mind)
+    MeditationMixin.wake_from_meditation(mind)
     assert not mind._is_meditating
     assert not heart.state.pulse_armed
     assert heart_client.pulse_calls[-1] == (0.0, 0.0, 0.0)

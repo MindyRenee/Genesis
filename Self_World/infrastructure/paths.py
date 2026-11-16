@@ -1,8 +1,8 @@
 """Install-layout-aware filesystem roots.
 
 Genesis's source is organized into three worlds — ``Self_World/``
-(the self and organism), ``Inner_Non_Physical_World/`` (the non-physical
-phenomena — field, waves, dreams, thoughts), and ``Outer_Physical_World/`` (the
+(the self and organism), ``Inner_World/`` (the non-physical
+phenomena — field, waves, dreams, thoughts), and ``Outer_World/`` (the
 environment) — each a package root holding the packages that belong
 to it. In a source checkout all three sit under the repository
 root; in a packaged install the same packages land flat in

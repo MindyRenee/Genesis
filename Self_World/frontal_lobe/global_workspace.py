@@ -77,7 +77,6 @@ References:
 from __future__ import annotations
 
 import logging
-import threading
 import time
 from collections import deque
 from collections.abc import Callable
@@ -86,6 +85,7 @@ from typing import Any, Protocol
 
 from brain_waves import BrainWave, BrainWaveState
 from genesis_client.swallow import note_swallowed
+from inhibition import InhibitoryGate
 
 logger = logging.getLogger(__name__)
 
@@ -254,7 +254,7 @@ class GlobalWorkspace:
         # (during think()) and the inner life thread (spontaneous
         # thoughts broadcast + tick). This lock protects _items,
         # _pending, and _broadcast_count from concurrent modification.
-        self._lock = threading.Lock()
+        self._lock = InhibitoryGate()
 
     def register_module(self, module: WorkspaceModule) -> None:
         """Register a module to receive workspace broadcasts.

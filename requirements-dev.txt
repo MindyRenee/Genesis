@@ -4,22 +4,23 @@
 -r requirements.txt
 
 # Lint
-ruff==0.16.9
-pyflakes==4.0.0
-mypy==2.3.1
+ruff
+pyflakes
+mypy
 # Unused-function detection. ruff's F rules and pyflakes only cover
 # unused *imports* (F401), so neither can see an unreferenced
 # function or method — the repo accumulated ~120 of them before this
 # was added. Not wired into CI as a blocking gate: there is a known
 # backlog to clear first.
-vulture==2.14
+vulture
 
 # Optional-at-runtime deps kept in dev/CI so their code paths and
 # tests run (symbolic.py degrades gracefully when sympy is absent).
-sympy==1.12
-# mpmath>=1.4 deprecated names sympy 1.12 still calls
-# (ctx_mp.bitcount, mpnumeric); keep it below the break.
-mpmath<1.4
+sympy
+# Known break: mpmath>=1.4 removed names sympy still calls
+# (ctx_mp.bitcount, mpnumeric). No bound per the rules — if the
+# symbolic-math tests fail, check the mpmath version first.
+mpmath
 
 # Test
-pytest==9.1.1
+pytest

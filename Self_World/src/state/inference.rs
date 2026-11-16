@@ -66,7 +66,7 @@
 //!  28     user_valence                 f32     inferred user valence [-1,1]
 //!  32     user_arousal                 f32     inferred user arousal [0,1]
 //!  36     user_engagement              f32     inferred user engagement [0,1]
-//!  40     prediction_error_dopamine    f32     DA state prediction error [-2,2]
+//!  40     prediction_error_dopamine    f32     DA state prediction error (unbounded)
 //!  44     prediction_error_cortisol    f32     CORT state prediction error [-2,2]
 //!  48     prediction_error_serotonin   f32     SRT state prediction error [-2,2]
 //!  52     model_maturity               f32     model confidence [0,1]
@@ -143,7 +143,7 @@ pub struct InferenceSignals {
     /// Dopamine prediction error from the last inference cycle.
     /// Positive = dopamine was higher than predicted (better-than-
     /// expected = reward prediction error). Negative = lower than
-    /// predicted. Range [-2, 2] (effective levels span [0, 2]).
+    /// predicted. Finite and unbounded.
     pub prediction_error_dopamine: f32,
     /// Cortisol prediction error from the last inference cycle.
     /// Positive = cortisol was higher than predicted (unexpected

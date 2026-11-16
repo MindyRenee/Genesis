@@ -33,10 +33,14 @@ def test_code_root_env_override(monkeypatch, tmp_path) -> None:
     assert code_root() == tmp_path
 
 
-def test_parse_headless_and_stop(monkeypatch) -> None:
-    monkeypatch.setattr(sys, "argv", ["genesis", "--headless", "--stop"])
+def test_parse_headless_self_directed_and_stop(monkeypatch) -> None:
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["genesis", "--headless", "--self-directed", "--stop"],
+    )
     args = genesis_cli._parse_cli_args()
-    assert args.headless and args.stop
+    assert args.headless and args.self_directed and args.stop
 
 
 def test_console_main_sets_genesis_run(monkeypatch, tmp_path) -> None:

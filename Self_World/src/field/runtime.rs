@@ -295,7 +295,12 @@ fn unit_finite(value: f32) -> f64 {
 }
 
 fn effective(state: &GenesisCoreState, id: NeurochemicalId) -> f32 {
-    state.neurochemicals.effective(id).clamp(0.0, 2.0)
+    let value = state.neurochemicals.effective(id);
+    if id == NeurochemicalId::Dopamine {
+        crate::state::sanitize::finite_or(value, 0.0)
+    } else {
+        value.clamp(0.0, 2.0)
+    }
 }
 
 fn body_projection(state: &GenesisCoreState) -> Vector {

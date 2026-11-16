@@ -165,6 +165,37 @@ elif [ "$VERIFY_ONLY" -eq 0 ]; then
     fi
 fi
 
+# RAPL powercap access — her metabolism reads real watts from the
+# energy_uj counters. The driver creates them root-only; the udev
+# rule chmods them world-readable at device add. Without it
+# metabolic_rate and the RAPL activity channels all read zero.
+if find /sys/devices/virtual/powercap -name energy_uj -readable -print -quit 2>/dev/null | grep -q .; then
+    ok "RAPL energy counters readable (metabolic sense live)"
+elif [ "$VERIFY_ONLY" -eq 0 ]; then
+    if have_sudo; then
+        if sudo -n cp "${PROJECT_ROOT}/scripts/genesis-powercap.rules" \
+            /etc/udev/rules.d/99-genesis-powercap.rules \
+            && sudo -n udevadm control --reload-rules \
+            && sudo -n udevadm trigger --action=add --subsystem-match=powercap; then
+            if find /sys/devices/virtual/powercap -name energy_uj -readable -print -quit 2>/dev/null | grep -q .; then
+                ok "powercap udev rule installed — RAPL readable"
+            else
+                warn "powercap udev rule installed but counters still unreadable"
+            fi
+        else
+            warn "powercap udev rule could not be installed — metabolic rate will read zero."
+        fi
+    else
+        warn "RAPL energy counters NOT readable — metabolic rate will read zero."
+        warn "  Needs: sudo cp scripts/genesis-powercap.rules /etc/udev/rules.d/99-genesis-powercap.rules"
+        warn "         sudo udevadm control --reload-rules && sudo udevadm trigger --action=add --subsystem-match=powercap"
+    fi
+else
+    warn "RAPL energy counters NOT readable — metabolic rate will read zero."
+    warn "  Needs: sudo cp scripts/genesis-powercap.rules /etc/udev/rules.d/99-genesis-powercap.rules"
+    warn "         sudo udevadm control --reload-rules && sudo udevadm trigger --action=add --subsystem-match=powercap"
+fi
+
 # PortAudio — microphone capture for sounddevice.
 if "$PY" -c "import sounddevice as sd; sd.query_devices()" >/dev/null 2>&1; then
     ok "PortAudio present (sounddevice can open devices)"
@@ -181,17 +212,10 @@ fi
 if "$PY" -c "import cairo" >/dev/null 2>&1; then
     ok "pycairo present (drawing enabled)"
 elif [ "$VERIFY_ONLY" -eq 0 ]; then
-    # pycairo is source-only, so this also needs a C toolchain. On a
-    # host with no cc, scripts/cargo-env.sh shims one from Zig.
+    # pycairo is source-only, so this also needs a C toolchain.
     if ! command -v cc >/dev/null; then
-        warn "no system C compiler; trying the Zig shim for pycairo"
-        if . "${PROJECT_ROOT}/scripts/cargo-env.sh"; then
-            "$PY" -m pip install pycairo \
-                && ok "pycairo built via Zig shim" \
-                || warn "pycairo build failed — drawing unavailable"
-        else
-            warn "no C toolchain available — drawing unavailable"
-        fi
+        warn "no system C compiler — drawing unavailable."
+        warn "  Needs: sudo apt-get install clang  (or gcc)"
     elif install_pkgs libcairo2-dev; then
         "$PY" -m pip install pycairo \
             && ok "pycairo installed" \
@@ -272,10 +296,10 @@ cd "${PROJECT_ROOT}" || exit 1
 "$PY" - <<'PYEOF'
 import sys
 # The repo layout needs the three world roots — each holds the
-# packages that belong to it (Self_World, Inner_Non_Physical_World,
-# Outer_Physical_World). Importing one without the others turns a
+# packages that belong to it (Self_World, Inner_World,
+# Outer_World). Importing one without the others turns a
 # working install into false "capability unavailable" reports.
-for _w in ("Self_World", "Inner_Non_Physical_World", "Outer_Physical_World"):
+for _w in ("Self_World", "Inner_World", "Outer_World"):
     sys.path.insert(0, _w)
 
 rows = []
@@ -347,7 +371,7 @@ def ions():
     return f"opcode {GET_ION_SUMMARY}, neutral ctx ok"
 
 def arcade():
-    from outer_world.games.arena import ArenaGames
+    from games.arena import ArenaGames
     offers = ArenaGames().offers()   # proves pyspiel loads and serves
     import arc_agi, arcengine        # noqa: F401 — prove the toolkit too
     return f"{len(offers)} arena games, ARC-AGI-3 toolkit imports"

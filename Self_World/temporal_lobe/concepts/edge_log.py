@@ -38,12 +38,12 @@ import logging
 import math
 import os
 import tempfile
-import threading
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, TextIO
 
 from genesis_client.swallow import note_swallowed
+from inhibition import RecurrentInhibition
 
 from .types import Edge, RelationType
 
@@ -181,7 +181,7 @@ class EdgeLog:
 
     def __init__(self, path: Path, decay_fn: Callable[[Edge, int], float] | None = None) -> None:
         self._path = Path(path)
-        self._lock = threading.RLock()
+        self._lock = RecurrentInhibition()
         self._fh: TextIO | None = None
         # Fold-time decay policy: (edge, now_ms) -> effective weight.
         # None = raw earned weights (default). The mechanism lives

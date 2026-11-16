@@ -1,7 +1,7 @@
 """Pytest configuration for Genesis tests.
 
 Adds the three world directories (``Self_World/``,
-``Inner_Non_Physical_World/``, ``Outer_Physical_World/``) and the
+``Inner_World/``, ``Outer_World/``) and the
 repository root to ``sys.path`` so the world packages and the support
 packages (``genesis_client``, ``infrastructure``, ``eval``, ``mind``)
 are importable without each test file manipulating ``sys.path``
@@ -18,7 +18,7 @@ import pytest
 # importable. The world dirs are sys.path roots — packages inside them
 # keep their anatomical names (``self``, ``frontal_lobe``, ``memory``…).
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-for _name in ("Self_World", "Inner_Non_Physical_World", "Outer_Physical_World"):
+for _name in ("Self_World", "Inner_World", "Outer_World"):
     _p = os.path.join(_PROJECT_ROOT, _name)
     if os.path.isdir(_p) and _p not in sys.path:
         sys.path.insert(0, _p)

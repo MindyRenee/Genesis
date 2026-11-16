@@ -135,8 +135,8 @@ fn scenario_stressed() -> ScenarioResult {
     }
 
     // Apply cortisol stress impulse.
-    neuro.apply_impulse_capped(NeurochemicalId::Cortisol, 0.5, 0);
-    neuro.apply_impulse_capped(NeurochemicalId::CRH, 0.3, 0);
+    neuro.apply_impulse(NeurochemicalId::Cortisol, 0.5, 0);
+    neuro.apply_impulse(NeurochemicalId::CRH, 0.3, 0);
     neuro.recompute_derived();
 
     // Run 50 ticks with the stressor active.
@@ -213,7 +213,7 @@ fn scenario_uncertain() -> ScenarioResult {
         } else {
             0.05
         };
-        neuro.apply_impulse_capped(chem, mag, 0);
+        neuro.apply_impulse(chem, mag, 0);
         neuro.recompute_derived();
 
         neuro.tick_with_params(&params);

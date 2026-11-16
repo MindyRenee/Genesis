@@ -85,7 +85,7 @@ fn run_at_complexity(chemicals: &[NeurochemicalId]) -> Vec<LearningPoint> {
                     0.0
                 };
                 if mag.abs() > 0.0 {
-                    neuro.apply_impulse_capped(chem, mag, 0);
+                    neuro.apply_impulse(chem, mag, 0);
                 }
                 let _ = i;
             }

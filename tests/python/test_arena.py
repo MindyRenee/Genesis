@@ -7,17 +7,17 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
-from outer_world.games.arcade import Arcade
-from outer_world.games.arena import (
+from games.arcade import Arcade
+from games.arena import (
     ARENA_PREFIX,
     ArenaGames,
     ArenaSession,
     CombinedGames,
     default_games,
 )
-from outer_world.games.official import GameOffer, GamesUnavailable
-from outer_world.world import OuterWorld
+from games.official import GameOffer, GamesUnavailable
 from tools.framework import ToolRegistry
+from workstation.environment import OuterEnvironment
 
 pyspiel = pytest.importorskip("pyspiel")
 
@@ -44,7 +44,7 @@ class _FakeOfficial:
 def _arcade():
     """An arcade with a combined shelf in an impulse-recording world."""
     impulses = []
-    world = OuterWorld(neuro_impulse=lambda c, a: impulses.append((c, a)))
+    world = OuterEnvironment(neuro_impulse=lambda c, a: impulses.append((c, a)))
     events = []
     world.on_external_event = events.append
     games = CombinedGames(_FakeOfficial(), ArenaGames(rng=random.Random(0)))

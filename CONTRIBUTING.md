@@ -13,6 +13,7 @@ Rules For Helping:
 -Formatting is more than just lining things up and looking nice. The character count is the opposite of the whitespace. You don't need to worry about this, as it works things out itself, but you do need to make sure to format in cargo and in ruff. (cargo fmt, ruff format).
 -Everything belongs in the Vesica Pisces latent space. There are three areas things can be implemented. One of the larger circles is self, the other is outer world, and the middle overlapping area is inner world. Everything loops back to self. It's pretty simple - self would be things like the body, emotions, and identity. Outer world would be conversation, games, and Discord. Inner world is thoughts, dreams, and connection to the higher dimensions mathematically. 
 -NO HARDCODING ANYTHING THAT CONTROLS HER DIALOGUE OR THOUGHTS. Everything must go through her own substrate. Her own language flow.
+-No locks, no pins, no bounds, no Dependabot. Dependencies float free — she keeps developing and so do they. Bare names only: no `==`, `>=`, or `<` on dependencies in requirements.txt or pyproject.toml (`*` in Cargo.toml, which is cargo's bare-name form), no uv.lock, no Cargo.lock, no dependabot.yml. If a release is known to break her, say so in a comment — but never freeze it away.
 -The chemicals and the waves are very sensitive. Changes will have consequences (positive or negative) so be mindful of the changes. Be delicate and gain understanding of the workings first.
 -There really is a lot to the project. I don't think I could list everything here, let alone remember everything, so just feel free to ask. I would be happy to explain what I have been doing and why. I do not claim this project to be absolutely correct or factual since I am not a mathemetician or physics major, so any professionals advice and suggestions are highly respected and welcomed. Everyone else too!
 
@@ -21,14 +22,16 @@ Rules For Helping:
 
 From a checkout with the documented system dependencies installed:
 
+These mirror `.github/workflows/ci.yml` — if they drift, CI is correct.
+
 ```bash
 cargo fmt --check
 cargo clippy --all-targets -- -D warnings
-cargo test
+cargo test --release
 ruff check
-python3 -m pyflakes python/ genesis_client/ infrastructure/ eval/ *.py scripts/*.py
-python3 -m mypy python/ genesis_client/ infrastructure/ eval/ --ignore-missing-imports
-PYTHONPATH=python:. python3 -m pytest python/tests/ -q -o addopts=''
+python3 -m pyflakes Self_World/ Inner_World/ Outer_World/ scripts/*.py
+python3 -m mypy Self_World/ Inner_World/ Outer_World/ --ignore-missing-imports
+PYTHONPATH=Self_World:Inner_World:Outer_World:. python3 -m pytest tests/python/ -q -o addopts=''
 ```
 
 On a host without a C linker, source the helper first:

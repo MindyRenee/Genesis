@@ -45,10 +45,21 @@ References:
 
 from __future__ import annotations
 
+import math
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
+
+
+def _finite_or(value: float, default: float) -> float:
+    """Return finite floats; malformed/non-finite inputs use ``default``."""
+    try:
+        result = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return default
+    return result if math.isfinite(result) else default
+
 
 _INTENTION_PRIOR = 0.5  # reliability assumed for an untried kind
 # An objective that keeps failing stops being retried — without a cap,
@@ -178,7 +189,7 @@ class ExecutiveIntention:
     @property
     def value(self) -> float:
         """Arbitration score: want times confidence times reliability."""
-        return max(0.0, self.priority) * self.reliability
+        return self.priority * self.reliability
 
     def describe(self) -> str:
         """One-line account of the intention and its evidence."""
@@ -396,7 +407,7 @@ class ExecutiveFunction:
             steps=steps,
             predicted_outcomes=outcomes,
             expected_value=value / max(len(steps), 1),
-            confidence=min(1.0, max(0.0, value / 2.0)),
+            confidence=_finite_or(value / 2.0, 0.0),
             goal=goal,
         )
 
@@ -442,8 +453,8 @@ class ExecutiveFunction:
             # and the actuator re-executes it forever.
             if current.status in {"completed", "abandoned"}:
                 return current
-            current.priority = max(current.priority, max(0.0, min(1.0, priority)))
-            current.confidence = max(0.0, min(1.0, confidence))
+            current.priority = max(current.priority, _finite_or(priority, current.priority))
+            current.confidence = _finite_or(confidence, current.confidence)
             if reason:
                 current.reason = reason
             if expected_outcome:
@@ -453,8 +464,8 @@ class ExecutiveFunction:
         intention = ExecutiveIntention(
             objective=objective.strip(),
             reason=reason,
-            priority=max(0.0, min(1.0, priority)),
-            confidence=max(0.0, min(1.0, confidence)),
+            priority=_finite_or(priority, 0.5),
+            confidence=_finite_or(confidence, 0.5),
             expected_outcome=expected_outcome,
             actionable=actionable,
         )
@@ -485,7 +496,7 @@ class ExecutiveFunction:
         selected = max(
             actionable,
             key=lambda c: (
-                c.priority * max(c.confidence, 0.05),
+                c.priority * c.confidence,
                 -c.attempts,
             ),
         )
@@ -551,8 +562,8 @@ class ExecutiveFunction:
             intention.last_observation = reason or note
             return intention
         intention.status = "pending"
-        intention.confidence = max(0.05, intention.confidence * 0.8)
-        intention.priority = min(1.0, intention.priority + 0.05)
+        intention.confidence *= 0.8
+        intention.priority += 0.05
         if reason:
             intention.last_observation = reason
             intention.revision = reason
@@ -598,8 +609,8 @@ class ExecutiveFunction:
             intention = ExecutiveIntention(
                 objective=objective,
                 reason=str(item.get("reason", "")),
-                priority=max(0.0, min(1.0, float(item.get("priority", 0.5)))),
-                confidence=max(0.0, min(1.0, float(item.get("confidence", 0.5)))),
+                priority=_finite_or(item.get("priority", 0.5), 0.5),
+                confidence=_finite_or(item.get("confidence", 0.5), 0.5),
                 expected_outcome=str(item.get("expected_outcome", "")),
                 status=str(item.get("status", "pending")),
                 created_at=int(item.get("created_at", int(time.time() * 1000))),
@@ -638,7 +649,7 @@ class ExecutiveFunction:
         """Convert salient cognitive signals into persistent objectives.
 
         Signal producers provide meaning and salience; the executive owns
-        normalization, deduplication, priority, and persistence.
+        finite validation, deduplication, priority, and persistence.
         """
         created: list[ExecutiveIntention] = []
         mode_kind = {
@@ -671,7 +682,7 @@ class ExecutiveFunction:
             raw_salience = candidate.get("salience", 0.0)
             if not isinstance(raw_salience, (int, float)):
                 continue
-            salience = max(0.0, min(1.0, float(raw_salience)))
+            salience = _finite_or(raw_salience, 0.0)
             if salience <= 0.0:
                 continue
             kind = str(candidate.get("kind", mode_kind.get(mode, "observe"))).strip()
@@ -689,7 +700,7 @@ class ExecutiveFunction:
                 objective,
                 reason=source,
                 priority=salience,
-                confidence=max(0.1, min(1.0, salience)),
+                confidence=salience,
                 expected_outcome=(
                     "knowledge or relationships updated"
                     if kind == "learn"
@@ -721,8 +732,8 @@ class ExecutiveFunction:
         inhibited (Aron et al., 2014).
 
         Args:
-            impulse_strength: The strength of the prepotent response
-                impulse (0..1). High = strong impulse, low = weak.
+            impulse_strength: Finite prepotent response strength.
+                High = strong impulse, low = weak.
 
         Returns:
             InhibitionResult indicating whether the response was
@@ -756,9 +767,9 @@ class ExecutiveFunction:
         control loop (Botvinick et al., 2001).
 
         Args:
-            threshold: New inhibition threshold (0..1).
+            threshold: New finite inhibition threshold.
         """
-        self.inhibition_threshold = max(0.0, min(1.0, threshold))
+        self.inhibition_threshold = _finite_or(threshold, self.inhibition_threshold)
 
     @property
     def inhibition_count(self) -> int:

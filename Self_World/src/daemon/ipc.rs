@@ -39,6 +39,8 @@
 //! | 24–33  | Reactive commands — the cognitive mind drives daemon     |
 //! |        | functions (advance neuro, consolidate, associate,        |
 //! |        | dream, sensors, body control, save, telemetry)           |
+//! | 64     | GET_STATE_SNAPSHOT — the mind's CoreStateSnapshot DTO;     |
+//! |        | GET_STATE (1) stays the raw brain image for inspection     |
 //!
 //! ## Notifications (server → client, unsolicited)
 //!
@@ -55,7 +57,7 @@ use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
 
 use crate::cognition::SelfModel;
-use crate::state::{CognitiveZone, GenesisCoreState, ModuleId, NeurochemicalId};
+use crate::state::{CognitiveZone, CoreStateSnapshot, GenesisCoreState, ModuleId, NeurochemicalId};
 use crate::store::{Episode, EventType, LtmStore, MmapState, RingBuffer};
 
 // ─────────────────────────────────────────────────────────────────
@@ -90,24 +92,18 @@ pub(crate) const MARKER_G04: u64 = 0x4753_0441_548A_9F5D;
 
 /// Back-off between `read_consistent` retries on the IPC path.
 ///
-/// The seqlock reader rejects any snapshot taken while a write is in
-/// progress, and a tick-loop write holds that window for the duration
-/// of a full 18-chemical coupled integration. Retrying without a pause
-/// burns CPU and does not shorten the window, so several consecutive
-/// attempts can all fail inside one transaction and surface a spurious
-/// `READ_FAILED` to the mind. 200 µs is well under the write window
-/// but long enough to yield the core.
+/// Retained for callers that still poll before escalating to the
+/// flock-serialized read. The snapshot itself is a single volatile
+/// copy — there is no write-in-progress marker to contend with — so
+/// the pause only matters when a caller explicitly retries.
 const RETRY_BACKOFF: std::time::Duration = std::time::Duration::from_micros(200);
 
 /// Read a consistent `GenesisCoreState` snapshot for a command.
 ///
-/// The seqlock path is tried first — it stays lock-free in the common
-/// case. If every retry lands inside the same write transaction (or
-/// the seqlock is wedged odd by a panicked publish), escalate to the
-/// flock(LOCK_SH)-serialized read in
-/// [`MmapState::read_consistent_locked`]: the reader waits out the
-/// writer's publish instead of answering `READ_FAILED` while the
-/// file is perfectly readable.
+/// The volatile snapshot path is taken first — it is lock-free. For
+/// a read that cannot overlap a publish, callers can use the
+/// flock(LOCK_SH)-serialized
+/// [`MmapState::read_consistent_locked`].
 fn snapshot_state(mmap: &MmapState) -> Option<GenesisCoreState> {
     for _ in 0..8 {
         if let Some(state) = mmap.read_consistent() {
@@ -131,15 +127,36 @@ fn live_emotional_tag(mmap: &MmapState, client_tag: [f32; 12]) -> [f32; 12] {
         Some(state) => {
             let mut tag = [0.0f32; 12];
             for (i, v) in tag.iter_mut().enumerate() {
-                *v = crate::state::sanitize::finite_clamp(
-                    state.neurochemicals.effective_levels[i],
-                    0.0,
-                    1.0,
-                );
+                let level = state.neurochemicals.effective_levels[i];
+                *v = crate::state::sanitize::finite_or(level, 0.0);
             }
             tag
         }
         None => client_tag,
+    }
+}
+
+/// Mirror live STM ring-buffer coordinates into the core state so the
+/// snapshot contract reports the store IPC is actually mutating.
+fn sync_stm_pointers(mmap: &MmapState, stm: &RingBuffer) {
+    let header = stm.header();
+    if let Err(e) = mmap.modify(crate::daemon::current_ms(), |state| {
+        state.memory.stm_head = header.head;
+        state.memory.stm_tail = header.tail;
+        state.memory.stm_count = header.count.min(u32::MAX as u64) as u32;
+        state.memory.stm_capacity = header.capacity;
+    }) {
+        eprintln!("[ipc] failed to mirror STM pointers: {e}");
+    }
+}
+
+/// Mirror the authoritative LTM count into the core state so snapshot
+/// consumers do not read a stale direct-store/archive/delete count.
+fn sync_ltm_episode_count(mmap: &MmapState, count: u64) {
+    if let Err(e) = mmap.modify(crate::daemon::current_ms(), |state| {
+        state.memory.ltm_episode_count = count;
+    }) {
+        eprintln!("[ipc] failed to mirror LTM count: {e}");
     }
 }
 
@@ -198,8 +215,9 @@ pub mod cmd {
     /// Get the interoceptive body state — CPU temperature, frequency,
     /// memory pressure, load, I/O activity, battery, thermal throttling,
     /// cognitive load, and distress level. This is how the cognitive
-    /// mind feels its own body. Response: BodyState (116-byte v3
-    /// header + trailing variable-length descriptor blocks).
+    /// mind feels its own body. Response: BodyState (current 124-byte
+    /// fixed header + trailing variable-length descriptor blocks; v1–v3
+    /// clients detect their layout by the exact descriptor offset).
     pub const GET_BODY_STATE: u8 = 17;
     /// Get the body control state — what Genesis is doing to its body
     /// (CPU frequency policy, scheduling priorities, I/O priority,
@@ -225,7 +243,7 @@ pub mod cmd {
     /// Retired — never reuse this wire number. Direct baseline edits
     /// let a caller permanently move a homeostatic set-point, bypassing
     /// the body's own dynamics; the only sanctioned chemistry channel
-    /// is NEURO_IMPULSE's bounded, decaying impulses.
+    /// is NEURO_IMPULSE's finite, decaying impulses.
     #[allow(dead_code)]
     pub const NEURO_ADJUST_BASELINE: u8 = 23;
 
@@ -325,8 +343,9 @@ pub mod cmd {
     /// delegate some of that judgement and keep some, and lets her
     /// withdraw it — a grant, not a build-time property.
     ///
-    /// Request: [f32 authority] in [0, 1].
-    /// Response: [u8 ack] + [f32 applied] (the clamped value written).
+    /// Request: [f32 authority]. Finite values are applied verbatim;
+    /// non-finite input becomes 0.
+    /// Response: [u8 ack] + [f32 applied] (the value written).
     pub const SET_POLICY_AUTHORITY: u8 = 35;
 
     /// Which optional hardware sensors this machine actually has.
@@ -592,6 +611,17 @@ pub mod cmd {
     /// Reply: [u8 ack]. Additive: PROTOCOL_VERSION unaffected.
     pub const SET_FIELD_PULSE: u8 = 63;
 
+    /// The mind's contract for core state — a `CoreStateSnapshot`
+    /// (232 bytes, self-describing: magic + version + size). This is
+    /// what `GET_STATE` *should* have been: a purpose-built wire DTO
+    /// mapped field-by-field from `GenesisCoreState`, so the Python
+    /// side never mirrors the brain's byte layout. `GET_STATE`
+    /// remains for full-fidelity body inspection (the Rust test
+    /// harness reads manifest and zone internals through it).
+    /// Additive: PROTOCOL_VERSION unaffected — an older daemon
+    /// rejects the unknown opcode loudly.
+    pub const GET_STATE_SNAPSHOT: u8 = 64;
+
     // ─── Tensor slab ──────────────────────────────────────────
     // Named multidimensional tensors shared between the daemon and
     // the cognitive mind — world frames, salience fields, embeddings,
@@ -672,8 +702,8 @@ pub mod error {
     pub const INTERNAL_ERROR: u8 = 0x84;
     /// A request field held an invalid value.
     pub const INVALID_VALUE: u8 = 0x85;
-    /// Consistent read failed after all retries (seqlock contention
-    /// or corrupt state). Returned instead of zero-filled data so
+    /// State read failed (e.g. corrupt state). Returned instead of
+    /// zero-filled data so
     /// callers can distinguish failure from a valid zero state.
     pub const READ_FAILED: u8 = 0x86;
 }
@@ -876,7 +906,7 @@ const _: () = {
 ///
 /// | Field | Meaning |
 /// |-------|---------|
-/// | `plasticity_gate` | BDNF/cortisol-derived gate \[0,1\]. High = capable of new memory formation. |
+/// | `plasticity_gate` | BDNF/cortisol-derived gate. High = capable of new memory formation. |
 /// | `bdnf_effective` | Effective BDNF level (level × receptor sensitivity). Drives plasticity. |
 /// | `bdnf_tonic` | Sustained (tonic) BDNF. Slow signal that drives metaplasticity. |
 /// | `cortisol_effective` | Effective cortisol. Acute stress. |
@@ -976,10 +1006,10 @@ pub struct BodyStateSummary {
     /// energy the machine is consuming right now. 0.0 if no
     /// power sensor is available.
     pub metabolic_rate: f32,
-    /// Core voltage (Vcore) in volts. Raw CPU electrical state,
-    /// clamped to [0, 25]. 0.0 if no sensor is available.
+    /// Core voltage (Vcore) in volts. Raw CPU electrical state;
+    /// 0.0 if no sensor is available.
     pub core_voltage: f32,
-    /// Supply voltage (battery rail) in volts, clamped to [0, 25].
+    /// Supply voltage (battery rail) in volts.
     /// The cognitive mind reads this for the energy-reserve health
     /// signal (a CRH impulse when critically low). 0.0 if no
     /// battery sensor is available.
@@ -1066,7 +1096,7 @@ pub struct ModuleTelemetrySummary {
     pub module_id: u8,
     /// ModuleStatus discriminant (0=Stopped … 5=Error).
     pub status: u8,
-    /// Self-reported activity share of the cognitive process \[0,1\].
+    /// Self-reported activity share of the cognitive process.
     pub cpu_share: f32,
     /// The task this part is working on (0 = none). Distinguishes a
     /// part that is busy from one that is busy *on something*.
@@ -1113,7 +1143,7 @@ pub struct BodyControlSummary {
     pub cognitive_nice: i32,
     /// I/O scheduling class label.
     pub io_class: String,
-    /// Plasticity gate \[0,1\] that drove I/O priority.
+    /// Plasticity gate that drove I/O priority.
     pub plasticity_gate: f32,
     /// Whether it's controlling the cognitive mind's PID.
     pub controlling_cognitive: bool,
@@ -1174,14 +1204,14 @@ fn serialize_body_control(ctrl: &super::cpufreq::BodyControlState) -> Vec<u8> {
     resp.extend_from_slice(gov_bytes);
     resp.push(ctrl.thermally_capped as u8);
     resp.extend_from_slice(
-        &crate::state::sanitize::finite_clamp(ctrl.thermal_cap_temp_c, 0.0, 150.0).to_le_bytes(),
+        &crate::state::sanitize::finite_or(ctrl.thermal_cap_temp_c, 0.0).to_le_bytes(),
     );
     resp.extend_from_slice(&ctrl.daemon_nice.to_le_bytes());
     resp.extend_from_slice(&ctrl.cognitive_nice.to_le_bytes());
     resp.extend_from_slice(&(io_bytes.len() as u32).to_le_bytes());
     resp.extend_from_slice(io_bytes);
     resp.extend_from_slice(
-        &crate::state::sanitize::finite_clamp(ctrl.plasticity_gate, 0.0, 1.0).to_le_bytes(),
+        &crate::state::sanitize::finite_or(ctrl.plasticity_gate, 0.0).to_le_bytes(),
     );
     resp.push(ctrl.controlling_cognitive as u8);
     resp.extend_from_slice(&(epp_bytes.len() as u32).to_le_bytes());
@@ -1226,26 +1256,18 @@ fn serialize_body_state(body: &super::interoception::BodyState) -> Vec<u8> {
     // Sanitize outgoing f32 fields — a NaN in the shared body state
     // would propagate to the Python client and corrupt its affect
     // inference.
+    resp.extend_from_slice(&crate::state::sanitize::finite_or(body.cpu_temp_c, 0.0).to_le_bytes());
+    resp.extend_from_slice(&crate::state::sanitize::finite_or(body.temperature, 0.0).to_le_bytes());
     resp.extend_from_slice(
-        &crate::state::sanitize::finite_clamp(body.cpu_temp_c, 0.0, 150.0).to_le_bytes(),
+        &crate::state::sanitize::finite_or(body.arousal_freq, 0.0).to_le_bytes(),
     );
     resp.extend_from_slice(
-        &crate::state::sanitize::finite_clamp(body.temperature, 0.0, 150.0).to_le_bytes(),
+        &crate::state::sanitize::finite_or(body.cognitive_load, 0.0).to_le_bytes(),
     );
+    resp.extend_from_slice(&crate::state::sanitize::finite_or(body.io_activity, 0.0).to_le_bytes());
+    resp.extend_from_slice(&crate::state::sanitize::finite_or(body.stress_load, 0.0).to_le_bytes());
     resp.extend_from_slice(
-        &crate::state::sanitize::finite_clamp(body.arousal_freq, 0.0, 1.0).to_le_bytes(),
-    );
-    resp.extend_from_slice(
-        &crate::state::sanitize::finite_clamp(body.cognitive_load, 0.0, 1.0).to_le_bytes(),
-    );
-    resp.extend_from_slice(
-        &crate::state::sanitize::finite_clamp(body.io_activity, 0.0, 1.0).to_le_bytes(),
-    );
-    resp.extend_from_slice(
-        &crate::state::sanitize::finite_clamp(body.stress_load, 0.0, 2.0).to_le_bytes(),
-    );
-    resp.extend_from_slice(
-        &crate::state::sanitize::finite_clamp(body.energy_reserve, 0.0, 1.0).to_le_bytes(),
+        &crate::state::sanitize::finite_or(body.energy_reserve, 0.0).to_le_bytes(),
     );
     resp.push(body.on_ac_power as u8);
     resp.extend_from_slice(&body.num_cores.to_le_bytes());
@@ -1253,73 +1275,62 @@ fn serialize_body_state(body: &super::interoception::BodyState) -> Vec<u8> {
     // Machine-native body fields — autonomic monitoring,
     // thermoregulatory effort, and metabolic rate.
     resp.extend_from_slice(
-        &crate::state::sanitize::finite_clamp(body.autonomic_rate, 0.0, 100.0).to_le_bytes(),
+        &crate::state::sanitize::finite_or(body.autonomic_rate, 0.0).to_le_bytes(),
     );
     resp.extend_from_slice(
-        &crate::state::sanitize::finite_clamp(body.thermoregulatory_effort, 0.0, 1.0).to_le_bytes(),
+        &crate::state::sanitize::finite_or(body.thermoregulatory_effort, 0.0).to_le_bytes(),
     );
     resp.extend_from_slice(
-        &crate::state::sanitize::finite_clamp(body.metabolic_rate, 0.0, 1.0).to_le_bytes(),
+        &crate::state::sanitize::finite_or(body.metabolic_rate, 0.0).to_le_bytes(),
     );
     // Voltage fields — core voltage (Vcore) and supply voltage
-    // (battery rail). Both are raw volts, clamped to [0, 25].
+    // (battery rail). Both are finite raw volts.
     resp.extend_from_slice(
-        &crate::state::sanitize::finite_clamp(body.core_voltage, 0.0, 25.0).to_le_bytes(),
+        &crate::state::sanitize::finite_or(body.core_voltage, 0.0).to_le_bytes(),
     );
     resp.extend_from_slice(
-        &crate::state::sanitize::finite_clamp(body.supply_voltage, 0.0, 25.0).to_le_bytes(),
+        &crate::state::sanitize::finite_or(body.supply_voltage, 0.0).to_le_bytes(),
     );
     // Silicon switching fields — RAPL per-domain energy rates
     // (normalized [0, 1]) and perf-counter miss ratios. 0.0 on
     // systems without powercap or perf access.
     resp.extend_from_slice(
-        &crate::state::sanitize::finite_clamp(body.core_activity, 0.0, 1.0).to_le_bytes(),
+        &crate::state::sanitize::finite_or(body.core_activity, 0.0).to_le_bytes(),
     );
     resp.extend_from_slice(
-        &crate::state::sanitize::finite_clamp(body.uncore_activity, 0.0, 1.0).to_le_bytes(),
+        &crate::state::sanitize::finite_or(body.uncore_activity, 0.0).to_le_bytes(),
     );
     resp.extend_from_slice(
-        &crate::state::sanitize::finite_clamp(body.dram_activity, 0.0, 1.0).to_le_bytes(),
+        &crate::state::sanitize::finite_or(body.dram_activity, 0.0).to_le_bytes(),
     );
     resp.extend_from_slice(
-        &crate::state::sanitize::finite_clamp(body.cache_miss_rate, 0.0, 1.0).to_le_bytes(),
+        &crate::state::sanitize::finite_or(body.cache_miss_rate, 0.0).to_le_bytes(),
     );
     resp.extend_from_slice(
-        &crate::state::sanitize::finite_clamp(body.branch_miss_rate, 0.0, 1.0).to_le_bytes(),
+        &crate::state::sanitize::finite_or(body.branch_miss_rate, 0.0).to_le_bytes(),
     );
     // Pulse — local-timer interrupt beats/sec plus the normalized
-    // value. Raw rate clamped to a generous ceiling; the normalized
-    // field is [0, 1].
-    resp.extend_from_slice(
-        &crate::state::sanitize::finite_clamp(body.pulse_hz, 0.0, 1_000_000.0).to_le_bytes(),
-    );
-    resp.extend_from_slice(
-        &crate::state::sanitize::finite_clamp(body.pulse, 0.0, 1.0).to_le_bytes(),
-    );
+    // value produced by the interoceptor.
+    resp.extend_from_slice(&crate::state::sanitize::finite_or(body.pulse_hz, 0.0).to_le_bytes());
+    resp.extend_from_slice(&crate::state::sanitize::finite_or(body.pulse, 0.0).to_le_bytes());
     // Involuntary layer — passive throttle and PSI stalls, plus
     // sustained exertion (top-P-state share of the read window).
     resp.extend_from_slice(
-        &crate::state::sanitize::finite_clamp(body.throttle_state, 0.0, 1.0).to_le_bytes(),
+        &crate::state::sanitize::finite_or(body.throttle_state, 0.0).to_le_bytes(),
     );
     resp.extend_from_slice(
-        &crate::state::sanitize::finite_clamp(body.top_freq_share, 0.0, 1.0).to_le_bytes(),
+        &crate::state::sanitize::finite_or(body.top_freq_share, 0.0).to_le_bytes(),
     );
-    resp.extend_from_slice(
-        &crate::state::sanitize::finite_clamp(body.psi_cpu, 0.0, 1.0).to_le_bytes(),
-    );
-    resp.extend_from_slice(
-        &crate::state::sanitize::finite_clamp(body.psi_io, 0.0, 1.0).to_le_bytes(),
-    );
-    resp.extend_from_slice(
-        &crate::state::sanitize::finite_clamp(body.psi_mem, 0.0, 1.0).to_le_bytes(),
-    );
+    resp.extend_from_slice(&crate::state::sanitize::finite_or(body.psi_cpu, 0.0).to_le_bytes());
+    resp.extend_from_slice(&crate::state::sanitize::finite_or(body.psi_io, 0.0).to_le_bytes());
+    resp.extend_from_slice(&crate::state::sanitize::finite_or(body.psi_mem, 0.0).to_le_bytes());
     // Senescence and entropy — battery cycle odometer (raw count)
     // and the kernel entropy pool level.
     resp.extend_from_slice(
-        &crate::state::sanitize::finite_clamp(body.battery_cycles, 0.0, 1_000_000.0).to_le_bytes(),
+        &crate::state::sanitize::finite_or(body.battery_cycles, 0.0).to_le_bytes(),
     );
     resp.extend_from_slice(
-        &crate::state::sanitize::finite_clamp(body.entropy_level, 0.0, 1.0).to_le_bytes(),
+        &crate::state::sanitize::finite_or(body.entropy_level, 0.0).to_le_bytes(),
     );
     resp.push(body.clocksource);
     resp.push(body.suspend_caps);
@@ -1329,12 +1340,8 @@ fn serialize_body_state(body: &super::interoception::BodyState) -> Vec<u8> {
     // so v3 decoders (desc_len at 112) see a v4 packet as "desc_len
     // mismatched → fixed-field decode, tail ignored" and v4 decoders
     // find their tail at 116–124.
-    resp.extend_from_slice(
-        &crate::state::sanitize::finite_clamp(body.rest, 0.0, 1.0).to_le_bytes(),
-    );
-    resp.extend_from_slice(
-        &crate::state::sanitize::finite_clamp(body.temp_trend, -1.0, 1.0).to_le_bytes(),
-    );
+    resp.extend_from_slice(&crate::state::sanitize::finite_or(body.rest, 0.0).to_le_bytes());
+    resp.extend_from_slice(&crate::state::sanitize::finite_or(body.temp_trend, 0.0).to_le_bytes());
     resp.extend_from_slice(&(desc_bytes.len() as u32).to_le_bytes());
     resp.extend_from_slice(desc_bytes);
     resp
@@ -1369,18 +1376,14 @@ fn serialize_subsystem_telemetry(
         resp.push(subsystem.subsystem.to_wire());
         resp.extend_from_slice(&subsystem.pid.to_le_bytes());
         resp.extend_from_slice(
-            &crate::state::sanitize::finite_clamp(subsystem.cpu, 0.0, 2.0).to_le_bytes(),
+            &crate::state::sanitize::finite_or(subsystem.cpu, 0.0).to_le_bytes(),
+        );
+        resp.extend_from_slice(&crate::state::sanitize::finite_or(subsystem.io, 0.0).to_le_bytes());
+        resp.extend_from_slice(
+            &crate::state::sanitize::finite_or(subsystem.cache_miss_rate, 0.0).to_le_bytes(),
         );
         resp.extend_from_slice(
-            &crate::state::sanitize::finite_clamp(subsystem.io, 0.0, 1.0).to_le_bytes(),
-        );
-        resp.extend_from_slice(
-            &crate::state::sanitize::finite_clamp(subsystem.cache_miss_rate, 0.0, 1.0)
-                .to_le_bytes(),
-        );
-        resp.extend_from_slice(
-            &crate::state::sanitize::finite_clamp(subsystem.branch_miss_rate, 0.0, 1.0)
-                .to_le_bytes(),
+            &crate::state::sanitize::finite_or(subsystem.branch_miss_rate, 0.0).to_le_bytes(),
         );
     }
     resp.push(modules.len().min(u8::MAX as usize) as u8);
@@ -1388,9 +1391,7 @@ fn serialize_subsystem_telemetry(
     {
         resp.push(*module_id);
         resp.push(*status);
-        resp.extend_from_slice(
-            &crate::state::sanitize::finite_clamp(*cpu_share, 0.0, 1.0).to_le_bytes(),
-        );
+        resp.extend_from_slice(&crate::state::sanitize::finite_or(*cpu_share, 0.0).to_le_bytes());
         resp.extend_from_slice(&task_id.to_le_bytes());
         resp.extend_from_slice(&error_code.to_le_bytes());
     }
@@ -1495,8 +1496,8 @@ pub fn write_message(stream: &mut UnixStream, cmd_id: u8, payload: &[u8]) -> std
 /// A trait for obtaining mutable access to an `LtmStore`.
 ///
 /// This abstraction lets the `IpcServer` work with both:
-/// - **Shared ownership** (daemon): `Arc<Mutex<LtmStore>>` implements
-///   this trait, locking the mutex and returning a `MutexGuard`.
+/// - **Shared ownership** (daemon): `Arc<Inhibition<LtmStore>>` implements
+///   this trait, locking the mutex and returning a `InhibitionGuard`.
 ///
 /// Without this, the daemon binary had to reimplement the entire IPC
 /// accept loop and connection handler — a 100-line duplication that
@@ -1512,9 +1513,9 @@ pub trait LtmAccess {
     fn access(&mut self) -> Self::Guard<'_>;
 }
 
-impl LtmAccess for std::sync::Arc<std::sync::Mutex<LtmStore>> {
+impl LtmAccess for std::sync::Arc<crate::inhibition::Inhibition<LtmStore>> {
     type Guard<'a>
-        = std::sync::MutexGuard<'a, LtmStore>
+        = crate::inhibition::InhibitionGuard<'a, LtmStore>
     where
         Self: 'a;
 
@@ -1602,7 +1603,7 @@ impl IpcServer {
     /// This blocks the calling thread — run it in a dedicated thread.
     ///
     /// The `ltm` parameter is generic over `LtmAccess`, so callers
-    /// pass an `Arc<Mutex<LtmStore>>` (daemon and tests) without
+    /// pass an `Arc<Inhibition<LtmStore>>` (daemon and tests) without
     /// reimplementing the server loop.
     ///
     /// `mmap` and `stm` are wrapped in `Arc` because they cannot be
@@ -1720,6 +1721,16 @@ impl IpcServer {
         server
             .owns_socket
             .store(true, std::sync::atomic::Ordering::Release);
+
+        // Bring the memory pointers in core state in line with the
+        // authoritative stores once at startup. Per-command readers can
+        // then report the snapshot without taking the LTM write mutex —
+        // a frequent GET_STATE_SNAPSHOT must not queue behind a slow
+        // episode scan and head-of-line-block the whole mind.
+        sync_stm_pointers(&mmap, &stm);
+        let mut startup_ltm = ltm.clone();
+        sync_ltm_episode_count(&mmap, startup_ltm.access().count() as u64);
+
         eprintln!("[ipc] listening on {}", server.socket_path.display());
         let mut client_threads: Vec<std::thread::JoinHandle<()>> = Vec::new();
 
@@ -2050,6 +2061,37 @@ impl IpcClient {
             );
         }
         Ok(state)
+    }
+
+    /// Get the core-state snapshot — the mind's wire contract
+    /// (`CoreStateSnapshot`, 232 bytes, self-describing). Unlike
+    /// [`get_state`](Self::get_state) this is a purpose-built DTO, so
+    /// the caller never mirrors the brain's byte layout; the header
+    /// is verified before any field is trusted.
+    pub fn get_state_snapshot(&mut self) -> std::io::Result<CoreStateSnapshot> {
+        let resp = self.request(cmd::GET_STATE_SNAPSHOT, &[])?;
+        if resp.len() < core::mem::size_of::<CoreStateSnapshot>() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "state snapshot response too short",
+            ));
+        }
+        let mut snapshot = CoreStateSnapshot::default();
+        // SAFETY: `resp.len()` was checked >= size_of::<CoreStateSnapshot>().
+        // `snapshot` is a stack value; non-overlapping heap->stack copy.
+        // CoreStateSnapshot is #[repr(C)] — the byte copy produces a
+        // valid bit-pattern for every field type it carries.
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                resp.as_ptr(),
+                &mut snapshot as *mut CoreStateSnapshot as *mut u8,
+                core::mem::size_of::<CoreStateSnapshot>(),
+            );
+        }
+        snapshot
+            .verify()
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        Ok(snapshot)
     }
 
     /// Get the neurochemical summary.
@@ -2637,7 +2679,7 @@ impl IpcClient {
     }
 
     /// Get the active inference summary — the generative self-model's
-    /// projection (60 bytes). This exposes surprise, free energy,
+    /// projection (64 bytes). This exposes surprise, free energy,
     /// allostatic load, precision, dyadic attunement/synchrony, user
     /// affect, and prediction errors to the cognitive mind.
     pub fn get_inference_summary(&mut self) -> std::io::Result<crate::state::InferenceSignals> {
@@ -2821,7 +2863,7 @@ impl IpcClient {
 ///
 /// Data commands (GET_STATE, GET_NEURO_SUMMARY, etc.) return raw
 /// struct bytes on success, or `vec![error::READ_FAILED]` if the
-/// mmap seqlock read fails — a distinguishable error rather than a
+/// mmap read fails — a distinguishable error rather than a
 /// zeroed struct that would masquerade as valid zero state.
 pub fn default_handler<L: LtmAccess>(
     mmap: &MmapState,
@@ -2858,10 +2900,9 @@ pub fn default_handler<L: LtmAccess>(
 
         cmd::GET_STATE => {
             // Return a consistent snapshot of the full state.
-            // `read_consistent` uses the seqlock protocol to ensure a
-            // consistent read without creating a `&GenesisCoreState`
-            // reference to the mmap'd memory. Retry a few times in
-            // case a writer is mid-update.
+            // `read_consistent` takes a volatile snapshot without
+            // creating a `&GenesisCoreState` reference to the
+            // mmap'd memory.
             let snapshot = snapshot_state(mmap);
             match snapshot {
                 Some(state) => {
@@ -2878,6 +2919,39 @@ pub fn default_handler<L: LtmAccess>(
                 }
                 None => {
                     eprintln!("[ipc] GET_STATE: state snapshot failed");
+                    vec![error::READ_FAILED]
+                }
+            }
+        }
+
+        cmd::GET_STATE_SNAPSHOT => {
+            // The mind's contract: a CoreStateSnapshot projected from
+            // a consistent state read. Same snapshot path as
+            // GET_STATE — never a racy mmap view — but the payload is
+            // the versioned DTO, not the brain's memory image.
+            let snapshot = snapshot_state(mmap);
+            match snapshot {
+                Some(state) => {
+                    let mut view = CoreStateSnapshot::from(&state);
+                    // The STM coordinates move with every accepted push;
+                    // report the live count rather than trusting a raw
+                    // pointer field that predates IPC's mirror. LTM is
+                    // mirrored at startup and by every mutating command,
+                    // so this read need not take the LTM write mutex.
+                    view.stm_count = stm.count().min(u32::MAX as u64) as u32;
+                    // SAFETY: `view` is a valid stack-owned
+                    // CoreStateSnapshot; the slice covers exactly
+                    // size_of::<CoreStateSnapshot>() bytes.
+                    let bytes = unsafe {
+                        std::slice::from_raw_parts(
+                            &view as *const CoreStateSnapshot as *const u8,
+                            core::mem::size_of::<CoreStateSnapshot>(),
+                        )
+                    };
+                    bytes.to_vec()
+                }
+                None => {
+                    eprintln!("[ipc] GET_STATE_SNAPSHOT: state snapshot failed");
                     vec![error::READ_FAILED]
                 }
             }
@@ -2974,61 +3048,51 @@ pub fn default_handler<L: LtmAccess>(
             }
         }
         cmd::GET_NEURO_SUMMARY => {
-            // `read_consistent` uses the seqlock protocol without
-            // creating a reference to the mmap'd memory. The tick loop
-            // may be writing concurrently, so retry a few times.
+            // `read_consistent` takes a volatile snapshot without
+            // creating a reference to the mmap'd memory.
             let snapshot = snapshot_state(mmap);
             match snapshot {
                 Some(state) => {
                     let summary = NeuroSummary {
-                        arousal: crate::state::sanitize::finite_clamp(
+                        arousal: crate::state::sanitize::finite_or(
                             state.neurochemicals.arousal,
                             0.0,
-                            1.0,
                         ),
-                        valence: crate::state::sanitize::finite_clamp(
+                        valence: crate::state::sanitize::finite_or(
                             state.neurochemicals.valence,
-                            -1.0,
-                            1.0,
+                            0.0,
                         ),
-                        global_tone: crate::state::sanitize::finite_clamp(
+                        global_tone: crate::state::sanitize::finite_or(
                             state.neurochemicals.global_tone,
                             0.0,
-                            2.0,
                         ),
-                        plasticity_gate: crate::state::sanitize::finite_clamp(
+                        plasticity_gate: crate::state::sanitize::finite_or(
                             state.neurochemicals.plasticity_gate,
                             0.0,
-                            1.0,
                         ),
-                        encoding_weight: crate::state::sanitize::finite_clamp(
+                        encoding_weight: crate::state::sanitize::finite_or(
                             state.memory.encoding_weight,
                             0.0,
-                            1.0,
                         ),
-                        consolidation_weight: crate::state::sanitize::finite_clamp(
+                        consolidation_weight: crate::state::sanitize::finite_or(
                             state.memory.consolidation_weight,
                             0.0,
-                            1.0,
                         ),
-                        retrieval_weight: crate::state::sanitize::finite_clamp(
+                        retrieval_weight: crate::state::sanitize::finite_or(
                             state.memory.retrieval_weight,
                             0.0,
-                            1.0,
                         ),
                         phase: state.zones.emergent_phase,
                         _pad: [0; 3],
-                        dopamine_tonic: crate::state::sanitize::finite_clamp(
+                        dopamine_tonic: crate::state::sanitize::finite_or(
                             state.neurochemicals.chemicals[NeurochemicalId::Dopamine as usize]
                                 .tonic_level,
                             0.0,
-                            1.0,
                         ),
-                        dopamine_phasic: crate::state::sanitize::finite_clamp(
+                        dopamine_phasic: crate::state::sanitize::finite_or(
                             state.neurochemicals.chemicals[NeurochemicalId::Dopamine as usize]
                                 .phasic_level,
                             0.0,
-                            1.0,
                         ),
                     };
                     // SAFETY: `summary` is a valid stack-owned value.
@@ -3060,25 +3124,25 @@ pub fn default_handler<L: LtmAccess>(
             // Sanitize salience: NaN/inf from the wire would corrupt
             // the STM ring buffer entry and later the consolidation
             // logic (salience-based promotion thresholds).
-            let salience = crate::state::sanitize::finite_clamp(
+            let salience = crate::state::sanitize::finite_or(
                 f32::from_le_bytes(payload[10..14].try_into().unwrap_or_default()),
                 0.0,
-                1.0,
             );
             let mut emotional_tag = [0.0f32; 12];
             for (i, chunk) in payload[14..62].chunks(4).enumerate() {
                 // Sanitize each emotional tag value: NaN/inf would
                 // corrupt the emotional tag and later the LTM
                 // associative retrieval (SimHash is sensitive to NaN).
-                emotional_tag[i] = crate::state::sanitize::finite_clamp(
+                emotional_tag[i] = crate::state::sanitize::finite_or(
                     f32::from_le_bytes(chunk.try_into().unwrap_or_default()),
                     0.0,
-                    1.0,
                 );
             }
             let text_len =
                 u16::from_le_bytes(payload[62..64].try_into().unwrap_or_default()) as usize;
-            let text_len = text_len.min(payload.len() - 64);
+            if payload.len() < 64 + text_len {
+                return vec![error::PAYLOAD_TOO_SHORT, 0, 0, 0, 0, 0, 0, 0];
+            }
             let text = String::from_utf8_lossy(&payload[64..64 + text_len]).into_owned();
 
             // Stamp the body's live chemistry — see live_emotional_tag.
@@ -3093,7 +3157,10 @@ pub fn default_handler<L: LtmAccess>(
                 emotional_tag,
                 &text,
             );
-            stm.push(entry);
+            if stm.push(entry) == u64::MAX {
+                return vec![error::INTERNAL_ERROR, 0, 0, 0, 0, 0, 0, 0];
+            }
+            sync_stm_pointers(mmap, stm);
             // Ack + the stamped tag (12×f32) so the caller's own
             // records can carry exactly what was stored. Pre-tail
             // clients only check resp[0] and ignore the rest.
@@ -3276,10 +3343,9 @@ pub fn default_handler<L: LtmAccess>(
                         let cort_eff = snap.neurochemicals.effective(NeurochemicalId::Cortisol);
                         let da_eff = snap.neurochemicals.effective(NeurochemicalId::Dopamine);
                         let compact_tag = [model.arousal, model.valence, cort_eff, da_eff];
-                        let salience = crate::state::sanitize::finite_clamp(
+                        let salience = crate::state::sanitize::finite_or(
                             model.arousal + model.valence.abs(),
                             0.0,
-                            1.0,
                         );
                         let trace_text = format!(
                             "zone_transition: {} -> {} | phase: {} | valence: {:.2} | arousal: {:.2} | sleep_pressure: {:.2} | cause: {}",
@@ -3313,29 +3379,20 @@ pub fn default_handler<L: LtmAccess>(
         }
 
         cmd::GET_PHASE => {
-            // `read_consistent` uses the seqlock protocol without
+            // `read_consistent` takes a volatile snapshot without
             // creating a reference to the mmap'd memory.
-            // Retry a few times in case a writer is mid-update.
             let snapshot = snapshot_state(mmap);
             match snapshot {
                 Some(state) => {
                     let mut resp = Vec::with_capacity(9);
                     resp.push(state.zones.emergent_phase);
                     resp.extend_from_slice(
-                        &crate::state::sanitize::finite_clamp(
-                            state.neurochemicals.arousal,
-                            0.0,
-                            1.0,
-                        )
-                        .to_le_bytes(),
+                        &crate::state::sanitize::finite_or(state.neurochemicals.arousal, 0.0)
+                            .to_le_bytes(),
                     );
                     resp.extend_from_slice(
-                        &crate::state::sanitize::finite_clamp(
-                            state.neurochemicals.valence,
-                            -1.0,
-                            1.0,
-                        )
-                        .to_le_bytes(),
+                        &crate::state::sanitize::finite_or(state.neurochemicals.valence, 0.0)
+                            .to_le_bytes(),
                     );
                     resp
                 }
@@ -3358,34 +3415,22 @@ pub fn default_handler<L: LtmAccess>(
             if chem_id >= 18 {
                 return vec![error::INVALID_VALUE];
             }
-            // Reject NaN/inf from the wire — a single NaN impulse
+            // Neutralize NaN/inf from the wire — a single NaN impulse
             // would propagate through the coupling matrix to all 18
             // chemicals within one tick and permanently corrupt the
             // mmap'd state. `finite_or` replaces non-finite values
-            // with 0.0 (no-op impulse), which is safe because the
-            // caller cannot distinguish "rejected" from "applied with
-            // zero magnitude" — both return ack [1].
+            // with 0.0 (no-op impulse); both rejected-looking input and
+            // an applied zero magnitude return ack [1].
             //
-            // Also clamp the magnitude to a physiologically plausible
-            // range [-1, 1]. Without this, a buggy or malicious client
-            // could send a huge finite magnitude (e.g. 1e20) that would
-            // set the chemical's velocity to an enormous value. The
-            // velocity decays geometrically but would keep the chemical
-            // saturated at 1.0 for hundreds of ticks, distorting the
-            // entire neurochemical state and the downstream body-control
-            // model. Clamping at the IPC boundary is the right place —
-            // it protects all downstream code regardless of caller.
-            let magnitude = crate::state::sanitize::finite_clamp(
-                crate::state::sanitize::finite_or(raw_magnitude, 0.0),
-                -1.0,
-                1.0,
-            );
-            let now = crate::daemon::current_ms();
+            // Finite magnitudes carry through unchanged for every chemical;
+            // the wire boundary neutralizes only non-finite data.
             let chem_id_enum = crate::state::neurochemical::NeurochemicalId::from_u8(chem_id);
+            let magnitude = crate::state::sanitize::finite_or(raw_magnitude, 0.0);
+            let now = crate::daemon::current_ms();
             match mmap.modify(now, |state| {
                 state
                     .neurochemicals
-                    .apply_impulse_capped(chem_id_enum, magnitude, now);
+                    .apply_impulse(chem_id_enum, magnitude, now);
                 state.neurochemicals.recompute_derived();
                 state.sync_neurochemistry_to_state();
             }) {
@@ -3447,7 +3492,7 @@ pub fn default_handler<L: LtmAccess>(
             // Response: [u8 ack (1=ok, 0=invalid module/status)]
             //
             // The optional cpu_share is the module's self-reported
-            // activity fraction [0,1] — the cognitive mind measures
+            // activity fraction — the cognitive mind measures
             // how much of its cycle time each brain part consumed
             // and reports it here so GET_SUBSYSTEM_TELEMETRY can answer
             // "which brain part is firing" at module granularity.
@@ -3464,14 +3509,13 @@ pub fn default_handler<L: LtmAccess>(
             let module_id = payload[0];
             let status = payload[1];
             let cpu_share = if payload.len() >= 6 {
-                Some(crate::state::sanitize::finite_clamp(
+                Some(crate::state::sanitize::finite_or(
                     payload
                         .get(2..6)
                         .and_then(|s| s.try_into().ok())
                         .map(f32::from_le_bytes)
                         .unwrap_or(0.0),
                     0.0,
-                    1.0,
                 ))
             } else {
                 None
@@ -3550,9 +3594,8 @@ pub fn default_handler<L: LtmAccess>(
         }
 
         cmd::GET_PLASTICITY_PROFILE => {
-            // `read_consistent` uses the seqlock protocol without
+            // `read_consistent` takes a volatile snapshot without
             // creating a reference to the mmap'd memory.
-            // Retry a few times in case a writer is mid-update.
             let snapshot = snapshot_state(mmap);
             match snapshot {
                 Some(state) => {
@@ -3583,61 +3626,46 @@ pub fn default_handler<L: LtmAccess>(
                         }
                     }
                     let coupling_drift = if drift_count > 0 {
-                        crate::state::sanitize::finite_clamp(
-                            drift_sum / drift_count as f32,
-                            0.0,
-                            1.0,
-                        )
+                        crate::state::sanitize::finite_or(drift_sum / drift_count as f32, 0.0)
                     } else {
                         0.0
                     };
 
                     // Mean receptor sensitivity across all chemicals.
-                    let mean_rs: f32 = crate::state::sanitize::finite_clamp(
+                    let mean_rs: f32 = crate::state::sanitize::finite_or(
                         n.chemicals
                             .iter()
                             .map(|c| c.receptor_sensitivity)
                             .sum::<f32>()
                             / n.chemicals.len() as f32,
                         0.0,
-                        1.0,
                     );
 
                     let profile = PlasticityProfile {
-                        plasticity_gate: crate::state::sanitize::finite_clamp(
-                            n.plasticity_gate,
-                            0.0,
-                            1.0,
-                        ),
-                        bdnf_effective: crate::state::sanitize::finite_clamp(
+                        plasticity_gate: crate::state::sanitize::finite_or(n.plasticity_gate, 0.0),
+                        bdnf_effective: crate::state::sanitize::finite_or(
                             n.effective_levels[bdnf_idx],
                             0.0,
-                            1.0,
                         ),
-                        bdnf_tonic: crate::state::sanitize::finite_clamp(
+                        bdnf_tonic: crate::state::sanitize::finite_or(
                             n.chemicals[bdnf_idx].tonic_level,
                             0.0,
-                            1.0,
                         ),
-                        cortisol_effective: crate::state::sanitize::finite_clamp(
+                        cortisol_effective: crate::state::sanitize::finite_or(
                             n.effective_levels[cort_idx],
                             0.0,
-                            1.0,
                         ),
-                        cortisol_tonic: crate::state::sanitize::finite_clamp(
+                        cortisol_tonic: crate::state::sanitize::finite_or(
                             n.chemicals[cort_idx].tonic_level,
                             0.0,
-                            1.0,
                         ),
-                        dopamine_effective: crate::state::sanitize::finite_clamp(
+                        dopamine_effective: crate::state::sanitize::finite_or(
                             n.effective_levels[da_idx],
                             0.0,
-                            1.0,
                         ),
-                        serotonin_effective: crate::state::sanitize::finite_clamp(
+                        serotonin_effective: crate::state::sanitize::finite_or(
                             n.effective_levels[srt_idx],
                             0.0,
-                            1.0,
                         ),
                         coupling_drift,
                         mean_receptor_sensitivity: mean_rs,
@@ -3827,28 +3855,22 @@ pub fn default_handler<L: LtmAccess>(
             // Sanitize all four f32 fields: NaN/inf from the wire
             // would propagate through the dyadic model into the
             // neurochemical system via oxytocin/cortisol impulses.
-            // Rust's native `.clamp()` returns NaN for NaN input,
-            // so we use `finite_clamp` which guarantees a finite
-            // return value.
-            let valence = crate::state::sanitize::finite_clamp(
-                f32::from_le_bytes([payload[0], payload[1], payload[2], payload[3]]),
-                -1.0,
-                1.0,
-            );
-            let arousal = crate::state::sanitize::finite_clamp(
-                f32::from_le_bytes([payload[4], payload[5], payload[6], payload[7]]),
+            // Finite observations carry through unchanged.
+            let valence = crate::state::sanitize::finite_or(
+                f32::from_le_bytes(payload[0..4].try_into().unwrap_or_default()),
                 0.0,
-                1.0,
             );
-            let engagement = crate::state::sanitize::finite_clamp(
-                f32::from_le_bytes([payload[8], payload[9], payload[10], payload[11]]),
+            let arousal = crate::state::sanitize::finite_or(
+                f32::from_le_bytes(payload[4..8].try_into().unwrap_or_default()),
                 0.0,
-                1.0,
             );
-            let confidence = crate::state::sanitize::finite_clamp(
-                f32::from_le_bytes([payload[12], payload[13], payload[14], payload[15]]),
+            let engagement = crate::state::sanitize::finite_or(
+                f32::from_le_bytes(payload[8..12].try_into().unwrap_or_default()),
                 0.0,
-                1.0,
+            );
+            let confidence = crate::state::sanitize::finite_or(
+                f32::from_le_bytes(payload[12..16].try_into().unwrap_or_default()),
+                0.0,
             );
             let obs = super::dyadic_model::UserAffectObservation {
                 valence,
@@ -3867,8 +3889,15 @@ pub fn default_handler<L: LtmAccess>(
                 return vec![error::PAYLOAD_TOO_SHORT];
             }
             let episode_id = u64::from_le_bytes(payload[0..8].try_into().unwrap_or_default());
-            match ltm.access().archive(episode_id) {
-                Ok(()) => vec![1],
+            let (result, count) = {
+                let mut guard = ltm.access();
+                (guard.archive(episode_id), guard.count())
+            };
+            match result {
+                Ok(()) => {
+                    sync_ltm_episode_count(mmap, count as u64);
+                    vec![1]
+                }
                 Err(_) => vec![0], // not found
             }
         }
@@ -3880,8 +3909,15 @@ pub fn default_handler<L: LtmAccess>(
                 return vec![error::PAYLOAD_TOO_SHORT];
             }
             let episode_id = u64::from_le_bytes(payload[0..8].try_into().unwrap_or_default());
-            match ltm.access().unarchive(episode_id) {
-                Ok(()) => vec![1],
+            let (result, count) = {
+                let mut guard = ltm.access();
+                (guard.unarchive(episode_id), guard.count())
+            };
+            match result {
+                Ok(()) => {
+                    sync_ltm_episode_count(mmap, count as u64);
+                    vec![1]
+                }
                 Err(_) => vec![0], // not found
             }
         }
@@ -3923,8 +3959,15 @@ pub fn default_handler<L: LtmAccess>(
                 return vec![error::PAYLOAD_TOO_SHORT];
             }
             let episode_id = u64::from_le_bytes(payload[0..8].try_into().unwrap_or_default());
-            match ltm.access().delete(episode_id) {
-                Ok(()) => vec![1],
+            let (result, count) = {
+                let mut guard = ltm.access();
+                (guard.delete(episode_id), guard.count())
+            };
+            match result {
+                Ok(()) => {
+                    sync_ltm_episode_count(mmap, count as u64);
+                    vec![1]
+                }
                 Err(_) => vec![0], // not found / already deleted
             }
         }
@@ -3947,22 +3990,22 @@ pub fn default_handler<L: LtmAccess>(
             let timestamp = u64::from_le_bytes(payload[0..8].try_into().unwrap_or_default());
             let event_type = payload[8];
             let source_module = payload[9];
-            let salience = crate::state::sanitize::finite_clamp(
+            let salience = crate::state::sanitize::finite_or(
                 f32::from_le_bytes(payload[10..14].try_into().unwrap_or_default()),
                 0.0,
-                1.0,
             );
             let mut emotional_tag = [0.0f32; 12];
             for (i, chunk) in payload[14..62].chunks(4).enumerate() {
-                emotional_tag[i] = crate::state::sanitize::finite_clamp(
+                emotional_tag[i] = crate::state::sanitize::finite_or(
                     f32::from_le_bytes(chunk.try_into().unwrap_or_default()),
                     0.0,
-                    1.0,
                 );
             }
             let text_len =
                 u16::from_le_bytes(payload[62..64].try_into().unwrap_or_default()) as usize;
-            let text_len = text_len.min(payload.len() - 64);
+            if payload.len() < 64 + text_len {
+                return vec![error::PAYLOAD_TOO_SHORT, 0, 0, 0, 0, 0, 0, 0, 0];
+            }
             let text = String::from_utf8_lossy(&payload[64..64 + text_len]).into_owned();
 
             // Stamp the body's live chemistry — see live_emotional_tag.
@@ -3975,16 +4018,24 @@ pub fn default_handler<L: LtmAccess>(
             let full_tag = crate::daemon::consolidation::expand_emotional_tag(&emotional_tag);
             let compact_tag = crate::daemon::consolidation::compact_tag_from_12(&emotional_tag);
 
-            match ltm.access().store(
-                timestamp,
-                salience,
-                full_tag,
-                compact_tag,
-                event_type,
-                source_module,
-                &text,
-            ) {
+            let (store_result, ltm_count) = {
+                let mut guard = ltm.access();
+                (
+                    guard.store(
+                        timestamp,
+                        salience,
+                        full_tag,
+                        compact_tag,
+                        event_type,
+                        source_module,
+                        &text,
+                    ),
+                    guard.count(),
+                )
+            };
+            match store_result {
                 Ok(episode_id) => {
+                    sync_ltm_episode_count(mmap, ltm_count as u64);
                     // Ack + episode_id + the stamped tag (12×f32) so
                     // the caller's MemoryRecord carries exactly what
                     // was stored. Pre-tail clients read only the
@@ -4024,18 +4075,18 @@ pub fn default_handler<L: LtmAccess>(
         }
 
         cmd::SET_POLICY_AUTHORITY => {
-            // Request: [f32 authority] in [0, 1].
+            // Request: [f32 authority]. Finite values are applied verbatim.
             if payload.len() < 4 {
                 return vec![error::PAYLOAD_TOO_SHORT, 0, 0, 0, 0];
             }
-            // finite_clamp, not clamp: a NaN from the wire would
+            // finite_or, not clamp: a NaN from the wire would
             // otherwise propagate into the engine's authority check,
             // and `NaN > 0.0` is false, which would silently read as a
             // full revocation of a delegation she intended to make.
-            let authority = crate::state::sanitize::finite_clamp(
+            // Finite values carry through unchanged.
+            let authority = crate::state::sanitize::finite_or(
                 f32::from_le_bytes(payload[0..4].try_into().unwrap_or_default()),
                 0.0,
-                1.0,
             );
             // The grant lives in InferenceSignals, which the tick loop
             // copies into the engine each cycle. Writing it there keeps
@@ -4209,9 +4260,9 @@ pub fn default_handler<L: LtmAccess>(
 /// This handler dispatches the reactive commands to the TickLoop
 /// and delegates all other commands to default_handler.
 pub fn reactive_handler<L>(
-    tick_loop: std::sync::Arc<std::sync::Mutex<super::tick::TickLoop>>,
+    tick_loop: std::sync::Arc<crate::inhibition::Inhibition<super::tick::TickLoop>>,
     data_dir: std::path::PathBuf,
-    auto_internals: std::sync::Arc<std::sync::Mutex<super::adaptive::AutoSnapshot>>,
+    auto_internals: std::sync::Arc<crate::inhibition::Inhibition<super::adaptive::AutoSnapshot>>,
 ) -> impl Fn(&MmapState, &RingBuffer, &mut L, u8, &[u8]) -> Vec<u8> + Clone + Send + 'static
 where
     L: LtmAccess,
@@ -4330,13 +4381,11 @@ where
                         0,
                     ];
                 }
-                // Same bounds the body applies to its own elapsed time,
-                // so an experiment cannot request a step the production
-                // integrator would refuse.
-                let dt = crate::state::sanitize::finite_clamp(
+                // Finite elapsed time carries through unchanged; malformed
+                // or non-finite input becomes a no-op step.
+                let dt = crate::state::sanitize::finite_or(
                     f32::from_le_bytes(payload[0..4].try_into().unwrap_or_default()),
-                    super::tick::DT_MIN,
-                    super::tick::DT_MAX,
+                    0.0,
                 );
                 let mut tl = match tick_loop.lock() {
                     Ok(tl) => tl,

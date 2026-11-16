@@ -52,12 +52,14 @@ detects state changes during the polling cycle — not by this client.
 from __future__ import annotations
 
 import logging
+import math
 import os
 import socket
 import struct
-import threading
 import time
 from typing import Any
+
+from inhibition import InhibitoryGate, RecurrentInhibition
 
 from .exceptions import (
     ConnectionError as GenesisConnectionError,
@@ -112,6 +114,7 @@ from .protocol import (
     GET_SENSOR_PRESENCE,
     # Command IDs
     GET_STATE,
+    GET_STATE_SNAPSHOT,
     GET_SUBSYSTEM_TELEMETRY,
     GET_TENSOR,
     GET_ZONE_TRANSITIONS,
@@ -198,6 +201,15 @@ from .types import (
 logger = logging.getLogger(__name__)
 
 
+def _finite_or(value: float, default: float) -> float:
+    """Return finite floats; malformed/non-finite inputs use ``default``."""
+    try:
+        result = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return default
+    return result if math.isfinite(result) else default
+
+
 class GenesisClient:
     """Client for the Genesis subcognitive daemon.
 
@@ -217,9 +229,9 @@ class GenesisClient:
         self._sock: socket.socket | None = None
         self._read_sock: socket.socket | None = None
         self._ever_connected = False
-        self._lock = threading.RLock()
-        self._read_lock = threading.RLock()
-        self._cache_lock = threading.Lock()
+        self._lock = RecurrentInhibition()
+        self._read_lock = RecurrentInhibition()
+        self._cache_lock = InhibitoryGate()
         self.request_timeout = request_timeout
         # Short-TTL cache for frequently-called read-only commands.
         # Background threads (inner_life, learner, regulator) call
@@ -414,6 +426,7 @@ class GenesisClient:
             PING,
             ANALYZE_CODE,
             GET_STATE,
+            GET_STATE_SNAPSHOT,
             GET_NEURO_SUMMARY,
             GET_PHASE,
             GET_MEMORY_STATS,
@@ -452,6 +465,7 @@ class GenesisClient:
     _CACHEABLE_CMDS = frozenset(
         {
             GET_STATE,
+            GET_STATE_SNAPSHOT,
             GET_NEURO_SUMMARY,
             GET_PHASE,
             GET_MEMORY_STATS,
@@ -765,8 +779,16 @@ class GenesisClient:
         return PingResponse.unpack(resp)
 
     def get_state(self, *, timeout: float | None = None) -> CoreState:
-        """Get the full core state (3480 bytes, schema v5), parsed into useful fields."""
-        resp = self._request(GET_STATE, timeout=timeout)
+        """Get the core-state snapshot — the mind's wire contract.
+
+        `GET_STATE_SNAPSHOT` returns a `CoreStateSnapshot` (232 bytes):
+        a self-describing, versioned DTO the daemon projects
+        field-by-field from `GenesisCoreState`. The mind never mirrors
+        the brain's byte layout, so a brain-schema change cannot
+        silently re-encode what this parses. (`GET_STATE`, the raw
+        3480-byte brain image, remains for full-fidelity inspection.)
+        """
+        resp = self._request(GET_STATE_SNAPSHOT, timeout=timeout)
         return CoreState.unpack(resp)
 
     def get_ion_summary(self, *, timeout: float | None = None) -> IonSummary:
@@ -1353,7 +1375,7 @@ class GenesisClient:
             timestamp: Milliseconds since Unix epoch.
             event_type: Event type ID (0=UserInput, 1=Output, etc.)
             source_module: Module ID that produced this event.
-            salience: Importance score [0.0, 1.0].
+            salience: Finite importance/evidence score.
             emotional_tag: Advisory — the field is defined as the
                 EMOTIONAL_TAG_SIZE effective neurochemical levels, and
                 the daemon always stamps them from its own live state
@@ -1387,9 +1409,9 @@ class GenesisClient:
         payload.extend(_U64.pack(timestamp))
         payload.append(event_type & 0xFF)
         payload.append(source_module & 0xFF)
-        payload.extend(_F32.pack(salience))
+        payload.extend(_F32.pack(_finite_or(salience, 0.0)))
         for v in emotional_tag:
-            payload.extend(_F32.pack(v))
+            payload.extend(_F32.pack(_finite_or(v, 0.0)))
         payload.extend(_U16.pack(text_len))
         payload.extend(text_bytes)
 
@@ -1420,7 +1442,7 @@ class GenesisClient:
             timestamp: Milliseconds since Unix epoch.
             event_type: Event type ID (0=UserInput, 1=Output, etc.)
             source_module: Module ID that produced this event.
-            salience: Importance score [0.0, 1.0].
+            salience: Finite importance/evidence score.
             emotional_tag: Advisory — see :meth:`store_event`. The
                 daemon stamps the tag from its own live effective
                 levels; pass None when the caller has no tag.
@@ -1459,9 +1481,9 @@ class GenesisClient:
         payload.extend(_U64.pack(timestamp))
         payload.append(event_type & 0xFF)
         payload.append(source_module & 0xFF)
-        payload.extend(_F32.pack(salience))
+        payload.extend(_F32.pack(_finite_or(salience, 0.0)))
         for v in emotional_tag:
-            payload.extend(_F32.pack(v))
+            payload.extend(_F32.pack(_finite_or(v, 0.0)))
         payload.extend(_U16.pack(text_len))
         payload.extend(text_bytes)
 
@@ -1785,13 +1807,13 @@ class GenesisClient:
         not a choice.
 
         Args:
-            authority: Fraction of policy authority to delegate, [0, 1].
+            authority: Finite policy-authority weight to delegate.
 
         Returns:
             True if the delegation was recorded.
         """
         payload = bytearray()
-        payload.extend(_F32.pack(max(0.0, min(1.0, float(authority)))))
+        payload.extend(_F32.pack(_finite_or(authority, 0.0)))
         resp = self._request(SET_POLICY_AUTHORITY, bytes(payload), timeout=timeout)
         return bool(resp) and resp[0] == 1
 
@@ -1969,9 +1991,9 @@ class GenesisClient:
             module_id: Module ID (0=Subcognitive, 6=Sensory, 7=Motor, etc.)
             status: Status ID (0=Stopped, 1=Starting, 2=Running,
                     3=Idle, 4=Stopping, 5=Error)
-            cpu_share: Optional self-reported activity fraction
-                    [0,1] — the module's share of the cognitive
-                    process's measured work. Written into the
+            cpu_share: Optional finite self-reported activity share —
+                    the module's share of the cognitive process's
+                    measured work. Written into the
                     manifest's ``cpu_share`` and served by
                     GET_SUBSYSTEM_TELEMETRY's module section.
             task_id: Optional identifier for what the module is working
@@ -1994,7 +2016,7 @@ class GenesisClient:
             raise ValueError(f"status must be 0-{MODULE_STATUS_ERROR}, got {status}")
         payload = bytearray([module_id & 0xFF, status & 0xFF])
         if cpu_share is not None:
-            payload += struct.pack("<f", max(0.0, min(1.0, float(cpu_share))))
+            payload += struct.pack("<f", _finite_or(cpu_share, 0.0))
         if task_id is not None:
             payload += struct.pack("<Q", max(0, int(task_id)))
         if error_code is not None:
@@ -2084,24 +2106,25 @@ class GenesisClient:
 
         Args:
             module_id: Module ID (6=Sensory, 7=Motor, etc.)
-            cpu_share: Optional self-reported activity fraction
-                    [0,1] for this module.
+            cpu_share: Optional finite self-reported activity share
+                    for this module.
             task_id: Optional identifier for what the module is on.
             error_code: Optional error the module has hit (0 = none).
 
         Returns:
             True if the heartbeat was recorded.
         """
+        share = _finite_or(cpu_share, 0.0) if cpu_share is not None else None
         if error_code:
             status = MODULE_STATUS_ERROR
-        elif cpu_share is not None and cpu_share <= 0.0:
+        elif share is not None and share <= 0.0:
             status = MODULE_STATUS_IDLE
         else:
             status = MODULE_STATUS_RUNNING
         return self.update_module_status(
             module_id,
             status,
-            cpu_share,
+            share,
             task_id=task_id,
             error_code=error_code,
             timeout=timeout,

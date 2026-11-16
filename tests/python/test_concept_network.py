@@ -1724,6 +1724,85 @@ def test_spill_warns_if_working_memory_did_not_shrink(caplog) -> None:
         net._archive.close()
 
 
+def test_merge_concepts_consolidates_twin() -> None:
+    """A merge archives the loser, retargets its edges, and keeps the
+    loser's name resolvable as an alias — nothing learned is lost."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        net = _make_network_with_archive(tmpdir)
+        net.add_concept("rust language", confidence=0.8)
+        net.add_concept("rust lang", confidence=0.5)
+        net.add_concept("compiler", confidence=0.7)
+        net.add_edge("rust language", "compiler", RelationType.RELATED_TO)
+        net.add_edge("rust lang", "compiler", RelationType.RELATED_TO)
+        net.add_edge("compiler", "rust lang", RelationType.RELATED_TO)
+
+        assert net.merge_concepts("rust language", "rust lang")
+
+        # Loser's canonical id left working memory; archive keeps it.
+        assert "rust lang" not in net.concept_ids
+        assert net._archive.has_concept("rust lang")
+
+        # The loser's parallel outgoing edge deduplicated into the
+        # winner's existing one — no duplicate RELATED_TO edge appears,
+        # and the incoming edge was retargeted, not dropped.
+        edges = {(e.source, e.relation, e.target) for e in net._edges}
+        assert ("rust language", RelationType.RELATED_TO, "compiler") in edges
+        assert ("compiler", RelationType.RELATED_TO, "rust language") in edges
+        assert not any(s == "rust lang" or t == "rust lang" for s, _, t in edges)
+
+        # The loser stays reachable as an alias of the winner.
+        assert net._resolve("rust lang") == "rust language"
+
+        # Confidence preserves the stronger signal.
+        assert net.get_concept("rust language").confidence == 0.8
+
+        net._archive.close()
+
+
+def test_merge_concepts_drops_self_loop() -> None:
+    """An edge between the twins themselves cannot survive the merge —
+    retargeted it would point the winner at itself."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        net = _make_network_with_archive(tmpdir)
+        net.add_concept("a")
+        net.add_concept("b")
+        net.add_concept("c")
+        net.add_edge("a", "b", RelationType.RELATED_TO)
+        net.add_edge("a", "c", RelationType.RELATED_TO)
+
+        assert net.merge_concepts("a", "b")
+
+        edges = {(e.source, e.relation, e.target) for e in net._edges}
+        assert not any(s == t for s, _, t in edges)
+        assert ("a", RelationType.RELATED_TO, "c") in edges
+        net._archive.close()
+
+
+def test_merge_concepts_refuses_unsafe_calls() -> None:
+    """Same-concept, missing, and archive-less merges are refused
+    without touching the network."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        net = _make_network_with_archive(tmpdir)
+        net.add_concept("a")
+        net.add_concept("b")
+        net.add_edge("a", "b", RelationType.RELATED_TO)
+        before = list(net._edges)
+
+        assert not net.merge_concepts("a", "a")
+        assert not net.merge_concepts("a", "nonexistent")
+        assert not net.merge_concepts("nonexistent", "a")
+        assert net.size == 2
+        assert net._edges == before
+
+        bare = ConceptNetwork()
+        bare.add_concept("x")
+        bare.add_concept("y")
+        assert not bare.merge_concepts("x", "y")
+        assert bare.size == 2
+
+        net._archive.close()
+
+
 def test_spill_protected_origins() -> None:
     """Protected origin concepts are never spilled."""
     with tempfile.TemporaryDirectory() as tmpdir:

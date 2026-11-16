@@ -437,7 +437,7 @@ pub struct BundleStore {
 }
 
 // SAFETY (Send/Sync): BundleStore is only ever shared through the
-// daemon's `Arc<Mutex<LtmStore>>`, and mutating methods take `&mut
+// daemon's `Arc<Inhibition<LtmStore>>`, and mutating methods take `&mut
 // self`. Cross-process exclusion is enforced by the sole-mapper
 // `flock` taken in `open`/`create_file` and held for the life of the
 // fd (released when Drop closes it), so no second process can map and

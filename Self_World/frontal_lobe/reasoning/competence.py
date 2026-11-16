@@ -27,6 +27,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import math
 import re
 import time
 from collections.abc import Callable, Iterable, Mapping, Sequence
@@ -43,6 +44,16 @@ Scalar = str | int | float | bool | None
 State = Mapping[str, Any]
 
 logger = logging.getLogger(__name__)
+
+
+def _finite_or(value: float, default: float) -> float:
+    """Return finite floats; malformed/non-finite inputs use ``default``."""
+    try:
+        result = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return default
+    return result if math.isfinite(result) else default
+
 
 _MATCH_THRESHOLD = 0.55
 _RELIABILITY_OBSERVATIONS = 3.0
@@ -822,7 +833,7 @@ class TaskCompetence:
         if self.salience_getter is None:
             return 1.0
         try:
-            return max(0.0, min(1.0, float(self.salience_getter())))
+            return _finite_or(self.salience_getter(), 1.0)
         except Exception:  # noqa: BLE001 — a broken gauge must not
             return 1.0  # block consolidation; treat as unmodulated
 

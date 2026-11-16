@@ -248,6 +248,71 @@ and installs an enabled
 systemd user unit (\fB\-\-uninstall\fR removes the install, never the
 data dir).
 
+.SH GLOSSARY
+.TP
+.B mind / body
+The \fImind\fR is the Python cognitive process (the CLI); the
+\fIbody\fR is the Rust daemon that owns time, chemistry, and
+memory. Each can outlive the other \(em the watcher and the
+shepherd regrow whichever was lost.
+.TP
+.B shepherd / re-inhabit
+The daemon's regrowth of a lost mind: it spawns the organism's own
+entry point headless so the new mind adopts the surviving body and
+persisted state. A surviving daemon without a mind is re-inhabited
+by the next mind that attaches.
+.TP
+.B mind.suppress
+A marker file written by every graceful exit and by \fB\-\-stop\fR:
+it tells the shepherd the last mind left intentionally \(em a
+goodbye, not a death \(em so it is not resurrected. Absent after a
+crash, which is the loss the shepherd answers.
+.TP
+.B volition
+Her urge system \(em accumulating drives that fire as acts. See
+the GLOSSARY in
+.BR genesis-cli (1).
+.TP
+.B N3 / deep sleep
+The deepest non-REM sleep stage \(em slow-wave sleep, where the
+body's own housekeeping runs.
+.TP
+.B ripple replay
+Brief high-frequency hippocampal bursts during N3 that re-run
+recent experience \(em replay \fIpotentiates\fR what it touches,
+strengthening the traces it replays.
+.TP
+.B potentiation
+Strengthening a memory trace or concept-network edge
+.RI ( "w += alpha(1\-w)" ):
+replay grows it toward 1; disuse decays it toward a floor.
+.TP
+.B SHY downscaler
+The synaptic-homeostasis renorm run each N3 tick: every edge's
+weight is scaled proportionally so daytime growth doesn't
+saturate the network \(em nothing is killed, everything is
+renormalized.
+.TP
+.B edge
+A weighted association between two concepts in her network.
+Edges are potentiated by replay and decay by disuse; they are
+never batch-deleted.
+.TP
+.B maintenance_policy.json
+The few deliberate knobs over her sleep housekeeping \(em hers,
+living in the data dir, loaded fresh each N3; malformed values
+fall back to defaults.
+.TP
+.B repairs
+JSON checkpoints under \fI<data_dir>/repairs/\fR merged at wake
+as a monotonic floor for developmental state \(em a later stage
+is restored, resolutions only rise.
+.TP
+.B agency
+The trust model for her acts: unrestricted tools whose safe use
+is her judgment, not a sandbox. See AGENCY above and
+.BR genesis-tools (7).
+
 .SH EXIT STATUS
 .TP
 .B 0

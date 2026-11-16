@@ -190,6 +190,7 @@ from .reasoner import (
     TimeInterval,
 )
 from .theory_of_mind import (
+    AttributedModel,
     KnowledgeLevel,
     TheoryOfMind,
     UserBelief,
@@ -197,6 +198,7 @@ from .theory_of_mind import (
 )
 
 __all__ = [
+    "AttributedModel",
     "HYPOTHESIS_CAP",
     "MAX_ATOMS",
     "AbstractLevel",

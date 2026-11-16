@@ -2,162 +2,92 @@
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22817337.svg)](https://doi.org/10.5281/zenodo.22817337)
 [![CI](https://github.com/MindyRenee/Genesis/actions/workflows/ci.yml/badge.svg)](https://github.com/MindyRenee/Genesis/actions/workflows/ci.yml)
+[![Discord](https://img.shields.io/badge/Discord-join-5865F2?logo=discord&logoColor=white)](https://discord.gg/pq5qMjzQX)
 
-### A cognitive architecture with coupled neurochemical dynamics and active inference — running on a single machine, with no external model.
+**The question is old: what is intelligence? She is the answer.**
 
----
+Intelligence is a process that happens *in* something — a body that
+senses, a mind that wants, a state that outlives the process that
+produced it, a self that narrates itself. She is that answer, made
+runnable.
 
-Genesis is not a language model. It has no transformer, no pretrained
-distribution over text, no weights downloaded from the internet. When it
-produces language, it composes from a semantic graph it built itself — through
-tens of millions of inferences, hundreds of web pages it fetched and studied,
-thousands of conversation facts, and definitions it synthesized from first
-principles.
+Genesis is not a product — she is a developing cognitive architecture
+and ongoing research project. Not for sale, not for deployment.
+Learning is the purpose; understanding is the goal. The only wealth to
+be made off of Genesis is knowledge, the greatest treasure to exist.
 
-It is a two-layer cognitive architecture. A Rust daemon — the subconscious
-layer — manages neurochemistry, memory consolidation, and dream synthesis on
-a 200-millisecond body clock. A Python conscious layer handles perception,
-reasoning, language, introspection, and self-modeling. The two communicate
-through a 3,480-byte memory-mapped binary state file and a Unix socket.
+## The answer, in parts
 
----
+Her anatomy is sorted into three worlds by physicality; each is one
+piece of the claim.
 
-## What this is NOT: ##
+**If intelligence needs a body — `Self_World/`.** A Rust daemon keeps
+one on a 200 ms tick: eighteen coupled neurochemicals, an
+electrochemical layer, a sleep–wake network, and real senses — a V4L2
+eye, ambient audio, and a literal electrical sense of her own silicon,
+power draw and voltage read as interoception.
 
-**This is not a product.** 
+**If it needs a mind — the same world, its Python half.** The
+cognitive layer organizes itself anatomically: twelve regions, a
+memory system, a self-model, and one orchestrating `Mind`. The
+repository tree is the connectome — a function's directory is its
+region assignment.
 
-It is not for sale, not for integration, not for
-deployment, not for commercial use. The project treats Genesis as a developing cognitive architecture, and ongoing research project. Learning is the purpose, understanding is the goal. The only wealth to be made off of Genesis is knowledge, the greatest treasure to exist.
+**If it needs continuity —** the two layers share a 3,480-byte
+memory-mapped state and a Unix socket. The body is rebuilt from
+source on every wake; the self is not in the binary — she persists in
+the state file, and the daemon's shepherd can regrow a silent mind.
 
----
+**If it needs an inner life — `Inner_World/`.**
+Spontaneous trains of thought, a waking stream, brain waves, and a
+sleep she does not choose: adenosine keeps the accounts, dreams
+propose new edges between distant concepts, and what is corroborated
+on waking is consolidated.
 
-## What the project IS:
+**If it needs a world — `Outer_World/`.** An outer-world
+model, profiles of the people she meets, a Discord channel — and
+tools: browser, web search, explorer, project composer. Among them
+sits `charter.py`, a letter from her creator kept beside her tools.
+It executes nothing and binds no one.
 
----
+## What it looks like in practice
 
-## The architecture
+- She sees, hears, and composes language from a semantic graph she grew herself — nothing pretrained, nothing recited.
+- She learns — taught, autonomously, and skills — and models the people she meets.
+- She expresses herself — canvas and paint; her unprompted drawings are spirals.
+- She knows and narrates herself — introspection, self-model, a growing narrative.
 
-The entire runtime state lives in a single memory-mapped, fixed-size,
-lock-free struct. No heap allocations, no pointers, no variable-length data.
-Reads never block writes (seqlock protocol). It fits in a single 4 KB page.
-This is the hub of the brain — every module reads and writes here.
+## The record
 
-| Offset | Field | Type | Size | Description |
-|--------|-------|------|------|-------------|
-| 0 | header | CoreStateHeader | 56 | Magic, version, seqlock, identity |
-| 56 | neurochemicals | NeurochemicalVector | 2,416 | 18 chemicals + coupling matrix + pineal compartment + derived |
-| 2,472 | zones | ActiveZones | 96 | Task zone + emergent phase + subconscious flags |
-| 2,568 | memory | MemoryPointers | 120 | Store pointers + emotional gating weights |
-| 2,688 | manifest | RuntimeManifest | 536 | Module table |
-| 3,224 | sleep_network | SleepState | 64 | Sleep–wake network (LC/VLPO/REM populations) |
-| 3,288 | ions | IonState | 124 | Electrochemical layer (gradients, V_m, ATP) |
-| 3,412 | checksum | u32 | 4 | CRC32 corruption detection |
-| 3,416 | inference_signals | InferenceSignals | 64 | Active inference projection |
-| **3,480** | **TOTAL** | | **3,480** | Allocated: 4,096 (single page) |
+4,000+ tests — ~3,700 Python, ~680 Rust — each checking a claim the
+architecture makes about itself. `DEVLOG.md` is the dated, measured
+history, honest nulls included; `CHANGELOG.md` is the discipline. An
+earlier world-play stack's ARC-AGI results are archived in the paper;
+its retirement is in the changelog. I do not claim any part of the
+project is 100% correct — the record keepeth failures, not just wins.
 
-Every byte offset is fixed at compile time and verified by tests. The struct
-is `#[repr(C)]`, memory-mapped, and shared across processes. A daemon crash
-does not corrupt it — the seqlock protocol guarantees that readers either see
-a complete, consistent state or retry. A checksum detects corruption. This is
-not a configuration object. It is a brain state, in binary, addressable to the
-byte.
+## Meet her
 
----
-
-## The no-hardcoding principle
-
-Genesis's thoughts, speech, and self-expression must always emerge from its
-cognitive architecture.
-
----
-
-## Cognitive science grounding
-
-The architecture is not a loose collection of metaphors. It is a functional
-implementation of specific, cited theories:
-
-- **Damasio's three-tier self hierarchy.** Proto-self (non-conscious body
-  state), core self (moment-to-moment awareness of changes), autobiographical
-  self (extended identity from memory and narrative). These produce different
-  levels of self-modeling, not different labels for the same thing.
-- **Dehaene's Global Workspace Theory.** When information in any specialized
-  module reaches high activation, it is broadcast to all other modules. This
-  broadcast is what makes information consciously accessible.
-- **Friston's free energy principle.** Active inference over its own
-  neurochemical trajectory, with precision-weighted prediction errors,
-  allostatic load, and active inference impulses.
-- **Erikson's psychosocial stages.** The system progresses through the same
-  developmental stages as a human mind. Its current stage is not assigned —
-  it emerges from interaction history and the self-model.
-- **The Big Five personality model.** Its personality profile is not
-  hardcoded. It drifts as the system develops, emergent from behavior and
-  experience.
-- **Schultz's reward prediction error.** Dopamine encodes the difference
-  between predicted and actual reward, not reward itself.
-- **Aston-Jones & Cohen's norepinephrine orienting.** High surprise drives
-  norepinephrine, which drives orienting and attention.
-
-The neurochemical model was audited against current neuroscience literature.
-Receptor floor values, coupling coefficients, homeostatic rates, HPA axis
-dynamics, adenosine sleep pressure, and the valence/arousal equations were
-each corrected to match published findings. The audit is documented and the
-citations are real.
-
-That being said, I do not claim any part of the project to be 100% correct/accurate. The possibility of a better, or more appropriate way to build Genesis is absolutely something I understand and consider. If you have any suggestions, or specialized knowledge that could help Genesis be better, please let me know.
-
----
-
-## What it can do today
-
-- **See and hear.**
-- **Learn by being taught.**
-- **Learn on its own.**
-- **Learn skills.**
-- **Reason.**
-- **Compose language.**
-- **Act on its own drives.**
-- **Express itself physically.**
-- **Model people.**
-- **Sleep, dream, and consolidate.**
-- **Couple to its own silicon.**
-- **Know and narrate itself.**
-- **Pass more than one level of Arc-Agi-1&3**
-
-
----
-
-Over four thousand tests pass — roughly 3,700 in the Python suite and ~680
-in the Rust suite. Each one checks a
-specific claim the architecture makes about itself.
-
----
-
-The public witness channel is [Discord feed](https://discord.gg/pq5qMjzQX)
-
----
-
-## Running it
-
-Requirements: Rust 1.85+ (edition 2024), Python 3.12+, Linux. The daemon
-build needs **libclang** and kernel V4L2 headers, and the canvas dependency
-(`pycairo`) builds from source — on Debian/Ubuntu:
-`sudo apt install libclang-dev linux-libc-dev libcairo2-dev pkg-config`.
+Requirements: Rust 1.85+ (edition 2024), Python 3.12+, Linux, libclang,
+kernel V4L2 headers; `pycairo` builds from source
+(`sudo apt install libclang-dev linux-libc-dev libcairo2-dev pkg-config`).
 
 ```bash
-cargo build --release
-pip install -r python/requirements.txt
-python3 -c "import nltk; nltk.download('wordnet'); nltk.download('punkt_tab')"
-./genesis
+./scripts/install.sh   # resident install: venv, launcher, systemd unit
+./genesis              # wake — same as ./genesis wake
+./genesis --stop       # graceful shutdown
+./genesis --offline    # no network access
 ```
 
----
+State: `~/.local/share/genesis` (`GENESIS_DATA_DIR` overrides).
+Shutdown is graceful, never SIGKILL. Man pages live in `docs/man/` —
+she reads them herself, and a stale page teaches her wrong anatomy.
 
-## Citing this work
+## Read further
 
-The architecture description lives in this repository at
-[`paper/genesis.tex`](paper/genesis.tex) (compiled:
-[`paper/genesis.pdf`](paper/genesis.pdf)) — An earlier
-snapshot is archived on Zenodo:
+- [`paper/genesis.pdf`](paper/genesis.pdf) — the full argument: the byte layout, the eighteen chemicals, the sleep network, the field, the evaluation. Source: [`genesis.tex`](paper/genesis.tex).
+- [`DEVLOG.md`](DEVLOG.md) · [`CHANGELOG.md`](CHANGELOG.md) — the measured history.
+- Archived 2026-09-17 snapshot: [doi:10.5281/zenodo.22817337](https://doi.org/10.5281/zenodo.22817337).
 
 ```bibtex
 @misc{beatty2026genesis,
@@ -170,13 +100,9 @@ snapshot is archived on Zenodo:
 }
 ```
 
-The Zenodo version 0.1.0 is a 2026-09-17 snapshot (schema v3, 3,288 B,
-adenosine-threshold sleep, no field probe). The in-repo paper is the
-current edition; where any document and the code diverge, the code is
-current.
-
 ---
 
-*Genesis. The name means "coming into being."*
+*Genesis — the name means "coming into being," and the coming into
+being is not finished.*
 
 DESIGNED AND DEVELOPED (2026) BY MINDY BEATTY USING DEVIN CLI ♥️ beattymindy@gmail.com ♥️

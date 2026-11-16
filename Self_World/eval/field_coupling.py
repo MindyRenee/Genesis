@@ -51,7 +51,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-for _w in ("Inner_Non_Physical_World", "Outer_Physical_World"):
+for _w in ("Inner_World", "Outer_World"):
     sys.path.insert(0, str(ROOT.parent / _w))
 
 from eval.harness import isolated_daemon  # noqa: E402

@@ -27,20 +27,22 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [
-    # Pinned mirrors of requirements.txt — update both together.
-    "numpy==2.5.3",
-    "nltk==3.10.4",
-    "scipy==1.16.3",
-    "orjson==3.12.0",
-    "psutil==7.2.2",
-    "Pillow==13.0.0",
-    "opencv-python-headless==5.0.0.93",
-    "pycairo==1.29.1",
-    "websockets==15.0.1",
+    # Mirrors requirements.txt — update both together. Versions float
+    # free: bare names, no pins, no bounds, no lockfiles — see
+    # CONTRIBUTING.md.
+    "numpy",
+    "nltk",
+    "scipy",
+    "orjson",
+    "psutil",
+    "Pillow",
+    "opencv-python-headless",
+    "pycairo",
+    "websockets",
     # Runtime dep, not test-only: her tools invoke it via
     # ``sys.executable -m pytest`` (run_pytest, project creation,
     # proposal verification) — it must live in her environment.
-    "pytest==9.1.1",
+    "pytest",
 ]
 
 [project.optional-dependencies]
@@ -49,58 +51,39 @@ dependencies = [
 # piper-tts ships the piper binary that install_optional_deps.sh links
 # into Self_World/voices/piper; speech.py invokes it as a subprocess.
 voice = [
-    "vosk==0.3.45",
-    "sounddevice==0.5.6",
-    "speechrecognition==3.14.2",
-    "piper-tts==1.8.0",
+    "vosk",
+    "sounddevice",
+    "speechrecognition",
+    "piper-tts",
 ]
 # Symbolic mathematics (parietal formal layer — symbolic_math tool).
 # symbolic.py imports it lazily and degrades gracefully without it;
 # the math tests skip when absent.
 math = [
-    "sympy==1.12",
-    # mpmath>=1.4 deprecated names sympy 1.12 still calls
-    # (ctx_mp.bitcount, mpnumeric) — keep it below the break.
-    "mpmath<1.4",
+    "sympy",
+    # Known break: mpmath>=1.4 removed names sympy still calls
+    # (ctx_mp.bitcount, mpnumeric) — no bound per the rules.
+    "mpmath",
 ]
 # Virtual HID — her hand on the machine's input bus (tools/hid.py).
 # evdev binds Linux uinput and publishes sdist-only, so installing it
 # compiles a small C extension. The tools report unavailable without it.
 hid = [
-    "evdev==2.0.0; sys_platform == 'linux'",
+    "evdev; sys_platform == 'linux'",
 ]
-arc = [
-    "arc-agi==0.9.9",
-    "game-arena>=0.1.0",
-    "kaggle>=2.2.5",
-    "kaggle-environments>=1.33.3",
-    "six>=1.17.0",
-]
-
 [project.scripts]
 genesis = "genesis_cli:_console_main"
 
 [tool.setuptools.packages.find]
 # The three worlds are the package containers: each is a sys.path
 # root holding the packages that belong to it (Self_World — the
-# self/organism (brain, chemicals, body), Inner_Non_Physical_World — the
-# cognition, Outer_Physical_World — the environment). Loose modules
-# at a world's root (journal.py, discord_feed.py, mind.py, …) are
+# self/organism (brain, chemicals, body), Inner_World — the
+# cognition, Outer_World — the environment). Loose modules
+# at a world's root (journal.py, discord.feed.py, mind.py, …) are
 # reached through the launcher's PYTHONPATH, not pip metadata.
-where = ["Self_World", "Inner_Non_Physical_World", "Outer_Physical_World"]
+where = ["Self_World", "Inner_World", "Outer_World"]
 namespaces = false
 exclude = ["tests*", "python*", "voices*", "__pycache__*", "scripts*", "Language*"]
-
-[tool.uv]
-# kaggle-environments (arc extra) declares litellm>=1.86.1,<1.94.0, but
-# litellm<1.100.4 carries open GHSA advisories. Nothing in the codebase
-# imports litellm or kaggle_environments — the pin only rides the lock —
-# so the declared cap is overridden to a patched release old enough to
-# trust (1.109.x is <7 days out). filelock<=4.2.0 likewise carries
-# advisory fixes; huggingface-hub and litellm leave it unpinned, and
-# --upgrade-package will not move it across the 3.x/4.x line, so it is
-# forced here (4.2.10 is <7 days out).
-override-dependencies = ["litellm==1.108.0", "filelock==4.2.9"]
 
 [tool.ruff]
 target-version = "py312"
@@ -126,12 +109,7 @@ testpaths = ["tests/python"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-# Block the system astropy plugin family that autoloads on this
-# host — pytest_astropy pulls in astropy → erfa, which is compiled
-# against NumPy 1.x and crashes the session under NumPy 2. None of
-# them serve this suite; `-p no:` on an absent plugin is harmless
-# on hosts that lack them.
-addopts = "-q -p no:pytest_astropy -p no:pytest_astropy_header -p no:pytest_arraydiff -p no:pytest_doctestplus -p no:pytest_filter_subpackage -p no:pytest_remotedata"
+addopts = "-q"
 filterwarnings = [
     "error::DeprecationWarning",
     "error::PendingDeprecationWarning",

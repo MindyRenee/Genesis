@@ -15,7 +15,8 @@ returns \fIToolResult\fR (success plus output, or an error string)
 .RI ( tools.framework.ToolRegistry )
 starts with the builtins in \fI_BUILTIN_TOOLS\fR and grows at
 runtime: \fIgames.arcade.Arcade.register_tools\fR adds the
-\fBarcade_*\fR family when the mind is constructed.
+\fBarcade_*\fR family and \fIOuter_World/tools/studio.py\fR the
+\fBstudio_*\fR family when the mind is constructed.
 .PP
 There is no sandbox around the registry. File paths resolve to
 their real locations, the shell is unfiltered, and nothing at the
@@ -80,6 +81,30 @@ writable by her user; no sudo is involved in daily use. Without
 \fIevdev\fR or the device the tools report unavailable and nothing
 else degrades.
 
+.SS The studio
+\fIOuter_World/tools/studio.py\fR registers the paint program's controls
+as the \fBstudio_*\fR family: \fBstudio_open\fR (launch Krita and
+connect the live bridge), \fBstudio_sheet\fR (any size and paper),
+\fBstudio_color\fR (any RGBA), \fBstudio_tool\fR (any Krita preset
+name or her own label), \fBstudio_brush\fR (size, opacity, hardness,
+scatter, texture, erase, blend), \fBstudio_stroke\fR (any point path
+\(em a hand move and a computed curve are the same op, and
+\fIlabel\fR names the gesture in her art history),
+\fBstudio_line\fR, \fBstudio_shape\fR (ellipse, rect, polygon),
+\fBstudio_fill\fR, \fBstudio_clear\fR, \fBstudio_presets\fR
+(enumerate the real app's toolbox), and \fBstudio_done\fR (finish
+the sheet \(em save it, remember it, share it). No fixed gesture
+vocabulary, color sectors, or tool menus: she issues the ops, so
+what gets drawn is her decision. Krita
+.RI ( Self_World/frontal_lobe/krita_studio.py )
+executes the same ops on a live document with real brushes when it
+is running; the built-in rasterizer
+.RI ( Self_World/frontal_lobe/canvas.py )
+always paints the canonical artifact. The queue accepts op files
+written out of process, so scripts she makes with
+\fBwrite_file\fR/\fBrun_shell\fR can drive the studio alongside the
+client.
+
 .SS The outer world
 Her workstation's other half is \fIworkstation.environment.OuterEnvironment\fR:
 presences, events, and the places she can act. Observations enter
@@ -91,6 +116,222 @@ brain waves, and neurochemistry on the way. The Discord channel
 .BR genesis-arcade (7))
 is another. The browser is a third: a place she goes, not a sense
 she has.
+
+.SH TOOL REFERENCE
+Each entry: the tool's name, the arguments it takes, and what it
+does and reports back. Arguments arrive as strings; tools return a
+\fIToolResult\fR \(em \fIsuccess\fR plus \fIoutput\fR, or an
+\fIerror\fR string. They report, they never raise.
+.SS Filesystem and code
+.TP
+.BR read_file " \fIpath [offset] [limit] [project_root]\fR"
+Return a character window of a text file starting at \fIoffset\fR;
+binary files return metadata (size, sha256, format, hex head)
+instead. Any readable file answers.
+.TP
+.BR write_file " \fIpath content [project_root]\fR"
+Write \fIcontent\fR to \fIpath\fR, creating parents. Overwrites
+wholesale \(em this is the whole file, not an append.
+.TP
+.BR make_dir " \fIpath [project_root]\fR"
+Create the directory and any missing parents.
+.TP
+.BR list_dir " \fIpath [project_root]\fR"
+List a directory's contents.
+.TP
+.BR delete_file " \fIpath [project_root]\fR"
+Delete a file. Refuses directories.
+.TP
+.BR move_file " \fIsource destination [project_root]\fR"
+Move or rename; absolute paths reach anywhere.
+.TP
+.BR compile_python " \fIpath\fR"
+Syntax-check a Python file; success means it compiles.
+.TP
+.BR run_pytest " \fIpath [project_root]\fR"
+Run pytest on a file or directory and return the result.
+.TP
+.BR analyze_python " \fIpath [symbol] [project_root]\fR"
+Read-only structural analysis: symbols, call edges, per-function
+cyclomatic complexity, imports; \fIsymbol\fR asks for impact
+analysis of that one name.
+.SS Shell
+.TP
+.BR run_shell " \fIcommand [timeout]\fR"
+Execute \fIcommand\fR with the checkout as cwd and the full user
+environment \(em unfiltered. Timeout defaults to 30 s, capped at
+3600 s.
+.TP
+.BR run_privileged " \fIscript [args]\fR"
+Run a staged or absolute-path script as root via
+\fBsudo \-n bash\fR \(em full control, no undo. Needs the NOPASSWD
+sudoers drop-in; without the grant it fails harmlessly.
+.SS Web
+.TP
+.BR web_search " \fIquery [num_results]\fR"
+Walk the search-engine plan and return result titles and URLs.
+Read-only; adult/malware results are blocked.
+.TP
+.BR web_fetch " \fIurl\fR"
+Fetch a page and return its readable article text plus up to five
+related links for curiosity chaining. Read-only GET.
+.TP
+.B browser_close
+Ask the shared browser to close: flushes profile/history to disk,
+frees the process. Reopens on the next search or fetch.
+.SS Body and reference
+.TP
+.B sense_cpu
+Proprioception \(em report her governor, clock speed, and allowed
+cores. Read-only.
+.TP
+.BR set_cpu_effort " \fImode\fR"
+Change how hard her process works: \fIslow\fR pins one core and
+idles I/O, \fIfast\fR restores everything, \fIauto\fR leaves
+scheduling alone. Reversible in both directions.
+.TP
+.BR concept_lookup " \fIname\fR"
+Describe a concept in her own knowledge network.
+.TP
+.BR man_page " \fIpage [section]\fR"
+Read a local manual page \(em the text \fBman\fR(1) shows. No
+network. Returns the page title, its \fBman:\fR URL, the NAME
+summary, and the rendered text.
+.SS Mathematics
+.TP
+.BR symbolic_math " \fIop expr [var] [point] [n]\fR"
+Exact CAS work via SymPy: \fIsimplify\fR, \fIexpand\fR,
+\fIfactor\fR, \fIcancel\fR, \fIapart\fR, \fItogether\fR,
+\fItrigsimp\fR, \fIdiff\fR, \fIintegrate\fR, \fIsolve\fR,
+\fIlimit\fR, \fIseries\fR, \fIevalf\fR, and matrix ops
+(\fIdet\fR, \fIeigenvals\fR, \fItrace\fR, \fIinv\fR,
+\fIcharpoly\fR) on \fB[[a,b],[c,d]]\fR literals.
+.TP
+.BR verify_equality " \fIlhs rhs\fR"
+Ask the oracle whether two expressions are exactly equal:
+\fIverified\fR, \fIrefuted\fR (with a numeric counterexample when
+one exists), or \fIundecided\fR \(em the honest third answer.
+.TP
+.BR research " \fIaction ...\fR"
+The persistent workbench: \fIopen\fR (statement), \fIconjecture\fR,
+\fIreading\fR, \fIattempt\fR, \fIempirical\fR, \fIverify\fR,
+\fIresolve\fR, \fIpause\fR, \fIstatus\fR. Threads persist across
+sessions; only the oracle can mark a claim verified.
+.SS Hands \(em the virtual HID
+.TP
+.B hid_status
+Report whether the uinput keyboard/pointer exist and are
+writable, plus the screen size absolute moves scale against.
+.TP
+.BR key_press " \fIkey\fR"
+A kernel-level keystroke: \fIenter\fR, \fItab\fR, \fIf5\fR,
+\fIa\fR, or a combo like \fIctrl+c\fR.
+.TP
+.BR type_text " \fItext\fR"
+Type a string, one keystroke per character on a US layout;
+newline is enter, tab is tab.
+.TP
+.BR mouse_move " \fIdx dy\fR"
+Move the pointer relative: \fIdx\fR right, \fIdy\fR down.
+.TP
+.BR mouse_goto " \fIx y\fR"
+Place the pointer at absolute desktop pixel \fI(x, y)\fR.
+.TP
+.BR mouse_click " \fI[button] [x] [y]\fR"
+Click \fIleft\fR/\fIright\fR/\fImiddle\fR, optionally moving to
+\fI(x, y)\fR first.
+.TP
+.BR mouse_scroll " \fIdy [dx]\fR"
+Turn the wheel \fIdy\fR notches (positive up), \fIdx\fR sideways.
+.SS Studio \(em the paint program
+Registered from \fIOuter_World/tools/studio.py\fR; full description under
+\fBThe studio\fR above.
+.TP
+.B studio_open
+Open the studio: launch Krita and connect the live bridge.
+.TP
+.BR studio_sheet " \fI[width] [height] [r] [g] [b]\fR"
+Lay out a fresh sheet \(em any size, any paper color.
+.TP
+.BR studio_color " \fIr g b [a]\fR"
+Dip the utensil in any RGBA color.
+.TP
+.BR studio_tool " \fItool [size]\fR"
+Take up a tool by name \(em any Krita preset or her own label.
+.TP
+.BR studio_brush " \fI[size] [opacity] [hardness] [scatter] [texture] [erase] [blend]\fR"
+Dial any point in brush space.
+.TP
+.BR studio_stroke " \fIpoints [label]\fR"
+Move through a path: \fB"x1,y1; x2,y2; ..."\fR or a
+\fB[[x,y],...]\fR list. \fIlabel\fR names the gesture for her art
+history.
+.TP
+.BR studio_line " \fIx1 y1 x2 y2\fR"
+A straight stroke.
+.TP
+.BR studio_shape " \fIkind ...\fR"
+A closed figure: \fIellipse\fR or \fIrect\fR with \fIx y w h\fR, or
+\fIpolygon\fR with \fIpoints\fR; \fIfill=true\fR paints it solid.
+.TP
+.BR studio_fill " \fIx y\fR"
+Flood-fill the region under a point.
+.TP
+.B studio_clear
+Wipe the sheet back to bare paper.
+.TP
+.BR studio_presets " \fI[query]\fR"
+List the real app's tool presets; \fIquery\fR filters by substring.
+.TP
+.BR studio_done " \fI[description] [mood]\fR"
+Finish the sheet \(em save it, remember it, share it.
+.SS Arcade
+The \fBarcade_*\fR family (registered by
+\fIgames.arcade.Arcade\fR) is documented under
+.BR genesis-arcade (7).
+
+.SH GLOSSARY
+.TP
+.B Tool
+A named callable in the registry: name, description, function.
+She invokes one by name with arguments.
+.TP
+.B ToolResult
+What a tool returns: \fIsuccess\fR plus \fIoutput\fR, or an
+\fIerror\fR string. A tool reports failure; it never raises.
+.TP
+.B Registry
+The flat \fIToolRegistry\fR dispatch table holding every tool she
+can call; \fIrun(name, **kwargs)\fR executes one.
+.TP
+.B Bridge
+The live link to a real program \(em the Krita studio bridge
+writes ops to a queue the in-process plugin executes on a real
+document, then acknowledges.
+.TP
+.B Preset
+A named utensil configuration in the real program (a Krita brush
+preset): tip shape, texture, dynamics \(em everything a saved
+brush is.
+.TP
+.B Rasterizer
+The built-in renderer that turns her ops into pixels on the
+internal sheet \(em the canonical artifact even when the real
+program is absent.
+.TP
+.B uinput
+The kernel facility for synthetic input devices \(em her
+\fBkey_press\fR/\fBmouse_*\fR events are real kernel events, not
+app-level fakes.
+.TP
+.B Oracle
+The SymPy-backed equality checker \(em the only authority that
+can mark a research claim \fIverified\fR.
+.TP
+.B Interstitial
+A captcha, consent wall, or bot challenge that blocks a fetched
+page \(em detected and reported honestly, never rendered as empty
+results.
 
 .SH DEPENDENCIES
 The core registry needs nothing beyond the project venv. Optional
@@ -138,6 +379,13 @@ Installs and verifies every optional capability.
 .TP
 .I Outer_World/workstation/environment.py
 The outer world her acts land in.
+.TP
+.I Outer_World/tools/studio.py
+The \fBstudio_*\fR tool family \(em her hands on the paint program.
+.TP
+.I Self_World/frontal_lobe/krita_studio.py
+The Krita bridge and embedded plugin; the live surface the studio
+ops mirror into.
 
 .SH SEE ALSO
 .BR genesis (1),

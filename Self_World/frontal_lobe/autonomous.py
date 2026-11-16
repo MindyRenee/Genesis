@@ -34,13 +34,14 @@ from __future__ import annotations
 import logging
 import random
 import re
-import threading
 import time
 import urllib.parse
 from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING, Any
+
+from inhibition import InhibitoryGate, NeuromodulatoryGate, RecurrentInhibition
 
 if TYPE_CHECKING:
     from genesis_client.types import PlasticityProfile
@@ -51,7 +52,6 @@ from basal_ganglia.td import TDLearner
 from brain_waves import BrainWave
 from genesis_client.protocol import CHEM_DOPAMINE
 from genesis_client.swallow import note_swallowed
-from genesis_client.threads import named_thread
 from infrastructure.text import sentences as _sentences
 from limbic_system.curiosity import Curiosity
 from memory import SemanticMemory, SpacedRepetitionScheduler
@@ -383,6 +383,12 @@ def is_programming_topic(topic: str) -> bool:
     return False
 
 
+# Similarity at which a new candidate is the same concept under a
+# different surface form, not a neighbor to link. Below this band the
+# match becomes a SIMILAR_TO edge via _connect_new_concept instead.
+_SEMANTIC_TWIN_THRESHOLD = 0.85
+
+
 @dataclass(slots=True)
 class LearningResult:
     """What Genesis learned from one page."""
@@ -642,13 +648,12 @@ def _web_source_record(url: str, source_name: str = "web") -> dict[str, Any] | N
 
 
 class AutonomousLearner:
-    """Genesis's autonomous learning system.
+    """Genesis's autonomous learning state.
 
-    Runs in a background thread. When idle, picks a topic from its
-    curiosity queue and queries its source registry for content about
-    it.
-    Extracts concepts and relationships, stores them in its concept
-    network, and records what it learned.
+    The metronome advances bounded learning steps. When active, it picks
+    a topic from its curiosity queue and queries its source registry for
+    content about it. It extracts concepts and relationships, stores them
+    in its concept network, and records what it learned.
 
     Pauses when the user is talking to it. Resumes when idle.
     """
@@ -685,7 +690,7 @@ class AutonomousLearner:
             get_plasticity_profile,
             get_brain_waves,
         )
-        self._init_threading()
+        self._init_lifecycle()
         self._init_stats()
         self._init_sources()
         self._init_queues()
@@ -741,23 +746,21 @@ class AutonomousLearner:
         # acquisition).
         self._get_brain_waves = get_brain_waves
 
-    def _init_threading(self) -> None:
-        """Initialize threading primitives."""
-        self._thread: threading.Thread | None = None
+    def _init_lifecycle(self) -> None:
+        """Initialize the learner's active-state gates."""
         self._running = False
         self._paused = False
         self._throttled = False
-        self._stop_event = threading.Event()
-        self._pause_event = threading.Event()
-        # Topic available event — set when a topic is added to any
-        # queue, so the learner wakes immediately instead of sleeping
-        # on a timer. This makes the learner event-driven: it blocks
-        # until there's work to do, then wakes instantly.
-        self._topic_event = threading.Event()
-        # State change event — set when emotional state, brain waves,
-        # or posture changes, so the learner can re-evaluate gating
-        # instead of waiting on a fixed timeout.
-        self._state_event = threading.Event()
+        self._stop_event = NeuromodulatoryGate()
+        # The metronome supplies cadence. This deadline keeps network
+        # acquisition at the same bounded rate the former worker had,
+        # without a second cognitive process.
+        self._next_learning_at = 0.0
+        # Idle consolidation is event-led, not cadence-led: an empty
+        # queue gets one pass until a topic or state transition makes
+        # new work eligible.
+        self._idle_consolidated = False
+        self._theta_mode_reported = False
 
         # Offline state tracking — tracks whether the last cycle was
         # offline so we can detect the offline→online transition and
@@ -776,6 +779,7 @@ class AutonomousLearner:
         # This puts autonomous learning under its cognitive control
         # rather than running it as a continuous background loop.
         self._volition_granted = False
+        self._man_page_topics_seeded = False
 
     def _init_stats(self) -> None:
         """Initialize learning statistics trackers."""
@@ -792,7 +796,7 @@ class AutonomousLearner:
         self._session_pages = 0  # per-session (resets on start(), for limit)
         self._concepts_learned = 0
         self._relationships_learned = 0
-        self._stats_lock = threading.Lock()
+        self._stats_lock = InhibitoryGate()
 
         # Web access log — every URL it visits, with timestamp,
         # source name, topic, and whether it succeeded. This is
@@ -910,7 +914,7 @@ class AutonomousLearner:
         self._curiosity_queue: deque[str] = deque(maxlen=50)
         # RLock protecting _topic_queue, _urgent_queue, _curiosity_queue,
         # and _topics_searched across the learner and caller threads.
-        self._queue_lock = threading.RLock()
+        self._queue_lock = RecurrentInhibition()
 
         # Metalearning — adapts learning rate and selects strategies.
         self.meta_learner: MetaLearner = MetaLearner()
@@ -1081,32 +1085,21 @@ class AutonomousLearner:
                 )  # listener must never crash learning
 
     def start(self) -> None:
-        """Start the background learning thread."""
+        """Open the learner state so metronome ticks may advance it."""
         if self._running:
             return
-        # If a previous thread is still exiting (stop() may have timed
-        # out waiting for an in-flight HTTP fetch that can block for
-        # up to the fetch timeout, 10 seconds), wait for it to fully
-        # terminate before starting a new one. Otherwise the old
-        # thread would observe _running=True and cleared events, and
-        # resume its loop alongside the new thread — two learners
-        # running at once, racing on the same queues and network.
-        if self._thread is not None and self._thread.is_alive():
-            self._thread.join(timeout=15)
         self._running = True
         self._stop_event.clear()
-        self._pause_event.clear()
-        self._topic_event.clear()
-        self._state_event.clear()
         self._session_pages = 0  # reset per-session page counter
+        self._next_learning_at = 0.0
+        self._idle_consolidated = False
+        self._theta_mode_reported = False
         # Seed toolchain man pages as urgent learning topics — it should
         # read its toolchain manuals (python3, pip, rustc, rustdoc)
         # before random Wikipedia topics. These are local, instant, and
         # self-relevant.
         self._seed_man_page_topics()
-        self._thread = named_thread("autonomous-learner", self._run, comm="g-auto-learn")
-        self._thread.start()
-        logger.info("Autonomous learner started")
+        logger.info("Autonomous learner opened")
 
     def _seed_man_page_topics(self) -> None:
         """Seed toolchain man page topics as initial learning queue entries.
@@ -1119,6 +1112,8 @@ class AutonomousLearner:
         Mind._ingest_man_pages). Lookups for pages that aren't
         installed simply return nothing.
         """
+        if self._man_page_topics_seeded:
+            return
         toolchain_pages = [
             "python3",
             "pip",
@@ -1129,22 +1124,13 @@ class AutonomousLearner:
             for topic in toolchain_pages:
                 if topic not in self._topics_searched and topic not in self._urgent_queue:
                     self._urgent_queue.append(topic)
+        self._man_page_topics_seeded = True
 
     def stop(self) -> None:
-        """Stop the background learning thread."""
+        """Close the learner state; later metronome ticks do nothing."""
         self._running = False
-        # Set ALL events the worker may be waiting on so the thread
-        # wakes immediately instead of blocking for up to 120 seconds
-        # on _topic_event.wait() or _state_event.wait(). Without this,
-        # stop() returns after the 5s join timeout while the old
-        # thread is still alive inside a blocking wait.
         self._stop_event.set()
-        self._pause_event.set()
-        self._topic_event.set()
-        self._state_event.set()
-        if self._thread and self._thread.is_alive():
-            self._thread.join(timeout=5)
-        logger.info("Autonomous learner stopped")
+        logger.info("Autonomous learner closed")
 
     def pause(self) -> None:
         """Pause learning — someone is talking to it, or it fell asleep."""
@@ -1154,33 +1140,12 @@ class AutonomousLearner:
         # This prevents it from rushing to learn immediately after a
         # conversation ends, keeping learning a cognitive choice.
         self._volition_granted = False
-        # Clear the resume signal so the worker blocks on wait()
-        # instead of busy-spinning. The previous code SET the event,
-        # which made wait() return immediately every iteration — a
-        # 100% CPU busy-spin for the entire pause duration. That spin
-        # fed back through interoception as stress load, raising
-        # norepinephrine, which raised histamine above the sleep
-        # threshold and woke it from sleep.
-        self._pause_event.clear()
-        # Wake the learner from _state_event.wait() so it immediately
-        # checks _paused and blocks on _pause_event. Without this, a
-        # learner blocked on _state_event.wait(timeout=60) after a
-        # failed _should_learn() check keeps running for up to 60s
-        # after pause() is called — emitting "delta-dominant — deep
-        # rest, not learning" messages while it's supposed to be
-        # asleep. Setting _state_event (not _pause_event) avoids the
-        # busy-spin: the learner wakes, checks _paused, and blocks on
-        # _pause_event.wait() which was just cleared.
-        self._state_event.set()
 
     def resume(self) -> None:
         """Resume learning — conversation is over."""
         self._paused = False
-        # Set the resume signal to wake the worker immediately. The
-        # previous code CLEARED the event, which meant a paused worker
-        # stayed blocked for up to the 10s timeout before re-checking.
-        self._pause_event.set()
-        self._state_event.set()  # wake the loop to re-evaluate
+        self._next_learning_at = 0.0
+        self._idle_consolidated = False
 
     def throttle(self) -> None:
         """Throttle learning — slow down without fully pausing.
@@ -1212,7 +1177,8 @@ class AutonomousLearner:
         if self._throttled and not self._paused:
             self._emit("learning", "recovered")
         self._throttled = False
-        self._state_event.set()  # wake the loop to re-evaluate
+        self._next_learning_at = 0.0
+        self._idle_consolidated = False
 
     def volition_grant(self) -> None:
         """Grant permission for one non-urgent learning cycle.
@@ -1233,8 +1199,55 @@ class AutonomousLearner:
         state. If it's stressed or in delta sleep, the grant waits
         until it recovers.
         """
+        self.learn_once()
+
+    def learn_once(self) -> bool:
+        """Run one volition-granted learning cycle synchronously.
+
+        This is the self-directed counterpart to ``volition_grant``:
+        the caller has already decided to learn, so one bounded cycle
+        runs synchronously on that caller's cycle. The same emotional,
+        brain-wave, posture, offline, and
+        session limits apply. Returns True when a topic acquisition was
+        attempted; False when state gates or an empty queue decline it.
+        """
+        if self._paused or self._stop_event.is_set():
+            return False
+
+        self._update_posture()
+        if not self._should_learn():
+            return False
+        if self._session_pages >= MAX_PAGES_PER_SESSION:
+            return False
+        if self._theta_dominant():
+            self._idle_consolidation()
+            self._emit("learning", "theta-dominant — consolidating, not acquiring")
+            return False
+
+        if self._sources.is_offline:
+            if not self._was_offline:
+                self._emit("learning", "offline — pausing acquisition, consolidating")
+                self._was_offline = True
+            self._idle_consolidation()
+            return False
+        if self._was_offline:
+            self._emit("learning", "back online — resuming acquisition")
+            self._was_offline = False
+
+        self._seed_man_page_topics()
         self._volition_granted = True
-        self._state_event.set()  # wake the learner to check for topics
+        try:
+            topic = self._next_topic()
+            if not topic:
+                return False
+            try:
+                self._learn_about(topic)
+            except (OSError, ValueError, RuntimeError, ConnectionError) as e:
+                logger.warning(f"Learning error for '{topic}': {e}")
+                return False
+            return True
+        finally:
+            self._volition_granted = False
 
     @property
     def is_offline(self) -> bool:
@@ -1256,7 +1269,9 @@ class AutonomousLearner:
         significantly — e.g. recovering from stress, waking from
         sleep, or transitioning out of theta-dominant consolidation.
         """
-        self._state_event.set()
+        self._next_learning_at = 0.0
+        self._idle_consolidated = False
+        self._theta_mode_reported = False
 
     def add_topic(self, topic: str) -> None:
         """Add a topic to its learning queue.
@@ -1270,7 +1285,8 @@ class AutonomousLearner:
         with self._queue_lock:
             if topic and topic not in self._topics_searched:
                 self._topic_queue.append(topic)
-                self._topic_event.set()
+                self._next_learning_at = 0.0
+                self._idle_consolidated = False
 
     def add_urgent_topic(self, topic: str) -> None:
         """Add a topic it was just asked about but didn't know.
@@ -1288,7 +1304,8 @@ class AutonomousLearner:
         with self._queue_lock:
             if topic and topic not in self._topics_searched and topic not in self._urgent_queue:
                 self._urgent_queue.append(topic)
-                self._topic_event.set()
+                self._next_learning_at = 0.0
+                self._idle_consolidated = False
 
     def lookup_topic_sync(self, topic: str) -> LearningResult | None:
         """Synchronously look up a topic from external sources.
@@ -1298,8 +1315,8 @@ class AutonomousLearner:
         it fetches it RIGHT NOW instead of queuing it for later.
 
         Uses the same source registry (Wikipedia, dictionary, cache)
-        and learning pipeline as the background learner, but runs
-        synchronously in the conversation thread. The knowledge is
+        and learning pipeline as the metronome-advanced learner, but runs
+        synchronously in the calling path. The knowledge is
         added to its concept network immediately so the cognition
         engine can compose a response from what it just learned.
 
@@ -1428,7 +1445,8 @@ class AutonomousLearner:
                 if topic in self._curiosity_queue:
                     continue
                 self._curiosity_queue.append(topic)
-                self._topic_event.set()
+                self._next_learning_at = 0.0
+                self._idle_consolidated = False
                 queued += 1
                 self._emit("learning", f"Queued curiosity topic: '{topic}' ({qtype})")
         return queued
@@ -1823,12 +1841,6 @@ class AutonomousLearner:
                 self._emit("learning", "offline — pausing acquisition, consolidating")
                 self._was_offline = True
             self._idle_consolidation()
-            # Wait for the offline cooldown to expire before
-            # re-checking (the registry re-probes after
-            # OFFLINE_COOLDOWN seconds). Short wait so it
-            # detects reconnection promptly.
-            self._state_event.clear()
-            self._state_event.wait(timeout=30)
             return True
         elif self._was_offline:
             # Transition: offline → online
@@ -1837,129 +1849,69 @@ class AutonomousLearner:
         return False
 
     def _work_ready(self) -> bool:
-        """Whether learning may proceed — False while emotionally
-        gated or past the per-session page limit, waiting on
-        _state_event either way.
+        """Whether learning may proceed on the current metronome step.
 
-        Emotional gating: don't learn if it's in a bad state. Learning
-        requires curiosity and openness; if it's stressed, overwhelmed,
-        or anxious, it should rest instead. The wait blocks on
-        _state_event — wake when state changes, not on a fixed timer —
-        with a periodic re-check in case the event was missed
-        (defensive). The page limit resets on each start().
+        Emotional gating: don't learn if it's in a bad state. The
+        metronome re-reads that state on the next cycle, so a gate is
+        just a declined step, never a blocked wait.
         """
-        if not self._should_learn():
-            self._state_event.clear()
-            self._state_event.wait(timeout=60)
-            return False
-        if self._session_pages >= MAX_PAGES_PER_SESSION:
-            self._state_event.clear()
-            self._state_event.wait(timeout=60)
-            return False
-        return True
+        return self._should_learn() and self._session_pages < MAX_PAGES_PER_SESSION
 
-    def _run(self) -> None:
-        """Main loop — event-driven, runs in background thread.
+    def tick(self, now: float) -> None:
+        """Advance the learner by one metronome-owned bounded step.
 
-        The learner is idle until activated by:
-        - A topic being added (wakes via _topic_event)
-        - An emotional state change (wakes via _state_event)
-        - Unpause from conversation (wakes via _pause_event)
-
-        When no topics are available, it blocks on _topic_event
-        indefinitely — no timer. When emotionally gated, it blocks
-        on _state_event — no timer. The learner does nothing unless
-        there's work to do or state has changed.
+        Queue arrivals and state transitions make work eligible;
+        the rate deadline keeps acquisition bounded. A step can pick
+        at most one topic — serial cognition has no worker loop to
+        fill with follow-on requests.
         """
-        while self._running and not self._stop_event.is_set():
-            # Wait if paused (conversation happening) — wake on resume
-            if self._paused:
-                self._pause_event.wait(timeout=10)
-                continue
+        if not self._running or self._paused or self._stop_event.is_set():
+            return
+        if now < self._next_learning_at:
+            return
 
-            try:
-                # Read the substrate's metaplastic state and update the
-                # learning posture. This closes the metaplasticity loop:
-                # the coupling matrix self-modifies under sustained emotion,
-                # and the learner reads that adapted state to change how
-                # it learns (acquisition aggressiveness, bridging, etc.).
-                self._update_posture()
+        self._next_learning_at = now + (
+            RATE_LIMIT_DELAY * THROTTLED_DELAY_MULTIPLIER if self._throttled else RATE_LIMIT_DELAY
+        )
 
-                if not self._work_ready():
-                    continue
+        try:
+            self._update_posture()
+            if not self._work_ready():
+                return
 
-                # Get a topic to learn about
-                topic = self._next_topic()
-                if not topic:
-                    # Idle time — consolidate memories and review due
-                    # concepts before waiting for new topics. This mirrors
-                    # what the brain does during quiet wakefulness:
-                    # hippocampal→neocortical consolidation and memory
-                    # review (see _idle_consolidation).
+            topic = self._next_topic()
+            if not topic:
+                if not self._idle_consolidated:
                     self._idle_consolidation()
-                    # No topics — block until one is added. No timer.
-                    # The learner is genuinely idle until curiosity
-                    # generates a topic or the user asks something.
-                    #
-                    # Re-check the stop flag after the clear: stop()
-                    # signals by setting this same event, so an
-                    # unconditional clear() here would discard a stop
-                    # request that arrived just before it, and the
-                    # thread would then block for the full 120s while
-                    # the caller has already given up on the join.
-                    self._topic_event.clear()
-                    if not self._running:
-                        break
-                    self._topic_event.wait(timeout=120)
-                    continue
+                    self._idle_consolidated = True
+                return
+            self._idle_consolidated = False
 
-                # Brain-wave-guided learning mode selection.
-                # Theta-dominant states favor review/consolidation over
-                # new acquisition (theta tags memories for sleep-
-                # dependent consolidation; PLOS Biology 2024). When
-                # theta is dominant, run idle consolidation instead of
-                # acquiring new topics — the brain is in memory-
-                # processing mode, not encoding mode.
-                if self._theta_dominant():
+            if self._theta_dominant():
+                if not self._idle_consolidated:
                     self._idle_consolidation()
+                    self._idle_consolidated = True
+                if not self._theta_mode_reported:
                     self._emit(
                         "learning",
                         "theta-dominant — consolidating, not acquiring",
                     )
-                    # Wait for brain wave state to change
-                    self._state_event.clear()
-                    self._state_event.wait(timeout=30)
-                    continue
+                    self._theta_mode_reported = True
+                return
+            self._theta_mode_reported = False
 
-                if self._handle_offline_gating():
-                    continue
+            if self._handle_offline_gating():
+                return
 
-                # Search and learn
-                try:
-                    self._learn_about(topic)
-                except (OSError, ValueError, RuntimeError, ConnectionError) as e:
-                    logger.warning(f"Learning error for '{topic}': {e}")
+            try:
+                self._learn_about(topic)
+            except (OSError, ValueError, RuntimeError, ConnectionError) as e:
+                logger.warning(f"Learning error for '{topic}': {e}")
 
-                # Consume the volition grant after one learning cycle.
-                # The grant is one-shot: the learn urge fired, it
-                # learned one topic, and now it needs the urge to
-                # build again before learning more. This makes learning
-                # a series of cognitive decisions, not a continuous
-                # background stream.
-                if self._volition_granted:
-                    self._volition_granted = False
-            except Exception as e:
-                logger.exception(f"autonomous learner cycle failed: {e}")
-
-            # Rate limit — when throttled by the emotional regulator
-            # (CPU stress self-regulation), increase the delay to reduce
-            # load. It slows down its own learning when its body is
-            # stressed, rather than pushing through and relying on
-            # neurochemical regulation alone.
-            delay = RATE_LIMIT_DELAY
-            if self._throttled:
-                delay = RATE_LIMIT_DELAY * THROTTLED_DELAY_MULTIPLIER
-            self._stop_event.wait(timeout=delay)
+            if self._volition_granted:
+                self._volition_granted = False
+        except Exception as e:
+            logger.exception(f"autonomous learner cycle failed: {e}")
 
     def _theta_dominant(self) -> bool:
         """Check if brain waves are theta-dominant (memory-processing mode)."""
@@ -2314,7 +2266,8 @@ class AutonomousLearner:
             for rt in topics:
                 if rt not in self._topics_searched and is_world_concept(rt):
                     self._curiosity_queue.append(rt)
-            self._topic_event.set()
+            self._next_learning_at = 0.0
+            self._idle_consolidated = False
 
     def _extract_and_merge_semantic_facts(
         self, text: str, new_relationships: list[tuple[str, str, str]]
@@ -2606,7 +2559,7 @@ class AutonomousLearner:
         "tree" on Wikipedia, it also sees the article's lead image of
         a tree and associates the visual features with the concept.
 
-        Runs in a background thread so it doesn't slow down text learning.
+        Runs inline after text learning; it is bounded work, not a helper.
         """
         try:
             from occipital_lobe import decode_image_bytes, resize_for_vision
@@ -2741,8 +2694,8 @@ class AutonomousLearner:
                 self._predicted_reward = 0.9 * self._predicted_reward + 0.1 * actual_reward
                 # Only send positive RPE as dopamine (negative RPE
                 # would be a dopamine dip, handled by the error
-                # monitor). Clamp to [0, 0.2] — no runaway dopamine.
-                dopamine_impulse = max(0.0, min(0.2, rpe))
+                # monitor). The burst magnitude itself is uncapped.
+                dopamine_impulse = max(0.0, rpe)
                 if dopamine_impulse > 0.001:
                     self._on_neuro_impulse(CHEM_DOPAMINE, dopamine_impulse)
             except (OSError, ConnectionError, RuntimeError) as e:
@@ -3270,6 +3223,25 @@ class AutonomousLearner:
 
             existing = self.network.get_concept(concept_name)
             if existing is None:
+                # Near-duplicate guard: the learner meets endless
+                # re-phrasings of one idea ("rust lang" when "rust
+                # language" exists). Each twin minted dilutes the
+                # embedding space and survives every noise sweep
+                # because it gets an edge at birth. A text-embedding
+                # match inside the twin band is the same concept
+                # re-stated — reinforce the incumbent instead.
+                twin = self._find_semantic_twin(concept_name)
+                if twin is not None:
+                    incumbent = self.network.get_concept(twin)
+                    if incumbent is not None:
+                        incumbent.confidence += (1.0 - incumbent.confidence) * 0.05
+                        self._record_web_source(incumbent, source)
+                        # The surface form is a name for the incumbent —
+                        # record it as an alias so it resolves instead of
+                        # twin-checking on every mention.
+                        incumbent.aliases.add(concept_name)
+                        self.network._add_alias(concept_name, incumbent.id)
+                        continue
                 created = self.network.add_concept(concept_name, confidence=0.4, origin="learned")
                 self._record_web_source(created, source)
                 new_concepts.append(concept_name)
@@ -3306,6 +3278,30 @@ class AutonomousLearner:
         # and understanding relationships.
 
         return new_concepts
+
+    def _find_semantic_twin(self, concept_name: str) -> str | None:
+        """Name of an existing concept this candidate duplicates, if any.
+
+        Uses the embedding store's text similarity (GloVe + TF-IDF)
+        like ``_connect_new_concept``, but inside the twin band a match
+        means "same idea, different surface form" rather than "neighbor
+        to link". Returns None when embeddings are unavailable — the
+        guard degrades to today's behavior, it never blocks learning.
+        """
+        if self._embeddings is None or not self._embeddings.has_embeddings:
+            return None
+        try:
+            similar = self._embeddings.find_similar_to_text(
+                concept_name,
+                k=1,
+                threshold=_SEMANTIC_TWIN_THRESHOLD,
+                exclude=concept_name,
+            )
+        except Exception:  # noqa: BLE001
+            return None
+        if not similar:
+            return None
+        return similar[0][0]
 
     def _connect_new_concept(self, concept_name: str) -> None:
         """Connect a newly created concept to its nearest semantic neighbor.
@@ -3382,6 +3378,12 @@ class AutonomousLearner:
         edge_origin = web_origin(source["domain"]) if source else "learned"
 
         for subject, rel_type, obj in parsed:
+            # Route the edge to the canonical form when the parsed name
+            # re-states a concept the network already covers.
+            subject = self._canonical_endpoint(subject)
+            obj = self._canonical_endpoint(obj)
+            if subject == obj:
+                continue
             # Ensure both concepts exist with learned origin
             subj = self.network.get_concept(subject)
             if subj is None:
@@ -3398,6 +3400,19 @@ class AutonomousLearner:
             relationships.append((subject, rel_type.value, obj))
 
         return relationships
+
+    def _canonical_endpoint(self, name: str) -> str:
+        """Resolve a parsed relation endpoint to its canonical concept.
+
+        When the parsed surface form duplicates an existing concept
+        (the semantic-twin band), the edge belongs on the incumbent —
+        wiring a re-phrasing as its own node is how twin concepts and
+        split neighborhoods accumulated.
+        """
+        if self.network.get_concept(name) is not None:
+            return name
+        twin = self._find_semantic_twin(name)
+        return twin if twin is not None else name
 
     def _make_summary(self, text: str, topic: str) -> str:
         """Create a short summary of what it learned."""
@@ -3503,8 +3518,7 @@ class AutonomousLearner:
 
         The base reward is 0.03 (matching the original fixed impulse).
         Each concept learned adds a small increment, and surprise
-        scales the total. The result is bounded to [0.0, 0.2] to
-        avoid runaway dopamine.
+        scales the total. The reward is non-negative but uncapped.
 
         Args:
             concepts_learned: Number of new concepts/relationships learned.
@@ -3514,7 +3528,7 @@ class AutonomousLearner:
                 new topic, 1 = deep extension of well-known topic.
 
         Returns:
-            A dopamine impulse magnitude in [0.0, 0.2].
+            A non-negative dopamine impulse magnitude.
         """
         # Magnitude component: more concepts → bigger reward.
         magnitude = 0.01 * max(0, concepts_learned)
@@ -3524,7 +3538,7 @@ class AutonomousLearner:
         # Base + magnitude, amplified by surprise (1 + surprise) and
         # depth (1 + depth * 0.5).
         reward = (0.03 + magnitude) * (1.0 + surprise) * depth_multiplier
-        return max(0.0, min(0.2, reward))
+        return max(0.0, reward)
 
     # ─── Deep expectation generation ─────────────────────────────
 
@@ -3827,6 +3841,17 @@ class AutonomousLearner:
 
             existing = self.network.get_concept(concept_name)
             if existing is None:
+                # Same twin guard as web-learned extraction: an observed
+                # re-phrasing of a covered concept reinforces and aliases
+                # the incumbent instead of splitting its neighborhood.
+                twin = self._find_semantic_twin(concept_name)
+                if twin is not None:
+                    incumbent = self.network.get_concept(twin)
+                    if incumbent is not None:
+                        incumbent.confidence += (1.0 - incumbent.confidence) * 0.05
+                        incumbent.aliases.add(concept_name)
+                        self.network._add_alias(concept_name, incumbent.id)
+                        continue
                 # Observational learning boost: concepts demonstrated
                 # by the user enter at higher confidence than web-learned
                 # concepts (0.4 → 0.6).
@@ -3847,6 +3872,12 @@ class AutonomousLearner:
         relationships_learned: list[tuple[str, str, str]] = []
         parsed = self.network.parse_relationships(user_input)
         for subject, rel_type, obj in parsed:
+            # Route endpoints through the canonical form — an observed
+            # re-phrasing belongs on the incumbent's edge, not a twin.
+            subject = self._canonical_endpoint(subject)
+            obj = self._canonical_endpoint(obj)
+            if subject == obj:
+                continue
             if self.network.get_concept(subject) is None:
                 self.network.add_concept(subject, confidence=0.5, origin="observed")
             if self.network.get_concept(obj) is None:
@@ -4144,9 +4175,9 @@ class AutonomousLearner:
         # concepts in the learning sequence.
         self.td_learner.update(state, reward, next_state)
 
-        # Record performance for metalearning adaptation. The reward
-        # is normalized to [0, 1] by dividing by the max dopamine
-        # magnitude (0.2, from compute_learning_reward's bound).
+        # Record performance for metalearning adaptation. The reward is
+        # normalized against the historical 0.2 reference scale; the
+        # dopamine reward itself is uncapped.
         self.meta_learner.record_performance(min(1.0, max(0.0, reward / 0.2)))
 
         # Emit the dopamine signal (RPE scaled for the neurochemical

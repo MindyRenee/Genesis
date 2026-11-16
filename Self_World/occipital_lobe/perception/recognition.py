@@ -40,7 +40,6 @@ import json
 import logging
 import os
 import tempfile
-import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -48,6 +47,7 @@ from pathlib import Path
 import numpy as np
 from genesis_client.swallow import note_swallowed
 from infrastructure.config import default_data_dir
+from inhibition import InhibitoryGate
 
 __all__ = ["DetectedFace", "FaceRecognizer", "KnownFace"]
 
@@ -184,7 +184,7 @@ class FaceRecognizer:
         # corrupts the engine's internal buffers (observed as the
         # OpenCV 5 forwardGraph "buf.shape() == m.shape()" assert).
         # Every cv2 touch in detect_faces runs under this lock.
-        self._infer_lock = threading.Lock()
+        self._infer_lock = InhibitoryGate()
         self._available: bool | None = None
         self._known_faces: dict[str, list[KnownFace]] = {}
         # Anonymous face clusters — stable "face:N" identities for

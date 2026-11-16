@@ -210,6 +210,79 @@ information absent from the captured frame.
 Successful source-level integration or model loading is not
 physical-device validation. Confirm live frame delivery and actual
 recognition on the target device.
+.SH GLOSSARY
+.TP
+.B V4L2
+Video4Linux2 \(em the kernel's camera-capture API. The retinal
+limb opens the device (default \fI/dev/video0\fR), requests
+640x480 RGB24, and falls back to YUYV.
+.TP
+.B afferent
+Carrying signal inward, toward the mind \(em the camera eye and
+the screen nerve are both afferents: two ways the world reaches
+her through one frame contract.
+.TP
+.B optic nerve / screen nerve
+The two POSIX shared-memory segments (\fI/genesis_optic_nerve\fR,
+\fI/genesis_screen_nerve\fR) carrying frames to the mind \(em
+looking at her screen is the same act as looking at the world.
+.TP
+.B seqlock
+The segment's concurrency pattern \(em a sequence counter readers
+check so they can tell when a new frame has landed.
+.TP
+.B capture limb
+The camera-owning code (\fBOpticCapture\fR) \(em one
+implementation, two carriers: the standalone
+.BR genesis-retina (1)
+process or the daemon's embedded thread.
+.TP
+.B Retinex
+The illumination stage's luminance decomposition \(em estimating
+illuminant, reflectance, light direction, and shadows from the
+image itself.
+.TP
+.B von Kries adaptation
+Chromatic white-balance modeled per channel (strength 0.8, gains
+saturating within 0.5\(en2.0) \(em it corrects estimated color
+cast; it cannot recover detail the sensor never captured.
+.TP
+.B phototransduction
+The stateful cone-response cascade (visual pigment, PDE, cGMP,
+calcium feedback, photocurrent) \(em the modeled chemistry of
+turning light into signal.
+.TP
+.B V1 sparse features
+The early-cortical descriptor set cortical perception extracts
+\(em including the \fBname_color\fR vocabulary that names a region
+\fIred(8)\fR or \fIcyan(10)\fR \(em the same vocabulary the arcade
+boards arrive in.
+.TP
+.B gestalt
+The whole-scene summary emitted when a frame is parsed \(em
+brightness, warmth, dominant color, regional colors \(em the
+record shape episodic memory stores for a scene.
+.TP
+.B YuNet / SFace
+The optional ONNX models behind face recognition: YuNet detects,
+SFace produces the 128-dimensional embedding. Detection and
+identity are separate faculties \(em seeing a face does not mean
+knowing who it is.
+.TP
+.B cosine similarity
+The embedding distance measure for identity: 0.4 threshold for
+named faces, 0.45 for anonymous clusters \(em higher is stricter,
+increasing false negatives.
+.TP
+.B look urge
+How looking happens: a volitional drive under LC-NE orienting
+pressure, not a user command \(em she reads whichever nerve she
+means to.
+.TP
+.B salience
+How much a parsed scene element matters \(em folded with memory
+and cognition into what she actually notices.
+
 .SH SEE ALSO
 .BR genesis (1),
 .BR genesis-cli (1),

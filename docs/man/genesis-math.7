@@ -326,6 +326,74 @@ faculties, and it is not a complete proof assistant. Propositional
 truth-table checks, finite algebraic-structure checks, symbolic
 identities, and numerical evidence each have their own scope.
 Unsupported or undecidable claims must remain unverified.
+.SH GLOSSARY
+.TP
+.B faculty
+One mathematical capability in the parietal lobe \(em algebra,
+calculus, statistics, and so on. She has a family of them, not one
+monolithic calculator.
+.TP
+.B facade
+\fBParietalMath\fR \(em the single front door consumers call; it
+dispatches to the native faculties behind it.
+.TP
+.B expression tree
+The immutable structure a parsed expression becomes: constants,
+variables, negation, sums, products, powers, function calls \(em
+the native faculties' working material.
+.TP
+.B canonical form
+The simplified normal shape an expression tree simplifies to \(em
+like terms combined, products expanded \(em so equal expressions
+compare equal.
+.TP
+.B oracle
+The SymPy-backed checker in \fIsymbolic.py\fR \(em optional,
+lazily imported, and the only authority that can mark a claim
+\fIverified\fR. It is not the implementation of the native
+faculties.
+.TP
+.B verified / refuted / undecided
+The oracle's three verdicts. A bounded check that passes every
+tested integer is still \fIundecided\fR \(em a finite range is not
+a proof, and an undecidable claim stays unverified.
+.TP
+.B workbench
+\fBResearchWorkbench\fR \(em the persistent long-horizon store of
+open problems, conjectures, readings, evidence, and attempts under
+\fI$DATA_DIR/research/workbench.json\fR. Only an oracle verdict
+gives a claim terminal provenance.
+.TP
+.B provenance
+Where a claim's status came from \(em oracle verdict, witness,
+or accumulated evidence. Bounded checks can refute with a
+witness; they cannot verify a universal claim.
+.TP
+.B subitizing
+Instant small-quantity recognition \(em the number-sense faculty's
+approximate magnitude judgments (Weber\(enFechner scaling), not
+exact arithmetic.
+.TP
+.B quadrature
+Numerical integration by sampled evaluation \(em composite Simpson
+here, the fallback when no closed-form antiderivative is found.
+.TP
+.B witness / countermodel
+The concrete exhibit an answer returns: a witness shows why a
+check failed or a refutation holds; a countermodel is the
+valuation that breaks an invalid inference.
+.TP
+.B closed form
+An exact symbolic answer rather than a numerical approximation
+\(em a numerical root is reported as an approximation, not dressed
+up as exact.
+.TP
+.B try_math
+The cognition-engine entry point: it detects the question kind
+(computation, solving, proof, discovery) and routes it to the
+right faculty \(em unsupported forms fail honestly, they are not
+guessed.
+
 .SH SEE ALSO
 .BR genesis (1),
 .BR genesis-cli (1),

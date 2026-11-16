@@ -86,6 +86,7 @@ References:
 
 from __future__ import annotations
 
+import math
 import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
@@ -98,6 +99,16 @@ from limbic_system.emotion import (
     NEGATIVE_VALENCE,
     POSITIVE_VALENCE,
 )
+
+
+def _finite_or(value: float, default: float) -> float:
+    """Return finite floats; malformed/non-finite inputs use ``default``."""
+    try:
+        result = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return default
+    return result if math.isfinite(result) else default
+
 
 if TYPE_CHECKING:
     from infrastructure.narrative import Narrator
@@ -407,8 +418,8 @@ class CoreSelf:
             return None
 
         # Salience: change magnitude + homeostatic disruption
-        balance_disruption = 1.0 - current.homeostatic_balance
-        salience = min(1.0, change + balance_disruption * 0.5)
+        balance_disruption = 1.0 - _finite_or(current.homeostatic_balance, 0.8)
+        salience = _finite_or(change + balance_disruption * 0.5, 0.0)
 
         episode = CoreSelfEpisode(
             trigger=trigger,
@@ -686,7 +697,10 @@ class DamasioSelfHierarchy:
         # Emerged content registers more strongly — the perturbation
         # came from the system's own dynamics, not an external object.
         if episode and recurrent_trigger:
-            episode.salience = min(1.0, episode.salience * 1.25)
+            episode.salience = _finite_or(
+                _finite_or(episode.salience, 0.0) * 1.25,
+                episode.salience,
+            )
 
         # 3. Promote significant episodes
         if episode and episode.salience >= self.core_self.salience_threshold:

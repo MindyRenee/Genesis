@@ -1,5 +1,10 @@
 target/
 build/
+
+# No lockfiles — dependencies float (see CONTRIBUTING.md). Tools
+# regenerate these locally; they are never committed.
+Cargo.lock
+uv.lock
 __pycache__/
 *.pyc
 *.egg-info/
@@ -10,6 +15,7 @@ __pycache__/
 genesis_data/
 .genesis-discord
 .genesis-discord-bot
+.genesis-discord-inner
 Self_World/voices/
 launch/
 

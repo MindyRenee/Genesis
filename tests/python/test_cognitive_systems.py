@@ -140,6 +140,19 @@ def test_focus_on_intensity_clamped() -> None:
     assert focus.intensity == 0.0
 
 
+def test_capture_preserves_finite_out_of_range_drive() -> None:
+    """Bottom-up capture drive is evidence; selective intensity stays bounded."""
+    att = AttentionSystem()
+    focus = att.capture("alarm", drive=1.7)
+    assert focus is not None
+    assert focus.attention_type == AttentionType.CAPTURED
+    assert focus.intensity == 1.7
+
+    att = AttentionSystem()
+    focus = att.capture("alarm", drive=float("nan"))
+    assert focus is None
+
+
 def test_focus_on_custom_type() -> None:
     """focus_on can use a custom attention type."""
     att = AttentionSystem()
@@ -1107,6 +1120,116 @@ def test_safeguard_urge_dynamics() -> None:
     assert fired_at is not None and fired_at < 60
 
 
+def test_metronome_interoceptive_signals_preserve_overload() -> None:
+    """Need channels report measured excess instead of saturating at 1."""
+    from types import SimpleNamespace
+
+    from brainstem.metronome import MetronomeMixin
+
+    holder = SimpleNamespace(
+        feel=lambda: SimpleNamespace(
+            arousal=1.2,
+            valence=0.8,
+            plasticity=-0.6,
+        ),
+        client=SimpleNamespace(
+            get_neuro_summary=lambda: SimpleNamespace(
+                global_tone=0.8,
+                valence=-0.1,
+            )
+        ),
+        _last_rest_time=time.time() - (2 * 75 * 60),
+    )
+
+    signals = MetronomeMixin._read_interoceptive_signals(holder)
+
+    assert signals["overstimulation"] > 1.0
+    assert signals["receptor_fatigue"] > 1.0
+    assert signals["elevated_cortisol"] > 1.0
+    assert signals["sustained_activity"] > 1.9
+
+
+def test_metronome_threat_signals_preserve_overload() -> None:
+    """Threat intensity keeps accumulating beyond the old ceiling."""
+    from types import SimpleNamespace
+
+    from brainstem.metronome import MetronomeMixin
+
+    snapshot = SimpleNamespace(self_concerns=lambda: ["a", "b", "c", "d"])
+    holder = SimpleNamespace(
+        _offline=False,
+        client=SimpleNamespace(is_connected=False),
+        _daemon_lost_since=time.monotonic() - 90.0,
+        _autosave_failures=6,
+        _last_threat_snapshot=0.0,
+        system_monitor=SimpleNamespace(
+            snapshot=lambda: snapshot,
+            baseline=SimpleNamespace(
+                is_established=True,
+                deviations=lambda _snapshot: ["a", "b", "c", "d", "e", "f"],
+            ),
+        ),
+    )
+
+    signals = MetronomeMixin._read_threat_signals(holder)
+
+    assert signals["daemon_lost"] > 2.9
+    assert signals["save_failure"] == pytest.approx(3.0)
+    assert signals["telemetry_anomaly"] == pytest.approx(2.0)
+    assert signals["body_distress"] == pytest.approx(2.0)
+
+
+def test_metronome_executive_candidates_preserve_salience() -> None:
+    """Finite salience is evidence, not a value to force into [0.1, 1]."""
+    from types import SimpleNamespace
+
+    from brainstem.metronome import MetronomeMixin
+
+    ingested = []
+    holder = SimpleNamespace(
+        is_resting=False,
+        brain=SimpleNamespace(
+            frontal=SimpleNamespace(executive=SimpleNamespace(ingest_candidates=ingested.extend))
+        ),
+        inner_life=SimpleNamespace(executive_candidates=lambda _emotion: []),
+        feel=lambda: None,
+        world=SimpleNamespace(
+            recent_events=lambda _limit: [
+                SimpleNamespace(
+                    inbound=True,
+                    topics=["quiet-signal"],
+                    content="",
+                    salience=0.04,
+                ),
+                SimpleNamespace(
+                    inbound=True,
+                    topics=["urgent-signal"],
+                    content="",
+                    salience=2.5,
+                ),
+            ]
+        ),
+        self_improvement=SimpleNamespace(
+            get_pending_proposals=lambda: [
+                SimpleNamespace(
+                    file_path="proposal.py",
+                    confidence=1.8,
+                    title="high-confidence",
+                )
+            ]
+        ),
+        _volition_context=lambda: {"daemon_lost": 1.7},
+    )
+
+    MetronomeMixin._cycle_feed_executive(holder)
+
+    by_topic = {candidate["topic"]: candidate["salience"] for candidate in ingested}
+    assert by_topic["quiet-signal"] == pytest.approx(0.04)
+    assert by_topic["urgent-signal"] == pytest.approx(2.5)
+    assert by_topic["proposal.py"] == pytest.approx(1.8)
+    assert by_topic["daemon_lost"] == pytest.approx(1.7)
+
+
 # ═══════════════════════════════════════════════════════════════════
 # Volition chemical drives — look and self-study are hers
 # ═══════════════════════════════════════════════════════════════════
@@ -1674,13 +1797,15 @@ def test_set_inhibition_threshold() -> None:
     assert result.inhibited is True
 
 
-def test_set_inhibition_threshold_clamped() -> None:
-    """set_inhibition_threshold clamps to [0, 1]."""
+def test_set_inhibition_threshold_preserves_finite_values() -> None:
+    """Finite thresholds outside [0, 1] survive unchanged."""
     exec_fn = ExecutiveFunction()
     exec_fn.set_inhibition_threshold(2.0)
-    assert exec_fn.inhibition_threshold == 1.0
+    assert exec_fn.inhibition_threshold == 2.0
     exec_fn.set_inhibition_threshold(-1.0)
-    assert exec_fn.inhibition_threshold == 0.0
+    assert exec_fn.inhibition_threshold == -1.0
+    exec_fn.set_inhibition_threshold(float("nan"))
+    assert exec_fn.inhibition_threshold == -1.0
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -3614,18 +3739,19 @@ def test_broadcast_gated_off_during_sleep() -> None:
 # ═══════════════════════════════════════════════════════════════════
 
 
-def _draw_holder(draw_result, **overrides):
-    """A broadcast holder extended for _perform_draw."""
+def _draw_holder(**overrides):
+    """A broadcast holder extended for the studio-finish path."""
     from basal_ganglia.volition import VolitionMixin
 
     holder, posts, said, _network, _composer, emitted = _broadcast_holder(**overrides)
     acted: list[tuple] = []
     holder.world.it_acted = lambda act, detail="": acted.append((act, detail))
     holder._emit_volition_thought = lambda seeds, kind: None
-    holder._draw_result = lambda: draw_result
     holder._share_drawing_image = lambda result, caption: VolitionMixin._share_drawing_image(
         holder, result, caption
     )
+    holder._store_drawing_event = lambda result: None
+    holder._compose_drawing_description = lambda result: ""
     return holder, posts, said, emitted, acted
 
 
@@ -3645,8 +3771,9 @@ def test_draw_posts_art_with_her_caption(tmp_path) -> None:
         description="",
         timestamp=0.0,
     )
-    holder, posts, said, emitted, acted = _draw_holder(("a wash of violet", result))
-    VolitionMixin._perform_draw(holder)
+    holder, posts, said, emitted, acted = _draw_holder()
+    holder._compose_drawing_description = lambda r: "a wash of violet"
+    VolitionMixin._on_drawing_finished(holder, result)
     assert posts == [("image", "a wash of violet", "Genesis", "drawing_1.png", 9)]
     assert emitted == [("broadcast", "a wash of violet")]
     assert said == ["a wash of violet"]
@@ -3669,8 +3796,8 @@ def test_draw_posts_bare_image_when_speechless(tmp_path) -> None:
         description="",
         timestamp=0.0,
     )
-    holder, posts, said, emitted, _acted = _draw_holder(("", result))
-    VolitionMixin._perform_draw(holder)
+    holder, posts, said, emitted, _acted = _draw_holder()
+    VolitionMixin._on_drawing_finished(holder, result)
     assert posts == [("image", "", "Genesis", "drawing_2.png", 9)]
     assert emitted == [] and said == []
 
@@ -3688,43 +3815,50 @@ def test_draw_without_feed_still_speaks() -> None:
         description="",
         timestamp=0.0,
     )
-    holder, posts, said, emitted, _acted = _draw_holder(("a wash of violet", result), channel=None)
-    VolitionMixin._perform_draw(holder)
+    holder, posts, said, emitted, _acted = _draw_holder(channel=None)
+    holder._compose_drawing_description = lambda r: "a wash of violet"
+    VolitionMixin._on_drawing_finished(holder, result)
     assert posts == []
     assert emitted == [("broadcast", "a wash of violet")]
     assert said == ["a wash of violet"]
 
 
+def test_perform_draw_sits_at_the_easel() -> None:
+    """The draw urge sits her down — opening the studio is the act;
+    every mark after is hers."""
+    from basal_ganglia.volition import VolitionMixin
+
+    holder, posts, said, _emitted, acted = _draw_holder()
+    holder.draw = lambda: "sitting at the easel — Krita is live"
+    VolitionMixin._perform_draw(holder)
+    assert acted == [("sat down to draw", "opened her studio")]
+    assert posts == [] and said == []
+
+
 def test_draw_failure_posts_nothing() -> None:
-    """No drawing → no image, no public words — just the honest
+    """No sitting → no image, no public words — just the honest
     reason in her inner feed."""
     from basal_ganglia.volition import VolitionMixin
 
-    holder, posts, said, emitted, _acted = _draw_holder((None, None))
+    holder, posts, said, emitted, _acted = _draw_holder()
+    holder.draw = lambda: None
     VolitionMixin._perform_draw(holder)
     assert posts == [] and said == []
     assert emitted == [("art", "couldn't draw right now")]
 
 
-def test_draw_command_also_shares_the_art(tmp_path) -> None:
-    """``draw()`` — the /draw entry point — shares the PNG too: a
-    requested drawing is still her drawing, and the channel mirrors
-    the session that asked for it."""
-    from basal_ganglia.volition import VolitionMixin
-    from frontal_lobe.canvas import DrawingResult
+def test_draw_command_sits_at_the_easel() -> None:
+    """``draw()`` — the /draw entry point — opens the studio; the
+    paper and everything after are hers."""
+    from types import SimpleNamespace
 
-    png = tmp_path / "drawing_3.png"
-    png.write_bytes(b"\x89PNG fake")
-    result = DrawingResult(
-        filepath=str(png),
-        width=64,
-        height=64,
-        description="",
-        timestamp=0.0,
-    )
-    holder, posts, _said, _emitted, _acted = _draw_holder(("a storm of green", result))
-    assert VolitionMixin.draw(holder) == "a storm of green"
-    assert posts == [("image", "a storm of green", "Genesis", "drawing_3.png", 9)]
+    from basal_ganglia.volition import VolitionMixin
+
+    holder, _posts, _said, _emitted, _acted = _draw_holder()
+    holder.canvas = SimpleNamespace(open_studio=lambda: True)
+    assert VolitionMixin.draw(holder) == "sitting at the easel — Krita is live"
+    holder.canvas = SimpleNamespace(open_studio=lambda: False)
+    assert VolitionMixin.draw(holder) == "sitting with the sketchbook — studio offline"
 
 
 def test_announce_creation_posts_composed_words() -> None:
@@ -3764,46 +3898,36 @@ def test_announce_creation_silent_without_composition() -> None:
     assert posts == [] and emitted == [] and said == []
 
 
-def test_volition_workers_run_below_foreground_priority() -> None:
-    """Urge worker threads renice themselves before acting.
-
-    The kernel-level half of foreground arbitration: a bug scan that
-    started before the user typed keeps losing scheduler/GIL handoffs
-    to think() instead of timing it out at 15 s.
-    """
-    import sys
-    from unittest.mock import MagicMock, patch
-
-    import basal_ganglia.volition as vol
-
-    if not sys.platform.startswith("linux"):
-        pytest.skip("per-thread nice is linux-only")
-
-    with patch.object(vol.os, "setpriority") as sp:
-        vol._lower_thread_priority()
-        sp.assert_called_once()
-        assert sp.call_args[0][2] == vol._VOLITION_NICE
-
-    # Wrapped actions carry the priority — the renice runs inside the
-    # worker thread, not on the dispatcher.
-    seen = {}
-
-    def probe():
-        seen["nice"] = vol.os.getpriority(vol.os.PRIO_PROCESS, 0)
-
-    holder = MagicMock()
+def test_volition_selects_one_act_synchronously() -> None:
+    """The strongest ready urge acts on the metronome; no worker spawns."""
     import threading
+    from types import SimpleNamespace
+    from unittest.mock import Mock
 
-    holder._volition_lock = threading.Lock()
-    holder._volition_active = {"probe"}
-    holder._volition_sem = threading.Semaphore(1)
-    holder._volition_sem.acquire()
-    # The wrapper drops work when the mind is suppressed or stopping —
-    # this probe must still run, so the holder reads as live.
+    from basal_ganglia.volition import VolitionMixin
+
+    improve = Mock()
+    speech = Mock()
+    holder = VolitionMixin()
     holder._suppress_volition = False
     holder._running = True
-    vol.VolitionMixin._run_volition_action(holder, "probe", probe)
-    assert seen["nice"] >= vol._VOLITION_NICE - 1
+    holder._filter_ready_urges = lambda ready: ready
+    holder.volition = SimpleNamespace(
+        get=lambda name: SimpleNamespace(value={"speech": 0.2, "improve": 0.9}[name])
+    )
+    holder._perform_improve = improve
+    holder._perform_speech = speech
+    before = {t.name for t in threading.enumerate()}
+
+    selected = VolitionMixin._act_on_volition(
+        holder,
+        ["speech", "improve"],
+    )
+
+    assert selected == ["improve"]
+    improve.assert_called_once_with()
+    speech.assert_not_called()
+    assert {t.name for t in threading.enumerate()} == before
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -3865,10 +3989,10 @@ def _heard_speech(world) -> list[str]:
 
 def _channel_holder(**overrides):
     """A broadcast holder extended for channel hearing — a real
-    OuterWorld owns the page and the record; the holder supplies the
+    OuterEnvironment owns the page and the record; the holder supplies the
     reply side the world forwards to."""
     from basal_ganglia.volition import VolitionMixin
-    from outer_world.world import OuterWorld
+    from workstation.environment import OuterEnvironment
 
     holder, posts, _said, _net, _comp, emitted = _broadcast_holder(**overrides)
     calls: list[str] = []
@@ -3878,7 +4002,7 @@ def _channel_holder(**overrides):
     holder._channel_addressed = lambda t, m: VolitionMixin._channel_addressed(holder, t, m)
     # The page the world owns — the broadcast holder's feed stub.
     channel = holder.world.channel
-    world = OuterWorld(
+    world = OuterEnvironment(
         is_sleeping=lambda: getattr(holder, "_is_sleeping", False),
         channel=channel,
         on_channel_speech=holder._hear_channel,
@@ -3953,7 +4077,7 @@ def _board_holder(**overrides):
     from types import SimpleNamespace
 
     from brain_waves import BrainWave
-    from outer_world.board import ChannelBoard
+    from discord.board import ChannelBoard
 
     boards: list[str] = []
 
@@ -4096,7 +4220,9 @@ def test_channel_board_shows_live_vitals() -> None:
     assert "stm 41" in text and "ltm 1,832" in text
     assert "ear on" in text
     assert "hb 36,412" in text and "id 8841" in text and "age 0." in text
-    assert "[thought] a passing idea" in text
+    # Her words belong on their own cards — the instrument board must
+    # not squeeze them into a clipped monospace status row.
+    assert "a passing idea" not in text
     # frequency, field, cell, proof, growth, drive — the physics and
     # the math, not narration
     assert "beta1 12-15 Hz" in text
@@ -4132,7 +4258,7 @@ def test_channel_board_degrades_without_channels() -> None:
 def test_channel_board_paces_fixed_cadence() -> None:
     """The board is a clock, not an urge — inside the window it
     doesn't repost; after it, it does."""
-    from outer_world.board import _CHANNEL_BOARD_S
+    from discord.board import _CHANNEL_BOARD_S
 
     holder, boards = _board_holder()
     holder._update_channel_board(1000.0)
@@ -4159,7 +4285,7 @@ def test_channel_board_without_feed_or_daemon() -> None:
 def test_channel_board_fits_a_phone() -> None:
     """Every board line stays under the mobile code-block width —
     wide rows reflow to continuation lines, never scroll sideways."""
-    from outer_world.board import _BOARD_WIDTH
+    from discord.board import _BOARD_WIDTH
 
     holder, boards = _board_holder()
     holder._update_channel_board(1000.0)

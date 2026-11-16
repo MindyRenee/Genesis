@@ -83,7 +83,7 @@ def resolve_launcher(env: dict[str, str]) -> str:
     return out.strip()
 
 
-WORLDS = "'Self_World', 'Inner_Non_Physical_World', 'Outer_Physical_World', '.'"
+WORLDS = "'Self_World', 'Inner_World', 'Outer_World', '.'"
 
 
 def resolve_config_py(env: dict[str, str]) -> str:

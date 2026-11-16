@@ -24,11 +24,11 @@ projection, not a broadcast: only subscribers of that source hear it.
 from __future__ import annotations
 
 import math
-import threading
 import time
 from collections.abc import Callable
 
 from genesis_client.swallow import note_swallowed
+from inhibition import InhibitoryGate
 
 # kind is the low 8 bits of the module's task_id. 0 means the module
 # has nothing to say. The remaining bits are a per-post salt so two
@@ -87,7 +87,7 @@ class Thalamus:
     """
 
     def __init__(self) -> None:
-        self._lock = threading.Lock()
+        self._lock = InhibitoryGate()
         self._pending: dict[int, tuple[int, object]] = {}
         self._seen: dict[int, int] = {}
         self._handlers: dict[int, list[Handler]] = {}

@@ -37,13 +37,13 @@ from __future__ import annotations
 import json
 import logging
 import math
-import threading
 import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, TypeGuard
 
+from inhibition import RecurrentInhibition
 from temporal_lobe.concepts import ConceptNetwork, RelationType
 
 if TYPE_CHECKING:
@@ -679,7 +679,7 @@ class ActionFeedback:
         # only state mutations and snapshots; external callbacks
         # (listener, reward learner, value estimator, suggesters) run
         # outside it so they cannot wedge the engine.
-        self._lock = threading.RLock()
+        self._lock = RecurrentInhibition()
 
     @property
     def history(self) -> list[ActionAttempt]:
@@ -770,14 +770,13 @@ class ActionFeedback:
             # Confidence grows with evidence but is bounded by model
             # uncertainty. A fresh action is deliberately only mildly
             # confident.
-            evidence = min(model.attempts, 20)
-            confidence = min(0.9, 0.55 + evidence * 0.015)
+            confidence = _approach(0.55, 0.9, model.attempts * 0.015)
             if model.attempts:
                 confidence = max(
                     confidence,
-                    min(0.95, abs(expected_success - 0.5) * 2.0 * 0.75 + 0.45),
+                    _approach(0.45, 0.95, abs(expected_success - 0.5) * 2.0 * 0.75),
                 )
-        confidence = _clamp01(confidence)
+        confidence = _unit01(confidence)
 
         self._counter += 1
         attempt = ActionAttempt(
@@ -841,9 +840,9 @@ class ActionFeedback:
         if model.attempts:
             # Blend the domain-declared prior with the learned posterior;
             # more attempts move the estimate toward experience.
-            weight = min(0.85, model.attempts / (model.attempts + 3.0))
-            return _clamp01(declared_p * (1.0 - weight) + model.expected_success * weight)
-        return _clamp01(declared_p)
+            weight = 0.85 * model.attempts / (model.attempts + 3.0)
+            return _unit01(declared_p * (1.0 - weight) + model.expected_success * weight)
+        return _unit01(declared_p)
 
     def _apply_learned_expectation(
         self,
@@ -1304,12 +1303,12 @@ class ActionFeedback:
             if existing is None:
                 hypotheses[cause] = CausalHypothesis(
                     cause=cause,
-                    confidence=_clamp01(confidence),
+                    confidence=_unit01(confidence),
                     evidence=evidence_list[:6],
                     source=source,
                 )
             else:
-                existing.confidence = max(existing.confidence, _clamp01(confidence))
+                existing.confidence = max(existing.confidence, _unit01(confidence))
                 existing.evidence = list(dict.fromkeys([*existing.evidence, *evidence_list]))[:8]
 
         actual_cause = self._actual_cause(actual)
@@ -1373,7 +1372,7 @@ class ActionFeedback:
             cause, count = top
             add(
                 cause,
-                min(0.9, 0.45 + count * 0.1),
+                _approach(0.45, 0.9, count * 0.1),
                 [f"learned failure cause observed {count} times"],
                 "learned",
             )
@@ -1384,7 +1383,7 @@ class ActionFeedback:
                 if edge.relation == RelationType.CAUSES:
                     add(
                         edge.source,
-                        min(0.9, edge.weight),
+                        _approach(0.0, 0.9, edge.weight),
                         [f"{edge.source} causes {outcome_cid}"],
                         "graph",
                     )
@@ -1613,12 +1612,12 @@ class ActionFeedback:
             score = 0.55
         else:
             score = model.expected_success
-            score -= min(0.2, model.discrepancy_ema * 0.15)
+            score -= _approach(0.0, 0.2, model.discrepancy_ema * 0.15)
             top = model.top_failure_cause()
             if top is not None:
                 _cause, count = top
-                score -= min(0.2, count * 0.03)
-            score = _clamp01(score)
+                score -= _approach(0.0, 0.2, count * 0.03)
+            score = _unit01(score)
         if self.value_estimator is not None:
             try:
                 value = self.value_estimator(action)
@@ -1626,7 +1625,7 @@ class ActionFeedback:
                 logger.debug(f"action value estimator failed: {e}")
                 value = None
             if value is not None:
-                score = _clamp01(0.65 * score + 0.35 * _clamp01(value))
+                score = _unit01(0.65 * score + 0.35 * _unit01(value))
         return score
 
     # ─── Convenience execution loop ───────────────────────────────
@@ -1730,11 +1729,28 @@ def model_repeated_failure(model: _ActionModel) -> bool:
     return model.repeated_error_count >= 2
 
 
-def _clamp01(value: float) -> float:
-    """Clamp a score to [0, 1]."""
+def _unit01(value: float) -> float:
+    """Project a score onto its declared [0, 1] range.
+
+    Confidence, success probability, and normalized scores live on
+    the unit interval by definition — this is a projection onto the
+    measure's own range (plus NaN reads as 0), not a control.
+    """
     if not math.isfinite(value):
         return 0.0
     return max(0.0, min(1.0, value))
+
+
+def _approach(base: float, asymptote: float, drive: float) -> float:
+    """Exponential approach to an asymptote — growth with a ceiling.
+
+    ``base + drive`` grows at slope 1 from ``base`` and bends smoothly
+    toward ``asymptote``, never reaching it: confidence and penalty
+    accumulate the way biological quantities saturate — a finite
+    pool filling — not the way a hard cap stops a line.
+    """
+    span = asymptote - base
+    return asymptote - span * math.exp(-max(0.0, drive) / span)
 
 
 def _is_number(value: Any) -> TypeGuard[int | float]:

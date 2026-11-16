@@ -1,4 +1,4 @@
-"""Tests for discord_feed — the webhook transport behind her channels.
+"""Tests for discord.feed — the webhook transport behind her channels.
 
 Network is faked throughout: ``urllib.request.urlopen`` is patched so
 no real webhook is ever contacted.
@@ -16,8 +16,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import discord_feed
-from discord_feed import DiscordFeed, DiscordListener, FeedLogHandler, StderrTee
+import discord.feed
+from discord.feed import DiscordFeed, DiscordListener, FeedLogHandler, StderrTee
 
 URL = "https://discord.invalid/api/webhooks/1/token"
 
@@ -37,7 +37,7 @@ def _make_feed(posts: list[dict], monkeypatch, **kwargs) -> DiscordFeed:
         posts.append(json.loads(req.data.decode("utf-8")))
         return _FakeResponse()
 
-    monkeypatch.setattr(discord_feed.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(discord.feed.urllib.request, "urlopen", fake_urlopen)
     kwargs.setdefault("post_interval", 0.0)
     return DiscordFeed(URL, **kwargs)
 
@@ -61,13 +61,16 @@ def test_post_with_and_without_author(monkeypatch):
     feed = _make_feed(posts, monkeypatch)
     try:
         feed.post("hello there", "Genesis")
-        feed.post("ops metric")
+        # A kind with no default speaker (pulse) leaves the webhook's
+        # own name on the message — no username override is sent.
+        feed.post("ops metric", kind=discord.feed.KIND_PULSE)
         assert _wait_for(lambda: len(posts) >= 2)
     finally:
         feed.close()
     assert posts[0]["username"] == "Genesis"
-    assert posts[0]["content"] == "hello there"
+    assert posts[0]["embeds"][0]["description"] == "hello there"
     assert "username" not in posts[1]
+    assert posts[1]["embeds"][0]["description"] == "ops metric"
 
 
 def test_post_line_classifies_prefixes(monkeypatch):
@@ -80,10 +83,42 @@ def test_post_line_classifies_prefixes(monkeypatch):
         assert _wait_for(lambda: len(posts) >= 3)
     finally:
         feed.close()
-    authors = {p.get("username"): p["content"] for p in posts}
-    assert authors["Genesis"] == "hello there"
-    assert authors["you"] == "hi genesis"
-    assert authors[None] == "[genesis] Daemon started."
+    # Her words ride a card, the human's post as plain text, and
+    # terminal noise attributes to "session" — never to her. A
+    # uniform [tag] lifts into the card header.
+    assert posts[0]["username"] == "Genesis"
+    assert posts[0]["embeds"][0]["description"] == "hello there"
+    assert posts[1]["username"] == "you"
+    assert posts[1]["content"] == "hi genesis"
+    assert posts[2]["username"] == "session"
+    assert posts[2]["embeds"][0]["author"] == {"name": "genesis"}
+    assert posts[2]["embeds"][0]["description"] == "Daemon started."
+
+
+def test_genesis_tilde_split_by_tag(monkeypatch):
+    """genesis~ is not one stream: outward utterances ride her speech
+    card, activity rides teal, thoughts go purple, and untagged
+    chrome is session noise."""
+    posts: list[dict] = []
+    feed = _make_feed(posts, monkeypatch)
+    try:
+        feed.post_line("  genesis~ [question] what is that sound?")
+        feed.post_line("  genesis~ [play] shuffling the board")
+        feed.post_line("  genesis~ [thought] the room is quiet")
+        feed.post_line("  genesis~ (thinking...)")
+        assert _wait_for(lambda: len(posts) >= 4)
+    finally:
+        feed.close()
+    style = discord.feed._KIND_STYLE
+    assert posts[0]["username"] == "Genesis"
+    assert posts[0]["embeds"][0]["color"] == style[discord.feed.KIND_SPEECH][0]
+    assert posts[0]["embeds"][0]["author"] == {"name": "question"}
+    assert posts[1]["embeds"][0]["color"] == style[discord.feed.KIND_ACTIVITY][0]
+    assert posts[1]["embeds"][0]["author"] == {"name": "play"}
+    assert posts[2]["username"] == "Genesis 💭"
+    assert posts[2]["embeds"][0]["author"] == {"name": "thought"}
+    assert posts[3]["username"] == "session"
+    assert posts[3]["embeds"][0]["description"] == "(thinking...)"
 
 
 def test_broadcast_echo_not_mirrored(monkeypatch):
@@ -100,8 +135,46 @@ def test_broadcast_echo_not_mirrored(monkeypatch):
     finally:
         feed.close()
     assert len(posts) == 1
-    assert posts[0]["username"] == "Genesis"
-    assert posts[0]["content"] == "[thought] a musing"
+    # Inner life posts under her marked name, on a purple card whose
+    # [thought] tag lifts out of the text into the card's header.
+    assert posts[0]["username"] == "Genesis 💭"
+    assert posts[0]["embeds"][0]["description"] == "a musing"
+    assert posts[0]["embeds"][0]["author"] == {"name": "thought"}
+
+
+def test_inner_lines_route_to_inner_feed(monkeypatch):
+    """With an inner page configured, her thoughts leave the shared
+    channel entirely — inner world is not the self∩outer overlap."""
+    main_posts: list[dict] = []
+    inner_posts: list[dict] = []
+
+    def fake_urlopen(req, timeout=0):
+        posts = inner_posts if "inner" in req.full_url else main_posts
+        posts.append(json.loads(req.data.decode("utf-8")))
+        return _FakeResponse()
+
+    monkeypatch.setattr(discord.feed.urllib.request, "urlopen", fake_urlopen)
+    main = DiscordFeed(URL, post_interval=0.0)
+    main.inner_feed = DiscordFeed(URL + "-inner", post_interval=0.0)
+    try:
+        main.post_line("  genesis~ [thought] a musing")
+        main.post_line("  genesis~ [dream] something vivid")
+        main.post_line("  genesis> said aloud")
+        main.post_line("  genesis~ [question] are you there?")
+        assert _wait_for(lambda: len(inner_posts) >= 1 and len(main_posts) >= 1)
+        time.sleep(0.3)
+    finally:
+        main.close()  # closing the parent drains the inner page too
+    # Thoughts and dreams go inner; replies and outward questions
+    # stay on the shared page — speech is the overlap, and the two
+    # speech lines coalesce into one blurple card.
+    assert len(main_posts) == 1
+    assert len(inner_posts) == 1
+    assert inner_posts[0]["username"] == "Genesis 💭"
+    assert inner_posts[0]["embeds"][0]["description"] == (
+        "[thought] a musing\n[dream] something vivid"
+    )
+    assert main_posts[0]["embeds"][0]["description"] == ("said aloud\n[question] are you there?")
 
 
 def test_coalesces_same_author_burst(monkeypatch):
@@ -114,10 +187,12 @@ def test_coalesces_same_author_burst(monkeypatch):
         assert _wait_for(lambda: len(posts) >= 1)
     finally:
         feed.close()
-    # The burst should have been coalesced into a single message.
+    # The burst should have been coalesced into a single message, its
+    # uniform [thought] tag lifted into the card header once.
     assert len(posts) == 1
-    assert posts[0]["username"] == "Genesis"
-    assert posts[0]["content"] == ("[thought] one\n[thought] two\n[thought] three")
+    assert posts[0]["username"] == "Genesis 💭"
+    assert posts[0]["embeds"][0]["description"] == "one\ntwo\nthree"
+    assert posts[0]["embeds"][0]["author"] == {"name": "thought"}
 
 
 def test_chunks_long_content(monkeypatch):
@@ -128,8 +203,9 @@ def test_chunks_long_content(monkeypatch):
         assert _wait_for(lambda: len(posts) >= 3)
     finally:
         feed.close()
-    assert all(len(p["content"]) <= discord_feed._MAX_CONTENT for p in posts)
-    assert "".join(p["content"] for p in posts) == "x" * 5000
+    texts = [p["embeds"][0]["description"] for p in posts]
+    assert all(len(t) <= discord.feed._MAX_CONTENT for t in texts)
+    assert "".join(texts) == "x" * 5000
 
 
 def test_mentions_disabled(monkeypatch):
@@ -149,7 +225,7 @@ def test_permanent_http_error_disables_feed(monkeypatch):
     def dead_urlopen(req, timeout=0):
         raise urllib.error.HTTPError(URL, 404, "Not Found", {}, io.BytesIO(b""))
 
-    monkeypatch.setattr(discord_feed.urllib.request, "urlopen", dead_urlopen)
+    monkeypatch.setattr(discord.feed.urllib.request, "urlopen", dead_urlopen)
     feed = DiscordFeed(URL, post_interval=0.0)
     try:
         feed.post("hello")
@@ -164,7 +240,7 @@ def test_log_handler_mirrors_records(monkeypatch):
     posts: list[dict] = []
     feed = _make_feed(posts, monkeypatch)
     handler = FeedLogHandler(feed)
-    test_logger = logging.getLogger("test_discord_feed")
+    test_logger = logging.getLogger("test_discord.feed")
     test_logger.setLevel(logging.INFO)
     test_logger.addHandler(handler)
     try:
@@ -174,7 +250,7 @@ def test_log_handler_mirrors_records(monkeypatch):
         test_logger.removeHandler(handler)
         feed.close()
     assert posts[0]["username"] == "Genesis"
-    assert posts[0]["content"] == "composed words"
+    assert posts[0]["embeds"][0]["description"] == "composed words"
 
 
 def test_stderr_tee_mirrors_and_forwards(monkeypatch):
@@ -190,7 +266,8 @@ def test_stderr_tee_mirrors_and_forwards(monkeypatch):
     finally:
         feed.close()
     assert real.getvalue() == "[genesis] Daemon started.\npartial line\n"
-    assert posts[0]["content"] == "[genesis] Daemon started.\npartial line"
+    assert posts[0]["embeds"][0]["description"] == ("[genesis] Daemon started.\npartial line")
+    assert posts[0]["username"] == "session"
 
 
 def test_blank_lines_skipped(monkeypatch):
@@ -224,7 +301,7 @@ def _capture_requests(calls: list, monkeypatch, reply: bytes = b"{}"):
         )
         return Resp()
 
-    monkeypatch.setattr(discord_feed.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(discord.feed.urllib.request, "urlopen", fake_urlopen)
 
 
 def _multipart_payload(body: bytes) -> dict:
@@ -251,7 +328,9 @@ def test_post_image_sends_multipart(monkeypatch):
     assert call["method"] == "POST"
     assert call["content_type"].startswith("multipart/form-data")
     payload = _multipart_payload(call["body"])
-    assert payload["content"] == "board"
+    embed = payload["embeds"][0]
+    assert embed["description"] == "board"
+    assert embed["image"]["url"] == "attachment://frame.png"
     assert payload["username"] == "Genesis"
     assert payload["attachments"][0]["filename"] == "frame.png"
     assert b"\x89PNG fake" in call["body"]
@@ -308,7 +387,7 @@ def test_live_patch_failure_recreates(monkeypatch):
             raise urllib.error.HTTPError(URL, 404, "gone", {}, io.BytesIO(b""))
         return Resp()
 
-    monkeypatch.setattr(discord_feed.urllib.request, "urlopen", flaky_urlopen)
+    monkeypatch.setattr(discord.feed.urllib.request, "urlopen", flaky_urlopen)
     feed = DiscordFeed(URL, post_interval=0.0)
     try:
         feed.update_live(b"png", caption="t1")
@@ -337,10 +416,11 @@ def test_live_text_creates_then_patches(monkeypatch):
     assert first["method"] == "POST"
     assert "wait=true" in first["url"]
     assert first["content_type"] == "application/json"
-    assert json.loads(first["body"])["content"] == "board one"
+    first_body = json.loads(first["body"])
+    assert first_body["embeds"][0]["description"] == "board one"
     assert second["method"] == "PATCH"
     assert second["url"].endswith("/messages/42")
-    assert json.loads(second["body"])["content"] == "board two"
+    assert json.loads(second["body"])["embeds"][0]["description"] == "board two"
 
 
 def test_live_text_collapses_with_pending_live(monkeypatch):
@@ -485,7 +565,7 @@ def test_listener_resolve_channel_from_webhook(monkeypatch):
         calls.append(req.full_url)
         return Resp()
 
-    monkeypatch.setattr(discord_feed.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(discord.feed.urllib.request, "urlopen", fake_urlopen)
     assert DiscordListener._resolve_channel(URL) == "777"
     assert calls == [URL]
 
@@ -515,7 +595,7 @@ def test_close_binds_inflight_post_to_drain_deadline(monkeypatch):
     """close() drains for _DRAIN_DEADLINE at most — an in-flight POST
     expires *with* the deadline instead of parking the join for the
     full urlopen bound on top of it."""
-    monkeypatch.setattr(discord_feed.urllib.request, "urlopen", _hanging_urlopen)
+    monkeypatch.setattr(discord.feed.urllib.request, "urlopen", _hanging_urlopen)
     feed = DiscordFeed(URL, post_interval=0.0)
     feed.post("pending line")
     time.sleep(0.3)  # let the poster enter the hanging request
@@ -525,7 +605,7 @@ def test_close_binds_inflight_post_to_drain_deadline(monkeypatch):
     # The thread must be *dead* when close() returns — the pre-fix
     # join expired at DRAIN+2 while the wedged request ran on to 15 s.
     assert not feed._thread.is_alive()
-    assert elapsed < discord_feed._DRAIN_DEADLINE + 2.0
+    assert elapsed < discord.feed._DRAIN_DEADLINE + 2.0
 
 
 def test_close_interrupts_backoff_sleep(monkeypatch):
@@ -535,7 +615,7 @@ def test_close_interrupts_backoff_sleep(monkeypatch):
     def rate_limited(req, timeout=0):
         raise urllib.error.HTTPError(URL, 429, "rl", {}, io.BytesIO(b'{"retry_after": 600}'))
 
-    monkeypatch.setattr(discord_feed.urllib.request, "urlopen", rate_limited)
+    monkeypatch.setattr(discord.feed.urllib.request, "urlopen", rate_limited)
     feed = DiscordFeed(URL, post_interval=0.0)
     feed.post("x")
     # Wait for the first POST to fail so the poster is parked in
@@ -550,7 +630,7 @@ def test_close_interrupts_backoff_sleep(monkeypatch):
 def test_listener_stop_interrupts_inflight_get(monkeypatch):
     """stop() cuts an in-flight poll — the ear must not hold
     teardown for the rest of a wedged urlopen's bound."""
-    monkeypatch.setattr(discord_feed.urllib.request, "urlopen", _hanging_urlopen)
+    monkeypatch.setattr(discord.feed.urllib.request, "urlopen", _hanging_urlopen)
     listener = DiscordListener("tok", "wh-url", lambda *a: None, poll_interval=0.01)
     monkeypatch.setattr(listener, "_resolve_channel", lambda url, stop=None: "chan")
     listener.start()
@@ -566,10 +646,6 @@ def test_listener_stop_interrupts_inflight_get(monkeypatch):
 # ---------------------------------------------------------------
 
 
-def _last_text(posts: list[dict]) -> str:
-    return posts[-1]["content"]
-
-
 def test_post_line_strips_ansi_dim_and_colour(monkeypatch):
     posts: list[dict] = []
     feed = _make_feed(posts, monkeypatch)
@@ -578,7 +654,7 @@ def test_post_line_strips_ansi_dim_and_colour(monkeypatch):
         assert _wait_for(lambda: posts)
     finally:
         feed.close()
-    content = _last_text(posts)
+    content = posts[-1]["embeds"][0]["description"]
     assert "\x1b" not in content
     assert content == "feeling: calm · confidence: 0.72"
 
@@ -592,7 +668,7 @@ def test_post_line_collapses_carriage_return_rewrites(monkeypatch):
     finally:
         feed.close()
     # only the final frame of the in-place rewrite survives
-    assert _last_text(posts) == "working... done"
+    assert posts[-1]["embeds"][0]["description"] == "working... done"
 
 
 def test_classify_sees_prefix_past_ansi(monkeypatch):
@@ -605,7 +681,7 @@ def test_classify_sees_prefix_past_ansi(monkeypatch):
         feed.close()
     # dim-wrapped prefix still classifies as her voice, escape-free
     assert posts[-1].get("username") == "Genesis"
-    assert _last_text(posts) == "hello there"
+    assert posts[-1]["embeds"][0]["description"] == "hello there"
 
 
 def test_box_drawing_panel_posts_fenced(monkeypatch):
@@ -616,7 +692,7 @@ def test_box_drawing_panel_posts_fenced(monkeypatch):
         assert _wait_for(lambda: posts)
     finally:
         feed.close()
-    content = _last_text(posts)
+    content = posts[-1]["embeds"][0]["description"]
     assert content.startswith("```\n") and content.endswith("\n```")
     assert "│  sal=0.42" in content
 
@@ -629,4 +705,4 @@ def test_clean_is_noop_on_plain_text(monkeypatch):
         assert _wait_for(lambda: posts)
     finally:
         feed.close()
-    assert _last_text(posts) == "a plain sentence · with a middot"
+    assert posts[-1]["embeds"][0]["description"] == "a plain sentence · with a middot"

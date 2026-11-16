@@ -19,11 +19,22 @@ way frontal input biases LIP (biased competition).
 
 from __future__ import annotations
 
+import math
 import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 import numpy as np
+
+
+def _finite_or(value: float, default: float) -> float:
+    """Return finite floats; malformed/non-finite inputs use ``default``."""
+    try:
+        result = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return default
+    return result if math.isfinite(result) else default
+
 
 if TYPE_CHECKING:
     from occipital_lobe.v1 import VisualField
@@ -131,11 +142,8 @@ class SaliencyMap:
         Aston-Jones & Cohen (2005): task-relevant peaks win harder,
         background salience loses contrast.
         """
-        import math
-
-        if not math.isfinite(level):
-            return
-        self._ne_gamma = 0.5 + max(0.0, min(1.0, float(level)))
+        level = _finite_or(level, 0.0)
+        self._ne_gamma = max(0.0, 0.5 + level)
 
     # ── Feature maps ─────────────────────────────────────────────
 
@@ -250,7 +258,7 @@ class SaliencyMap:
 
         result = SaliencyResult(
             priority=priority,
-            scene_salience=min(1.0, float(priority.max()) if priority.size else 0.0),
+            scene_salience=_finite_or(priority.max() if priority.size else 0.0, 0.0),
             feature_weights=weights,
         )
         self.last = result

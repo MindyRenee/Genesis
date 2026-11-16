@@ -746,7 +746,7 @@ mod tests {
         let rest = rest_state.nak_pump_rate;
 
         let mut neuro_glu = NeurochemicalVector::new(0);
-        neuro_glu.apply_impulse_capped(NeurochemicalId::Glutamate, 2.0, 0);
+        neuro_glu.apply_impulse(NeurochemicalId::Glutamate, 2.0, 0);
         // Impulses touch level/velocity directly; one neuro tick
         // refreshes effective levels so the ion layer sees the drive.
         neuro_glu.tick_with_params(&NeuroTickParams::DEFAULT);

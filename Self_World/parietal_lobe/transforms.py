@@ -1,17 +1,22 @@
-"""Transformation DSL — the hypothesis space for spatial reasoning.
+"""Transformation operators — the spatial transformation group.
 
-A ``Transform`` is a named, parameterized grid→grid operation. The
-spatial reasoner solves a task by finding a *sequence* of transforms
-that maps every training input to its output. This is the perceptual
-analogue of the concept network's typed edges: where semantic reasoning
-traverses relations between concepts, spatial reasoning composes
-operations over scenes.
+A ``Transform`` is a named, parameterized grid→grid operation — an
+element of a transformation group acting on the colored lattice.
+Rotations and reflections are the dihedral group D₄; translations are
+T(ℤ²); recolors act on the color fiber. This is the perceptual
+analogue of the concept network's typed edges: where semantic
+reasoning traverses relations between concepts, spatial reasoning
+composes group actions over scenes — the same coordinate-transformation
+repertoire the intraparietal sulcus computes in mental rotation
+(Zacks et al., 2008).
 
-Each proposal function inspects the training pairs and emits the
-transform instances that could plausibly explain them (e.g. a recolor
-map is only proposed when every input/output pair has the same cell
-geometry). The solver then verifies candidates by exact replay — a
-hypothesis is only kept if it reproduces *all* training outputs.
+Given observed transitions (before → after), each proposal function
+infers the group elements consistent with the evidence — e.g. a
+recolor map is only proposed when every transition preserves cell
+geometry. This is operator inference, not guessing: the proposer reads
+parameters off the observed change (delta.py). The inductive reasoner
+then verifies candidates by exact replay — a hypothesis is only kept
+if it reproduces *every* observed after.
 """
 
 from __future__ import annotations
@@ -22,14 +27,14 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from fractions import Fraction
 
-from .delta import perceive_task
+from .delta import perceive_changes
 from .grid import Grid
 from .scene import PerceivedObject, _spans_overlap, perceive
 
 _logger = logging.getLogger(__name__)
 
-# A training pair: (input grid, output grid).
-Example = tuple[Grid, Grid]
+# An observed transition: (perception before, perception after).
+Transition = tuple[Grid, Grid]
 
 TransformFn = Callable[[Grid], Grid]
 
@@ -57,19 +62,21 @@ class Transform:
         return self.apply(grid)
 
 
-# ── Proposals ─────────────────────────────────────────────────────
+# ── Operator inference ────────────────────────────────────────────
 #
-# Each proposer takes the training pairs and returns the transform
-# instances consistent with what the pairs show. Proposers are the
+# Each proposer takes the observed transitions and returns the group
+# elements consistent with what they show. Proposers are the
 # perceptual hypothesis generators: they look at evidence and suggest
-# candidate operations. None of them verify — that is the solver's job.
+# candidate operations. None of them verify — that is the reasoner's
+# job, and it is what makes the split honest: perception proposes,
+# frontal cortex disposes.
 
 
-def _propose_identity(_examples: list[Example]) -> list[Transform]:
+def _propose_identity(_transitions: list[Transition]) -> list[Transform]:
     return [Transform("identity", lambda g: g)]
 
 
-def _propose_rotations(_examples: list[Example]) -> list[Transform]:
+def _propose_rotations(_transitions: list[Transition]) -> list[Transform]:
     return [
         Transform("rotate90", lambda g: g.rotate90(1), {"turns": 1}),
         Transform("rotate180", lambda g: g.rotate90(2), {"turns": 2}),
@@ -77,7 +84,7 @@ def _propose_rotations(_examples: list[Example]) -> list[Transform]:
     ]
 
 
-def _propose_reflections(_examples: list[Example]) -> list[Transform]:
+def _propose_reflections(_transitions: list[Transition]) -> list[Transform]:
     return [
         Transform("reflect_h", lambda g: g.reflect_h()),
         Transform("reflect_v", lambda g: g.reflect_v()),
@@ -85,7 +92,7 @@ def _propose_reflections(_examples: list[Example]) -> list[Transform]:
     ]
 
 
-def _propose_recolor(examples: list[Example]) -> list[Transform]:
+def _propose_recolor(transitions: list[Transition]) -> list[Transform]:
     """Propose the color map when every pair preserves cell geometry.
 
     If input and output are the same shape with the same pattern of
@@ -94,7 +101,7 @@ def _propose_recolor(examples: list[Example]) -> list[Transform]:
     across all of them.
     """
     mapping: dict[int, int] = {}
-    for inp, out in examples:
+    for inp, out in transitions:
         if inp.shape != out.shape:
             return []
         for r, c, v in inp.iter_cells():
@@ -107,11 +114,11 @@ def _propose_recolor(examples: list[Example]) -> list[Transform]:
     return [Transform("recolor", lambda g: g.recolor(mapping), {"map": mapping})]
 
 
-def _propose_crop(examples: list[Example]) -> list[Transform]:
+def _propose_crop(transitions: list[Transition]) -> list[Transform]:
     """Propose cropping to content when every output is smaller."""
     if not all(
         out.shape[0] <= inp.shape[0] and out.shape[1] <= inp.shape[1] and out.shape != inp.shape
-        for inp, out in examples
+        for inp, out in transitions
     ):
         return []
     return [
@@ -120,10 +127,10 @@ def _propose_crop(examples: list[Example]) -> list[Transform]:
     ]
 
 
-def _propose_scale(examples: list[Example]) -> list[Transform]:
+def _propose_scale(transitions: list[Transition]) -> list[Transform]:
     """Propose integer upscaling when output dims are a constant multiple."""
     ratios: set[int] = set()
-    for inp, out in examples:
+    for inp, out in transitions:
         if inp.width == 0 or out.width % inp.width != 0 or out.height % inp.height != 0:
             return []
         rw, rh = out.width // inp.width, out.height // inp.height
@@ -136,9 +143,9 @@ def _propose_scale(examples: list[Example]) -> list[Transform]:
     return [Transform("scale", lambda g: g.scale(factor), {"factor": factor})]
 
 
-def _propose_tile(examples: list[Example]) -> list[Transform]:
+def _propose_tile(transitions: list[Transition]) -> list[Transform]:
     """Propose tiling when output dims are a constant multiple."""
-    for inp, out in examples:
+    for inp, out in transitions:
         if (
             inp.height == 0
             or inp.width == 0
@@ -149,8 +156,8 @@ def _propose_tile(examples: list[Example]) -> list[Transform]:
         rr, rc = out.height // inp.height, out.width // inp.width
         if rr == 1 and rc == 1:
             return []
-    rr = examples[0][1].height // examples[0][0].height
-    rc = examples[0][1].width // examples[0][0].width
+    rr = transitions[0][1].height // transitions[0][0].height
+    rc = transitions[0][1].width // transitions[0][0].width
     return [Transform("tile", lambda g: g.tile(rr, rc), {"reps": (rr, rc)})]
 
 
@@ -1504,7 +1511,7 @@ def instantiate(family: str, params: dict[str, object]) -> Transform | None:
     Used by schema induction: a learned rule like
     ``fill_enclosed(color=4)`` abstracts to "fill enclosed regions
     with *some* color", and this binds the free parameters to new
-    values observed in a later task. Returns None for families that
+    values observed in a later instance. Returns None for families that
     can't be re-parameterized (e.g. ``recolor``, whose map is derived
     from evidence rather than chosen).
 
@@ -1768,7 +1775,7 @@ def _table_param_builders(
     }
 
 
-def _propose_gravity(examples: list[Example]) -> list[Transform]:
+def _propose_gravity(transitions: list[Transition]) -> list[Transform]:
     """Propose gravity: objects fall to an edge within the frame."""
     return [
         Transform(
@@ -1780,13 +1787,13 @@ def _propose_gravity(examples: list[Example]) -> list[Transform]:
     ]
 
 
-def _propose_erase_color(examples: list[Example]) -> list[Transform]:
+def _propose_erase_color(transitions: list[Transition]) -> list[Transform]:
     """Propose erasing a color when outputs lose a color the inputs have."""
     out_colors = set()
-    for _, out in examples:
+    for _, out in transitions:
         out_colors |= set(out.colors())
     candidates: set[int] = set()
-    for inp, _ in examples:
+    for inp, _ in transitions:
         candidates |= set(inp.colors()) - out_colors
     candidates.discard(0)
     return [
@@ -1799,7 +1806,7 @@ def _propose_erase_color(examples: list[Example]) -> list[Transform]:
     ]
 
 
-def _propose_keep_object(examples: list[Example]) -> list[Transform]:
+def _propose_keep_object(transitions: list[Transition]) -> list[Transform]:
     """Propose keeping only the largest/smallest object, cropped to it."""
 
     def keep(grid: Grid, which: str) -> Grid:
@@ -1816,7 +1823,7 @@ def _propose_keep_object(examples: list[Example]) -> list[Transform]:
     ]
 
 
-def _propose_object_recolor(examples: list[Example]) -> list[Transform]:
+def _propose_object_recolor(transitions: list[Transition]) -> list[Transform]:
     """Propose recoloring a selected object (largest/smallest) to a color.
 
     Catches the common pattern where the output keeps the input's
@@ -1824,7 +1831,7 @@ def _propose_object_recolor(examples: list[Example]) -> list[Transform]:
     can't express when that color appears elsewhere.
     """
     new_colors: set[int] = set()
-    for inp, out in examples:
+    for inp, out in transitions:
         if inp.shape != out.shape:
             continue
         for r, c, v in out.iter_cells():
@@ -1845,7 +1852,7 @@ def _propose_object_recolor(examples: list[Example]) -> list[Transform]:
     ]
 
 
-def _propose_fill_enclosed(examples: list[Example]) -> list[Transform]:
+def _propose_fill_enclosed(transitions: list[Transition]) -> list[Transform]:
     """Propose filling enclosed background regions with a color.
 
     A background cell is enclosed if it can't reach the grid border
@@ -1853,7 +1860,7 @@ def _propose_fill_enclosed(examples: list[Example]) -> list[Transform]:
     the box" operation.
     """
     new_colors: set[int] = set()
-    for inp, out in examples:
+    for inp, out in transitions:
         if inp.shape != out.shape:
             continue
         for r, c, v in out.iter_cells():
@@ -1873,7 +1880,7 @@ def _propose_fill_enclosed(examples: list[Example]) -> list[Transform]:
     ]
 
 
-def _propose_attract_marks(examples: list[Example]) -> list[Transform]:
+def _propose_attract_marks(transitions: list[Transition]) -> list[Transform]:
     """Propose sliding isolated marks onto same-colored lines.
 
     When a grid has colored lines (solid runs of length >= 2 along a
@@ -1882,7 +1889,7 @@ def _propose_attract_marks(examples: list[Example]) -> list[Transform]:
     (or column) to the cell adjacent to the nearest same-colored
     line. Marks with no matching line are erased.
     """
-    for inp, out in examples:
+    for inp, out in transitions:
         if inp.shape != out.shape:
             return []
 
@@ -1960,7 +1967,7 @@ def _propose_attract_marks(examples: list[Example]) -> list[Transform]:
     return [Transform("attract_marks", apply, {})]
 
 
-def _propose_denoise(examples: list[Example]) -> list[Transform]:
+def _propose_denoise(transitions: list[Transition]) -> list[Transform]:
     """Propose absorbing minority colors into a dominant structure.
 
     When a grid holds a dominant non-background color (the structure)
@@ -1970,7 +1977,7 @@ def _propose_denoise(examples: list[Example]) -> list[Transform]:
     dominant above and below — lies inside the silhouette and takes
     its color; unbracketed noise is erased.
     """
-    for inp, out in examples:
+    for inp, out in transitions:
         if inp.shape != out.shape:
             return []
 
@@ -2028,7 +2035,7 @@ def _propose_denoise(examples: list[Example]) -> list[Transform]:
     return [Transform("denoise", apply, {})]
 
 
-def _propose_periodic_completion(examples: list[Example]) -> list[Transform]:
+def _propose_periodic_completion(transitions: list[Transition]) -> list[Transform]:
     """Propose completing a periodic pattern.
 
     When the output equals the input plus filled background cells and
@@ -2084,7 +2091,7 @@ def _propose_periodic_completion(examples: list[Example]) -> list[Transform]:
         if all(
             inp.shape == out.shape
             and complete(inp, mask if mask is not None else rare_mask(inp)) == out
-            for inp, out in examples
+            for inp, out in transitions
         ):
             if mask is not None:
 
@@ -2101,7 +2108,7 @@ def _propose_periodic_completion(examples: list[Example]) -> list[Transform]:
     return transforms
 
 
-def _propose_translate_complete(examples: list[Example]) -> list[Transform]:
+def _propose_translate_complete(transitions: list[Transition]) -> list[Transform]:
     """Propose completing a pattern under a translation vector.
 
     Generalizes axis-aligned period completion to diagonal lattices:
@@ -2128,7 +2135,7 @@ def _propose_translate_complete(examples: list[Example]) -> list[Transform]:
     for mask in mask_variants:
         # The lattice scan is expensive — run it on the first pair
         # only, then verify the resulting transform on the rest.
-        first_inp, first_out = examples[0]
+        first_inp, first_out = transitions[0]
         if first_inp.shape != first_out.shape:
             continue
         mask0 = mask if mask is not None else rare_mask(first_inp)
@@ -2139,14 +2146,14 @@ def _propose_translate_complete(examples: list[Example]) -> list[Transform]:
             def apply(g: Grid, m: frozenset[int] = mask) -> Grid:
                 return complete(g, m) or g
 
-            if all(apply(inp) == out for inp, out in examples[1:]):
+            if all(apply(inp) == out for inp, out in transitions[1:]):
                 transforms.append(Transform("translate_complete", apply, {}))
         else:
 
             def apply_masked(g: Grid) -> Grid:
                 return complete(g, rare_mask(g)) or g
 
-            if all(apply_masked(inp) == out for inp, out in examples[1:]):
+            if all(apply_masked(inp) == out for inp, out in transitions[1:]):
                 transforms.append(Transform("translate_complete_masked", apply_masked, {}))
     return transforms
 
@@ -2250,7 +2257,7 @@ def _lattice_complete(g: Grid, unknowns: frozenset[int]) -> Grid | None:
     return None
 
 
-def _propose_symmetrize(examples: list[Example]) -> list[Transform]:
+def _propose_symmetrize(transitions: list[Transition]) -> list[Transform]:
     """Propose completing a partial symmetry.
 
     When every output strictly contains the input's cells and the
@@ -2260,9 +2267,9 @@ def _propose_symmetrize(examples: list[Example]) -> list[Transform]:
     """
     # The output strictly contains the input: every *non-background*
     # input cell keeps its value. Background cells are exactly what a
-    # completion task paints — checking them here would reject the
-    # entire task class this rule exists for.
-    for inp, out in examples:
+    # completion transition paints — checking them here would reject the
+    # entire transition class this rule exists for.
+    for inp, out in transitions:
         if inp.shape != out.shape:
             return []
         bg = inp.most_common_color()
@@ -2302,17 +2309,17 @@ def _mk_symmetrize(axis: str) -> TransformFn:
     return apply
 
 
-def _propose_delta_completion(examples: list[Example]) -> list[Transform]:
+def _propose_delta_completion(transitions: list[Transition]) -> list[Transform]:
     """Propose completion transforms from *perceived* delta structure.
 
     Instead of each rule passing a private gate, the delta layer
-    (``delta.py``) describes what the task did — cells only added — and
+    (``delta.py``) describes what the transition did — cells only added — and
     which geometric relation the added cells bear to the input's
-    existing cells. When every training pair's additions are exactly
+    existing cells. When every observed transition's additions are exactly
     the input seen through one relation, the matching completion rule
     is proposed directly.
     """
-    obs = perceive_task(examples)
+    obs = perceive_changes(transitions)
     _REL_TO_AXIS = {
         "mirror_v": "v",
         "mirror_h": "h",
@@ -2325,12 +2332,12 @@ def _propose_delta_completion(examples: list[Example]) -> list[Transform]:
             _mk_symmetrize(axis),
             {"axis": axis, "from": "delta"},
         )
-        for rel in sorted(obs.added_relations(examples))
+        for rel in sorted(obs.added_relations(transitions))
         if (axis := _REL_TO_AXIS.get(rel)) is not None
     ]
 
 
-def _propose_connect_aligned(examples: list[Example]) -> list[Transform]:
+def _propose_connect_aligned(transitions: list[Transition]) -> list[Transform]:
     """Propose drawing a line between same-colored aligned objects.
 
     When two objects share a row-span or column-span and the output
@@ -2338,7 +2345,7 @@ def _propose_connect_aligned(examples: list[Example]) -> list[Transform]:
     straight line of the objects' color across the gap.
     """
     # Only viable when every output strictly contains the input's cells.
-    for inp, out in examples:
+    for inp, out in transitions:
         if inp.shape != out.shape:
             return []
         for r, c, v in inp.iter_cells():
@@ -2375,7 +2382,7 @@ def _propose_connect_aligned(examples: list[Example]) -> list[Transform]:
     return [Transform("connect_aligned", apply)]
 
 
-def _propose_select_by_color(examples: list[Example]) -> list[Transform]:
+def _propose_select_by_color(transitions: list[Transition]) -> list[Transform]:
     """Propose cropping to the object(s) of a specific color.
 
     `keep_largest`/`keep_smallest` select by size; many tasks
@@ -2383,11 +2390,11 @@ def _propose_select_by_color(examples: list[Example]) -> list[Transform]:
     bbox of all objects of that color.
     """
     if not all(
-        out.shape[0] <= inp.shape[0] and out.shape[1] <= inp.shape[1] for inp, out in examples
+        out.shape[0] <= inp.shape[0] and out.shape[1] <= inp.shape[1] for inp, out in transitions
     ):
         return []
     colors: set[int] = set()
-    for inp, _ in examples:
+    for inp, _ in transitions:
         colors |= set(inp.colors())
     colors.discard(0)
 
@@ -2401,14 +2408,14 @@ def _propose_select_by_color(examples: list[Example]) -> list[Transform]:
     ]
 
 
-def _propose_mirror_copy(examples: list[Example]) -> list[Transform]:
+def _propose_mirror_copy(transitions: list[Transition]) -> list[Transform]:
     """Propose adding a mirrored copy of each object beside itself.
 
     Catches "the output adds a reflected/rotated twin of the object"
     — a relational operation (the copy's position depends on the
     original's), not a unary grid transform.
     """
-    for inp, out in examples:
+    for inp, out in transitions:
         if inp.shape != out.shape:
             return []
         for r, c, v in inp.iter_cells():
@@ -2445,14 +2452,14 @@ def _propose_mirror_copy(examples: list[Example]) -> list[Transform]:
     ]
 
 
-def _propose_recolor_touching(examples: list[Example]) -> list[Transform]:
+def _propose_recolor_touching(transitions: list[Transition]) -> list[Transform]:
     """Propose recoloring objects that touch a reference object.
 
     "The objects touching the frame turn green" — recolor conditioned
     on a spatial relation, not on color or size alone.
     """
     new_colors: set[int] = set()
-    for inp, out in examples:
+    for inp, out in transitions:
         if inp.shape != out.shape:
             continue
         for r, c, v in out.iter_cells():
@@ -2483,16 +2490,16 @@ def _propose_recolor_touching(examples: list[Example]) -> list[Transform]:
     return [Transform("recolor_touching", make(c), {"color": c}) for c in sorted(new_colors)]
 
 
-def _propose_gravity_color(examples: list[Example]) -> list[Transform]:
+def _propose_gravity_color(transitions: list[Transition]) -> list[Transform]:
     """Propose moving only objects of a specific color to an edge.
 
     Conditional gravity: the marked objects fall, others stay put.
     """
-    for inp, out in examples:
+    for inp, out in transitions:
         if inp.shape != out.shape:
             return []
     colors: set[int] = set()
-    for inp, _ in examples:
+    for inp, _ in transitions:
         colors |= set(inp.colors())
     colors.discard(0)
     if not colors:
@@ -2509,18 +2516,18 @@ def _propose_gravity_color(examples: list[Example]) -> list[Transform]:
     ]
 
 
-def _propose_mark_uniform(examples: list[Example]) -> list[Transform]:
+def _propose_mark_uniform(transitions: list[Transition]) -> list[Transform]:
     """Propose marking uniform rows/columns with a single color.
 
     Applies when the output keeps the input's shape but its colors
     collapse to at most {0, mark} — the signature of a line-selector.
     The mark color is read from the outputs.
     """
-    for inp, out in examples:
+    for inp, out in transitions:
         if inp.shape != out.shape:
             return []
     marks: set[int] = set()
-    for _, out in examples:
+    for _, out in transitions:
         oc = set(out.colors())
         if len(oc - {0}) > 1:
             return []
@@ -2538,18 +2545,18 @@ def _propose_mark_uniform(examples: list[Example]) -> list[Transform]:
     ]
 
 
-def _propose_shift(examples: list[Example]) -> list[Transform]:
+def _propose_shift(transitions: list[Transition]) -> list[Transform]:
     """Propose rigid translations by a small fixed offset.
 
-    The offset is read from the examples: for the first pair, every
+    The offset is read from the transitions: for the first pair, every
     (dr, dc) that could map a non-zero cell to a same-colored output
     cell is a candidate; candidates are kept only if consistent
     across all pairs' cell colorings.
     """
-    for inp, out in examples:
+    for inp, out in transitions:
         if inp.shape != out.shape:
             return []
-    inp, out = examples[0]
+    inp, out = transitions[0]
     candidates: set[tuple[int, int]] = set()
     for r, c, v in inp.iter_cells():
         if v == 0:
@@ -2557,7 +2564,7 @@ def _propose_shift(examples: list[Example]) -> list[Transform]:
         for rr, cc, ov in out.iter_cells():
             if ov == v:
                 candidates.add((rr - r, cc - c))
-    for inp, out in examples[1:]:
+    for inp, out in transitions[1:]:
         keep: set[tuple[int, int]] = set()
         for dr, dc in candidates:
             if all(
@@ -2590,25 +2597,25 @@ def _propose_shift(examples: list[Example]) -> list[Transform]:
     ]
 
 
-def _propose_self_tile(examples: list[Example]) -> list[Transform]:
+def _propose_self_tile(transitions: list[Transition]) -> list[Transform]:
     """Propose self-stenciling when output dims are input dims squared."""
-    for inp, out in examples:
+    for inp, out in transitions:
         if out.height != inp.height * inp.height or out.width != inp.width * inp.width:
             return []
     return [Transform("self_tile", _mk_self_tile(), {})]
 
 
-def _propose_mark_diagonals(examples: list[Example]) -> list[Transform]:
+def _propose_mark_diagonals(transitions: list[Transition]) -> list[Transform]:
     """Propose filling diagonal neighbors of marks with a new color.
 
     Signature: same shape, and the output introduces a color absent
     from the inputs — the mark that appeared.
     """
-    for inp, out in examples:
+    for inp, out in transitions:
         if inp.shape != out.shape:
             return []
     new_colors: set[int] = set()
-    for inp, out in examples:
+    for inp, out in transitions:
         new_colors |= set(out.colors()) - set(inp.colors())
     new_colors.discard(0)
     return [
@@ -2621,18 +2628,18 @@ def _propose_mark_diagonals(examples: list[Example]) -> list[Transform]:
     ]
 
 
-def _propose_corner_completion(examples: list[Example]) -> list[Transform]:
+def _propose_corner_completion(transitions: list[Transition]) -> list[Transform]:
     """Propose closing the open corner of 2×2 blocks.
 
     Signature: same shape, and the output only *adds* cells — each
     the missing fourth of a 2×2 square whose other three cells share
     one color. The mark color is read off the cells that appeared.
     """
-    for inp, out in examples:
+    for inp, out in transitions:
         if inp.shape != out.shape:
             return []
     new_colors: set[int] = set()
-    for inp, out in examples:
+    for inp, out in transitions:
         for r, c, v in out.iter_cells():
             if v != inp.at(r, c):
                 new_colors.add(v)
@@ -2647,12 +2654,12 @@ def _propose_corner_completion(examples: list[Example]) -> list[Transform]:
     ]
 
 
-def _propose_extend_down(examples: list[Example]) -> list[Transform]:
+def _propose_extend_down(transitions: list[Transition]) -> list[Transform]:
     """Propose periodic downward growth when the output is the input
-    plus extra rows. The row count is read from the examples; the
+    plus extra rows. The row count is read from the transitions; the
     period is detected per grid at apply time."""
     n: int | None = None
-    for inp, out in examples:
+    for inp, out in transitions:
         if out.width != inp.width or out.height <= inp.height:
             return []
         extra = out.height - inp.height
@@ -2665,24 +2672,24 @@ def _propose_extend_down(examples: list[Example]) -> list[Transform]:
     return [Transform("extend_down", _mk_extend_down(n), {"n": n})]
 
 
-def _propose_repeat_down(examples: list[Example]) -> list[Transform]:
+def _propose_repeat_down(transitions: list[Transition]) -> list[Transform]:
     """Propose doubling downward when output height is exactly 2×."""
-    for inp, out in examples:
+    for inp, out in transitions:
         if out.width != inp.width or out.height != 2 * inp.height:
             return []
     return [Transform("repeat_down", _mk_repeat_down(), {})]
 
 
-def _propose_intersect_halves(examples: list[Example]) -> list[Transform]:
+def _propose_intersect_halves(transitions: list[Transition]) -> list[Transform]:
     """Propose divider-intersection when every input has a full
     monochrome nonzero divider line and the output is smaller."""
-    for inp, out in examples:
+    for inp, out in transitions:
         if _divider_index(inp) is None:
             return []
         if out.height >= inp.height and out.width >= inp.width:
             return []
     colors: set[int] = set()
-    for _, out in examples:
+    for _, out in transitions:
         colors |= set(out.colors())
     colors.discard(0)
     return [
@@ -2695,16 +2702,16 @@ def _propose_intersect_halves(examples: list[Example]) -> list[Transform]:
     ]
 
 
-def _propose_empty_halves(examples: list[Example]) -> list[Transform]:
+def _propose_empty_halves(transitions: list[Transition]) -> list[Transform]:
     """Propose divider-NOR: same shape gate as intersect_halves, but
     the output marks positions empty in both halves."""
-    for inp, out in examples:
+    for inp, out in transitions:
         if _divider_index(inp) is None:
             return []
         if out.height >= inp.height and out.width >= inp.width:
             return []
     colors: set[int] = set()
-    for _, out in examples:
+    for _, out in transitions:
         colors |= set(out.colors())
     colors.discard(0)
     return [
@@ -2717,16 +2724,16 @@ def _propose_empty_halves(examples: list[Example]) -> list[Transform]:
     ]
 
 
-def _propose_diff_halves(examples: list[Example]) -> list[Transform]:
+def _propose_diff_halves(transitions: list[Transition]) -> list[Transform]:
     """Propose divider-XOR: same shape gate as intersect_halves, but
     the output marks positions where the halves differ."""
-    for inp, out in examples:
+    for inp, out in transitions:
         if _divider_index(inp) is None:
             return []
         if out.height >= inp.height and out.width >= inp.width:
             return []
     colors: set[int] = set()
-    for _, out in examples:
+    for _, out in transitions:
         colors |= set(out.colors())
     colors.discard(0)
     return [
@@ -2739,10 +2746,10 @@ def _propose_diff_halves(examples: list[Example]) -> list[Transform]:
     ]
 
 
-def _propose_pick_quadrant(examples: list[Example]) -> list[Transform]:
+def _propose_pick_quadrant(transitions: list[Transition]) -> list[Transform]:
     """Propose quadrant-picking when every input has a divider cross
     and the output is a smaller rectangle."""
-    for inp, out in examples:
+    for inp, out in transitions:
         if _cross_lines(inp) is None:
             return []
         if out.height >= inp.height or out.width >= inp.width:
@@ -2750,10 +2757,10 @@ def _propose_pick_quadrant(examples: list[Example]) -> list[Transform]:
     return [Transform("pick_quadrant", _mk_pick_quadrant(), {})]
 
 
-def _propose_shear(examples: list[Example]) -> list[Transform]:
+def _propose_shear(transitions: list[Transition]) -> list[Transform]:
     """Propose corner-pinned shears by one cell in each cardinal and
     diagonal direction — verification decides which, if any."""
-    for inp, out in examples:
+    for inp, out in transitions:
         if inp.shape != out.shape:
             return []
     return [
@@ -2764,10 +2771,10 @@ def _propose_shear(examples: list[Example]) -> list[Transform]:
     ]
 
 
-def _propose_dual_frame(examples: list[Example]) -> list[Transform]:
+def _propose_dual_frame(transitions: list[Transition]) -> list[Transform]:
     """Propose the two-dot frame when every input holds exactly two
     non-zero cells."""
-    for inp, out in examples:
+    for inp, out in transitions:
         if inp.shape != out.shape:
             return []
         if sum(1 for _, _, v in inp.iter_cells() if v != 0) != 2:
@@ -2775,22 +2782,22 @@ def _propose_dual_frame(examples: list[Example]) -> list[Transform]:
     return [Transform("dual_frame", _mk_dual_frame(), {})]
 
 
-def _propose_align_tops(examples: list[Example]) -> list[Transform]:
+def _propose_align_tops(transitions: list[Transition]) -> list[Transform]:
     """Propose aligning every object's top edge to a reference
     color's top edge — one candidate per non-background color."""
-    for inp, out in examples:
+    for inp, out in transitions:
         if inp.shape != out.shape:
             return []
     colors: set[int] = set()
-    for inp, _ in examples:
+    for inp, _ in transitions:
         colors |= {v for _, _, v in inp.iter_cells() if v != 0}
     return [Transform("align_tops", _mk_align_tops(c), {"color": c}) for c in sorted(colors)]
 
 
-def _propose_unwind_tile(examples: list[Example]) -> list[Transform]:
+def _propose_unwind_tile(transitions: list[Transition]) -> list[Transform]:
     """Propose quadrant-tile reconstruction when the output is half
     the input's content box in each dimension."""
-    for inp, out in examples:
+    for inp, out in transitions:
         box = inp.crop_to_content()
         if (
             box.height != box.width
@@ -2802,10 +2809,10 @@ def _propose_unwind_tile(examples: list[Example]) -> list[Transform]:
     return [Transform("unwind_tile", _mk_unwind_tile(), {})]
 
 
-def _propose_stamp_recolor(examples: list[Example]) -> list[Transform]:
+def _propose_stamp_recolor(transitions: list[Transition]) -> list[Transform]:
     """Propose stamp-recoloring when some input holds a multicolor
     object — the stamp — among monochrome ones."""
-    for inp, out in examples:
+    for inp, out in transitions:
         if inp.shape != out.shape:
             return []
         if len(set(inp.colors())) < 3:
@@ -2813,10 +2820,10 @@ def _propose_stamp_recolor(examples: list[Example]) -> list[Transform]:
     return [Transform("stamp_recolor", _mk_stamp_recolor(), {})]
 
 
-def _propose_link_blocks(examples: list[Example]) -> list[Transform]:
-    """Propose the bridging-verdict task when every output is a 1x1
+def _propose_link_blocks(transitions: list[Transition]) -> list[Transform]:
+    """Propose the bridging-verdict operator when every output is a 1x1
     0-or-8 cell and every input holds both 2s and 8s."""
-    for inp, out in examples:
+    for inp, out in transitions:
         if out.height != 1 or out.width != 1:
             return []
         if not {v for _, _, v in out.iter_cells()} <= {0, 8}:
@@ -2827,9 +2834,9 @@ def _propose_link_blocks(examples: list[Example]) -> list[Transform]:
     return [Transform("link_blocks", _mk_link_blocks(), {})]
 
 
-def _propose_cross_halos(examples: list[Example]) -> list[Transform]:
+def _propose_cross_halos(transitions: list[Transition]) -> list[Transform]:
     """Learn a seed-color → halo table: each nonzero cell sprouts
-    fixed neighbors. The table is read off the training pairs by
+    fixed neighbors. The table is read off the transitions by
     diffing each cell's 8-neighborhood, then verified in full."""
     # A changed cell may border seeds of several colors; first pass
     # credits only unambiguous cells, then each ambiguous cell goes to
@@ -2837,7 +2844,7 @@ def _propose_cross_halos(examples: list[Example]) -> list[Transform]:
     # every adjacent color when no such preference exists).
     table: dict[int, set[tuple[int, int, int]]] = {}
     ambiguous: list[tuple[int, list[tuple[int, int, int]]]] = []
-    for inp, out in examples:
+    for inp, out in transitions:
         if inp.shape != out.shape:
             return []
         for r, c, v in inp.iter_cells():
@@ -2873,16 +2880,16 @@ def _propose_cross_halos(examples: list[Example]) -> list[Transform]:
         _mk_cross_halos(halo_table),
         {"table": {str(c): [list(h) for h in hs] for c, hs in halo_table.items()}},
     )
-    for inp, out in examples:
+    for inp, out in transitions:
         if cand.apply(inp) != out:
             return []
     return [cand]
 
 
-def _propose_rot_symmetrize(examples: list[Example]) -> list[Transform]:
+def _propose_rot_symmetrize(transitions: list[Transition]) -> list[Transform]:
     """Propose rotational completion when shapes are preserved and
     the output only adds cells of existing colors."""
-    for inp, out in examples:
+    for inp, out in transitions:
         if inp.shape != out.shape:
             return []
         if not set(out.colors()) <= set(inp.colors()):
@@ -2893,10 +2900,10 @@ def _propose_rot_symmetrize(examples: list[Example]) -> list[Transform]:
     return [Transform("rot_symmetrize", _mk_rot_symmetrize(), {})]
 
 
-def _propose_ray_recolor(examples: list[Example]) -> list[Transform]:
+def _propose_ray_recolor(transitions: list[Transition]) -> list[Transform]:
     """Propose edge-ray recoloring when shapes are preserved and the
     output only recolors cells that were already non-zero."""
-    for inp, out in examples:
+    for inp, out in transitions:
         if inp.shape != out.shape:
             return []
         for r, c, v in out.iter_cells():
@@ -2905,10 +2912,10 @@ def _propose_ray_recolor(examples: list[Example]) -> list[Transform]:
     return [Transform("ray_recolor", _mk_ray_recolor(), {})]
 
 
-def _propose_nearest_border(examples: list[Example]) -> list[Transform]:
+def _propose_nearest_border(transitions: list[Transition]) -> list[Transform]:
     """Propose nearest-border recoloring when shapes are preserved and
     every input is flanked by two monochrome edge lines."""
-    for inp, out in examples:
+    for inp, out in transitions:
         if inp.shape != out.shape:
             return []
         vertical = (
@@ -2924,11 +2931,11 @@ def _propose_nearest_border(examples: list[Example]) -> list[Transform]:
     return [Transform("nearest_border", _mk_nearest_border(), {})]
 
 
-def _propose_ghost_pair(examples: list[Example]) -> list[Transform]:
+def _propose_ghost_pair(transitions: list[Transition]) -> list[Transform]:
     """Propose ghost-pair copies when outputs keep every input cell and
     add cells of a single new color."""
     candidates: set[int] | None = None
-    for inp, out in examples:
+    for inp, out in transitions:
         if inp.shape != out.shape:
             return []
         for r, c, v in inp.iter_cells():
@@ -2947,11 +2954,11 @@ def _propose_ghost_pair(examples: list[Example]) -> list[Transform]:
     ]
 
 
-def _propose_axes_stamp(examples: list[Example]) -> list[Transform]:
+def _propose_axes_stamp(transitions: list[Transition]) -> list[Transform]:
     """Propose axis cross-stamps when outputs keep every input cell and
     add cells of a single new color — same gate as ghost_pair."""
     candidates: set[int] | None = None
-    for inp, out in examples:
+    for inp, out in transitions:
         if inp.shape != out.shape:
             return []
         for r, c, v in inp.iter_cells():
@@ -2975,12 +2982,12 @@ def _propose_axes_stamp(examples: list[Example]) -> list[Transform]:
     ]
 
 
-def _propose_ring_unique(examples: list[Example]) -> list[Transform]:
+def _propose_ring_unique(transitions: list[Transition]) -> list[Transform]:
     """Propose singleton-ring when each input has exactly one
     color occurring once and the output is a one-color ring around
     it (plus the kept center cell)."""
     colors: set[int] | None = None
-    for inp, out in examples:
+    for inp, out in transitions:
         if inp.shape != out.shape:
             return []
         counts = inp.color_counts()
@@ -2996,11 +3003,11 @@ def _propose_ring_unique(examples: list[Example]) -> list[Transform]:
     return [Transform("ring_unique", _mk_ring_unique(c), {"color": c}) for c in sorted(colors)]
 
 
-def _propose_attract_to(examples: list[Example]) -> list[Transform]:
+def _propose_attract_to(transitions: list[Transition]) -> list[Transform]:
     """Propose slide-to-anchor when shapes are preserved and each
     input holds exactly two objects of distinct colors."""
     colors: set[int] | None = None
-    for inp, out in examples:
+    for inp, out in transitions:
         if inp.shape != out.shape:
             return []
         scene = perceive(inp, compute_relations=False)
@@ -3014,12 +3021,12 @@ def _propose_attract_to(examples: list[Example]) -> list[Transform]:
 
 
 def _propose_stamp_at_marks(
-    examples: list[Example],
+    transitions: list[Transition],
 ) -> list[Transform]:
     """Propose template-stamping when every input has a divider line
     that the output preserves (the marks themselves get stamped
     over, so only the divider is invariant)."""
-    for inp, out in examples:
+    for inp, out in transitions:
         found = _divider_index(inp)
         if inp.shape != out.shape or found is None:
             return []
@@ -3033,12 +3040,12 @@ def _propose_stamp_at_marks(
     return [Transform("stamp_at_marks", _mk_stamp_at_marks(), {})]
 
 
-def _propose_radial_map(examples: list[Example]) -> list[Transform]:
+def _propose_radial_map(transitions: list[Transition]) -> list[Transform]:
     """Propose radial compression when every output is 3x3 with a
     centered marker cell: each input color whose cells all map onto
     the marker's neighborhood is a candidate marker color."""
     colors: set[int] | None = None
-    for inp, out in examples:
+    for inp, out in transitions:
         if out.shape != (3, 3):
             return []
         have = {v for _, _, v in inp.iter_cells() if v != 0 and _mk_radial_map(v)(inp) == out}
@@ -3048,64 +3055,64 @@ def _propose_radial_map(examples: list[Example]) -> list[Transform]:
     return [Transform("radial_map", _mk_radial_map(c), {"color": c}) for c in sorted(colors)]
 
 
-def _propose_fill_busiest(examples: list[Example]) -> list[Transform]:
+def _propose_fill_busiest(transitions: list[Transition]) -> list[Transform]:
     """Propose busiest-block filling when every pair keeps its shape,
     every input is crossed by monochrome divider lines, and replaying
     the rule reproduces the outputs exactly."""
-    if any(inp.shape != out.shape for inp, out in examples):
+    if any(inp.shape != out.shape for inp, out in transitions):
         return []
-    if all(_apply_fill_busiest(inp) == out for inp, out in examples):
+    if all(_apply_fill_busiest(inp) == out for inp, out in transitions):
         return [Transform("fill_busiest", _mk_fill_busiest(), {})]
     return []
 
 
-def _propose_fill_lanes(examples: list[Example]) -> list[Transform]:
+def _propose_fill_lanes(transitions: list[Transition]) -> list[Transform]:
     """Propose lane-filling when outputs keep the input's geometry and
     every output-only color can replay the lane rule exactly."""
-    if any(inp.shape != out.shape for inp, out in examples):
+    if any(inp.shape != out.shape for inp, out in transitions):
         return []
-    colors = {v for _, out in examples for _, _, v in out.iter_cells()} - {0}
+    colors = {v for _, out in transitions for _, _, v in out.iter_cells()} - {0}
     return [
         Transform("fill_lanes", _mk_fill_lanes(c), {"color": c})
         for c in sorted(colors)
-        if all(_mk_fill_lanes(c)(inp) == out for inp, out in examples)
+        if all(_mk_fill_lanes(c)(inp) == out for inp, out in transitions)
     ]
 
 
-def _propose_eye_ray(examples: list[Example]) -> list[Transform]:
+def _propose_eye_ray(transitions: list[Transition]) -> list[Transform]:
     """Propose the eye ray when every pair has two non-zero colors,
     one of them a lone cell, and the replay verifies."""
-    for inp, out in examples:
+    for inp, out in transitions:
         if inp.shape != out.shape:
             return []
         counts = Counter(v for _, _, v in inp.iter_cells() if v != 0)
         if len(counts) != 2 or 1 not in counts.values():
             return []
-    if all(_apply_eye_ray(inp) == out for inp, out in examples):
+    if all(_apply_eye_ray(inp) == out for inp, out in transitions):
         return [Transform("eye_ray", _mk_eye_ray(), {})]
     return []
 
 
-def _propose_cross_fill(examples: list[Example]) -> list[Transform]:
+def _propose_cross_fill(transitions: list[Transition]) -> list[Transform]:
     """Propose cross-filling when every input is divided into a 3x3
     cell array and the replay verifies."""
-    if any(inp.shape != out.shape for inp, out in examples):
+    if any(inp.shape != out.shape for inp, out in transitions):
         return []
-    if all(_apply_cross_fill(inp) == out for inp, out in examples):
+    if all(_apply_cross_fill(inp) == out for inp, out in transitions):
         return [Transform("cross_fill", _mk_cross_fill(), {})]
     return []
 
 
-def _propose_draw_lines(examples: list[Example]) -> list[Transform]:
+def _propose_draw_lines(transitions: list[Transition]) -> list[Transform]:
     """Learn a color → row/column table when each seed cell emits a
     full line. Axis per color is guessed by coverage, then every
     consistent assignment is verified against all pairs."""
-    for inp, out in examples:
+    for inp, out in transitions:
         if inp.shape != out.shape:
             return []
     guessed: dict[int, str] = {}
     ambiguous: set[int] = set()
-    for inp, out in examples:
+    for inp, out in transitions:
         for r, c, v in inp.iter_cells():
             if v == 0:
                 continue
@@ -3138,21 +3145,21 @@ def _propose_draw_lines(examples: list[Example]) -> list[Transform]:
             _mk_draw_lines(table),
             {"table": {str(k): a for k, a in table.items()}},
         )
-        if all(cand.apply(inp) == out for inp, out in examples):
+        if all(cand.apply(inp) == out for inp, out in transitions):
             found.append(cand)
     return found
 
 
-def _propose_count_blocks(examples: list[Example]) -> list[Transform]:
+def _propose_count_blocks(transitions: list[Transition]) -> list[Transform]:
     """Propose 2x2-block counting when every output is a single row
     of one color padded with zeros — the counted color is whichever
     input color's block count explains every output."""
-    widths = {out.width for _, out in examples}
-    if any(out.height != 1 for _, out in examples) or len(widths) != 1:
+    widths = {out.width for _, out in transitions}
+    if any(out.height != 1 for _, out in transitions) or len(widths) != 1:
         return []
     width = widths.pop()
     candidates: set[int] | None = None
-    for inp, out in examples:
+    for inp, out in transitions:
         row = [out.at(0, c) for c in range(width)]
         possible = {
             c
@@ -3171,16 +3178,16 @@ def _propose_count_blocks(examples: list[Example]) -> list[Transform]:
     ]
 
 
-def _propose_classify_shape(examples: list[Example]) -> list[Transform]:
+def _propose_classify_shape(transitions: list[Transition]) -> list[Transform]:
     """Propose shape→label classification when every output is 1x1.
 
-    The label table is read off the training pairs keyed by
+    The label table is read off the transitions keyed by
     color-invariant mask; conflicting masks (same shape, different
-    labels) mean the task isn't pure shape classification.
+    labels) mean the transition isn't pure shape classification.
     """
     table: dict[tuple[tuple[int, ...], ...], int] = {}
     shapes: set[tuple[int, int]] = set()
-    for inp, out in examples:
+    for inp, out in transitions:
         if out.height != 1 or out.width != 1:
             return []
         key = _mask_key(inp)
@@ -3194,10 +3201,10 @@ def _propose_classify_shape(examples: list[Example]) -> list[Transform]:
     return [Transform("classify_shape", _mk_classify_shape(table), {"table": table})]
 
 
-def _propose_settle(examples: list[Example]) -> list[Transform]:
+def _propose_settle(transitions: list[Transition]) -> list[Transform]:
     """Propose cell-packing against an edge when shapes are preserved
     and cell counts are conserved."""
-    for inp, out in examples:
+    for inp, out in transitions:
         if inp.shape != out.shape:
             return []
         if sum(1 for _, _, v in inp.iter_cells() if v != 0) != sum(
@@ -3214,14 +3221,14 @@ def _propose_settle(examples: list[Example]) -> list[Transform]:
     ]
 
 
-def _propose_bridge_endpoints(examples: list[Example]) -> list[Transform]:
+def _propose_bridge_endpoints(transitions: list[Transition]) -> list[Transform]:
     """Propose endpoint bridging when shapes are preserved and a new
     marker color appears in the outputs."""
-    for inp, out in examples:
+    for inp, out in transitions:
         if inp.shape != out.shape:
             return []
     markers: set[int] = set()
-    for inp, out in examples:
+    for inp, out in transitions:
         markers |= set(out.colors()) - set(inp.colors())
     markers.discard(0)
     return [
@@ -3234,14 +3241,14 @@ def _propose_bridge_endpoints(examples: list[Example]) -> list[Transform]:
     ]
 
 
-def _propose_rank_bars(examples: list[Example]) -> list[Transform]:
+def _propose_rank_bars(transitions: list[Transition]) -> list[Transform]:
     """Propose height-ranking when inputs are column bars and the
     output introduces rank colors."""
-    for inp, out in examples:
+    for inp, out in transitions:
         if inp.shape != out.shape:
             return []
     new_colors: set[int] = set()
-    for inp, out in examples:
+    for inp, out in transitions:
         new_colors |= set(out.colors()) - set(inp.colors())
     new_colors.discard(0)
     if new_colors != set(range(1, len(new_colors) + 1)):
@@ -3249,17 +3256,17 @@ def _propose_rank_bars(examples: list[Example]) -> list[Transform]:
     return [Transform("rank_bars", _mk_rank_bars(), {})]
 
 
-def _propose_cross_rays(examples: list[Example]) -> list[Transform]:
+def _propose_cross_rays(transitions: list[Transition]) -> list[Transform]:
     """Propose ray-crossing when outputs keep the input's dots but add
     full rows/columns plus one clash color."""
-    for inp, out in examples:
+    for inp, out in transitions:
         if inp.shape != out.shape:
             return []
         dots = sum(1 for r in range(inp.height) for c in range(inp.width) if inp.at(r, c) != 0)
         if dots < 2 or dots > 4:
             return []
     new_colors: set[int] = set()
-    for inp, out in examples:
+    for inp, out in transitions:
         new_colors |= set(out.colors()) - set(inp.colors())
     new_colors.discard(0)
     return [Transform("cross_rays", _mk_cross_rays(cl), {"clash": cl}) for cl in sorted(new_colors)]
@@ -3267,7 +3274,7 @@ def _propose_cross_rays(examples: list[Example]) -> list[Transform]:
 
 #: All proposal generators. Order matters only for readability — the
 #: solver tries every proposed transform at each search step.
-PROPOSERS: tuple[Callable[[list[Example]], list[Transform]], ...] = (
+PROPOSERS: tuple[Callable[[list[Transition]], list[Transform]], ...] = (
     _propose_identity,
     _propose_rotations,
     _propose_reflections,
@@ -3332,12 +3339,12 @@ PROPOSERS: tuple[Callable[[list[Example]], list[Transform]], ...] = (
 )
 
 
-def propose(examples: list[Example]) -> list[Transform]:
-    """Generate all candidate transforms consistent with the examples."""
+def propose(transitions: list[Transition]) -> list[Transform]:
+    """Generate all candidate transforms consistent with the transitions."""
     out: list[Transform] = []
     for proposer in PROPOSERS:
         try:
-            out.extend(proposer(examples))
+            out.extend(proposer(transitions))
         except Exception as e:  # noqa: BLE001
             # a malformed proposer must not break the search
             _logger.debug(
@@ -3445,7 +3452,7 @@ def parameterized_ops(input_grid: Grid) -> list[tuple[str, Op]]:
 
 
 def _single_example(
-    examples: list[Example],
+    transitions: list[Transition],
 ) -> tuple[Grid, Grid] | None:
     """The one pair these ops can read, or None if evidence is thin.
 
@@ -3453,9 +3460,9 @@ def _single_example(
     More pairs than that describes a rule, which belongs in the
     learning path (proposers/solver), not in a primitive.
     """
-    if len(examples) != 1:
+    if len(transitions) != 1:
         return None
-    before, after = examples[0]
+    before, after = transitions[0]
     if before == after:
         return None
     return before, after
@@ -3471,9 +3478,9 @@ def _verified(op: Op, before: Grid, after: Grid) -> Op | None:
     return op if out == after else None
 
 
-def infer_gravity_direction(examples: list[Example]) -> Op | None:
+def infer_gravity_direction(transitions: list[Transition]) -> Op | None:
     """Everything slid flush to one edge."""
-    pair = _single_example(examples)
+    pair = _single_example(transitions)
     if pair is None:
         return None
     before, after = pair
@@ -3483,9 +3490,9 @@ def infer_gravity_direction(examples: list[Example]) -> Op | None:
     return None
 
 
-def infer_erase_color(examples: list[Example]) -> Op | None:
+def infer_erase_color(transitions: list[Transition]) -> Op | None:
     """A color vanished entirely, replaced by what lay behind it."""
-    pair = _single_example(examples)
+    pair = _single_example(transitions)
     if pair is None:
         return None
     before, after = pair
@@ -3495,9 +3502,9 @@ def infer_erase_color(examples: list[Example]) -> Op | None:
     return _verified(_mk_erase(next(iter(vanished))), before, after)
 
 
-def infer_keep_color(examples: list[Example]) -> Op | None:
+def infer_keep_color(transitions: list[Transition]) -> Op | None:
     """Everything but one color was dropped."""
-    pair = _single_example(examples)
+    pair = _single_example(transitions)
     if pair is None:
         return None
     before, after = pair
@@ -3507,9 +3514,9 @@ def infer_keep_color(examples: list[Example]) -> Op | None:
     return _verified(_mk_select(next(iter(before.colors() - gone))), before, after)
 
 
-def infer_fill_enclosed(examples: list[Example]) -> Op | None:
+def infer_fill_enclosed(transitions: list[Transition]) -> Op | None:
     """A hole closed: background enclosed by an object was filled in."""
-    pair = _single_example(examples)
+    pair = _single_example(transitions)
     if pair is None:
         return None
     before, after = pair
@@ -3519,9 +3526,9 @@ def infer_fill_enclosed(examples: list[Example]) -> Op | None:
     return _verified(_mk_fill_enclosed(next(iter(filled))), before, after)
 
 
-def infer_recolor_largest(examples: list[Example]) -> Op | None:
+def infer_recolor_largest(transitions: list[Transition]) -> Op | None:
     """The largest object took on a new color."""
-    pair = _single_example(examples)
+    pair = _single_example(transitions)
     if pair is None:
         return None
     before, after = pair
@@ -3532,9 +3539,9 @@ def infer_recolor_largest(examples: list[Example]) -> Op | None:
     return _verified(op, before, after)
 
 
-def infer_recolor_smallest(examples: list[Example]) -> Op | None:
+def infer_recolor_smallest(transitions: list[Transition]) -> Op | None:
     """The smallest object took on a new color."""
-    pair = _single_example(examples)
+    pair = _single_example(transitions)
     if pair is None:
         return None
     before, after = pair
@@ -3545,9 +3552,9 @@ def infer_recolor_smallest(examples: list[Example]) -> Op | None:
     return _verified(op, before, after)
 
 
-def infer_recolor_map(examples: list[Example]) -> Op | None:
+def infer_recolor_map(transitions: list[Transition]) -> Op | None:
     """A color permutation: the shape is untouched, the hues changed."""
-    pair = _single_example(examples)
+    pair = _single_example(transitions)
     if pair is None:
         return None
     before, after = pair
@@ -3566,9 +3573,9 @@ def infer_recolor_map(examples: list[Example]) -> Op | None:
     return _verified(lambda g: g.recolor(mapping), before, after)
 
 
-def infer_shift(examples: list[Example]) -> Op | None:
+def infer_shift(transitions: list[Transition]) -> Op | None:
     """Every foreground cell moved by one fixed offset."""
-    pair = _single_example(examples)
+    pair = _single_example(transitions)
     if pair is None:
         return None
     before, after = pair
@@ -3592,7 +3599,7 @@ def infer_shift(examples: list[Example]) -> Op | None:
 # Ordered most-specific first: a change that is exactly "gravity down"
 # should not also be reported as a generic shift when both happen to
 # fit the same observation.
-INFER_OPS: list[Callable[[list[Example]], Op | None]] = [
+INFER_OPS: list[Callable[[list[Transition]], Op | None]] = [
     infer_gravity_direction,
     infer_erase_color,
     infer_keep_color,
@@ -3606,6 +3613,6 @@ INFER_OPS: list[Callable[[list[Example]], Op | None]] = [
 # Display name per infer op. Callers strip the ``infer_`` prefix, so the
 # name is the skill as it would be spoken ("recolor_map"), not the
 # Python symbol that produced it.
-INFER_OP_NAMES: dict[Callable[[list[Example]], Op | None], str] = {
+INFER_OP_NAMES: dict[Callable[[list[Transition]], Op | None], str] = {
     fn: f"infer_{fn.__name__.removeprefix('infer_')}" for fn in INFER_OPS
 }

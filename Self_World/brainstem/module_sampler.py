@@ -50,6 +50,7 @@ from genesis_client.protocol import (
 )
 from genesis_client.swallow import note_swallowed
 from genesis_client.threads import named_thread
+from inhibition import NeuromodulatoryGate
 
 logger = logging.getLogger(__name__)
 
@@ -85,14 +86,14 @@ _CLIENT_DIR = genesis_client.__path__[0]
 # The three worlds are the checkout's package roots: the region tree
 # (``_PKG_DIR``) is the self world — brain and chemicals; the inner
 # and outer worlds sit beside it. Files under any of them attribute
-# by the same directory tables — ``self/`` and ``outer_world/`` keep
-# their manifest modules wherever their world is filed. In an
+# by the same directory tables — ``self/``, ``workstation/``,
+# ``discord/``, and ``games/`` keep their manifest modules wherever
+# their world is filed. In an
 # installed layout the worlds collapse into one site root, which
 # ``_PKG_DIR`` already covers.
 _PROJECT_ROOT = os.path.dirname(_PKG_DIR)
 _WORLD_DIRS = [
-    os.path.join(_PROJECT_ROOT, name)
-    for name in ("Self_World", "Inner_Non_Physical_World", "Outer_Physical_World")
+    os.path.join(_PROJECT_ROOT, name) for name in ("Self_World", "Inner_World", "Outer_World")
 ]
 _WORLD_DIRS = [d for d in _WORLD_DIRS if os.path.isdir(d)] or [_PKG_DIR]
 
@@ -145,8 +146,9 @@ _DIR_MODULE = {
     "sleep": MODULE_DREAMING,
     "tools": MODULE_INTENTION,
     "self": MODULE_METACOGNITION,
-    "world": MODULE_REASONING,  # nested world-model packages
-    "outer_world": MODULE_REASONING,  # the model of the world and other minds
+    "workstation": MODULE_REASONING,  # the model of the environment and other minds
+    "discord": MODULE_SENSORY,  # the public channel — an ear
+    "games": MODULE_REASONING,  # play in the outer environment
     "eval": MODULE_METACOGNITION,  # measuring herself
 }
 
@@ -168,7 +170,7 @@ for _root_name, _root_mod in (
     ("turn", MODULE_METACOGNITION),  # one turn across regions — orchestration
     ("genesis_cli", MODULE_METACOGNITION),  # launcher / rebirth shepherd
     ("commitment", MODULE_INTENTION),  # boundary machinery — volition's digitizer
-    ("discord_feed", MODULE_SENSORY),  # the public channel — an ear
+    ("discord.feed", MODULE_SENSORY),  # the public channel — an ear
 ):
     try:
         _spec = importlib.util.find_spec(_root_name)
@@ -194,7 +196,7 @@ _FILE_MODULE = {
     "comprehension.py": MODULE_LANGUAGE,
     "concept_learner.py": MODULE_LANGUAGE,
     "conversation.py": MODULE_LANGUAGE,
-    "discord_feed.py": MODULE_SENSORY,
+    "discord.feed.py": MODULE_SENSORY,
     "dual.py": MODULE_MEMORY,
     "emotional_regulator.py": MODULE_EMOTION,
     "emotion.py": MODULE_EMOTION,
@@ -341,7 +343,7 @@ class ModuleSampler:
     def __init__(self, credit: Callable[[int, float], None]) -> None:
         """Initialize the sampler with the callback receiving module-time credit."""
         self._credit = credit
-        self._stop = threading.Event()
+        self._stop = NeuromodulatoryGate()
         self._thread: threading.Thread | None = None
         # thread ident → (id of leaf frame, f_lasti) at the last
         # sample. An identical pair twice in a row means the leaf has

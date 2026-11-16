@@ -115,7 +115,7 @@ fn adenosine_impulses_are_one_way() {
     let adn = NeurochemicalId::Adenosine;
 
     let baseline = adenosine(&v);
-    v.apply_impulse_capped(adn, 0.1, 0);
+    v.apply_impulse(adn, 0.1, 0);
     let raised = adenosine(&v);
     assert!(
         raised > baseline,
@@ -123,7 +123,7 @@ fn adenosine_impulses_are_one_way() {
     );
 
     let velocity_before = v.get(adn).unwrap().velocity;
-    v.apply_impulse_capped(adn, -0.5, 1);
+    v.apply_impulse(adn, -0.5, 1);
     assert_eq!(
         adenosine(&v),
         raised,
@@ -140,7 +140,7 @@ fn adenosine_impulses_are_one_way() {
     // Control: ordinary chemicals still accept negative impulses.
     let da = NeurochemicalId::Dopamine;
     let d0 = v.get(da).unwrap().level;
-    v.apply_impulse_capped(da, -0.2, 2);
+    v.apply_impulse(da, -0.2, 2);
     assert!(
         v.get(da).unwrap().level < d0,
         "control impulse on dopamine must still apply"

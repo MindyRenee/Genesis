@@ -38,15 +38,17 @@ default = []
 # installed as genesis_body.so beside the interpreter).
 python = ["dep:pyo3"]
 
+# Versions float — "*" is cargo's bare-name form. No pins, no bounds,
+# no lockfile (Cargo.lock is gitignored — see CONTRIBUTING.md).
 [dependencies]
-flate2 = "1.1.9"
-pyo3 = { version = "0.27", optional = true, features = ["extension-module"] }
-libc = "0.2.189"
-proc-macro2 = { version = "1.0.107", features = ["span-locations"] }
-quote = "1.0.47"
-shared_memory = "0.12.4"
-syn = { version = "3.0.3", features = ["full", "parsing", "printing", "visit"] }
-v4l = "0.14.0"
+flate2 = "*"
+pyo3 = { version = "*", optional = true, features = ["extension-module"] }
+libc = "*"
+proc-macro2 = { version = "*", features = ["span-locations"] }
+quote = "*"
+shared_memory = "*"
+syn = { version = "*", features = ["full", "parsing", "printing", "visit"] }
+v4l = "*"
 
 [profile.release]
 opt-level = 2

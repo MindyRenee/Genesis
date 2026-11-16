@@ -368,55 +368,46 @@ def test_similar_results_valid() -> None:
 
 
 def test_core_state_unpack() -> None:
-    """A 3480-byte buffer unpacks the key fields correctly.
+    """A 232-byte snapshot unpacks the key fields correctly.
 
-    Tests the v5 schema (18 chemicals, 3480 bytes). The offsets are:
-    - Header: 0-55 (56 bytes)
-    - NeurochemicalVector: 56-2471 (2416 bytes)
-      - chemicals[18]: 56-1063 (1008 bytes, 18 × 56 each)
-      - coupling_matrix[18][18]: 1064-2359 (1296 bytes)
-      - effective_levels[18]: 2360-2431 (72 bytes)
-      - global_tone: 2432
-      - arousal: 2436
-      - valence: 2440
-      - plasticity_gate: 2444
-    - ActiveZones: 2472-2567 (96 bytes)
-      - cognitive_zone: 2472
-      - emergent_phase: 2473
-    - MemoryPointers: 2568-2687 (120 bytes)
-      - stm_count: 2584
-      - ltm_episode_count: 2600
-      - encoding_weight: 2632
-      - consolidation_weight: 2636
-      - retrieval_weight: 2640
+    Snapshot v1 offsets (see src/state/snapshot.rs):
+    - header: 0-55 (magic, version, size, created_at, last_updated,
+      heartbeat, instance_id, ltm_episode_count)
+    - effective_levels[18]: 56-127
+    - global_tone/arousal/valence/plasticity_gate: 128-143
+    - inference projection: 144-207
+    - memory gating + sleep_pressure + stm_count: 208-227
+    - cognitive_zone/emergent_phase: 228-229
     """
-    data = bytearray(3480)
+    data = bytearray(232)
+    data[0:4] = b"GSS1"
+    struct.pack_into("<I", data, 4, 1)  # version
+    struct.pack_into("<I", data, 8, 232)  # state_size
 
     # Header fields
     struct.pack_into("<Q", data, 16, 1000)  # created_at
     struct.pack_into("<Q", data, 24, 2000)  # last_updated
     struct.pack_into("<Q", data, 32, 42)  # heartbeat
-    struct.pack_into("<Q", data, 48, 99)  # instance_id
+    struct.pack_into("<Q", data, 40, 99)  # instance_id
+    struct.pack_into("<Q", data, 48, 200)  # ltm_episode_count
 
-    # NeurochemicalVector derived fields
-    # effective_levels[18] at offset 2360 (56 + 1008 + 1296)
-    struct.pack_into("<f", data, 2360, 0.50)  # dopamine
-    struct.pack_into("<f", data, 2364, 0.55)  # serotonin
-    struct.pack_into("<f", data, 2432, 0.45)  # global_tone
-    struct.pack_into("<f", data, 2436, 0.65)  # arousal
-    struct.pack_into("<f", data, 2440, 0.30)  # valence
-    struct.pack_into("<f", data, 2444, 0.70)  # plasticity_gate
+    # effective_levels[18] at offset 56 (NeurochemicalId order)
+    struct.pack_into("<f", data, 56, 0.50)  # dopamine
+    struct.pack_into("<f", data, 60, 0.55)  # serotonin
+    struct.pack_into("<f", data, 128, 0.45)  # global_tone
+    struct.pack_into("<f", data, 132, 0.65)  # arousal
+    struct.pack_into("<f", data, 136, 0.30)  # valence
+    struct.pack_into("<f", data, 140, 0.70)  # plasticity_gate
 
-    # ActiveZones
-    data[2472] = 2  # cognitive_zone
-    data[2473] = 2  # emergent_phase (flow)
+    # Zones
+    data[228] = 2  # cognitive_zone
+    data[229] = 2  # emergent_phase (flow)
 
-    # MemoryPointers
-    struct.pack_into("<I", data, 2584, 15)  # stm_count
-    struct.pack_into("<Q", data, 2600, 200)  # ltm_episode_count
-    struct.pack_into("<f", data, 2632, 0.55)  # encoding_weight
-    struct.pack_into("<f", data, 2636, 0.54)  # consolidation_weight
-    struct.pack_into("<f", data, 2640, 0.60)  # retrieval_weight
+    # Memory gating + counts
+    struct.pack_into("<I", data, 224, 15)  # stm_count
+    struct.pack_into("<f", data, 208, 0.55)  # encoding_weight
+    struct.pack_into("<f", data, 212, 0.54)  # consolidation_weight
+    struct.pack_into("<f", data, 216, 0.60)  # retrieval_weight
 
     state = CoreState.unpack(bytes(data))
     assert state.heartbeat == 42
@@ -439,27 +430,23 @@ def test_core_state_unpack() -> None:
     assert approx_equal(state.retrieval_weight, 0.60)
 
 
-def test_core_state_reads_inference_signals_from_the_v5_offset() -> None:
-    """The inference block is read from 3416, not the v4 offset of 3352.
+def test_core_state_reads_inference_projection() -> None:
+    """The 16 inference fields unpack at their snapshot offsets.
 
-    Schema v5 inserted the 64-byte sleep network at 3224 and moved the
-    ion block to 3288. A v4 offset of 3352 now lands inside IonState, and
-    a read there does not fail: it returns ion concentrations wearing the
-    field names of inference signals, which is worse than an error
-    because the regulator consumes `allostasis_load` as real burden.
+    The daemon flattens InferenceSignals into named f32 fields plus a
+    u32 tick count — the projection is the contract, so these offsets
+    are the wire layout, not the brain block's.
     """
-    data = bytearray(3480)
-    # Poison the region a stale v4 read would hit, so the wrong offset is
-    # unambiguously wrong rather than accidentally plausible.
-    for off in range(3352, 3412, 4):
-        struct.pack_into("<f", data, off, 9.99)
-    # Field offsets are relative to 3416: 14 f32s in declaration order,
-    # then inference_tick_count (u32) at +56, then policy_authority.
-    struct.pack_into("<f", data, 3416, 0.1111)  # surprise_ema
-    struct.pack_into("<f", data, 3420, 0.2222)  # free_energy
-    struct.pack_into("<f", data, 3428, 0.7777)  # allostasis_load
-    struct.pack_into("<f", data, 3468, 0.6666)  # model_maturity
-    struct.pack_into("<I", data, 3472, 4242)  # inference_tick_count
+    data = bytearray(232)
+    data[0:4] = b"GSS1"
+    struct.pack_into("<I", data, 4, 1)
+    struct.pack_into("<I", data, 8, 232)
+    struct.pack_into("<f", data, 144, 0.1111)  # surprise_ema
+    struct.pack_into("<f", data, 148, 0.2222)  # free_energy
+    struct.pack_into("<f", data, 156, 0.7777)  # allostasis_load
+    struct.pack_into("<f", data, 196, 0.6666)  # model_maturity
+    struct.pack_into("<f", data, 200, 0.3333)  # policy_authority
+    struct.pack_into("<I", data, 204, 4242)  # inference_tick_count
 
     state = CoreState.unpack(bytes(data))
     assert state.inference is not None
@@ -467,13 +454,84 @@ def test_core_state_reads_inference_signals_from_the_v5_offset() -> None:
     assert approx_equal(state.inference.free_energy, 0.2222)
     assert approx_equal(state.inference.allostasis_load, 0.7777)
     assert approx_equal(state.inference.model_maturity, 0.6666)
+    assert approx_equal(state.inference.policy_authority, 0.3333)
     assert state.inference.inference_tick_count == 4242
 
 
+def test_core_state_reads_sleep_pressure_fraction() -> None:
+    """sleep_pressure arrives pre-normalized — the daemon divides the
+    homeostat's h by its ceiling, so no hmax constant lives here."""
+    data = bytearray(232)
+    data[0:4] = b"GSS1"
+    struct.pack_into("<I", data, 4, 1)
+    struct.pack_into("<I", data, 8, 232)
+    struct.pack_into("<f", data, 220, 0.637)
+    state = CoreState.unpack(bytes(data))
+    assert approx_equal(state.sleep_pressure, 0.637)
+
+
 def test_core_state_too_short() -> None:
-    """A buffer shorter than 3480 bytes raises ValueError."""
+    """A buffer shorter than 232 bytes raises ValueError."""
     try:
-        CoreState.unpack(b"\x00" * 3407)
+        CoreState.unpack(b"\x00" * 200)
+        raise AssertionError()
+    except ValueError as e:
+        logger.debug(repr(e))
+
+
+def test_core_state_rejects_foreign_schema() -> None:
+    """A raw GenesisCoreState image must never parse as a snapshot.
+
+    This is the regression the DTO exists for: the 3480-byte brain
+    image starts with magic b"GNSX", not b"GSS1" — before the
+    snapshot contract, a wrong-schema buffer did not fail, it
+    returned plausible numbers read from the wrong fields.
+    """
+    raw_state = bytearray(3480)
+    raw_state[0:4] = b"GNSX"
+    struct.pack_into("<I", raw_state, 4, 5)  # brain schema v5
+    struct.pack_into("<I", raw_state, 8, 3480)
+    try:
+        CoreState.unpack(bytes(raw_state))
+        raise AssertionError()
+    except ValueError as e:
+        logger.debug(repr(e))
+
+
+def test_core_state_rejects_bad_magic() -> None:
+    """Right size, wrong magic — not a snapshot."""
+    data = bytearray(232)
+    data[0:4] = b"NOPE"
+    struct.pack_into("<I", data, 4, 1)
+    struct.pack_into("<I", data, 8, 232)
+    try:
+        CoreState.unpack(bytes(data))
+        raise AssertionError()
+    except ValueError as e:
+        logger.debug(repr(e))
+
+
+def test_core_state_rejects_wrong_version() -> None:
+    """A future snapshot version fails loudly, not silently."""
+    data = bytearray(232)
+    data[0:4] = b"GSS1"
+    struct.pack_into("<I", data, 4, 2)
+    struct.pack_into("<I", data, 8, 232)
+    try:
+        CoreState.unpack(bytes(data))
+        raise AssertionError()
+    except ValueError as e:
+        logger.debug(repr(e))
+
+
+def test_core_state_rejects_bad_state_size() -> None:
+    """A state_size smaller than the v1 layout is corrupt."""
+    data = bytearray(232)
+    data[0:4] = b"GSS1"
+    struct.pack_into("<I", data, 4, 1)
+    struct.pack_into("<I", data, 8, 100)
+    try:
+        CoreState.unpack(bytes(data))
         raise AssertionError()
     except ValueError as e:
         logger.debug(repr(e))
@@ -1028,15 +1086,6 @@ if __name__ == "__main__":
     sys.exit(0 if success else 1)
 
 
-def test_core_state_reads_the_network_sleep_pressure() -> None:
-    """The homeostat h is sleep_network[4] at offset 3256; the mind
-    reads it as a fraction of the source's hmax (323.88)."""
-    data = bytearray(3480)
-    struct.pack_into("<d", data, 3256, 161.94)
-    state = CoreState.unpack(bytes(data))
-    assert approx_equal(state.sleep_pressure, 0.5)
-
-
 def _v3_field_probe_body() -> bytearray:
     """A v3 field-probe wire body (195 bytes) laid out per
     `src/daemon/field_probe.rs`."""
@@ -1234,10 +1283,13 @@ def test_field_probe_v2_still_decodes() -> None:
 
 
 def test_core_state_rejects_truncated_body() -> None:
-    """A short body is a refusal, not a misread."""
-    data = bytearray(3400)
+    """One byte short of the snapshot is a refusal, not a misread."""
+    data = bytearray(232)
+    data[0:4] = b"GSS1"
+    struct.pack_into("<I", data, 4, 1)
+    struct.pack_into("<I", data, 8, 232)
     try:
-        CoreState.unpack(bytes(data))
+        CoreState.unpack(bytes(data[:231]))
         raise AssertionError()
     except ValueError as e:
         logger.debug(repr(e))

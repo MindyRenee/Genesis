@@ -22,10 +22,10 @@ from thalamus.events import HypnagogicState
 
 
 def _rest_mind(sleeping=False, meditating=False, hypnagogic=None, stage=None):
-    """A bare SleepMixin carrying just the state the gate reads."""
-    from sleep.sleep import SleepMixin
+    """A bare Mind carrying just the state the gate reads."""
+    from mind import Mind
 
-    mind = SleepMixin.__new__(SleepMixin)
+    mind = Mind.__new__(Mind)
     mind._is_sleeping = sleeping
     mind._is_meditating = meditating
     mind.inner_life = SimpleNamespace(
@@ -69,14 +69,10 @@ def test_is_resting_meditation_is_not_hypnagogic():
 
 
 def _volition_mind(sleeping=False, meditating=False, hypnagogic=None, stage=None):
-    """A bare mind composing the two mixins the gate path reads."""
-    from basal_ganglia.volition import VolitionMixin
-    from sleep.sleep import SleepMixin
+    """A bare Mind — the composite the gate path reads."""
+    from mind import Mind
 
-    class _GateMind(SleepMixin, VolitionMixin):
-        pass
-
-    mind = _GateMind.__new__(_GateMind)
+    mind = Mind.__new__(Mind)
     mind._is_sleeping = sleeping
     mind._is_meditating = meditating
     mind.inner_life = SimpleNamespace(

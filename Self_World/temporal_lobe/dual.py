@@ -59,12 +59,12 @@ References:
 
 from __future__ import annotations
 
-import threading
 import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import numpy as np
+from inhibition import InhibitoryGate
 
 if TYPE_CHECKING:
     from temporal_lobe.concepts import ConceptNetwork, EmbeddingStore
@@ -170,7 +170,7 @@ class DualSystemLearner:
         # Slow (neocortical) store, keyed by generalized key
         self._slow_store: dict[str, NeocorticalMemory] = {}
 
-        self._lock = threading.Lock()
+        self._lock = InhibitoryGate()
 
         # Statistics
         self.total_encoded = 0

@@ -172,10 +172,10 @@ class PaintSheet:
     def set_color(self, r: int, g: int, b: int, a: float = 1.0) -> None:
         """Dip the utensil in a color — any RGB + opacity."""
         self._color = (
-            max(0, min(255, int(r))) / 255,
-            max(0, min(255, int(g))) / 255,
-            max(0, min(255, int(b))) / 255,
-            max(0.0, min(1.0, float(a))),
+            float(r) / 255,
+            float(g) / 255,
+            float(b) / 255,
+            float(a),
         )
 
     def set_brush(
@@ -194,15 +194,15 @@ class PaintSheet:
         this space. Named tools are only aliases over these settings.
         """
         if size is not None:
-            self._brush.size = max(0.5, float(size))
+            self._brush.size = float(size)
         if opacity is not None:
-            self._brush.opacity = max(0.0, min(1.0, float(opacity)))
+            self._brush.opacity = float(opacity)
         if hardness is not None:
-            self._brush.hardness = max(0.0, min(1.0, float(hardness)))
+            self._brush.hardness = float(hardness)
         if scatter is not None:
-            self._brush.scatter = max(0.0, min(1.0, float(scatter)))
+            self._brush.scatter = float(scatter)
         if texture is not None:
-            self._brush.texture = max(0.0, min(1.0, float(texture)))
+            self._brush.texture = float(texture)
         if erase is not None:
             self._brush.erase = bool(erase)
         if blend is not None:
@@ -219,7 +219,7 @@ class PaintSheet:
         """
         self._tool = tool
         if size is not None:
-            self._brush.size = max(0.5, float(size))
+            self._brush.size = float(size)
 
     # ── Marks ─────────────────────────────────────────────────────
 
@@ -241,7 +241,7 @@ class PaintSheet:
     def _stamp_soft(self, points: list[tuple[float, float]]) -> None:
         """A soft brush lays down dabs with a feathered edge."""
         r, g, b, a = self._color
-        radius = self._brush.size
+        radius = abs(self._brush.size)
         spacing = max(1.5, radius * 0.35)
         traveled = 0.0
         prev = points[0]
@@ -265,7 +265,7 @@ class PaintSheet:
     def _stamp_scatter(self, points: list[tuple[float, float]]) -> None:
         """A scattered stroke mists dabs around the path."""
         r, g, b, a = self._color
-        spread = max(3.0, self._brush.size * (0.5 + self._brush.scatter))
+        spread = max(3.0, abs(self._brush.size) * (0.5 + abs(self._brush.scatter)))
         for pt in points:
             n_dots = int(self._rng.integers(6, 16))
             xs = self._rng.normal(pt[0], spread, n_dots)
@@ -309,7 +309,6 @@ class PaintSheet:
         """Draw one stroke through ``points`` with the current brush."""
         if not points:
             return
-        points = [(max(0, min(self.width, x)), max(0, min(self.height, y))) for x, y in points]
         b = self._brush
         if b.erase:
             self._stroke_line(
@@ -324,7 +323,7 @@ class PaintSheet:
             self._stamp_soft(points)
         else:
             op = cairo.OPERATOR_MULTIPLY if b.blend == "multiply" else None
-            jitter = b.texture * b.size * 0.3
+            jitter = abs(b.texture * b.size * 0.3)
             self._stroke_line(points, b.size, b.opacity, jitter, op)
             # A rough utensil skids — a second faint offset pass.
             if b.texture > 0.3:
@@ -345,12 +344,12 @@ class PaintSheet:
         r, g, b, a = self._color
         self._ctx.set_source_rgba(r, g, b, a * self._brush.opacity)
         if not fill:
-            self._ctx.set_line_width(max(0.6, self._brush.size * 0.5))
+            self._ctx.set_line_width(self._brush.size * 0.5)
 
     def ellipse(self, x: float, y: float, w: float, h: float, fill: bool = False) -> None:
         """An ellipse (or circle) inscribed in the given rect."""
         cx, cy = x + w / 2, y + h / 2
-        rx, ry = max(w / 2, 0.5), max(h / 2, 0.5)
+        rx, ry = abs(w) / 2, abs(h) / 2
         if fill:
             self._ctx.save()
             self._shape_style(True)
@@ -401,7 +400,12 @@ class PaintSheet:
         The fill sees the composite — paper plus paint — and repaints
         the contiguous region on the paint layer.
         """
-        seed = (int(max(0, min(self.width - 1, x))), int(max(0, min(self.height - 1, y))))
+        x, y = float(x), float(y)
+        if not (math.isfinite(x) and math.isfinite(y)):
+            return False
+        seed = (math.floor(x), math.floor(y))
+        if not (0 <= seed[0] < self.width and 0 <= seed[1] < self.height):
+            return False
         comp = self._composite_rgb()
         if cv2 is not None:
             mask = np.zeros((self.height + 2, self.width + 2), np.uint8)
@@ -418,11 +422,10 @@ class PaintSheet:
             return False
         paint = self._paint_array()
         r, g, b, a = self._color
-        # ARGB32 is premultiplied — store color × alpha.
-        paint[region, 0] = int(b * a * 255)
-        paint[region, 1] = int(g * a * 255)
-        paint[region, 2] = int(r * a * 255)
-        paint[region, 3] = int(a * 255)
+        # ARGB32 is premultiplied — encode the raw color for an 8-bit surface.
+        encoded = np.clip(np.nan_to_num(np.array([b, g, r, a]) * a * 255), 0, 255).astype(np.uint8)
+        encoded[3] = np.clip(np.nan_to_num(a * 255), 0, 255).astype(np.uint8)
+        paint[region] = encoded
         self._paint.mark_dirty()
         return True
 
@@ -526,6 +529,39 @@ class Canvas:
         if studio is not None:
             studio.send(op, **args)
 
+    def open_studio(self, timeout: float = 20.0, launch: bool = True) -> bool:
+        """Bring up the real program — launch Krita and connect the bridge.
+
+        Krita is her painting surface when it is reachable; the
+        built-in rasterizer still records the same ops in parallel so
+        the artifact is never lost. Returns True when a live studio
+        answered.
+        """
+        if not self._use_krita:
+            return False
+        try:
+            from frontal_lobe.krita_studio import KritaStudio
+
+            studio = self._krita or KritaStudio()
+            if studio.connect(timeout=timeout, launch=launch):
+                self._krita = studio
+                self._krita_tried = True
+                return True
+        except Exception as e:  # noqa: BLE001
+            logger.debug("studio open failed: %s", e)
+        return False
+
+    def studio_presets(self, query: str = "") -> list[str] | None:
+        """The real app's preset names — every tool Krita ships."""
+        studio = self._studio()
+        if studio is None:
+            return None
+        try:
+            return studio.presets(query=query)
+        except Exception as e:  # noqa: BLE001
+            logger.debug("preset query failed: %s", e)
+            return None
+
     # ── Art history ───────────────────────────────────────────────
 
     @property
@@ -554,19 +590,16 @@ class Canvas:
         """A copy of her drawing history (oldest first)."""
         return list(self._history)
 
-    def _recency(
-        self, key: str, universe: tuple[str, ...] | list[str], now: float | None = None
-    ) -> dict[str, float]:
-        """Seconds since each entry in ``universe`` was last used."""
+    def _label_recency(self, key: str, now: float | None = None) -> dict[str, float]:
+        """Seconds since each recorded label under ``key`` was last used."""
         now = time.time() if now is None else now
-        recency = dict.fromkeys(universe, math.inf)
+        recency: dict[str, float] = {}
         for record in self._history:
             ts = record.get("ts")
             if not isinstance(ts, (int, float)):
                 continue
             for item in record.get(key) or ():
-                if item in recency:
-                    recency[item] = min(recency[item], now - float(ts))
+                recency[item] = min(recency.get(item, math.inf), now - float(ts))
         return recency
 
     def tool_recency(self, now: float | None = None) -> dict[str, float]:
@@ -575,33 +608,15 @@ class Canvas:
         Only names she has actually used appear — the vocabulary is
         hers, so there is no fixed universe to enumerate.
         """
-        now = time.time() if now is None else now
-        recency: dict[str, float] = {}
-        for record in self._history:
-            ts = record.get("ts")
-            if not isinstance(ts, (int, float)):
-                continue
-            for item in record.get("tools") or ():
-                recency[item] = min(recency.get(item, math.inf), now - float(ts))
-        return recency
+        return self._label_recency("tools", now)
 
     def gesture_recency(self, now: float | None = None) -> dict[str, float]:
-        """Seconds since each gesture family was last used."""
-        gestures = (
-            "line",
-            "polyline",
-            "curve",
-            "arc",
-            "loop",
-            "zigzag",
-            "scribble",
-            "spiral",
-            "wave",
-            "dabs",
-            "shape",
-            "fill",
-        )
-        return self._recency("gestures", gestures, now)
+        """Seconds since each gesture label was last used.
+
+        Gestures are whatever she names her moves — unbounded, like
+        her tools — so only labels that actually occurred appear.
+        """
+        return self._label_recency("gestures", now)
 
     def recent_hues(self, limit: int = 12) -> list[float]:
         """Hue degrees used in her most recent drawings."""

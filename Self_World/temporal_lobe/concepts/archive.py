@@ -22,9 +22,10 @@ from __future__ import annotations
 import json
 import logging
 import sqlite3
-import threading
 from pathlib import Path
 from typing import Any
+
+from inhibition import InhibitoryGate
 
 from .classify import _normalize_id
 
@@ -63,7 +64,7 @@ class ConceptArchive:
 
     def __init__(self, db_path: Path) -> None:
         self._db_path = db_path
-        self._lock = threading.Lock()
+        self._lock = InhibitoryGate()
         # Set by close() under the lock: after shutdown begins, archive
         # ops degrade to benign no-ops instead of ProgrammingError on a
         # dead connection — a draining worker is not an error.

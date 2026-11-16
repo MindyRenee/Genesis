@@ -17,11 +17,11 @@ from pathlib import Path
 
 _HERE = Path(__file__).resolve().parent.parent  # Self_World/
 _ROOT = _HERE.parent  # the repo root holding the three worlds
-for _w in ("Self_World", "Inner_Non_Physical_World", "Outer_Physical_World"):
+for _w in ("Self_World", "Inner_World", "Outer_World"):
     sys.path.insert(0, str(_ROOT / _w))
 
-from infrastructure.config import default_data_dir
-from temporal_lobe.concepts import (
+from infrastructure.config import default_data_dir  # noqa: E402
+from temporal_lobe.concepts import (  # noqa: E402
     ConceptNetwork,
     RelationType,
     SchemaInducer,

@@ -57,10 +57,28 @@ _ILLUMINANT_SIGMA_DIV = 12.0
 
 # Chromatic adaptation is partial in the living eye (~60–90% under
 # natural illuminants); the gain blends toward full von Kries, never
-# past it, and is clamped so a pathological illuminant estimate
+# past it, and saturates — a compressive nonlinearity approaching
+# the bound asymptotically — so a pathological illuminant estimate
 # cannot invert the frame.
 _ADAPT_STRENGTH = 0.8
 _GAIN_LO, _GAIN_HI = 0.5, 2.0
+
+
+def _saturate_gain(gains: np.ndarray) -> np.ndarray:
+    """Softsign saturation on the adaptation gain.
+
+    Real gain mechanisms do not clip — they compress. The softsign
+    1 + d/(1 + |d|) rises with slope 1 at the neutral point and
+    approaches its bounds asymptotically, the same divisive
+    nonlinearity a photoreceptor applies to light. Gains are
+    positive ratios, so d > −1 always, and the output lives in
+    (_GAIN_LO, _GAIN_HI) by construction: ordinary illuminants adapt
+    at nearly full strength while pathological estimates saturate
+    without ever reaching — or crossing — the bound.
+    """
+    d = gains - 1.0
+    return 1.0 + d / (1.0 + np.abs(d))
+
 
 # Only a near-achromatic surface shows the light's colour plainly —
 # its chromaticity IS the illuminant's, where a saturated surface
@@ -175,7 +193,7 @@ def _von_kries(frame: np.ndarray, illuminant: np.ndarray, confidence: float = 1.
     luma_ill = float(illuminant @ np.array([0.299, 0.587, 0.114], dtype=np.float64))
     gains = luma_ill / np.maximum(illuminant, _EPS)
     gains = 1.0 + _ADAPT_STRENGTH * confidence * (gains - 1.0)
-    gains = np.clip(gains, _GAIN_LO, _GAIN_HI).astype(np.float32)
+    gains = _saturate_gain(gains).astype(np.float32)
     return np.clip(frame.astype(np.float32) * gains, 0.0, 255.0).astype(np.uint8)
 
 

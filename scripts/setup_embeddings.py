@@ -20,9 +20,14 @@ import os
 import sys
 import tempfile
 import zipfile
+from pathlib import Path
 from typing import TYPE_CHECKING
 
-from infrastructure.config import default_data_dir
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+for _world in ("Self_World", "Inner_World", "Outer_World"):
+    sys.path.insert(0, str(_REPO_ROOT / _world))
+
+from infrastructure.config import default_data_dir  # noqa: E402
 
 if TYPE_CHECKING:
     import numpy as np
@@ -57,7 +62,6 @@ def _load_concept_vocab(data_dir: str) -> tuple[object, set[str]] | None:
 
     Returns (network, vocab) or None if no saved state is found.
     """
-    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from infrastructure.persistence import load_state, restore_network
     from temporal_lobe.concepts import ConceptNetwork
 

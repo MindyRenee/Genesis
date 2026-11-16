@@ -38,6 +38,7 @@ import logging
 import math
 import random
 import time
+import traceback
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
@@ -161,7 +162,7 @@ class MemoryRecord:
 
     Attributes:
         episode_id: The LTM episode ID (matches the Rust store).
-        salience: Memory salience [0..1] — may be modified by
+        salience: Finite memory salience/evidence — may be modified by
             reconsolidation.
         emotional_tag: EMOTIONAL_TAG_SIZE-chemical emotional snapshot (mutable —
             reconsolidation can re-tag).
@@ -256,7 +257,7 @@ class SourceTag:
               percept, notice) — not addressed to it like conversation
         modality: How the memory was received — "text", "visual",
             "auditory", "internal".
-        confidence: Confidence in the source attribution [0..1].
+        confidence: Finite confidence in the source attribution.
             Lower confidence means the source is uncertain, increasing
             the risk of source monitoring errors.
     """
@@ -579,7 +580,7 @@ class MemorySystem:
 
         Args:
             text: The memory text content.
-            salience: Memory salience [0..1].
+            salience: Finite memory salience/evidence.
             emotional_tag: Advisory chemical snapshot — the daemon
                 stamps the tag from its own live effective levels on
                 store, and the returned stamped tag is what the
@@ -592,8 +593,8 @@ class MemorySystem:
                 "learning", "inference", "imagination",
                 "self_analysis", "unknown". Used for reality
                 monitoring (Johnson et al., 1993).
-            source_confidence: Confidence in the source attribution
-                [0..1]. Lower values indicate uncertain source, which
+            source_confidence: Finite confidence in the source attribution.
+                Lower values indicate uncertain source, which
                 increases the risk of source monitoring errors.
             memory_mode: Theta-gamma coupling mode — "encoding",
                 "retrieval", or "balanced". In encoding mode, salience
@@ -605,23 +606,35 @@ class MemorySystem:
                 (``SomaticSnapshot.to_dict()``). When None, the
                 engine consults ``somatic_provider`` if wired.
         """
+        # The daemon refuses empty episode text — don't burn the
+        # round-trip on a store that cannot succeed. The warning keeps
+        # the upstream composition gap visible instead of surfacing
+        # only as daemon-side log noise.
+        if not text or not text.strip():
+            caller = traceback.extract_stack(limit=2)[0]
+            logger.warning(
+                "store_memory refused empty text (caller: %s:%d in %s)",
+                caller.filename,
+                caller.lineno,
+                caller.name,
+            )
+            return False
+
         # Theta-gamma coupling gates encoding strength.
         # In encoding mode, the theta trough aligns gamma bursts for
         # new association formation — boost salience so the memory is
         # more likely to consolidate. In retrieval mode, dampen it.
+        salience = _finite_or(salience, 0.5)
         if memory_mode == "encoding":
-            salience = min(1.0, salience * 1.2)
+            salience = _finite_or(salience * 1.2, 0.5)
         elif memory_mode == "retrieval":
-            salience = max(0.0, salience * 0.8)
+            salience = _finite_or(salience * 0.8, 0.5)
 
-        # Clamp salience and emotional_tag to [0,1] with NaN/Inf
-        # replaced by neutral defaults, matching the Rust IPC's
-        # finite_clamp. This ensures the Python-side MemoryRecord,
-        # the Rust-side LTM store, and the wired subsystems all
-        # agree on the same values.
-        salience = _finite_clamp(salience, 0.0, 1.0, default=0.5)
+        # Preserve finite evidence verbatim; malformed/non-finite
+        # inputs use neutral defaults so the Python record and the
+        # daemon store see the same values.
         if emotional_tag is not None:
-            emotional_tag = [_finite_clamp(v, 0.0, 1.0, default=0.5) for v in emotional_tag]
+            emotional_tag = [_finite_or(v, 0.5) for v in emotional_tag]
         eid, stamped_tag = self.client.store_episode(
             timestamp=int(time.time() * 1000),
             event_type=event_type,
@@ -676,15 +689,12 @@ class MemorySystem:
         ``store_episode``. The record tracks consolidation state that
         the Rust store doesn't hold.
 
-        Salience and emotional_tag are clamped to [0,1] with NaN/Inf
-        replaced by neutral defaults, matching the Rust IPC's
-        ``finite_clamp``. Without this, the Python-side record and the
-        Rust-side store would disagree on salience when the caller
-        passes out-of-range values, causing the forgetting formula
-        (which scales tau by rec.salience) to produce incorrect decay.
+        Salience and emotional_tag preserve finite evidence verbatim;
+        malformed/non-finite inputs use neutral defaults so the
+        Python-side record and the Rust-side store agree.
         """
-        clean_salience = _finite_clamp(salience, 0.0, 1.0, default=0.5)
-        clean_tag = [_finite_clamp(v, 0.0, 1.0, default=0.5) for v in emotional_tag]
+        clean_salience = _finite_or(salience, 0.5)
+        clean_tag = [_finite_or(v, 0.5) for v in emotional_tag]
         record = MemoryRecord(
             episode_id=eid,
             salience=clean_salience,
@@ -694,13 +704,13 @@ class MemorySystem:
             source_tag=SourceTag(
                 source=source if source in VALID_SOURCES else "unknown",
                 modality="text",
-                confidence=max(0.0, min(1.0, source_confidence)),
+                confidence=_finite_or(source_confidence, 0.8),
             ),
             somatic=dict(somatic) if isinstance(somatic, dict) else None,
             # Encoding sets the synaptic tag proportional to induction
             # strength (Frey & Morris): a weakly-encoded trace tags
             # weakly and needs a bigger dopaminergic event to persist.
-            tag_strength=clean_salience,
+            tag_strength=_bounded01(clean_salience, default=0.0),
         )
         self._records[eid] = record
 
@@ -1544,9 +1554,9 @@ class MemorySystem:
             # Base score: salience minus normalised hamming distance.
             # hamming_distance is the number of differing bits between
             # 64-bit SimHash fingerprints, so it ranges [0, 64].
-            # Dividing by 64 normalises it to [0, 1] to match the
-            # salience range [0, 1], so the two terms contribute on the
-            # same scale.
+            # Dividing by 64 normalises semantic distance to [0, 1],
+            # giving it a fixed comparison scale against the finite
+            # salience evidence term.
             base = r.salience - (r.hamming_distance / 64.0)
             rec = self._records.get(r.episode_id)
             if rec is None or rec.forgotten:
@@ -2153,10 +2163,13 @@ class MemorySystem:
         """
         # ── 1. Ebbinghaus decay ───────────────────────────────
         age_s = max(0.0, (now_ms - rec.encoded_at) / 1000.0)
-        # Salience scales tau: salient memories decay slower.
-        salience_factor = 0.3 + rec.salience  # 0.3..1.3
+        # Salience scales tau: salient memories decay slower. The raw
+        # salience stays finite; only its positive contribution can be
+        # a physical time constant. At or below the dead zone the trace
+        # has no effective persistence horizon.
+        salience_factor = max(0.0, 0.3 + _finite_or(rec.salience, 0.0))
         tau = self._FORGETTING_TAU * salience_factor
-        decayed = math.exp(-age_s / tau)
+        decayed = math.exp(-age_s / tau) if tau > 0.0 else 0.0
 
         # ── 2. Proactive + retroactive interference ────────────
         # Older memories encoded close in time interfere with this
@@ -2197,7 +2210,7 @@ class MemorySystem:
         # time-based multiplicative factor, not a per-call penalty.
         since_access_s = max(0.0, (now_ms - rec.last_accessed) / 1000.0)
         # Retrieval probability decays with disuse.
-        retrieval_prob = math.exp(-since_access_s / (tau * 2.0))
+        retrieval_prob = math.exp(-since_access_s / (tau * 2.0)) if tau > 0.0 else 0.0
         retrieval_mult = 0.8 if retrieval_prob < 0.1 else 1.0
 
         # ── 4. Adaptive forgetting ───────────────────────────
@@ -2268,31 +2281,35 @@ class MemorySystem:
             return False
 
         # Apply strength modification (strengthen or weaken).
-        rec.salience = max(0.0, min(1.0, rec.salience + modification.strength_delta))
-        rec.retention = max(0.0, min(1.0, rec.retention + modification.strength_delta))
-        rec.synaptic_strength = max(
-            0.0,
-            min(1.0, rec.synaptic_strength + modification.strength_delta),
+        strength_delta = _finite_or(modification.strength_delta, 0.0)
+        rec.salience = _finite_or(
+            _finite_or(rec.salience, 0.5) + strength_delta,
+            rec.salience,
         )
+        retention = _bounded01(rec.retention, default=1.0)
+        rec.retention = _bounded01(retention + strength_delta, default=retention)
+        synaptic = _bounded01(rec.synaptic_strength, default=0.3)
+        rec.synaptic_strength = _bounded01(synaptic + strength_delta, default=synaptic)
 
         # Emotional modulation: blend the current emotional state
         # into the memory's emotional tag.
         if modification.emotional_tag is not None:
-            blend = max(0.0, min(1.0, modification.blend_factor))
+            blend = _bounded01(modification.blend_factor, default=0.0)
             for i in range(min(len(rec.emotional_tag), len(modification.emotional_tag))):
-                rec.emotional_tag[i] = max(
-                    0.0,
-                    min(
-                        1.0,
-                        rec.emotional_tag[i] * (1.0 - blend)
-                        + modification.emotional_tag[i] * blend,
-                    ),
+                current = _finite_or(rec.emotional_tag[i], 0.5)
+                incoming = _finite_or(modification.emotional_tag[i], current)
+                rec.emotional_tag[i] = _finite_or(
+                    current * (1.0 - blend) + incoming * blend,
+                    current,
                 )
 
         # Reconsolidation re-destabilizes the synapse — the re-stored
         # trace carries a fresh tag, so a dopaminergic event inside
         # the new window can re-commit it at the modified strength.
-        rec.tag_strength = max(rec.tag_strength, rec.salience)
+        rec.tag_strength = _bounded01(
+            max(rec.tag_strength, rec.salience),
+            default=rec.tag_strength,
+        )
         # Close the reconsolidation window (memory is re-stored).
         rec.reconsolidation_window = 0.0
         rec.last_reconsolidated = int(time.time() * 1000)
@@ -2337,8 +2354,9 @@ class MemorySystem:
 
         Args:
             dt: Elapsed time in seconds.
-            dopamine: The body's current effective dopamine level
-                [0, 1]. Below the capture threshold only decay runs.
+            dopamine: The body's current effective dopamine level,
+                finite and uncapped. Below the capture threshold only
+                decay runs.
             norepinephrine: The body's effective noradrenaline level
                 [0, 1] — the emotional-arousal co-gate.
 
@@ -2611,31 +2629,40 @@ class MemorySystem:
                 source_tag = SourceTag(
                     source=source if source in VALID_SOURCES else "unknown",
                     modality=entry.get("source_modality", "text"),
-                    confidence=max(0.0, min(1.0, float(entry.get("source_confidence", 0.8)))),
+                    confidence=_finite_or(entry.get("source_confidence", 0.8), 0.8),
                 )
             rec = MemoryRecord(
                 episode_id=eid,
-                salience=float(entry.get("salience", 0.5)),
-                emotional_tag=list(entry.get("emotional_tag", [0.5] * EMOTIONAL_TAG_SIZE)),
+                salience=_finite_or(entry.get("salience", 0.5), 0.5),
+                emotional_tag=[
+                    _finite_or(v, 0.5)
+                    for v in entry.get("emotional_tag", [0.5] * EMOTIONAL_TAG_SIZE)
+                ],
                 encoded_at=int(entry.get("encoded_at", 0)),
                 last_accessed=int(entry.get("last_accessed", 0)),
-                access_count=int(entry.get("access_count", 0)),
-                hippocampal_dependency=float(entry.get("hippocampal_dependency", 1.0)),
-                synaptic_strength=float(entry.get("synaptic_strength", 0.3)),
-                systems_strength=float(entry.get("systems_strength", 0.0)),
-                retention=float(entry.get("retention", 1.0)),
+                access_count=max(0, int(entry.get("access_count", 0))),
+                hippocampal_dependency=_bounded01(
+                    entry.get("hippocampal_dependency", 1.0),
+                    default=1.0,
+                ),
+                synaptic_strength=_bounded01(entry.get("synaptic_strength", 0.3), default=0.3),
+                systems_strength=_bounded01(entry.get("systems_strength", 0.0), default=0.0),
+                retention=_bounded01(entry.get("retention", 1.0), default=1.0),
                 forgotten=bool(entry.get("forgotten", False)),
-                reconsolidation_window=float(entry.get("reconsolidation_window", 0.0)),
+                reconsolidation_window=max(
+                    0.0,
+                    _finite_or(entry.get("reconsolidation_window", 0.0), 0.0),
+                ),
                 last_reconsolidated=int(entry.get("last_reconsolidated", 0)),
-                reconsolidation_count=int(entry.get("reconsolidation_count", 0)),
+                reconsolidation_count=max(0, int(entry.get("reconsolidation_count", 0))),
                 source_tag=source_tag,
                 somatic=(
-                    {k: float(v) for k, v in entry["somatic"].items()}
+                    {k: _finite_or(v, 0.0) for k, v in entry["somatic"].items()}
                     if isinstance(entry.get("somatic"), dict)
                     else None
                 ),
-                tag_strength=float(entry.get("tag_strength", 0.0)),
-                late_strength=float(entry.get("late_strength", 0.0)),
+                tag_strength=_bounded01(entry.get("tag_strength", 0.0), default=0.0),
+                late_strength=_bounded01(entry.get("late_strength", 0.0), default=0.0),
             )
             self._records[eid] = rec
         self._protein_pool = max(
@@ -2670,17 +2697,18 @@ def _emotional_intensity(tag: list[float]) -> float:
     return min(1.0, 0.5 * arousal + 0.5 * min(1.0, variance * 4.0))
 
 
-def _finite_clamp(value: float, lo: float, hi: float, *, default: float = 0.5) -> float:
-    """Clamp a float to [lo, hi], replacing NaN/Inf with a default.
+def _finite_or(value: float, default: float) -> float:
+    """Return finite floats; malformed/non-finite inputs use ``default``."""
+    try:
+        result = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return default
+    return result if math.isfinite(result) else default
 
-    Mirrors the Rust daemon's ``finite_clamp``: non-finite values
-    (NaN, +Inf, -Inf) are replaced by ``default`` before clamping to
-    the range. This prevents NaN from propagating through the
-    forgetting and consolidation formulas.
-    """
-    if math.isnan(value) or math.isinf(value):
-        return max(lo, min(hi, default))
-    return max(lo, min(hi, value))
+
+def _bounded01(value: float, *, default: float = 0.5) -> float:
+    """Sanitize a bounded model-state variable to [0, 1]."""
+    return max(0.0, min(1.0, _finite_or(value, default)))
 
 
 def _emotional_similarity(a: list[float], b: list[float]) -> float:

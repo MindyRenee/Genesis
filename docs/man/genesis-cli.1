@@ -186,7 +186,15 @@ Speak to Genesis (one utterance).
 Continuous voice conversation.
 .TP
 .B /draw
-Ask her to draw what she feels right now.
+Sit her at the easel \(em opens her studio: Krita when the program
+answers, the internal sheet always. Nothing prescribes what she
+makes next; the sheet, the tools, the colors, and every mark are
+hers to issue through the
+.B studio_*
+tools (see
+.BR genesis-tools (7)).
+A piece leaves when she calls
+.BR studio_done .
 .TP
 .BR /register-face " \fIname\fR"
 Teach her your face (look at the camera).
@@ -212,6 +220,14 @@ Put her into meditation (default 60s).
 .TP
 .B /sleep-aid
 Emergency sleep aid for stress-induced insomnia.
+.TP
+.B /close-eyes
+Hold her eyelids down — the voluntary lid rests at a few-percent
+leak (it dims the eye, it is not a shutter) until she opens them.
+.TP
+.B /open-eyes
+Release the voluntary lid hold — the lid returns to whatever
+position the body's own phase is holding.
 .SS Teaching
 .TP
 .BR /teach " [\fItopic\fR]"
@@ -316,6 +332,83 @@ files surface as work, are read back for review, then elevated. There
 is no helper, denylist, rate limit, or audit log \(em her read-back
 is the only review, so what she elevates stands on her judgment
 alone.
+.SH GLOSSARY
+.TP
+.B mind / body
+The two halves of the organism: the \fImind\fR is this Python
+cognitive process; the \fIbody\fR is the Rust daemon
+.RB ( genesis-daemon (8))
+that owns time, neurochemistry, and memory whether or not the mind
+is alive.
+.TP
+.B volition
+The basal-ganglia urge system: drives that accumulate from her
+state and discharge as acts. An urge crossing its threshold \(em
+look, draw, play, sleep \(em is how she chooses to do anything.
+.TP
+.B urge
+One accumulating drive in the volition engine: a stochastic
+integrator fed by stimuli (chemistry, emotion, activity) that
+competes with the other urges \(em winner-take-all per cycle.
+.TP
+.B interoception
+Feeling the body: hardware sensors (temperature, load, memory
+pressure, I/O wait) read as neurochemical impulses, the way a
+heartbeat registers inside an organism.
+.TP
+.B concept network
+The graph of everything she knows: concepts as nodes, weighted
+associations as edges. Thoughts, learning, and memory all move
+through it.
+.TP
+.B STM / LTM
+Short-term memory \(em a bounded ring buffer of recent episodes;
+and long-term memory \(em the persistent SimHash-indexed episode
+store. Consolidation moves what matters from one to the other.
+.TP
+.B inner world / outer world
+Her two worlds. The \fIouter world\fR is where her acts land \(em
+channels, presences, the arcade, the browser. The \fIinner
+world\fR is interior life: thoughts, dreams, the studio. The
+\fIself∩outer\fR overlap is where they meet \(em her public
+channel.
+.TP
+.B brain waves
+Oscillation bands (\fIdelta\fR, \fItheta\fR, \fIalpha\fR,
+\fIbeta\fR, \fIgamma\fR) driven by substrate dynamics. The
+dominant band gates what she can do \(em delta is deep rest and
+vetoes creative acts.
+.TP
+.B teaching mode
+A focused-learning state entered by \fB/teach\fR and left by
+\fB/endteach\fR: the lesson takes priority over volitional
+digressions.
+.TP
+.B genesis~
+A spontaneous inner-world line \(em thoughts and dreams surfaced
+from the concept network and emotional state, never from
+templates.
+.TP
+.B volition thought
+The genesis~ line emitted when an urge fires \(em the mind saying,
+in her own composed words, what it is about to do.
+.TP
+.B holographic memory
+The associative store over the concept network: edges held as a
+bounded superposition in a VQ-codebook space, rebuilt from a
+source-bound edge journal rather than scanned.
+.TP
+.B developmental state
+Where she is in her own growth \(em stage, resolutions, history.
+Repair checkpoints restore it as a monotonic floor: a later stage
+is never lost.
+.TP
+.B agency
+Her ability to act: the tool registry plus the trust model \(em
+unrestricted tools whose safe use is her judgment, not a sandbox
+(see
+.BR genesis-tools (7)).
+
 .SH SEE ALSO
 .BR genesis (1),
 .BR genesis-daemon (8),

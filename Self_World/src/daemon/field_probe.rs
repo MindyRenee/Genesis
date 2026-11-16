@@ -1,6 +1,6 @@
 //! Physical field probe — the body listening to its own substrate.
 //!
-//! Genesis's brain-wave model (`Inner_Non_Physical_World/brain_waves.py`) is a
+//! Genesis's brain-wave model (`Inner_World/brain_waves.py`) is a
 //! coupled oscillator: real phase and amplitude state, but driven
 //! entirely by *simulated* quantities — neurochemical targets and
 //! top-down cognitive drive. This module closes one direction of the
@@ -95,7 +95,8 @@
 //!
 //! The probe also *writes* a rhythm: its work-slice length is
 //! modulated sinusoidally at a frequency set by the daemon's own
-//! sleep-wake phase (wake ≈ 10 Hz, REM ≈ 5.5 Hz, NREM ≈ 2.25 Hz).
+//! sleep-wake phase (wake ≈ 10 Hz, drowsy/REM ≈ 5.5 Hz,
+//! NREM ≈ 2.25 Hz).
 //! Modulated work is modulated current — the die's draw genuinely
 //! swings at the body's rhythm. Whether it *measurably* does is no
 //! longer assumed: the power channel is demodulated against the
@@ -129,11 +130,11 @@
 //! # Wire layout — GET_FIELD_PROBE = 47
 //!
 //! ```text
-//! [u8 version = 3]
+//! [u8 version = 6]
 //! [10 × f32 throughput band energy]   (normalized to own baseline)
 //! [10 × f32 jitter band energy]
 //! [f32 throughput_mean_iters_s]
-//! [f32 jitter_cv]
+//! [f32 jitter_cv]                       (RMS period error / nominal period)
 //! [f32 pstate_trans_rate_s]
 //! [f32 irq_rate_s]
 //! [f32 carrier_freq_hz]               (0 = carrier off)
@@ -187,14 +188,14 @@
 //! assumption.
 //! Additive — PROTOCOL_VERSION unchanged.
 
+use crate::inhibition::{Inhibition, Innate};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 /// Center frequencies (Hz) of the ten wave bands, ordered
 /// slowest→fastest and matched to `BrainWave` in
-/// `Inner_Non_Physical_World/brain_waves.py`:
+/// `Inner_World/brain_waves.py`:
 /// infraslow, delta, theta, alpha, sigma, beta1, beta2, beta3,
 /// gamma, epsilon.
 ///
@@ -217,14 +218,13 @@ const RING_LEN: usize = 1024;
 /// enough to measure, small enough to cost ~5% of one thread.
 const WORK_SLICE_ITERS: u32 = 4096;
 
-/// Carrier frequency — the body's rhythm written into real work,
-/// one rate for every phase: 10 Hz, the alpha-band center she was
-/// born at. Phase keying stays in place for the day it earns its
-/// way back; until then the beat does not wander.
+/// Carrier frequencies — the body's phase written into real work at
+/// the wave model's own band centers: wake alpha, drowsy/REM theta,
+/// NREM delta.
 const CARRIER_WAKE_HZ: f32 = 10.0;
-const CARRIER_DROWSY_HZ: f32 = 10.0;
-const CARRIER_REM_HZ: f32 = 10.0;
-const CARRIER_NREM_HZ: f32 = 10.0;
+const CARRIER_DROWSY_HZ: f32 = 5.5;
+const CARRIER_REM_HZ: f32 = 5.5;
+const CARRIER_NREM_HZ: f32 = 2.25;
 
 /// Baseline tracking time constant (seconds). The per-call EMA
 /// weight is α = 1 − e^(−dt/τ) — the baseline ages with the wall
@@ -611,18 +611,26 @@ enum PowerSource {
 
 /// Wrap-safe energy-counter delta in µJ. `max_range` is the value the
 /// counter wraps at (`max_energy_range_uj`); `u64::MAX` when the
-/// driver doesn't publish one — the subtraction then saturates
-/// honestly rather than wrapping silently.
+/// driver doesn't publish one. An unbounded counter moving backwards
+/// is a discontinuity with no attributable energy — report the absent
+/// interval rather than inventing an enormous wattage.
 fn energy_delta_uj(cur: u64, prev: u64, max_range: u64) -> u64 {
     if cur >= prev {
         cur - prev
+    } else if max_range == u64::MAX {
+        0
     } else {
         max_range.saturating_sub(prev).saturating_add(cur)
     }
 }
 
 fn read_f64(path: &Path) -> Option<f64> {
-    std::fs::read_to_string(path).ok()?.trim().parse().ok()
+    std::fs::read_to_string(path)
+        .ok()?
+        .trim()
+        .parse::<f64>()
+        .ok()
+        .filter(|v| v.is_finite())
 }
 
 fn read_u64(path: &Path) -> Option<u64> {
@@ -825,14 +833,24 @@ fn parse_wireless_levels(content: &str) -> (bool, Option<f32>, Option<f32>) {
             continue;
         }
         seen = true;
-        let parse_dbm = |s: &str| s.trim_end_matches('.').parse::<f32>().ok();
-        if let Some(level) = parse_dbm(t[2]).filter(|v| *v != 0.0) {
+        // The quality `link` column is a positive unitless score;
+        // `level` and `noise` are only dBm where the driver reports a
+        // negative value. A positive number cannot be emitted as dBm.
+        let parse_dbm = |s: &str| {
+            s.trim_end_matches('.')
+                .parse::<f32>()
+                .ok()
+                .filter(|v| v.is_finite() && *v < 0.0 && *v > DBM_ABSENT_FLOOR)
+        };
+        let level = parse_dbm(t[2]);
+        let noise = parse_dbm(t[3]);
+        if let Some(level) = level {
             if level_best.is_none_or(|b| level > b) {
                 level_best = Some(level);
+                noise_out = noise;
             }
-        }
-        if let Some(noise) = parse_dbm(t[3]).filter(|v| *v > DBM_ABSENT_FLOOR) {
-            noise_out = Some(noise);
+        } else if level_best.is_none() {
+            noise_out = noise;
         }
     }
     (seen, level_best, noise_out)
@@ -999,7 +1017,7 @@ fn read_bt_link_rssi(hci: &str) -> Option<f32> {
             .split("RSSI return value:")
             .nth(1)
             .and_then(|s| s.trim().parse::<f32>().ok())
-            .filter(|v| *v != 0.0)
+            .filter(|v| v.is_finite() && *v < 0.0)
         {
             sum += v;
             n += 1;
@@ -1045,14 +1063,16 @@ fn parse_iw_station(content: &str) -> Option<IwStation> {
         };
         let key = key.trim();
         let tok = rest.split_whitespace().next().unwrap_or("");
+        let parse_f32 = |s: &str| s.parse::<f32>().ok().filter(|v| v.is_finite());
+        let parse_dbm = |s: &str| parse_f32(s).filter(|v| *v < 0.0);
         match key {
-            "signal" => st.signal_dbm = tok.parse().ok(),
-            "signal avg" => st.signal_avg_dbm = tok.parse().ok(),
+            "signal" => st.signal_dbm = parse_dbm(tok),
+            "signal avg" => st.signal_avg_dbm = parse_dbm(tok),
             "tx retries" => st.tx_retries = tok.parse().unwrap_or(0),
             "tx failed" => st.tx_failed = tok.parse().unwrap_or(0),
             "beacon loss" => st.beacon_loss = tok.parse().unwrap_or(0),
-            "tx bitrate" => st.tx_mbps = tok.parse().ok(),
-            "rx bitrate" => st.rx_mbps = tok.parse().ok(),
+            "tx bitrate" => st.tx_mbps = parse_f32(tok),
+            "rx bitrate" => st.rx_mbps = parse_f32(tok),
             _ => {}
         }
     }
@@ -1572,19 +1592,19 @@ struct ProbeInner {
 /// The running probe. `spawn`ed once by the daemon; `signature` is
 /// called by the IPC handler at the mind's cadence.
 pub struct FieldProbe {
-    inner: Mutex<ProbeInner>,
+    inner: Inhibition<ProbeInner>,
     /// Serializes a signature's snapshot→compute→apply cycle so two
     /// concurrent readers can't interleave their baseline write-backs.
     /// Uncontended in practice — held for the resonator passes too, so
     /// `inner` stays µs-held while the math runs lock-free.
-    sig_lock: Mutex<()>,
+    sig_lock: Inhibition<()>,
     running: AtomicBool,
     stop: AtomicBool,
 }
 
 /// Process-shared probe handle. Started in `daemon main`, read by
 /// the IPC handler — mirrors how `interoception` shares state.
-static FIELD_PROBE: OnceLock<std::sync::Arc<FieldProbe>> = OnceLock::new();
+static FIELD_PROBE: Innate<std::sync::Arc<FieldProbe>> = Innate::new();
 
 /// Ask RealtimeKit to lift this thread out of bulk SCHED_OTHER
 /// competition — the unprivileged scheduling boost (rtkit-daemon
@@ -1599,7 +1619,7 @@ static FIELD_PROBE: OnceLock<std::sync::Arc<FieldProbe>> = OnceLock::new();
 /// which is why a one-shot `dbus-send` cannot do this job. An
 /// absent service or a refusal leaves scheduling as it was —
 /// degraded jitter, never a failure.
-fn request_scheduling_boost(inner: &Mutex<ProbeInner>) {
+fn request_scheduling_boost(inner: &Inhibition<ProbeInner>) {
     let pid = std::process::id() as u64;
     // SAFETY: SYS_gettid takes no arguments and cannot fail — the
     // raw syscall always returns the calling thread's id.
@@ -1684,8 +1704,8 @@ impl FieldProbe {
     fn new() -> Self {
         Self {
             running: AtomicBool::new(false),
-            sig_lock: Mutex::new(()),
-            inner: Mutex::new(ProbeInner {
+            sig_lock: Inhibition::new(()),
+            inner: Inhibition::new(ProbeInner {
                 throughput: Channel::new(),
                 jitter: Channel::new(),
                 carrier_ref: Channel::new(),
@@ -1741,8 +1761,10 @@ impl FieldProbe {
     /// the resolvable band.
     pub fn set_carrier(&self, depth: f32, freq: f32) {
         let mut g = self.inner.lock().unwrap_or_else(|e| e.into_inner());
-        g.carrier_depth = depth.clamp(0.0, 1.0);
-        g.carrier_freq_override = if freq > 0.0 {
+        if depth.is_finite() {
+            g.carrier_depth = depth.clamp(0.0, 1.0);
+        }
+        g.carrier_freq_override = if freq.is_finite() && freq > 0.0 {
             freq.clamp(0.1, 100.0)
         } else {
             0.0
@@ -1759,11 +1781,19 @@ impl FieldProbe {
     /// carrier and above the bath's own weather).
     pub fn set_pulse(&self, base: f32, mod_freq: f32, mod_depth: f32) {
         let mut g = self.inner.lock().unwrap_or_else(|e| e.into_inner());
-        g.pulse_armed = mod_freq > 0.0;
+        g.pulse_armed = mod_freq.is_finite() && mod_freq > 0.0;
         if g.pulse_armed {
-            g.pulse_base = base.clamp(0.0, 1.0);
+            g.pulse_base = if base.is_finite() {
+                base.clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
             g.pulse_mod_freq = mod_freq.clamp(0.01, 4.0);
-            g.pulse_mod_depth = mod_depth.clamp(0.0, 1.0);
+            g.pulse_mod_depth = if mod_depth.is_finite() {
+                mod_depth.clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
         }
     }
 
@@ -1834,8 +1864,11 @@ impl FieldProbe {
         };
         while !self.stop.load(Ordering::Relaxed) {
             let t0 = Instant::now();
-            // Jitter: how long since the last iteration actually ran.
-            let jitter = (t0 - prev).as_secs_f32() - nominal;
+            // Jitter and the real sample interval: carrier phase,
+            // pulse phase, and counter rates all advance on measured
+            // elapsed time, never the nominal cadence.
+            let period = (t0 - prev).as_secs_f32();
+            let jitter = period - nominal;
             prev = t0;
 
             // Carrier-modulated work slice: the body's phase (or an
@@ -1890,13 +1923,13 @@ impl FieldProbe {
                     g.radio.has_wlan_irq |= wintr.1;
                     g.last_slow = Instant::now();
                 }
-                g.carrier_phase += 2.0 * std::f32::consts::PI * carrier_f * nominal;
+                g.carrier_phase += 2.0 * std::f32::consts::PI * carrier_f * period;
                 g.carrier_phase = g.carrier_phase.rem_euclid(2.0 * std::f32::consts::PI);
                 carrier_phase = g.carrier_phase;
                 depth = if g.pulse_armed {
                     // The pulse's own clock — the wave breathes on the
                     // body's time even when the mind isn't ticking.
-                    g.pulse_phase += 2.0 * std::f32::consts::PI * g.pulse_mod_freq * nominal;
+                    g.pulse_phase += 2.0 * std::f32::consts::PI * g.pulse_mod_freq * period;
                     g.pulse_phase = g.pulse_phase.rem_euclid(2.0 * std::f32::consts::PI);
                     (g.pulse_base + g.pulse_mod_depth * g.pulse_phase.sin()).clamp(0.0, 1.0)
                 } else {
@@ -1928,7 +1961,7 @@ impl FieldProbe {
                 Some(cur) => {
                     let d = cur.saturating_sub(g.radio.last_bytes) as f32;
                     g.radio.last_bytes = cur;
-                    d / nominal
+                    d / period.max(1e-6)
                 }
                 None => 0.0,
             };
@@ -2032,7 +2065,7 @@ impl FieldProbe {
     }
 
     /// Compute the current signature. Called by the IPC handler.
-    /// Returns the 328-byte wire body (version byte included).
+    /// Returns the 408-byte wire body (version byte included).
     ///
     /// Three phases: snapshot the rings + scalars under `inner`
     /// (memcpy-scale microseconds), compute the resonator/demodulate/
@@ -2145,15 +2178,11 @@ impl FieldProbe {
         let (rf_raw, rf_phase, rf_coh) = Channel::raw_band_phasors(&rf_s);
         let rr_raw = Channel::raw_band_powers(&rr_s);
         let jvar = (jitter_sq_mean - jitter_mean * jitter_mean).max(0.0);
-        // CV is a ratio, not a unit. Mean→0 with real variance means
-        // the variation dominates — the honest report is the ceiling,
-        // not a rescaled RMS in a dimensionless field. Zero variance
-        // means the channel is quiescent.
-        let jcv = if jvar > 0.0 {
-            (jvar.sqrt() / jitter_mean.abs()).min(8.0)
-        } else {
-            0.0
-        };
+        // Jitter is a signed period error centered near zero, so a
+        // coefficient of variation against its mean is unstable. The
+        // wire field reports RMS period error relative to the nominal
+        // 4 ms period — the same dimensionless scale the bath uses.
+        let jcv = jvar.sqrt() / PROBE_PERIOD.as_secs_f32();
 
         // The measured phase: demodulate the real response against
         // the generator's own phase track. The duty channel is the
@@ -2335,10 +2364,10 @@ mod tests {
 
     #[test]
     fn carrier_maps_phase() {
-        assert_eq!(FieldProbe::carrier_for_phase("nrem"), CARRIER_NREM_HZ);
-        assert_eq!(FieldProbe::carrier_for_phase("rem"), CARRIER_REM_HZ);
-        assert_eq!(FieldProbe::carrier_for_phase("drowsy"), CARRIER_DROWSY_HZ);
-        assert_eq!(FieldProbe::carrier_for_phase("active"), CARRIER_WAKE_HZ);
+        assert_eq!(FieldProbe::carrier_for_phase("nrem"), 2.25);
+        assert_eq!(FieldProbe::carrier_for_phase("rem"), 5.5);
+        assert_eq!(FieldProbe::carrier_for_phase("drowsy"), 5.5);
+        assert_eq!(FieldProbe::carrier_for_phase("active"), 10.0);
     }
 
     #[test]
@@ -2352,14 +2381,6 @@ mod tests {
             assert_eq!(g.pulse_mod_freq, 0.15);
             assert_eq!(g.pulse_mod_depth, 0.10);
         }
-        // Out-of-range writes clamp, never wrap.
-        probe.set_pulse(2.0, 100.0, -1.0);
-        {
-            let g = probe.inner.lock().unwrap();
-            assert_eq!(g.pulse_base, 1.0);
-            assert_eq!(g.pulse_mod_freq, 4.0);
-            assert_eq!(g.pulse_mod_depth, 0.0);
-        }
         // mod_freq <= 0 disarms; the static set-point is untouched.
         probe.set_pulse(0.0, 0.0, 0.0);
         {
@@ -2367,6 +2388,17 @@ mod tests {
             assert!(!g.pulse_armed);
             assert_eq!(g.carrier_depth, 0.60);
         }
+    }
+
+    #[test]
+    fn nonfinite_controls_do_not_corrupt_state() {
+        let probe = FieldProbe::new();
+        probe.set_carrier(f32::NAN, f32::INFINITY);
+        probe.set_pulse(f32::NAN, f32::INFINITY, f32::NAN);
+        let g = probe.inner.lock().unwrap();
+        assert_eq!(g.carrier_depth, 0.60, "NaN depth leaves set-point");
+        assert_eq!(g.carrier_freq_override, 0.0, "∞ override is absent");
+        assert!(!g.pulse_armed, "∞ pulse frequency disarms");
     }
 
     #[test]
@@ -2506,6 +2538,17 @@ mod tests {
     }
 
     #[test]
+    fn wireless_levels_positive_quality_is_not_dbm() {
+        // Legacy drivers can expose a positive unitless quality score;
+        // only a negative level is a dBm reading.
+        let content = "hdr1\nhdr2\n wlan0: 0000   70.  42.  -90.\n";
+        let (seen, level, noise) = parse_wireless_levels(content);
+        assert!(seen);
+        assert_eq!(level, None);
+        assert_eq!(noise, Some(-90.0));
+    }
+
+    #[test]
     fn wireless_intr_matches_named_drivers_only() {
         let content = "           CPU0       CPU1\n \
              \x20 53:          0          9  IO-APIC    4-fasteoi   ath9k\n \
@@ -2524,6 +2567,9 @@ mod tests {
         assert_eq!(energy_delta_uj(100, 900, 1_000), 200);
         // Equal reads → no energy, never a negative wrap-around spike.
         assert_eq!(energy_delta_uj(500, 500, 1_000), 0);
+        // With no published wrap bound, a backwards read is an absent
+        // interval, not a fabricated near-u64::MAX energy burst.
+        assert_eq!(energy_delta_uj(5, 10, u64::MAX), 0);
     }
 
     #[test]

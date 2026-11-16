@@ -702,8 +702,8 @@ class StatusMixin:
 
         While asleep, the ultradian sleep-cycle tracker's stage is
         passed through as the authoritative N1/N2/N3/REM. The daemon
-        only distinguishes NREM from REM and clamps arousal into
-        0.10-0.25 for the whole of NREM, so the stage cannot be
+        only distinguishes NREM from REM and its sleep-wake
+        network settles NREM arousal near ~0.21, so the stage cannot be
         recovered from the summary; without the tracker the waves
         would report slow-wave N3 for the entire night while
         consolidation ran the full N1→N2→N3→N2→REM architecture.
@@ -1319,6 +1319,10 @@ class StatusMixin:
             # profile for introspection.
             "user_profile_summary": self.user_profile.summarize(),
             "user_interaction_count": self.user_profile.interaction_count,
+            # Attachment as a number for introspection — the felt
+            # state, not a phrase. Its verbal report lives on the
+            # self-inquiry path, not in the profile's summary.
+            "user_bond": self.user_profile.bond,
             # Vision — whether the optic nerve is attached and what it
             # last saw. Exposes last_faces_seen() and last_objects_seen()
             # for introspection so its visual state is visible alongside

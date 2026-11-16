@@ -232,3 +232,17 @@ def test_frequencies_remain_anatomically_identifiable() -> None:
     assert freqs[BrainWave.BETA2] == 17.5
     assert freqs[BrainWave.BETA3] == 25.0
     assert freqs[BrainWave.GAMMA] == 50.0
+
+
+def test_adaptive_interval_preserves_overdrive_and_underdrive() -> None:
+    """Demand is finite-only; the period—not the signal—carries bounds."""
+    from brainstem.metronome import _AdaptiveInterval
+
+    gate = _AdaptiveInterval(1.0, 0.2, 5.0)
+    gate.drive(4.0)
+    assert gate._smoothed > 1.0
+    assert gate.period == gate.minimum
+
+    gate.drive(-10.0)
+    assert gate._smoothed < 0.0
+    assert gate.period == gate.maximum

@@ -71,7 +71,6 @@ from limbic_system.emotional_regulator import (
     AllostaticState,
     HPAAxis,
     HPAState,
-    _clamp01,
 )
 from memory import (
     AttractorNetwork,
@@ -105,6 +104,16 @@ from temporal_lobe.synapses import SynapticStore
 from .narrative import LifeChapter, LifeEvent, Narrator
 
 logger = logging.getLogger(__name__)
+
+
+def _finite_or(value: object, default: float) -> float:
+    """Return ``value`` as a finite float, otherwise ``default``."""
+    try:
+        result = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return default
+    return result if math.isfinite(result) else default
+
 
 # Gzip compression for cognitive_state.json. The file can grow to 10+ MB
 # with a large concept network; gzip reduces it to ~1-2 MB, cutting disk
@@ -203,7 +212,7 @@ def save_state(
         memory_records: Python-side memory metadata (consolidation,
             forgetting, source tags) from ``MemorySystem.serialize_records``.
         world_state: Its external world (presences, recent events,
-            social clock) from ``OuterWorld.to_dict``.
+            social clock) from ``OuterEnvironment.to_dict``.
         curiosity: Asked/resolved question history and gap habituation —
             the novelty window that stops questions re-firing on restart.
         remaining kwargs: Optional subsystem states, each serialized iff
@@ -612,8 +621,8 @@ def _merge_duplicate_sense_suffixes(
         # Merge: take the higher confidence, union aliases/columns,
         # fill in empty definition from the non-empty one.
         base_c["confidence"] = max(
-            base_c.get("confidence", 0.5),
-            dup_c.get("confidence", 0.5),
+            _finite_or(base_c.get("confidence", 0.5), 0.5),
+            _finite_or(dup_c.get("confidence", 0.5), 0.5),
         )
         base_c.setdefault("aliases", [])
         for a in dup_c.get("aliases", []):
@@ -689,25 +698,24 @@ def _restore_concepts(
         old_id = c_data["id"]
         new_id = _normalize_id(old_id)
         id_remap[old_id] = new_id
-        confidence = c_data.get("confidence")
-        if confidence is None:
-            confidence = 0.5
+        confidence = _finite_or(c_data.get("confidence"), 0.5)
+        activation = _finite_or(c_data.get("activation"), 0.0)
 
         # If a concept with this normalized ID already exists (e.g.,
         # from seeding), merge rather than overwrite
         if new_id in network._concepts:
             existing = network._concepts[new_id]
             existing.aliases |= set(c_data.get("aliases", []))
-            existing.activation = max(existing.activation or 0.0, c_data.get("activation") or 0.0)
+            existing.activation = max(_finite_or(existing.activation, 0.0), activation)
             network._mark_active(new_id)
-            existing.confidence = max(existing.confidence, confidence)
+            existing.confidence = max(_finite_or(existing.confidence, 0.5), confidence)
             existing.columns |= set(c_data.get("columns", []))
             existing.properties.update(c_data.get("properties", {}))
         else:
             concept = Concept(
                 id=new_id,
                 aliases=set(c_data.get("aliases", [])),
-                activation=c_data.get("activation") or 0.0,
+                activation=activation,
                 confidence=confidence,
                 origin=c_data.get("origin", "conversation"),
                 columns=set(c_data.get("columns", [])),
@@ -809,7 +817,7 @@ def _restore_edges(
             source=source,
             target=target,
             relation=relation,
-            weight=e_data.get("weight", 0.5),
+            weight=_finite_or(e_data.get("weight", 0.5), 0.5),
             created_at=e_data.get("created_at", 0),
             origin=origin,
         )
@@ -834,39 +842,41 @@ def _restore_edges(
 def restore_reflection(reflection: Reflection, data: dict[str, Any]) -> None:
     """Restore reflection engine state from saved data."""
     reflection._interaction_count = data.get("interaction_count", 0)
+    reflection.insights.clear()
 
     # Restore insights, deduplicating pattern insights that may have
     # accumulated from the pre-cooldown repetition detection. Pattern
     # insights like "overusing inform (7/10)" and "overusing inform (8/10)"
     # are essentially the same insight with slightly different counts.
-    # We deduplicate by extracting the core pattern (e.g., "overusing inform")
-    # and keeping only the most recent occurrence.
-    seen_pattern_keys: set[str] = set()
-    for i_data in data.get("insights", []):
-        insight = Insight(
-            type=i_data["type"],
-            content=i_data["content"],
-            confidence=i_data["confidence"],
-            actionable=i_data.get("actionable", False),
-            action=i_data.get("action", ""),
-            timestamp=i_data.get("timestamp", 0),
+    # Keep the most recent item for each core pattern.
+    def _pattern_key(i_data: dict[str, Any]) -> str:
+        content = i_data["content"]
+        lowered = content.lower()
+        if "overusing" in lowered:
+            return content.split("(")[0].strip().lower()
+        if "repeatedly" in lowered:
+            return "repeatedly"
+        return content[:50].lower()
+
+    insight_data = list(data.get("insights", []))
+    latest_pattern_index = {
+        _pattern_key(i_data): index
+        for index, i_data in enumerate(insight_data)
+        if i_data.get("type") == "pattern"
+    }
+    for index, i_data in enumerate(insight_data):
+        if i_data.get("type") == "pattern" and latest_pattern_index[_pattern_key(i_data)] != index:
+            continue
+        reflection.insights.append(
+            Insight(
+                type=i_data["type"],
+                content=i_data["content"],
+                confidence=_finite_or(i_data.get("confidence", 0.5), 0.5),
+                actionable=i_data.get("actionable", False),
+                action=i_data.get("action", ""),
+                timestamp=i_data.get("timestamp", 0),
+            )
         )
-        # Deduplicate pattern insights by their core message
-        if insight.type == "pattern":
-            # Extract the core pattern (e.g., "overusing 'inform'" or
-            # "responding with 'inform' repeatedly")
-            content = insight.content
-            if "overusing" in content:
-                # Keep only "overusing 'X'" as the key
-                key = content.split("(")[0].strip()
-            elif "repeatedly" in content:
-                key = "repeatedly"
-            else:
-                key = content[:50]
-            if key in seen_pattern_keys:
-                continue
-            seen_pattern_keys.add(key)
-        reflection.insights.append(insight)
 
     # Restore mood history
     reflection._mood_history = deque((tuple(m) for m in data.get("mood_history", [])), maxlen=50)
@@ -898,6 +908,20 @@ def restore_narrative(narrative: Narrator, data: dict[str, Any]) -> None:
     if "born_at" in data:
         narrative._born_at = data["born_at"]
 
+    # ``Mind`` restores into a staged deep copy so a malformed save
+    # cannot corrupt live state. Clear every serialized collection here
+    # so staged contents cannot be merged back in by accident.
+    narrative.events.clear()
+    narrative.chapters.clear()
+    narrative._current_chapter = None
+    narrative._personality_snapshots.clear()
+    for nodes in narrative._hierarchy.values():
+        nodes.clear()
+    narrative._event_to_label.clear()
+    narrative._temporal_links.clear()
+    narrative._links_out.clear()
+    narrative._links_in.clear()
+
     # Restore event counter so new events don't collide with restored
     # ones (e.g., restored event-5 + new event-1 = no collision).
     if "event_counter" in data:
@@ -925,11 +949,11 @@ def restore_narrative(narrative: Narrator, data: dict[str, Any]) -> None:
     # Restore personality snapshots
     for snap in data.get("personality_snapshots", []):
         traits = PersonalityTraits(
-            openness=snap.get("openness", 0.85),
-            conscientiousness=snap.get("conscientiousness", 0.70),
-            extraversion=snap.get("extraversion", 0.60),
-            agreeableness=snap.get("agreeableness", 0.75),
-            neuroticism=snap.get("neuroticism", 0.40),
+            openness=_finite_or(snap.get("openness", 0.85), 0.85),
+            conscientiousness=_finite_or(snap.get("conscientiousness", 0.70), 0.70),
+            extraversion=_finite_or(snap.get("extraversion", 0.60), 0.60),
+            agreeableness=_finite_or(snap.get("agreeableness", 0.75), 0.75),
+            neuroticism=_finite_or(snap.get("neuroticism", 0.40), 0.40),
         )
         narrative._personality_snapshots.append((snap["timestamp"], traits))
 
@@ -945,13 +969,12 @@ def restore_narrative(narrative: Narrator, data: dict[str, Any]) -> None:
                 Milestone(
                     name=m_data["name"],
                     expected_age=m_data["expected_age"],
-                    importance=m_data.get("importance", 0.5),
+                    importance=_finite_or(m_data.get("importance", 0.5), 0.5),
                     reached=m_data.get("reached", False),
                     reached_at=m_data.get("reached_at", 0),
                 )
             )
-        if restored_milestones:
-            narrative.life_script.milestones = restored_milestones
+        narrative.life_script.milestones = restored_milestones
 
     # Restore autobiographical memory hierarchy (Conway, 2005).
     # Backward compat: older saves don't have this key — the hierarchy
@@ -977,7 +1000,7 @@ def restore_narrative(narrative: Narrator, data: dict[str, Any]) -> None:
                 source_id=source,
                 target_id=target,
                 link_type=link_type,
-                weight=max(0.0, min(1.0, link_data.get("weight", 0.5))),
+                weight=_finite_or(link_data.get("weight", 0.5), 0.5),
             )
             narrative._temporal_links.append(link)
             narrative._links_out.setdefault(source, []).append(link)
@@ -1004,7 +1027,7 @@ def _restore_chapters(narrative: Narrator, data: dict[str, Any]) -> None:
                 id=ev_data.get("id", f"event-{ev_data['timestamp']}"),
                 timestamp=ev_data["timestamp"],
                 summary=ev_data["summary"],
-                significance=ev_data["significance"],
+                significance=_finite_or(ev_data["significance"], 0.5),
                 emotion_at_time=ev_data["emotion_at_time"],
                 concepts_involved=ev_data.get("concepts_involved", []),
                 chapter=ev_data.get("chapter", chapter.title),
@@ -1068,11 +1091,11 @@ def restore_self_model(self_model: SelfModel, data: dict[str, Any]) -> None:
     personality_data = data.get("personality")
     if personality_data:
         self_model.personality = PersonalityTraits(
-            openness=personality_data.get("openness", 0.85),
-            conscientiousness=personality_data.get("conscientiousness", 0.70),
-            extraversion=personality_data.get("extraversion", 0.60),
-            agreeableness=personality_data.get("agreeableness", 0.75),
-            neuroticism=personality_data.get("neuroticism", 0.40),
+            openness=_finite_or(personality_data.get("openness", 0.85), 0.85),
+            conscientiousness=_finite_or(personality_data.get("conscientiousness", 0.70), 0.70),
+            extraversion=_finite_or(personality_data.get("extraversion", 0.60), 0.60),
+            agreeableness=_finite_or(personality_data.get("agreeableness", 0.75), 0.75),
+            neuroticism=_finite_or(personality_data.get("neuroticism", 0.40), 0.40),
         )
 
     # Restore self-knowledge entries. Person-name fields are validated:
@@ -1084,6 +1107,7 @@ def restore_self_model(self_model: SelfModel, data: dict[str, Any]) -> None:
     _PERSON_KEYS = {"user_name", "current_speaker", "creator_name"}
     from occipital_lobe.perception.core import is_plausible_name
 
+    self_model.self_knowledge.clear()
     for entry in data.get("self_knowledge", []):
         key = entry["key"]
         value = entry["value"]
@@ -1118,28 +1142,39 @@ def restore_predictive_coding(
 
     sp = predictive_coding.smoothing_prior
 
+    def _to_inner_dict(d: dict[str, Any]) -> defaultdict:
+        """Restore finite learned counts with the smoothing prior as default."""
+        return defaultdict(
+            lambda: sp,
+            {k: _finite_or(v, sp) for k, v in d.items()},
+        )
+
     def _to_nested_dict(d: dict[str, Any]) -> defaultdict:
         """Convert a flat dict into a nested defaultdict with the smoothing prior as default."""
         return defaultdict(
             lambda: defaultdict(lambda: sp),
-            {k: defaultdict(lambda: sp, v) for k, v in d.items()},
+            {k: _to_inner_dict(v) for k, v in d.items() if isinstance(v, dict)},
         )
 
     predictive_coding._topic_transitions = _to_nested_dict(data.get("topic_transitions", {}))
     predictive_coding._intent_transitions = _to_nested_dict(data.get("intent_transitions", {}))
+    predictive_coding._intent_marginal = defaultdict(
+        float,
+        {k: _finite_or(v, 0.0) for k, v in data.get("intent_marginal", {}).items()},
+    )
     predictive_coding._emotion_intents = _to_nested_dict(data.get("emotion_intents", {}))
     raw_hours = data.get("hour_intents", {})
     predictive_coding._hour_intents = defaultdict(
         lambda: defaultdict(lambda: sp),
         {
-            int(k): defaultdict(lambda: sp, values)
+            int(k): _to_inner_dict(values)
             for k, values in raw_hours.items()
-            if str(k).lstrip("-").isdigit()
+            if str(k).lstrip("-").isdigit() and isinstance(values, dict)
         },
     )
     predictive_coding._concept_cooccurrence = _to_nested_dict(data.get("concept_cooccurrence", {}))
-    predictive_coding._surprise_ema = data.get("surprise_ema", 0.0)
-    predictive_coding._accuracy_ema = data.get("accuracy_ema", 1.0)
+    predictive_coding._surprise_ema = _finite_or(data.get("surprise_ema", 0.0), 0.0)
+    predictive_coding._accuracy_ema = _finite_or(data.get("accuracy_ema", 1.0), 1.0)
     predictive_coding._prediction_count = data.get("prediction_count", 0)
 
 
@@ -1152,7 +1187,7 @@ def restore_theory_of_mind(theory_of_mind: TheoryOfMind, data: dict[str, Any]) -
         belief = UserBelief(
             concept=b_data["concept"],
             value=b_data["value"],
-            confidence=b_data.get("confidence", 0.5),
+            confidence=_finite_or(b_data.get("confidence", 0.5), 0.5),
             timestamp=b_data.get("timestamp", 0),
         )
         model.beliefs[belief.concept] = belief
@@ -1169,8 +1204,8 @@ def restore_theory_of_mind(theory_of_mind: TheoryOfMind, data: dict[str, Any]) -
             )  # skip unknown levels
     # Restore scalar fields
     model.emotional_state = model_data.get("emotional_state", "neutral")
-    model.emotional_valence = model_data.get("emotional_valence", 0.0)
-    model.expertise_level = model_data.get("expertise_level", 0.5)
+    model.emotional_valence = _finite_or(model_data.get("emotional_valence", 0.0), 0.0)
+    model.expertise_level = _finite_or(model_data.get("expertise_level", 0.5), 0.5)
     model.name = model_data.get("name", "")
     model.interaction_count = model_data.get("interaction_count", 0)
     model.asked_about = set(model_data.get("asked_about", []))
@@ -1196,6 +1231,8 @@ def restore_procedural_memory(procedural_memory: ProceduralMemory, data: dict[st
     string) instead of ``strategy`` (a dict). Old skills are restored
     with a default strategy.
     """
+    procedural_memory._skills.clear()
+    procedural_memory._trigger_index.clear()
     for s_data in data.get("skills", []):
         # Restore strategy: use the new dict format if present, else
         # create a default strategy (backward compat with old saves
@@ -1203,6 +1240,9 @@ def restore_procedural_memory(procedural_memory: ProceduralMemory, data: dict[st
         strategy_data = s_data.get("strategy")
         if strategy_data is not None and isinstance(strategy_data, dict):
             strategy = SkillStrategy.from_dict(strategy_data)
+            strategy.avg_confidence = _finite_or(strategy.avg_confidence, 0.5)
+            strategy.avg_length_band = _finite_or(strategy.avg_length_band, 1.0)
+            strategy.success_rate = _finite_or(strategy.success_rate, 0.5)
         else:
             strategy = SkillStrategy()
 
@@ -1210,7 +1250,7 @@ def restore_procedural_memory(procedural_memory: ProceduralMemory, data: dict[st
             name=s_data["name"],
             trigger_condition=s_data["trigger_condition"],
             strategy=strategy,
-            strength=s_data.get("strength", 0.2),
+            strength=_finite_or(s_data.get("strength", 0.2), 0.2),
             practice_count=s_data.get("practice_count", 0),
             last_practiced=s_data.get("last_practiced", 0),
             success_count=s_data.get("success_count", 0),
@@ -1239,57 +1279,59 @@ def restore_spaced_repetition(
     spaced_repetition: SpacedRepetitionScheduler, data: dict[str, Any]
 ) -> None:
     """Restore spaced repetition scheduler from saved data."""
+    spaced_repetition._records.clear()
     for r_data in data.get("records", []):
         record = ReviewRecord(
             concept=r_data["concept"],
-            stability=r_data.get("stability") or 86400.0,
+            stability=_finite_or(r_data.get("stability", 86400.0), 86400.0),
             review_count=r_data.get("review_count", 0),
             success_count=r_data.get("success_count", 0),
-            last_review=r_data.get("last_review") or 0.0,
-            ease_factor=r_data.get("ease_factor") or 2.5,
+            last_review=_finite_or(r_data.get("last_review", 0.0), 0.0),
+            ease_factor=_finite_or(r_data.get("ease_factor", 2.5), 2.5),
         )
         spaced_repetition._records[record.concept] = record
+    spaced_repetition._evict_to_capacity()
 
 
 def restore_td_learner(td_learner: TDLearner, data: dict[str, Any]) -> None:
     """Restore TD learner from saved data."""
-    td_learner._weights = dict(data.get("weights", {}))
+    td_learner._weights = {str(k): _finite_or(v, 0.0) for k, v in data.get("weights", {}).items()}
     # Action-conditioned weights use a list representation because tuple
     # keys are not valid JSON object keys.
     td_learner._action_weights = {}
     for item in data.get("action_weights", []):
         try:
             concept, action, weight = item
-            td_learner._action_weights[(str(concept), str(action))] = float(weight)
+            td_learner._action_weights[(str(concept), str(action))] = _finite_or(weight, 0.0)
         except (TypeError, ValueError):
             continue
     # Restore transition history
-    for t_data in data.get("history", []):
+    td_learner._history.clear()
+    history = data.get("history", [])
+    for t_data in history[-td_learner._max_history :] if td_learner._max_history else []:
         transition = TDTransition(
             state=list(t_data.get("state", [])),
-            reward=t_data.get("reward", 0.0),
+            reward=_finite_or(t_data.get("reward", 0.0), 0.0),
             next_state=list(t_data.get("next_state", [])),
-            rpe=t_data.get("rpe", 0.0),
+            rpe=_finite_or(t_data.get("rpe", 0.0), 0.0),
             timestamp=t_data.get("timestamp", 0),
         )
         td_learner._history.append(transition)
-    td_learner._last_rpe = data.get("last_rpe", 0.0)
+    td_learner._last_rpe = _finite_or(data.get("last_rpe", 0.0), 0.0)
     td_learner.total_updates = data.get("total_updates", 0)
     td_learner.total_positive_rpe = data.get("total_positive_rpe", 0)
     td_learner.total_negative_rpe = data.get("total_negative_rpe", 0)
     # Restore λ and eligibility traces (absent in pre-TD(λ) saves).
-    lam = data.get("lam", 0.0)
-    if 0.0 <= lam <= 1.0:
-        td_learner.lam = lam
+    td_learner.lam = _finite_or(data.get("lam", td_learner.lam), td_learner.lam)
     # Restore both legacy concept traces and action-conditioned traces.
     td_learner._traces = {}
     traces = data.get("traces", {})
     if isinstance(traces, dict):
-        td_learner._traces = {str(k): float(v) for k, v in traces.items()}
+        td_learner._traces = {str(k): _finite_or(v, 0.0) for k, v in traces.items()}
     for item in data.get("action_traces", []):
         try:
             concept, action, value = item
-            td_learner._traces[(str(concept), str(action))] = float(value)
+            td_learner._traces[(str(concept), str(action))] = _finite_or(value, 0.0)
         except (TypeError, ValueError):
             continue
 
@@ -1301,12 +1343,15 @@ def restore_synapses(synapses: SynapticStore, data: dict[str, Any]) -> None:
 
 def restore_emotional_memory(emotional_memory: EmotionalMemorySystem, data: dict[str, Any]) -> None:
     """Restore emotional memory system from saved data."""
+    emotional_memory._memories.clear()
     for m_data in data.get("memories", []):
         memory = EmotionalMemory(
             stimulus=m_data["stimulus"],
-            emotional_tag=list(m_data.get("emotional_tag", [0.5] * 12)),
-            association_strength=m_data.get("association_strength", 0.5),
-            extinction_level=m_data.get("extinction_level", 0.0),
+            emotional_tag=[
+                _finite_or(value, 0.5) for value in m_data.get("emotional_tag", [0.5] * 12)
+            ],
+            association_strength=_finite_or(m_data.get("association_strength", 0.5), 0.5),
+            extinction_level=_finite_or(m_data.get("extinction_level", 0.0), 0.0),
             is_extinct=m_data.get("is_extinct", False),
             timestamp=m_data.get("timestamp", 0),
             last_retrieved=m_data.get("last_retrieved", 0),
@@ -1342,12 +1387,19 @@ def restore_attractor(attractor: AttractorNetwork, data: dict[str, Any]) -> None
     # Restore weight matrix directly (if present)
     weights = data.get("weights")
     if weights is not None:
-        attractor._weights = [list(row) for row in weights]
+        attractor._weights = [[_finite_or(value, 0.0) for value in row] for row in weights]
+        if len(attractor._weights) != attractor._size or any(
+            len(row) != attractor._size for row in attractor._weights
+        ):
+            raise ValueError("attractor weight matrix does not match saved size")
+    else:
+        attractor._weights = [[0.0] * attractor._size for _ in range(attractor._size)]
     # Restore patterns
+    attractor._patterns.clear()
     for p_data in data.get("patterns", []):
         pattern = AttractorPattern(
             id=p_data["id"],
-            vector=list(p_data.get("vector", [])),
+            vector=[_finite_or(value, 0.0) for value in p_data.get("vector", [])],
             timestamp=p_data.get("timestamp", 0),
             retrieval_count=p_data.get("retrieval_count", 0),
         )
@@ -1373,34 +1425,46 @@ def restore_attractor(attractor: AttractorNetwork, data: dict[str, Any]) -> None
 def restore_error_monitor(error_monitor: ErrorMonitor, data: dict[str, Any]) -> None:
     """Restore error monitor from saved data."""
     error_monitor.error_count = data.get("error_count", 0)
-    error_monitor.cumulative_error_signal = data.get("cumulative_error_signal", 0.0)
-    error_monitor._caution_level = data.get("caution_level", 0.0)
+    error_monitor.cumulative_error_signal = _finite_or(
+        data.get("cumulative_error_signal", 0.0), 0.0
+    )
+    error_monitor._caution_level = _finite_or(data.get("caution_level", 0.0), 0.0)
+    error_monitor._errors.clear()
+    error_monitor._last_error = None
     # Restore error history
     for e_data in data.get("errors", []):
         error = PredictionError(
             expected=e_data.get("expected", ""),
             actual=e_data.get("actual", ""),
-            error_magnitude=e_data.get("error_magnitude", 0.0),
+            error_magnitude=_finite_or(e_data.get("error_magnitude", 0.0), 0.0),
             timestamp=e_data.get("timestamp", 0),
             context=e_data.get("context", ""),
             channel=e_data.get("channel", "decision"),
             signal=e_data.get("signal", "ern"),
         )
         error_monitor._errors.append(error)
+    error_monitor._last_error = error_monitor._errors[-1] if error_monitor._errors else None
     # Restore per-channel control demand (EVC payoff term)
-    for channel, demand in data.get("channel_demand", {}).items():
-        error_monitor._channel_demand[channel] = demand
+    error_monitor._channel_demand = {
+        str(k): _finite_or(v, 0.0) for k, v in data.get("channel_demand", {}).items()
+    }
     # Restore config (adjusted thresholds)
     if "caution_decay_rate" in data:
-        error_monitor.caution_decay_rate = data["caution_decay_rate"]
+        error_monitor.caution_decay_rate = _finite_or(
+            data["caution_decay_rate"], error_monitor.caution_decay_rate
+        )
     if "max_caution" in data:
-        error_monitor.max_caution = data["max_caution"]
+        error_monitor.max_caution = _finite_or(data["max_caution"], error_monitor.max_caution)
     if "min_caution" in data:
-        error_monitor.min_caution = data["min_caution"]
+        error_monitor.min_caution = _finite_or(data["min_caution"], error_monitor.min_caution)
     if "error_threshold" in data:
-        error_monitor.error_threshold = data["error_threshold"]
+        error_monitor.error_threshold = _finite_or(
+            data["error_threshold"], error_monitor.error_threshold
+        )
     if "conflict_threshold" in data:
-        error_monitor.conflict_threshold = data["conflict_threshold"]
+        error_monitor.conflict_threshold = _finite_or(
+            data["conflict_threshold"], error_monitor.conflict_threshold
+        )
     # Re-evaluate each restored record against its signal's detection
     # gate — is_error is derived, not stored, so older saves and
     # threshold changes both recompute cleanly.
@@ -1423,13 +1487,13 @@ def restore_emergent_identity(
         source = EmergentIdentitySource(
             name=s_data.get("name", ""),
             description=s_data.get("description", ""),
-            weight=s_data.get("weight", 0.5),
+            weight=_finite_or(s_data.get("weight", 0.5), 0.5),
             observations=list(s_data.get("observations", [])),
         )
         sources.append(source)
     self_description = data.get("self_description", "")
-    confidence = data.get("confidence", 0.0)
-    coherence = data.get("coherence", 0.0)
+    confidence = _finite_or(data.get("confidence", 0.0), 0.0)
+    coherence = _finite_or(data.get("coherence", 0.0), 0.0)
     # Restore into the identity object (for continuity)
     emergent_identity.sources = list(sources)
     emergent_identity.self_description = self_description
@@ -1442,16 +1506,26 @@ def restore_hpa_axis(hpa_axis: HPAAxis, data: dict[str, Any]) -> None:
     """Restore HPA axis cascade state from saved data."""
     state_data = data.get("state", data)
     hpa_axis._state = HPAState(
-        crh_level=state_data.get("crh_level", 0.0),
-        acth_level=state_data.get("acth_level", 0.0),
-        cortisol_level=state_data.get("cortisol_level", 0.0),
-        elapsed_time=state_data.get("elapsed_time", 0.0),
+        crh_level=_finite_or(state_data.get("crh_level", 0.0), 0.0),
+        acth_level=_finite_or(state_data.get("acth_level", 0.0), 0.0),
+        cortisol_level=_finite_or(state_data.get("cortisol_level", 0.0), 0.0),
+        elapsed_time=_finite_or(state_data.get("elapsed_time", 0.0), 0.0),
         stress_active=state_data.get("stress_active", False),
-        peak_cortisol=state_data.get("peak_cortisol", 0.0),
-        time_to_peak=state_data.get("time_to_peak"),
+        peak_cortisol=_finite_or(state_data.get("peak_cortisol", 0.0), 0.0),
+        time_to_peak=(
+            None
+            if state_data.get("time_to_peak") is None
+            else _finite_or(state_data.get("time_to_peak"), 0.0)
+        ),
     )
     # History buffers are transient (delay modeling) — they rebuild
-    # as ticks accumulate after restart.
+    # as ticks accumulate after restart. Clear staged copies so an
+    # aborted restore cannot leak the pre-restart history through.
+    hpa_axis._crh_history.clear()
+    hpa_axis._acth_history.clear()
+    hpa_axis._stress_onset_time = None
+    hpa_axis._peak_reached = False
+    hpa_axis._avg_dt = 1.0
 
 
 def restore_allostatic_load(allostatic_load: AllostaticLoadTracker, data: dict[str, Any]) -> None:
@@ -1463,26 +1537,20 @@ def restore_allostatic_load(allostatic_load: AllostaticLoadTracker, data: dict[s
     False; it will be set to True on the next ``set_inference_load``
     call from the Mind's reactive cycle.
 
-    Every restored float is clamped to its valid range and non-finite
-    values are mapped to 0.0. ``load_state`` validates the save file's
-    version but not the values inside it, and the load feeds
-    ``_regulation_effectiveness`` — an unclamped value inverts the
-    regulatory relationship rather than merely saturating it (a load of
-    -3.0 yields effectiveness 2.5, amplifying every regulatory
-    impulse). Saturating to the range bound is the safe reading of a
-    corrupt or hand-edited value in either direction.
+    Finite values restore verbatim. ``load_state`` validates the save
+    file's version but not the values inside it, so malformed and
+    non-finite values are mapped to 0.0 at the persistence boundary.
     """
     state_data = data.get("state", data)
     allostatic_load._state = AllostaticState(
-        allostatic_load=_clamp01(state_data.get("allostatic_load", 0.0)),
+        allostatic_load=_finite_or(state_data.get("allostatic_load", 0.0), 0.0),
         is_chronic=bool(state_data.get("is_chronic", False)),
         substrate_connected=False,
     )
     # Read from the top level, matching where `_serialize_allostatic_load`
     # writes it — not from `state_data`.
-    duration = data.get("elevated_stress_duration", 0.0)
-    allostatic_load._elevated_stress_duration = (
-        float(duration) if isinstance(duration, (int, float)) and math.isfinite(duration) else 0.0
+    allostatic_load._elevated_stress_duration = _finite_or(
+        data.get("elevated_stress_duration", 0.0), 0.0
     )
 
 
@@ -1499,15 +1567,16 @@ def restore_self_directed_learner(learner: SelfDirectedLearner, data: dict[str, 
     learner._total_corrections = data.get("total_corrections", 0)
     learner._total_definitions_synthesized = data.get("total_definitions_synthesized", 0)
     learner._studied_concepts = dict(data.get("studied_concepts", {}))
-    learner._last_inference_time = data.get("last_inference_time", 0.0)
+    learner._last_inference_time = _finite_or(data.get("last_inference_time", 0.0), 0.0)
 
     # Restore learning log (capped at the deque's maxlen)
+    learner._learning_log.clear()
     for ev_data in data.get("learning_log", []):
         event = LearningEvent(
             event_type=ev_data.get("event_type", ""),
             description=ev_data.get("description", ""),
             concepts_involved=ev_data.get("concepts_involved", []),
-            confidence=ev_data.get("confidence", 0.5),
+            confidence=_finite_or(ev_data.get("confidence", 0.5), 0.5),
             timestamp=ev_data.get("timestamp", 0),
         )
         learner._learning_log.append(event)
@@ -1729,6 +1798,7 @@ def _serialize_predictive_coding(
         "intent_transitions": {
             k: dict(v) for k, v in _snapshot(predictive_coding._intent_transitions.items)
         },
+        "intent_marginal": dict(_snapshot(predictive_coding._intent_marginal.items)),
         "emotion_intents": {
             k: dict(v) for k, v in _snapshot(predictive_coding._emotion_intents.items)
         },

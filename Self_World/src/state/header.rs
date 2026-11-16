@@ -1,7 +1,8 @@
 //! Core state header — the first bytes of the memory-mapped state block.
 //!
-//! Contains identity, versioning, and the sequence lock that enables
-//! lock-free concurrent reads from the mmap'd region.
+//! Contains identity and versioning. Reads from the mmap'd region are
+//! volatile copies; cross-thread consistency comes from the
+//! `MmapState` writer mutex + flock, not a sequence lock.
 
 /// Magic bytes identifying a Genesis core state file. ASCII `"GNSX"`.
 pub const MAGIC: [u8; 4] = *b"GNSX";
@@ -51,17 +52,9 @@ pub(crate) const MARKER_G06: u64 = 0x4753_0620_43BA_C78D;
 ///  16     created_at     u64    unix epoch milliseconds
 ///  24     last_updated   u64    unix epoch milliseconds
 ///  32     heartbeat      u64    monotonic counter, incremented each tick
-///  40     seq_lock       u64    sequence lock for lock-free reads
+///  40     reserved       u64    former sequence-lock slot; inert
 ///  48     instance_id    u64    unique per Genesis process instance
 /// ```
-///
-/// ## Sequence lock
-/// Writers increment `seq_lock` to an **odd** value before writing,
-/// then to the next **even** value after writing. Readers sample
-/// `seq_lock` before and after reading the state; if either sample is
-/// odd (write in progress) or the two samples differ, the read is
-/// retried. This gives us lock-free, wait-free reads with no atomics
-/// overhead beyond the seq_lock field.
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct CoreStateHeader {
@@ -77,7 +70,7 @@ pub struct CoreStateHeader {
     /// mmap'd state file. The checksum covers bytes [0..40) (magic
     /// through heartbeat) and [48..checksum_offset) (instance_id
     /// through the fields before the checksum), so this field at
-    /// offset 12 IS covered by the CRC. Only `seq_lock` at offset
+    /// offset 12 IS covered by the CRC. Only `reserved` at offset
     /// 40..48 is excluded.
     pub _pad: [u8; 4],
     /// Milliseconds-timestamp when the state was first created.
@@ -86,8 +79,10 @@ pub struct CoreStateHeader {
     pub last_updated: u64,
     /// Monotonic heartbeat counter (incremented each tick).
     pub heartbeat: u64,
-    /// Seqlock counter — odd during a write, even when stable.
-    pub seq_lock: u64,
+    /// Reserved — formerly the sequence-lock counter. Inert: nothing
+    /// reads or writes it; the slot is kept so the header layout and
+    /// checksum regions stay byte-identical to prior schema versions.
+    pub reserved: u64,
     /// Identifier for this state instance. Currently a constant (1)
     /// from the daemon's single production call site; it is covered by
     /// the CRC, so it is at least stable across restarts. It is not
@@ -107,7 +102,7 @@ impl CoreStateHeader {
             created_at: now_ms,
             last_updated: now_ms,
             heartbeat: 0,
-            seq_lock: 0, // even = no write in progress
+            reserved: 0,
             instance_id,
         }
     }
@@ -129,6 +124,6 @@ const _: () = {
     assert!(offset_of!(CoreStateHeader, created_at) == 16);
     assert!(offset_of!(CoreStateHeader, last_updated) == 24);
     assert!(offset_of!(CoreStateHeader, heartbeat) == 32);
-    assert!(offset_of!(CoreStateHeader, seq_lock) == 40);
+    assert!(offset_of!(CoreStateHeader, reserved) == 40);
     assert!(offset_of!(CoreStateHeader, instance_id) == 48);
 };

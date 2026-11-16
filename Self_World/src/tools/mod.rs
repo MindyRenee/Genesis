@@ -1,6 +1,6 @@
 //! Tools — capabilities the body can exercise.
 //!
-//! Mirrors `Inner_Non_Physical_World/tools/` on the mind side. Anatomically, tool use
+//! Mirrors `Outer_World/tools/` on the mind side. Anatomically, tool use
 //! recruits a left-lateralized premotor–parietal network: the skill
 //! of operating on the world through instruments. Code analysis is
 //! the daemon-side such capability — deterministic structural

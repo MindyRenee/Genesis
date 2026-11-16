@@ -235,7 +235,7 @@ Maximum impulse magnitude: 0.1
 (Conservative — adenosine is the primary sleep driver)
 
 One-way rule:
-    Process S only moves down through sleep. `apply_impulse_capped`
+    Process S only moves down through sleep. `apply_impulse`
     ignores negative adenosine impulses: external events may add
     metabolic load, but clearance belongs to the dedicated mechanism
     (glymphatic during sleep, offline rest). Fighting drowsiness is

@@ -123,6 +123,17 @@ def test_readiness_report_is_introspectable() -> None:
     assert report["u"]["samples"] >= 2.0
 
 
+def test_urge_signals_are_finite_evidence_while_value_stays_bounded() -> None:
+    """Signals above the old [0,1] interface still charge the LCA state."""
+    urge = _urge(growth=0.0, stimuli={"signal": 1.0}, threshold=0.7)
+    urge.tick({"signal": 1.7}, dt=1.0)
+    assert urge.value == 1.0
+
+    urge.value = 0.5
+    urge.tick({"signal": float("nan")}, dt=1.0)
+    assert urge.value == 0.5
+
+
 def test_frozen_record() -> None:
     """The record is a snapshot — it must not mutate with the urge."""
     import dataclasses

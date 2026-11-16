@@ -24,8 +24,8 @@
       "num_perturbed": 18,
       "initial_free_energy": 0.00000000,
       "final_free_energy": 0.00000125,
-      "final_surprise": 0.00052502,
-      "final_precision": 0.795280,
+      "final_surprise": 0.00052497,
+      "final_precision": 0.795292,
       "final_model_maturity": 0.000742
     }
   ],
@@ -323,7 +323,7 @@
       "complexity": "medium",
       "num_perturbed": 6,
       "free_energy": 0.00006860,
-      "surprise": 0.00227012,
+      "surprise": 0.00227013,
       "precision": 0.882897,
       "model_maturity": 0.000000
     },
@@ -331,7 +331,7 @@
       "tick": 600,
       "complexity": "medium",
       "num_perturbed": 6,
-      "free_energy": 0.03722757,
+      "free_energy": 0.03722763,
       "surprise": 0.00694924,
       "precision": 0.895302,
       "model_maturity": 0.000000
@@ -340,7 +340,7 @@
       "tick": 650,
       "complexity": "medium",
       "num_perturbed": 6,
-      "free_energy": 0.00000036,
+      "free_energy": 0.00000030,
       "surprise": 0.00013561,
       "precision": 0.898179,
       "model_maturity": 0.000001
@@ -358,7 +358,7 @@
       "tick": 750,
       "complexity": "medium",
       "num_perturbed": 6,
-      "free_energy": 0.00000149,
+      "free_energy": 0.00000155,
       "surprise": 0.00118745,
       "precision": 0.893894,
       "model_maturity": 0.000011
@@ -466,7 +466,7 @@
       "tick": 300,
       "complexity": "complex",
       "num_perturbed": 18,
-      "free_energy": 0.07865226,
+      "free_energy": 0.07865232,
       "surprise": 0.01324369,
       "precision": 0.768401,
       "model_maturity": 0.000000
@@ -493,7 +493,7 @@
       "tick": 450,
       "complexity": "complex",
       "num_perturbed": 18,
-      "free_energy": 0.00001287,
+      "free_energy": 0.00001281,
       "surprise": 0.00223536,
       "precision": 0.730567,
       "model_maturity": 0.000000
@@ -502,90 +502,90 @@
       "tick": 500,
       "complexity": "complex",
       "num_perturbed": 18,
-      "free_energy": 0.01980627,
-      "surprise": 0.00861050,
-      "precision": 0.731601,
+      "free_energy": 0.01980644,
+      "surprise": 0.00861064,
+      "precision": 0.731607,
       "model_maturity": 0.000000
     },
     {
       "tick": 550,
       "complexity": "complex",
       "num_perturbed": 18,
-      "free_energy": 0.00020272,
-      "surprise": 0.00389089,
-      "precision": 0.733573,
+      "free_energy": 0.00020283,
+      "surprise": 0.00389174,
+      "precision": 0.733586,
       "model_maturity": 0.000000
     },
     {
       "tick": 600,
       "complexity": "complex",
       "num_perturbed": 18,
-      "free_energy": 0.05421054,
-      "surprise": 0.01123496,
-      "precision": 0.762246,
+      "free_energy": 0.05419672,
+      "surprise": 0.01123407,
+      "precision": 0.762258,
       "model_maturity": 0.000000
     },
     {
       "tick": 650,
       "complexity": "complex",
       "num_perturbed": 18,
-      "free_energy": 0.00000381,
-      "surprise": 0.00035170,
-      "precision": 0.765160,
+      "free_energy": 0.00000387,
+      "surprise": 0.00035231,
+      "precision": 0.765175,
       "model_maturity": 0.000001
     },
     {
       "tick": 700,
       "complexity": "complex",
       "num_perturbed": 18,
-      "free_energy": 0.00000387,
-      "surprise": 0.00060762,
-      "precision": 0.762630,
+      "free_energy": 0.00000393,
+      "surprise": 0.00060829,
+      "precision": 0.762647,
       "model_maturity": 0.000003
     },
     {
       "tick": 750,
       "complexity": "complex",
       "num_perturbed": 18,
-      "free_energy": 0.00000536,
-      "surprise": 0.00189872,
-      "precision": 0.760319,
+      "free_energy": 0.00000548,
+      "surprise": 0.00189921,
+      "precision": 0.760338,
       "model_maturity": 0.000009
     },
     {
       "tick": 800,
       "complexity": "complex",
       "num_perturbed": 18,
-      "free_energy": 0.01778549,
-      "surprise": 0.00775610,
-      "precision": 0.763902,
+      "free_energy": 0.01778775,
+      "surprise": 0.00775643,
+      "precision": 0.763923,
       "model_maturity": 0.000026
     },
     {
       "tick": 850,
       "complexity": "complex",
       "num_perturbed": 18,
-      "free_energy": 0.00014722,
-      "surprise": 0.00338907,
-      "precision": 0.767766,
+      "free_energy": 0.00014710,
+      "surprise": 0.00338873,
+      "precision": 0.767786,
       "model_maturity": 0.000070
     },
     {
       "tick": 900,
       "complexity": "complex",
       "num_perturbed": 18,
-      "free_energy": 0.04655284,
-      "surprise": 0.00990355,
-      "precision": 0.793078,
+      "free_energy": 0.04654682,
+      "surprise": 0.00990225,
+      "precision": 0.793093,
       "model_maturity": 0.000169
     },
     {
       "tick": 950,
       "complexity": "complex",
       "num_perturbed": 18,
-      "free_energy": 0.00000119,
-      "surprise": 0.00022164,
-      "precision": 0.797385,
+      "free_energy": 0.00000113,
+      "surprise": 0.00022142,
+      "precision": 0.797399,
       "model_maturity": 0.000372
     },
     {
@@ -593,8 +593,8 @@
       "complexity": "complex",
       "num_perturbed": 18,
       "free_energy": 0.00000125,
-      "surprise": 0.00052502,
-      "precision": 0.795280,
+      "surprise": 0.00052497,
+      "precision": 0.795292,
       "model_maturity": 0.000742
     }
   ]

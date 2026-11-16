@@ -92,13 +92,18 @@ def learn_sentiment(word: str, score: float) -> None:
 
     Args:
         word: Single word (case-insensitive, stored lowercased).
-        score: Sentiment in [-4, +4]. Positive = pleasant, negative
-            = unpleasant. Clamped to range.
+        score: Learned valence. Positive = pleasant, negative =
+            unpleasant. Finite scores are stored unchanged.
     """
     w = word.lower().strip()
     if not w or len(w) > 64:
         return
-    LEARNED_LEXICON[w] = max(-4.0, min(4.0, float(score)))
+    try:
+        value = float(score)
+    except (TypeError, ValueError):
+        return
+    if math.isfinite(value):
+        LEARNED_LEXICON[w] = value
 
 
 def clear_learned_sentiment() -> None:
@@ -142,10 +147,9 @@ _CORE_AFFECT: tuple[float, float] = (0.0, 0.0)
 def set_core_affect(valence: float = 0.0, arousal: float = 0.0) -> None:
     """Set the organism's standing affective state (core affect).
 
-    ``valence`` in [-1,1], ``arousal`` in [0,1] from the body's
-    neurochemical summary. The fold starts at this point, so the same
-    stimulus appraises differently in an aroused body than a calm one
-    — the misattribution term of emotion.
+    The fold starts at this point, so the same stimulus appraises
+    differently in an aroused body than a calm one — the misattribution
+    term of emotion. Finite values are retained unchanged.
     """
     global _CORE_AFFECT
     try:
@@ -154,7 +158,7 @@ def set_core_affect(valence: float = 0.0, arousal: float = 0.0) -> None:
     except (TypeError, ValueError):
         return
     if math.isfinite(v) and math.isfinite(a):
-        _CORE_AFFECT = (max(-1.0, min(1.0, v)), max(0.0, min(1.0, a)))
+        _CORE_AFFECT = (v, a)
 
 
 def _affect_vector(token: str) -> np.ndarray | None:
@@ -363,10 +367,10 @@ _EXCLAMATION_BOOST_THRESHOLD = 3  # need this many ! to register an impulse
 
 def _exclamation_gain(text: str) -> float:
     """Terminal arousal gain from exclamation runs — a scalar operator
-    on the whole utterance state, saturating at +50%."""
+    on the whole utterance state."""
     count = text.count("!")
     if count >= _EXCLAMATION_BOOST_THRESHOLD:
-        return 1.0 + min(0.5, 0.1 * count)
+        return 1.0 + 0.1 * count
     return 1.0
 
 
@@ -505,11 +509,11 @@ def analyze_sentiment(text: str) -> dict:
     compresses the terminal valence and reads the valence masses.
 
     Returns a dict with:
-        - compound: float in [-1, 1] — compressed terminal valence
-        - arousal: float in [0, 1] — compressed terminal arousal
-        - positive: float in [0, 1] — positive valence mass proportion
-        - negative: float in [0, 1] — negative valence mass proportion
-        - neutral: float in [0, 1] — unaffective mass proportion
+        - compound: compressed terminal valence
+        - arousal: compressed terminal arousal
+        - positive: positive valence mass proportion
+        - negative: negative valence mass proportion
+        - neutral: unaffective mass proportion
         - sentiment_words: int — affect vectors that entered the fold
     """
     tokens = _tokenize(text)
@@ -550,9 +554,7 @@ def analyze_sentiment(text: str) -> dict:
 
     # Signed saturating compress — the report map.
     compound = valence / math.sqrt(valence * valence + _COMPRESS_ALPHA)
-    compound = max(-1.0, min(1.0, compound))
     arousal_report = arousal / math.sqrt(arousal * arousal + _COMPRESS_ALPHA)
-    arousal_report = max(0.0, min(1.0, arousal_report))
 
     # Valence masses: the signed projection of the trajectory onto
     # the valence axis, normalized against neutral token mass.
@@ -562,7 +564,7 @@ def analyze_sentiment(text: str) -> dict:
     if total > 0:
         positive = pos_mass / total
         negative = neg_mass / total
-        neutral_prop = max(0.0, min(1.0, neutral_count / total))
+        neutral_prop = neutral_count / total
     else:
         positive = 0.0
         negative = 0.0

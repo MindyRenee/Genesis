@@ -89,7 +89,7 @@ fn run_cortisol_benchmark() -> Vec<(usize, f32)> {
     let baseline_cortisol = neuro.chemicals[NeurochemicalId::Cortisol as usize].level;
 
     // Apply a single CRH impulse (acute stressor).
-    neuro.apply_impulse_capped(NeurochemicalId::CRH, 0.5, 0);
+    neuro.apply_impulse(NeurochemicalId::CRH, 0.5, 0);
     neuro.recompute_derived();
 
     // Record cortisol level every tick.

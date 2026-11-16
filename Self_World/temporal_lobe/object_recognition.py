@@ -33,12 +33,12 @@ Biological basis:
 from __future__ import annotations
 
 import logging
-import threading
 from dataclasses import dataclass
 
 import numpy as np
 from genesis_client.swallow import note_swallowed
 from infrastructure.config import default_data_dir
+from inhibition import InhibitoryGate
 
 logger = logging.getLogger(__name__)
 
@@ -198,7 +198,7 @@ class ObjectRecognizer:
         self._net: object | None = None
         # cv2.dnn.Net is not thread-safe — see the note on
         # FaceRecognizer._infer_lock in occipital_lobe.perception.
-        self._infer_lock = threading.Lock()
+        self._infer_lock = InhibitoryGate()
         self._available: bool | None = None
 
     def is_available(self) -> bool:

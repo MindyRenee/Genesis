@@ -98,18 +98,59 @@ feed the existing belief-revision engine, and hypotheses formed
 associatively can be confirmed mechanically when the domain admits
 formality.
 .SH ENTRY POINTS
+Each entry: the function, what it takes, and what it returns.
+Consumers import from the \fBfrontal_lobe.reasoning\fR package
+facade.
 .TP
-.B frontal_lobe.reasoning
-Package facade; consumers import from here.
+.BR parse (text)
+Parse a formula string \(em \fI"a & ~b -> c"\fR, unicode
+connectives, namespaced atoms like \fIconcept:bird\fR \(em into an
+immutable formula tree.
 .TP
-.BR parse ", " verify ", " entails ", " models ", " satisfiable
-Syntax and model theory.
+.BR models (formulas ", " limit=None)
+Enumerate the valuations satisfying the given formulas, bounded by
+\fBMAX_ATOMS\fR \(em the witness set a satisfiable theory stands
+on.
 .TP
-.BR expand ", " contract ", " revise ", " consistent ", " ramsey ", " explain
-AGM revision, the Ramsey test, and minimal abduction.
+.BR satisfiable (formulas)
+Ask whether the formulas have any satisfying valuation at all.
 .TP
-.BR Categorical ", " Quantifier ", " syllogism
-Single-step categorical deduction over Venn-region models.
+.BR entails (kb ", " q)
+Ask whether the knowledge base entails the query \(em true iff the
+query holds in every valuation of the premises.
+.TP
+.BR verify (premises ", " conclusion)
+Deduction by refutation: valid iff no valuation satisfies the
+premises while falsifying the conclusion \(em an invalid
+inference returns the countermodel that refutes it.
+.TP
+.BR expand (K ", " p)
+AGM expansion: add \fIp\fR to the belief set and close.
+.TP
+.BR contract (K ", " p)
+AGM contraction: remove \fIp\fR with minimal mutilation \(em
+least-entrenched beliefs surrender first.
+.TP
+.BR revise (K ", " p)
+AGM revision: incorporate \fIp\fR by the Levi identity,
+contracting the negation first.
+.TP
+.BR consistent (K)
+Ask whether the belief set is contradiction-free \(em the answer
+that feeds belief revision.
+.TP
+.BR ramsey (K ", " p ", " q)
+The Ramsey test for conditionals: "if p then q" is acceptable iff
+K revised by p entails q.
+.TP
+.BR explain (K ", " q ", " candidates)
+Minimal abduction: the smallest consistent subset of
+\fIcandidates\fR that entails the observation.
+.TP
+.BR Categorical ", " Quantifier ", " syllogism (p1 ", " p2 ", " conclusion)
+Single-step categorical deduction over Aristotelian propositions
+(ALL, NO, SOME, SOME_NOT), checked against the 256 Venn-region
+inhabitance patterns \(em modern semantics, no existential import.
 .TP
 .B try_math
 The math-question entry point in
@@ -136,6 +177,75 @@ Relational schemas and anti-unification (induction over structure).
 .TP
 .I tests/python/test_logic.py ", " test_reasoning.py
 The faculties under test.
+.SH GLOSSARY
+.TP
+.B associative / formal
+Her two reasoning styles: the \fIassociative\fR engine proposes
+(best-first traversal over the concept network, conclusions held
+with revisable confidence \(em what might be true); the \fIformal\fR
+engine verifies (mechanical derivation over sentences \(em what
+must be true).
+.TP
+.B model enumeration
+The formal engine's method in the spirit of Johnson-Laird's mental
+models: a conclusion is valid iff it holds in \fIevery\fR valuation
+consistent with the premises; an invalid inference returns the
+countermodel that refutes it.
+.TP
+.B valuation / countermodel
+A truth-assignment to the atoms. A countermodel is the valuation
+satisfying the premises but not the conclusion \(em the concrete
+exhibit of an invalid inference.
+.TP
+.B AGM
+The belief-revision framework for belief sets: \fIexpand\fR adds,
+\fIcontract\fR removes minimally (least-entrenched first;
+structural depth is the default entrenchment), and \fIrevise\fR
+incorporates by the Levi identity K*p = (K \(mi ~p) + p.
+.TP
+.B entrenchment
+How hard a belief is to give up \(em the ordering contraction
+respects; literals surrender before rules.
+.TP
+.B Ramsey test
+The conditional's acceptance test: "if p then q" is acceptable
+iff the belief set revised by p entails q \(em
+.BR ramsey (K ", " p ", " q) .
+.TP
+.B syllogism
+Single-step categorical deduction over Aristotelian propositions
+(ALL, NO, SOME, SOME_NOT) evaluated against the 256 Venn-region
+inhabitance patterns \(em modern semantics, no existential import.
+.TP
+.B existential import
+The assumption that a universal implies existence ("all S are P"
+means an S exists). Her syllogisms use modern semantics: it does
+not.
+.TP
+.B Venn-region inhabitance
+The pattern of which regions a categorization populates \(em the
+finite model space syllogisms are checked against.
+.TP
+.B MAX_ATOMS
+The enumeration bound (14 atoms, 2^14 valuations) \(em
+intentional, matching that human mental models hold ~3
+possibilities: a problem too big for the bound is a problem to
+split, not to brute-force.
+.TP
+.B namespaced atom
+A formula atom like \fIconcept:bird\fR \(em lets a formal sentence
+point into her concept network.
+.TP
+.B anti-unification
+Induction over structure in the parietal lobe \(em finding the
+most specific generalization of two relational forms, the way an
+analogy's skeleton is extracted.
+.TP
+.B reasoning types
+The associative engine's seven modes: deductive (transitive
+chains), abductive (best explanation), analogical, causal,
+contradiction detection, hypothesis formation, synthesis.
+
 .SH SEE ALSO
 .BR genesis (1),
 .BR genesis-browser (7),

@@ -23,7 +23,7 @@ use super::zones::ActiveZones;
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct GenesisCoreStateV3 {
-    /// Identity, versioning, and seqlock.
+    /// Identity and versioning header.
     pub header: CoreStateHeader,
     /// 18-chemical coupled neurochemical dynamics.
     pub neurochemicals: NeurochemicalVector,
@@ -33,7 +33,7 @@ pub struct GenesisCoreStateV3 {
     pub memory: MemoryPointers,
     /// Runtime module manifest table.
     pub manifest: RuntimeManifest,
-    /// CRC32 checksum of all preceding bytes (header.seq_lock excluded).
+    /// CRC32 checksum of all preceding bytes (header.reserved excluded).
     pub checksum: u32,
     /// Active inference signals — the generative self-model's
     /// projection. Lives in the former reserved region (64 bytes).

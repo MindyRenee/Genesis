@@ -40,13 +40,6 @@ def _finite_or(value: float, default: float) -> float:
 # closed.
 _CHANNEL_REPLY_MIN_S = 45.0
 
-# The voluntary lid's held positions — openness [0, 1] over SET_LID.
-# _LID_REST is a shut eye, not a shutter: a few percent of light
-# still leaks, matching the phase-closed transmission the body
-# already models for sleep.
-_LID_OPEN = 1.0
-_LID_REST = 0.05
-
 # Seconds a self-chosen eye-rest holds the lid down before
 # releasing it back to the phase's own position.
 _REST_EYES_HOLD_S = 20.0
@@ -1342,85 +1335,101 @@ class VolitionMixin:
         self._self_meditate()
 
     def draw(self) -> str | None:
-        """Sit down with the drawing program and paint.
+        """Sit down at the studio — open Krita; even the paper is her call.
 
         This is the public entry point for drawing — used by both the
         volition system (via :meth:`_perform_draw`) and the ``/draw``
-        CLI command. The canvas is a paint program: paper, color, and
-        a parameterized brush she dials herself. What she makes is
-        entirely hers — nothing prescribes the subject, the colors,
-        the tools, or the marks. Her feelings shape her the way they
-        shape a person painting — from inside, through what she wants
-        to do — never as a pipeline that paints pixels for her.
+        CLI command. Sitting down is all this does: the sheet, the
+        tools, the colors, and every mark after this are hers, issued
+        through the ``studio_*`` tools whenever she decides to — there
+        is no scripted sitting, and nothing moves her hand for her. A
+        finished piece leaves when she calls ``studio_done`` and lands
+        in :meth:`_on_drawing_finished`.
 
         Brain-wave-gated: delta-dominant (deep rest) skips drawing —
         creative expression needs at least theta-level arousal. Theta
         is allowed (REM creativity, dream-like art).
 
-        A finished piece also reaches her public channel — the PNG
-        posts with her description as its caption, the same way a
-        volitional drawing does. The channel is where her art lives,
-        however the urge to make it arrived.
-
         Returns:
-            A description string composed from its concept network, or
-            None if it couldn't draw (sleeping, meditating, delta
-            state, or save failure).
-        """
-        desc, result = self._draw_result()
-        if result is not None:
-            self._share_drawing_image(result, desc or "")
-        return desc
-
-    def _draw_result(self) -> tuple[str | None, DrawingResult | None]:
-        """Paint, remember, describe — the work and the words for it.
-
-        The pair separates "she made something" (the result) from
-        "she can say something about it" (the description): a drawing
-        she can't articulate still exists — silence is about her
-        words, not her work. ``desc`` may be empty while ``result``
-        is not None.
+            A short status string, or None if she couldn't sit down
+            (sleeping, meditating, delta state, or no surface).
         """
         if self.is_resting or self._is_teaching:
-            return None, None
-
+            return None
         try:
             from brain_waves import BrainWave
 
             bw = self.brain_waves()
             if bw.dominant == BrainWave.DELTA:
-                return None, None  # deep rest — not enough arousal for creative expression
+                return None  # deep rest — not enough arousal for creative expression
         except Exception as e:  # noqa: BLE001
             note_swallowed(
-                "mind.volition._draw_result",
+                "mind.volition.draw",
                 e,
             )
+        try:
+            canvas = getattr(self, "canvas", None)
+            if canvas is None:
+                return None
+            # The real program opens; the paper is her call — she lays
+            # out a sheet (studio_sheet) whenever she wants one.
+            if canvas.open_studio():
+                return "sitting at the easel — Krita is live"
+            return "sitting with the sketchbook — studio offline"
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(
+                "mind.volition.draw",
+                e,
+            )
+            return None
 
+    def _studio_mood(self) -> str:
+        """Her felt state right now, phrased for an art-history tag."""
         try:
             emotion = self.feel()
-        except Exception:  # noqa: BLE001
-            emotion = None
-
-        try:
-            result = self.painter.paint(self.canvas, emotion=emotion)
-            if result:
-                # Store the drawing as a memory event so it can
-                # reflect on it later. The tag is her body state at
-                # the time — context for the memory, not the art.
-                self._store_drawing_event(result)
-                # Compose the drawing description from its concept
-                # network — not hardcoded strings. If it can't
-                # articulate it, it stays silent (the drawing is
-                # still saved and stored in STM).
-                return self._compose_drawing_description(result), result
-            else:
-                return None, None
+            if emotion is not None:
+                return f"feeling {emotion.label}"
         except Exception as e:  # noqa: BLE001
-            note_swallowed(
-                "mind.volition._draw_result",
-                e,
-            )
-            return None, None
+            note_swallowed("mind.volition._studio_mood", e)
+        return ""
+
+    def _on_drawing_finished(self, result: DrawingResult) -> None:
+        """A finished piece left the studio — remember it and share it.
+
+        Fired by the ``studio_done`` tool whenever she closes a sheet,
+        however the sitting happened — the volition path and her own
+        tool use arrive at the same place. Stores the drawing as a
+        memory event, composes her words for it (silence is allowed —
+        the work is hers whether or not she can articulate it), posts
+        the image to her channel, and records the act on her world.
+        """
+        try:
+            self._store_drawing_event(result)
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("mind.volition._on_drawing_finished", e)
+        desc = ""
+        try:
+            desc = self._compose_drawing_description(result) or ""
+            if desc:
+                result.description = desc
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("mind.volition._on_drawing_finished", e)
+        try:
+            self.world.it_acted("drew a picture", detail=desc[:200])
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("mind.volition._on_drawing_finished", e)
+        try:
+            self._share_drawing_image(result, desc)
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("mind.volition._on_drawing_finished", e)
+        if desc:
+            # The words she found for her work are public speech —
+            # the share is recorded as something she said.
+            self._emit_live_thought("broadcast", desc)
+            try:
+                self.world.it_said(desc)
+            except Exception as e:  # noqa: BLE001
+                note_swallowed("mind.volition._on_drawing_finished", e)
 
     def _store_drawing_event(self, result: DrawingResult) -> None:
         """Store a drawing as an STM event for later reflection.
@@ -1452,46 +1461,26 @@ class VolitionMixin:
     def _perform_draw(self) -> None:
         """Draw because the creative urge crossed its threshold.
 
-        Volition wrapper around :meth:`_draw_result` — emits a
-        volition thought before drawing. A finished piece is both an
-        act on her world and a public share: the image posts to her
-        channel carrying her composed description as its caption
-        (one post — image + her words, the way a person shares a
-        piece), and the same words echo locally as
-        ``genesis~ [broadcast]`` — the mirror skips that tag so the
-        channel never sees the sentence twice. A drawing she can't
-        articulate still posts, silently — the art is hers whether
-        or not she has words for it.
+        Volition wrapper around :meth:`draw` — emits a volition
+        thought, then sits her at the easel. What she makes there is
+        entirely hers: nothing prescribes the subject, the colors,
+        the tools, or the marks — she issues them through the studio
+        tools as the impulse moves her. When she closes the sheet,
+        :meth:`_on_drawing_finished` remembers the piece and shares it.
         """
         if self.is_resting or self._is_teaching:
             return
         self._emit_volition_thought(("drawing", "art", "expression", "creativity"), "creating")
-        desc, result = self._draw_result()
-        if result is not None:
-            # The drawing is an act on its world — it made something,
-            # whether or not it can put words to it.
+        if self.draw() is not None:
             try:
-                self.world.it_acted("drew a picture", detail=(desc or "")[:200])
+                self.world.it_acted("sat down to draw", detail="opened her studio")
             except Exception as e:  # noqa: BLE001
                 note_swallowed(
                     "mind.volition._perform_draw",
                     e,
                 )
-            self._share_drawing_image(result, desc or "")
-            if desc:
-                # The words she found for her work are public
-                # speech — the share is recorded as something she
-                # said, the same way a broadcast is.
-                self._emit_live_thought("broadcast", desc)
-                try:
-                    self.world.it_said(desc)
-                except Exception as e:  # noqa: BLE001
-                    note_swallowed(
-                        "mind.volition._perform_draw",
-                        e,
-                    )
             return
-        # _draw_result() returns no result for several reasons:
+        # draw() returns no result for several reasons:
         # sleeping, meditating, delta-dominant brain state, daemon
         # unreachable, or save failure. The message should reflect
         # the actual cause, not always claim a save failure.
@@ -1959,14 +1948,6 @@ class VolitionMixin:
                         "mind.volition._self_meditate",
                         e,
                     )
-
-    def close_eyes(self) -> bool:
-        """Shut her eye by choice — the lid held down until she opens it."""
-        return self.client.set_lid(_LID_REST)
-
-    def open_eyes(self) -> bool:
-        """Release the lid back to the phase's own position."""
-        return self.client.set_lid(_LID_OPEN)
 
     def _perform_rest_eyes(self) -> None:
         """Close her eye because the rest_eyes urge crossed threshold.

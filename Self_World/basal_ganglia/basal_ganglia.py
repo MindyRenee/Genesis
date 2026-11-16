@@ -123,7 +123,7 @@ class BasalGanglia:
     # Vigor (Niv et al., 2007): tonic dopamine reports the average
     # reward rate — the opportunity cost of time — so a rich reward
     # history lowers the release bar for action. VIGOR_GAIN converts
-    # the caller's normalized vigor into threshold relief, floored so
+    # the caller's non-negative vigor into threshold relief, floored so
     # the brake can never be fully abolished.
     VIGOR_GAIN: float = 0.2
     MIN_EFFECTIVE_THRESHOLD: float = 0.02
@@ -154,7 +154,7 @@ class BasalGanglia:
             raise ValueError("dopamine_rpe must be finite")
         if not math.isfinite(vigor):
             raise ValueError("vigor must be finite")
-        vigor = _clip(vigor, 0.0, 1.0)
+        vigor = max(0.0, vigor)
 
         salience: dict[str, float] = {}
         for bid in bids:
@@ -164,10 +164,9 @@ class BasalGanglia:
                 raise ValueError("action salience must be finite")
             if bid.action in salience:
                 raise ValueError(f"duplicate action: {bid.action}")
-            salience[bid.action] = _clip(bid.salience, 0.0, 1.0)
+            salience[bid.action] = bid.salience
 
-        rpe = _clip(dopamine_rpe, -1.0, 1.0)
-        d1_drive, d2_drive = self._channel_drives(salience, rpe)
+        d1_drive, d2_drive = self._channel_drives(salience, dopamine_rpe)
 
         stn_control = self.control_gain * (sum(d2_drive.values()) / len(d2_drive))
 

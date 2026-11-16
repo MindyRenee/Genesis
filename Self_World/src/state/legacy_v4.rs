@@ -24,7 +24,7 @@ use super::zones::ActiveZones;
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct GenesisCoreStateV4 {
-    /// Identity, versioning, and seqlock.
+    /// Identity and versioning header.
     pub header: CoreStateHeader,
     /// 18-chemical coupled neurochemical dynamics.
     pub neurochemicals: NeurochemicalVector,
@@ -36,7 +36,7 @@ pub struct GenesisCoreStateV4 {
     pub manifest: RuntimeManifest,
     /// Ion electrochemistry.
     pub ions: IonState,
-    /// CRC32 checksum of all preceding bytes (header.seq_lock excluded).
+    /// CRC32 checksum of all preceding bytes (header.reserved excluded).
     pub checksum: u32,
     /// Active inference signals (not covered by the checksum).
     pub inference_signals: InferenceSignals,

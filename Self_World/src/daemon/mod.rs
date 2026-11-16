@@ -47,7 +47,6 @@
 //! ```
 
 pub mod active_inference;
-pub mod actuators;
 pub mod adaptive;
 pub mod association;
 pub mod consolidation;

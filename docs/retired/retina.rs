@@ -177,8 +177,8 @@ fn main() {
         // memory concurrently.
         unsafe {
             // Initialize the header once.
-            // The frame counter is an AtomicU64 using a seqlock:
-            // even = frame complete, odd = write in progress.
+            // The frame counter is an AtomicU64 sequence number —
+            // incremented once per published frame.
             let counter = &*(base as *const AtomicU64);
             counter.store(0, Ordering::Relaxed);
             core::ptr::write_volatile(base.add(8) as *mut u32, fmt.width);
@@ -257,33 +257,22 @@ fn main() {
         // setup and only accessed via atomic operations. The frame data
         // copy (`base.add(HEADER_SIZE)`) stays within bounds because
         // `frame_size` was checked against `fmt.size` above, and
-        // `shm_size = HEADER_SIZE + fmt.size`. The seqlock protocol
-        // ensures readers see consistent data.
+        // `shm_size = HEADER_SIZE + fmt.size`.
         unsafe {
             let counter = &*(base as *const AtomicU64);
-
-            // Seqlock write protocol:
-            // 1. Increment counter to odd → signals "write in progress"
-            //    Any reader seeing an odd counter will retry.
-            // 2. Copy the frame data.
-            // 3. Increment counter to even → signals "frame complete"
-            //    The Release ordering ensures the frame copy is visible
-            //    before the even counter is observed by the reader.
-            let seq = counter.load(Ordering::Relaxed);
-            counter.store(seq.wrapping_add(1), Ordering::Relaxed);
-            std::sync::atomic::fence(Ordering::SeqCst);
 
             // Copy the raw frame into the shared buffer after the header.
             core::ptr::copy_nonoverlapping(buf.as_ptr(), base.add(HEADER_SIZE), frame_size);
 
-            // Publish the completed frame.
-            counter.store(seq.wrapping_add(2), Ordering::Release);
+            // Publish: bump the frame counter. Release ordering so the
+            // frame bytes land before the new sequence number is seen.
+            counter.fetch_add(1, Ordering::Release);
         }
 
         // Frame-rate throttling — cap at ~30 FPS to avoid burning CPU
         // when the camera delivers frames faster than the consumer
         // (the cognitive mind) needs them. The cognitive mind samples
-        // at its own rate via the seqlock, so extra frames are wasted
+        // at its own rate via the frame counter, so extra frames are wasted
         // work. 33ms ≈ 30 FPS.
         thread::sleep(Duration::from_millis(33));
     }

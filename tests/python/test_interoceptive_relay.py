@@ -14,13 +14,9 @@ from typing import Any
 import pytest
 from brainstem.interoceptive_relay import InteroceptiveRelay
 from genesis_client.protocol import (
-    CHEM_ACETYLCHOLINE,
-    CHEM_ENDOCANNABINOID,
-    CHEM_EPINEPHRINE,
-    CHEM_GABA,
+    CHEM_HISTAMINE,
     CHEM_NOREPINEPHRINE,
     CHEM_OREXIN,
-    CHEM_SEROTONIN,
     SENSOR_CPUIDLE,
     SENSOR_FAN,
     SENSOR_TEMPERATURE,
@@ -78,29 +74,18 @@ class TestThreatArm:
         assert "body:heat" in cues and ctx == "interoception"
         assert us < 0.0, "threat US is aversive"
 
-    def test_overload_fires_the_adrenal_arm(self):
+    def test_overload_fires_the_sympathetic_arousal_arm(self):
         relay, calls = make_relay()
         out = relay.relay(make_body(stress_load=1.4), FULL_PRESENCE)
         sent = dict(calls["impulses"])
-        assert CHEM_EPINEPHRINE in sent, "adrenal-medullary surge absent"
-        assert CHEM_NOREPINEPHRINE in sent
+        assert sent[CHEM_NOREPINEPHRINE] > 0
         assert "body:overload" in out["threat_cues"]
 
-    def test_host_contention_reaches_the_low_road(self):
+    def test_host_contention_is_not_an_interoceptive_channel(self):
         relay, calls = make_relay()
-        out = relay.relay(make_body(psi_cpu=0.6), FULL_PRESENCE)
-        assert "body:contention" in out["threat_cues"]
-        sent = dict(calls["impulses"])
-        assert CHEM_NOREPINEPHRINE in sent
-
-    def test_memory_stall_is_pressure_not_occupancy(self):
-        relay, calls = make_relay()
-        # Small footprint, real stalls — the cue reads contention,
-        # not size.
-        out = relay.relay(make_body(cognitive_load=0.2, psi_mem=0.5), FULL_PRESENCE)
-        assert "body:memory_pressure" in out["threat_cues"]
-        sent = dict(calls["impulses"])
-        assert CHEM_GABA in sent
+        out = relay.relay(make_body(psi_cpu=0.6, psi_io=0.7, psi_mem=0.8), FULL_PRESENCE)
+        assert out["threat_cues"] == []
+        assert calls["impulses"] == []
 
     def test_cooling_failure_needs_a_fan_sensor(self):
         relay, _ = make_relay()
@@ -125,48 +110,44 @@ class TestThreatArm:
         cues = calls["cues"][0][0]
         assert "body:heat" in cues
         assert "body:overload" in cues
-        assert "body:memory_pressure" in cues
+        assert "body:cooling_failure" in cues
+        assert "body:memory_pressure" not in cues
 
 
 class TestParasympatheticArm:
-    def test_deep_rest_produces_recovery_chemistry(self):
+    def test_deep_rest_withdraws_arousal_tone(self):
         # Alerting tone present so the withdrawal arm has something
         # to withdraw (negative impulses scale with live level).
         relay, calls = make_relay(
             levels={
                 "norepinephrine": 0.5,
                 "orexin": 0.5,
-                "glutamate": 0.5,
                 "histamine": 0.5,
             }
         )
         out = relay.relay(make_body(rest=0.8), FULL_PRESENCE)
         sent = dict(calls["impulses"])
-        assert CHEM_SEROTONIN in sent
-        assert CHEM_GABA in sent
-        assert CHEM_ENDOCANNABINOID in sent
-        # Deepest rest withdraws alerting tone — negative impulses.
         assert sent[CHEM_NOREPINEPHRINE] < 0
         assert sent[CHEM_OREXIN] < 0
+        assert sent[CHEM_HISTAMINE] < 0
+        assert not any(mag > 0 for _, mag in calls["impulses"])
         assert out["threat_cues"] == []
 
     def test_rest_silent_without_the_cpuidle_sensor(self):
         relay, calls = make_relay()
         relay.relay(make_body(rest=0.9), SensorPresence(mask=0))
         sent = dict(calls["impulses"])
-        # Absence of the sensor is not evidence of calm — only the
-        # ungated contentment arm may still fire.
-        assert CHEM_ENDOCANNABINOID not in sent
+        # Absence of the sensor is not evidence of rest.
+        assert sent == {}
         assert not any(m < 0 for _, m in calls["impulses"])
 
-    def test_cooling_trend_is_a_relief_channel(self):
+    def test_cooling_trend_is_not_an_ecb_signal(self):
         relay, calls = make_relay()
         relay.relay(
-            make_body(rest=0.0, temp_trend=-0.3, cpu_temp_c=70.0),
+            make_body(rest=0.0, temp_trend=-0.3, cpu_temp_c=50.0),
             FULL_PRESENCE,
         )
-        sent = dict(calls["impulses"])
-        assert sent.get(CHEM_ENDOCANNABINOID, 0.0) > 0.0
+        assert calls["impulses"] == []
 
 
 class TestSelfSettingMagnitudes:
@@ -187,11 +168,10 @@ class TestSelfSettingMagnitudes:
         assert ne_low / ne_high == pytest.approx(9.0)  # (1−0.1)/(1−0.9)
 
     def test_saturated_chemical_gets_no_offer(self):
-        relay, calls = make_relay(levels={"serotonin": 1.0, "gaba": 1.0})
-        relay.relay(make_body(), FULL_PRESENCE)
+        relay, calls = make_relay(levels={"norepinephrine": 1.0})
+        relay.relay(make_body(cpu_temp_c=85.0), FULL_PRESENCE)
         sent = dict(calls["impulses"])
-        assert CHEM_SEROTONIN not in sent
-        assert CHEM_GABA not in sent
+        assert CHEM_NOREPINEPHRINE not in sent
 
     def test_negative_impulses_scale_with_level(self):
         """Withdrawal cannot exceed the tone that exists."""
@@ -209,22 +189,25 @@ class TestSelfSettingMagnitudes:
         assert ne_tone is not None and ne_tone < 0
 
 
-class TestVigilanceArm:
-    def test_effort_and_traffic_raise_lc_drive(self):
+class TestNonBiologicalChannels:
+    def test_effort_raises_lc_drive(self):
         relay, calls = make_relay()
-        relay.relay(
-            make_body(stress_load=0.8, io_activity=0.3, dram_activity=0.5),
-            FULL_PRESENCE,
-        )
+        relay.relay(make_body(stress_load=0.8), FULL_PRESENCE)
         sent = dict(calls["impulses"])
         assert sent[CHEM_NOREPINEPHRINE] > 0
-        assert sent[CHEM_ACETYLCHOLINE] > 0, "DRAM traffic is ACh-encoded"
 
-    def test_hardware_prediction_errors_orient(self):
+    def test_silicon_activity_is_not_neuromodulation(self):
         relay, calls = make_relay()
-        relay.relay(make_body(branch_miss_rate=0.15), FULL_PRESENCE)
-        sent = dict(calls["impulses"])
-        assert sent.get(CHEM_NOREPINEPHRINE, 0.0) > 0.0
+        relay.relay(
+            make_body(io_activity=0.8, core_activity=0.9, dram_activity=0.9),
+            FULL_PRESENCE,
+        )
+        assert calls["impulses"] == []
+
+    def test_hardware_prediction_errors_do_not_orient(self):
+        relay, calls = make_relay()
+        relay.relay(make_body(branch_miss_rate=0.9, cache_miss_rate=0.9), FULL_PRESENCE)
+        assert calls["impulses"] == []
 
 
 class TestResilience:

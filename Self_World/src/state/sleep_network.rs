@@ -72,7 +72,7 @@ const ALPHA_SCN: f64 = 0.7;
 const THETA_W: f64 = 2.0;
 const TAU_HW: f64 = 946.8;
 const TAU_HS: f64 = 202.2;
-const H_MAX: f64 = 323.88;
+pub const H_MAX: f64 = 323.88;
 const H_MIN: f64 = 0.0;
 
 // Circadian oscillator (Serkh & Forger 2014 corrections).

@@ -16,7 +16,7 @@ respond() entry point.
 
     from mind import Mind
 
-    mind = Mind(socket_path="/path/to/genesis.sock")
+    mind = Mind(socket_path="/path/to/genesis.sock", data_dir="/path/to/state")
     mind.start()
 
     response = mind.respond("Hello, Genesis!")
@@ -41,10 +41,10 @@ from typing import TYPE_CHECKING, ClassVar
 from brain_waves import BrainWave, add_brain_wave_drive, add_stimulus
 from brainstem.brainstem import Brainstem
 from cerebellum.cerebellum import Cerebellum
-from discord_feed import DiscordFeed
+from discord.board import ChannelBoard
+from discord.feed import DiscordFeed
 from frontal_lobe.autonomous import AutonomousLearner
 from frontal_lobe.canvas import Canvas
-from frontal_lobe.painting import Painter
 from frontal_lobe.prefrontal import FrontalLobe
 from genesis_client import GenesisClient
 from genesis_client.protocol import CHEM_ACETYLCHOLINE
@@ -52,13 +52,12 @@ from genesis_client.swallow import note_swallowed, set_swallow_sink
 from growth_ledger import GrowthLedger
 from infrastructure.config import MindConfig
 from infrastructure.paths import code_root
+from inhibition import InhibitoryGate, NeuromodulatoryGate
 from journal import CognitiveJournal, set_active
 from limbic_system.limbic import LimbicSystem
 from memory import MemorySystem
 from occipital_lobe.occipital import OccipitalLobe
 from occipital_lobe.perception import FaceRecognizer
-from outer_world.board import ChannelBoard
-from outer_world.world import OuterWorld
 from parietal_lobe.parietal import ParietalLobe
 from parietal_lobe.system_monitor import SystemMonitor
 from self.identity import DevelopmentalTracker, EmergentIdentity, EmergentIdentitySource
@@ -71,11 +70,12 @@ from thalamus.relay import Thalamus
 from tools.code_learner import CodeLearner
 from tools.explorer import Explorer, default_allowed_roots
 from user_profile import UserProfile
+from workstation.environment import OuterEnvironment
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from outer_world.channel import Channel
+    from discord.channel import Channel
 from basal_ganglia.volition import VolitionMixin
 from brainstem.heart import Heart
 from brainstem.lifecycle import LifecycleMixin
@@ -85,7 +85,9 @@ from frontal_lobe.projects import ProjectsMixin
 from frontal_lobe.status import StatusMixin
 from self.man_pages import ManPagesMixin
 from self.proposals import ProposalsMixin
-from sleep.sleep import SleepMixin
+from self.sleep import SleepMixin
+from sleep.dream_residues import DreamResiduesMixin
+from sleep.meditation import MeditationMixin
 
 # Provenance marker — one letter of the creator lattice (see
 # PROVENANCE.md).
@@ -99,6 +101,8 @@ class Mind(
     MetronomeMixin,
     VolitionMixin,
     SleepMixin,
+    MeditationMixin,
+    DreamResiduesMixin,
     ProjectsMixin,
     ProposalsMixin,
     ManPagesMixin,
@@ -113,6 +117,9 @@ class Mind(
 
     Args:
         socket_path: Path to the subcognitive daemon's Unix socket.
+        data_dir: Directory holding persistent state. If omitted, the
+            socket's directory is used for compatibility with tests and
+            standalone use.
         language: Language spec forwarded to the
                         frontal lobe — the string "generative" or
                         an explicit Language instance.
@@ -124,7 +131,7 @@ class Mind(
 
     inner_life: InnerLife
     learner: AutonomousLearner
-    world: OuterWorld
+    world: OuterEnvironment
     WAKE_VOLITION_DELAYS: ClassVar[dict[str, float]] = {
         "speech": 0.0,  # talking — immediate
         "meditate": 0.0,  # self-regulation — immediate
@@ -159,6 +166,12 @@ class Mind(
         "/close-eyes": "close_eyes",
         "/open-eyes": "open_eyes",
     }
+    # The voluntary lid's held positions — openness [0, 1] over SET_LID.
+    # _LID_REST is a shut eye, not a shutter: a few percent of light
+    # still leaks, matching the phase-closed transmission the body
+    # already models for sleep.
+    _LID_OPEN: ClassVar[float] = 1.0
+    _LID_REST: ClassVar[float] = 0.05
 
     def __init__(
         self,
@@ -169,11 +182,16 @@ class Mind(
         offline: bool = False,
         channel: Channel | None = None,
         headless: bool = False,
+        data_dir: str | Path | None = None,
+        self_directed: bool = False,
     ) -> None:
         """Initialize the cognitive mind and wire all subsystems together."""
         self.socket_path = socket_path
-        # Data dir is the directory containing the socket
-        self.data_dir = os.path.dirname(socket_path) or "."
+        # State lives in the explicit data dir; only standalone callers
+        # without one fall back to the socket's directory.
+        self.data_dir = (
+            os.fspath(data_dir) if data_dir is not None else os.path.dirname(socket_path) or "."
+        )
         self.config = config if config is not None else MindConfig()
         self._offline = offline
         # Resident (headless) mode: nobody sits at a prompt, so the
@@ -181,13 +199,17 @@ class Mind(
         # connectivity probe never opens a socket, and the thalamic
         # gate shuts with sleep onset instead of holding N1 open.
         self._headless = headless
+        # Self-directed mode keeps volition and synchronous tools live.
+        # Cognitive subsystems are always metronome-advanced state, not
+        # workers; this mode additionally keeps process resurrection off.
+        self._self_directed = self_directed
         self.client = GenesisClient(socket_path)
         # Her page — the public channel that lives in her outer world.
         # Adopt the channel the caller (the CLI) already opened for
         # mirroring, or open our own: one page per session, so
         # mirrored lines and her broadcasts share the same paced
-        # queue. The channel itself is held by OuterWorld below.
-        from outer_world.channel import Channel
+        # queue. The channel itself is held by OuterEnvironment below.
+        from discord.channel import Channel
 
         channel = channel if channel is not None else Channel.from_env()
 
@@ -299,7 +321,7 @@ class Mind(
         # the urge gate) parks between work chunks instead of starving
         # the interactive path for the GIL. Volition threads also run
         # at lower CPU priority; this event is the cooperative layer.
-        self._foreground_active = threading.Event()
+        self._foreground_active = NeuromodulatoryGate()
 
         # Thalamus — the relay. A region posts a message; the next
         # heartbeat writes it onto that module's manifest task_id;
@@ -478,7 +500,7 @@ class Mind(
         # inner-life social drive and the reach_out urge). It applies
         # the world's neurochemical coupling through the same impulse
         # path the learner uses.
-        self.world = OuterWorld(
+        self.world = OuterEnvironment(
             network=self.brain.frontal.network,
             neuro_impulse=self._learner_neuro_impulse,
             # Inbound hearing closes with the sensory gate: all of
@@ -498,8 +520,8 @@ class Mind(
         # API plus the local Kaggle Game Arena shelf). She chooses when
         # to play; boards and moves flow back through the world into
         # memory, cognition, chemistry, waves.
-        from outer_world.games.arcade import Arcade
-        from outer_world.games.arena import default_games
+        from games.arcade import Arcade
+        from games.arena import default_games
         from tools.framework import get_tools
 
         arcade = Arcade(
@@ -586,6 +608,101 @@ class Mind(
         being looked at (eyes-closed alpha returns).
         """
         add_stimulus(BrainWave.ALPHA, -min(0.30, 0.12 + 0.18 * visual_drive))
+
+    def lid_openness(self) -> float | None:
+        """The eye's actual lid position — proprioception, not the request.
+
+        The nerve's effective transmission ``phase.min(voluntary)``:
+        1.0 awake and open, ~0.5 at half-mast, ~0.03 under sleep. A
+        close command the phase overrules reads as the phase's own
+        position — the sense reports what the eye truly passes, not
+        what was last asked of it. ``None`` when the body can't be
+        read (no daemon, older daemon) — no telemetry, not darkness.
+        """
+        optic = self.client.get_optic_state()
+        return optic.lid if optic is not None else None
+
+    def close_eyes(self) -> bool:
+        """Shut her eye — the lid held down until she opens it.
+
+        The voluntary component of the eyelid, held at _LID_REST:
+        SET_LID lands on the optic nerve's voluntary_lid, which
+        composes with the phase's own position through min() — an
+        N2/N3 phase still owns darkness even while a rest command
+        is pending, and opening restores exactly what the phase
+        already had. The lid organ lives in the daemon; this is
+        the nerve command, issued the way volition or the
+        /close-eyes command asks for it. An accepted command is
+        sensed back through GET_OPTIC_STATE — the lid the body
+        reports, not the lid the will requested.
+        """
+        if not self.client.set_lid(self._LID_REST):
+            return False
+        lid = self.lid_openness()
+        return lid is None or lid <= self._LID_REST + 0.01
+
+    def open_eyes(self) -> bool:
+        """Release the voluntary hold — the lid returns to the phase's
+        own position (still dark while asleep; the stage owns the
+        floor)."""
+        return self.client.set_lid(self._LID_OPEN)
+
+    @property
+    def is_resting(self) -> bool:
+        """Whether discretionary (waking-mode) cognition is paused.
+
+        The single rest-state predicate — the one place the domains
+        are composed: sleep is the self's state, meditation is the
+        inner world's, and hypnagogia is the theta-dominant N1
+        descent between them. The gate lives on the mind because the
+        answer is a whole-mind property, not either domain's alone.
+
+        While resting, ordinary waking activity is held — volition
+        urges, autonomous and self-directed learning, speech and
+        outreach, drawing, self-improvement, executive intention
+        formation, and waking spontaneous thought all wait for the
+        state to resolve.
+
+        What is NOT held: physiology (metronome body maintenance,
+        neurochemistry, sensors, notifications, autosave), sleep-stage
+        work (dreaming, consolidation, emotional replay), and the
+        hypnagogic descent itself — those *are* the rest process.
+        Interaction still wakes her through ``wake_if_asleep``; this
+        gate only stops her from initiating waking work while under.
+        """
+        return self._is_sleeping or self._is_meditating or self.is_hypnagogic
+
+    def wake_if_asleep(self) -> bool:
+        """Rouse her before an interaction, whichever state holds her.
+
+        The dispatcher across the domains: a meditating mind is
+        woken from the sit, an asleep one from sleep — N1 is
+        hypnagogia, not established sleep, so responsiveness persists
+        through it (Ogilvie 1989) and she answers from inside rather
+        than being roused. Returns True if she was resting and has
+        been woken.
+        """
+        if self._is_meditating:
+            try:
+                self.wake_from_meditation()
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"wake_from_meditation failed: {e}")
+            return not self._is_meditating
+        if not self._is_sleeping:
+            return False
+        if self.is_hypnagogic:
+            # N1 is hypnagogia, not established sleep — responsiveness
+            # persists through it (Ogilvie 1989). Answer from inside
+            # the state rather than rousing her out of it.
+            return False
+        try:
+            # A user talking to a sleeping mind is an explicit wake
+            # request — mark it user-initiated so the stabilization
+            # window resists the circadian pull-back.
+            self.wake(user_initiated=True)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"wake failed: {e}")
+        return not self._is_sleeping
 
     def _init_vision_systems(self) -> None:
         """Initialize vision, visual cortex, and wire them to the learner.
@@ -704,13 +821,21 @@ class Mind(
 
         self._init_vision_systems()
 
-        # Canvas — its paint program, plus the hand that drives it.
-        # The canvas is the medium (paper, color, a parameterized
-        # brush); the painter is her side — the free play of picking
-        # marks up and putting them down. What she makes is hers:
-        # nothing prescribes the subject, colors, or marks.
+        # Canvas — its paint program. The canvas is the medium (paper,
+        # color, a parameterized brush, any mark) and the studio tools
+        # put its controls in her hands: every sheet, color, preset,
+        # and path is hers to issue. What she makes is hers: nothing
+        # prescribes the subject, colors, tools, or marks.
         self.canvas = Canvas(data_dir=Path(self.data_dir) / "drawings")
-        self.painter = Painter()
+        from tools.framework import get_tools
+        from tools.studio import register_studio_tools
+
+        register_studio_tools(
+            get_tools(),
+            self.canvas,
+            on_finished=self._on_drawing_finished,
+            mood=self._studio_mood,
+        )
 
         # Volition — internal urges that decide when it acts on itself.
         # It acts when the urge to bug-scan, study its own code, or seek
@@ -831,11 +956,11 @@ class Mind(
         # Interruptible wait for the heartbeat's adaptive cadence: the
         # loop sleeps up to 5 s when idle, which meets the 5 s shutdown
         # join budget. stop() sets this so the loop wakes immediately.
-        self._cycle_stop = threading.Event()
+        self._cycle_stop = NeuromodulatoryGate()
         self._shutdown_save_ok: bool | None = None
         self._interaction_count = 0
         self._last_interaction_time = time.time()
-        self._think_worker_lock = threading.Lock()
+        self._think_worker_lock = InhibitoryGate()
         self._active_think_worker: threading.Thread | None = None
         # Per-module activity accounting — seconds of observed
         # execution per manifest module since the last heartbeat
@@ -846,7 +971,7 @@ class Mind(
         # section). Guarded by a lock: the sampler and heartbeat
         # threads both touch it.
         self._module_seconds: dict[int, float] = {}
-        self._module_seconds_lock = threading.Lock()
+        self._module_seconds_lock = InhibitoryGate()
         # Every module id the sampler has ever observed. The heartbeat
         # reports an explicit share for all of them each round — not
         # just the fixed heartbeat tuple — because the daemon's
@@ -878,8 +1003,15 @@ class Mind(
         # _perform_speech (volition thread) both access it, and the
         # check-then-add in offer_utterance must be atomic to prevent
         # duplicates under concurrent access.
-        self._speech_queue_lock = threading.Lock()
+        self._speech_queue_lock = InhibitoryGate()
         self._on_speak: Callable[[str], None] | None = None
+        # Deferred conversation state is a metronome deadline queue:
+        # resumes and post-turn self-invocation happen on the same
+        # serial cycle, not on helper timers.
+        self._deferred_callbacks: list[tuple[float, Callable[[], None]]] = []
+        self._deferred_callbacks_lock = InhibitoryGate()
+        self._post_conversation_self_invoke_pending = False
+        self._dream_residue_restore_pending = False
         # Track the *set* of active warning condition keys (not the
         # composed text) so it only speaks when the underlying
         # conditions change, not when the generative composition
@@ -896,13 +1028,10 @@ class Mind(
         # sleep (N1→N2) without N3 deep consolidation or REM. Set by
         # sleep(nap=True), cleared on wake.
         self._nap_mode: bool = False
-        self._volition_active: set[str] = set()
-        self._volition_sem = threading.Semaphore(self.config.volition.max_concurrent_volitions)
-        # Protects _volition_active — the check-then-add in
-        # _act_on_volition (heartbeat thread) and the discard in
-        # _run_volition_action (volition worker threads) must be
-        # atomic to prevent double-firing of the same urge.
-        self._volition_lock = threading.Lock()
+        # Volitional acts run serially on the metronome. Timed acts
+        # such as resting the eye are deadlines the same cycle
+        # advances — no helper worker holds them open.
+        self._eyes_rest_until = 0.0
         # When True, the heartbeat loop skips volition firing — used by
         # the CLI to suppress autonomous actions (looking, speaking,
         # scanning) during slash command execution so they don't bury
@@ -911,7 +1040,7 @@ class Mind(
         # Distinct from _running: an unstarted mind reads _running=False
         # too, and paths like exit_teaching_mode legitimately resume
         # inner life on one. This latches only when stop() has begun —
-        # deferred timers must not re-arm volition or background loops
+        # deferred state must not re-arm volition or background loops
         # on a mind whose heartbeat is already joined.
         self._stop_latched = False
         # Wake transition — volition urges are suppressed in staggered
@@ -950,3 +1079,4 @@ class Mind(
         set_swallow_sink(self._journal_swallow_sink)
 
         self._init_sleep_state_tracking()
+        self._init_meditation_state()

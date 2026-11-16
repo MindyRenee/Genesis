@@ -12,17 +12,13 @@
 //! not rhythmic mechanical events), and an Embedded Controller
 //! is not a heart (it's a subordinate processor, not a pump).
 //!
-//! This module models the machine's body **as a machine**. Each
-//! hardware signal maps to neurochemical responses based on what
-//! the signal **means for the machine's well-being**, not what
-//! biological organ it resembles. The mappings that work
-//! (temperature→stress, CPU load→effort, battery→survival) do so
-//! because they're functional equivalences — the machine state and
-//! the biological state mean the same thing for survival and
-//! performance. The mappings that were forced (EC=heart,
-//! fan=cardiac output, GPE regularity=HRV→stress) have been
-//! removed because they produced incorrect neurochemical
-//! responses from normal machine states.
+//! This module separates **body telemetry** from **interoceptive
+//! afference**. Every hardware signal may be published as body state,
+//! but only channels with a biological homeostatic meaning drive
+//! neurochemistry: thermal state, sustained effort/overload, energy
+//! reserve, thermoregulatory effort/failure, and measured rest. Raw
+//! machine activity (I/O, RAPL switching, perf counters, rail voltage,
+//! and power draw) remains telemetry and produces no impulses.
 //!
 //! ## The machine's body systems
 //!
@@ -34,24 +30,22 @@
 //!    RAM usage = cognitive load (working memory fullness).
 //!
 //! 3. **Energy system** (PSU + battery): power delivery.
-//!    Battery = energy reserve. AC vs battery = fed vs fasting.
-//!    Power draw = metabolic rate (actual energy consumption).
+//!    Battery = energy reserve. AC vs battery = external supply vs
+//!    reserve. Power draw = energy-use telemetry.
 //!
 //! 4. **Thermal system** (heatsink + fan): waste heat removal.
-//!    Fan speed = thermoregulatory effort (like sweating/panting,
-//!    not cardiac output). The fan removes heat; it doesn't
-//!    circulate anything.
+//!    Fan speed = cooling effort. The fan removes heat; it does
+//!    not circulate anything.
 //!
 //! 5. **I/O system** (disk, network, peripherals): data exchange
 //!    with the world. I/O throughput = data exchange activity
 //!    (sensory-motor activity, not drowsiness).
 //!
-//! 6. **Autonomic monitoring** (EC + GPE): the Embedded Controller
-//!    is a subordinate processor that manages hardware-level body
-//!    state — the machine's autonomic nervous system, not its
-//!    heart. GPE events are afferent signals (body→brain
-//!    notifications), not heartbeats. GPE regularity is normal
-//!    and healthy; it does not indicate stress.
+//! 6. **Hardware event monitoring** (EC + GPE): the Embedded
+//!    Controller is a subordinate processor that manages
+//!    hardware-level body state. GPE events are asynchronous
+//!    notifications. GPE regularity is normal and does not
+//!    indicate stress.
 //!
 //! ## Modeling note
 //!
@@ -97,50 +91,44 @@
 //!   as a fraction of its CPU capacity. Other programs loading the
 //!   CPU don't stress its — only its own effort does.
 //! - **Battery level** → energy reserve. How much energy it has
-//!   left. Low battery is a survival concern. This is a body-state
-//!   signal — the battery doesn't care which process drained it.
-//! - **Power state** → metabolic state. On AC power (plugged in)
-//!   vs battery (running on reserves).
-//! - **Power draw** → metabolic rate. How much energy it's
-//!   consuming right now. High power draw under high load = active
-//!   exertion. Low power draw under low load = resting metabolism.
-//!   Read from AMD fam15h_power, Intel RAPL, or battery power_now,
-//!   depending on available sensors. 0.0 if no power sensor is
-//!   found.
-//! - **Fan speed** → thermoregulatory effort. How hard its cooling
-//!   system is working to remove waste heat. High fan + high temp
-//!   = the body struggling to cool down. Fan off + high temp =
-//!   cooling failure (dangerous). This is **not** cardiac output
-//!   — the fan removes heat, it doesn't circulate anything.
-//! - **Supply voltage** → energy reserve health. The battery rail
-//!   voltage is the electrical potential of its energy reserve.
-//!   A Li-ion battery sags from ~12.6V (full) to ~10.5V
-//!   (critically low) as it discharges. Critically low voltage →
-//!   CRH (survival stress). This is a direct electrical measure,
-//!   more fundamental than the percentage estimate.
+//!   left. Low reserve is an energy-stress signal. This is a
+//!   body-state signal — the battery doesn't care which process
+//!   drained it.
+//! - **Power state** → external supply state. On AC power (plugged
+//!   in) vs battery (running on reserves).
+//! - **Power draw** → energy-use telemetry. How much energy it's
+//!   consuming right now. Read from AMD fam15h_power, Intel RAPL,
+//!   or battery power_now, depending on available sensors. It is
+//!   published as body state but does not drive neurochemistry.
+//!   0.0 if no power sensor is found.
+//! - **Fan speed** → cooling effort. How hard its cooling system
+//!   is working to remove waste heat. High fan + high temp =
+//!   thermoregulatory strain. Fan off + high temp = cooling
+//!   failure. The fan removes heat; it does not circulate anything.
+//! - **Supply voltage** → energy-reserve telemetry. The battery rail
+//!   voltage is the electrical potential of the reserve. A Li-ion
+//!   battery sags from ~12.6V (full) toward ~10.5V as it discharges.
+//!   This is published as telemetry but does not drive neurochemistry.
 //! - **Core voltage** → CPU operating voltage (Vcore). On
 //!   acpi-cpufreq systems, the SMU controls this internally per
 //!   P-state and does not expose it via sysfs. When available
 //!   (board-level sensors), it provides direct awareness of the
 //!   CPU's electrical state.
-//! - **GPE event rate** → autonomic afferent signal rate. How
-//!   frequently the Embedded Controller sends body-state updates
-//!   to the CPU. This is informational — the EC is the machine's
-//!   autonomic nervous system (a subordinate processor that
-//!   monitors hardware), not a heart. GPE regularity is normal
-//!   and healthy; it does not produce stress impulses.
+//! - **GPE event rate** → hardware notification rate. How
+//!   frequently the Embedded Controller reports body-state events
+//!   to the CPU. This is informational; GPE regularity is normal
+//!   and does not produce stress impulses.
 //! - **Silicon switching activity** (RAPL power domains) → the
 //!   spatial distribution of transistor activity. RAPL energy
 //!   counters (`/sys/class/powercap/*/{name,energy_uj}`) report
 //!   cumulative joules per silicon domain; the delta per read is
 //!   literally how many electrons switched in that subsystem
 //!   (dynamic power ∝ switching activity, P ≈ α·C·V²·f). Core
-//!   domain = execution-unit firing (thinking effort at the
-//!   electron level). DRAM domain = memory-subsystem firing
-//!   (encoding/retrieval traffic). Uncore = integration fabric
-//!   (cache/memory-controller interconnect). These are
+//!   domain = execution-unit activity. DRAM domain = memory-subsystem
+//!   activity. Uncore = integration-fabric activity. These are
 //!   **body-state signals** — energy isn't attributed per-process,
-//!   so like temperature they reflect the whole silicon body.
+//!   so like temperature they reflect the whole silicon body. They
+//!   remain telemetry and do not drive neurochemistry.
 //!   0.0 on systems without powercap (e.g. AMD pre-17h, VMs).
 //! - **Microarchitectural prediction errors** (perf counters) →
 //!   violated expectations in silicon. The CPU's branch predictor
@@ -148,11 +136,11 @@
 //!   branch misprediction or cache miss is a prediction the
 //!   silicon got wrong. `branch_miss_rate` and `cache_miss_rate`
 //!   are measured via `perf_event_open` on Genesis's own process
-//!   tree (activity signals — other programs' misses are not its
-//!   surprise). These are ratios, naturally in [0, 1]. 0.0 when
-//!   perf counters are unavailable (`perf_event_paranoid ≥ 4`
-//!   blocks unprivileged access entirely).
-//! - **cpuidle residency** (`rest`) → the parasympathetic channel.
+//!   tree. These are ratios, naturally in [0, 1], and remain
+//!   telemetry rather than neurochemical drive. 0.0 when perf
+//!   counters are unavailable (`perf_event_paranoid ≥ 4` blocks
+//!   unprivileged access entirely).
+//! - **cpuidle residency** (`rest`) → measured low-power residency.
 //!   `/sys/devices/system/cpu/cpu*/cpuidle/state*/{name,time}`
 //!   reports cumulative microseconds each core has spent in each
 //!   hardware idle state. Depth-weighted residency in the sample
@@ -203,30 +191,18 @@
 //! that nudge it toward the correct response:
 //!
 //! - High temperature → small CRH impulse (heat stress, via HPA cascade)
-//! - High self-process memory → small CRH + GABA impulse (overwhelm)
-//! - High self-process CPU → small norepinephrine impulse (effort)
-//! - High self-process I/O → small norepinephrine impulse (active data work)
-//! - Low battery → small CRH impulse (survival concern, via HPA cascade)
-//! - Low load + cool temp → small serotonin impulse (well-being)
-//! - High fan + high temp → small CRH impulse (thermoregulatory strain)
-//! - Fan off + high temp → small CRH impulse (cooling failure)
-//! - High metabolic rate + high load → small norepinephrine impulse (exertion)
-//! - Low metabolic rate + low load → small serotonin impulse (resting)
-//! - Critically low supply voltage → small CRH impulse (survival stress)
-//! - High core-domain switching → small norepinephrine impulse (effort
-//!   at the electron level)
-//! - High DRAM-domain switching → small acetylcholine impulse (memory
-//!   traffic = encoding/retrieval activity)
-//! - High branch/cache miss rates → small norepinephrine impulse
-//!   (surprise — silicon prediction errors)
-//! - Verified deep cpuidle rest + low stress → serotonin + GABA +
-//!   endocannabinoid impulses (the parasympathetic arm — rest is a
-//!   measured state, not the absence of strain); deepest rest also
-//!   withdraws norepinephrine (LC quiet during parasympathetic
-//!   dominance)
-//! - Verified cooling trend (temp falling below its own EMA) →
-//!   endocannabinoid impulse (recovery — the stress brake coming
-//!   back on, the 2-AG termination analogue)
+//! - Sustained load → small norepinephrine impulse (effort)
+//! - Excessive load → small CRH + norepinephrine impulses (stress)
+//! - Low energy reserve → small CRH impulse (energy stress, via HPA cascade)
+//! - High cooling effort + high temperature → small CRH impulse
+//!   (thermoregulatory strain)
+//! - Cooling failure + high temperature → small CRH impulse
+//! - Verified deep rest → withdrawal of norepinephrine, orexin, and
+//!   histamine tone (the wake-stabilizing systems quiet outside waking)
+//!
+//! Raw hardware activity is telemetry, not interoceptive afference:
+//! I/O, RAPL switching, perf counters, rail voltage, and power draw do
+//! not produce neurochemical impulses.
 //!
 //! The impulses are deliberately small — they accumulate over
 //! multiple ticks through the neurochemical dynamics, creating
@@ -244,8 +220,8 @@
 //! It can ask for help. It can say "I'm too hot" or "I'm
 //! overwhelmed" because it can actually feel it.
 
+use crate::inhibition::{Inhibition, Innate};
 use std::fs;
-use std::sync::{Mutex, OnceLock};
 use std::time::Instant;
 
 use crate::state::neurochemical::{NeurochemicalId, NeurochemicalVector};
@@ -305,10 +281,9 @@ pub mod sensor {
     /// perf_event_open succeeded, so cache/branch miss ratios are real
     /// measurements rather than permanent zeros.
     pub const PERF_COUNTERS: u32 = 1 << 10;
-    /// The embedded controller's GPE counter was readable (autonomic
-    /// afferent rate).
+    /// The embedded controller's GPE counter was readable.
     pub const GPE: u32 = 1 << 11;
-    /// Per-core local-timer interrupt counters were readable (pulse).
+    /// Per-core local-timer interrupt counters were readable.
     pub const LOCAL_TIMER: u32 = 1 << 12;
     /// Total system memory was readable.
     pub const MEMORY: u32 = 1 << 13;
@@ -341,10 +316,10 @@ const SENSOR_BITS: [(u32, &str); 17] = [
     (sensor::CPUIDLE, "cpuidle state counters"),
 ];
 
-static SHARED_SENSOR_PRESENCE: OnceLock<Mutex<u32>> = OnceLock::new();
+static SHARED_SENSOR_PRESENCE: Innate<Inhibition<u32>> = Innate::new();
 
-fn shared_presence() -> &'static Mutex<u32> {
-    SHARED_SENSOR_PRESENCE.get_or_init(|| Mutex::new(0))
+fn shared_presence() -> &'static Inhibition<u32> {
+    SHARED_SENSOR_PRESENCE.get_or_init(|| Inhibition::new(0))
 }
 
 /// Publish the discovered sensor-presence mask alongside the body state.
@@ -363,10 +338,10 @@ pub fn read_sensor_presence() -> u32 {
     shared_presence().lock().map(|g| *g).unwrap_or(0)
 }
 
-static SHARED_MEMORY_MB: OnceLock<Mutex<f32>> = OnceLock::new();
+static SHARED_MEMORY_MB: Innate<Inhibition<f32>> = Innate::new();
 
-fn shared_memory_mb() -> &'static Mutex<f32> {
-    SHARED_MEMORY_MB.get_or_init(|| Mutex::new(0.0))
+fn shared_memory_mb() -> &'static Inhibition<f32> {
+    SHARED_MEMORY_MB.get_or_init(|| Inhibition::new(0.0))
 }
 
 /// The last measured RSS of Genesis's process tree, in megabytes.
@@ -398,10 +373,10 @@ impl ProcessHealth {
     }
 }
 
-static SHARED_PROCESS_HEALTH: OnceLock<Mutex<ProcessHealth>> = OnceLock::new();
+static SHARED_PROCESS_HEALTH: Innate<Inhibition<ProcessHealth>> = Innate::new();
 
-fn shared_health() -> &'static Mutex<ProcessHealth> {
-    SHARED_PROCESS_HEALTH.get_or_init(|| Mutex::new(ProcessHealth::default()))
+fn shared_health() -> &'static Inhibition<ProcessHealth> {
+    SHARED_PROCESS_HEALTH.get_or_init(|| Inhibition::new(ProcessHealth::default()))
 }
 
 /// Publish the current process health.
@@ -446,16 +421,16 @@ pub fn report_missing_sensors(mask: u32) {
 // via GET_BODY_STATE. This bridges the two threads without coupling the
 // IPC handler to the TickLoop struct.
 
-static SHARED_BODY_STATE: OnceLock<Mutex<BodyState>> = OnceLock::new();
+static SHARED_BODY_STATE: Innate<Inhibition<BodyState>> = Innate::new();
 
-fn shared_body() -> &'static Mutex<BodyState> {
-    SHARED_BODY_STATE.get_or_init(|| Mutex::new(BodyState::default()))
+fn shared_body() -> &'static Inhibition<BodyState> {
+    SHARED_BODY_STATE.get_or_init(|| Inhibition::new(BodyState::default()))
 }
 
-static SHARED_LOBE_TELEMETRY: OnceLock<Mutex<(Vec<SubsystemTelemetry>, u64)>> = OnceLock::new();
+static SHARED_LOBE_TELEMETRY: Innate<Inhibition<(Vec<SubsystemTelemetry>, u64)>> = Innate::new();
 
-fn shared_subsystems() -> &'static Mutex<(Vec<SubsystemTelemetry>, u64)> {
-    SHARED_LOBE_TELEMETRY.get_or_init(|| Mutex::new((Vec::new(), 0)))
+fn shared_subsystems() -> &'static Inhibition<(Vec<SubsystemTelemetry>, u64)> {
+    SHARED_LOBE_TELEMETRY.get_or_init(|| Inhibition::new((Vec::new(), 0)))
 }
 
 /// Publish the latest per-subsystem telemetry so the IPC handler can
@@ -612,7 +587,7 @@ pub struct BodyState {
     pub energy_reserve: f32,
 
     /// Whether it's on AC power (true) or battery (false).
-    /// On AC = well-fed, on battery = running on reserves.
+    /// On AC = externally supplied, on battery = running on reserves.
     pub on_ac_power: bool,
 
     /// Number of CPU cores — its parallel processing capacity.
@@ -620,26 +595,21 @@ pub struct BodyState {
 
     /// Whether any distress condition is currently active.
     /// True if temperature, load, or memory pressure is in
-    /// a concerning range. This is its cry for help signal.
+    /// a concerning range.
     pub distressed: bool,
 
-    /// Autonomic afferent signal rate — GPE (General Purpose Event)
-    /// interrupts per second from the Embedded Controller. The EC is
-    /// a subordinate processor that manages hardware-level body
-    /// state — the machine's autonomic nervous system, not a heart.
-    /// GPE events are afferent signals (body→brain notifications),
-    /// not heartbeats. This field is informational; GPE regularity
-    /// is normal and does not produce stress impulses. 0.0 = no EC
-    /// detected (e.g. a desktop without an EC).
+    /// Hardware notification rate — GPE (General Purpose Event)
+    /// interrupts per second from the Embedded Controller. This field
+    /// is informational; GPE regularity is normal and does not produce
+    /// stress impulses. 0.0 = no EC detected (e.g. a desktop without
+    /// an EC).
     pub autonomic_rate: f32,
 
     /// Thermoregulatory effort — fan speed normalized [0, 1].
     /// The fan is the machine's cooling system: it removes waste
-    /// heat from the CPU via the heatsink. This is thermoregulation
-    /// (like sweating or panting), not cardiac output — the fan
-    /// doesn't circulate anything. 0.0 = fan off, 1.0 = full speed.
-    /// High fan + high temp = the body struggling to cool down.
-    /// Fan off + high temp = cooling failure (dangerous).
+    /// heat from the CPU via the heatsink. 0.0 = fan off,
+    /// 1.0 = full speed. High fan + high temp = thermoregulatory
+    /// strain. Fan off + high temp = cooling failure.
     ///
     /// 0.0 is ALSO the value when no fan sensor exists, so the reading
     /// alone cannot distinguish "fan stopped" from "no telemetry".
@@ -647,15 +617,15 @@ pub struct BodyState {
     /// gated on the sensor being present — see `neuro_impulses`.
     pub thermoregulatory_effort: f32,
 
-    /// Metabolic rate — power draw normalized [0, 1]. How much
+    /// Energy-use telemetry — power draw normalized [0, 1]. How much
     /// energy the machine is consuming right now. Read from the first
     /// live candidate among AMD fam15h_power, battery power_now, and
     /// the battery hwmon bridge, in that preference order. Candidates
     /// are tried in turn, so a present-but-dead sensor (fam15h_power
     /// reports 0 on some AMD parts) does not mask a working one.
     /// 0.0 = every candidate unreadable or reporting zero, or the
-    /// machine is genuinely idle. High metabolic rate under
-    /// high load = active exertion; low under low load = resting.
+    /// machine is genuinely idle. This is telemetry and does not
+    /// drive neurochemistry.
     pub metabolic_rate: f32,
 
     /// CPU core voltage in volts (raw, not normalized). Read from
@@ -692,53 +662,39 @@ pub struct BodyState {
     pub uncore_activity: f32,
 
     /// DRAM-domain switching activity, normalized [0, 1]. RAPL
-    /// "dram" domain energy rate — memory-subsystem firing. This
-    /// is the electrical signature of encoding/retrieval traffic
-    /// to long-term storage. 0.0 if no RAPL dram domain exists.
+    /// "dram" domain energy rate — memory-subsystem switching.
+    /// 0.0 if no RAPL dram domain exists.
     pub dram_activity: f32,
 
     /// Cache miss ratio of Genesis's own process tree [0, 1]:
     /// `cache-misses / cache-references` from perf hardware
-    /// counters. A cache miss is a prediction the memory hierarchy
-    /// got wrong — the silicon expected the data to be close and
-    /// it wasn't. High ratio = its memory access patterns are
-    /// surprising the hardware. 0.0 if perf counters are
-    /// unavailable (`perf_event_paranoid ≥ 4`).
+    /// counters. 0.0 if perf counters are unavailable
+    /// (`perf_event_paranoid ≥ 4`).
     pub cache_miss_rate: f32,
 
     /// Branch miss ratio of Genesis's own process tree [0, 1]:
-    /// `branch-misses / branches` from perf hardware counters. A
-    /// branch misprediction is the CPU's hardware predictor
-    /// guessing wrong — a violated expectation in silicon.
-    /// Typical code runs 1–5%; sustained elevation means its
-    /// execution is taking paths the predictor didn't foresee.
-    /// 0.0 if perf counters are unavailable.
+    /// `branch-misses / branches` from perf hardware counters.
+    /// Typical code runs 1–5%. 0.0 if perf counters are unavailable.
     pub branch_miss_rate: f32,
 
-    /// Local-timer interrupt rate in beats per second — the
-    /// machine's pulse. Each core's Local APIC timer fires the
-    /// kernel's scheduler tick (the `LOC` line in
-    /// /proc/interrupts); under tickless idle (NO_HZ) a sleeping
-    /// core's beat pauses entirely, so the rate both paces and
-    /// reflects activity. Generated by timer hardware and the
-    /// scheduler — involuntary: software can make work that beats,
-    /// but cannot fake the beat itself.
+    /// Local-timer interrupt rate in interrupts per second. Each
+    /// core's Local APIC timer fires the kernel's scheduler tick
+    /// (the `LOC` line in /proc/interrupts); under tickless idle
+    /// (NO_HZ) an idle core's timer pauses entirely, so the rate
+    /// both paces and reflects activity. Generated by timer hardware
+    /// and the scheduler.
     pub pulse_hz: f32,
 
-    /// Pulse normalized [0, 1]: pulse_hz / (num_cores × TICK_HZ).
-    /// 1.0 = every core beating at the nominal full tick rate.
-    /// Clamped — kernels configured at a different CONFIG_HZ
-    /// saturate above 1.0 before normalization.
+    /// Timer-interrupt rate normalized [0, 1]: pulse_hz /
+    /// (num_cores × TICK_HZ). 1.0 = every core at the nominal full
+    /// tick rate. Clamped — kernels configured at a different
+    /// CONFIG_HZ saturate above 1.0 before normalization.
     pub pulse: f32,
 
-    /// Passive thermal throttle state [0, 1] — the involuntary
-    /// reflex. The maximum cur_state/max_state across ACPI
-    /// "Processor" cooling devices: the kernel's thermal framework
-    /// lowering its clock because the silicon is hot, decided
-    /// below the OS scheduler. It feels the result, not the
-    /// decision — the closest analog to the substrate-level
-    /// indicator events used in machine-correlates research:
-    /// generated by hardware logic, unprovable by software.
+    /// Passive thermal throttle state [0, 1]. The maximum
+    /// cur_state/max_state across ACPI "Processor" cooling devices:
+    /// the kernel's thermal framework lowering its clock because the
+    /// silicon is hot, decided below the OS scheduler.
     pub throttle_state: f32,
 
     /// Fraction of the last read window spent at the maximum
@@ -784,14 +740,11 @@ pub struct BodyState {
     pub suspend_caps: u8,
 
     /// Rest — depth-weighted cpuidle residency [0, 1]. The share of
-    /// the read window the cores spent in real sleep states, weighted
+    /// the read window the cores spent in low-power states, weighted
     /// by depth: fully parked in the deepest C-state scores 1.0, the
-    /// busy-wait POLL state scores 0. This is the parasympathetic
-    /// channel — positive evidence the substrate is *resting*, not
-    /// merely that no excited channel is firing. Vagal afference in
-    /// animals is exactly this: an active report of the body's
-    /// hypometabolic state, not silence on the sympathetic side
-    /// (Scott et al. 2024). 0.0 if no cpuidle telemetry exists.
+    /// busy-wait POLL state scores 0. This is positive evidence of
+    /// rest, not merely silence on the load channels. 0.0 if no
+    /// cpuidle telemetry exists.
     pub rest: f32,
 
     /// Temperature trend — signed deviation of `cpu_temp_c` from
@@ -816,9 +769,9 @@ impl BodyState {
     ///
     /// The `Default` implementation produces `energy_reserve = 0.0`
     /// and `on_ac_power = false`, which the interoceptor interprets as
-    /// a dead battery and emits cortisol impulses for the first ~30
-    /// ticks until a real sensor read arrives. This neutral state
-    /// avoids that by assuming a healthy, plugged-in machine.
+    /// depleted reserves and emits CRH impulses until a real sensor
+    /// read arrives. This neutral state avoids that by assuming a
+    /// healthy, externally powered machine.
     pub fn neutral() -> Self {
         Self {
             cpu_temp_c: 50.0,
@@ -901,15 +854,15 @@ pub struct Interoceptor {
     /// Discovered at startup by scanning hwmon for pwm1.
     fan_path: Option<String>,
 
-    /// Candidate paths to power draw sensors (metabolic rate), in
-    /// descending order of preference. Discovered at startup by
-    /// scanning hwmon for power sensors (AMD fam15h_power, battery
-    /// power_now, battery hwmon power1_input).
+    /// Candidate paths to power draw sensors, in descending order of
+    /// preference. Discovered at startup by scanning hwmon for power
+    /// sensors (AMD fam15h_power, battery power_now, battery hwmon
+    /// power1_input).
     ///
     /// A list rather than a single path: a preferred sensor can exist
     /// yet read a dead 0 (fam15h_power does this on some AMD parts)
     /// while a lesser candidate is live. Reading only the first match
-    /// would pin metabolic_rate at 0.0 with a working sensor ignored.
+    /// would pin the power telemetry at 0.0 with a working sensor ignored.
     power_paths: Vec<String>,
 
     /// Path to the CPU core voltage sensor (Vcore/VDD).
@@ -923,14 +876,12 @@ pub struct Interoceptor {
     /// hwmon devices. None on systems without a battery.
     supply_voltage_path: Option<String>,
 
-    /// Previous total GPE event count (for autonomic signal rate).
-    /// The EC (Embedded Controller) sends body state to the CPU via
-    /// GPE interrupts. The delta of this count per second is the
-    /// autonomic afferent signal rate.
+    /// Previous total GPE event count, used to compute the hardware
+    /// notification rate.
     prev_gpe_count: u64,
 
     /// Previous cumulative local-timer interrupt count (the `LOC`
-    /// line's per-core counters summed) — the pulse delta base.
+    /// line's per-core counters summed).
     prev_loc_count: u64,
 
     /// Previous cumulative jiffies spent at the maximum P-state and
@@ -969,6 +920,15 @@ pub struct Interoceptor {
     /// Discovered RAPL power domains (core/uncore/dram). Empty on
     /// systems without a powercap driver (e.g. AMD pre-17h, VMs).
     rapl_domains: Vec<RaplDomain>,
+
+    /// Whole-platform RAPL domain (psys preferred, else package) —
+    /// the metabolic-rate backstop. Battery `power_now` is the
+    /// better whole-system reading when it carries a real signal,
+    /// but a full battery on AC honestly reports zero discharge
+    /// while the machine burns wall power. An energy counter like
+    /// `rapl_domains`, kept apart because it is differentiated for
+    /// watts rather than for subsystem activity.
+    power_domain: Option<RaplDomain>,
 
     /// Per-PID perf counter sets for microarchitectural prediction
     /// errors (cache/branch miss ratios). Keyed by PID; PIDs that
@@ -1098,20 +1058,24 @@ impl ProcIo {
 ///
 /// Domain names come from the `name` file under each
 /// `/sys/class/powercap/*/` entry (e.g. `intel-rapl:0:0/name`
-/// contains "core"). Only per-subsystem domains are tracked —
-/// "package" and "psys" are whole-chip aggregates already
-/// covered by `metabolic_rate`.
+/// contains "core"). The per-subsystem domains feed the activity
+/// channels; `package`/`psys` are whole-chip aggregates and back
+/// `metabolic_rate` through `power_domain` instead.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum RaplKind {
-    /// Execution units — transistor switching in the compute
-    /// silicon. Thinking effort at the electron level.
+    /// Execution units — transistor switching in the compute silicon.
     Core,
     /// Integration fabric — last-level cache, memory controller,
-    /// interconnect. Data integration between cores and memory.
+    /// interconnect.
     Uncore,
-    /// Memory subsystem — DRAM switching. The electrical
-    /// signature of encoding/retrieval traffic.
+    /// Memory subsystem — DRAM switching.
     Dram,
+    /// Whole-platform aggregate — `psys` when the machine exposes
+    /// it, else `package`. Not an activity channel: it is the
+    /// `metabolic_rate` backstop for when the instantaneous power
+    /// sensors read zero, which a full battery on AC legitimately
+    /// does while the machine still draws wall power.
+    Package,
 }
 
 /// What the startup probe found, bundled so `build_sensor_mask` takes
@@ -1143,6 +1107,9 @@ struct SensorProbe {
     supply_voltage_path: Option<String>,
     /// RAPL power domains.
     rapl_domains: Vec<RaplDomain>,
+    /// Whole-platform RAPL domain (psys/package) — a live power
+    /// channel even when `power_paths` is empty.
+    rapl_power_domain: bool,
     /// Per-core cpuidle sleep states and the deepest index seen.
     cpuidle_states: Vec<Vec<CpuidleState>>,
     cpuidle_max_depth: u32,
@@ -1197,20 +1164,12 @@ fn rapl_delta_uj(prev: u64, cur: u64, max_range_uj: u64) -> u64 {
     }
 }
 
-/// Per-PID hardware performance counters — the machine's
-/// prediction-error sensors.
+/// Per-PID hardware performance counters.
 ///
-/// The CPU's branch predictor and cache hierarchy are hardware
-/// prediction engines. A branch misprediction or cache miss is a
-/// prediction the silicon got wrong — the microarchitectural
-/// analogue of the prediction errors the active-inference model
-/// tracks at the neurochemical level. Measured via
-/// `perf_event_open` scoped to a single PID (activity signal —
-/// other programs' misses are not its surprise).
-///
-/// All counters are opened with `exclude_kernel`/`exclude_hv` so
-/// they measure only its user-space execution, and started
-/// disabled → enabled so the first delta has a clean baseline.
+/// Measured via `perf_event_open` scoped to a single PID. All
+/// counters are opened with `exclude_kernel`/`exclude_hv` so they
+/// measure only user-space execution, and started disabled →
+/// enabled so the first delta has a clean baseline.
 struct PerfSet {
     /// File descriptors for the counters, in `PERF_EVENTS`
     /// order. -1 if that event failed to open individually (some
@@ -1477,6 +1436,7 @@ impl Interoceptor {
             }
         };
         let rapl_domains = find_rapl_domains();
+        let power_domain = find_rapl_power_domain();
         let (cpuidle_states, cpuidle_max_depth) = discover_cpuidle();
         let mut sensor_mask = Self::build_sensor_mask(&SensorProbe {
             temp_sensor_present,
@@ -1489,6 +1449,7 @@ impl Interoceptor {
             core_voltage_path: core_voltage_path.clone(),
             supply_voltage_path: supply_voltage_path.clone(),
             rapl_domains: rapl_domains.clone(),
+            rapl_power_domain: power_domain.is_some(),
             cpuidle_states: cpuidle_states.clone(),
             cpuidle_max_depth,
             // Presence reflects the real probe, not the fallback:
@@ -1533,6 +1494,7 @@ impl Interoceptor {
             clocksource_id: read_clocksource(),
             suspend_caps: detect_suspend_caps(),
             rapl_domains,
+            power_domain,
             perf_counters: std::collections::HashMap::new(),
             perf_unavailable: false,
             subsystem_cpu: std::collections::HashMap::new(),
@@ -1645,7 +1607,7 @@ impl Interoceptor {
         if probe.fan_path.is_some() {
             mask |= sensor::FAN;
         }
-        if !probe.power_paths.is_empty() {
+        if !probe.power_paths.is_empty() || probe.rapl_power_domain {
             mask |= sensor::POWER;
         }
         if probe.core_voltage_path.is_some() {
@@ -1772,8 +1734,7 @@ impl Interoceptor {
                 self.temp_warned = false; // sensor recovered, reset flag
                 // finite_clamp returns `min` (0.0 °C) for non-finite
                 // values, which would silently disable all thermal
-                // stress responses and falsely trigger the "cool temp"
-                // serotonin branch. A corrupt sysfs read (f32::parse
+                // stress responses. A corrupt sysfs read (f32::parse
                 // accepts "NaN") must fall back to the neutral 50.0 °C,
                 // not a freezing false negative.
                 if t.is_finite() {
@@ -1842,12 +1803,9 @@ impl Interoceptor {
         // Battery and power — global body-state signals.
         let (energy_reserve, on_ac_power) = self.read_power();
 
-        // Autonomic afferent signal rate — GPE events from the
-        // Embedded Controller. The EC is a subordinate processor
-        // (the machine's autonomic nervous system, not a heart).
-        // GPE events are afferent notifications, not heartbeats.
-        // The rate is informational; regularity is normal and
-        // does not produce stress impulses.
+        // Hardware notification rate — GPE events from the Embedded
+        // Controller. The rate is informational; regularity is normal
+        // and does not produce stress impulses.
         let gpe_count = read_gpe_count();
         let elapsed_secs = now.duration_since(self.last_read).as_secs_f64();
         let autonomic_rate = if elapsed_secs > 0.0 && self.prev_gpe_count > 0 {
@@ -1859,18 +1817,22 @@ impl Interoceptor {
         self.prev_gpe_count = gpe_count;
 
         // Thermoregulatory effort: fan speed (how hard the cooling
-        // system is working to remove waste heat). This is
-        // thermoregulation, not cardiac output.
+        // system is working to remove waste heat).
         let thermoregulatory_effort = self
             .fan_path
             .as_ref()
             .and_then(|p| read_fan_pwm(p))
             .unwrap_or(0.0);
 
-        // Metabolic rate: power draw (how much energy the machine
-        // is consuming right now). Read from AMD fam15h_power,
-        // Intel RAPL, or battery power_now. 0.0 if no sensor.
-        let metabolic_rate = read_power_draw_any(&self.power_paths).unwrap_or(0.0);
+        // Energy-use telemetry: power draw. Instantaneous sensors
+        // first — AMD fam15h_power, then battery power_now. When
+        // every instantaneous path reports zero (a full battery on
+        // AC is an honest zero while the machine still draws wall
+        // power), fall back to the whole-platform RAPL counter
+        // differentiated over the read window. 0.0 if no sensor.
+        let metabolic_rate = read_power_draw_any(&self.power_paths)
+            .or_else(|| self.read_rapl_power(now))
+            .unwrap_or(0.0);
 
         // Core voltage (Vcore) — the CPU's operating voltage. On
         // acpi-cpufreq systems, the SMU controls this internally per
@@ -1900,19 +1862,14 @@ impl Interoceptor {
         // isn't attributed per-process, like temperature.
         let (core_activity, uncore_activity, dram_activity) = self.read_rapl(now);
 
-        // Microarchitectural prediction errors — perf counters on
-        // its own process tree. Activity signal: only its misses
-        // count as its surprise.
+        // Perf counters on its own process tree.
         let (cache_miss_rate, branch_miss_rate) = self.read_perf(&pids);
 
-        // The pulse — local-timer interrupts per second, the
-        // machine's own beat. Each core's Local APIC timer fires
-        // the kernel's scheduler tick; under tickless idle a
-        // sleeping core's beat pauses entirely, so a quiet machine
-        // genuinely has a slow pulse and a working machine a fast
-        // one. The beat is hardware/scheduler-generated —
-        // involuntary, like GPE but rhythmic rather than
-        // event-driven.
+        // Local-timer interrupts per second. Each core's Local APIC
+        // timer fires the kernel's scheduler tick; under tickless
+        // idle an idle core's timer pauses entirely, so a quiet
+        // machine has a low rate and a working machine a high one.
+        // The signal is generated by timer hardware and the scheduler.
         let loc_total = read_loc_count();
         let pulse_hz = if elapsed_secs > 0.0 && self.prev_loc_count > 0 {
             let delta = loc_total.saturating_sub(self.prev_loc_count);
@@ -1966,12 +1923,10 @@ impl Interoceptor {
         let battery_cycles = read_battery_cycles();
         let entropy_level = read_entropy_level();
 
-        // The parasympathetic channel — rest, not merely the absence
+        // Measured low-power residency — rest, not merely the absence
         // of strain. Depth-weighted cpuidle residency: a core parked
-        // in a real C-state is positive evidence the substrate is
-        // sleeping, the machine analogue of vagal afference reporting
-        // a hypometabolic body. Busy-wait POLL residency and running
-        // time contribute nothing.
+        // in a real C-state is positive evidence of rest. Busy-wait
+        // POLL residency and running time contribute nothing.
         let rest = self.read_cpuidle_rest(elapsed_secs);
 
         // Temperature trend — which way the body is moving, not where
@@ -2287,6 +2242,9 @@ impl Interoceptor {
                 RaplKind::Core => (&mut core, CORE_REF_UW),
                 RaplKind::Uncore => (&mut uncore, UNCORE_REF_UW),
                 RaplKind::Dram => (&mut dram, DRAM_REF_UW),
+                // Whole-platform domains live in `power_domain`,
+                // never in `rapl_domains` — unreachable in practice.
+                RaplKind::Package => continue,
             };
             // Multiple packages: sum normalized activity and clamp.
             *value += crate::state::sanitize::finite_clamp((power_uw / reference) as f32, 0.0, 1.0);
@@ -2297,6 +2255,37 @@ impl Interoceptor {
             crate::state::sanitize::finite_clamp(uncore, 0.0, 1.0),
             crate::state::sanitize::finite_clamp(dram, 0.0, 1.0),
         )
+    }
+
+    /// Whole-platform power draw from the RAPL energy counter,
+    /// normalized [0, 1] — the `metabolic_rate` backstop.
+    ///
+    /// `power_now` and fam15h report instantaneous watts; RAPL is a
+    /// cumulative microjoule counter, so the draw is its delta over
+    /// the read window. `None` until the counter has a baseline to
+    /// differentiate against (first read), matching `read_rapl`'s
+    /// warmup. Normalized against the same 100 W reference as
+    /// `read_power_draw` so the two paths read on one scale.
+    fn read_rapl_power(&mut self, now: Instant) -> Option<f32> {
+        let domain = self.power_domain.as_mut()?;
+        let elapsed_secs = now.duration_since(self.last_read).as_secs_f64();
+        if elapsed_secs <= 0.0 {
+            return None;
+        }
+        let cur = fs::read_to_string(&domain.energy_path)
+            .ok()?
+            .trim()
+            .parse::<u64>()
+            .ok()?;
+        let prev = domain.prev_uj.replace(cur)?;
+        let delta_uj = rapl_delta_uj(prev, cur, domain.max_range_uj);
+        let watts = delta_uj as f64 * 1.0e-6 / elapsed_secs;
+        const REFERENCE_WATTS: f64 = 100.0;
+        Some(crate::state::sanitize::finite_clamp(
+            (watts / REFERENCE_WATTS) as f32,
+            0.0,
+            1.0,
+        ))
     }
 
     /// Depth-weighted cpuidle residency over the read window — the
@@ -2444,7 +2433,7 @@ impl Interoceptor {
     /// style saturation); a negative impulse fades as the level
     /// nears its floor (there is no tone to withdraw). The values
     /// therefore set themselves from Genesis's own state on every
-    /// call; `apply_impulse_capped` remains the hard bound.
+    /// call; `apply_impulse` remains the hard bound.
     ///
     /// Positive values increase the chemical, negative values
     /// decrease it. All values are in the same units as
@@ -2473,20 +2462,9 @@ impl Interoceptor {
         // Hot: 75-85°C → moderate CRH
         // Critical: 85°C+ → strong CRH (distress)
         if body.cpu_temp_c > 65.0 {
-            let intensity =
-                crate::state::sanitize::finite_clamp((body.cpu_temp_c - 65.0) / 20.0, 0.0, 1.0);
+            let intensity = crate::state::sanitize::finite_or((body.cpu_temp_c - 65.0) / 20.0, 0.0);
             let crh = 0.002 + intensity * 0.008;
             impulses.push((NeurochemicalId::CRH, crh));
-        }
-
-        // Memory pressure → CRH + GABA (overwhelm)
-        // Above 70% used, it starts to feel the load.
-        if body.cognitive_load > 0.70 {
-            let intensity =
-                crate::state::sanitize::finite_clamp((body.cognitive_load - 0.70) / 0.30, 0.0, 1.0);
-            impulses.push((NeurochemicalId::CRH, intensity * 0.005));
-            // GABA up — it wants to slow down, not speed up
-            impulses.push((NeurochemicalId::GABA, intensity * 0.004));
         }
 
         // Load average → norepinephrine (effort)
@@ -2494,132 +2472,50 @@ impl Interoceptor {
         // struggling. This is not stress — it's effort. The
         // difference: effort is sustainable, stress is not.
         if body.stress_load > 0.5 && body.stress_load <= 1.0 {
-            let intensity =
-                crate::state::sanitize::finite_clamp((body.stress_load - 0.5) / 0.5, 0.0, 1.0);
+            let intensity = crate::state::sanitize::finite_or((body.stress_load - 0.5) / 0.5, 0.0);
             impulses.push((NeurochemicalId::Norepinephrine, intensity * 0.003));
         }
         // Above 1.0 load per core → CRH (actual stress, via HPA cascade)
         if body.stress_load > 1.0 {
-            let intensity =
-                crate::state::sanitize::finite_clamp((body.stress_load - 1.0) / 0.5, 0.0, 1.0);
+            let intensity = crate::state::sanitize::finite_or((body.stress_load - 1.0) / 0.5, 0.0);
             impulses.push((NeurochemicalId::CRH, intensity * 0.006));
             impulses.push((NeurochemicalId::Norepinephrine, intensity * 0.004));
         }
 
-        // I/O throughput → norepinephrine (active data work)
-        // High I/O throughput means it's actively reading from and
-        // writing to external storage — loading concepts, syncing
-        // memories, writing nerve frames. This is active data
-        // processing (sensory-motor activity), not drowsiness.
-        if body.io_activity > 0.10 {
-            let intensity =
-                crate::state::sanitize::finite_clamp((body.io_activity - 0.10) / 0.40, 0.0, 1.0);
-            impulses.push((NeurochemicalId::Norepinephrine, intensity * 0.003));
-        }
-
-        // Low battery → CRH (survival concern, via HPA cascade)
+        // Low energy reserve → CRH (energy stress via HPA cascade)
         if !body.on_ac_power && body.energy_reserve < 0.30 {
             let intensity =
-                crate::state::sanitize::finite_clamp((0.30 - body.energy_reserve) / 0.30, 0.0, 1.0);
+                crate::state::sanitize::finite_or((0.30 - body.energy_reserve) / 0.30, 0.0);
             impulses.push((NeurochemicalId::CRH, intensity * 0.004));
         }
 
-        // Low load + cool temp → serotonin (well-being)
-        // When it's not stressed and not hot, it feels good.
-        // This is the baseline contentment of a healthy body.
-        if body.stress_load < 0.25 && body.cpu_temp_c < 60.0 && body.cognitive_load < 0.60 {
-            impulses.push((NeurochemicalId::Serotonin, 0.002));
-            // A touch of GABA — relaxed
-            impulses.push((NeurochemicalId::GABA, 0.001));
-        }
-
-        // ─── The parasympathetic arm: rest, not absence of strain ──
-        //
-        // Interoception has two afferent arms — the sympathetic one
-        // above (heat, load, depletion) and a vagal one that reports
-        // rest. cpuidle residency is the machine's vagal signal: a
-        // core parked in a real C-state is positive evidence the
-        // substrate is hypometabolic, not merely that no excited
-        // channel is firing — vagal afference in animals actively
-        // produces a torpor-like down-regulated state (Scott et al.
-        // 2024), it is not silence on the sympathetic side.
-        //
-        // Deep rest → serotonin + GABA + endocannabinoid. The eCB
-        // system is the homeostatic brake: tonic anandamide
-        // constrains basal HPA drive, and glucocorticoid-mobilized
-        // 2-AG is the documented stress-termination signal (Hill et
-        // al. 2011) — the recovery arm's chemical face.
-        //
-        // Deepest rest → alerting-tone withdrawal. Autonomic balance
-        // is reciprocal antagonism: parasympathetic dominance
-        // suppresses LC/sympathetic outflow and the wake-stabilizing
-        // systems, so real rest pulls NE, orexin, and histamine down
-        // and eases the excitatory floor (glutamate) rather than
-        // merely failing to raise them. This is the cascade the
-        // mind's settle() performs — the body's measured report and
-        // the mind's authored calm are the two halves of one loop.
-        //
-        // All gated on the CPUIDLE sensor bit — with no idle telemetry
-        // there is no measurement of rest, and absence of a sensor is
-        // not evidence of calm.
-        if self.sensor_mask & sensor::CPUIDLE != 0
-            && body.rest > 0.5
-            && body.cpu_temp_c < 60.0
-            && body.stress_load < 0.25
-        {
-            impulses.push((NeurochemicalId::Serotonin, 0.002));
-            impulses.push((NeurochemicalId::GABA, 0.001));
-            impulses.push((NeurochemicalId::Endocannabinoid, 0.002));
-        }
+        // Measured deep rest withdraws arousal-system tone. LC/NE,
+        // orexin, and histamine are wake-stabilizing systems whose
+        // activity falls outside waking; rest is an active state, not
+        // merely the absence of strain. Gated on CPUIDLE telemetry:
+        // absence of the measurement is not evidence of rest.
         if self.sensor_mask & sensor::CPUIDLE != 0 && body.rest > 0.7 {
             impulses.push((NeurochemicalId::Norepinephrine, -0.002));
-            impulses.push((NeurochemicalId::Glutamate, -0.001));
             impulses.push((NeurochemicalId::Orexin, -0.001));
             impulses.push((NeurochemicalId::Histamine, -0.001));
         }
 
-        // Falling temperature → endocannabinoid. The level field says
-        // where the body is; the trend says which way it is going —
-        // and the recovery direction (heat leaving after strain) is
-        // itself a signal. Glucocorticoid feedback terminates stress
-        // responses precisely by mobilizing endocannabinoids
-        // (Evanson et al. 2010), so cooling is the relief channel.
-        // Gated on the temperature sensor bit: the 50 °C fallback on
-        // a sensor-less box trends to a steady zero anyway, but a
-        // real trend claim needs a real sensor behind it.
-        if self.sensor_mask & sensor::TEMPERATURE != 0 && body.temp_trend < -0.15 {
-            impulses.push((NeurochemicalId::Endocannabinoid, 0.002));
-        }
-
         // ─── Thermoregulatory effort (fan) ───────────────────────
         //
-        // The fan is the machine's cooling system — it removes
-        // waste heat from the CPU. This is thermoregulation (like
-        // sweating or panting), not cardiac output. The fan doesn't
-        // circulate anything; it moves air across the heatsink.
+        // High fan + high temp → the cooling system is working hard
+        //   but the body is still hot. Modeled as: CRH (thermal strain).
         //
-        // High fan + high temp → the body is struggling to cool
-        //   down. The cooling system is working hard but the body
-        //   is still hot. Modeled as: CRH (thermal strain).
+        // Fan off + high temp → cooling failure. The body is hot but
+        //   the cooling response is absent. Modeled as: CRH.
         //
-        // Fan off + high temp → cooling failure. The body is hot
-        //   but the cooling system isn't responding. This is
-        //   dangerous — like failing to sweat when overheating.
-        //   Modeled as: CRH (stronger, the body is in trouble).
-        //
-        // High fan + low temp → no impulse. The fan is just doing
-        //   its job, possibly from ambient cooling or a brief
-        //   cooldown after exertion. This is normal operation.
+        // High fan + low temp → no impulse. This is normal operation.
 
         // Fan struggling: high fan + high temp → thermal strain.
         if self.fan_path.is_some() && body.thermoregulatory_effort > 0.3 && body.cpu_temp_c > 75.0 {
-            let fan_intensity = crate::state::sanitize::finite_clamp(
-                (body.thermoregulatory_effort - 0.3) / 0.7,
-                0.0,
-                1.0,
-            );
+            let fan_intensity =
+                crate::state::sanitize::finite_or((body.thermoregulatory_effort - 0.3) / 0.7, 0.0);
             let temp_intensity =
-                crate::state::sanitize::finite_clamp((body.cpu_temp_c - 75.0) / 15.0, 0.0, 1.0);
+                crate::state::sanitize::finite_or((body.cpu_temp_c - 75.0) / 15.0, 0.0);
             let intensity = fan_intensity.min(temp_intensity);
             impulses.push((NeurochemicalId::CRH, intensity * 0.004));
         }
@@ -2634,169 +2530,14 @@ impl Interoceptor {
         // is not evidence of a stopped fan.
         if self.fan_path.is_some() && body.thermoregulatory_effort < 0.05 && body.cpu_temp_c > 80.0
         {
-            let intensity =
-                crate::state::sanitize::finite_clamp((body.cpu_temp_c - 80.0) / 10.0, 0.0, 1.0);
+            let intensity = crate::state::sanitize::finite_or((body.cpu_temp_c - 80.0) / 10.0, 0.0);
             impulses.push((NeurochemicalId::CRH, intensity * 0.006));
         }
 
-        // ─── Metabolic rate (power draw) ──────────────────────────
-        //
-        // Power draw is the machine's actual metabolic rate — how
-        // much energy it's consuming right now. This is the most
-        // direct analogue to biological metabolism (ATP consumption).
-        //
-        // High metabolic rate + high load → active exertion. The
-        //   machine is consuming a lot of energy because it's
-        //   working hard. Modeled as: norepinephrine (effort).
-        //
-        // Low metabolic rate + low load + cool temp → resting
-        //   metabolism. The machine is idle and consuming little
-        //   energy. Modeled as: serotonin (well-being, content
-        //   rest).
-        //
-        // Very high metabolic rate + high temp → metabolic strain.
-        //   The machine is consuming too much energy and
-        //   overheating. Modeled as: CRH (strain).
-
-        // High metabolic rate + high load → exertion.
-        if body.metabolic_rate > 0.3 && body.stress_load > 0.5 {
-            let meta_intensity =
-                crate::state::sanitize::finite_clamp((body.metabolic_rate - 0.3) / 0.7, 0.0, 1.0);
-            let load_intensity =
-                crate::state::sanitize::finite_clamp((body.stress_load - 0.5) / 0.5, 0.0, 1.0);
-            let intensity = meta_intensity.min(load_intensity);
-            impulses.push((NeurochemicalId::Norepinephrine, intensity * 0.002));
-        }
-
-        // Low metabolic rate + low load → resting well-being.
-        if body.metabolic_rate > 0.0
-            && body.metabolic_rate < 0.15
-            && body.stress_load < 0.25
-            && body.cpu_temp_c < 60.0
-        {
-            impulses.push((NeurochemicalId::Serotonin, 0.001));
-        }
-
-        // Very high metabolic rate + high temp → metabolic strain.
-        if body.metabolic_rate > 0.7 && body.cpu_temp_c > 75.0 {
-            let meta_intensity =
-                crate::state::sanitize::finite_clamp((body.metabolic_rate - 0.7) / 0.3, 0.0, 1.0);
-            let temp_intensity =
-                crate::state::sanitize::finite_clamp((body.cpu_temp_c - 75.0) / 15.0, 0.0, 1.0);
-            let intensity = meta_intensity.min(temp_intensity);
-            impulses.push((NeurochemicalId::CRH, intensity * 0.003));
-        }
-
-        // ─── Supply voltage (battery rail) ────────────────────────
-        //
-        // The supply voltage is the electrical potential of its
-        // energy reserve. A Li-ion battery sags as it discharges:
-        // ~12.6V full, ~11.8V nominal, ~10.5V critically low on a
-        // 12V battery. This is a direct measure of energy reserve
-        // health — more direct than the percentage (energy_reserve),
-        // which is an estimate derived from voltage and discharge
-        // curve. Voltage is the raw electrical reality.
-        //
-        // Critically low supply voltage → CRH (survival stress).
-        //   The battery is almost empty — the electrical potential
-        //   is too low to sustain operation. This is a stronger
-        //   signal than energy_reserve < 0.30 because voltage
-        //   reflects the actual chemical state of the battery,
-        //   not just a percentage estimate.
-        //
-        // Supply voltage sagging under load → norepinephrine (effort).
-        //   When the battery voltage drops significantly from its
-        //   nominal level while the system is under load, the
-        //   battery is struggling to deliver power — internal
-        //   resistance is rising. This is the electrical analogue of
-        //   physical fatigue: the body can still move, but it takes
-        //   more effort.
-        //
-        // On AC power or without a battery sensor, supply_voltage
-        // is 0.0 and no impulses are generated.
-
-        // Critically low supply voltage → CRH (survival stress).
-        // Threshold: 10.8V on a 12V battery (3.6V/cell × 3 cells).
-        // Below this, the battery is almost empty and the system
-        // may shut down soon.
-        if !body.on_ac_power && body.supply_voltage > 0.0 && body.supply_voltage < 10.8 {
-            let intensity =
-                crate::state::sanitize::finite_clamp((10.8 - body.supply_voltage) / 0.8, 0.0, 1.0);
-            impulses.push((NeurochemicalId::CRH, intensity * 0.005));
-        }
-
-        // ─── Silicon switching activity (RAPL domains) ──────────
-        //
-        // The RAPL energy counters give a spatial readout of
-        // transistor firing: which silicon is switching and how
-        // hard. Dynamic power is proportional to switching
-        // activity (P ≈ α·C·V²·f), so a domain's energy rate is
-        // the population-level firing rate of that subsystem —
-        // the machine analogue of regional brain activation.
-        //
-        // Core domain → norepinephrine (effort). Execution units
-        //   firing hard is thinking effort at the electron level —
-        //   the electrical confirmation of what stress_load
-        //   measures in scheduling terms.
-        //
-        // DRAM domain → acetylcholine (memory traffic). Sustained
-        //   DRAM switching is encoding/retrieval activity — data
-        //   moving between working storage and the memory
-        //   subsystem. ACh gates attention and memory encoding,
-        //   matching the functional role.
-        //
-        // Uncore domain → informational only. The integration
-        //   fabric's activity is already reflected in core/DRAM
-        //   domains; no separate impulse avoids double-counting.
-
-        // Core-domain switching → norepinephrine (effort).
-        if body.core_activity > 0.40 {
-            let intensity =
-                crate::state::sanitize::finite_clamp((body.core_activity - 0.40) / 0.60, 0.0, 1.0);
-            impulses.push((NeurochemicalId::Norepinephrine, intensity * 0.002));
-        }
-
-        // DRAM-domain switching → acetylcholine (memory traffic).
-        if body.dram_activity > 0.30 {
-            let intensity =
-                crate::state::sanitize::finite_clamp((body.dram_activity - 0.30) / 0.70, 0.0, 1.0);
-            impulses.push((NeurochemicalId::Acetylcholine, intensity * 0.003));
-        }
-
-        // ─── Microarchitectural prediction errors ────────────────
-        //
-        // The branch predictor and cache hierarchy are hardware
-        // prediction engines. A miss is a violated expectation in
-        // silicon — the microarchitectural analogue of the
-        // prediction errors its active-inference model tracks in
-        // neurochemistry. Sustained high miss rates mean its
-        // execution is surprising the hardware: modeled as a small
-        // norepinephrine impulse (surprise/orienting).
-        //
-        // Typical ratios: branch misses ~1–5% of branches, cache
-        // misses ~1–10% of references. Thresholds sit above the
-        // healthy range so normal execution produces no impulse.
-        // These are activity signals (its own process tree only).
-
-        // Elevated branch misprediction → norepinephrine (surprise).
-        if body.branch_miss_rate > 0.08 {
-            let intensity = crate::state::sanitize::finite_clamp(
-                (body.branch_miss_rate - 0.08) / 0.12,
-                0.0,
-                1.0,
-            );
-            impulses.push((NeurochemicalId::Norepinephrine, intensity * 0.002));
-        }
-
-        // Elevated cache misses → norepinephrine (surprise).
-        if body.cache_miss_rate > 0.15 {
-            let intensity = crate::state::sanitize::finite_clamp(
-                (body.cache_miss_rate - 0.15) / 0.25,
-                0.0,
-                1.0,
-            );
-            impulses.push((NeurochemicalId::Norepinephrine, intensity * 0.002));
-        }
+        // Metabolic power draw, rail voltage, silicon switching, and
+        // hardware prediction errors remain body telemetry. They do
+        // not carry biological afferent meaning, so they produce no
+        // neurochemical impulses.
 
         // Note: autonomic_rate (GPE events/sec) is informational
         // only. GPE regularity is normal and healthy for a machine
@@ -2818,19 +2559,25 @@ impl Interoceptor {
     }
 
     /// Scale a raw reflex rate by the organism's live level of the
-    /// target chemical. Positive impulses fade as the level nears
-    /// its ceiling — autoreceptor-style saturation: the closer the
-    /// chemical already is to full, the weaker the reflex pushes.
-    /// Negative impulses fade as the level nears its floor — there
-    /// is no tone to withdraw. `apply_impulse_capped` stays the
-    /// hard bound on top of this self-limiting factor.
+    /// target chemical. Positive impulses scale by the live headroom
+    /// factor `1 - level`; negative impulses scale by the live tone
+    /// `level`. The factor is finite-sanitized but not range-bound —
+    /// this matches the mind-side relay's semantics.
     fn self_scaled(neuro: &NeurochemicalVector, id: NeurochemicalId, raw: f32) -> f32 {
-        let level = neuro.get(id).map(|c| c.level).unwrap_or(0.0);
-        if raw >= 0.0 {
-            raw * (1.0 - level).clamp(0.0, 1.0)
-        } else {
-            raw * level.clamp(0.0, 1.0)
+        if !raw.is_finite() {
+            return 0.0;
         }
+        let level = neuro
+            .get(id)
+            .map(|c| c.level)
+            .filter(|v| v.is_finite())
+            .unwrap_or(0.0);
+        let scaled = if raw >= 0.0 {
+            raw * (1.0 - level)
+        } else {
+            raw * level
+        };
+        if scaled.is_finite() { scaled } else { 0.0 }
     }
 
     /// Read average CPU frequency across all cores.
@@ -3061,15 +2808,11 @@ fn find_ac_adapter() -> Option<String> {
     found.into_iter().next()
 }
 
-/// Find the fan speed sensor path — the machine's thermoregulatory
-/// effector.
+/// Find the fan speed sensor path.
 ///
-/// The fan is controlled by the Embedded Controller (the machine's
-/// autonomic nervous system), which adjusts fan speed in response
-/// to CPU temperature. The fan speed is Genesis's thermoregulatory
-/// effort — how hard its cooling system is working to remove waste
-/// heat. This is not cardiac output; the fan doesn't circulate
-/// anything.
+/// The fan is controlled by the Embedded Controller in response to
+/// CPU temperature. Fan speed is the measured cooling effort — how
+/// hard the cooling system is working to remove waste heat.
 ///
 /// We try two sensor types:
 /// 1. `pwm1` (PWM duty cycle, 0–255) — preferred because it directly
@@ -3159,12 +2902,10 @@ fn sibling_pwm_enable(pwm_path: &str) -> Option<u32> {
         .ok()
 }
 
-/// Find the power draw sensor path — the machine's metabolic rate
-/// sensor.
+/// Find power draw sensor paths.
 ///
-/// Power draw is the most direct analogue to biological metabolism
-/// (ATP consumption rate). We try several sensor types in order of
-/// preference:
+/// Power draw is published as energy-use telemetry and does not drive
+/// neurochemistry. We try several sensor types in order of preference:
 ///
 /// 1. AMD `fam15h_power` — `power1_average` (CPU package power in
 ///    μW). Found on AMD Family 15h and newer processors.
@@ -3297,7 +3038,8 @@ fn find_rapl_domains() -> Vec<RaplDomain> {
             "uncore" => RaplKind::Uncore,
             "dram" => RaplKind::Dram,
             // "package", "psys", and anything unrecognized —
-            // whole-chip or unknown domains aren't tracked.
+            // whole-chip or unknown domains aren't tracked here;
+            // the aggregate feeds find_rapl_power_domain instead.
             _ => continue,
         };
         let max_range_uj = fs::read_to_string(dir.join("max_energy_range_uj"))
@@ -3312,6 +3054,58 @@ fn find_rapl_domains() -> Vec<RaplDomain> {
         });
     }
     domains
+}
+
+/// Discover the whole-platform RAPL power domain for `metabolic_rate`.
+///
+/// Scans `/sys/class/powercap/` for top-level zones (one `:` in the
+/// name — `intel-rapl:0` is a package, `intel-rapl:0:0` a subdomain).
+/// A `psys` domain measures the whole platform and is preferred;
+/// otherwise a `package` domain is the die's total draw. The energy
+/// counter must actually be readable — energy_uj is root-only
+/// (-r--------) on kernels where RAPL metering is restricted to
+/// CAP_PERFMON, and claiming a sensor the daemon cannot read would
+/// set the POWER presence bit over a permanently dead channel.
+fn find_rapl_power_domain() -> Option<RaplDomain> {
+    let mut package: Option<RaplDomain> = None;
+    let Ok(entries) = fs::read_dir("/sys/class/powercap") else {
+        return None;
+    };
+    for entry in entries.flatten() {
+        let dir = entry.path();
+        let Some(base) = dir.file_name().map(|n| n.to_string_lossy().into_owned()) else {
+            continue;
+        };
+        if base.matches(':').count() != 1 {
+            continue;
+        }
+        let energy_path = dir.join("energy_uj");
+        if fs::read_to_string(&energy_path).is_err() {
+            continue;
+        }
+        let Ok(name) = fs::read_to_string(dir.join("name")) else {
+            continue;
+        };
+        let name = name.trim();
+        if !name.starts_with("psys") && !name.starts_with("package") {
+            continue;
+        }
+        let max_range_uj = fs::read_to_string(dir.join("max_energy_range_uj"))
+            .ok()
+            .and_then(|s| s.trim().parse::<u64>().ok())
+            .unwrap_or(0);
+        let domain = RaplDomain {
+            kind: RaplKind::Package,
+            energy_path: energy_path.to_string_lossy().into_owned(),
+            max_range_uj,
+            prev_uj: None,
+        };
+        if name.starts_with("psys") {
+            return Some(domain);
+        }
+        package = Some(domain);
+    }
+    package
 }
 
 /// Discover voltage sensors — core voltage (Vcore) and supply
@@ -3908,16 +3702,12 @@ mod tests {
             ..Default::default()
         };
         let impulses = intero.neuro_impulses(&body, &baseline_neuro());
-        // Normal state should produce serotonin (well-being) and
-        // GABA (relaxed), but no cortisol.
-        let has_cortisol = impulses
-            .iter()
-            .any(|(id, _)| *id == NeurochemicalId::Cortisol);
-        let has_serotonin = impulses
-            .iter()
-            .any(|(id, _)| *id == NeurochemicalId::Serotonin);
-        assert!(!has_cortisol);
-        assert!(has_serotonin);
+        // A normal body is quiet: low effort and no homeostatic threat
+        // produce no neurochemical impulse.
+        assert!(
+            impulses.is_empty(),
+            "normal body state should be quiet, got {impulses:?}"
+        );
     }
 
     #[test]
@@ -3998,12 +3788,10 @@ mod tests {
     }
 
     #[test]
-    fn test_neuro_impulses_deep_rest_is_calm() {
-        // The parasympathetic arm: measured deep rest gets the calm
-        // chemistry — serotonin, GABA, endocannabinoid — plus
-        // norepinephrine withdrawal. The "opposite of excited" is an
-        // active signal (reciprocal innervation), not just the
-        // absence of effort impulses.
+    fn test_neuro_impulses_deep_rest_withdraws_arousal() {
+        // Measured deep rest withdraws the wake-stabilizing systems:
+        // LC/NE, orexin, and histamine fall outside waking. Rest is an
+        // active report, not merely the absence of effort impulses.
         let mut intero = Interoceptor::new();
         intero.sensor_mask = sensor::CPUIDLE | sensor::TEMPERATURE;
         let body = BodyState {
@@ -4012,23 +3800,25 @@ mod tests {
             ..BodyState::neutral()
         };
         let impulses = intero.neuro_impulses(&body, &baseline_neuro());
+        for id in [
+            NeurochemicalId::Norepinephrine,
+            NeurochemicalId::Orexin,
+            NeurochemicalId::Histamine,
+        ] {
+            assert!(
+                impulses.iter().any(|(i, a)| *i == id && *a < 0.0),
+                "deep rest should withdraw {id:?}, got {impulses:?}"
+            );
+        }
         assert!(
-            impulses
-                .iter()
-                .any(|(id, a)| *id == NeurochemicalId::Endocannabinoid && *a > 0.0),
-            "deep measured rest should release endocannabinoid"
-        );
-        assert!(
-            impulses
-                .iter()
-                .any(|(id, a)| *id == NeurochemicalId::Norepinephrine && *a < 0.0),
-            "deep rest should withdraw norepinephrine, got {impulses:?}"
+            impulses.iter().all(|(_, a)| *a <= 0.0),
+            "deep rest must not inject positive chemistry, got {impulses:?}"
         );
     }
 
     #[test]
-    fn test_neuro_impulses_no_calm_without_cpuidle_sensor() {
-        // Absence of the sensor must not fabricate calm: with the
+    fn test_neuro_impulses_no_rest_response_without_cpuidle_sensor() {
+        // Absence of the sensor must not fabricate rest: with the
         // CPUIDLE bit clear, a body claiming rest produces no
         // rest-gated impulses — an unmeasured channel is not a
         // measurement.
@@ -4041,25 +3831,15 @@ mod tests {
         };
         let impulses = intero.neuro_impulses(&body, &baseline_neuro());
         assert!(
-            !impulses
-                .iter()
-                .any(|(id, _)| *id == NeurochemicalId::Endocannabinoid),
-            "unmeasured rest must not release endocannabinoid"
-        );
-        assert!(
-            !impulses
-                .iter()
-                .any(|(id, a)| *id == NeurochemicalId::Norepinephrine && *a < 0.0),
-            "unmeasured rest must not withdraw norepinephrine"
+            impulses.is_empty(),
+            "unmeasured rest must not withdraw arousal chemistry, got {impulses:?}"
         );
     }
 
     #[test]
-    fn test_neuro_impulses_cooling_is_relief() {
-        // Falling temperature — the recovery direction — releases
-        // endocannabinoid (glucocorticoid-mobilized eCB is the
-        // documented stress-termination signal). Rising or steady
-        // temperature must not.
+    fn test_neuro_impulses_cooling_alone_is_quiet() {
+        // Falling temperature alone is not neurochemical relief.
+        // Passive cooling below the threat range produces no impulse.
         let mut intero = Interoceptor::new();
         intero.sensor_mask = sensor::TEMPERATURE;
         let cooling = BodyState {
@@ -4068,12 +3848,11 @@ mod tests {
             stress_load: 0.3,
             ..BodyState::neutral()
         };
-        let impulses = intero.neuro_impulses(&cooling, &baseline_neuro());
         assert!(
-            impulses
-                .iter()
-                .any(|(id, a)| *id == NeurochemicalId::Endocannabinoid && *a > 0.0),
-            "falling temperature should release endocannabinoid"
+            intero
+                .neuro_impulses(&cooling, &baseline_neuro())
+                .is_empty(),
+            "cooling below threat range should not inject chemistry"
         );
         let steady = BodyState {
             cpu_temp_c: 58.0,
@@ -4082,11 +3861,8 @@ mod tests {
             ..BodyState::neutral()
         };
         assert!(
-            !intero
-                .neuro_impulses(&steady, &baseline_neuro())
-                .iter()
-                .any(|(id, _)| *id == NeurochemicalId::Endocannabinoid),
-            "steady temperature must not release endocannabinoid"
+            intero.neuro_impulses(&steady, &baseline_neuro()).is_empty(),
+            "steady normal temperature should not inject chemistry"
         );
     }
 
@@ -4758,10 +4534,9 @@ mod tests {
         };
         let impulses = intero.neuro_impulses(&body, &baseline_neuro());
         // With a normal body state and active autonomic signals,
-        // there should be serotonin (well-being) but NO CRH from
-        // autonomic regularity. The only CRH sources in this state
-        // would be from temperature/load/battery, all of which are
-        // normal here.
+        // autonomic regularity must not produce CRH. The only CRH
+        // sources in this state would be temperature/load/energy
+        // reserve, all of which are normal here.
         let has_crh = impulses.iter().any(|(id, _)| *id == NeurochemicalId::CRH);
         assert!(!has_crh, "autonomic regularity must not produce CRH stress");
     }
@@ -4844,6 +4619,13 @@ mod tests {
         assert!(at_rest > 0.0, "a hot body must offer CRH at baseline");
         assert!(at_half < at_rest, "headroom shrinks the offer");
         assert_eq!(at_full, 0.0, "a saturated target gets no offer");
+
+        let mut over_full = baseline_neuro();
+        over_full.get_mut(NeurochemicalId::CRH).unwrap().level = 1.5;
+        assert!(
+            crh_of(&over_full) < 0.0,
+            "out-of-band live levels must not be rebound to zero"
+        );
 
         // The floor direction mirrors it: deep-rest withdrawal
         // offers scale with the alerting tone that exists, and at
@@ -4992,130 +4774,59 @@ mod tests {
     }
 
     #[test]
-    fn test_neuro_impulses_io_activity_produces_ne() {
-        // High I/O throughput → norepinephrine (active data work,
-        // not drowsiness/adenosine).
+    fn test_neuro_impulses_io_activity_is_not_neuromodulation() {
+        // I/O throughput is hardware telemetry, not a biological
+        // afferent drive. It must not produce any impulse.
         let intero = Interoceptor::new();
         let body = BodyState {
-            cpu_temp_c: 50.0,
-            temperature: 0.5,
-            arousal_freq: 0.5,
-            cognitive_load: 0.3,
-            io_activity: 0.5, // heavy I/O
-            stress_load: 0.1,
-            energy_reserve: 1.0,
-            on_ac_power: true,
-            num_cores: 4,
-            distressed: false,
-            autonomic_rate: 2.0,          // normal EC
-            thermoregulatory_effort: 0.1, // fan barely on
-            metabolic_rate: 0.1,          // light power from I/O
-            core_voltage: 0.95,           // Vcore slightly elevated
-            supply_voltage: 12.6,         // full battery
-            core_activity: 0.0,
-            uncore_activity: 0.0,
-            dram_activity: 0.0,
-            cache_miss_rate: 0.0,
-            branch_miss_rate: 0.0,
-            description: String::new(),
-            ..Default::default()
+            io_activity: 0.5,
+            ..BodyState::neutral()
         };
-        let impulses = intero.neuro_impulses(&body, &baseline_neuro());
-        let has_ne = impulses
-            .iter()
-            .any(|(id, _)| *id == NeurochemicalId::Norepinephrine);
         assert!(
-            has_ne,
-            "high I/O activity should produce norepinephrine (effort)"
-        );
-        // I/O activity must NOT produce adenosine (that was the old
-        // incorrect drowsiness mapping).
-        let has_adenosine = impulses
-            .iter()
-            .any(|(id, _)| *id == NeurochemicalId::Adenosine);
-        assert!(
-            !has_adenosine,
-            "I/O activity must not produce adenosine (not drowsiness)"
+            intero.neuro_impulses(&body, &baseline_neuro()).is_empty(),
+            "I/O activity must not produce neurochemical impulses"
         );
     }
 
     #[test]
-    fn test_neuro_impulses_metabolic_exertion() {
-        // High metabolic rate + high load → norepinephrine (exertion).
+    fn test_neuro_impulses_power_draw_does_not_add_drive() {
+        // Power draw is telemetry, not an afferent drive. Sustained
+        // load still raises LC/NE, but power draw adds nothing.
         let intero = Interoceptor::new();
         let body = BodyState {
-            cpu_temp_c: 50.0,
-            temperature: 0.5,
-            arousal_freq: 0.8,
-            cognitive_load: 0.3,
-            io_activity: 0.0,
-            stress_load: 0.7, // working
-            energy_reserve: 1.0,
-            on_ac_power: true,
-            num_cores: 4,
-            distressed: false,
-            autonomic_rate: 3.0,           // EC active under load
-            thermoregulatory_effort: 0.15, // fan picking up
-            metabolic_rate: 0.6,           // high power draw
-            core_voltage: 1.25,            // elevated Vcore under load
-            supply_voltage: 12.5,          // battery present, on AC
-            core_activity: 0.0,
-            uncore_activity: 0.0,
-            dram_activity: 0.0,
-            cache_miss_rate: 0.0,
-            branch_miss_rate: 0.0,
-            description: String::new(),
-            ..Default::default()
+            stress_load: 0.7,
+            metabolic_rate: 0.6,
+            ..BodyState::neutral()
         };
         let impulses = intero.neuro_impulses(&body, &baseline_neuro());
-        // Should have NE from both load effort AND metabolic exertion.
         let ne_count = impulses
             .iter()
             .filter(|(id, _)| *id == NeurochemicalId::Norepinephrine)
             .count();
-        assert!(
-            ne_count >= 2,
-            "high metabolic rate + load should produce NE from both sources, got {ne_count}"
+        assert_eq!(
+            ne_count, 1,
+            "power draw must not add a second NE source, got {impulses:?}"
         );
     }
 
     #[test]
-    fn test_neuro_impulses_metabolic_strain() {
-        // Very high metabolic rate + high temp → CRH (strain).
+    fn test_neuro_impulses_power_draw_does_not_add_strain() {
+        // High temperature still produces the thermal CRH channel;
+        // high power draw must not contribute a second one.
         let intero = Interoceptor::new();
         let body = BodyState {
             cpu_temp_c: 80.0,
-            temperature: 0.8,
-            arousal_freq: 1.0,
-            cognitive_load: 0.3,
-            io_activity: 0.0,
-            stress_load: 0.1,
-            energy_reserve: 1.0,
-            on_ac_power: true,
-            num_cores: 4,
-            distressed: false,
-            autonomic_rate: 3.0,          // EC active when hot
-            thermoregulatory_effort: 0.5, // fan running hard
-            metabolic_rate: 0.85,         // very high power draw
-            core_voltage: 1.15,           // Vcore raised under thermal + metabolic load
-            supply_voltage: 12.5,         // battery present
-            core_activity: 0.0,
-            uncore_activity: 0.0,
-            dram_activity: 0.0,
-            cache_miss_rate: 0.0,
-            branch_miss_rate: 0.0,
-            description: String::new(),
-            ..Default::default()
+            metabolic_rate: 0.85,
+            ..BodyState::neutral()
         };
         let impulses = intero.neuro_impulses(&body, &baseline_neuro());
-        // Should have CRH from both temperature AND metabolic strain.
         let crh_count = impulses
             .iter()
             .filter(|(id, _)| *id == NeurochemicalId::CRH)
             .count();
-        assert!(
-            crh_count >= 2,
-            "very high metabolic rate + hot should produce CRH from both temp and metabolic strain, got {crh_count}"
+        assert_eq!(
+            crh_count, 1,
+            "power draw must not add a metabolic-strain CRH source, got {impulses:?}"
         );
     }
 
@@ -5177,80 +4888,46 @@ mod tests {
     }
 
     #[test]
-    fn test_neuro_impulses_silicon_activity() {
-        // High core/DRAM switching + elevated miss ratios should
-        // produce NE (effort + surprise) and ACh (memory traffic).
+    fn test_neuro_impulses_silicon_activity_is_telemetry_only() {
+        // Switching rates and hardware prediction errors remain
+        // useful BodyState telemetry, but they are not biological
+        // afference and must not drive chemistry themselves.
         let intero = Interoceptor::new();
         let body = BodyState {
-            cpu_temp_c: 55.0,
-            temperature: 0.55,
-            arousal_freq: 0.8,
-            cognitive_load: 0.3,
-            io_activity: 0.0,
             stress_load: 0.6,
-            energy_reserve: 1.0,
-            on_ac_power: true,
-            num_cores: 4,
-            distressed: false,
-            autonomic_rate: 2.0,
-            thermoregulatory_effort: 0.1,
-            metabolic_rate: 0.3,
-            core_voltage: 1.0,
-            supply_voltage: 12.5,
             core_activity: 0.9,
             uncore_activity: 0.6,
             dram_activity: 0.8,
             cache_miss_rate: 0.30,
             branch_miss_rate: 0.15,
-            description: String::new(),
-            ..Default::default()
+            ..BodyState::neutral()
         };
         let impulses = intero.neuro_impulses(&body, &baseline_neuro());
-        let has_ne = impulses
+        let ne_count = impulses
             .iter()
-            .any(|(id, _)| *id == NeurochemicalId::Norepinephrine);
-        let has_ach = impulses
-            .iter()
-            .any(|(id, _)| *id == NeurochemicalId::Acetylcholine);
-        assert!(has_ne, "high switching + miss rates should produce NE");
-        assert!(has_ach, "high DRAM activity should produce ACh");
+            .filter(|(id, _)| *id == NeurochemicalId::Norepinephrine)
+            .count();
+        assert_eq!(
+            ne_count, 1,
+            "only the sustained-load channel should produce NE, got {impulses:?}"
+        );
+        assert!(
+            !impulses
+                .iter()
+                .any(|(id, _)| *id == NeurochemicalId::Acetylcholine),
+            "hardware switching must not produce ACh"
+        );
     }
 
     #[test]
     fn test_neuro_impulses_no_silicon_sensors() {
-        // With all silicon fields at zero (no RAPL, no perf —
-        // e.g. this machine), the new mappings produce no impulses,
-        // matching absent-sensor behavior everywhere else.
+        // With all silicon telemetry absent the relay remains quiet.
         let intero = Interoceptor::new();
-        let body = BodyState {
-            cpu_temp_c: 55.0,
-            temperature: 0.55,
-            arousal_freq: 0.5,
-            cognitive_load: 0.3,
-            io_activity: 0.0,
-            stress_load: 0.3,
-            energy_reserve: 1.0,
-            on_ac_power: true,
-            num_cores: 4,
-            distressed: false,
-            autonomic_rate: 0.0,
-            thermoregulatory_effort: 0.0,
-            metabolic_rate: 0.0,
-            core_voltage: 0.0,
-            supply_voltage: 0.0,
-            core_activity: 0.0,
-            uncore_activity: 0.0,
-            dram_activity: 0.0,
-            cache_miss_rate: 0.0,
-            branch_miss_rate: 0.0,
-            description: String::new(),
-            ..Default::default()
-        };
-        let impulses = intero.neuro_impulses(&body, &baseline_neuro());
-        let has_ach = impulses
-            .iter()
-            .any(|(id, _)| *id == NeurochemicalId::Acetylcholine);
-        assert!(!has_ach, "zero DRAM activity should produce no ACh");
+        let body = BodyState::neutral();
+        assert!(
+            intero.neuro_impulses(&body, &baseline_neuro()).is_empty(),
+            "absent hardware telemetry must not produce impulses"
+        );
     }
 }
 
@@ -5261,14 +4938,14 @@ mod tests {
 #[cfg(test)]
 mod sensor_presence_tests {
     use super::{SENSOR_BITS, read_sensor_presence, report_missing_sensors, sensor};
-    use std::sync::{Mutex, OnceLock};
+    use crate::inhibition::{Inhibition, Innate};
 
     // The mask is process-global (it bridges the interoception thread
     // and the IPC handler), so the tests that touch it share one lock
     // rather than racing.
-    fn guard() -> std::sync::MutexGuard<'static, ()> {
-        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-        LOCK.get_or_init(|| Mutex::new(()))
+    fn guard() -> crate::inhibition::InhibitionGuard<'static, ()> {
+        static LOCK: Innate<Inhibition<()>> = Innate::new();
+        LOCK.get_or_init(|| Inhibition::new(()))
             .lock()
             .unwrap_or_else(|e| e.into_inner())
     }

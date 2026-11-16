@@ -37,7 +37,7 @@ fn test_hpa_cascade_dormant_at_zero_maturation() {
     let mut neuro = NeurochemicalVector::new(0);
 
     // Drive CRH up with a strong impulse
-    neuro.apply_impulse_capped(NeurochemicalId::CRH, 0.5, 0);
+    neuro.apply_impulse(NeurochemicalId::CRH, 0.5, 0);
     neuro.recompute_derived();
 
     // Tick with maturation = 0.0 (SHRP)
@@ -71,7 +71,7 @@ fn test_hpa_cascade_active_at_full_maturation() {
     let mut neuro = NeurochemicalVector::new(0);
 
     // Drive CRH up with a strong impulse
-    neuro.apply_impulse_capped(NeurochemicalId::CRH, 0.5, 0);
+    neuro.apply_impulse(NeurochemicalId::CRH, 0.5, 0);
     neuro.recompute_derived();
 
     // Tick with maturation = 1.0 (fully mature)
@@ -86,7 +86,7 @@ fn test_hpa_cascade_active_at_full_maturation() {
     // At 10 Hz, 100 seconds = 1000 ticks. Run 2000 to be safe.
     for _ in 0..2000 {
         // Re-apply CRH impulse periodically to sustain the signal
-        neuro.apply_impulse_capped(NeurochemicalId::CRH, 0.01, 0);
+        neuro.apply_impulse(NeurochemicalId::CRH, 0.01, 0);
         neuro.tick_with_params(&params);
     }
 
@@ -113,8 +113,8 @@ fn test_hpa_cascade_partial_at_half_maturation() {
     let mut neuro_full = NeurochemicalVector::new(0);
 
     // Drive CRH up in both
-    neuro_half.apply_impulse_capped(NeurochemicalId::CRH, 0.5, 0);
-    neuro_full.apply_impulse_capped(NeurochemicalId::CRH, 0.5, 0);
+    neuro_half.apply_impulse(NeurochemicalId::CRH, 0.5, 0);
+    neuro_full.apply_impulse(NeurochemicalId::CRH, 0.5, 0);
     neuro_half.recompute_derived();
     neuro_full.recompute_derived();
 
@@ -130,8 +130,8 @@ fn test_hpa_cascade_partial_at_half_maturation() {
     };
 
     for _ in 0..2000 {
-        neuro_half.apply_impulse_capped(NeurochemicalId::CRH, 0.01, 0);
-        neuro_full.apply_impulse_capped(NeurochemicalId::CRH, 0.01, 0);
+        neuro_half.apply_impulse(NeurochemicalId::CRH, 0.01, 0);
+        neuro_full.apply_impulse(NeurochemicalId::CRH, 0.01, 0);
         neuro_half.tick_with_params(&params_half);
         neuro_full.tick_with_params(&params_full);
     }
@@ -223,7 +223,7 @@ fn test_crh_impulse_routes_through_cascade() {
     // stimulus (then clears with a ~66 min half-life) — so the peak
     // lands well after the impulse tick and must be tracked rather than
     // sampled at a fixed time.
-    neuro.apply_impulse_capped(NeurochemicalId::CRH, 0.3, 0);
+    neuro.apply_impulse(NeurochemicalId::CRH, 0.3, 0);
     let mut cortisol_peak = 0.0f32;
     for _ in 0..3000 {
         neuro.tick_with_params(&params);
@@ -265,7 +265,7 @@ fn test_cortisol_hard_clamp_under_sustained_crh() {
 
     // Sustained CRH drive
     for _ in 0..5000 {
-        neuro.apply_impulse_capped(NeurochemicalId::CRH, 0.05, 0);
+        neuro.apply_impulse(NeurochemicalId::CRH, 0.05, 0);
         neuro.tick_with_params(&params);
     }
 
@@ -292,7 +292,7 @@ fn test_stronger_impulse_is_never_weaker_response() {
         let mut ms = 0u64;
         for _ in 0..20_000u32 {
             ms += 100;
-            nv.apply_impulse_capped(NeurochemicalId::CRH, imp, ms);
+            nv.apply_impulse(NeurochemicalId::CRH, imp, ms);
             nv.tick_with_params(&NeuroTickParams::default());
         }
         nv.effective_levels[NeurochemicalId::CRH as usize]
@@ -369,7 +369,7 @@ fn test_hpa_axis_remains_monotone_in_drive() {
         let mut ms = 0u64;
         for _ in 0..20_000u32 {
             ms += 100;
-            nv.apply_impulse_capped(NeurochemicalId::CRH, imp, ms);
+            nv.apply_impulse(NeurochemicalId::CRH, imp, ms);
             nv.tick_with_params(&NeuroTickParams::default());
         }
         let acth = nv.acth_level;

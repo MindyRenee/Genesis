@@ -10,7 +10,7 @@
 //!   we let the OS manage paging. State lives on disk, mapped into
 //!   the process's address space.
 //! - **Zero-copy reads**: readers access the mmap'd memory directly
-//!   through the sequence lock protocol.
+//!   through volatile copies.
 //! - **Crash-safe**: the state file has magic bytes, a schema version,
 //!   and a CRC32 checksum. Corruption is detected on open.
 //! - **No external services**: no database daemon, no server process.

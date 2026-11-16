@@ -15,6 +15,7 @@ was being set wrong.
 from __future__ import annotations
 
 import logging
+import time
 
 import pytest
 from frontal_lobe.reasoning import Reasoner
@@ -525,6 +526,7 @@ def test_dream_chain_walks_past_its_anchor(monkeypatch) -> None:
 
     # Deterministic walk: alpha -> beta -> gamma via the test edges.
     monkeypatch.setattr(il._rng, "random", lambda: 0.5)
+    il._is_mind_sleeping = lambda: True
     il._current_chain_concepts = ["alpha"]
     il._continue_dream_chain(
         _emotion(),
@@ -535,6 +537,9 @@ def test_dream_chain_walks_past_its_anchor(monkeypatch) -> None:
         chain_id=0,
         max_len=4,
     )
+    now = time.time()
+    for step in range(4):
+        il._advance_dream_chain(now + step)
 
     with il._thoughts_lock:
         topics = [t.metadata.get("topic") for t in il._thoughts]

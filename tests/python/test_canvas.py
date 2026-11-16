@@ -14,7 +14,6 @@ from pathlib import Path
 import frontal_lobe.canvas as canvas_module
 import numpy as np
 from frontal_lobe.canvas import Canvas, PaintSheet
-from frontal_lobe.painting import Painter
 
 
 def _sheet(**kw) -> PaintSheet:
@@ -55,15 +54,15 @@ class TestBrushParameters:
         assert b.erase is True
         assert b.blend == "multiply"
 
-    def test_parameters_clamp_not_reject(self):
+    def test_parameters_preserve_values(self):
         sheet = _sheet()
         sheet.set_brush(size=-5, opacity=7.0, hardness=-1, scatter=2, texture=-0.5)
         b = sheet._brush
-        assert b.size == 0.5
-        assert b.opacity == 1.0
-        assert b.hardness == 0.0
-        assert b.scatter == 1.0
-        assert b.texture == 0.0
+        assert b.size == -5.0
+        assert b.opacity == 7.0
+        assert b.hardness == -1.0
+        assert b.scatter == 2.0
+        assert b.texture == -0.5
 
     def test_none_leaves_parameter_untouched(self):
         sheet = _sheet()
@@ -87,12 +86,12 @@ class TestColor:
         assert (r, g, b) == (17 / 255, 203 / 255, 91 / 255)
         assert a == 0.6
 
-    def test_out_of_range_clamps(self):
+    def test_out_of_range_values_preserved(self):
         sheet = _sheet()
         sheet.set_color(-40, 999, 128, 3.0)
         r, g, b, a = sheet._color
-        assert (r, g, b) == (0.0, 1.0, 128 / 255)
-        assert a == 1.0
+        assert (r, g, b) == (-40 / 255, 999 / 255, 128 / 255)
+        assert a == 3.0
 
 
 class TestToolLabels:
@@ -144,11 +143,11 @@ class TestMarks:
             sheet.stroke([(30, 30), (120, 90)])
             assert _alpha(sheet).max() > 0, params
 
-    def test_stroke_clamped_to_sheet(self):
+    def test_stroke_coordinates_not_rewritten(self):
         sheet = _sheet()
         sheet.set_color(0, 0, 0)
         sheet.stroke([(-500, -500), (9999, 9999)])
-        assert _alpha(sheet).max() > 0  # drew within bounds, no crash
+        assert _alpha(sheet).max() > 0  # the path can cross the sheet without clipping
 
     def test_shapes_outline_and_fill(self):
         for op in ("ellipse", "rect", "polygon"):
@@ -300,63 +299,66 @@ class TestArtHistory:
 # ── Her free play ─────────────────────────────────────────────────
 
 
-class TestPainter:
+class TestStudioTools:
+    """The paint program's controls, issued as her tool calls."""
+
+    def _tools(self, tmp_path, canvas=None):
+        from tools.framework import ToolRegistry
+        from tools.studio import register_studio_tools
+
+        canvas = canvas or _canvas(tmp_path)
+        registry = ToolRegistry()
+        self.finished = []
+        register_studio_tools(
+            registry,
+            canvas,
+            on_finished=self.finished.append,
+            mood=lambda: "feeling test",
+        )
+        return registry, canvas
+
     def test_sitting_produces_drawing(self, tmp_path):
-        canvas = _canvas(tmp_path)
-        painter = Painter(seed=3)
-        result = painter.paint(canvas)
-        assert result is not None
-        assert Path(result.filepath).exists()
-        assert result.strokes > 0
-        assert result.tools_used  # she named what she held
+        registry, _ = self._tools(tmp_path)
+        assert registry.run("studio_sheet", width="320", height="240").success
+        assert registry.run("studio_color", r="200", g="30", b="90", a="0.8").success
+        assert registry.run("studio_tool", tool="pencil", size="6").success
+        assert registry.run("studio_stroke", points="10,10; 100,40; 80,120", label="wander").success
+        result = registry.run("studio_done")
+        assert result.success, result.error
+        assert Path(result.output).exists()
+        assert self.finished and self.finished[0].mood == "feeling test"
 
-    def test_sittings_explore(self, tmp_path):
-        """Back-to-back sittings shouldn't reuse the same gestures."""
-        canvas = _canvas(tmp_path)
-        painter = Painter(seed=11)
-        first = painter.paint(canvas)
-        gestures1 = set(canvas.art_history[-1]["gestures"])
-        second = painter.paint(canvas)
-        gestures2 = set(canvas.art_history[-1]["gestures"])
-        assert first.filepath != second.filepath
-        # Novelty weighting: used gestures lose pull next sitting.
-        assert gestures1 != gestures2 or canvas.gesture_recency()
+    def test_stroke_accepts_point_lists(self, tmp_path):
+        registry, _ = self._tools(tmp_path)
+        registry.run("studio_sheet")
+        assert registry.run("studio_stroke", points=[[1, 2], [3, 4]]).success
+        assert registry.run("studio_stroke", points=[1, 2, 3, 4]).success
+        bad = registry.run("studio_stroke", points="not,points")
+        assert not bad.success
 
-    def test_brush_dials_span_space(self, tmp_path):
-        """Across sittings, her dialed brush params vary."""
-        canvas = _canvas(tmp_path)
-        painter = Painter(seed=5)
-        sizes = set()
-        for _ in range(3):
-            painter.paint(canvas)
-            for entry in canvas._op_log:
-                if entry["op"] == "tool" and entry.get("size"):
-                    sizes.add(round(entry["size"]))
-        assert len(sizes) > 1
+    def test_shapes_and_fill(self, tmp_path):
+        registry, _ = self._tools(tmp_path)
+        registry.run("studio_sheet")
+        assert registry.run("studio_shape", kind="ellipse", x="5", y="5", w="40", h="30").success
+        assert registry.run(
+            "studio_shape", kind="rect", x="5", y="5", w="40", h="30", fill="true"
+        ).success
+        assert registry.run("studio_shape", kind="polygon", points="1,1; 30,4; 8,29").success
+        assert registry.run("studio_fill", x="10", y="10").success
+        assert not registry.run("studio_shape", kind="cone", x="0", y="0", w="5", h="5").success
 
-    def test_gesture_generators_stay_on_sheet(self, tmp_path):
-        canvas = _canvas(tmp_path)
-        canvas.new_sheet()
-        painter = Painter(seed=9)
-        for gesture in (
-            "line",
-            "polyline",
-            "curve",
-            "arc",
-            "loop",
-            "zigzag",
-            "scribble",
-            "spiral",
-            "wave",
-            "dabs",
-        ):
-            pts = painter._gesture_points(gesture, canvas)
-            assert len(pts) >= 2, gesture
-            assert all(math.isfinite(x) and math.isfinite(y) for x, y in pts), gesture
+    def test_gesture_labels_are_hers(self, tmp_path):
+        """Whatever she names a move lands in her art history."""
+        registry, canvas = self._tools(tmp_path)
+        registry.run("studio_sheet")
+        registry.run("studio_stroke", points="0,0; 50,50", label="maurer_rose")
+        registry.run("studio_done")
+        assert "maurer_rose" in canvas.gesture_recency()
 
-    def test_novelty_weight_curve(self):
-        w = Painter._novelty_weight
-        assert w(math.inf) > w(86400) > w(3600) > w(60)
+    def test_done_without_sheet_reports(self, tmp_path):
+        registry, _ = self._tools(tmp_path)
+        result = registry.run("studio_done")
+        assert not result.success
 
 
 # ── Backend optionality ───────────────────────────────────────────

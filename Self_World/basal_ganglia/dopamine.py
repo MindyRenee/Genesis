@@ -113,14 +113,14 @@ Subtype-weighted effective level:
     different coupling depending on receptor state.
 
     subtype_effective_level = base * (d1 - d2) / total * 2.0 + base
-    (clamped to [0, 2])
+    (finite; no range bound)
 
 Phasic boost:
     Phasic bursts activate low-affinity D1 (excitatory) receptors,
     adding signaling beyond the tonic baseline.
 
     effective = base + phasic_level * d1_weight * 0.3
-    (clamped to [0, 2])
+    (finite; no range bound)
 
     Tonic level activates high-affinity D2 receptors (mood
     maintenance). Phasic bursts activate low-affinity D1 receptors
@@ -160,7 +160,7 @@ Homeostatic force (with autoreceptor nonlinearity):
 Effective level:
 
     effective = level * receptor_sensitivity * desensitization * internalization
-    (clamped to [0, 2])
+    (finite; no range bound)
 
 Subtype-weighted effective level:
 
@@ -168,12 +168,12 @@ Subtype-weighted effective level:
     d2 = receptor_subtypes[1]
     total = d1 + d2
     subtype_effective = base * (d1 - d2) / total * 2.0 + base
-    (clamped to [0, 2])
+    (finite; no range bound)
 
 Phasic boost:
 
     effective = base + phasic_level * d1_weight * 0.3
-    (clamped to [0, 2])
+    (finite; no range bound)
 
 Coupling force (sum over all chemicals j != i):
 
@@ -183,7 +183,7 @@ Coupling force (sum over all chemicals j != i):
     where:
         deviation_j = max(-AUTORECEPTOR_THRESHOLD, eff_j - baseline_j)
         level_gate_j = eff_j^2 / (baseline_j^2 + eff_j^2)  (Hill, n=2)
-        coupling_gain_j = clamp(1 + 0.3 * tanh(self_dev * j_dev), 0.7, 1.3)
+        coupling_gain_j = bounded(1 + 0.3 * tanh(self_dev * j_dev), 0.7, 1.3)
 
 Vesicular pool:
     On impulse: pool -= |magnitude| * 0.3 (depletion)
@@ -238,7 +238,7 @@ Valence equation:
     (dopamine weight = 0.25 — reward/wanting)
     (DA × SRT synergy = 0.10 — balanced mood when both high)
     (cort_stress = cortisol expressed as a fraction of its reachable
-    envelope, (cort - 0.02) / (0.08 - 0.02) clamped to [0, 1] —
+    envelope, (cort - 0.02) / (0.08 - 0.02) normalized to [0, 1] —
     the raw level peaks near 0.08 and could never move valence on
     the [0, 1] scale the coefficient was written for)
 
@@ -251,8 +251,7 @@ Flow phase:
 APPLICATION IN GENESIS
 ════════════════════════════════════════════════════════════════════════
 
-Maximum impulse magnitude: 0.05
-(Conservative — dopamine is potent and easily overstimulated)
+Impulse magnitude: no fixed limit
 
 Python modules that send dopamine impulses:
     - limbic_system/emotional_regulator.py: reward, motivation, novelty,
@@ -298,7 +297,6 @@ class Dopamine:
     receptor_adaptation_multiplier: float = 1.2
     receptor_subtypes: tuple[str, str] = ("D1", "D2")
     receptor_subtype_balance: tuple[float, float] = (0.50, 0.50)
-    max_impulse: float = 0.05
     origin: tuple[str, ...] = ("VTA", "SNc")
     projections: tuple[str, ...] = (
         "nucleus accumbens",

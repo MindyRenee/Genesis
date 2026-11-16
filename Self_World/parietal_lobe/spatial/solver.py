@@ -1,17 +1,32 @@
-"""Spatial reasoner — searching transformation space for the rule.
+"""Spatial reasoner — inductive rule learning over transformations.
 
 This is the perceptual counterpart to ``ReasoningEngine``: where the
 semantic engine traverses typed edges between concepts, the spatial
-engine composes grid transformations and verifies them against
-evidence. Solving a task means finding a sequence of ``Transform``s
-that reproduces every training output exactly — the same exact-match
-verification discipline the concept-network problem solver uses.
+engine composes transformation-group elements and verifies them
+against evidence. Inducing a rule means finding the sequence of
+``Transform``s that reproduces every observed after exactly — the
+same exact-match verification discipline the concept-network problem
+solver uses.
 
-Search is breadth-first with beam pruning, ranked by how many cells
-the candidate output gets right across all training pairs (fractional
-match), then by sequence length — Occam's razor: shorter explanations
-are preferred when they tie. A hypothesis is only a *solution* when it
-reproduces every training output exactly.
+The mathematics is Bayesian program induction under a minimum
+description length prior (Solomonoff 1964; Piantadosi, Rule &
+Tenenbaum 2024): each hypothesis is a short program in the transform
+DSL, and the search maximizes
+
+    P(h | D) ∝ P(D | h) · 2^(−L(h))
+
+where P(D | h) is the fraction of observed transitions the program
+reproduces exactly and L(h) is the program's description length —
+its length in composed operators. Ranking by cell-accuracy then by
+sequence length is the beam-search approximation of that posterior:
+Occam's razor is the prior term, exact-match verification is the
+likelihood.
+
+Neurally this is the frontoparietal induction circuit: mid-DLPFC
+generates and holds candidate rules during rule acquisition while
+frontopolar cortex integrates the separate inferences (Reverberi et
+al. 2007); the parietal substrate supplies the transformation
+operators themselves.
 """
 
 from __future__ import annotations
@@ -34,7 +49,7 @@ from genesis_client.swallow import note_swallowed
 
 from parietal_lobe.grid import Grid
 from parietal_lobe.scene import Scene, perceive
-from parietal_lobe.transforms import Example, Transform, propose
+from parietal_lobe.transforms import Transform, Transition, propose
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +59,8 @@ class SpatialHypothesis:
     """A candidate rule: a sequence of transforms plus its evidence."""
 
     transforms: list[Transform]
-    score: float  # mean cell-accuracy across training pairs, [0, 1]
-    exact: int = 0  # number of training pairs reproduced exactly
+    score: float  # mean cell-accuracy across observed transitions, [0, 1]
+    exact: int = 0  # number of observed transitions reproduced exactly
 
     def describe(self) -> str:
         return " → ".join(t.describe() for t in self.transforms)
@@ -61,14 +76,14 @@ class FailureInfo:
     """A counterexample report: why the best hypothesis failed.
 
     Produced on unsolved tasks so the caller can see *where* the best
-    rule broke rather than getting an opaque miss — which training
+    rule broke rather than getting an opaque miss — which transition
     pair was the counterexample, whether the failure was a shape
     mismatch or cell-level disagreement, and which colors were
     confused (predicted → expected over the differing cells).
     """
 
     rule: str  # describe() of the best hypothesis
-    pair_scores: list[float]  # per-training-pair accuracy of that rule
+    pair_scores: list[float]  # per-transition accuracy of that rule
     worst_pair: int  # index of the pair it fit worst
     shape_mismatch: bool  # predicted grid had the wrong shape
     mismatched: int  # differing cells on the worst pair
@@ -91,7 +106,7 @@ class SpatialSolution:
     """The result of solving a task.
 
     ``hypothesis`` is the best verified rule (None if nothing solved
-    all training pairs). ``predictions`` are the hypothesis applied to
+    all observed transitions). ``predictions`` are the hypothesis applied to
     each test input — empty when unsolved. ``hypotheses`` retains the
     runner-up candidates for inspection.
     """
@@ -105,9 +120,9 @@ class SpatialSolution:
     # All prediction sets from the top-k verified hypotheses (multiple
     # guesses are kept when several hypotheses verify). predictions == guesses[0].
     guesses: list[list[Grid]] = field(default_factory=list)
-    # describe() of every rule verified on all training pairs — when
+    # describe() of every rule verified on all observed transitions — when
     # the test guess misses, these are the proven counterexamples
-    # (rules that fit the training data but generalized wrong).
+    # (rules that fit the evidence but generalized wrong).
     verified_rules: list[str] = field(default_factory=list)
     # Why the best hypothesis failed, when nothing verified.
     failure: FailureInfo | None = None
@@ -127,7 +142,7 @@ def _cell_accuracy(candidate: Grid, target: Grid) -> float:
 
 
 class SpatialReasoner:
-    """Few-shot spatial inference: examples → rule → prediction.
+    """Few-shot spatial inference: transitions → rule → prediction.
 
     The reasoner may optionally hold a ``ConceptNetwork`` so perceived
     scenes and verified rules can be grounded into conceptual structure
@@ -222,24 +237,24 @@ class SpatialReasoner:
         return str(value)
 
     @staticmethod
-    def _task_state_features(examples: list[Example], tests: list[Grid]) -> dict[str, Any]:
+    def _task_state_features(transitions: list[Transition], queries: list[Grid]) -> dict[str, Any]:
         """Describe the task's structure without binding its answer."""
         features: dict[str, Any] = {
             "grid.task": True,
-            "examples.multi": len(examples) > 1,
-            "tests.present": bool(tests),
+            "transitions.multi": len(transitions) > 1,
+            "queries.present": bool(queries),
         }
-        if not examples:
+        if not transitions:
             return features
 
-        same_shape = all(inp.shape == out.shape for inp, out in examples)
+        same_shape = all(inp.shape == out.shape for inp, out in transitions)
         shrinks = all(
             out.width <= inp.width and out.height <= inp.height and out.shape != inp.shape
-            for inp, out in examples
+            for inp, out in transitions
         )
         grows = all(
             out.width >= inp.width and out.height >= inp.height and out.shape != inp.shape
-            for inp, out in examples
+            for inp, out in transitions
         )
         features["shape.same"] = same_shape
         features["shape.shrinks"] = shrinks
@@ -250,7 +265,7 @@ class SpatialReasoner:
         added = removed = False
         fractions: list[float] = []
         input_objects = output_objects = 0
-        for inp, out in examples:
+        for inp, out in transitions:
             in_colors = set(inp.colors())
             out_colors = set(out.colors())
             added |= bool(out_colors - in_colors)
@@ -293,7 +308,7 @@ class SpatialReasoner:
         return features
 
     @staticmethod
-    def _operator_affordances(examples: list[Example], state: Mapping[str, Any]) -> set[str]:
+    def _operator_affordances(transitions: list[Transition], state: Mapping[str, Any]) -> set[str]:
         """Infer broad operator affordances from example structure."""
         affordances = {"compose", "verify_exact"}
         if state.get("shape.same"):
@@ -310,24 +325,24 @@ class SpatialReasoner:
             affordances.add("erase")
         if state.get("objects.present"):
             affordances.add("object_manipulation")
-        if examples and all(
+        if transitions and all(
             inp.shape == out.shape
             and inp.to_lists() != out.to_lists()
             and Counter(v for _, _, v in inp.iter_cells())
             == Counter(v for _, _, v in out.iter_cells())
-            for inp, out in examples
+            for inp, out in transitions
         ):
             affordances.add("translate")
         return affordances
 
-    def _recognize_task(self, examples: list[Example], tests: list[Grid]) -> TaskContext:
+    def _recognize_task(self, transitions: list[Transition], queries: list[Grid]) -> TaskContext:
         """Bind this grid task to a domain-general task schema."""
-        state = self._task_state_features(examples, tests)
+        state = self._task_state_features(transitions, queries)
         goal = GoalCondition("train.exact_match", "eq", 1.0)
         context = self.task_competence.recognize(
             domain="spatial.transform",
             state=state,
-            actions=self._operator_affordances(examples, state),
+            actions=self._operator_affordances(transitions, state),
             goal_conditions=[goal],
             entities=("grid", "cell", "object", "color", "background"),
             roles=("transform", "input-output"),
@@ -361,7 +376,7 @@ class SpatialReasoner:
 
     @staticmethod
     def _rebind_candidates(
-        intermediates: list[Example],
+        intermediates: list[Transition],
     ) -> list[int]:
         """Colors this task produces that intermediates don't contain —
         the evidence a stored binding should be swapped against."""
@@ -373,7 +388,7 @@ class SpatialReasoner:
     def _rebound_skill_steps(
         self,
         skill_steps: tuple[ProcedureStep, ...],
-        intermediates: list[Example],
+        intermediates: list[Transition],
     ) -> list[list[Transform]]:
         """Re-parameterized variants of a stored procedure.
 
@@ -408,7 +423,7 @@ class SpatialReasoner:
                         return variants
         return variants
 
-    def _skill_transforms(self, intermediates: list[Example] | None = None) -> list[Transform]:
+    def _skill_transforms(self, intermediates: list[Transition] | None = None) -> list[Transform]:
         """Turn retrieved skills into candidate macro-transforms.
 
         Emits the verbatim replay plus, when the task's evidence
@@ -491,7 +506,7 @@ class SpatialReasoner:
         self,
         context: TaskContext,
         transforms: list[Transform],
-        examples: list[Example],
+        transitions: list[Transition],
         *,
         success: bool,
     ) -> None:
@@ -499,7 +514,7 @@ class SpatialReasoner:
         expanded = self._expanded_transforms(transforms)
         if not expanded:
             return
-        for inp, _expected in examples:
+        for inp, _expected in transitions:
             current = inp
             for transform in expanded:
                 try:
@@ -549,7 +564,7 @@ class SpatialReasoner:
         *,
         success: bool,
         score: float,
-        examples: list[Example] | None = None,
+        transitions: list[Transition] | None = None,
     ) -> None:
         """Feed an externally verified solve outcome back into competence."""
         context = solution.task_context or self._active_task
@@ -569,8 +584,8 @@ class SpatialReasoner:
                 context.schema.family_priors[self._family(t)] = (
                     context.schema.family_priors.get(self._family(t), 0) + 1
                 )
-        if examples:
-            self._record_transition_effects(context, transforms, examples, success=success)
+        if transitions:
+            self._record_transition_effects(context, transforms, transitions, success=success)
         self.task_competence.record_episode(
             context,
             steps=self._procedure_steps(transforms),
@@ -599,7 +614,7 @@ class SpatialReasoner:
                 return fam
         return None
 
-    def _schema_transforms(self, examples: list[Example]) -> list[Transform]:
+    def _schema_transforms(self, transitions: list[Transition]) -> list[Transform]:
         """Induce schemas from learned rules and instantiate them.
 
         Grouping learned transforms by family and re-binding their
@@ -624,7 +639,7 @@ class SpatialReasoner:
 
         # Task-observed candidate values for free parameters.
         task_colors: set[int] = set()
-        for inp, out in examples:
+        for inp, out in transitions:
             task_colors |= set(inp.colors()) | set(out.colors())
 
         known = {t.describe() for t in self._learned}
@@ -690,13 +705,13 @@ class SpatialReasoner:
 
     @staticmethod
     def prediction_key(predictions: list[Grid]) -> str:
-        """Stable fingerprint of a predicted test-output set."""
+        """Stable fingerprint of a predicted query-output set."""
         return repr(tuple(tuple(tuple(row) for row in grid.to_lists()) for grid in predictions))
 
     def solve(
         self,
-        examples: list[Example],
-        tests: list[Grid],
+        transitions: list[Transition],
+        queries: list[Grid],
         *,
         max_depth: int = 2,
         beam_width: int = 32,
@@ -706,11 +721,11 @@ class SpatialReasoner:
         exclude_rules: set[str] | None = None,
         exclude_predictions: set[str] | None = None,
     ) -> SpatialSolution:
-        """Search for a transform sequence explaining the examples.
+        """Induce the shortest program explaining the transitions.
 
         Args:
-            examples: (input, output) training pairs.
-            tests: grids to predict outputs for.
+            transitions: observed (before, after) pairs — the evidence.
+            queries: grids to predict outcomes for, given the induced rule.
             max_depth: maximum number of composed transforms.
             beam_width: hypotheses kept per depth level.
             max_nodes: total search budget (safety cap).
@@ -723,25 +738,25 @@ class SpatialReasoner:
                 rules can't be selected as solutions or near-misses, so
                 a retry explores genuinely different hypotheses instead
                 of re-deriving the same failure.
-            exclude_predictions: fingerprints of held-out test outputs
+            exclude_predictions: fingerprints of held-out query outputs
                 already disproven on this task. This is behavioral pruning:
                 semantically equivalent hypotheses making the same wrong
                 prediction are excluded without banning an entire family.
         """
         excluded = exclude_rules or set()
         excluded_predictions = exclude_predictions or set()
-        scenes = [perceive(inp) for inp, _ in examples]
-        if not examples:
+        scenes = [perceive(inp) for inp, _ in transitions]
+        if not transitions:
             return SpatialSolution(solved=False, hypothesis=None, scenes=scenes)
-        task_context = self._recognize_task(examples, tests)
+        task_context = self._recognize_task(transitions, queries)
         retrieved_skills = [match.skill.skill_id for match in self._active_skills]
 
         def evaluate(transforms: list[Transform]) -> tuple[float, int]:
-            return self._evaluate(transforms, examples)
+            return self._evaluate(transforms, transitions)
 
         solved_hyps, frontier, explored = self._search(
-            examples,
-            tests,
+            transitions,
+            queries,
             evaluate,
             excluded,
             excluded_predictions,
@@ -768,12 +783,12 @@ class SpatialReasoner:
                 hypotheses=hypotheses,
                 scenes=scenes,
                 nodes_explored=explored,
-                failure=self._analyze_failure(best, examples),
+                failure=self._analyze_failure(best, transitions),
                 task_context=task_context,
                 retrieved_skills=retrieved_skills,
             )
 
-        guesses = [self._predict_all(hyp, tests) for hyp in solved_hyps]
+        guesses = [self._predict_all(hyp, queries) for hyp in solved_hyps]
 
         # Success teaches: the most general verified rule becomes part
         # of its recalled strategy set — overfit alternates are not
@@ -795,8 +810,8 @@ class SpatialReasoner:
 
     def _search(
         self,
-        examples: list[Example],
-        tests: list[Grid],
+        transitions: list[Transition],
+        queries: list[Grid],
         evaluate,
         excluded: set[str],
         excluded_predictions: set[str],
@@ -826,7 +841,7 @@ class SpatialReasoner:
                 for hyp in frontier:
                     new_cands, explored, stop = self._expand_hypothesis(
                         hyp,
-                        examples,
+                        transitions,
                         preferred_only,
                         evaluate,
                         explored,
@@ -836,7 +851,7 @@ class SpatialReasoner:
                     candidates.extend(new_cands)
                     if stop:
                         break
-                if any(h.exact == len(examples) for h in candidates) or stop:
+                if any(h.exact == len(transitions) for h in candidates) or stop:
                     break
 
             # Keep the most accurate candidates; prefer shorter
@@ -844,9 +859,9 @@ class SpatialReasoner:
             candidates.sort(key=lambda h: (-h.score, len(h.transforms)))
             exact_hits = []
             for h in candidates:
-                if h.exact != len(examples) or h.describe() in excluded:
+                if h.exact != len(transitions) or h.describe() in excluded:
                     continue
-                predictions = self._predict_all(h, tests)
+                predictions = self._predict_all(h, queries)
                 if self.prediction_key(predictions) in excluded_predictions:
                     continue
                 exact_hits.append(h)
@@ -859,11 +874,11 @@ class SpatialReasoner:
 
     @staticmethod
     def _analyze_failure(
-        hyp: SpatialHypothesis | None, examples: list[Example]
+        hyp: SpatialHypothesis | None, transitions: list[Transition]
     ) -> FailureInfo | None:
         """Explain why the best hypothesis failed.
 
-        Replays the hypothesis against each training pair and reports
+        Replays the hypothesis against each observed transition and reports
         the counterexample: which pair it fit worst, whether the output
         shape was wrong, and which colors were confused on the
         differing cells. This is the observational half of learning
@@ -873,7 +888,7 @@ class SpatialReasoner:
             return None
         pair_scores: list[float] = []
         worst, worst_idx = 1.0, 0
-        for i, (inp, out) in enumerate(examples):
+        for i, (inp, out) in enumerate(transitions):
             try:
                 cand = hyp.apply(inp)
                 acc = 1.0 if cand == out else _cell_accuracy(cand, out)
@@ -886,7 +901,7 @@ class SpatialReasoner:
             pair_scores.append(acc)
             if acc < worst:
                 worst, worst_idx = acc, i
-        inp, out = examples[worst_idx]
+        inp, out = transitions[worst_idx]
         try:
             cand = hyp.apply(inp)
         except Exception as e:  # noqa: BLE001 — failure analysis must not crash on bad transforms
@@ -929,7 +944,7 @@ class SpatialReasoner:
         Fewest transforms, then fewest parameters. A rule with no
         conditions (gravity_down) beats an equally accurate but more
         specific one (gravity_down_1) — specific rules overfit the
-        training colors.
+        transition colors.
         """
         exact_hits.sort(
             key=lambda h: (
@@ -940,10 +955,10 @@ class SpatialReasoner:
         return exact_hits[:num_guesses]
 
     @staticmethod
-    def _evaluate(transforms: list[Transform], examples: list[Example]) -> tuple[float, int]:
+    def _evaluate(transforms: list[Transform], transitions: list[Transition]) -> tuple[float, int]:
         """Score a transform sequence: (mean cell accuracy, exact hits)."""
         total_acc, exact = 0.0, 0
-        for inp, out in examples:
+        for inp, out in transitions:
             try:
                 cand = inp
                 for t in transforms:
@@ -969,13 +984,13 @@ class SpatialReasoner:
                 total_acc += 1.0
             else:
                 total_acc += _cell_accuracy(cand, out)
-        return total_acc / len(examples), exact
+        return total_acc / len(transitions), exact
 
     @staticmethod
-    def _predict_all(hyp: SpatialHypothesis, tests: list[Grid]) -> list[Grid]:
+    def _predict_all(hyp: SpatialHypothesis, queries: list[Grid]) -> list[Grid]:
         """Apply a hypothesis to each test grid; failures echo the input."""
         preds = []
-        for test in tests:
+        for test in queries:
             try:
                 preds.append(hyp.apply(test))
             except Exception as e:  # noqa: BLE001 — failed transform echoes input
@@ -989,7 +1004,7 @@ class SpatialReasoner:
     def _expand_hypothesis(
         self,
         hyp: SpatialHypothesis,
-        examples: list[Example],
+        transitions: list[Transition],
         preferred_only: bool,
         evaluate: Any,
         explored: int,
@@ -1010,8 +1025,8 @@ class SpatialReasoner:
         # what lets composition work (e.g. crop→recolor: the
         # recolor map is only inferable once the crop has
         # produced a grid with the output's shape).
-        intermediates: list[Example] = []
-        for inp, out in examples:
+        intermediates: list[Transition] = []
+        for inp, out in transitions:
             try:
                 mid = inp
                 for t in hyp.transforms:
@@ -1023,7 +1038,7 @@ class SpatialReasoner:
                 )
                 break
             intermediates.append((mid, out))
-        if len(intermediates) != len(examples):
+        if len(intermediates) != len(transitions):
             return candidates, explored, stop
 
         # Retrieved skills lead the proposal list, followed by

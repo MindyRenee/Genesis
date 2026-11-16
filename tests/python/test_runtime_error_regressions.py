@@ -44,7 +44,7 @@ def test_sleep_desync_reads_the_phase_field(monkeypatch) -> None:
     """The reader must use the field `PhaseInfo` actually has."""
     import inspect
 
-    from sleep.sleep import SleepMixin
+    from self.sleep import SleepMixin
 
     src = inspect.getsource(SleepMixin._check_sleep_desync)
     assert "get_phase().phase" in src, "_check_sleep_desync must read PhaseInfo.phase"
@@ -257,7 +257,7 @@ def test_sleep_desync_runs_without_raising() -> None:
         def get_phase(self) -> PhaseInfo:
             return PhaseInfo(phase=5, arousal=0.2, valence=0.0)
 
-    from sleep.sleep import SleepMixin
+    from self.sleep import SleepMixin
 
     probe = SleepMixin.__new__(SleepMixin)
     probe._is_sleeping = False

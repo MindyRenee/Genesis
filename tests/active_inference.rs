@@ -138,22 +138,37 @@ fn test_engine_new_identity_prediction() {
 }
 
 #[test]
-fn test_engine_predict_clamps_to_range() {
-    // Predictions should be clamped to [0, 2] since effective levels
-    // can exceed 1.0 under phasic bursts (dopamine D1, serotonin 5-HT2A)
-    // and allosteric modulation (GABA).
+fn test_engine_predict_clamps_non_dopamine_to_range() {
+    // Non-dopamine predictions retain the [0, 2] effective-level
+    // contract. Dopamine is exempt and handled by the next test.
     let engine = ActiveInferenceEngine::new();
     let current = [0.0f32; NEUROCHEMICAL_COUNT];
     let predicted = engine.predict(&current);
-    for p in predicted {
-        assert!((0.0..=2.0).contains(&p), "predicted {} out of [0,2]", p);
+    for (i, p) in predicted.iter().enumerate() {
+        if i == NeurochemicalId::Dopamine as usize {
+            continue;
+        }
+        assert!((0.0..=2.0).contains(p), "predicted {p} out of [0,2]");
     }
 
     let current = [2.0f32; NEUROCHEMICAL_COUNT];
     let predicted = engine.predict(&current);
-    for p in predicted {
-        assert!((0.0..=2.0).contains(&p), "predicted {} out of [0,2]", p);
+    for (i, p) in predicted.iter().enumerate() {
+        if i == NeurochemicalId::Dopamine as usize {
+            continue;
+        }
+        assert!((0.0..=2.0).contains(p), "predicted {p} out of [0,2]");
     }
+}
+
+#[test]
+fn test_engine_predict_dopamine_unclamped() {
+    let engine = ActiveInferenceEngine::new();
+    let mut current = [0.0f32; NEUROCHEMICAL_COUNT];
+    current[NeurochemicalId::Dopamine as usize] = 3.0;
+    let predicted = engine.predict(&current);
+    let da = predicted[NeurochemicalId::Dopamine as usize];
+    assert!(da > 2.0 && da.is_finite(), "dopamine prediction {da}");
 }
 
 // ─── Active inference engine: cycle ───────────────────────────
@@ -1214,7 +1229,7 @@ fn test_update_signals_writes_all_fields() {
 
     engine.update_signals(
         &mut signals,
-        0.1,   // da_pe
+        2.5,   // da_pe (unbounded)
         -0.05, // cort_pe
         0.02,  // srt_pe
         &DyadicSignals {
@@ -1226,7 +1241,7 @@ fn test_update_signals_writes_all_fields() {
         },
     );
 
-    assert!((signals.prediction_error_dopamine - 0.1).abs() < 1e-6);
+    assert!((signals.prediction_error_dopamine - 2.5).abs() < 1e-6);
     assert!((signals.prediction_error_cortisol - (-0.05)).abs() < 1e-6);
     assert!((signals.prediction_error_serotonin - 0.02).abs() < 1e-6);
     assert!((signals.attunement - 0.4).abs() < 1e-6);

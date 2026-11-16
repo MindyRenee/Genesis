@@ -57,13 +57,13 @@ import logging
 import math
 import os
 import sqlite3
-import threading
 from collections import OrderedDict
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from genesis_client.swallow import note_swallowed
 from infrastructure._npz_io import load_npz, save_npz, str_array
+from inhibition import RecurrentInhibition
 
 from .classify import _normalize_id
 
@@ -293,7 +293,7 @@ class EmbeddingStore:
         # full rebuild and calls private builders that in turn reach
         # public read accessors; an RLock makes that class of
         # self-deadlock impossible rather than merely unlikely.
-        self._lock = threading.RLock()
+        self._lock = RecurrentInhibition()
 
         # Dimensionality (set at build time)
         self._dim = 0

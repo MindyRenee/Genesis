@@ -21,13 +21,14 @@ real concept graph rather than raw text.
 from __future__ import annotations
 
 import re
-import threading
 import time
 from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
+
+from inhibition import InhibitoryGate
 
 # Words this short are usually grammatical noise, not topics.
 _MIN_TOPIC_WORD_LEN = 4
@@ -86,8 +87,9 @@ class ExternalEvent:
             ``"self"`` for its own outbound acts.
         content: Semantic description of what happened. For speech this
             is the utterance text; for actions a short semantic summary.
-        salience: How much this event matters [0..1]. Salient events
-            are broadcast to the workspace and stored as memories.
+        salience: Finite evidence for how much this event matters.
+            Salient events are broadcast to the workspace and stored as
+            memories.
         addressed: Whether the event was directed at its specifically.
         topics: Concept names from its network that appear in the
             event — grounds the event in its knowledge.
@@ -211,7 +213,7 @@ class EventStream:
     def __init__(self, max_size: int = 200) -> None:
         """Create a bounded stream holding at most ``max_size`` events."""
         self._events: deque[ExternalEvent] = deque(maxlen=max_size)
-        self._lock = threading.Lock()
+        self._lock = InhibitoryGate()
 
     def append(self, event: ExternalEvent) -> None:
         """Record an event (thread-safe)."""

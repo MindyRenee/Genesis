@@ -67,15 +67,15 @@
 //!   interpersonal exchange, towards a second-person approach
 //!   to social neuroscience.
 
+use crate::inhibition::Inhibition;
 use std::collections::VecDeque;
-use std::sync::Mutex;
 
 /// Shared slot for the latest user affect observation, written by the
 /// IPC handler (when the Python conscious mind sends an
 /// `UpdateUserAffect` command) and read by the daemon's `advance_neuro`.
 /// This follows the same pattern as the shared body state in
 /// `interoception.rs`.
-static SHARED_USER_AFFECT: Mutex<Option<UserAffectObservation>> = Mutex::new(None);
+static SHARED_USER_AFFECT: Inhibition<Option<UserAffectObservation>> = Inhibition::new(None);
 
 /// Publish a user affect observation to the shared slot. Called by
 /// the IPC handler when the conscious mind sends an

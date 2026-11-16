@@ -3,13 +3,12 @@
 The Rust substrate owns the ion dynamics: concentrations, reversal
 potentials, conductances, membrane voltage, transporters, ATP availability,
 and physiological sanitization. This module performs the narrower conscious
-task of interpreting the resulting :class:`IonSummary` as bounded cognitive
+task of interpreting the resulting :class:`IonSummary` as finite cognitive
 signals — how much attention, global broadcast, memory consolidation, and
 synaptic learning the current electrochemical state can support.
 
-Nothing here recomputes electrochemistry. The derived gains are deliberately
-small and clamped so ion state biases cognition without turning a single IPC
-read into an override.
+Nothing here recomputes electrochemistry. The derived gains stay finite for
+malformed input, but valid substrate values are not range-limited here.
 """
 
 from __future__ import annotations
@@ -24,7 +23,7 @@ __all__ = ["IonCognitiveContext", "interpret_ions"]
 
 @dataclass(frozen=True, slots=True)
 class IonCognitiveContext:
-    """Bounded interpretation of the substrate's ion state.
+    """Finite interpretation of the substrate's ion state.
 
     Raw normalized fields are the substrate's own derived readouts. Gain
     fields are cognitive modulation factors centered near 1.0 at physiological
@@ -85,7 +84,7 @@ class IonCognitiveContext:
 
 
 def interpret_ions(summary: IonSummary | None) -> IonCognitiveContext:
-    """Interpret an ``IonSummary`` as bounded cognitive modulation.
+    """Interpret an ``IonSummary`` as finite cognitive modulation.
 
     The summary's normalized fields are sanitized again defensively because
     this boundary may be reached through older clients, test doubles, or a
@@ -95,55 +94,53 @@ def interpret_ions(summary: IonSummary | None) -> IonCognitiveContext:
     if not isinstance(summary, IonSummary):
         return IonCognitiveContext.neutral()
 
-    membrane = _finite_clamp(summary.membrane_potential_mv, -120.0, 80.0, -75.0)
-    nak = _finite_clamp(summary.nak_pump_rate, 0.0, 0.042, 0.018)
-    kcl = _finite_clamp(summary.kcl_cotransporter_flux, -0.08, 0.12, 0.010)
-    ncx = _finite_clamp(summary.ncx_flux, -0.002, 0.02, 0.0002)
-    net_current = _finite_clamp(summary.net_membrane_current, -1000.0, 1000.0, 0.0)
+    membrane = _finite_or(summary.membrane_potential_mv, -75.0)
+    nak = _finite_or(summary.nak_pump_rate, 0.018)
+    kcl = _finite_or(summary.kcl_cotransporter_flux, 0.010)
+    ncx = _finite_or(summary.ncx_flux, 0.0002)
+    net_current = _finite_or(summary.net_membrane_current, 0.0)
 
-    atp = _unit(summary.atp_availability, 0.9)
-    calcium = _unit(summary.calcium_signal, 0.0)
-    chloride = _unit(summary.chloride_efficacy, 0.5)
-    excitability = _unit(summary.excitability, 0.0)
-    integrity = _unit(summary.gradient_integrity, 1.0)
-    load = _unit(summary.energy_load, 0.25)
+    atp = _finite_or(summary.atp_availability, 0.9)
+    calcium = _finite_or(summary.calcium_signal, 0.0)
+    chloride = _finite_or(summary.chloride_efficacy, 0.5)
+    excitability = _finite_or(summary.excitability, 0.0)
+    integrity = _finite_or(summary.gradient_integrity, 1.0)
+    load = _finite_or(summary.energy_load, 0.25)
 
     # Resting values are centered rather than absolute: load=0.25 and
     # atp=0.9 are physiological baseline, not strain. This keeps the
     # interpretation neutral when the daemon reports a healthy rest state.
-    metabolic_strain = _clamp(
-        0.70 * max(0.0, (load - 0.25) / 0.75) + 0.30 * max(0.0, (0.9 - atp) / 0.9)
+    metabolic_strain = _finite_or(
+        0.70 * ((load - 0.25) / 0.75) + 0.30 * ((0.9 - atp) / 0.9),
+        0.0,
     )
-    physiological_balance = _clamp(
-        0.45 * integrity + 0.25 * atp + 0.20 * (1.0 - load) + 0.10 * chloride
+    physiological_balance = _finite_or(
+        0.45 * integrity + 0.25 * atp + 0.20 * (1.0 - load) + 0.10 * chloride,
+        0.875,
     )
 
-    attention_gain = _clamp(
+    attention_gain = _finite_or(
         1.0
         + 0.20 * excitability
         + 0.12 * (chloride - 0.5)
         - 0.20 * metabolic_strain
         - 0.10 * (1.0 - integrity),
-        0.55,
-        1.25,
+        1.0,
     )
-    workspace_gain = _clamp(
+    workspace_gain = _finite_or(
         1.0
         + 0.20 * excitability
         + 0.15 * (physiological_balance - 0.875)
         - 0.10 * metabolic_strain,
-        0.50,
-        1.20,
+        1.0,
     )
-    memory_consolidation_gain = _clamp(
+    memory_consolidation_gain = _finite_or(
         1.0 + 0.15 * (atp - 0.9) + 0.20 * (integrity - 1.0) - 0.15 * (load - 0.25),
-        0.50,
-        1.20,
+        1.0,
     )
-    synaptic_plasticity_gain = _clamp(
+    synaptic_plasticity_gain = _finite_or(
         1.0 + 0.45 * calcium + 0.20 * (atp - 0.9) + 0.20 * (integrity - 1.0) - 0.20 * (load - 0.25),
-        0.35,
-        1.30,
+        1.0,
     )
 
     return IonCognitiveContext(
@@ -167,24 +164,10 @@ def interpret_ions(summary: IonSummary | None) -> IonCognitiveContext:
     )
 
 
-def _clamp(value: float, lower: float = 0.0, upper: float = 1.0) -> float:
-    """Clamp a finite value to a closed interval."""
-    return max(lower, min(upper, value))
-
-
-def _unit(value: float, default: float) -> float:
-    """Interpret a normalized signal, replacing malformed/non-finite input."""
+def _finite_or(value: object, default: float) -> float:
+    """Preserve a finite scalar and replace malformed/NaN/±∞ values."""
     try:
-        return _clamp(value, 0.0, 1.0) if math.isfinite(value) else default
+        value = float(value)
     except (TypeError, ValueError, OverflowError):
         return default
-
-
-def _finite_clamp(value: float, lower: float, upper: float, default: float) -> float:
-    """Clamp a scalar and replace malformed/NaN/±∞ values."""
-    try:
-        if not math.isfinite(value):
-            return default
-        return max(lower, min(upper, value))
-    except (TypeError, ValueError, OverflowError):
-        return default
+    return value if math.isfinite(value) else default

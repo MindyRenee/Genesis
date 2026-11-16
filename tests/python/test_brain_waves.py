@@ -249,7 +249,7 @@ def test_rem_theta_uses_sawtooth_carrier():
 def test_sleep_stage_override_drives_nrem_waves():
     """The ultradian stage overrides the arousal-derived stage.
 
-    The daemon clamps arousal into 0.10-0.25 for all of NREM, so
+    The sleep-wake network settles NREM arousal near ~0.21, so
     arousal cannot distinguish N1 from N3 — without the override
     every NREM tick reports slow-wave N3.
     """

@@ -16,7 +16,7 @@ Pipeline:
         |                           (semantic grounding)
         v
     SpatialReasoner.solve()        Transform hypotheses, verified
-        |                           against every example
+        |                           against every observed transition
         v
     SpatialSolution                rule + predictions
 
@@ -37,12 +37,11 @@ from parietal_lobe.scene import (
     SpatialRelationKind,
     perceive,
 )
-from parietal_lobe.transforms import Example, Transform, propose
+from parietal_lobe.transforms import Transform, Transition, propose
 
 from .solver import SpatialHypothesis, SpatialReasoner, SpatialSolution
 
 __all__ = [
-    "Example",
     "Grid",
     "ObjectRelation",
     "PerceivedObject",
@@ -52,6 +51,7 @@ __all__ = [
     "SpatialRelationKind",
     "SpatialSolution",
     "Transform",
+    "Transition",
     "ground_scene",
     "perceive",
     "propose",

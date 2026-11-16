@@ -39,7 +39,7 @@ Commands (typed during conversation):
     /growth-report — markdown growth report
     /voice       — speak to Genesis (one utterance)
     /voice-mode  — continuous voice conversation
-    /draw        — ask it to draw what it feels right now
+    /draw        — sit it at the easel; what it makes there is its own
     /register-face <name> — teach it your face (look at the camera)
     /faces       — show known faces and who it last saw
     /mission [text] — set or show its top-level mission
@@ -77,7 +77,6 @@ import socket
 import subprocess
 import sys
 import threading
-from inhibition import InhibitoryGate, NeuromodulatoryGate, ThalamicRelay
 import time
 from collections import deque
 from collections.abc import Callable
@@ -92,9 +91,10 @@ from genesis_client.ltm_index import scan_ltm_index
 from genesis_client.swallow import note_swallowed
 from genesis_client.threads import named_thread
 from infrastructure.config import default_data_dir
+from inhibition import InhibitoryGate, NeuromodulatoryGate, ThalamicRelay
 from mind import Mind
 from occipital_lobe.perception.ambient import AmbientListener, contains_wake_word, strip_wake_word
-from sleep.sleep import WakeOutcome
+from self.sleep import WakeOutcome
 from temporal_lobe import AuditoryCortex, SoundEvent
 from temporal_lobe.concepts import RelationType
 from temporal_lobe.speech import Voice, VoiceInput
@@ -1704,11 +1704,12 @@ def _cmd_nap(mind: Mind, rest: str) -> str:
 
 
 def _cmd_draw(mind: Mind, rest: str) -> str:
-    """Ask Genesis to draw a picture from its current state.
+    """Ask Genesis to sit down at her studio.
 
-    It translates its neurochemistry into visual art — colors, forms,
-    and energy that reflect how it feels right now. The drawing is
-    saved as a WebP in its drawings directory.
+    Opens Krita (her real drawing surface); even the paper is her
+    call — what she makes and when she finishes are hers, through
+    the studio_* tools, and the piece lands in her drawings
+    directory when she closes the sheet.
     """
     if mind.is_sleeping:
         return (
@@ -2212,7 +2213,7 @@ def _print_help() -> None:
     logger.info("    /growth-report — markdown growth report")
     logger.info("    /voice        — speak to Genesis (one utterance)")
     logger.info("    /voice-mode   — continuous voice conversation")
-    logger.info("    /draw         — ask it to draw what it feels right now")
+    logger.info("    /draw         — sit it at the easel; what it makes is its own")
     logger.info("    /register-face <name> — teach it your face")
     logger.info("    /faces        — show known faces and who it last saw")
     logger.info("    /mission [text] — set or show its top-level mission")

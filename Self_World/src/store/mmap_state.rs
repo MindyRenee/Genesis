@@ -7,12 +7,14 @@
 //! - **Crash recovery**: detecting corruption via magic, version, and
 //!   checksum, and recovering when possible
 //! - **Lock-free reads**: readers get an owned copy of the state via
-//!   the sequence lock protocol — no Rust reference to the mmap'd
+//!   a single volatile copy — no Rust reference to the mmap'd
 //!   memory is ever created, so there is no aliasing with concurrent
-//!   writers
-//! - **Atomic writes**: writers use the seqlock protocol
-//!   (write_begin → modify → write_end) which makes writes visible
-//!   atomically to readers
+//!   writers. A racing read may observe a torn snapshot; readers that
+//!   cannot tolerate that take the flock-serialized
+//!   `read_consistent_locked` path.
+//! - **Serialized writes**: writers are serialized by the in-process
+//!   `write_lock` mutex and the cross-process flock; each publish is
+//!   a single volatile copy of a fully-prepared stack state.
 //! - **Synchronisation**: `sync()` flushes dirty pages to disk so
 //!   state survives a crash
 //!
@@ -30,8 +32,8 @@
 //! thread (via [`MmapState::modify`]) or another process at any time. Returning
 //! a Rust `&GenesisCoreState` from the mmap'd memory would be
 //! **undefined behaviour**: Rust's aliasing rules forbid a `&` from
-//! coexisting with a `&mut` to the same bytes, even if the seqlock
-//! prevents torn reads. The compiler is free to assume that a `&`
+//! coexisting with a `&mut` to the same bytes. The compiler is free
+//! to assume that a `&`
 //! reference's pointee does not change, which could cause miscompilation
 //! when another thread writes through `&mut`.
 //!
@@ -44,8 +46,8 @@
 //!
 //! Every production write path — [`MmapState::modify`] and the open-time
 //! repairs/migrations — runs its mutation on a **stack copy** and
-//! publishes it with `publish_stack` (seqlock odd → single
-//! `write_volatile` → seqlock even). No `&` or `&mut` into
+//! publishes it with `publish_stack` (a single `write_volatile`).
+//! No `&` or `&mut` into
 //! the shared mapping is ever formed, so there is no aliasing with
 //! concurrent readers under Stacked/Tree Borrows: the old pattern
 //! (a `&mut GenesisCoreState` materialised into `MAP_SHARED` for the
@@ -57,8 +59,8 @@
 //! - A panicking [`MmapState::modify`] closure only ever saw the stack copy, so
 //!   the mapping needs no rollback — it was never touched.
 //! - `read_volatile` in the readers remains load-bearing: it stops
-//!   the compiler eliding or merging the seqlock-guarded loads, it is
-//!   not (and never was) what made concurrent access defined.
+//!   the compiler eliding or merging the loads, it is not (and never
+//!   was) what made concurrent access defined.
 //! - `MmapState::state_mut` was removed: it formed `&mut` references
 //!   into `MAP_SHARED` memory with exclusivity left to the caller,
 //!   and the only callers were tests that now use `modify`'s stack
@@ -79,8 +81,6 @@
 use std::fs::OpenOptions;
 use std::os::unix::io::AsRawFd;
 use std::path::Path;
-
-use core::sync::atomic::{AtomicU64, Ordering, fence};
 
 use libc::{
     LOCK_EX, LOCK_NB, LOCK_SH, LOCK_UN, MAP_FAILED, MAP_SHARED, MS_ASYNC, MS_SYNC, PROT_READ,
@@ -171,19 +171,18 @@ pub(crate) fn local_seconds_of_day(now_ms: u64) -> i64 {
 /// raw pointers, returning an owned `GenesisCoreState` on the caller's
 /// stack.
 ///
-/// Writers are serialised by an in-process `Mutex` ([`MmapState::modify`]) and a
+/// Writers are serialised by an in-process `Inhibition` ([`MmapState::modify`]) and a
 /// cross-process `flock(LOCK_EX)` advisory lock on the state file.
 /// [`MmapState::modify`] copies the current snapshot to an owned stack value,
 /// hands the closure a `&mut GenesisCoreState` to that private copy,
-/// and publishes it with volatile byte copies that preserve the live
-/// `seq_lock` word. No production write path creates a Rust reference
-/// into the mmap'd memory. The flock ensures that only one process can
-/// write at a time, preventing two processes from simultaneously
-/// incrementing `seq_lock` and publishing a torn state.
+/// and publishes it with a single volatile copy. No production write
+/// path creates a Rust reference into the mmap'd memory. The flock
+/// ensures that only one process can write at a time, preventing two
+/// processes from publishing concurrently.
 ///
-/// Cross-process reads remain lock-free — the seqlock protocol ensures
-/// tear-free reads regardless of what any process does. Only writers
-/// take the flock.
+/// Cross-process reads remain lock-free; a racing read may observe a
+/// torn snapshot — readers that cannot tolerate that take the
+/// flock-serialized `read_consistent_locked` path.
 pub struct MmapState {
     /// Pointer to the mmap'd region.
     ptr: *mut u8,
@@ -196,18 +195,16 @@ pub struct MmapState {
     /// `MmapState` is shared between the daemon's reactive handler and
     /// the IPC thread via `Arc`. Both threads can call
     /// [`MmapState::modify`], which
-    /// mutates the mmap'd state. The seqlock protects readers from
-    /// seeing torn writes, but it does **not** serialize multiple
-    /// writers. This mutex ensures only one writer proceeds at a
-    /// time, preventing data races on `seq_lock`, checksums, and state
-    /// fields. Reads via [`MmapState::read`] and [`MmapState::read_consistent`] remain
-    /// lock-free.
+    /// mutates the mmap'd state. This mutex ensures only one writer
+    /// proceeds at a time, preventing data races on checksums and
+    /// state fields. Reads via [`MmapState::read`] and
+    /// [`MmapState::read_consistent`] remain lock-free.
     ///
     /// If the lock is poisoned, [`MmapState::modify`] returns
     /// `StateFileError::LockFailed`. The daemon intentionally panics
     /// on this rather than risk writing to a potentially-torn shared
     /// state.
-    write_lock: std::sync::Mutex<()>,
+    write_lock: crate::inhibition::Inhibition<()>,
     /// How long the body was dark before this open, in milliseconds —
     /// `now - header.last_updated` measured before the open path
     /// overwrote it. Zero for a newly created state. The daemon's
@@ -223,9 +220,8 @@ pub struct MmapState {
 //     raw pointers — no Rust references to the mmap'd memory are
 //     created.
 //   - Writes: `modify` acquires `write_lock`, mutates an owned stack
-//     snapshot, then `publish_stack` uses volatile byte copies under
-//     the seqlock — no production writer creates a reference into the
-//     mapping.
+//     snapshot, then `publish_stack` uses volatile byte copies — no
+//     production writer creates a reference into the mapping.
 unsafe impl Send for MmapState {}
 unsafe impl Sync for MmapState {}
 
@@ -358,7 +354,7 @@ impl MmapState {
             ptr,
             fd,
             created: true,
-            write_lock: std::sync::Mutex::new(()),
+            write_lock: crate::inhibition::Inhibition::new(()),
             offline_ms: 0,
         })
     }
@@ -676,8 +672,8 @@ impl MmapState {
         // SAFETY: `ptr` is the live MAP_SHARED mapping of
         // `mapped_len()` bytes returned by `do_mmap` above; every
         // munmap path returns before this point, so the mapping is
-        // still valid here. `publish_stack` drives the seqlock
-        // protocol itself and writes only inside the mapped range.
+        // still valid here. `publish_stack` writes only inside the
+        // mapped range.
         unsafe { Self::publish_stack(ptr, &snapshot) };
         if let Err(e) = Self::do_msync(ptr, mapped_len()) {
             unsafe {
@@ -724,19 +720,6 @@ impl MmapState {
             }
         }
 
-        // Repair an inverted seqlock parity while the open-time flock is held.
-        // The sequence counter is excluded from the CRC, so parity repair does
-        // not require recomputing the state checksum.
-        // SAFETY: ptr is a valid mapped GenesisCoreState and the flock excludes
-        // all other writers until ownership is returned below.
-        let seq_lock = unsafe { core::ptr::read_volatile(ptr as *const GenesisCoreState) }
-            .header
-            .seq_lock;
-        if seq_lock & 1 == 1 {
-            let seq = unsafe { AtomicU64::from_ptr(ptr.add(Self::SEQ_LOCK_OFFSET) as *mut u64) };
-            seq.fetch_add(1, Ordering::Release);
-        }
-
         // The verification/migration transaction is complete. Release the
         // open-time flock before returning the live mapping; subsequent
         // writers synchronize through MmapState::write_lock plus this file
@@ -749,7 +732,7 @@ impl MmapState {
             ptr,
             fd,
             created: false,
-            write_lock: std::sync::Mutex::new(()),
+            write_lock: crate::inhibition::Inhibition::new(()),
             offline_ms,
         })
     }
@@ -789,8 +772,8 @@ impl MmapState {
     /// aliasing with concurrent writers.
     ///
     /// The copy may be **torn** if a write is in progress on another
-    /// thread. For a seqlock-guarded consistent read, use
-    /// [`MmapState::read_consistent`] instead.
+    /// thread. For a read that cannot race a publish, use
+    /// [`MmapState::read_consistent_locked`].
     ///
     /// This method is lock-free and wait-free.
     pub fn read(&self) -> GenesisCoreState {
@@ -804,12 +787,16 @@ impl MmapState {
         unsafe { core::ptr::read_volatile(self.ptr as *const GenesisCoreState) }
     }
 
-    /// Attempt a lock-free, wait-free, **consistent** read of the
-    /// state using the sequence lock protocol.
+    /// Take a lock-free, wait-free snapshot of the state.
     ///
-    /// Samples `seq_lock` before and after copying the state. If
-    /// either sample is odd (write in progress) or the samples differ,
-    /// returns `None` and the caller should retry.
+    /// A single volatile copy of the whole struct — there is no
+    /// sequence lock, so a read that races a publish may observe a
+    /// torn snapshot. Callers that need a guarantee take
+    /// [`MmapState::read_consistent_locked`], which serializes
+    /// against writers through the cross-process flock.
+    ///
+    /// The `Option` return is kept for call-site compatibility with
+    /// the former sequence-lock protocol; it now always yields `Some`.
     ///
     /// Unlike [`GenesisCoreState::read_consistent`], this method
     /// operates directly on the raw mmap pointer and **never** creates
@@ -829,85 +816,23 @@ impl MmapState {
     /// # let path = std::env::temp_dir()
     /// #     .join(format!("genesis-mmap-doctest-{}", std::process::id()));
     /// # let mmap = MmapState::open_or_create(&path, 1, 0).expect("open");
-    /// // Retry up to 8 times for a consistent snapshot.
-    /// let mut snapshot = None;
-    /// for _ in 0..8 {
-    ///     snapshot = mmap.read_consistent();
-    ///     if snapshot.is_some() {
-    ///         break;
-    ///     }
-    ///     std::thread::sleep(std::time::Duration::from_micros(200));
-    /// }
+    /// let snapshot = mmap.read_consistent();
     /// assert!(snapshot.is_some());
     /// # let _ = std::fs::remove_file(&path);
     /// ```
     pub fn read_consistent(&self) -> Option<GenesisCoreState> {
-        // SAFETY: `self.ptr` is a valid mmap'd region for the lifetime
-        // of `self`. The seq_lock field is at a known offset (40) within
-        // the struct, properly aligned (8-byte aligned, verified by
-        // compile-time assertions in header.rs). We access it through
-        // `AtomicU64::from_ptr` which performs an atomic load without
-        // creating a reference. The data copy uses `read_volatile`,
-        // which also does not create a reference.
-        let state_ptr = self.ptr as *const GenesisCoreState;
-        let seq_lock_ptr = unsafe { core::ptr::addr_of!((*state_ptr).header.seq_lock) as *mut u64 };
-
-        // SAFETY: `seq_lock_ptr` is a properly aligned `*mut u64`
-        // pointing to the seq_lock field in the mmap'd region. The
-        // atomic load does not mutate the pointed-to memory through
-        // the raw pointer — it only reads it atomically.
-        let seq = unsafe { AtomicU64::from_ptr(seq_lock_ptr) };
-
-        // Acquire load: synchronises-with the Release store in
-        // `write_end`, ensuring we see all data writes from the
-        // completed transaction that produced this even seq_lock.
-        let lock1 = seq.load(Ordering::Acquire);
-        if lock1 & 1 != 0 {
-            return None;
-        }
-        // Acquire fence ensures the data reads below happen after the
-        // lock1 load. On weak memory orderings (ARM, RISC-V), the CPU
-        // could otherwise reorder the data reads before the lock1
-        // load, seeing stale data.
-        fence(Ordering::Acquire);
-
-        // SAFETY: `state_ptr` is a valid pointer to the mmap'd
-        // `GenesisCoreState`. `read_volatile` copies
-        // `size_of::<GenesisCoreState>()` bytes without creating a
-        // reference, avoiding aliasing issues with a concurrent writer.
-        // The seqlock protocol (checked below) ensures the copy is
-        // consistent.
-        let copy = unsafe { core::ptr::read_volatile(state_ptr) };
-
-        // Acquire fence ensures all data reads above are completed
-        // before we sample lock2. On weak memory orderings, the CPU
-        // could otherwise reorder the data reads after the lock2
-        // load, causing the seqlock validation to pass on stale
-        // (torn) data. (On x86's TSO model this is harmless, but the
-        // mmap'd state may be shared across architectures.)
-        fence(Ordering::Acquire);
-        // Relaxed is sufficient here: the fence above provides the
-        // ordering we need. We only need an atomic load (not a plain
-        // read) so the compiler doesn't merge this with lock1.
-        let lock2 = seq.load(Ordering::Relaxed);
-
-        if lock1 != lock2 || lock2 & 1 != 0 {
-            return None;
-        }
-        Some(copy)
+        Some(self.read())
     }
 
-    /// Consistent read serialized against writers by the same
+    /// Read serialized against writers by the same
     /// cross-process `flock` that [`MmapState::modify`](Self::modify) holds for
     /// its entire transaction.
     ///
-    /// This is the escalation path for seqlock readers whose retries
-    /// keep landing inside a write window: `LOCK_SH` blocks until any
-    /// exclusive (writer) lock is released, so the volatile copy
-    /// cannot overlap a publish — even a wedged seqlock (a panic that
-    /// left the counter odd) cannot stall it. Unlike
-    /// [`MmapState::read_consistent`] it can block briefly while a writer
-    /// publishes, so callers should try the lock-free path first.
+    /// `LOCK_SH` blocks until any exclusive (writer) lock is released,
+    /// so the volatile copy cannot overlap a publish — this is the
+    /// read path for callers that must not observe a torn snapshot.
+    /// Unlike [`MmapState::read_consistent`] it can block briefly while
+    /// a writer publishes.
     pub fn read_consistent_locked(&self) -> Result<GenesisCoreState, StateFileError> {
         // SAFETY: `self.fd` is a valid open file descriptor kept alive
         // for the lifetime of this MmapState.
@@ -927,9 +852,8 @@ impl MmapState {
     /// The closure runs against a **stack copy**, never against the
     /// mapping: no `&` or `&mut` into the mmap'd memory is formed on
     /// any path here (see `publish_stack`). On success the prepared
-    /// copy is published atomically w.r.t. seqlock readers
-    /// (odd → volatile write → even) and the checksum with it; on
-    /// closure panic the mapping is untouched — there is nothing to
+    /// copy is published as a single volatile copy with its checksum;
+    /// on closure panic the mapping is untouched — there is nothing to
     /// roll back — and the panic resumes after the flock is released.
     ///
     /// This acquires the in-process writer mutex plus the
@@ -946,11 +870,9 @@ impl MmapState {
     where
         F: FnOnce(&mut GenesisCoreState),
     {
-        // Serialize writers within this process. The seqlock only
-        // protects readers from a single in-flight writer; it does not
-        // protect two writers from each other. Holding this mutex for
-        // the duration of the transaction makes `modify` safe across
-        // threads.
+        // Serialize writers within this process. Holding this mutex
+        // for the duration of the transaction makes `modify` safe
+        // across threads.
         let _guard = self
             .write_lock
             .lock()
@@ -960,7 +882,7 @@ impl MmapState {
         // The in-process mutex only protects against concurrent writers
         // within this process — but the file is mapped MAP_SHARED, so
         // another process that opens the same path can write to the
-        // same bytes concurrently, defeating the seqlock. The flock
+        // same bytes concurrently. The flock
         // serializes writers across all processes. We use LOCK_NB
         // (non-blocking) so the daemon doesn't hang if another process
         // holds the lock — it returns FileLockBusy instead, letting
@@ -978,19 +900,17 @@ impl MmapState {
         // flock additionally guarantees no other process is
         // publishing concurrently, so this copy is coherent.
         let mut next = self.read();
-        // Heartbeat stamp — the non-seqlock half of what
-        // `write_begin` used to do inline on the mapping.
+        // Heartbeat stamp.
         next.header.last_updated = now_ms;
         next.header.heartbeat = next.header.heartbeat.wrapping_add(1);
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(&mut next)));
         match result {
             Ok(()) => {
                 next.checksum = next.compute_checksum();
-                // Hold the flock until AFTER the publish has flipped
-                // the seqlock back to even (see `publish_stack`).
-                // Releasing earlier would let another process start
-                // its own publish mid-window, tearing the state and
-                // the sequence lock.
+                // Hold the flock until AFTER the publish completes —
+                // releasing earlier would let another process start
+                // its own publish mid-window, interleaving the two
+                // volatile copies into a torn state.
                 // SAFETY: `self.ptr` is a valid MAP_SHARED mapping of
                 // `GenesisCoreState::SIZE` bytes; the in-process
                 // `write_lock` guard and the flock exclude every other
@@ -1019,8 +939,8 @@ impl MmapState {
     /// Acquires `write_lock` and the cross-process flock to serialize
     /// with any concurrent `modify()` call — including from another
     /// process. Without this, `msync` could flush a partially written
-    /// (torn seqlock) state to disk if an IPC `modify()` is between
-    /// `write_begin` and `write_end`, or if another process is mid-write.
+    /// (torn) state to disk if an IPC `modify()` is mid-publish, or if
+    /// another process is mid-write.
     pub fn sync(&self) -> Result<(), StateFileError> {
         let _guard = self
             .write_lock
@@ -1071,32 +991,17 @@ impl MmapState {
 
     // ─── Internal helpers ────────────────────────────────────────
 
-    /// Byte offset of `header.seq_lock` from the start of the mapping.
-    ///
-    /// Derived from the layout (`header` is the first field at offset
-    /// 0; `seq_lock` is at offset 40 within the header — both pinned
-    /// by compile-time asserts in `core_state.rs`/`header.rs`), never
-    /// from a live reference, so the seqlock can be driven without
-    /// forming any reference into the mapping.
-    const SEQ_LOCK_OFFSET: usize = core::mem::offset_of!(GenesisCoreState, header)
-        + core::mem::offset_of!(crate::state::header::CoreStateHeader, seq_lock);
-
     /// Publish a fully-prepared stack state to the mapping.
     ///
-    /// The integrity contract, replacing the old in-place
-    /// `write_begin`/`write_end` on a mapping reference:
+    /// One `write_volatile` of the whole prepared struct. No `&`/`&mut`
+    /// into the mapping is formed here or by the caller, so there is no
+    /// aliasing with concurrent readers under Stacked/Tree Borrows —
+    /// the previous `&mut`-into-`MAP_SHARED` pattern was unsound
+    /// (Miri-flagged) and is gone from every production path.
     ///
-    /// 1. Flip `seq_lock` to odd (write in progress) through a raw
-    ///    atomic — lock-free readers sample this and retry instead of
-    ///    trusting bytes written below.
-    /// 2. `write_volatile` the whole prepared struct. No `&`/`&mut`
-    ///    into the mapping is formed here or by the caller, so there
-    ///    is no aliasing with concurrent readers under Stacked/Tree
-    ///    Borrows — the previous `&mut`-into-`MAP_SHARED` pattern was
-    ///    unsound (Miri-flagged) and is now gone from every
-    ///    production path.
-    /// 3. Flip `seq_lock` back to even (write complete) with release
-    ///    ordering, publishing all preceding bytes to readers.
+    /// There is no sequence lock: a lock-free reader racing this copy
+    /// may observe a torn snapshot. Readers that cannot tolerate that
+    /// use [`MmapState::read_consistent_locked`].
     ///
     /// The caller must hold `write_lock` and the flock, and
     /// `prepared.checksum` must already cover `prepared` (as
@@ -1108,69 +1013,21 @@ impl MmapState {
     /// `GenesisCoreState::SIZE` bytes with no other writer active
     /// (caller-held locks guarantee this).
     unsafe fn publish_stack(ptr: *mut u8, prepared: &GenesisCoreState) {
-        // SAFETY: `ptr.add(SEQ_LOCK_OFFSET)` is the `seq_lock` u64 by
-        // the layout const above (8-byte aligned: 40 % 8 == 0).
-        // `AtomicU64::from_ptr` performs atomic RMWs without creating
-        // a reference; nothing else here creates one either.
-        let seq = unsafe { AtomicU64::from_ptr(ptr.add(Self::SEQ_LOCK_OFFSET) as *mut u64) };
-        seq.fetch_add(1, Ordering::AcqRel);
-        // Self-heal an inverted parity, mirroring the old
-        // `write_begin`: starting from a stale odd lock, one increment
-        // lands even ("stable") and would publish a torn snapshot
-        // mid-write to readers.
-        if seq.load(Ordering::Acquire) & 1 == 0 {
-            seq.fetch_add(1, Ordering::AcqRel);
-        }
-        fence(Ordering::Acquire);
-        // Publish the payload in two ranges that SKIP the seqlock
-        // counter (offset 40..48). The counter must be owned solely by
-        // the atomic RMWs above and below — it is the one field a
-        // payload write must never touch.
-        //
-        // Writing the whole struct here was a live defect: `prepared`
-        // is a snapshot taken *before* the increments, so its
-        // `seq_lock` field is the stale pre-write value. A single
-        // whole-struct `write_volatile` therefore (a) overwrote the
-        // counter with the stale even value, so the trailing
-        // `fetch_add` left it odd and every `read_consistent` in the
-        // process then failed forever (READ_FAILED on every read), and
-        // (b) briefly restored an even counter *while the payload was
-        // half-written*, which is precisely the torn read the seqlock
-        // exists to prevent. Two ranges fix both: the counter keeps
-        // the value the atomics gave it, and readers never observe an
-        // even counter between the two payload stores.
-        //
-        // The split mirrors `compute_checksum`'s regions (0..40 and
-        // 48..end), both layout-pinned by the header asserts.
-        //
         // SAFETY: `prepared` is a valid stack value (`Copy` — this
         // moves bytes without borrowing the mapping); the mapping is
-        // writable and `SIZE` bytes long. Both ranges are inside it:
-        // region 1 is [0, SEQ_LOCK_OFFSET), region 2 is
-        // [SEQ_LOCK_OFFSET+8, size_of::<GenesisCoreState>()). Volatile
-        // so the compiler must emit the stores.
+        // writable and `SIZE` bytes long. Volatile so the compiler
+        // must emit the stores.
         unsafe {
             Self::volatile_copy_region(
                 (prepared as *const GenesisCoreState).cast::<u8>(),
                 ptr,
-                Self::SEQ_LOCK_OFFSET,
-            );
-            Self::volatile_copy_region(
-                (prepared as *const GenesisCoreState)
-                    .cast::<u8>()
-                    .add(Self::SEQ_LOCK_OFFSET + 8),
-                ptr.add(Self::SEQ_LOCK_OFFSET + 8),
-                core::mem::size_of::<GenesisCoreState>() - Self::SEQ_LOCK_OFFSET - 8,
+                core::mem::size_of::<GenesisCoreState>(),
             );
         }
-        fence(Ordering::Release);
-        // SAFETY: same atomic as above; Release publishes the bytes.
-        seq.fetch_add(1, Ordering::Release);
     }
 
     /// Copy `len` bytes from `src` to `dst` with volatile loads and
-    /// stores, so the compiler can neither elide nor reorder the copy
-    /// across the seqlock's fences.
+    /// stores, so the compiler can neither elide nor reorder the copy.
     ///
     /// Volatile byte-at-a-time rather than `copy_nonoverlapping` for the
     /// same reason the reader side uses `read_volatile`: the publish
@@ -1263,9 +1120,8 @@ impl MmapState {
             .unwrap_or(0);
         next.header.last_updated = now_ms;
         next.header.heartbeat = next.header.heartbeat.wrapping_add(1);
-        // Publish the migration through the seqlock as well as the
-        // flock: the flock excludes writers, while the seqlock keeps
-        // lock-free readers from observing a partially migrated state.
+        // Publish the migration under the flock, which excludes other
+        // writers; lock-free readers may still race the copy.
         let migration =
             std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| migrate(&mut next)));
         match migration {

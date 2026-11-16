@@ -15,6 +15,6 @@ thalamus, cerebellum, basal_ganglia).
     _npz_io.py               Atomic, pickle-free .npz artifact writes.
 
 The world-facing records — ``journal.py`` and ``growth_ledger.py``
-(Self_World) and ``user_profile.py`` (Outer_Physical_World) — live at
+(Self_World) and ``user_profile.py`` (Outer_World) — live at
 their worlds' roots as top-level modules, not inside this package.
 """
