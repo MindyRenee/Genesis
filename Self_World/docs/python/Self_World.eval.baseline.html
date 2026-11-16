@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.eval.baseline</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.eval.html" class="white">eval</a>.baseline</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/eval/baseline.py">/home/mindyrenee/GenAnd/Genesis/Self_World/eval/baseline.py</a></td></tr></table>
+    <p><span class="code">Resting-state&nbsp;snapshot:&nbsp;what&nbsp;"normal"&nbsp;looks&nbsp;like,&nbsp;as&nbsp;data.<br>
+&nbsp;<br>
+A&nbsp;:class:`<a href="#Snapshot">Snapshot</a>`&nbsp;is&nbsp;a&nbsp;deterministic&nbsp;capture&nbsp;of&nbsp;a&nbsp;freshly&nbsp;settled<br>
+isolated&nbsp;daemon:&nbsp;per-chemical&nbsp;effective&nbsp;levels,&nbsp;arousal/valence,<br>
+plasticity&nbsp;gate,&nbsp;memory&nbsp;gating&nbsp;weights,&nbsp;phase,&nbsp;plasticity&nbsp;profile,<br>
+and&nbsp;inference&nbsp;summary.&nbsp;Serialized&nbsp;to&nbsp;JSON,<br>
+it&nbsp;becomes&nbsp;a&nbsp;baseline&nbsp;file&nbsp;that&nbsp;:mod:`drift`&nbsp;compares&nbsp;against.<br>
+&nbsp;<br>
+``DEFAULT_BASELINES``&nbsp;mirrors&nbsp;``NeurochemicalId::default_baseline()``<br>
+in&nbsp;``src/state/neurochemical.rs``&nbsp;—&nbsp;the&nbsp;genetic&nbsp;set-points&nbsp;the<br>
+homeostatic&nbsp;force&nbsp;pulls&nbsp;toward.&nbsp;If&nbsp;the&nbsp;Rust&nbsp;values&nbsp;change,&nbsp;this&nbsp;table<br>
+(and&nbsp;``test_default_baselines_match_documented_values``)&nbsp;must&nbsp;change<br>
+with&nbsp;them.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="json.html">json</a><br>
+</td><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="time.html">time</a><br>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.eval.baseline.html#Snapshot">Snapshot</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Snapshot">class <strong>Snapshot</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Snapshot">Snapshot</a>(format_version:&nbsp;'int'&nbsp;=&nbsp;1,&nbsp;captured_at_unix:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;protocol_version:&nbsp;'int'&nbsp;=&nbsp;3,&nbsp;settle_ticks:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;settle_dt:&nbsp;'float'&nbsp;=&nbsp;1.0,&nbsp;chemicals:&nbsp;'dict[str,&nbsp;float]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;arousal:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;valence:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;global_tone:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;plasticity_gate:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;encoding_weight:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;consolidation_weight:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;retrieval_weight:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;phase:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;phase_name:&nbsp;'str'&nbsp;=&nbsp;'unknown',&nbsp;coupling_drift:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;mean_receptor_sensitivity:&nbsp;'float'&nbsp;=&nbsp;1.0,&nbsp;bdnf_effective:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;cortisol_effective:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;surprise_ema:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;free_energy:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;precision:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;allostatic_load:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;model_maturity:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;resting_emotion:&nbsp;'dict[str,&nbsp;str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;settled&nbsp;resting-state&nbsp;capture.&nbsp;JSON-serializable&nbsp;via&nbsp;to_dict.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Snapshot-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="Snapshot-__init__"><strong>__init__</strong></a>(self, format_version: 'int' = 1, captured_at_unix: 'float' = 0.0, protocol_version: 'int' = 3, settle_ticks: 'int' = 0, settle_dt: 'float' = 1.0, chemicals: 'dict[str, float]' = &lt;factory&gt;, arousal: 'float' = 0.0, valence: 'float' = 0.0, global_tone: 'float' = 0.0, plasticity_gate: 'float' = 0.0, encoding_weight: 'float' = 0.0, consolidation_weight: 'float' = 0.0, retrieval_weight: 'float' = 0.0, phase: 'int' = 0, phase_name: 'str' = 'unknown', coupling_drift: 'float' = 0.0, mean_receptor_sensitivity: 'float' = 1.0, bdnf_effective: 'float' = 0.0, cortisol_effective: 'float' = 0.0, surprise_ema: 'float' = 0.0, free_energy: 'float' = 0.0, precision: 'float' = 0.0, allostatic_load: 'float' = 0.0, model_maturity: 'float' = 0.0, resting_emotion: 'dict[str, str]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Snapshot-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="Snapshot-save"><strong>save</strong></a>(self, path: 'str') -&gt; 'None'</dt><dd><span class="code">Write&nbsp;the&nbsp;snapshot&nbsp;as&nbsp;pretty-printed&nbsp;JSON.</span></dd></dl>
+
+<dl><dt><a name="Snapshot-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict[str, Any]'</dt><dd><span class="code">Serialize&nbsp;to&nbsp;a&nbsp;JSON-compatible&nbsp;dict.</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="Snapshot-from_dict"><strong>from_dict</strong></a>(data: 'dict[str, Any]') -&gt; 'Snapshot'</dt><dd><span class="code">Deserialize;&nbsp;unknown&nbsp;keys&nbsp;are&nbsp;ignored&nbsp;for&nbsp;forward&nbsp;compatibility.</span></dd></dl>
+
+<dl><dt><a name="Snapshot-load"><strong>load</strong></a>(path: 'str') -&gt; 'Snapshot'</dt><dd><span class="code">Read&nbsp;a&nbsp;snapshot&nbsp;from&nbsp;a&nbsp;JSON&nbsp;file.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'allostatic_load': 'float', 'arousal': 'float', 'bdnf_effective': 'float', 'captured_at_unix': 'float', 'chemicals': 'dict[str, float]', 'consolidation_weight': 'float', 'cortisol_effective': 'float', 'coupling_drift': 'float', 'encoding_weight': 'float', 'format_version': 'int', ...}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'allostatic_load': Field(name='allostatic_load',type='float',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'arousal': Field(name='arousal',type='float',default=0.0,de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'bdnf_effective': Field(name='bdnf_effective',type='float',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'captured_at_unix': Field(name='captured_at_unix',type='float',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'chemicals': Field(name='chemicals',type='dict[str, float]',d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'consolidation_weight': Field(name='consolidation_weight',type='float',d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'cortisol_effective': Field(name='cortisol_effective',type='float',def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'coupling_drift': Field(name='coupling_drift',type='float',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'encoding_weight': Field(name='encoding_weight',type='float',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'format_version': Field(name='format_version',type='int',default=1...appingproxy({}),kw_only=False,_field_type=_FIELD), ...}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('format_version', 'captured_at_unix', 'protocol_version', 'settle_ticks', 'settle_dt', 'chemicals', 'arousal', 'valence', 'global_tone', 'plasticity_gate', 'encoding_weight', 'consolidation_weight', 'retrieval_weight', 'phase', 'phase_name', 'coupling_drift', 'mean_receptor_sensitivity', 'bdnf_effective', 'cortisol_effective', 'surprise_ema', ...)</dl>
+
+<dl><dt><strong>allostatic_load</strong> = 0.0</dl>
+
+<dl><dt><strong>arousal</strong> = 0.0</dl>
+
+<dl><dt><strong>bdnf_effective</strong> = 0.0</dl>
+
+<dl><dt><strong>captured_at_unix</strong> = 0.0</dl>
+
+<dl><dt><strong>consolidation_weight</strong> = 0.0</dl>
+
+<dl><dt><strong>cortisol_effective</strong> = 0.0</dl>
+
+<dl><dt><strong>coupling_drift</strong> = 0.0</dl>
+
+<dl><dt><strong>encoding_weight</strong> = 0.0</dl>
+
+<dl><dt><strong>format_version</strong> = 1</dl>
+
+<dl><dt><strong>free_energy</strong> = 0.0</dl>
+
+<dl><dt><strong>global_tone</strong> = 0.0</dl>
+
+<dl><dt><strong>mean_receptor_sensitivity</strong> = 1.0</dl>
+
+<dl><dt><strong>model_maturity</strong> = 0.0</dl>
+
+<dl><dt><strong>phase</strong> = 0</dl>
+
+<dl><dt><strong>phase_name</strong> = 'unknown'</dl>
+
+<dl><dt><strong>plasticity_gate</strong> = 0.0</dl>
+
+<dl><dt><strong>precision</strong> = 0.0</dl>
+
+<dl><dt><strong>protocol_version</strong> = 3</dl>
+
+<dl><dt><strong>retrieval_weight</strong> = 0.0</dl>
+
+<dl><dt><strong>settle_dt</strong> = 1.0</dl>
+
+<dl><dt><strong>settle_ticks</strong> = 0</dl>
+
+<dl><dt><strong>surprise_ema</strong> = 0.0</dl>
+
+<dl><dt><strong>valence</strong> = 0.0</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-capture_snapshot"><strong>capture_snapshot</strong></a>(client: 'GenesisClient', *, settle_ticks: 'int' = 60, settle_dt: 'float' = 1.0) -&gt; 'Snapshot'</dt><dd><span class="code">Settle&nbsp;the&nbsp;daemon&nbsp;to&nbsp;rest,&nbsp;then&nbsp;capture&nbsp;a&nbsp;<a href="#Snapshot">Snapshot</a>.<br>
+&nbsp;<br>
+Must&nbsp;be&nbsp;called&nbsp;on&nbsp;an&nbsp;isolated&nbsp;daemon&nbsp;(see&nbsp;harness.isolated_daemon)<br>
+so&nbsp;impulses&nbsp;from&nbsp;production&nbsp;activity&nbsp;cannot&nbsp;pollute&nbsp;the&nbsp;capture.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>CHEM_NAMES</strong> = {0: 'dopamine', 1: 'serotonin', 2: 'norepinephrine', 3: 'acetylcholine', 4: 'gaba', 5: 'glutamate', 6: 'cortisol', 7: 'oxytocin', 8: 'endorphin', 9: 'histamine', ...}<br>
+<strong>CHEM_ORDER</strong> = ['dopamine', 'serotonin', 'norepinephrine', 'acetylcholine', 'gaba', 'glutamate', 'cortisol', 'oxytocin', 'endorphin', 'histamine', 'adenosine', 'bdnf', 'endocannabinoid', 'vasopressin', 'crh', 'orexin', 'epinephrine', 'melatonin']<br>
+<strong>CIRCADIAN_SENSITIVE</strong> = frozenset({'dopamine', 'histamine', 'melatonin', 'serotonin'})<br>
+<strong>DEFAULT_BASELINES</strong> = {'acetylcholine': 0.35, 'adenosine': 0.2, 'bdnf': 0.45, 'cortisol': 0.0, 'crh': 0.0, 'dopamine': 0.35, 'endocannabinoid': 0.25, 'endorphin': 0.25, 'epinephrine': 0.15, 'gaba': 0.5, ...}<br>
+<strong>FORMAT_VERSION</strong> = 1<br>
+<strong>PROTOCOL_VERSION</strong> = 3<br>
+<strong>__annotations__</strong> = {'CHEM_ORDER': 'list[str]', 'DEFAULT_BASELINES': 'dict[str, float]'}<br>
+<strong>logger</strong> = &lt;Logger Self_World.eval.baseline (WARNING)&gt;</td></tr></table>
+</body></html>

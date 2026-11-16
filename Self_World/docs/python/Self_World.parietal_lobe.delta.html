@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.parietal_lobe.delta</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.parietal_lobe.html" class="white">parietal_lobe</a>.delta</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/parietal_lobe/delta.py">/home/mindyrenee/GenAnd/Genesis/Self_World/parietal_lobe/delta.py</a></td></tr></table>
+    <p><span class="code">Delta&nbsp;perception&nbsp;—&nbsp;describing&nbsp;what&nbsp;*changed*&nbsp;before&nbsp;explaining&nbsp;how.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;change&nbsp;channel&nbsp;of&nbsp;parietal&nbsp;perception,&nbsp;not&nbsp;a&nbsp;game&nbsp;solver.<br>
+Given&nbsp;two&nbsp;perceptions&nbsp;of&nbsp;related&nbsp;structure&nbsp;—&nbsp;a&nbsp;scene&nbsp;before&nbsp;and&nbsp;after<br>
+some&nbsp;event&nbsp;—&nbsp;it&nbsp;computes&nbsp;the&nbsp;*difference&nbsp;itself*:&nbsp;which&nbsp;cells&nbsp;appeared,<br>
+which&nbsp;vanished,&nbsp;which&nbsp;changed&nbsp;color,&nbsp;and&nbsp;what&nbsp;geometric&nbsp;relation&nbsp;the<br>
+appeared&nbsp;cells&nbsp;bear&nbsp;to&nbsp;the&nbsp;structure&nbsp;already&nbsp;present.<br>
+&nbsp;<br>
+Neurally,&nbsp;this&nbsp;is&nbsp;the&nbsp;surprise&nbsp;channel&nbsp;of&nbsp;predictive&nbsp;coding.&nbsp;The<br>
+parietal&nbsp;cortex&nbsp;(LIP&nbsp;in&nbsp;the&nbsp;monkey,&nbsp;its&nbsp;human&nbsp;homologs)&nbsp;encodes<br>
+*surprise*&nbsp;—&nbsp;the&nbsp;Shannon&nbsp;information&nbsp;of&nbsp;an&nbsp;observation&nbsp;under&nbsp;the<br>
+current&nbsp;generative&nbsp;model,&nbsp;I_S&nbsp;=&nbsp;−log&nbsp;P(o&nbsp;|&nbsp;M)&nbsp;—&nbsp;separately&nbsp;from&nbsp;the<br>
+model&nbsp;*update*,&nbsp;which&nbsp;ACC&nbsp;performs&nbsp;and&nbsp;which&nbsp;is&nbsp;measured&nbsp;by&nbsp;the<br>
+Kullback–Leibler&nbsp;divergence&nbsp;between&nbsp;posterior&nbsp;and&nbsp;prior<br>
+(O'Reilly&nbsp;et&nbsp;al.,&nbsp;2013).&nbsp;This&nbsp;module&nbsp;produces&nbsp;the&nbsp;parietal&nbsp;half&nbsp;of<br>
+that&nbsp;pair:&nbsp;a&nbsp;precise,&nbsp;structured&nbsp;description&nbsp;of&nbsp;the&nbsp;residual<br>
+δ&nbsp;=&nbsp;observed&nbsp;−&nbsp;predicted.&nbsp;What&nbsp;to&nbsp;do&nbsp;with&nbsp;it&nbsp;—&nbsp;whether&nbsp;to&nbsp;revise&nbsp;a<br>
+held&nbsp;rule&nbsp;—&nbsp;is&nbsp;downstream,&nbsp;in&nbsp;the&nbsp;inductive&nbsp;reasoner.<br>
+&nbsp;<br>
+Geometrically,&nbsp;the&nbsp;relations&nbsp;an&nbsp;added&nbsp;cell&nbsp;can&nbsp;bear&nbsp;to&nbsp;an&nbsp;existing<br>
+cell&nbsp;are&nbsp;elements&nbsp;of&nbsp;the&nbsp;dihedral&nbsp;group&nbsp;D₄&nbsp;—&nbsp;the&nbsp;symmetry&nbsp;group&nbsp;of&nbsp;the<br>
+square&nbsp;lattice&nbsp;—&nbsp;acting&nbsp;on&nbsp;grid&nbsp;coordinates.&nbsp;"The&nbsp;output&nbsp;is&nbsp;the&nbsp;input<br>
+plus&nbsp;its&nbsp;own&nbsp;mirror&nbsp;image"&nbsp;is&nbsp;literally&nbsp;the&nbsp;claim&nbsp;that&nbsp;the&nbsp;added&nbsp;cells<br>
+lie&nbsp;in&nbsp;the&nbsp;orbit&nbsp;of&nbsp;the&nbsp;input's&nbsp;cells&nbsp;under&nbsp;a&nbsp;D₄&nbsp;element:&nbsp;a&nbsp;thing&nbsp;she<br>
+can&nbsp;*see*,&nbsp;not&nbsp;a&nbsp;gate&nbsp;a&nbsp;rule&nbsp;must&nbsp;pass.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="math.html">math</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.parietal_lobe.delta.html#ChangeDelta">ChangeDelta</a>
+</dt><dt class="heading-text"><a href="Self_World.parietal_lobe.delta.html#ChangeProfile">ChangeProfile</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ChangeDelta">class <strong>ChangeDelta</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ChangeDelta">ChangeDelta</a>(same_shape:&nbsp;'bool',&nbsp;added:&nbsp;'frozenset[tuple[int,&nbsp;int,&nbsp;int]]',&nbsp;removed:&nbsp;'frozenset[tuple[int,&nbsp;int]]',&nbsp;recolored:&nbsp;'frozenset[tuple[int,&nbsp;int,&nbsp;int,&nbsp;int]]')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;perceived&nbsp;change&nbsp;of&nbsp;one&nbsp;observed&nbsp;transition.<br>
+&nbsp;<br>
+The&nbsp;residual&nbsp;of&nbsp;perception:&nbsp;the&nbsp;set&nbsp;difference&nbsp;between&nbsp;what&nbsp;was<br>
+seen&nbsp;and&nbsp;what&nbsp;came&nbsp;next,&nbsp;decomposed&nbsp;into&nbsp;the&nbsp;three&nbsp;primitive<br>
+change&nbsp;types&nbsp;—&nbsp;appearance,&nbsp;disappearance,&nbsp;recolor.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ChangeDelta-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="ChangeDelta-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="ChangeDelta-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="ChangeDelta-__init__"><strong>__init__</strong></a>(self, same_shape: 'bool', added: 'frozenset[tuple[int, int, int]]', removed: 'frozenset[tuple[int, int]]', recolored: 'frozenset[tuple[int, int, int, int]]') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="ChangeDelta-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="ChangeDelta-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<dl><dt><a name="ChangeDelta-surprise"><strong>surprise</strong></a>(self, cells: 'int') -&gt; 'float'</dt><dd><span class="code">Shannon&nbsp;surprise&nbsp;of&nbsp;this&nbsp;change,&nbsp;in&nbsp;bits.<br>
+&nbsp;<br>
+Under&nbsp;the&nbsp;null&nbsp;model&nbsp;that&nbsp;every&nbsp;cell&nbsp;was&nbsp;equally&nbsp;likely&nbsp;to&nbsp;be<br>
+the&nbsp;one&nbsp;to&nbsp;change,&nbsp;a&nbsp;change&nbsp;touching&nbsp;k&nbsp;of&nbsp;N&nbsp;cells&nbsp;carries<br>
+I_S&nbsp;=&nbsp;−log₂(k/N)&nbsp;bits&nbsp;of&nbsp;surprise.&nbsp;``cells``&nbsp;is&nbsp;N&nbsp;—&nbsp;the&nbsp;number<br>
+of&nbsp;cells&nbsp;in&nbsp;the&nbsp;perceived&nbsp;scene.&nbsp;A&nbsp;change&nbsp;that&nbsp;touches&nbsp;nothing<br>
+is&nbsp;fully&nbsp;expected&nbsp;(0&nbsp;bits);&nbsp;a&nbsp;sweeping&nbsp;change&nbsp;approaches<br>
+log₂&nbsp;N&nbsp;under&nbsp;this&nbsp;uniform&nbsp;prior.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>pure_addition</strong></dt>
+<dd><span class="code">The&nbsp;after&nbsp;strictly&nbsp;contains&nbsp;the&nbsp;before:&nbsp;only&nbsp;bg&nbsp;cells&nbsp;painted.</span></dd>
+</dl>
+<dl><dt><strong>pure_recolor</strong></dt>
+</dl>
+<dl><dt><strong>pure_removal</strong></dt>
+</dl>
+<dl><dt><strong>unchanged</strong></dt>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'added': 'frozenset[tuple[int, int, int]]', 'recolored': 'frozenset[tuple[int, int, int, int]]', 'removed': 'frozenset[tuple[int, int]]', 'same_shape': 'bool'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'added': Field(name='added',type='frozenset[tuple[int, in...appingproxy({}),kw_only=False,_field_type=_FIELD), 'recolored': Field(name='recolored',type='frozenset[tuple[int...appingproxy({}),kw_only=False,_field_type=_FIELD), 'removed': Field(name='removed',type='frozenset[tuple[int, ...appingproxy({}),kw_only=False,_field_type=_FIELD), 'same_shape': Field(name='same_shape',type='bool',default=&lt;dat...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('same_shape', 'added', 'removed', 'recolored')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ChangeProfile">class <strong>ChangeProfile</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ChangeProfile">ChangeProfile</a>(deltas:&nbsp;'list[<a href="#ChangeDelta">ChangeDelta</a>]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Aggregated&nbsp;perceived&nbsp;change&nbsp;across&nbsp;repeated&nbsp;observations.<br>
+&nbsp;<br>
+When&nbsp;the&nbsp;same&nbsp;kind&nbsp;of&nbsp;transition&nbsp;is&nbsp;observed&nbsp;several&nbsp;times,&nbsp;the<br>
+profile&nbsp;holds&nbsp;the&nbsp;per-transition&nbsp;deltas&nbsp;and&nbsp;answers&nbsp;conjunctive<br>
+questions&nbsp;—&nbsp;did&nbsp;every&nbsp;instance&nbsp;only&nbsp;add?&nbsp;—&nbsp;which&nbsp;is&nbsp;the&nbsp;perceptual<br>
+evidence&nbsp;an&nbsp;operator&nbsp;inference&nbsp;acts&nbsp;on.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ChangeProfile-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="ChangeProfile-__init__"><strong>__init__</strong></a>(self, deltas: 'list[ChangeDelta]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="ChangeProfile-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="ChangeProfile-added_relations"><strong>added_relations</strong></a>(self, transitions: 'list[Transition]') -&gt; 'set[str]'</dt><dd><span class="code">D₄&nbsp;elements&nbsp;whose&nbsp;orbit&nbsp;explains&nbsp;every&nbsp;transition's&nbsp;added&nbsp;cells.<br>
+&nbsp;<br>
+An&nbsp;element&nbsp;qualifies&nbsp;when,&nbsp;on&nbsp;every&nbsp;observed&nbsp;transition,&nbsp;painting<br>
+each&nbsp;non-background&nbsp;before-cell's&nbsp;image&nbsp;under&nbsp;the&nbsp;element&nbsp;onto&nbsp;the<br>
+before&nbsp;reproduces&nbsp;the&nbsp;after&nbsp;exactly&nbsp;—&nbsp;i.e.&nbsp;the&nbsp;added&nbsp;cells&nbsp;ARE<br>
+the&nbsp;before's&nbsp;structure&nbsp;seen&nbsp;through&nbsp;that&nbsp;group&nbsp;element.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>all_same_shape</strong></dt>
+</dl>
+<dl><dt><strong>pure_addition</strong></dt>
+</dl>
+<dl><dt><strong>pure_recolor</strong></dt>
+</dl>
+<dl><dt><strong>pure_removal</strong></dt>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'deltas': 'list[ChangeDelta]'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'deltas': Field(name='deltas',type='list[ChangeDelta]',def...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('deltas',)</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-perceive_change"><strong>perceive_change</strong></a>(before: 'Grid', after: 'Grid') -&gt; 'ChangeDelta'</dt><dd><span class="code">Describe&nbsp;the&nbsp;cell-level&nbsp;change&nbsp;from&nbsp;one&nbsp;perception&nbsp;to&nbsp;the&nbsp;next.</span></dd></dl>
+ <dl><dt><a name="-perceive_changes"><strong>perceive_changes</strong></a>(transitions: 'list[Transition]') -&gt; 'ChangeProfile'</dt><dd><span class="code">Perceive&nbsp;the&nbsp;change&nbsp;across&nbsp;a&nbsp;series&nbsp;of&nbsp;observed&nbsp;transitions.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>Transition</strong> = tuple[Self_World.parietal_lobe.grid.Grid, Self_World.parietal_lobe.grid.Grid]<br>
+<strong>__annotations__</strong> = {'_DELTA_RELATIONS': 'dict[str, Callable[[int, int, int, int], tuple[int, int]]]'}</td></tr></table>
+</body></html>

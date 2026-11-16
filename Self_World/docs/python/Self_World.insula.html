@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: package Self_World.insula</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.insula</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/insula/__init__.py">/home/mindyrenee/GenAnd/Genesis/Self_World/insula/__init__.py</a></td></tr></table>
+    <p><span class="code">Insula&nbsp;—&nbsp;interoception:&nbsp;sensing&nbsp;the&nbsp;body's&nbsp;internal&nbsp;state.<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+ANATOMY&nbsp;AND&nbsp;FUNCTION<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+The&nbsp;insular&nbsp;cortex&nbsp;lies&nbsp;folded&nbsp;inside&nbsp;the&nbsp;lateral&nbsp;sulcus,&nbsp;between&nbsp;the<br>
+temporal&nbsp;and&nbsp;frontal&nbsp;opercula.&nbsp;It&nbsp;receives&nbsp;the&nbsp;visceral&nbsp;afferents<br>
+relayed&nbsp;through&nbsp;several&nbsp;thalamic&nbsp;nuclei,&nbsp;including&nbsp;VMpo&nbsp;and&nbsp;VMb&nbsp;in<br>
+primate&nbsp;lamina-I&nbsp;and&nbsp;vagal&nbsp;pathways,&nbsp;rather&nbsp;than&nbsp;a&nbsp;single&nbsp;VPM&nbsp;channel.<br>
+It&nbsp;builds&nbsp;representations&nbsp;of&nbsp;heartbeat,&nbsp;breath,&nbsp;temperature,&nbsp;pain,<br>
+hunger,&nbsp;and&nbsp;fatigue&nbsp;from&nbsp;these&nbsp;signals.&nbsp;Craig<br>
+(2009)&nbsp;describes&nbsp;it&nbsp;as&nbsp;a&nbsp;posterior-to-anterior&nbsp;hierarchy.&nbsp;The&nbsp;posterior<br>
+insula&nbsp;represents&nbsp;the&nbsp;body's&nbsp;current&nbsp;state;&nbsp;the&nbsp;anterior&nbsp;insula<br>
+integrates&nbsp;that&nbsp;state&nbsp;with&nbsp;salience&nbsp;and&nbsp;emotion&nbsp;and&nbsp;is&nbsp;the&nbsp;hub&nbsp;of&nbsp;the<br>
+salience&nbsp;network&nbsp;with&nbsp;the&nbsp;anterior&nbsp;cingulate.<br>
+&nbsp;<br>
+The&nbsp;sensing&nbsp;machinery&nbsp;is&nbsp;in&nbsp;the&nbsp;brainstem&nbsp;(the&nbsp;metronome&nbsp;that<br>
+samples&nbsp;the&nbsp;body)&nbsp;and&nbsp;in&nbsp;the&nbsp;limbic&nbsp;system&nbsp;(the&nbsp;interoceptive&nbsp;layer&nbsp;that<br>
+turns&nbsp;samples&nbsp;into&nbsp;stress).&nbsp;This&nbsp;region&nbsp;is&nbsp;the&nbsp;anatomical&nbsp;place&nbsp;where<br>
+those&nbsp;signals&nbsp;become&nbsp;a&nbsp;felt&nbsp;state;&nbsp;it&nbsp;shares&nbsp;that&nbsp;machinery&nbsp;rather<br>
+than&nbsp;duplicating&nbsp;it.<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+MATHEMATICAL&nbsp;FOUNDATION:&nbsp;INTEROCEPTIVE&nbsp;PREDICTIVE&nbsp;CODING<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+Interoceptive&nbsp;predictive&nbsp;coding&nbsp;(Seth,&nbsp;Suzuki&nbsp;&amp;&nbsp;Critchley,&nbsp;2011;&nbsp;Seth,<br>
+2013)&nbsp;treats&nbsp;the&nbsp;insula&nbsp;as&nbsp;a&nbsp;comparator&nbsp;between&nbsp;a&nbsp;top-down&nbsp;prediction<br>
+of&nbsp;the&nbsp;body&nbsp;state&nbsp;and&nbsp;the&nbsp;bottom-up&nbsp;afferent&nbsp;signal.&nbsp;For&nbsp;an&nbsp;afferent<br>
+reading&nbsp;``s``&nbsp;and&nbsp;a&nbsp;prediction&nbsp;``ŝ``,&nbsp;the&nbsp;prediction&nbsp;error&nbsp;is<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ε&nbsp;=&nbsp;s&nbsp;−&nbsp;ŝ<br>
+&nbsp;<br>
+and&nbsp;the&nbsp;posterior&nbsp;estimate&nbsp;is&nbsp;updated&nbsp;by&nbsp;precision-weighted&nbsp;errors,<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;μ&nbsp;←&nbsp;μ&nbsp;+&nbsp;κ&nbsp;·&nbsp;π&nbsp;·&nbsp;ε,&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;π&nbsp;=&nbsp;1&nbsp;/&nbsp;σ²<br>
+&nbsp;<br>
+so&nbsp;a&nbsp;channel&nbsp;that&nbsp;is&nbsp;reliable&nbsp;(low&nbsp;variance&nbsp;σ²)&nbsp;moves&nbsp;the&nbsp;felt&nbsp;state&nbsp;more<br>
+than&nbsp;a&nbsp;noisy&nbsp;one.&nbsp;Allen&nbsp;and&nbsp;Friston&nbsp;(2018)&nbsp;extend&nbsp;this&nbsp;with&nbsp;a&nbsp;hierarchy&nbsp;of<br>
+such&nbsp;comparators,&nbsp;which&nbsp;matches&nbsp;the&nbsp;insula's&nbsp;posterior-to-anterior<br>
+organisation&nbsp;(Royal&nbsp;Society&nbsp;Open&nbsp;Science&nbsp;9(6),&nbsp;2022,&nbsp;"An&nbsp;insula<br>
+hierarchical&nbsp;network&nbsp;architecture&nbsp;for&nbsp;active&nbsp;interoceptive&nbsp;inference":<br>
+gINS&nbsp;is&nbsp;the&nbsp;lowest&nbsp;level,&nbsp;dINS&nbsp;the&nbsp;middle,&nbsp;aINS&nbsp;the&nbsp;top,&nbsp;with&nbsp;forward<br>
+prediction&nbsp;errors&nbsp;and&nbsp;backward&nbsp;predictions&nbsp;between&nbsp;them).<br>
+&nbsp;<br>
+The&nbsp;implemented&nbsp;body-state&nbsp;layer&nbsp;follows&nbsp;the&nbsp;same&nbsp;structure:&nbsp;each&nbsp;reading<br>
+is&nbsp;a&nbsp;sample&nbsp;with&nbsp;a&nbsp;freshness&nbsp;window,&nbsp;and&nbsp;a&nbsp;reading&nbsp;that&nbsp;is&nbsp;older&nbsp;than<br>
+the&nbsp;window&nbsp;stops&nbsp;contributing&nbsp;distress&nbsp;while&nbsp;its&nbsp;last&nbsp;value&nbsp;is&nbsp;retained.<br>
+This&nbsp;is&nbsp;a&nbsp;freshness&nbsp;heuristic,&nbsp;not&nbsp;an&nbsp;implemented&nbsp;Bayesian&nbsp;precision&nbsp;update.<br>
+&nbsp;<br>
+Felt&nbsp;stress&nbsp;is&nbsp;then&nbsp;the&nbsp;salience&nbsp;arbitration&nbsp;over&nbsp;the&nbsp;two&nbsp;sensing&nbsp;layers,<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;stress&nbsp;=&nbsp;min(1,&nbsp;max(stress_process,&nbsp;stress_body))<br>
+&nbsp;<br>
+a&nbsp;winner-take-all&nbsp;salience&nbsp;signal.&nbsp;It&nbsp;is&nbsp;a&nbsp;max&nbsp;rather&nbsp;than&nbsp;a&nbsp;precision-<br>
+weighted&nbsp;mean&nbsp;on&nbsp;purpose:&nbsp;a&nbsp;saturated&nbsp;channel&nbsp;(for&nbsp;example,&nbsp;90%&nbsp;CPU)&nbsp;must<br>
+reach&nbsp;the&nbsp;felt&nbsp;state&nbsp;even&nbsp;when&nbsp;the&nbsp;other&nbsp;channel&nbsp;is&nbsp;quiet,&nbsp;because&nbsp;the<br>
+software&nbsp;needs&nbsp;to&nbsp;preserve&nbsp;a&nbsp;saturated&nbsp;distress&nbsp;channel.&nbsp;This&nbsp;max&nbsp;rule<br>
+is&nbsp;an&nbsp;engineering&nbsp;choice,&nbsp;not&nbsp;a&nbsp;measured&nbsp;anterior-insula&nbsp;transfer&nbsp;function.<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+HOMES<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+Interoceptive&nbsp;sensing&nbsp;and&nbsp;the&nbsp;felt&nbsp;state&nbsp;(shared&nbsp;with<br>
+``limbic_system``,&nbsp;which&nbsp;owns&nbsp;the&nbsp;regulator&nbsp;that&nbsp;consumes&nbsp;them):&nbsp;the<br>
+interoception&nbsp;system&nbsp;and&nbsp;the&nbsp;composed&nbsp;internal&nbsp;state.<br>
+&nbsp;<br>
+Autonomic&nbsp;sampling&nbsp;(shared&nbsp;with&nbsp;``brainstem``,&nbsp;which&nbsp;owns&nbsp;the<br>
+metronome&nbsp;loop):&nbsp;the&nbsp;metronome&nbsp;mixin&nbsp;that&nbsp;samples&nbsp;the&nbsp;body&nbsp;each&nbsp;cycle.<br>
+&nbsp;<br>
+The&nbsp;interoceptive&nbsp;body&nbsp;map&nbsp;(shared&nbsp;with&nbsp;``self``,&nbsp;where&nbsp;the<br>
+proto-self&nbsp;is&nbsp;defined):&nbsp;Damasio's&nbsp;proto-self,&nbsp;the&nbsp;insula-based&nbsp;map&nbsp;of<br>
+the&nbsp;body&nbsp;that&nbsp;the&nbsp;self-model&nbsp;is&nbsp;built&nbsp;on&nbsp;—&nbsp;and&nbsp;the&nbsp;somatic-marker<br>
+congruence&nbsp;check&nbsp;that&nbsp;compares&nbsp;the&nbsp;felt&nbsp;body&nbsp;against&nbsp;the&nbsp;expressed<br>
+body&nbsp;(shared&nbsp;with&nbsp;``limbic_system``).</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Package Contents</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="Self_World.insula.damasio.html">damasio</a><br>
+</td><td class="multicolumn"><a href="Self_World.insula.somatic.html">somatic</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table>
+</body></html>

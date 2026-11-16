@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["CRC32_POLY","LEGACY_SIZE","RESERVED_BYTES"],"enum":["CoreStateError"],"fn":["crc32_ieee"],"static":["CRC32_TABLE"],"struct":["GenesisCoreState"]};

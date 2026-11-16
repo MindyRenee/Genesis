@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.brainstem.electrochemistry</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.brainstem.html" class="white">brainstem</a>.electrochemistry</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/brainstem/electrochemistry.py">/home/mindyrenee/GenAnd/Genesis/Self_World/brainstem/electrochemistry.py</a></td></tr></table>
+    <p><span class="code">Electrochemical&nbsp;interpretation&nbsp;for&nbsp;conscious&nbsp;cognition.<br>
+&nbsp;<br>
+The&nbsp;Rust&nbsp;substrate&nbsp;owns&nbsp;the&nbsp;ion&nbsp;dynamics:&nbsp;concentrations,&nbsp;reversal<br>
+potentials,&nbsp;conductances,&nbsp;membrane&nbsp;voltage,&nbsp;transporters,&nbsp;ATP&nbsp;availability,<br>
+and&nbsp;physiological&nbsp;sanitization.&nbsp;This&nbsp;module&nbsp;performs&nbsp;the&nbsp;narrower&nbsp;conscious<br>
+task&nbsp;of&nbsp;interpreting&nbsp;the&nbsp;resulting&nbsp;:class:`IonSummary`&nbsp;as&nbsp;finite&nbsp;cognitive<br>
+signals&nbsp;—&nbsp;how&nbsp;much&nbsp;attention,&nbsp;global&nbsp;broadcast,&nbsp;memory&nbsp;consolidation,&nbsp;and<br>
+synaptic&nbsp;learning&nbsp;the&nbsp;current&nbsp;electrochemical&nbsp;state&nbsp;can&nbsp;support.<br>
+&nbsp;<br>
+Nothing&nbsp;here&nbsp;recomputes&nbsp;electrochemistry.&nbsp;The&nbsp;derived&nbsp;gains&nbsp;stay&nbsp;finite&nbsp;for<br>
+malformed&nbsp;input,&nbsp;but&nbsp;valid&nbsp;substrate&nbsp;values&nbsp;are&nbsp;not&nbsp;range-limited&nbsp;here.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="math.html">math</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.brainstem.electrochemistry.html#IonCognitiveContext">IonCognitiveContext</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="IonCognitiveContext">class <strong>IonCognitiveContext</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#IonCognitiveContext">IonCognitiveContext</a>(membrane_potential_mv:&nbsp;'float',&nbsp;nak_pump_rate:&nbsp;'float',&nbsp;kcl_cotransporter_flux:&nbsp;'float',&nbsp;ncx_flux:&nbsp;'float',&nbsp;net_membrane_current:&nbsp;'float',&nbsp;atp_availability:&nbsp;'float',&nbsp;calcium_signal:&nbsp;'float',&nbsp;chloride_efficacy:&nbsp;'float',&nbsp;excitability:&nbsp;'float',&nbsp;gradient_integrity:&nbsp;'float',&nbsp;energy_load:&nbsp;'float',&nbsp;metabolic_strain:&nbsp;'float',&nbsp;physiological_balance:&nbsp;'float',&nbsp;attention_gain:&nbsp;'float',&nbsp;workspace_gain:&nbsp;'float',&nbsp;memory_consolidation_gain:&nbsp;'float',&nbsp;synaptic_plasticity_gain:&nbsp;'float')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Finite&nbsp;interpretation&nbsp;of&nbsp;the&nbsp;substrate's&nbsp;ion&nbsp;state.<br>
+&nbsp;<br>
+Raw&nbsp;normalized&nbsp;fields&nbsp;are&nbsp;the&nbsp;substrate's&nbsp;own&nbsp;derived&nbsp;readouts.&nbsp;Gain<br>
+fields&nbsp;are&nbsp;cognitive&nbsp;modulation&nbsp;factors&nbsp;centered&nbsp;near&nbsp;1.0&nbsp;at&nbsp;physiological<br>
+rest:&nbsp;1.0&nbsp;is&nbsp;neutral,&nbsp;&lt;1&nbsp;suppresses,&nbsp;&gt;1&nbsp;amplifies.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="IonCognitiveContext-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="IonCognitiveContext-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="IonCognitiveContext-__getstate__"><strong>__getstate__</strong></a> = _dataclass_getstate(self)<span class="grey"><span class="heading-text"> from <a href="dataclasses.html">dataclasses</a></span></span></dt><dd><span class="code">#&nbsp;_dataclass_getstate&nbsp;and&nbsp;_dataclass_setstate&nbsp;are&nbsp;needed&nbsp;for&nbsp;pickling&nbsp;frozen<br>
+#&nbsp;classes&nbsp;with&nbsp;slots.&nbsp;&nbsp;These&nbsp;could&nbsp;be&nbsp;slightly&nbsp;more&nbsp;performant&nbsp;if&nbsp;we&nbsp;generated<br>
+#&nbsp;the&nbsp;code&nbsp;instead&nbsp;of&nbsp;iterating&nbsp;over&nbsp;fields.&nbsp;&nbsp;But&nbsp;that&nbsp;can&nbsp;be&nbsp;a&nbsp;project&nbsp;for<br>
+#&nbsp;another&nbsp;day,&nbsp;if&nbsp;performance&nbsp;becomes&nbsp;an&nbsp;issue.</span></dd></dl>
+
+<dl><dt><a name="IonCognitiveContext-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="IonCognitiveContext-__init__"><strong>__init__</strong></a>(self, membrane_potential_mv: 'float', nak_pump_rate: 'float', kcl_cotransporter_flux: 'float', ncx_flux: 'float', net_membrane_current: 'float', atp_availability: 'float', calcium_signal: 'float', chloride_efficacy: 'float', excitability: 'float', gradient_integrity: 'float', energy_load: 'float', metabolic_strain: 'float', physiological_balance: 'float', attention_gain: 'float', workspace_gain: 'float', memory_consolidation_gain: 'float', synaptic_plasticity_gain: 'float') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="IonCognitiveContext-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="IonCognitiveContext-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<dl><dt><a name="IonCognitiveContext-__setstate__"><strong>__setstate__</strong></a> = _dataclass_setstate(self, state)<span class="grey"><span class="heading-text"> from <a href="dataclasses.html">dataclasses</a></span></span></dt></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="IonCognitiveContext-neutral"><strong>neutral</strong></a>() -&gt; 'IonCognitiveContext'</dt><dd><span class="code">The&nbsp;behavior-preserving&nbsp;context&nbsp;used&nbsp;when&nbsp;no&nbsp;summary&nbsp;is&nbsp;available.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>needs_physiological_recovery</strong></dt>
+<dd><span class="code">Whether&nbsp;ion&nbsp;state&nbsp;is&nbsp;strained&nbsp;enough&nbsp;to&nbsp;favor&nbsp;protective&nbsp;learning.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>atp_availability</strong></dt>
+</dl>
+<dl><dt><strong>attention_gain</strong></dt>
+</dl>
+<dl><dt><strong>calcium_signal</strong></dt>
+</dl>
+<dl><dt><strong>chloride_efficacy</strong></dt>
+</dl>
+<dl><dt><strong>energy_load</strong></dt>
+</dl>
+<dl><dt><strong>excitability</strong></dt>
+</dl>
+<dl><dt><strong>gradient_integrity</strong></dt>
+</dl>
+<dl><dt><strong>kcl_cotransporter_flux</strong></dt>
+</dl>
+<dl><dt><strong>membrane_potential_mv</strong></dt>
+</dl>
+<dl><dt><strong>memory_consolidation_gain</strong></dt>
+</dl>
+<dl><dt><strong>metabolic_strain</strong></dt>
+</dl>
+<dl><dt><strong>nak_pump_rate</strong></dt>
+</dl>
+<dl><dt><strong>ncx_flux</strong></dt>
+</dl>
+<dl><dt><strong>net_membrane_current</strong></dt>
+</dl>
+<dl><dt><strong>physiological_balance</strong></dt>
+</dl>
+<dl><dt><strong>synaptic_plasticity_gain</strong></dt>
+</dl>
+<dl><dt><strong>workspace_gain</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'atp_availability': 'float', 'attention_gain': 'float', 'calcium_signal': 'float', 'chloride_efficacy': 'float', 'energy_load': 'float', 'excitability': 'float', 'gradient_integrity': 'float', 'kcl_cotransporter_flux': 'float', 'membrane_potential_mv': 'float', 'memory_consolidation_gain': 'float', ...}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'atp_availability': Field(name='atp_availability',type='float',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'attention_gain': Field(name='attention_gain',type='float',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'calcium_signal': Field(name='calcium_signal',type='float',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'chloride_efficacy': Field(name='chloride_efficacy',type='float',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'energy_load': Field(name='energy_load',type='float',default=&lt;d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'excitability': Field(name='excitability',type='float',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD), 'gradient_integrity': Field(name='gradient_integrity',type='float',def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'kcl_cotransporter_flux': Field(name='kcl_cotransporter_flux',type='float'...appingproxy({}),kw_only=False,_field_type=_FIELD), 'membrane_potential_mv': Field(name='membrane_potential_mv',type='float',...appingproxy({}),kw_only=False,_field_type=_FIELD), 'memory_consolidation_gain': Field(name='memory_consolidation_gain',type='flo...appingproxy({}),kw_only=False,_field_type=_FIELD), ...}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('membrane_potential_mv', 'nak_pump_rate', 'kcl_cotransporter_flux', 'ncx_flux', 'net_membrane_current', 'atp_availability', 'calcium_signal', 'chloride_efficacy', 'excitability', 'gradient_integrity', 'energy_load', 'metabolic_strain', 'physiological_balance', 'attention_gain', 'workspace_gain', 'memory_consolidation_gain', 'synaptic_plasticity_gain')</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-interpret_ions"><strong>interpret_ions</strong></a>(summary: 'IonSummary | None') -&gt; 'IonCognitiveContext'</dt><dd><span class="code">Interpret&nbsp;an&nbsp;``IonSummary``&nbsp;as&nbsp;finite&nbsp;cognitive&nbsp;modulation.<br>
+&nbsp;<br>
+The&nbsp;summary's&nbsp;normalized&nbsp;fields&nbsp;are&nbsp;sanitized&nbsp;again&nbsp;defensively&nbsp;because<br>
+this&nbsp;boundary&nbsp;may&nbsp;be&nbsp;reached&nbsp;through&nbsp;older&nbsp;clients,&nbsp;test&nbsp;doubles,&nbsp;or&nbsp;a<br>
+malformed&nbsp;IPC&nbsp;response.&nbsp;No&nbsp;electrochemical&nbsp;equations&nbsp;live&nbsp;here&nbsp;—&nbsp;the&nbsp;Rust<br>
+``IonState``&nbsp;remains&nbsp;the&nbsp;source&nbsp;of&nbsp;physical&nbsp;truth.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['IonCognitiveContext', 'interpret_ions']</td></tr></table>
+</body></html>

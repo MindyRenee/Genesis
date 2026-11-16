@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Inner_World.sleep.compression</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Inner_World.html" class="white">Inner_World</a>.<a href="Inner_World.sleep.html" class="white">sleep</a>.compression</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Inner_World/sleep/compression.py">/home/mindyrenee/GenAnd/Genesis/Inner_World/sleep/compression.py</a></td></tr></table>
+    <p><span class="code">Algorithmic&nbsp;sleep&nbsp;compression&nbsp;—&nbsp;the&nbsp;compaction&nbsp;pass&nbsp;that&nbsp;keeps&nbsp;Genesis&nbsp;bounded.<br>
+&nbsp;<br>
+##&nbsp;Modeling&nbsp;note<br>
+&nbsp;<br>
+This&nbsp;module&nbsp;implements&nbsp;**memory&nbsp;compaction**&nbsp;—&nbsp;VQ&nbsp;codebook&nbsp;retraining,<br>
+edge&nbsp;migration&nbsp;into&nbsp;the&nbsp;holographic&nbsp;graph,&nbsp;and&nbsp;episode&nbsp;summarization&nbsp;—<br>
+inspired&nbsp;by&nbsp;but&nbsp;not&nbsp;equivalent&nbsp;to&nbsp;biological&nbsp;sleep&nbsp;consolidation.<br>
+Biological&nbsp;memory&nbsp;consolidation&nbsp;is&nbsp;selective&nbsp;replay&nbsp;and&nbsp;systems-level<br>
+transformation&nbsp;in&nbsp;which&nbsp;hippocampal&nbsp;episodic&nbsp;traces&nbsp;are&nbsp;gradually<br>
+integrated&nbsp;into&nbsp;neocortical&nbsp;semantic&nbsp;networks&nbsp;(Rasch&nbsp;&amp;&nbsp;Born,&nbsp;2013);<br>
+it&nbsp;is&nbsp;not&nbsp;destructive&nbsp;deletion.&nbsp;The&nbsp;"compact&nbsp;LTM"&nbsp;phase&nbsp;below&nbsp;deletes<br>
+raw&nbsp;episodes&nbsp;after&nbsp;extracting&nbsp;their&nbsp;semantic&nbsp;content,&nbsp;which&nbsp;is&nbsp;a<br>
+storage-management&nbsp;decision,&nbsp;not&nbsp;a&nbsp;model&nbsp;of&nbsp;memory&nbsp;transformation.<br>
+The&nbsp;synaptic-homeostasis&nbsp;renormalization&nbsp;is&nbsp;a&nbsp;weight-scaling&nbsp;operation<br>
+inspired&nbsp;by&nbsp;Tononi&nbsp;&amp;&nbsp;Cirelli&nbsp;(2006),&nbsp;but&nbsp;it&nbsp;operates&nbsp;on&nbsp;graph&nbsp;edge<br>
+weights,&nbsp;not&nbsp;synaptic&nbsp;strengths.&nbsp;The&nbsp;biological&nbsp;language&nbsp;used&nbsp;below<br>
+("hippocampal&nbsp;→&nbsp;neocortical&nbsp;transfer,"&nbsp;"synaptic&nbsp;reorganization")<br>
+marks&nbsp;analogies,&nbsp;not&nbsp;mechanistic&nbsp;claims.<br>
+&nbsp;<br>
+This&nbsp;module&nbsp;implements&nbsp;the&nbsp;sleep&nbsp;compression&nbsp;algorithm&nbsp;that&nbsp;runs&nbsp;during<br>
+N3&nbsp;slow-wave&nbsp;sleep.&nbsp;It&nbsp;is&nbsp;the&nbsp;third&nbsp;pillar&nbsp;of&nbsp;Genesis's&nbsp;bounded-growth<br>
+architecture,&nbsp;alongside&nbsp;vector&nbsp;quantization&nbsp;(VQ)&nbsp;and&nbsp;holographic<br>
+associative&nbsp;graphs.<br>
+&nbsp;<br>
+#&nbsp;What&nbsp;sleep&nbsp;compression&nbsp;does<br>
+&nbsp;<br>
+During&nbsp;wakefulness,&nbsp;Genesis&nbsp;accumulates:<br>
+-&nbsp;New&nbsp;concepts&nbsp;from&nbsp;learning&nbsp;and&nbsp;conversation<br>
+-&nbsp;New&nbsp;edges&nbsp;from&nbsp;frontal_lobe.reasoning&nbsp;and&nbsp;bridge&nbsp;creation<br>
+-&nbsp;New&nbsp;LTM&nbsp;episodes&nbsp;from&nbsp;every&nbsp;experience<br>
+&nbsp;<br>
+Without&nbsp;compression,&nbsp;this&nbsp;growth&nbsp;is&nbsp;monotonic&nbsp;—&nbsp;it&nbsp;will&nbsp;eventually<br>
+exhaust&nbsp;disk&nbsp;and&nbsp;memory.&nbsp;Algorithmic&nbsp;sleep&nbsp;is&nbsp;the&nbsp;compaction&nbsp;pass&nbsp;that<br>
+keeps&nbsp;it&nbsp;bounded.<br>
+&nbsp;<br>
+Three&nbsp;phases,&nbsp;mirroring&nbsp;biological&nbsp;sleep:<br>
+&nbsp;<br>
+1.&nbsp;**Quantize**&nbsp;(hippocampal&nbsp;→&nbsp;neocortical&nbsp;transfer):<br>
+&nbsp;&nbsp;&nbsp;Retrain&nbsp;the&nbsp;VQ&nbsp;codebook&nbsp;with&nbsp;current&nbsp;concept&nbsp;embeddings.&nbsp;Identify<br>
+&nbsp;&nbsp;&nbsp;near-duplicate&nbsp;concepts&nbsp;(same&nbsp;prototype,&nbsp;tiny&nbsp;residual)&nbsp;as&nbsp;merge<br>
+&nbsp;&nbsp;&nbsp;candidates.&nbsp;The&nbsp;codebook&nbsp;compresses&nbsp;the&nbsp;embedding&nbsp;space.<br>
+&nbsp;<br>
+2.&nbsp;**Holographize**&nbsp;(synaptic&nbsp;reorganization):<br>
+&nbsp;&nbsp;&nbsp;Migrate&nbsp;all&nbsp;auto-generated&nbsp;bridge&nbsp;edges&nbsp;into&nbsp;the&nbsp;holographic<br>
+&nbsp;&nbsp;&nbsp;associative&nbsp;graph.&nbsp;Delete&nbsp;them&nbsp;from&nbsp;the&nbsp;explicit&nbsp;edge&nbsp;list.&nbsp;The<br>
+&nbsp;&nbsp;&nbsp;explicit&nbsp;graph&nbsp;retains&nbsp;only&nbsp;"real"&nbsp;edges&nbsp;—&nbsp;stated,&nbsp;learned,&nbsp;inferred.<br>
+&nbsp;&nbsp;&nbsp;The&nbsp;holographic&nbsp;graph&nbsp;handles&nbsp;fuzzy&nbsp;associations&nbsp;at&nbsp;fixed&nbsp;size.<br>
+&nbsp;<br>
+3.&nbsp;**Compact&nbsp;LTM**&nbsp;(memory&nbsp;consolidation):<br>
+&nbsp;&nbsp;&nbsp;Replay&nbsp;recent&nbsp;LTM&nbsp;episodes,&nbsp;extract&nbsp;their&nbsp;semantic&nbsp;content&nbsp;(concepts<br>
+&nbsp;&nbsp;&nbsp;+&nbsp;associations),&nbsp;bind&nbsp;the&nbsp;associations&nbsp;into&nbsp;the&nbsp;holographic&nbsp;graph,<br>
+&nbsp;&nbsp;&nbsp;and&nbsp;delete&nbsp;the&nbsp;raw&nbsp;episodes.&nbsp;Only&nbsp;high-salience&nbsp;episodes&nbsp;are&nbsp;retained<br>
+&nbsp;&nbsp;&nbsp;verbatim.&nbsp;The&nbsp;episode's&nbsp;*meaning*&nbsp;persists&nbsp;in&nbsp;the&nbsp;compressed<br>
+&nbsp;&nbsp;&nbsp;representation;&nbsp;the&nbsp;raw&nbsp;text&nbsp;is&nbsp;transient.<br>
+&nbsp;<br>
+Synaptic&nbsp;homeostasis&nbsp;is&nbsp;*not*&nbsp;a&nbsp;phase&nbsp;of&nbsp;this&nbsp;pass:&nbsp;SHY<br>
+renormalisation&nbsp;is&nbsp;a&nbsp;continuous&nbsp;process&nbsp;that&nbsp;lives&nbsp;in&nbsp;the<br>
+``SynapticDownscaler``&nbsp;on&nbsp;her&nbsp;inner-life&nbsp;loop&nbsp;—&nbsp;every&nbsp;N3&nbsp;tick<br>
+downscales&nbsp;weights&nbsp;proportionally&nbsp;at&nbsp;a&nbsp;rate&nbsp;set&nbsp;by&nbsp;accumulated<br>
+synaptic&nbsp;load&nbsp;and&nbsp;the&nbsp;body's&nbsp;sleep&nbsp;pressure&nbsp;(Tononi&nbsp;&amp;&nbsp;Cirelli:<br>
+discharge&nbsp;rate&nbsp;∝&nbsp;sleep&nbsp;pressure).&nbsp;The&nbsp;old&nbsp;lumped&nbsp;renormalisation<br>
+here&nbsp;—&nbsp;one&nbsp;multiplicative&nbsp;sweep&nbsp;per&nbsp;pass&nbsp;—&nbsp;was&nbsp;replaced&nbsp;by&nbsp;that<br>
+continuous&nbsp;model;&nbsp;what&nbsp;remains&nbsp;is&nbsp;the&nbsp;compression&nbsp;itself.<br>
+&nbsp;<br>
+#&nbsp;Integration<br>
+&nbsp;<br>
+This&nbsp;module's&nbsp;steps&nbsp;are&nbsp;queued&nbsp;by&nbsp;``Mind._build_n3_work()``&nbsp;after&nbsp;the<br>
+existing&nbsp;``consolidate_during_sleep``&nbsp;pass.&nbsp;It&nbsp;augments&nbsp;—&nbsp;does&nbsp;not<br>
+replace&nbsp;—&nbsp;the&nbsp;existing&nbsp;sleep&nbsp;consolidation.<br>
+&nbsp;<br>
+#&nbsp;Neuroscience&nbsp;grounding<br>
+&nbsp;<br>
+-&nbsp;**Replay&nbsp;&amp;&nbsp;consolidation**:&nbsp;episodic&nbsp;memories&nbsp;(hippocampus)&nbsp;are<br>
+&nbsp;&nbsp;replayed&nbsp;and&nbsp;transferred&nbsp;to&nbsp;semantic&nbsp;memory&nbsp;(neocortex).&nbsp;This&nbsp;is<br>
+&nbsp;&nbsp;literally&nbsp;VQ&nbsp;codebook&nbsp;update&nbsp;—&nbsp;the&nbsp;day's&nbsp;episodes&nbsp;are&nbsp;compressed<br>
+&nbsp;&nbsp;into&nbsp;prototypes&nbsp;and&nbsp;residuals.&nbsp;(McClelland&nbsp;et&nbsp;al.,&nbsp;1995)<br>
+&nbsp;<br>
+-&nbsp;**Synaptic&nbsp;homeostasis**:&nbsp;synaptic&nbsp;weights&nbsp;that&nbsp;grew&nbsp;during&nbsp;the&nbsp;day<br>
+&nbsp;&nbsp;are&nbsp;globally&nbsp;downscaled.&nbsp;This&nbsp;prevents&nbsp;saturation&nbsp;and&nbsp;keeps&nbsp;the<br>
+&nbsp;&nbsp;system&nbsp;learnable.&nbsp;Modelled&nbsp;continuously&nbsp;by&nbsp;the<br>
+&nbsp;&nbsp;``SynapticDownscaler``&nbsp;—&nbsp;proportional&nbsp;``w&nbsp;−=&nbsp;rate·dt·w``&nbsp;per&nbsp;N3<br>
+&nbsp;&nbsp;tick,&nbsp;rate&nbsp;gated&nbsp;by&nbsp;synaptic&nbsp;load&nbsp;and&nbsp;the&nbsp;body's&nbsp;adenosine/sleep<br>
+&nbsp;&nbsp;pressure&nbsp;—&nbsp;not&nbsp;by&nbsp;a&nbsp;pass&nbsp;here.&nbsp;(Tononi&nbsp;&amp;&nbsp;Cirelli,&nbsp;2006)<br>
+&nbsp;<br>
+-&nbsp;**Memory&nbsp;pruning**:&nbsp;weak/noisy&nbsp;associations&nbsp;are&nbsp;eliminated.&nbsp;In&nbsp;the<br>
+&nbsp;&nbsp;holographic&nbsp;model,&nbsp;this&nbsp;is&nbsp;denoising&nbsp;—&nbsp;the&nbsp;sleep&nbsp;replay&nbsp;process<br>
+&nbsp;&nbsp;re-encodes&nbsp;the&nbsp;strongest&nbsp;associations&nbsp;and&nbsp;lets&nbsp;the&nbsp;weak&nbsp;noise&nbsp;decay.<br>
+&nbsp;<br>
+It&nbsp;wakes&nbsp;up&nbsp;smaller&nbsp;than&nbsp;it&nbsp;went&nbsp;to&nbsp;sleep&nbsp;—&nbsp;not&nbsp;because&nbsp;it&nbsp;forgot,<br>
+but&nbsp;because&nbsp;it&nbsp;*compressed*.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="copy.html">copy</a><br>
+<a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="os.html">os</a><br>
+<a href="re.html">re</a><br>
+</td><td class="multicolumn"><a href="time.html">time</a><br>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Inner_World.sleep.compression.html#SleepCompressor">SleepCompressor</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SleepCompressor">class <strong>SleepCompressor</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SleepCompressor">SleepCompressor</a>(data_dir:&nbsp;'str',&nbsp;vq_k:&nbsp;'int'&nbsp;=&nbsp;2048,&nbsp;vq_iters:&nbsp;'int'&nbsp;=&nbsp;25,&nbsp;salience_threshold:&nbsp;'float'&nbsp;=&nbsp;0.6,&nbsp;max_ltm_episodes:&nbsp;'int'&nbsp;=&nbsp;500,&nbsp;max_concepts_per_episode:&nbsp;'int'&nbsp;=&nbsp;20,&nbsp;merge_threshold:&nbsp;'float'&nbsp;=&nbsp;0.02,&nbsp;recent_grace_ms:&nbsp;'int'&nbsp;=&nbsp;172800000,&nbsp;max_archive_per_sweep:&nbsp;'int'&nbsp;=&nbsp;1000,&nbsp;max_delete_per_sweep:&nbsp;'int'&nbsp;=&nbsp;5000,&nbsp;dedup_similarity:&nbsp;'float'&nbsp;=&nbsp;0.92,&nbsp;max_merges_per_sweep:&nbsp;'int'&nbsp;=&nbsp;64)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Algorithmic&nbsp;sleep&nbsp;compression&nbsp;pass.<br>
+&nbsp;<br>
+Runs&nbsp;during&nbsp;N3&nbsp;sleep&nbsp;to&nbsp;compress&nbsp;the&nbsp;concept&nbsp;network,&nbsp;migrate<br>
+bridge&nbsp;edges&nbsp;to&nbsp;the&nbsp;holographic&nbsp;graph,&nbsp;and&nbsp;compact&nbsp;LTM&nbsp;episodes.<br>
+This&nbsp;keeps&nbsp;Genesis's&nbsp;memory&nbsp;bounded&nbsp;across&nbsp;indefinite&nbsp;operation.<br>
+&nbsp;<br>
+The&nbsp;compressor&nbsp;is&nbsp;stateful&nbsp;—&nbsp;it&nbsp;holds&nbsp;references&nbsp;to&nbsp;the&nbsp;VQ&nbsp;codebook<br>
+and&nbsp;holographic&nbsp;graph&nbsp;that&nbsp;persist&nbsp;across&nbsp;sleep&nbsp;cycles.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="SleepCompressor-__init__"><strong>__init__</strong></a>(self, data_dir: 'str', vq_k: 'int' = 2048, vq_iters: 'int' = 25, salience_threshold: 'float' = 0.6, max_ltm_episodes: 'int' = 500, max_concepts_per_episode: 'int' = 20, merge_threshold: 'float' = 0.02, recent_grace_ms: 'int' = 172800000, max_archive_per_sweep: 'int' = 1000, max_delete_per_sweep: 'int' = 5000, dedup_similarity: 'float' = 0.92, max_merges_per_sweep: 'int' = 64) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;sleep&nbsp;compressor&nbsp;with&nbsp;persistent&nbsp;components.<br>
+&nbsp;<br>
+Loads&nbsp;(or&nbsp;creates)&nbsp;the&nbsp;VQ&nbsp;codebook&nbsp;and&nbsp;holographic&nbsp;graph&nbsp;from<br>
+``data_dir``,&nbsp;and&nbsp;prepares&nbsp;the&nbsp;concept&nbsp;matcher&nbsp;for&nbsp;episode<br>
+scanning.&nbsp;All&nbsp;parameters&nbsp;have&nbsp;module-level&nbsp;defaults&nbsp;tuned&nbsp;for<br>
+long-running&nbsp;operation.</span></dd></dl>
+
+<dl><dt><a name="SleepCompressor-compress"><strong>compress</strong></a>(self, network: 'ConceptNetwork', embeddings: 'EmbeddingStore | None' = None, ltm_client: 'object | None' = None, consolidation_intensity: 'float' = 0.5, release_fn: 'Callable[[object], bool] | None' = None) -&gt; 'dict[str, int | float | str]'</dt><dd><span class="code">Run&nbsp;the&nbsp;full&nbsp;sleep&nbsp;compression&nbsp;pass&nbsp;in&nbsp;one&nbsp;call.<br>
+&nbsp;<br>
+The&nbsp;whole&nbsp;step&nbsp;list&nbsp;pumped&nbsp;end-to-end&nbsp;—&nbsp;kept&nbsp;for&nbsp;callers&nbsp;that<br>
+genuinely&nbsp;want&nbsp;a&nbsp;monolithic&nbsp;pass&nbsp;(tests,&nbsp;maintenance).&nbsp;The<br>
+sleep&nbsp;loop&nbsp;uses&nbsp;:meth:`compress_steps`&nbsp;instead&nbsp;so&nbsp;the&nbsp;work&nbsp;is<br>
+spread&nbsp;across&nbsp;the&nbsp;stage.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;network:&nbsp;The&nbsp;concept&nbsp;network&nbsp;to&nbsp;compress.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;embeddings:&nbsp;The&nbsp;embedding&nbsp;store&nbsp;(for&nbsp;VQ&nbsp;training).&nbsp;If&nbsp;None,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;VQ&nbsp;training&nbsp;is&nbsp;skipped.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ltm_client:&nbsp;An&nbsp;LTM&nbsp;client&nbsp;for&nbsp;episode&nbsp;compaction.&nbsp;If&nbsp;None,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;LTM&nbsp;compaction&nbsp;is&nbsp;skipped.&nbsp;Expected&nbsp;to&nbsp;have&nbsp;methods<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;``search_episodes(limit,&nbsp;offset)``&nbsp;and<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;``archive_episode(episode_id)``.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;consolidation_intensity:&nbsp;Retained&nbsp;for&nbsp;API&nbsp;compatibility;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;consolidation&nbsp;gating&nbsp;now&nbsp;lives&nbsp;in&nbsp;the&nbsp;sleep&nbsp;loop's<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;chemistry,&nbsp;not&nbsp;in&nbsp;this&nbsp;pass.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;release_fn:&nbsp;The&nbsp;memory&nbsp;system's&nbsp;own&nbsp;verdict&nbsp;on&nbsp;whether&nbsp;an<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;archived&nbsp;engram&nbsp;is&nbsp;still&nbsp;alive&nbsp;—&nbsp;``True``&nbsp;releases&nbsp;it<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;to&nbsp;real&nbsp;deletion.&nbsp;``None``&nbsp;disables&nbsp;the&nbsp;prune&nbsp;step:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;compressor&nbsp;archives&nbsp;but&nbsp;never&nbsp;forgets&nbsp;on&nbsp;its&nbsp;own.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Dict&nbsp;with&nbsp;compression&nbsp;statistics.<br>
+&nbsp;<br>
+Atomicity:&nbsp;The&nbsp;edge&nbsp;list&nbsp;is&nbsp;snapshotted&nbsp;before&nbsp;any&nbsp;mutations.<br>
+If&nbsp;any&nbsp;step&nbsp;fails,&nbsp;the&nbsp;snapshot&nbsp;is&nbsp;restored&nbsp;so&nbsp;the&nbsp;network&nbsp;is<br>
+unchanged&nbsp;—&nbsp;the&nbsp;next&nbsp;sleep&nbsp;cycle&nbsp;can&nbsp;try&nbsp;again.</span></dd></dl>
+
+<dl><dt><a name="SleepCompressor-compress_steps"><strong>compress_steps</strong></a>(self, network: 'ConceptNetwork', embeddings: 'EmbeddingStore | None' = None, ltm_client: 'object | None' = None, release_fn: 'Callable[[object], bool] | None' = None) -&gt; 'list[tuple[str, Callable[[], dict[str, int | float]]]]'</dt><dd><span class="code">The&nbsp;compression&nbsp;pass&nbsp;as&nbsp;discrete&nbsp;safe&nbsp;steps.<br>
+&nbsp;<br>
+She&nbsp;runs&nbsp;one&nbsp;step&nbsp;per&nbsp;sleep&nbsp;tick,&nbsp;so&nbsp;the&nbsp;pass&nbsp;is&nbsp;spread<br>
+through&nbsp;the&nbsp;stage&nbsp;like&nbsp;real&nbsp;consolidation&nbsp;—&nbsp;thousands&nbsp;of<br>
+ripples,&nbsp;not&nbsp;one&nbsp;dump.&nbsp;Each&nbsp;step&nbsp;is&nbsp;self-committing:<br>
+&nbsp;<br>
+-&nbsp;**quantize**&nbsp;—&nbsp;one&nbsp;k-means&nbsp;iteration&nbsp;per&nbsp;step&nbsp;via<br>
+&nbsp;&nbsp;:meth:`VQCodebook.fit_steps`;&nbsp;the&nbsp;codebook&nbsp;converges&nbsp;across<br>
+&nbsp;&nbsp;the&nbsp;stage&nbsp;instead&nbsp;of&nbsp;blocking&nbsp;in&nbsp;a&nbsp;single&nbsp;fit.<br>
+-&nbsp;**holographize+save**&nbsp;—&nbsp;migrates&nbsp;bridge&nbsp;edges&nbsp;into&nbsp;the<br>
+&nbsp;&nbsp;holographic&nbsp;graph&nbsp;and&nbsp;persists&nbsp;it&nbsp;in&nbsp;the&nbsp;same&nbsp;step,&nbsp;so&nbsp;a<br>
+&nbsp;&nbsp;mid-queue&nbsp;exit&nbsp;never&nbsp;leaves&nbsp;migrated&nbsp;edges&nbsp;unsaved.<br>
+-&nbsp;**compact_ltm**&nbsp;—&nbsp;archives&nbsp;episodes&nbsp;one&nbsp;at&nbsp;a&nbsp;time;&nbsp;each<br>
+&nbsp;&nbsp;archived&nbsp;episode&nbsp;is&nbsp;already&nbsp;durable.<br>
+-&nbsp;**prune_ltm**&nbsp;—&nbsp;releases&nbsp;archived&nbsp;engrams&nbsp;the&nbsp;memory&nbsp;system<br>
+&nbsp;&nbsp;itself&nbsp;reports&nbsp;dead.&nbsp;Runs&nbsp;only&nbsp;when&nbsp;a&nbsp;``release_fn``&nbsp;is<br>
+&nbsp;&nbsp;supplied:&nbsp;forgetting&nbsp;is&nbsp;her&nbsp;verdict,&nbsp;not&nbsp;the&nbsp;compressor's.<br>
+-&nbsp;**save**&nbsp;—&nbsp;VQ&nbsp;codebook&nbsp;+&nbsp;holographic&nbsp;graph,&nbsp;plus&nbsp;the<br>
+&nbsp;&nbsp;periodic&nbsp;holographic&nbsp;rebuild.<br>
+&nbsp;<br>
+Steps&nbsp;not&nbsp;yet&nbsp;run&nbsp;when&nbsp;the&nbsp;stage&nbsp;ends&nbsp;simply&nbsp;wait&nbsp;—&nbsp;nothing<br>
+half-committed&nbsp;needs&nbsp;rolling&nbsp;back.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['SleepCompressor']</td></tr></table>
+</body></html>

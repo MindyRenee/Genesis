@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["EMOTIONAL_TAG_SIZE","ENTRY_SIZE","ENTRY_TEXT_SIZE","MAX_CAPACITY","STM_MAGIC","STM_SCHEMA_VERSION"],"enum":["EventType","RingBufferError"],"fn":["file_size","mmap_size"],"struct":["RingBuffer","RingBufferEntry","RingBufferHeader"]};

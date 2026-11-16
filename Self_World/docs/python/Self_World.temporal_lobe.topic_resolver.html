@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.temporal_lobe.topic_resolver</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.temporal_lobe.html" class="white">temporal_lobe</a>.topic_resolver</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/topic_resolver.py">/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/topic_resolver.py</a></td></tr></table>
+    <p><span class="code">Topic&nbsp;resolution&nbsp;—&nbsp;extract&nbsp;and&nbsp;refine&nbsp;topic&nbsp;concepts&nbsp;from&nbsp;user&nbsp;input.<br>
+&nbsp;<br>
+Extracted&nbsp;from&nbsp;FrontalLobe&nbsp;as&nbsp;a&nbsp;focused&nbsp;subsystem.&nbsp;The&nbsp;resolver<br>
+combines&nbsp;adjacent&nbsp;topic&nbsp;words&nbsp;into&nbsp;multi-word&nbsp;concepts,&nbsp;finds<br>
+plural/singular&nbsp;variants&nbsp;in&nbsp;the&nbsp;concept&nbsp;network,&nbsp;merges&nbsp;concepts<br>
+found&nbsp;directly&nbsp;in&nbsp;the&nbsp;raw&nbsp;text,&nbsp;and&nbsp;filters&nbsp;out&nbsp;function&nbsp;words.<br>
+&nbsp;<br>
+Dependencies&nbsp;(passed&nbsp;to&nbsp;``__init__``):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;network:&nbsp;ConceptNetwork&nbsp;for&nbsp;concept&nbsp;lookup&nbsp;and&nbsp;neighbor&nbsp;queries</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="re.html">re</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.topic_resolver.html#TopicResolver">TopicResolver</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="TopicResolver">class <strong>TopicResolver</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#TopicResolver">TopicResolver</a>(network:&nbsp;'ConceptNetwork')&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Resolve&nbsp;raw&nbsp;topic&nbsp;words&nbsp;into&nbsp;concept-network-compatible&nbsp;topics.<br>
+&nbsp;<br>
+Takes&nbsp;a&nbsp;list&nbsp;of&nbsp;single-word&nbsp;topics&nbsp;(from&nbsp;the&nbsp;perception&nbsp;layer)&nbsp;and<br>
+the&nbsp;raw&nbsp;input&nbsp;text,&nbsp;then:<br>
+1.&nbsp;Combines&nbsp;adjacent&nbsp;words&nbsp;into&nbsp;multi-word&nbsp;concepts&nbsp;(e.g.&nbsp;"utah"<br>
+&nbsp;&nbsp;&nbsp;+&nbsp;"law"&nbsp;→&nbsp;"utah&nbsp;law"&nbsp;if&nbsp;that&nbsp;concept&nbsp;exists).<br>
+2.&nbsp;Finds&nbsp;plural/singular&nbsp;variants&nbsp;(e.g.&nbsp;"felony"&nbsp;↔&nbsp;"felonies").<br>
+3.&nbsp;Merges&nbsp;multi-word&nbsp;concepts&nbsp;found&nbsp;directly&nbsp;in&nbsp;the&nbsp;raw&nbsp;text.<br>
+4.&nbsp;Filters&nbsp;out&nbsp;English&nbsp;function&nbsp;words.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="TopicResolver-__init__"><strong>__init__</strong></a>(self, network: 'ConceptNetwork') -&gt; 'None'</dt><dd><span class="code">Wire&nbsp;the&nbsp;resolver&nbsp;to&nbsp;its&nbsp;concept&nbsp;network.</span></dd></dl>
+
+<dl><dt><a name="TopicResolver-find_concept_variant"><strong>find_concept_variant</strong></a>(self, word: 'str') -&gt; 'str | None'</dt><dd><span class="code">Find&nbsp;a&nbsp;concept&nbsp;by&nbsp;trying&nbsp;the&nbsp;word&nbsp;as-is,&nbsp;then&nbsp;pluralized/singularized.<br>
+&nbsp;<br>
+Prefers&nbsp;concepts&nbsp;that&nbsp;actually&nbsp;have&nbsp;relationships&nbsp;(neighbors).</span></dd></dl>
+
+<dl><dt><a name="TopicResolver-resolve_topics"><strong>resolve_topics</strong></a>(self, topics: 'list[str]', raw_text: 'str') -&gt; 'list[str]'</dt><dd><span class="code">Combine&nbsp;adjacent&nbsp;topic&nbsp;words&nbsp;into&nbsp;multi-word&nbsp;concepts.<br>
+&nbsp;<br>
+The&nbsp;perception&nbsp;module&nbsp;extracts&nbsp;single-word&nbsp;topics&nbsp;(e.g.,&nbsp;"utah",<br>
+"law"),&nbsp;but&nbsp;the&nbsp;concept&nbsp;network&nbsp;stores&nbsp;multi-word&nbsp;concepts&nbsp;(e.g.,<br>
+"utah&nbsp;law").&nbsp;This&nbsp;method&nbsp;tries&nbsp;to&nbsp;find&nbsp;multi-word&nbsp;combinations<br>
+of&nbsp;the&nbsp;topics&nbsp;that&nbsp;exist&nbsp;in&nbsp;the&nbsp;concept&nbsp;network,&nbsp;and&nbsp;replaces<br>
+the&nbsp;individual&nbsp;words&nbsp;with&nbsp;the&nbsp;combined&nbsp;concept.<br>
+&nbsp;<br>
+This&nbsp;also&nbsp;tries&nbsp;to&nbsp;find&nbsp;concepts&nbsp;from&nbsp;the&nbsp;raw&nbsp;text&nbsp;that&nbsp;may&nbsp;not<br>
+have&nbsp;been&nbsp;extracted&nbsp;as&nbsp;topics&nbsp;(e.g.,&nbsp;"stare&nbsp;decisis"&nbsp;where&nbsp;both<br>
+words&nbsp;are&nbsp;too&nbsp;short/common&nbsp;to&nbsp;be&nbsp;topics).<br>
+&nbsp;<br>
+It&nbsp;also&nbsp;handles&nbsp;plural/singular&nbsp;mismatches&nbsp;(e.g.,&nbsp;the&nbsp;question<br>
+uses&nbsp;"felony"&nbsp;but&nbsp;the&nbsp;concept&nbsp;network&nbsp;has&nbsp;"felonies").<br>
+&nbsp;<br>
+Topics&nbsp;already&nbsp;resolved&nbsp;by&nbsp;the&nbsp;perception&nbsp;layer's&nbsp;context-aware<br>
+resolution&nbsp;(code&nbsp;concepts&nbsp;with&nbsp;python:/rust:&nbsp;prefix)&nbsp;are&nbsp;passed<br>
+through&nbsp;unchanged&nbsp;—&nbsp;they&nbsp;don't&nbsp;need&nbsp;further&nbsp;combination.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['TopicResolver']</td></tr></table>
+</body></html>

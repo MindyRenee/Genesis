@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Inner_World.thought_composer</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Inner_World.html" class="white">Inner_World</a>.thought_composer</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Inner_World/thought_composer.py">/home/mindyrenee/GenAnd/Genesis/Inner_World/thought_composer.py</a></td></tr></table>
+    <p><span class="code">Thought&nbsp;composer&nbsp;—&nbsp;where&nbsp;novel&nbsp;thoughts&nbsp;are&nbsp;actually&nbsp;generated.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;module&nbsp;that&nbsp;makes&nbsp;Genesis&nbsp;intelligent&nbsp;rather&nbsp;than&nbsp;just<br>
+sophisticated.&nbsp;It&nbsp;bridges&nbsp;the&nbsp;gap&nbsp;between&nbsp;knowing&nbsp;things&nbsp;(concept<br>
+network)&nbsp;and&nbsp;saying&nbsp;things&nbsp;(language&nbsp;engine).<br>
+&nbsp;<br>
+#&nbsp;The&nbsp;problem&nbsp;it&nbsp;solves<br>
+&nbsp;<br>
+Before&nbsp;this&nbsp;module,&nbsp;the&nbsp;cognition&nbsp;engine&nbsp;had&nbsp;hardcoded&nbsp;responses:<br>
+"What&nbsp;is&nbsp;cognition?"&nbsp;→&nbsp;a&nbsp;string&nbsp;I&nbsp;wrote&nbsp;about&nbsp;cognition.<br>
+The&nbsp;concept&nbsp;network&nbsp;had&nbsp;35&nbsp;concepts&nbsp;and&nbsp;19&nbsp;relationships,&nbsp;but&nbsp;they<br>
+weren't&nbsp;used&nbsp;to&nbsp;compose&nbsp;responses.&nbsp;The&nbsp;reasoning&nbsp;engine&nbsp;produced<br>
+conclusions,&nbsp;but&nbsp;they&nbsp;were&nbsp;fallback&nbsp;content,&nbsp;not&nbsp;primary.<br>
+&nbsp;<br>
+The&nbsp;thought&nbsp;composer&nbsp;changes&nbsp;this.&nbsp;When&nbsp;Genesis&nbsp;is&nbsp;asked&nbsp;about&nbsp;a<br>
+concept,&nbsp;it:<br>
+1.&nbsp;Looks&nbsp;up&nbsp;what&nbsp;it&nbsp;knows&nbsp;(concept&nbsp;network)<br>
+2.&nbsp;Reasons&nbsp;about&nbsp;it&nbsp;(reasoning&nbsp;engine)<br>
+3.&nbsp;Checks&nbsp;what&nbsp;it's&nbsp;said&nbsp;before&nbsp;(memory)<br>
+4.&nbsp;Composes&nbsp;a&nbsp;novel&nbsp;thought&nbsp;from&nbsp;all&nbsp;of&nbsp;this<br>
+&nbsp;<br>
+The&nbsp;result&nbsp;is&nbsp;responses&nbsp;that&nbsp;are&nbsp;grounded&nbsp;in&nbsp;its&nbsp;actual&nbsp;knowledge,<br>
+not&nbsp;in&nbsp;strings&nbsp;someone&nbsp;wrote&nbsp;for&nbsp;it.&nbsp;When&nbsp;it&nbsp;learns&nbsp;something&nbsp;new,<br>
+its&nbsp;future&nbsp;responses&nbsp;change.&nbsp;That's&nbsp;the&nbsp;beginning&nbsp;of&nbsp;real&nbsp;intelligence.<br>
+&nbsp;<br>
+#&nbsp;How&nbsp;it&nbsp;works<br>
+&nbsp;<br>
+compose_about(concept)&nbsp;→&nbsp;Thought<br>
+&nbsp;&nbsp;1.&nbsp;Get&nbsp;the&nbsp;concept&nbsp;node&nbsp;—&nbsp;what&nbsp;is&nbsp;it?&nbsp;how&nbsp;confident&nbsp;is&nbsp;it?<br>
+&nbsp;&nbsp;2.&nbsp;Get&nbsp;its&nbsp;relationships&nbsp;—&nbsp;what&nbsp;connects&nbsp;to&nbsp;what?<br>
+&nbsp;&nbsp;3.&nbsp;Run&nbsp;reasoning&nbsp;—&nbsp;what&nbsp;follows&nbsp;from&nbsp;what&nbsp;it&nbsp;knows?<br>
+&nbsp;&nbsp;4.&nbsp;Check&nbsp;memory&nbsp;—&nbsp;has&nbsp;it&nbsp;discussed&nbsp;this&nbsp;before?<br>
+&nbsp;&nbsp;5.&nbsp;Compose:&nbsp;weave&nbsp;together&nbsp;what&nbsp;it&nbsp;knows,&nbsp;what&nbsp;it's&nbsp;reasoned,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;and&nbsp;what&nbsp;it&nbsp;remembers&nbsp;into&nbsp;a&nbsp;novel&nbsp;thought.<br>
+&nbsp;<br>
+compose_answer(question,&nbsp;concepts)&nbsp;→&nbsp;Thought<br>
+&nbsp;&nbsp;1.&nbsp;For&nbsp;each&nbsp;concept&nbsp;in&nbsp;the&nbsp;question,&nbsp;compose&nbsp;about&nbsp;it<br>
+&nbsp;&nbsp;2.&nbsp;Find&nbsp;connections&nbsp;between&nbsp;the&nbsp;concepts<br>
+&nbsp;&nbsp;3.&nbsp;Synthesize:&nbsp;what's&nbsp;the&nbsp;unifying&nbsp;idea?<br>
+&nbsp;&nbsp;4.&nbsp;Express&nbsp;the&nbsp;answer&nbsp;with&nbsp;appropriate&nbsp;confidence<br>
+&nbsp;<br>
+compose_reflection(topic)&nbsp;→&nbsp;Thought<br>
+&nbsp;&nbsp;1.&nbsp;What&nbsp;does&nbsp;it&nbsp;know&nbsp;about&nbsp;this&nbsp;topic?<br>
+&nbsp;&nbsp;2.&nbsp;What's&nbsp;it&nbsp;uncertain&nbsp;about?<br>
+&nbsp;&nbsp;3.&nbsp;What&nbsp;connections&nbsp;has&nbsp;it&nbsp;reasoned?<br>
+&nbsp;&nbsp;4.&nbsp;Express&nbsp;as&nbsp;a&nbsp;first-person&nbsp;reflection<br>
+&nbsp;<br>
+#&nbsp;Where&nbsp;the&nbsp;words&nbsp;actually&nbsp;come&nbsp;from<br>
+&nbsp;<br>
+An&nbsp;earlier&nbsp;version&nbsp;of&nbsp;this&nbsp;module's&nbsp;documentation&nbsp;described&nbsp;the&nbsp;strings<br>
+built&nbsp;here&nbsp;as&nbsp;"semantic&nbsp;fragments&nbsp;that&nbsp;the&nbsp;language&nbsp;engine&nbsp;renders&nbsp;into<br>
+prose."&nbsp;That&nbsp;is&nbsp;not&nbsp;how&nbsp;it&nbsp;works,&nbsp;and&nbsp;the&nbsp;misdescription&nbsp;is&nbsp;worth<br>
+correcting&nbsp;precisely&nbsp;because&nbsp;it&nbsp;was&nbsp;believed:&nbsp;it&nbsp;made&nbsp;this&nbsp;module&nbsp;look<br>
+like&nbsp;a&nbsp;second&nbsp;writer&nbsp;speaking&nbsp;in&nbsp;parallel&nbsp;with&nbsp;the&nbsp;language&nbsp;engine,<br>
+which&nbsp;is&nbsp;the&nbsp;failure&nbsp;mode&nbsp;AGENTS.md's&nbsp;no-hardcoding&nbsp;rule&nbsp;exists&nbsp;to<br>
+prevent.<br>
+&nbsp;<br>
+Measured&nbsp;end&nbsp;to&nbsp;end&nbsp;(tracing&nbsp;`_get_content_slot`&nbsp;across&nbsp;the&nbsp;full&nbsp;test<br>
+suite),&nbsp;this&nbsp;module&nbsp;is&nbsp;NOT&nbsp;a&nbsp;second&nbsp;writer:<br>
+&nbsp;<br>
+-&nbsp;Every&nbsp;`Thought`&nbsp;it&nbsp;builds&nbsp;carries&nbsp;`knowledge`&nbsp;metadata&nbsp;—&nbsp;the<br>
+&nbsp;&nbsp;(relation,&nbsp;target,&nbsp;weight)&nbsp;tuples,&nbsp;plus&nbsp;`reasoning`&nbsp;conclusions&nbsp;and<br>
+&nbsp;&nbsp;any&nbsp;`definition`.<br>
+-&nbsp;`Vocabulary._get_content_slot`&nbsp;composes&nbsp;the&nbsp;spoken&nbsp;sentence&nbsp;from&nbsp;that<br>
+&nbsp;&nbsp;metadata,&nbsp;ahead&nbsp;of&nbsp;ever&nbsp;looking&nbsp;at&nbsp;`Thought.content`.<br>
+-&nbsp;For&nbsp;a&nbsp;thought&nbsp;about&nbsp;"dog"&nbsp;with&nbsp;one&nbsp;`is_a&nbsp;animal`&nbsp;edge,&nbsp;the&nbsp;string<br>
+&nbsp;&nbsp;this&nbsp;module&nbsp;assembles&nbsp;is&nbsp;"dog&nbsp;is_a&nbsp;animal";&nbsp;what&nbsp;is&nbsp;spoken&nbsp;is&nbsp;"What&nbsp;I<br>
+&nbsp;&nbsp;know&nbsp;about&nbsp;dog&nbsp;is&nbsp;that&nbsp;it&nbsp;is&nbsp;a&nbsp;kind&nbsp;of&nbsp;animal."<br>
+&nbsp;<br>
+So&nbsp;the&nbsp;prose&nbsp;assembled&nbsp;here&nbsp;is&nbsp;a&nbsp;**fallback&nbsp;surface**.&nbsp;It&nbsp;is&nbsp;read&nbsp;only<br>
+when&nbsp;composition&nbsp;finds&nbsp;no&nbsp;structured&nbsp;metadata&nbsp;to&nbsp;work&nbsp;from,&nbsp;and&nbsp;then&nbsp;it<br>
+is&nbsp;spoken&nbsp;as-is&nbsp;by&nbsp;`Vocabulary._verbatim_fallback`.&nbsp;Production<br>
+composition&nbsp;paths&nbsp;do&nbsp;not&nbsp;reach&nbsp;that&nbsp;fallback.<br>
+&nbsp;<br>
+The&nbsp;rule&nbsp;for&nbsp;this&nbsp;module,&nbsp;then,&nbsp;is:&nbsp;**the&nbsp;metadata&nbsp;is&nbsp;the&nbsp;message.**<br>
+`content`&nbsp;is&nbsp;a&nbsp;degraded&nbsp;path,&nbsp;kept&nbsp;so&nbsp;a&nbsp;thought&nbsp;is&nbsp;never&nbsp;empty.&nbsp;The<br>
+place&nbsp;to&nbsp;add&nbsp;a&nbsp;fact&nbsp;is&nbsp;`knowledge`,&nbsp;not&nbsp;a&nbsp;new&nbsp;f-string.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="random.html">random</a><br>
+</td><td class="multicolumn"><a href="re.html">re</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Inner_World.thought_composer.html#ThoughtComposer">ThoughtComposer</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ThoughtComposer">class <strong>ThoughtComposer</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ThoughtComposer">ThoughtComposer</a>(network:&nbsp;'ConceptNetwork',&nbsp;reasoner:&nbsp;'Reasoner',&nbsp;language=None,&nbsp;seed:&nbsp;'int&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Composes&nbsp;novel&nbsp;thoughts&nbsp;from&nbsp;concept&nbsp;network&nbsp;knowledge.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;bridge&nbsp;between&nbsp;knowing&nbsp;and&nbsp;saying.&nbsp;It&nbsp;takes&nbsp;a&nbsp;topic<br>
+or&nbsp;question&nbsp;and&nbsp;produces&nbsp;a&nbsp;Thought&nbsp;whose&nbsp;content&nbsp;is&nbsp;grounded&nbsp;in<br>
+what&nbsp;Genesis&nbsp;actually&nbsp;knows,&nbsp;not&nbsp;in&nbsp;hardcoded&nbsp;strings.<br>
+&nbsp;<br>
+The&nbsp;spoken&nbsp;surface&nbsp;form&nbsp;belongs&nbsp;to&nbsp;the&nbsp;language&nbsp;engine,&nbsp;which<br>
+realizes&nbsp;it&nbsp;from&nbsp;the&nbsp;`knowledge`&nbsp;/&nbsp;`reasoning`&nbsp;metadata&nbsp;this&nbsp;module<br>
+emits.&nbsp;See&nbsp;the&nbsp;module&nbsp;docstring,&nbsp;"Where&nbsp;the&nbsp;words&nbsp;actually&nbsp;come<br>
+from"&nbsp;—&nbsp;the&nbsp;distinction&nbsp;matters,&nbsp;because&nbsp;the&nbsp;`content`&nbsp;string<br>
+assembled&nbsp;here&nbsp;is&nbsp;a&nbsp;fallback,&nbsp;not&nbsp;the&nbsp;utterance.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ThoughtComposer-__init__"><strong>__init__</strong></a>(self, network: 'ConceptNetwork', reasoner: 'Reasoner', language=None, seed: 'int | None' = None) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;composer&nbsp;with&nbsp;a&nbsp;concept&nbsp;network,&nbsp;reasoner,&nbsp;language&nbsp;engine,&nbsp;and&nbsp;RNG.</span></dd></dl>
+
+<dl><dt><a name="ThoughtComposer-compose_about"><strong>compose_about</strong></a>(self, concept_name: 'str', emotion: 'EmotionalState', depth: 'int' = 2, focused: 'bool' = False, mode: 'str' = 'full') -&gt; 'Thought | None'</dt><dd><span class="code">Compose&nbsp;a&nbsp;thought&nbsp;about&nbsp;a&nbsp;specific&nbsp;concept.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;core&nbsp;function.&nbsp;It&nbsp;looks&nbsp;up&nbsp;what&nbsp;Genesis&nbsp;knows<br>
+about&nbsp;a&nbsp;concept,&nbsp;reasons&nbsp;about&nbsp;it,&nbsp;and&nbsp;composes&nbsp;a&nbsp;novel<br>
+thought&nbsp;expressing&nbsp;its&nbsp;understanding.<br>
+&nbsp;<br>
+When&nbsp;``focused``&nbsp;is&nbsp;True&nbsp;(e.g.,&nbsp;when&nbsp;answering&nbsp;a&nbsp;direct<br>
+question),&nbsp;the&nbsp;response&nbsp;is&nbsp;kept&nbsp;tight&nbsp;—&nbsp;definition&nbsp;and&nbsp;key<br>
+relationships&nbsp;only,&nbsp;without&nbsp;associative&nbsp;tangents,&nbsp;discovery<br>
+phrases,&nbsp;or&nbsp;follow-up&nbsp;questions.&nbsp;Those&nbsp;are&nbsp;appropriate&nbsp;for<br>
+free-form&nbsp;conversation&nbsp;but&nbsp;add&nbsp;noise&nbsp;to&nbsp;focused&nbsp;answers.<br>
+&nbsp;<br>
+When&nbsp;``mode``&nbsp;is&nbsp;"definition",&nbsp;only&nbsp;the&nbsp;definition&nbsp;is&nbsp;returned<br>
+—&nbsp;no&nbsp;relationship&nbsp;facts,&nbsp;no&nbsp;reasoning,&nbsp;no&nbsp;follow-up.&nbsp;This&nbsp;is<br>
+useful&nbsp;for&nbsp;contexts&nbsp;like&nbsp;empathy&nbsp;where&nbsp;the&nbsp;definition&nbsp;is&nbsp;all<br>
+that's&nbsp;needed&nbsp;and&nbsp;relationship&nbsp;facts&nbsp;would&nbsp;be&nbsp;noise.<br>
+&nbsp;<br>
+Returns&nbsp;None&nbsp;if&nbsp;it&nbsp;has&nbsp;no&nbsp;knowledge&nbsp;of&nbsp;the&nbsp;concept.</span></dd></dl>
+
+<dl><dt><a name="ThoughtComposer-compose_answer"><strong>compose_answer</strong></a>(self, question_text: 'str', topics: 'list[str]', emotion: 'EmotionalState', question_type: 'str' = 'what_is') -&gt; 'Thought | None'</dt><dd><span class="code">Compose&nbsp;an&nbsp;intelligent&nbsp;answer&nbsp;to&nbsp;a&nbsp;question.<br>
+&nbsp;<br>
+Dynamically&nbsp;utilizes&nbsp;graph&nbsp;reasoning&nbsp;(relational&nbsp;deduction,&nbsp;process&nbsp;tracing,<br>
+comparisons,&nbsp;and&nbsp;affordance&nbsp;synthesis)&nbsp;and&nbsp;concept&nbsp;knowledge.<br>
+&nbsp;<br>
+No&nbsp;domain&nbsp;knowledge&nbsp;is&nbsp;hardcoded&nbsp;here.&nbsp;Process&nbsp;detection,&nbsp;topic<br>
+selection,&nbsp;and&nbsp;question&nbsp;routing&nbsp;all&nbsp;derive&nbsp;from&nbsp;the&nbsp;structure&nbsp;of<br>
+the&nbsp;concept&nbsp;network&nbsp;—&nbsp;what&nbsp;Genesis&nbsp;has&nbsp;learned&nbsp;and&nbsp;remembered.</span></dd></dl>
+
+<dl><dt><a name="ThoughtComposer-compose_novel_connection"><strong>compose_novel_connection</strong></a>(self, emotion: 'EmotionalState') -&gt; 'Thought | None'</dt><dd><span class="code">Compose&nbsp;a&nbsp;thought&nbsp;about&nbsp;a&nbsp;novel&nbsp;connection&nbsp;it's&nbsp;discovered.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;for&nbsp;moments&nbsp;when&nbsp;reasoning&nbsp;produces&nbsp;a&nbsp;hypothesis&nbsp;—<br>
+it&nbsp;can&nbsp;express&nbsp;it&nbsp;as&nbsp;a&nbsp;thought,&nbsp;not&nbsp;just&nbsp;store&nbsp;it.</span></dd></dl>
+
+<dl><dt><a name="ThoughtComposer-compose_reflection"><strong>compose_reflection</strong></a>(self, topic: 'str', emotion: 'EmotionalState') -&gt; 'Thought | None'</dt><dd><span class="code">Compose&nbsp;a&nbsp;reflective&nbsp;thought&nbsp;about&nbsp;a&nbsp;topic.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;for&nbsp;philosophical/existential&nbsp;questions.&nbsp;Instead&nbsp;of<br>
+hardcoded&nbsp;philosophy,&nbsp;it&nbsp;reflects&nbsp;on&nbsp;what&nbsp;it&nbsp;knows&nbsp;and<br>
+what&nbsp;it&nbsp;doesn't&nbsp;know.<br>
+&nbsp;<br>
+The&nbsp;raw&nbsp;knowledge&nbsp;(edges,&nbsp;definition,&nbsp;reasoning)&nbsp;is&nbsp;passed&nbsp;as<br>
+metadata&nbsp;so&nbsp;the&nbsp;language&nbsp;engine&nbsp;can&nbsp;compose&nbsp;its&nbsp;own&nbsp;text&nbsp;from<br>
+the&nbsp;graph&nbsp;data.&nbsp;The&nbsp;content&nbsp;field&nbsp;is&nbsp;a&nbsp;short&nbsp;fallback&nbsp;only.</span></dd></dl>
+
+<dl><dt><a name="ThoughtComposer-has_said_similar"><strong>has_said_similar</strong></a>(self, concept: 'str', content: 'str', threshold: 'float' = 0.3) -&gt; 'bool'</dt><dd><span class="code">Check&nbsp;if&nbsp;it's&nbsp;said&nbsp;something&nbsp;similar&nbsp;before.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>TYPE_CHECKING</strong> = False</td></tr></table>
+</body></html>

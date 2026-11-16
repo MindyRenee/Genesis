@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["generated_subgroup","is_homomorphism_zn","units_mod","zn_add_table","zn_order"],"struct":["Permutation"]};

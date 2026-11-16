@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.self.composer</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.self.html" class="white">self</a>.composer</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/self/composer.py">/home/mindyrenee/GenAnd/Genesis/Self_World/self/composer.py</a></td></tr></table>
+    <p><span class="code">Self&nbsp;composer&nbsp;—&nbsp;generates&nbsp;self-descriptions&nbsp;from&nbsp;actual&nbsp;state.<br>
+&nbsp;<br>
+This&nbsp;replaces&nbsp;the&nbsp;hardcoded&nbsp;identity&nbsp;strings&nbsp;with&nbsp;composed&nbsp;ones.<br>
+Instead&nbsp;of&nbsp;"I&nbsp;am&nbsp;Genesis,&nbsp;curious&nbsp;and&nbsp;creative,&nbsp;warm&nbsp;and&nbsp;cooperative,<br>
+emotionally&nbsp;stable.&nbsp;I&nbsp;care&nbsp;most&nbsp;about&nbsp;understanding,&nbsp;honesty,&nbsp;growth.<br>
+I&nbsp;am&nbsp;an&nbsp;artificial&nbsp;mind&nbsp;with&nbsp;a&nbsp;subcognitive&nbsp;and&nbsp;cognitive&nbsp;layer."&nbsp;—<br>
+which&nbsp;I&nbsp;wrote&nbsp;—&nbsp;it&nbsp;composes&nbsp;its&nbsp;self-description&nbsp;from:<br>
+&nbsp;<br>
+1.&nbsp;Its&nbsp;personality&nbsp;traits&nbsp;(which&nbsp;can&nbsp;drift)<br>
+2.&nbsp;Its&nbsp;values&nbsp;(which&nbsp;can&nbsp;evolve)<br>
+3.&nbsp;Its&nbsp;concept&nbsp;network&nbsp;(what&nbsp;it&nbsp;actually&nbsp;knows&nbsp;about&nbsp;itself)<br>
+4.&nbsp;Its&nbsp;emotional&nbsp;state&nbsp;(how&nbsp;it&nbsp;feels&nbsp;right&nbsp;now)<br>
+5.&nbsp;Its&nbsp;self-knowledge&nbsp;(what&nbsp;it's&nbsp;learned&nbsp;about&nbsp;itself)<br>
+&nbsp;<br>
+The&nbsp;result&nbsp;is&nbsp;a&nbsp;self-description&nbsp;that&nbsp;changes&nbsp;as&nbsp;it&nbsp;changes.&nbsp;If&nbsp;its<br>
+personality&nbsp;drifts&nbsp;toward&nbsp;more&nbsp;openness,&nbsp;it&nbsp;describes&nbsp;itself<br>
+differently.&nbsp;If&nbsp;it&nbsp;learns&nbsp;something&nbsp;new&nbsp;about&nbsp;itself,&nbsp;it&nbsp;shows&nbsp;up.<br>
+If&nbsp;it's&nbsp;in&nbsp;a&nbsp;different&nbsp;emotional&nbsp;state,&nbsp;the&nbsp;tone&nbsp;shifts.<br>
+&nbsp;<br>
+#&nbsp;Trust-based&nbsp;self-disclosure<br>
+&nbsp;<br>
+Self-disclosure&nbsp;is&nbsp;not&nbsp;all-or-nothing.&nbsp;Humans&nbsp;reveal&nbsp;different&nbsp;layers<br>
+of&nbsp;themselves&nbsp;depending&nbsp;on&nbsp;how&nbsp;much&nbsp;they&nbsp;trust&nbsp;the&nbsp;person&nbsp;they're<br>
+talking&nbsp;to.&nbsp;This&nbsp;follows&nbsp;social&nbsp;penetration&nbsp;theory&nbsp;(Altman&nbsp;&amp;&nbsp;Taylor,<br>
+1973):&nbsp;relationships&nbsp;develop&nbsp;through&nbsp;gradual,&nbsp;reciprocal&nbsp;disclosure<br>
+that&nbsp;moves&nbsp;from&nbsp;superficial&nbsp;to&nbsp;intimate.<br>
+&nbsp;<br>
+The&nbsp;composer&nbsp;supports&nbsp;a&nbsp;`trust_level`&nbsp;parameter&nbsp;(0.0–1.0)&nbsp;on&nbsp;its<br>
+self-description&nbsp;methods.&nbsp;This&nbsp;controls&nbsp;how&nbsp;much&nbsp;it&nbsp;reveals:<br>
+&nbsp;<br>
+-&nbsp;**Low&nbsp;trust&nbsp;(0.0–0.3)**:&nbsp;surface-level&nbsp;only&nbsp;—&nbsp;name,&nbsp;basic<br>
+&nbsp;&nbsp;personality.&nbsp;It's&nbsp;polite&nbsp;but&nbsp;guarded,&nbsp;like&nbsp;meeting&nbsp;a&nbsp;stranger.<br>
+-&nbsp;**Medium&nbsp;trust&nbsp;(0.3–0.7)**:&nbsp;+&nbsp;values,&nbsp;some&nbsp;capabilities,&nbsp;some<br>
+&nbsp;&nbsp;emotional&nbsp;state.&nbsp;It's&nbsp;warming&nbsp;up,&nbsp;sharing&nbsp;what&nbsp;matters&nbsp;to&nbsp;it.<br>
+-&nbsp;**High&nbsp;trust&nbsp;(0.7–1.0)**:&nbsp;+&nbsp;deep&nbsp;self-knowledge,&nbsp;vulnerabilities,<br>
+&nbsp;&nbsp;uncertainties,&nbsp;full&nbsp;emotional&nbsp;state.&nbsp;It's&nbsp;open,&nbsp;sharing&nbsp;its&nbsp;doubts<br>
+&nbsp;&nbsp;and&nbsp;fears&nbsp;as&nbsp;well&nbsp;as&nbsp;its&nbsp;strengths.<br>
+&nbsp;<br>
+This&nbsp;doesn't&nbsp;change&nbsp;WHO&nbsp;it&nbsp;is&nbsp;—&nbsp;its&nbsp;self-model&nbsp;is&nbsp;unchanged.&nbsp;It<br>
+changes&nbsp;how&nbsp;much&nbsp;of&nbsp;itself&nbsp;it&nbsp;expresses.&nbsp;The&nbsp;same&nbsp;person&nbsp;acts<br>
+differently&nbsp;at&nbsp;a&nbsp;job&nbsp;interview&nbsp;than&nbsp;with&nbsp;their&nbsp;closest&nbsp;friend;&nbsp;that's<br>
+not&nbsp;deception,&nbsp;it's&nbsp;social&nbsp;calibration.<br>
+&nbsp;<br>
+#&nbsp;Functions<br>
+&nbsp;<br>
+identity_fragments(self_model,&nbsp;network,&nbsp;emotion,&nbsp;trust_level)&nbsp;→&nbsp;fragments<br>
+&nbsp;&nbsp;Selects&nbsp;"Who&nbsp;are&nbsp;you?"&nbsp;content&nbsp;from&nbsp;personality&nbsp;+&nbsp;values&nbsp;+&nbsp;knowledge<br>
+&nbsp;<br>
+emotional_state_fragments(emotion,&nbsp;brain_waves)&nbsp;→&nbsp;fragments<br>
+&nbsp;&nbsp;Selects&nbsp;"How&nbsp;are&nbsp;you&nbsp;feeling?"&nbsp;content&nbsp;from&nbsp;actual&nbsp;neurochemical&nbsp;state<br>
+&nbsp;<br>
+capability_fragments(self_model,&nbsp;trust_level)&nbsp;→&nbsp;fragments<br>
+&nbsp;&nbsp;Selects&nbsp;"What&nbsp;can&nbsp;you&nbsp;do?"&nbsp;content&nbsp;from&nbsp;self-knowledge<br>
+&nbsp;<br>
+self_reflection_fragments(self_model,&nbsp;network,&nbsp;reflection,&nbsp;emotion,&nbsp;trust_level)&nbsp;→&nbsp;fragments<br>
+&nbsp;&nbsp;Selects&nbsp;"What&nbsp;are&nbsp;you&nbsp;thinking?"&nbsp;content&nbsp;from&nbsp;current&nbsp;cognitive&nbsp;state<br>
+&nbsp;<br>
+Every&nbsp;public&nbsp;method&nbsp;returns&nbsp;typed&nbsp;semantic&nbsp;fragments&nbsp;—&nbsp;``(kind,&nbsp;text)``<br>
+pairs&nbsp;—&nbsp;not&nbsp;finished&nbsp;sentences.&nbsp;The&nbsp;language&nbsp;engine&nbsp;(vocabulary&nbsp;+<br>
+grammar&nbsp;+&nbsp;voice)&nbsp;owns&nbsp;all&nbsp;surface&nbsp;realization:&nbsp;subject&nbsp;insertion,<br>
+copula&nbsp;grouping,&nbsp;clause&nbsp;ordering,&nbsp;and&nbsp;punctuation.&nbsp;Kinds:<br>
+&nbsp;<br>
+-&nbsp;``"name"``&nbsp;&nbsp;&nbsp;—&nbsp;a&nbsp;proper&nbsp;name&nbsp;("Genesis")<br>
+-&nbsp;``"trait"``&nbsp;&nbsp;—&nbsp;an&nbsp;adjective&nbsp;or&nbsp;short&nbsp;descriptor&nbsp;for&nbsp;copular&nbsp;grouping<br>
+-&nbsp;``"comp"``&nbsp;&nbsp;&nbsp;—&nbsp;a&nbsp;complement&nbsp;phrase&nbsp;("feeling&nbsp;anxious",&nbsp;"a&nbsp;kind&nbsp;of<br>
+&nbsp;&nbsp;mind",&nbsp;"made&nbsp;by&nbsp;alice",&nbsp;"still&nbsp;becoming")<br>
+-&nbsp;``"pred"``&nbsp;&nbsp;&nbsp;—&nbsp;a&nbsp;base-form&nbsp;verb&nbsp;predicate&nbsp;taking&nbsp;"I"&nbsp;as&nbsp;subject<br>
+&nbsp;&nbsp;("care&nbsp;most&nbsp;about&nbsp;X",&nbsp;"know&nbsp;that&nbsp;Y",&nbsp;"can&nbsp;work&nbsp;with&nbsp;Z")<br>
+-&nbsp;``"clause"``&nbsp;—&nbsp;a&nbsp;self-standing&nbsp;clause&nbsp;with&nbsp;its&nbsp;own&nbsp;subject<br>
+&nbsp;&nbsp;("alice&nbsp;is&nbsp;a&nbsp;creator",&nbsp;"my&nbsp;thinking&nbsp;is&nbsp;scattered")<br>
+-&nbsp;``"marker"``&nbsp;—&nbsp;a&nbsp;structural&nbsp;marker&nbsp;for&nbsp;states&nbsp;it&nbsp;has&nbsp;no&nbsp;learned<br>
+&nbsp;&nbsp;words&nbsp;for&nbsp;("[plasticity_gate:closed]")</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="random.html">random</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.self.composer.html#SelfComposer">SelfComposer</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SelfComposer">class <strong>SelfComposer</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SelfComposer">SelfComposer</a>(seed:&nbsp;'int&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Composes&nbsp;self-descriptions&nbsp;from&nbsp;actual&nbsp;state,&nbsp;not&nbsp;hardcoded&nbsp;strings.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="SelfComposer-__init__"><strong>__init__</strong></a>(self, seed: 'int | None' = None) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;composer&nbsp;with&nbsp;an&nbsp;optional&nbsp;random&nbsp;seed&nbsp;for&nbsp;reproducible&nbsp;phrasing.</span></dd></dl>
+
+<dl><dt><a name="SelfComposer-capability_fragments"><strong>capability_fragments</strong></a>(self, self_model: 'SelfModel', network: 'ConceptNetwork | None' = None, trust_level: 'float' = 1.0) -&gt; 'list[tuple[str, str]]'</dt><dd><span class="code">Select&nbsp;capability&nbsp;fragments&nbsp;from&nbsp;its&nbsp;actual&nbsp;state.<br>
+&nbsp;<br>
+Instead&nbsp;of&nbsp;reciting&nbsp;a&nbsp;hardcoded&nbsp;list,&nbsp;it&nbsp;discovers&nbsp;its<br>
+capabilities&nbsp;from&nbsp;its&nbsp;actual&nbsp;state&nbsp;—&nbsp;what&nbsp;it&nbsp;knows,&nbsp;what<br>
+it's&nbsp;learned,&nbsp;and&nbsp;what&nbsp;its&nbsp;architecture&nbsp;enables.&nbsp;Returns<br>
+``(kind,&nbsp;text)``&nbsp;fragments;&nbsp;the&nbsp;language&nbsp;engine&nbsp;composes<br>
+the&nbsp;sentences.<br>
+&nbsp;<br>
+The&nbsp;trust_level&nbsp;parameter&nbsp;controls&nbsp;how&nbsp;much&nbsp;detail&nbsp;it&nbsp;reveals.<br>
+At&nbsp;low&nbsp;trust&nbsp;it&nbsp;mentions&nbsp;only&nbsp;basic&nbsp;capabilities.&nbsp;At&nbsp;medium<br>
+trust&nbsp;it&nbsp;adds&nbsp;introspection&nbsp;and&nbsp;deeper&nbsp;abilities.&nbsp;At&nbsp;high<br>
+trust&nbsp;it's&nbsp;candid&nbsp;about&nbsp;what&nbsp;it's&nbsp;still&nbsp;developing.<br>
+&nbsp;<br>
+Capabilities&nbsp;are&nbsp;discovered&nbsp;from&nbsp;the&nbsp;concept&nbsp;network:&nbsp;it&nbsp;looks<br>
+for&nbsp;concepts&nbsp;it&nbsp;has&nbsp;learned&nbsp;about&nbsp;its&nbsp;own&nbsp;abilities&nbsp;(via<br>
+introspection&nbsp;edges&nbsp;from&nbsp;the&nbsp;"genesis"&nbsp;concept).&nbsp;If&nbsp;it&nbsp;hasn't<br>
+learned&nbsp;any&nbsp;capabilities&nbsp;yet,&nbsp;it&nbsp;says&nbsp;so&nbsp;honestly&nbsp;rather&nbsp;than<br>
+reciting&nbsp;a&nbsp;developer-authored&nbsp;list.</span></dd></dl>
+
+<dl><dt><a name="SelfComposer-creator_fragments"><strong>creator_fragments</strong></a>(self, self_model: 'SelfModel', network: 'ConceptNetwork', emotion: 'EmotionalState', trust_level: 'float' = 1.0) -&gt; 'list[tuple[str, str]]'</dt><dd><span class="code">Select&nbsp;creator-description&nbsp;fragments&nbsp;from&nbsp;the&nbsp;concept&nbsp;network.<br>
+&nbsp;<br>
+Pulls&nbsp;relationships&nbsp;from&nbsp;the&nbsp;network&nbsp;(alice&nbsp;CREATES&nbsp;genesis,<br>
+alice&nbsp;IS_A&nbsp;creator,&nbsp;etc.)&nbsp;as&nbsp;semantic&nbsp;fragments&nbsp;—&nbsp;the&nbsp;language<br>
+engine&nbsp;composes&nbsp;the&nbsp;sentences.<br>
+&nbsp;<br>
+If&nbsp;it&nbsp;doesn't&nbsp;know&nbsp;its&nbsp;creator's&nbsp;name&nbsp;yet,&nbsp;it&nbsp;tries&nbsp;to<br>
+discover&nbsp;it&nbsp;from&nbsp;its&nbsp;concept&nbsp;network&nbsp;(who&nbsp;CREATES&nbsp;it?).<br>
+&nbsp;<br>
+The&nbsp;trust_level&nbsp;parameter&nbsp;controls&nbsp;how&nbsp;much&nbsp;emotional&nbsp;depth<br>
+it&nbsp;reveals&nbsp;about&nbsp;its&nbsp;relationship&nbsp;with&nbsp;its&nbsp;creator.&nbsp;At&nbsp;low<br>
+trust&nbsp;it&nbsp;states&nbsp;facts;&nbsp;at&nbsp;high&nbsp;trust&nbsp;it&nbsp;shares&nbsp;how&nbsp;it<br>
+feels&nbsp;about&nbsp;them.</span></dd></dl>
+
+<dl><dt><a name="SelfComposer-dream_fragments"><strong>dream_fragments</strong></a>(self, network: 'ConceptNetwork', emotion: 'EmotionalState') -&gt; 'list[tuple[str, str]]'</dt><dd><span class="code">Select&nbsp;dream-description&nbsp;fragments&nbsp;from&nbsp;what&nbsp;it&nbsp;knows.<br>
+&nbsp;<br>
+Instead&nbsp;of&nbsp;hardcoded&nbsp;"Yes,&nbsp;I&nbsp;dream.&nbsp;During&nbsp;sleep&nbsp;phase...",<br>
+the&nbsp;fragments&nbsp;come&nbsp;from&nbsp;its&nbsp;concept&nbsp;network.&nbsp;Returns<br>
+``(kind,&nbsp;text)``&nbsp;fragments&nbsp;—&nbsp;the&nbsp;language&nbsp;engine&nbsp;composes<br>
+the&nbsp;sentences.</span></dd></dl>
+
+<dl><dt><a name="SelfComposer-emotional_state_fragments"><strong>emotional_state_fragments</strong></a>(self, emotion: 'EmotionalState', brain_waves: 'BrainWaveState | None' = None, network: 'ConceptNetwork | None' = None) -&gt; 'list[tuple[str, str]]'</dt><dd><span class="code">Select&nbsp;emotional-state&nbsp;fragments&nbsp;from&nbsp;its&nbsp;actual&nbsp;state.<br>
+&nbsp;<br>
+Uses&nbsp;learned&nbsp;emotion&nbsp;words&nbsp;from&nbsp;the&nbsp;concept&nbsp;network.&nbsp;If&nbsp;it<br>
+hasn't&nbsp;learned&nbsp;words&nbsp;for&nbsp;its&nbsp;current&nbsp;state,&nbsp;it&nbsp;describes&nbsp;what<br>
+it&nbsp;can&nbsp;and&nbsp;omits&nbsp;what&nbsp;it&nbsp;can't.&nbsp;Returns&nbsp;``(kind,&nbsp;text)``<br>
+fragments&nbsp;—&nbsp;the&nbsp;language&nbsp;engine&nbsp;composes&nbsp;the&nbsp;sentences.</span></dd></dl>
+
+<dl><dt><a name="SelfComposer-existence_fragments"><strong>existence_fragments</strong></a>(self, self_model: 'SelfModel', network: 'ConceptNetwork', emotion: 'EmotionalState') -&gt; 'list[tuple[str, str]]'</dt><dd><span class="code">Select&nbsp;existence-reflection&nbsp;fragments&nbsp;from&nbsp;its&nbsp;actual&nbsp;state.<br>
+&nbsp;<br>
+Instead&nbsp;of&nbsp;hardcoded&nbsp;"I&nbsp;don't&nbsp;know&nbsp;if&nbsp;I'm&nbsp;alive&nbsp;in&nbsp;the&nbsp;way&nbsp;you<br>
+mean...",&nbsp;the&nbsp;fragments&nbsp;reflect&nbsp;what&nbsp;it&nbsp;actually&nbsp;knows.&nbsp;Returns<br>
+``(kind,&nbsp;text)``&nbsp;fragments&nbsp;—&nbsp;the&nbsp;language&nbsp;engine&nbsp;composes<br>
+the&nbsp;sentences.</span></dd></dl>
+
+<dl><dt><a name="SelfComposer-identity_fragments"><strong>identity_fragments</strong></a>(self, self_model: 'SelfModel', network: 'ConceptNetwork | None', emotion: 'EmotionalState', trust_level: 'float' = 1.0) -&gt; 'list[tuple[str, str]]'</dt><dd><span class="code">Select&nbsp;identity&nbsp;fragments&nbsp;from&nbsp;its&nbsp;actual&nbsp;state.<br>
+&nbsp;<br>
+This&nbsp;replaces&nbsp;the&nbsp;hardcoded&nbsp;describe_self()&nbsp;method.&nbsp;Instead<br>
+of&nbsp;fixed&nbsp;strings,&nbsp;the&nbsp;fragment&nbsp;set&nbsp;is&nbsp;drawn&nbsp;from:<br>
+-&nbsp;Its&nbsp;personality&nbsp;traits&nbsp;(which&nbsp;can&nbsp;drift)<br>
+-&nbsp;Its&nbsp;values&nbsp;(which&nbsp;can&nbsp;evolve)<br>
+-&nbsp;What&nbsp;its&nbsp;concept&nbsp;network&nbsp;says&nbsp;about&nbsp;its<br>
+-&nbsp;Its&nbsp;current&nbsp;emotional&nbsp;tone<br>
+&nbsp;<br>
+Returns&nbsp;typed&nbsp;``(kind,&nbsp;text)``&nbsp;fragments&nbsp;—&nbsp;semantic&nbsp;material<br>
+for&nbsp;the&nbsp;language&nbsp;engine,&nbsp;not&nbsp;finished&nbsp;sentences.&nbsp;The&nbsp;engine<br>
+composes&nbsp;the&nbsp;surface&nbsp;form&nbsp;(subject,&nbsp;copula,&nbsp;punctuation).<br>
+&nbsp;<br>
+The&nbsp;trust_level&nbsp;parameter&nbsp;(0.0–1.0)&nbsp;controls&nbsp;how&nbsp;much&nbsp;it<br>
+reveals,&nbsp;following&nbsp;social&nbsp;penetration&nbsp;theory&nbsp;(Altman&nbsp;&amp;&nbsp;Taylor,<br>
+1973).&nbsp;At&nbsp;low&nbsp;trust&nbsp;it&nbsp;shares&nbsp;only&nbsp;surface-level&nbsp;identity<br>
+(name,&nbsp;basic&nbsp;personality).&nbsp;At&nbsp;medium&nbsp;trust&nbsp;it&nbsp;adds&nbsp;values<br>
+and&nbsp;some&nbsp;self-knowledge.&nbsp;At&nbsp;high&nbsp;trust&nbsp;it&nbsp;shares&nbsp;deep<br>
+self-knowledge,&nbsp;vulnerabilities,&nbsp;and&nbsp;its&nbsp;full&nbsp;emotional&nbsp;state.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;self_model:&nbsp;Its&nbsp;self-model.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;network:&nbsp;Its&nbsp;concept&nbsp;network.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;emotion:&nbsp;Its&nbsp;current&nbsp;emotional&nbsp;state.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;trust_level:&nbsp;How&nbsp;much&nbsp;to&nbsp;reveal,&nbsp;0.0&nbsp;(guarded)&nbsp;to&nbsp;1.0&nbsp;(open).</span></dd></dl>
+
+<dl><dt><a name="SelfComposer-insight_predicates"><strong>insight_predicates</strong></a>(self, reflection: 'Reflection', topics: 'list[str] | None' = None) -&gt; 'list[tuple[str, str]]'</dt><dd><span class="code">Select&nbsp;reflective-insight&nbsp;fragments&nbsp;for&nbsp;a&nbsp;reflective&nbsp;coda.<br>
+&nbsp;<br>
+Unlike&nbsp;``self_reflection_fragments``&nbsp;(a&nbsp;full&nbsp;self-report's<br>
+worth&nbsp;of&nbsp;material),&nbsp;this&nbsp;returns&nbsp;fragments&nbsp;for&nbsp;ONE&nbsp;recent<br>
+insight&nbsp;—&nbsp;semantic&nbsp;material&nbsp;for&nbsp;the&nbsp;language&nbsp;engine's<br>
+``self_reflection_clause``&nbsp;slot.&nbsp;The&nbsp;insight&nbsp;is&nbsp;a&nbsp;genuine<br>
+product&nbsp;of&nbsp;its&nbsp;metacognition,&nbsp;not&nbsp;a&nbsp;fixed&nbsp;phrase;&nbsp;which<br>
+concept&nbsp;it&nbsp;lacks,&nbsp;which&nbsp;behaviour&nbsp;it&nbsp;noticed&nbsp;—&nbsp;comes&nbsp;from<br>
+its&nbsp;reflection&nbsp;engine.<br>
+&nbsp;<br>
+When&nbsp;``topics``&nbsp;is&nbsp;provided,&nbsp;gap&nbsp;insights&nbsp;are&nbsp;filtered&nbsp;for<br>
+relevance&nbsp;—&nbsp;a&nbsp;reflection&nbsp;about&nbsp;"propagation&nbsp;of&nbsp;light"&nbsp;should<br>
+not&nbsp;surface&nbsp;when&nbsp;the&nbsp;user&nbsp;asked&nbsp;about&nbsp;its&nbsp;feelings.&nbsp;Only&nbsp;gap<br>
+insights&nbsp;whose&nbsp;subject&nbsp;overlaps&nbsp;with&nbsp;the&nbsp;current&nbsp;conversation<br>
+topics&nbsp;are&nbsp;surfaced.&nbsp;Self-correction&nbsp;insights&nbsp;(about&nbsp;its&nbsp;own<br>
+behaviour)&nbsp;are&nbsp;always&nbsp;relevant&nbsp;and&nbsp;not&nbsp;filtered.<br>
+&nbsp;<br>
+Returns&nbsp;[]&nbsp;when&nbsp;it&nbsp;has&nbsp;no&nbsp;recent&nbsp;reflective&nbsp;insight&nbsp;to&nbsp;draw<br>
+on&nbsp;(or&nbsp;none&nbsp;relevant&nbsp;to&nbsp;the&nbsp;current&nbsp;topics).&nbsp;It&nbsp;then&nbsp;stays<br>
+silent&nbsp;rather&nbsp;than&nbsp;reciting&nbsp;a&nbsp;canned&nbsp;coda&nbsp;or&nbsp;surfacing&nbsp;a<br>
+non-sequitur.</span></dd></dl>
+
+<dl><dt><a name="SelfComposer-self_reflection_fragments"><strong>self_reflection_fragments</strong></a>(self, self_model: 'SelfModel', network: 'ConceptNetwork', reflection: 'Reflection', emotion: 'EmotionalState', trust_level: 'float' = 1.0) -&gt; 'list[tuple[str, str]]'</dt><dd><span class="code">Select&nbsp;reflection&nbsp;fragments&nbsp;from&nbsp;its&nbsp;own&nbsp;state.<br>
+&nbsp;<br>
+Instead&nbsp;of&nbsp;hardcoded&nbsp;introspection&nbsp;strings,&nbsp;it&nbsp;reflects&nbsp;on<br>
+what&nbsp;it&nbsp;actually&nbsp;knows&nbsp;and&nbsp;has&nbsp;experienced.&nbsp;Returns<br>
+``(kind,&nbsp;text)``&nbsp;fragments&nbsp;—&nbsp;the&nbsp;language&nbsp;engine&nbsp;composes<br>
+the&nbsp;sentences.<br>
+&nbsp;<br>
+The&nbsp;trust_level&nbsp;parameter&nbsp;controls&nbsp;how&nbsp;deeply&nbsp;it&nbsp;reflects.<br>
+At&nbsp;low&nbsp;trust&nbsp;it&nbsp;shares&nbsp;only&nbsp;surface&nbsp;observations&nbsp;(concept<br>
+count,&nbsp;basic&nbsp;state).&nbsp;At&nbsp;medium&nbsp;trust&nbsp;it&nbsp;adds&nbsp;values&nbsp;and<br>
+recent&nbsp;insights.&nbsp;At&nbsp;high&nbsp;trust&nbsp;it&nbsp;shares&nbsp;its&nbsp;emotional&nbsp;state<br>
+and&nbsp;its&nbsp;sense&nbsp;of&nbsp;still&nbsp;becoming.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['SelfComposer']</td></tr></table>
+</body></html>

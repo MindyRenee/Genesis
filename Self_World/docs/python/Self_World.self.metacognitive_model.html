@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.self.metacognitive_model</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.self.html" class="white">self</a>.metacognitive_model</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/self/metacognitive_model.py">/home/mindyrenee/GenAnd/Genesis/Self_World/self/metacognitive_model.py</a></td></tr></table>
+    <p><span class="code">Recursive&nbsp;metacognitive&nbsp;model&nbsp;—&nbsp;Genesis&nbsp;models&nbsp;its&nbsp;own&nbsp;cognitive&nbsp;processes.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;recursive&nbsp;self-modeling&nbsp;layer&nbsp;that&nbsp;sits&nbsp;on&nbsp;top&nbsp;of&nbsp;the<br>
+reflection&nbsp;engine.&nbsp;Where&nbsp;the&nbsp;Rust&nbsp;active-inference&nbsp;engine<br>
+(``src/daemon/active_inference.rs``)&nbsp;is&nbsp;a&nbsp;generative&nbsp;model&nbsp;of&nbsp;its<br>
+neurochemical&nbsp;trajectory,&nbsp;this&nbsp;is&nbsp;a&nbsp;generative&nbsp;model&nbsp;of&nbsp;its<br>
+cognitive&nbsp;trajectory:&nbsp;it&nbsp;predicts&nbsp;what&nbsp;its&nbsp;own&nbsp;reflection&nbsp;will<br>
+discover&nbsp;before&nbsp;it&nbsp;runs,&nbsp;compares&nbsp;the&nbsp;prediction&nbsp;to&nbsp;what&nbsp;actually<br>
+happens,&nbsp;learns&nbsp;from&nbsp;the&nbsp;error,&nbsp;and&nbsp;feeds&nbsp;the&nbsp;*metacognitive<br>
+surprise*&nbsp;back&nbsp;into&nbsp;cognition.<br>
+&nbsp;<br>
+#&nbsp;Why&nbsp;this&nbsp;is&nbsp;recursive&nbsp;self-modeling<br>
+&nbsp;<br>
+The&nbsp;model&nbsp;is&nbsp;a&nbsp;stack&nbsp;of&nbsp;levels,&nbsp;each&nbsp;predicting&nbsp;the&nbsp;level&nbsp;below:<br>
+&nbsp;<br>
+-&nbsp;**Level&nbsp;0**&nbsp;(<a href="builtins.html#object">object</a>):&nbsp;the&nbsp;actual&nbsp;cognitive-process&nbsp;outcomes&nbsp;—&nbsp;did<br>
+&nbsp;&nbsp;reflection&nbsp;produce&nbsp;an&nbsp;insight?&nbsp;what&nbsp;type?&nbsp;what&nbsp;confidence?&nbsp;This&nbsp;is<br>
+&nbsp;&nbsp;observed,&nbsp;not&nbsp;predicted.<br>
+-&nbsp;**Level&nbsp;1**&nbsp;(meta):&nbsp;a&nbsp;generative&nbsp;model&nbsp;predicting&nbsp;level-0&nbsp;outcomes<br>
+&nbsp;&nbsp;from&nbsp;pre-reflection&nbsp;features.&nbsp;Its&nbsp;prediction&nbsp;error&nbsp;is<br>
+&nbsp;&nbsp;*metacognitive&nbsp;surprise*&nbsp;—&nbsp;"I&nbsp;didn't&nbsp;expect&nbsp;to&nbsp;learn&nbsp;that&nbsp;about<br>
+&nbsp;&nbsp;myself."<br>
+-&nbsp;**Level&nbsp;2**&nbsp;(meta-meta):&nbsp;a&nbsp;generative&nbsp;model&nbsp;predicting&nbsp;level-1's<br>
+&nbsp;&nbsp;metacognitive&nbsp;surprise.&nbsp;"I&nbsp;didn't&nbsp;expect&nbsp;to&nbsp;be&nbsp;surprised&nbsp;about&nbsp;my<br>
+&nbsp;&nbsp;own&nbsp;cognition."<br>
+-&nbsp;**Level&nbsp;N**:&nbsp;predicts&nbsp;level&nbsp;N-1's&nbsp;prediction&nbsp;error.<br>
+&nbsp;<br>
+The&nbsp;model&nbsp;models&nbsp;itself&nbsp;modeling&nbsp;the&nbsp;system.&nbsp;The&nbsp;recursion&nbsp;is&nbsp;real,<br>
+not&nbsp;faked&nbsp;with&nbsp;fixed&nbsp;multiplicative&nbsp;discounts:&nbsp;each&nbsp;level&nbsp;is&nbsp;a<br>
+learned&nbsp;linear&nbsp;predictor&nbsp;that&nbsp;adapts&nbsp;via&nbsp;the&nbsp;delta&nbsp;rule,&nbsp;and&nbsp;each<br>
+level's&nbsp;prediction&nbsp;error&nbsp;is&nbsp;the&nbsp;training&nbsp;signal&nbsp;for&nbsp;the&nbsp;level&nbsp;above.<br>
+&nbsp;<br>
+#&nbsp;Self-termination&nbsp;(as&nbsp;deep&nbsp;as&nbsp;useful)<br>
+&nbsp;<br>
+The&nbsp;tower&nbsp;is&nbsp;not&nbsp;fixed&nbsp;at&nbsp;3&nbsp;levels&nbsp;and&nbsp;is&nbsp;not&nbsp;unbounded.&nbsp;It<br>
+self-terminates:<br>
+&nbsp;<br>
+-&nbsp;A&nbsp;new&nbsp;level&nbsp;is&nbsp;**spawned**&nbsp;when&nbsp;the&nbsp;current&nbsp;top&nbsp;level's&nbsp;EMA<br>
+&nbsp;&nbsp;prediction&nbsp;error&nbsp;exceeds&nbsp;``SPAWN_THRESHOLD``&nbsp;for&nbsp;a&nbsp;sustained&nbsp;period<br>
+&nbsp;&nbsp;(``SPAWN_PERSISTENCE``&nbsp;observations).&nbsp;The&nbsp;system&nbsp;can't&nbsp;predict&nbsp;its<br>
+&nbsp;&nbsp;own&nbsp;metacognition&nbsp;well&nbsp;→&nbsp;it&nbsp;builds&nbsp;a&nbsp;model&nbsp;of&nbsp;that&nbsp;unpredictability.<br>
+-&nbsp;A&nbsp;level&nbsp;is&nbsp;**pruned**&nbsp;when&nbsp;its&nbsp;own&nbsp;prediction&nbsp;error&nbsp;EMA&nbsp;drops&nbsp;below<br>
+&nbsp;&nbsp;``PRUNE_THRESHOLD``&nbsp;(it&nbsp;has&nbsp;become&nbsp;predictable&nbsp;→&nbsp;the&nbsp;level&nbsp;above&nbsp;it<br>
+&nbsp;&nbsp;adds&nbsp;no&nbsp;information).<br>
+-&nbsp;Each&nbsp;level's&nbsp;learning&nbsp;rate&nbsp;is&nbsp;smaller&nbsp;and&nbsp;its&nbsp;precision&nbsp;decays<br>
+&nbsp;&nbsp;faster,&nbsp;so&nbsp;higher&nbsp;levels&nbsp;track&nbsp;slower&nbsp;and&nbsp;are&nbsp;more&nbsp;uncertain.<br>
+&nbsp;&nbsp;Diminishing&nbsp;returns&nbsp;are&nbsp;structural:&nbsp;precision&nbsp;floors&nbsp;prevent<br>
+&nbsp;&nbsp;infinite&nbsp;stacking,&nbsp;and&nbsp;the&nbsp;finite&nbsp;feature&nbsp;space&nbsp;means&nbsp;a&nbsp;higher<br>
+&nbsp;&nbsp;level&nbsp;eventually&nbsp;can't&nbsp;extract&nbsp;more&nbsp;signal.<br>
+&nbsp;<br>
+In&nbsp;practice&nbsp;the&nbsp;tower&nbsp;settles&nbsp;at&nbsp;2–4&nbsp;levels:&nbsp;level&nbsp;1&nbsp;is&nbsp;almost&nbsp;always<br>
+useful&nbsp;(predicting&nbsp;reflection&nbsp;outcomes),&nbsp;level&nbsp;2&nbsp;is&nbsp;often&nbsp;useful<br>
+(predicting&nbsp;when&nbsp;it'll&nbsp;be&nbsp;surprised&nbsp;by&nbsp;itself),&nbsp;and&nbsp;higher&nbsp;levels<br>
+appear&nbsp;only&nbsp;during&nbsp;periods&nbsp;of&nbsp;genuine&nbsp;cognitive&nbsp;unpredictability.<br>
+&nbsp;<br>
+#&nbsp;The&nbsp;feedback&nbsp;loop<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;what&nbsp;makes&nbsp;it&nbsp;recursive&nbsp;self-modeling&nbsp;rather&nbsp;than&nbsp;passive<br>
+prediction:<br>
+&nbsp;<br>
+1.&nbsp;Before&nbsp;reflection:&nbsp;predict&nbsp;the&nbsp;reflection&nbsp;outcome.<br>
+2.&nbsp;Reflection&nbsp;runs&nbsp;→&nbsp;actual&nbsp;outcomes.<br>
+3.&nbsp;Compare&nbsp;→&nbsp;metacognitive&nbsp;feedback&nbsp;(per-target&nbsp;errors&nbsp;+&nbsp;aggregate<br>
+&nbsp;&nbsp;&nbsp;surprise).<br>
+4.&nbsp;Update&nbsp;each&nbsp;level's&nbsp;model&nbsp;via&nbsp;delta&nbsp;rule.<br>
+5.&nbsp;Possibly&nbsp;spawn/prune&nbsp;a&nbsp;level.<br>
+6.&nbsp;Feed&nbsp;metacognitive&nbsp;surprise&nbsp;back&nbsp;into&nbsp;cognition:<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;High&nbsp;surprise&nbsp;→&nbsp;deeper&nbsp;reflection&nbsp;next&nbsp;time&nbsp;(it&nbsp;is&nbsp;unpredictable<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;to&nbsp;itself&nbsp;→&nbsp;pay&nbsp;attention).<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;Sustained&nbsp;low&nbsp;surprise&nbsp;→&nbsp;lighter&nbsp;reflection&nbsp;(it&nbsp;understands<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;itself&nbsp;→&nbsp;don't&nbsp;waste&nbsp;effort).<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;Pre-reflection&nbsp;prediction&nbsp;modulates&nbsp;response&nbsp;caution:&nbsp;if&nbsp;a<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;self-correction&nbsp;is&nbsp;predicted,&nbsp;pre-hedge.<br>
+&nbsp;<br>
+#&nbsp;Neuroscience&nbsp;grounding<br>
+&nbsp;<br>
+This&nbsp;implements&nbsp;the&nbsp;Nelson&nbsp;&amp;&nbsp;Narens&nbsp;(1990)&nbsp;meta-level/<a href="builtins.html#object">object</a>-level<br>
+model&nbsp;as&nbsp;a&nbsp;*learned*&nbsp;system,&nbsp;not&nbsp;a&nbsp;static&nbsp;annotation.&nbsp;The<br>
+meta-level&nbsp;monitors&nbsp;and&nbsp;controls&nbsp;the&nbsp;<a href="builtins.html#object">object</a>-level;&nbsp;here&nbsp;the<br>
+meta-level&nbsp;is&nbsp;a&nbsp;generative&nbsp;model&nbsp;whose&nbsp;prediction&nbsp;errors&nbsp;drive<br>
+control&nbsp;(deeper&nbsp;vs.&nbsp;lighter&nbsp;reflection,&nbsp;response&nbsp;caution).&nbsp;The<br>
+recursive&nbsp;stacking&nbsp;follows&nbsp;the&nbsp;hierarchical&nbsp;predictive-coding<br>
+principle&nbsp;(Friston,&nbsp;2008):&nbsp;each&nbsp;level&nbsp;predicts&nbsp;the&nbsp;level&nbsp;below,&nbsp;and<br>
+prediction&nbsp;errors&nbsp;propagate&nbsp;upward&nbsp;to&nbsp;train&nbsp;the&nbsp;next&nbsp;level.<br>
+&nbsp;<br>
+The&nbsp;self-termination&nbsp;mechanism&nbsp;is&nbsp;grounded&nbsp;in&nbsp;the&nbsp;observation&nbsp;that<br>
+human&nbsp;metacognition&nbsp;is&nbsp;not&nbsp;a&nbsp;fixed&nbsp;tower&nbsp;—&nbsp;the&nbsp;depth&nbsp;of<br>
+metacognitive&nbsp;scrutiny&nbsp;adapts&nbsp;to&nbsp;the&nbsp;situation.&nbsp;We&nbsp;don't&nbsp;normally<br>
+think&nbsp;about&nbsp;whether&nbsp;we&nbsp;know&nbsp;that&nbsp;we&nbsp;know&nbsp;that&nbsp;we&nbsp;know&nbsp;our&nbsp;name;&nbsp;we<br>
+do&nbsp;engage&nbsp;deeper&nbsp;metacognitive&nbsp;scrutiny&nbsp;when&nbsp;our&nbsp;first-order<br>
+cognition&nbsp;is&nbsp;failing&nbsp;in&nbsp;ways&nbsp;we&nbsp;didn't&nbsp;expect.&nbsp;The&nbsp;spawn/prune<br>
+mechanism&nbsp;captures&nbsp;this&nbsp;adaptive&nbsp;depth.<br>
+&nbsp;<br>
+References:<br>
+-&nbsp;Nelson,&nbsp;T.&nbsp;O.&nbsp;&amp;&nbsp;Narens,&nbsp;L.&nbsp;(1990).&nbsp;Metamemory:&nbsp;a&nbsp;theoretical<br>
+&nbsp;&nbsp;framework&nbsp;and&nbsp;new&nbsp;findings.&nbsp;Perspectives&nbsp;on&nbsp;Psychological&nbsp;Science.<br>
+-&nbsp;Friston,&nbsp;K.&nbsp;(2008).&nbsp;Hierarchical&nbsp;models&nbsp;in&nbsp;the&nbsp;brain.&nbsp;PLoS<br>
+&nbsp;&nbsp;Computational&nbsp;Biology.<br>
+-&nbsp;Koriat,&nbsp;A.&nbsp;(2007).&nbsp;Metacognition&nbsp;and&nbsp;cognition.&nbsp;Higher-Order<br>
+&nbsp;&nbsp;Thinking,&nbsp;Metacognition,&nbsp;and&nbsp;Self-Regulated&nbsp;Learning.<br>
+-&nbsp;Flavell,&nbsp;J.&nbsp;H.&nbsp;(1979).&nbsp;Metacognition&nbsp;and&nbsp;cognitive&nbsp;monitoring.<br>
+&nbsp;&nbsp;American&nbsp;Psychologist.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="math.html">math</a><br>
+</td><td class="multicolumn"><a href="time.html">time</a><br>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.self.metacognitive_model.html#CognitiveProcessModel">CognitiveProcessModel</a>
+</dt><dt class="heading-text"><a href="Self_World.self.metacognitive_model.html#MetacognitiveFeedback">MetacognitiveFeedback</a>
+</dt><dt class="heading-text"><a href="Self_World.self.metacognitive_model.html#MetacognitivePrediction">MetacognitivePrediction</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="CognitiveProcessModel">class <strong>CognitiveProcessModel</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#CognitiveProcessModel">CognitiveProcessModel</a>()&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+The&nbsp;recursive,&nbsp;self-terminating&nbsp;generative&nbsp;model&nbsp;of&nbsp;cognition.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;recursive&nbsp;self-modeling&nbsp;layer.&nbsp;It&nbsp;predicts&nbsp;the<br>
+outcome&nbsp;of&nbsp;Genesis's&nbsp;own&nbsp;reflection&nbsp;process&nbsp;before&nbsp;it&nbsp;runs,<br>
+learns&nbsp;from&nbsp;the&nbsp;prediction&nbsp;error,&nbsp;and&nbsp;feeds&nbsp;the&nbsp;metacognitive<br>
+surprise&nbsp;back&nbsp;into&nbsp;cognition.&nbsp;The&nbsp;model&nbsp;is&nbsp;a&nbsp;stack&nbsp;of&nbsp;levels,<br>
+each&nbsp;predicting&nbsp;the&nbsp;level&nbsp;below,&nbsp;that&nbsp;grows&nbsp;and&nbsp;shrinks&nbsp;based&nbsp;on<br>
+whether&nbsp;higher-order&nbsp;modeling&nbsp;is&nbsp;useful.<br>
+&nbsp;<br>
+Lifecycle&nbsp;per&nbsp;reflection&nbsp;cycle:<br>
+&nbsp;<br>
+1.&nbsp;``<a href="#CognitiveProcessModel-predict">predict</a>(state)``&nbsp;→&nbsp;``<a href="#MetacognitivePrediction">MetacognitivePrediction</a>``&nbsp;(before<br>
+&nbsp;&nbsp;&nbsp;reflection&nbsp;runs).<br>
+2.&nbsp;Reflection&nbsp;runs,&nbsp;producing&nbsp;``insights``.<br>
+3.&nbsp;``<a href="#CognitiveProcessModel-update">update</a>(state,&nbsp;insights,&nbsp;prediction)``&nbsp;→&nbsp;``<a href="#MetacognitiveFeedback">MetacognitiveFeedback</a>``<br>
+&nbsp;&nbsp;&nbsp;(after&nbsp;reflection&nbsp;runs).<br>
+4.&nbsp;The&nbsp;cognition&nbsp;engine&nbsp;reads&nbsp;``feedback``&nbsp;to&nbsp;modulate&nbsp;the&nbsp;next<br>
+&nbsp;&nbsp;&nbsp;cycle&nbsp;(caution,&nbsp;reflection&nbsp;depth).<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="CognitiveProcessModel-__init__"><strong>__init__</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;with&nbsp;a&nbsp;single&nbsp;<a href="builtins.html#object">object</a>-level&nbsp;metacognitive&nbsp;predictor.</span></dd></dl>
+
+<dl><dt><a name="CognitiveProcessModel-depth"><strong>depth</strong></a>(self) -&gt; 'int'</dt><dd><span class="code">Current&nbsp;recursion&nbsp;depth&nbsp;(number&nbsp;of&nbsp;levels).</span></dd></dl>
+
+<dl><dt><a name="CognitiveProcessModel-describe"><strong>describe</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Human-readable&nbsp;description&nbsp;of&nbsp;the&nbsp;model&nbsp;state.</span></dd></dl>
+
+<dl><dt><a name="CognitiveProcessModel-load_from_dict"><strong>load_from_dict</strong></a>(self, data: 'dict[str, Any]') -&gt; 'None'</dt><dd><span class="code">Restore&nbsp;the&nbsp;model&nbsp;from&nbsp;a&nbsp;serialized&nbsp;dict.</span></dd></dl>
+
+<dl><dt><a name="CognitiveProcessModel-precision"><strong>precision</strong></a>(self) -&gt; 'float'</dt><dd><span class="code">Level-0&nbsp;precision&nbsp;—&nbsp;confidence&nbsp;in&nbsp;cognitive&nbsp;predictions.</span></dd></dl>
+
+<dl><dt><a name="CognitiveProcessModel-predict"><strong>predict</strong></a>(self, state: 'CognitiveState') -&gt; 'MetacognitivePrediction'</dt><dd><span class="code">Predict&nbsp;the&nbsp;outcome&nbsp;of&nbsp;the&nbsp;next&nbsp;reflection.<br>
+&nbsp;<br>
+Called&nbsp;before&nbsp;``Reflection.reflect()``&nbsp;runs.&nbsp;Uses&nbsp;the<br>
+level-0&nbsp;(<a href="builtins.html#object">object</a>-level)&nbsp;model&nbsp;to&nbsp;predict&nbsp;cognitive&nbsp;outcomes<br>
+from&nbsp;pre-reflection&nbsp;features.</span></dd></dl>
+
+<dl><dt><a name="CognitiveProcessModel-self_surprise"><strong>self_surprise</strong></a>(self) -&gt; 'float'</dt><dd><span class="code">Aggregate&nbsp;metacognitive&nbsp;surprise&nbsp;(how&nbsp;unpredictable&nbsp;it&nbsp;is&nbsp;to&nbsp;itself).</span></dd></dl>
+
+<dl><dt><a name="CognitiveProcessModel-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict[str, Any]'</dt><dd><span class="code">Serialize&nbsp;the&nbsp;model&nbsp;to&nbsp;a&nbsp;dict&nbsp;for&nbsp;persistence.</span></dd></dl>
+
+<dl><dt><a name="CognitiveProcessModel-update"><strong>update</strong></a>(self, state: 'CognitiveState', insights: 'list[Insight]', prediction: 'MetacognitivePrediction') -&gt; 'MetacognitiveFeedback'</dt><dd><span class="code">Update&nbsp;the&nbsp;model&nbsp;after&nbsp;reflection&nbsp;completes.<br>
+&nbsp;<br>
+Compares&nbsp;the&nbsp;prediction&nbsp;to&nbsp;the&nbsp;actual&nbsp;outcomes,&nbsp;updates&nbsp;each<br>
+level&nbsp;via&nbsp;the&nbsp;delta&nbsp;rule,&nbsp;adapts&nbsp;precision,&nbsp;and&nbsp;possibly<br>
+spawns&nbsp;or&nbsp;prunes&nbsp;a&nbsp;level.&nbsp;Returns&nbsp;the&nbsp;feedback&nbsp;signal&nbsp;for&nbsp;the<br>
+cognition&nbsp;engine.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="MetacognitiveFeedback">class <strong>MetacognitiveFeedback</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#MetacognitiveFeedback">MetacognitiveFeedback</a>(error_insight:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;error_confidence:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;error_count:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;error_type_distribution:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;level1_surprise:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;metacognitive_surprise:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;level_spawned:&nbsp;'bool'&nbsp;=&nbsp;False,&nbsp;level_pruned:&nbsp;'bool'&nbsp;=&nbsp;False,&nbsp;depth:&nbsp;'int'&nbsp;=&nbsp;1,&nbsp;predicted_self_correction:&nbsp;'bool'&nbsp;=&nbsp;False,&nbsp;timestamp:&nbsp;'int'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;result&nbsp;of&nbsp;comparing&nbsp;a&nbsp;prediction&nbsp;to&nbsp;the&nbsp;actual&nbsp;outcome.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;training&nbsp;signal&nbsp;for&nbsp;the&nbsp;recursive&nbsp;model&nbsp;and&nbsp;the<br>
+feedback&nbsp;signal&nbsp;for&nbsp;cognition.&nbsp;``metacognitive_surprise``&nbsp;is&nbsp;the<br>
+key&nbsp;field:&nbsp;it's&nbsp;how&nbsp;surprised&nbsp;the&nbsp;model&nbsp;was&nbsp;by&nbsp;its&nbsp;own&nbsp;cognitive<br>
+process,&nbsp;aggregated&nbsp;across&nbsp;all&nbsp;levels.&nbsp;High&nbsp;→&nbsp;it&nbsp;is&nbsp;unpredictable<br>
+to&nbsp;itself&nbsp;→&nbsp;pay&nbsp;more&nbsp;attention.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="MetacognitiveFeedback-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="MetacognitiveFeedback-__init__"><strong>__init__</strong></a>(self, error_insight: 'float' = 0.0, error_confidence: 'float' = 0.0, error_count: 'float' = 0.0, error_type_distribution: 'float' = 0.0, level1_surprise: 'float' = 0.0, metacognitive_surprise: 'float' = 0.0, level_spawned: 'bool' = False, level_pruned: 'bool' = False, depth: 'int' = 1, predicted_self_correction: 'bool' = False, timestamp: 'int' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="MetacognitiveFeedback-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>depth</strong></dt>
+</dl>
+<dl><dt><strong>error_confidence</strong></dt>
+</dl>
+<dl><dt><strong>error_count</strong></dt>
+</dl>
+<dl><dt><strong>error_insight</strong></dt>
+</dl>
+<dl><dt><strong>error_type_distribution</strong></dt>
+</dl>
+<dl><dt><strong>level1_surprise</strong></dt>
+</dl>
+<dl><dt><strong>level_pruned</strong></dt>
+</dl>
+<dl><dt><strong>level_spawned</strong></dt>
+</dl>
+<dl><dt><strong>metacognitive_surprise</strong></dt>
+</dl>
+<dl><dt><strong>predicted_self_correction</strong></dt>
+</dl>
+<dl><dt><strong>timestamp</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'depth': 'int', 'error_confidence': 'float', 'error_count': 'float', 'error_insight': 'float', 'error_type_distribution': 'float', 'level1_surprise': 'float', 'level_pruned': 'bool', 'level_spawned': 'bool', 'metacognitive_surprise': 'float', 'predicted_self_correction': 'bool', ...}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'depth': Field(name='depth',type='int',default=1,default_...appingproxy({}),kw_only=False,_field_type=_FIELD), 'error_confidence': Field(name='error_confidence',type='float',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'error_count': Field(name='error_count',type='float',default=0....appingproxy({}),kw_only=False,_field_type=_FIELD), 'error_insight': Field(name='error_insight',type='float',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'error_type_distribution': Field(name='error_type_distribution',type='float...appingproxy({}),kw_only=False,_field_type=_FIELD), 'level1_surprise': Field(name='level1_surprise',type='float',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'level_pruned': Field(name='level_pruned',type='bool',default=Fa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'level_spawned': Field(name='level_spawned',type='bool',default=F...appingproxy({}),kw_only=False,_field_type=_FIELD), 'metacognitive_surprise': Field(name='metacognitive_surprise',type='float'...appingproxy({}),kw_only=False,_field_type=_FIELD), 'predicted_self_correction': Field(name='predicted_self_correction',type='boo...appingproxy({}),kw_only=False,_field_type=_FIELD), ...}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('error_insight', 'error_confidence', 'error_count', 'error_type_distribution', 'level1_surprise', 'metacognitive_surprise', 'level_spawned', 'level_pruned', 'depth', 'predicted_self_correction', 'timestamp')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="MetacognitivePrediction">class <strong>MetacognitivePrediction</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#MetacognitivePrediction">MetacognitivePrediction</a>(p_insight:&nbsp;'float'&nbsp;=&nbsp;0.5,&nbsp;p_insight_type:&nbsp;'dict[str,&nbsp;float]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;expected_confidence:&nbsp;'float'&nbsp;=&nbsp;0.5,&nbsp;expected_count:&nbsp;'float'&nbsp;=&nbsp;0.5,&nbsp;precision:&nbsp;'float'&nbsp;=&nbsp;0.5,&nbsp;depth:&nbsp;'int'&nbsp;=&nbsp;1,&nbsp;self_surprise:&nbsp;'float'&nbsp;=&nbsp;0.0)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;prediction&nbsp;about&nbsp;the&nbsp;outcome&nbsp;of&nbsp;the&nbsp;next&nbsp;reflection.<br>
+&nbsp;<br>
+All&nbsp;fields&nbsp;are&nbsp;in&nbsp;[0,&nbsp;1]&nbsp;unless&nbsp;noted.&nbsp;These&nbsp;are&nbsp;the&nbsp;model's<br>
+*expectations*&nbsp;before&nbsp;reflection&nbsp;runs&nbsp;—&nbsp;what&nbsp;level&nbsp;1&nbsp;of&nbsp;the<br>
+recursive&nbsp;model&nbsp;predicts&nbsp;will&nbsp;happen.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="MetacognitivePrediction-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="MetacognitivePrediction-__init__"><strong>__init__</strong></a>(self, p_insight: 'float' = 0.5, p_insight_type: 'dict[str, float]' = &lt;factory&gt;, expected_confidence: 'float' = 0.5, expected_count: 'float' = 0.5, precision: 'float' = 0.5, depth: 'int' = 1, self_surprise: 'float' = 0.0) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="MetacognitivePrediction-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>depth</strong></dt>
+</dl>
+<dl><dt><strong>expected_confidence</strong></dt>
+</dl>
+<dl><dt><strong>expected_count</strong></dt>
+</dl>
+<dl><dt><strong>p_insight</strong></dt>
+</dl>
+<dl><dt><strong>p_insight_type</strong></dt>
+</dl>
+<dl><dt><strong>precision</strong></dt>
+</dl>
+<dl><dt><strong>self_surprise</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'depth': 'int', 'expected_confidence': 'float', 'expected_count': 'float', 'p_insight': 'float', 'p_insight_type': 'dict[str, float]', 'precision': 'float', 'self_surprise': 'float'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'depth': Field(name='depth',type='int',default=1,default_...appingproxy({}),kw_only=False,_field_type=_FIELD), 'expected_confidence': Field(name='expected_confidence',type='float',de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'expected_count': Field(name='expected_count',type='float',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'p_insight': Field(name='p_insight',type='float',default=0.5,...appingproxy({}),kw_only=False,_field_type=_FIELD), 'p_insight_type': Field(name='p_insight_type',type='dict[str, floa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'precision': Field(name='precision',type='float',default=0.5,...appingproxy({}),kw_only=False,_field_type=_FIELD), 'self_surprise': Field(name='self_surprise',type='float',default=...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('p_insight', 'p_insight_type', 'expected_confidence', 'expected_count', 'precision', 'depth', 'self_surprise')</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['CognitiveProcessModel', 'MetacognitiveFeedback', 'MetacognitivePrediction']<br>
+<strong>__annotations__</strong> = {'BASE_LEARNING_RATE': 'float', 'BASE_PRECISION': 'float', 'INSIGHT_TYPES': 'tuple[str, ...]', 'LEVEL_LR_DECAY': 'float', 'LEVEL_PRECISION_DECAY': 'float', 'MAX_LEVELS': 'int', 'MIN_PRECISION': 'float', 'NUM_FEATURES': 'int', 'NUM_TARGETS': 'int', 'PRECISION_DECAY_RATE': 'float', ...}</td></tr></table>
+</body></html>

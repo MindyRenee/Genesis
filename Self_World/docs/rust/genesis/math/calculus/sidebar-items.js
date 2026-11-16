@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["definite_integral_poly","differentiate_poly","integrate_poly","numeric_derivative"]};

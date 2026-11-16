@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.frontal_lobe.glutamate</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.frontal_lobe.html" class="white">frontal_lobe</a>.glutamate</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/glutamate.py">/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/glutamate.py</a></td></tr></table>
+    <p><span class="code"><a href="#Glutamate">Glutamate</a>&nbsp;—&nbsp;primary&nbsp;excitatory&nbsp;neurotransmitter;&nbsp;drives&nbsp;cortical&nbsp;activity.<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+BIOLOGY<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+Origin:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Cortical&nbsp;pyramidal&nbsp;neurons&nbsp;(ubiquitous)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Thalamic&nbsp;relay&nbsp;neurons<br>
+&nbsp;<br>
+Projections:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Throughout&nbsp;the&nbsp;brain.&nbsp;<a href="#Glutamate">Glutamate</a>&nbsp;is&nbsp;the&nbsp;brain's&nbsp;main&nbsp;excitatory<br>
+&nbsp;&nbsp;&nbsp;&nbsp;neurotransmitter,&nbsp;present&nbsp;in&nbsp;the&nbsp;majority&nbsp;of&nbsp;all&nbsp;synapses.<br>
+&nbsp;<br>
+Receptors:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;NMDA&nbsp;—&nbsp;voltage-gated,&nbsp;Ca2+&nbsp;permeable,&nbsp;slow.&nbsp;Key&nbsp;for&nbsp;LTP/LTD.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Blocked&nbsp;by&nbsp;Mg2+&nbsp;at&nbsp;rest,&nbsp;requires&nbsp;depolarization&nbsp;to&nbsp;open.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;AMPA&nbsp;—&nbsp;fast&nbsp;Na+/K+&nbsp;channel,&nbsp;primary&nbsp;EPSC.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Kainate&nbsp;—&nbsp;fast,&nbsp;less&nbsp;common.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Metabotropic&nbsp;(mGluR1-8)&nbsp;—&nbsp;Gq/Gi-coupled,&nbsp;modulatory.<br>
+&nbsp;<br>
+No&nbsp;subtype&nbsp;differentiation&nbsp;modeled&nbsp;(default_receptor_subtypes&nbsp;=&nbsp;[1.0,&nbsp;1.0]).<br>
+&nbsp;<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+DEFAULT&nbsp;BASELINE<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;baseline&nbsp;=&nbsp;0.60<br>
+&nbsp;<br>
+~2&nbsp;µM&nbsp;extracellular.&nbsp;Main&nbsp;excitatory&nbsp;transmitter,&nbsp;highest<br>
+concentration.&nbsp;The&nbsp;GLU/GABA&nbsp;balance&nbsp;is&nbsp;the&nbsp;primary&nbsp;E/I&nbsp;axis.<br>
+&nbsp;<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+RECEPTOR&nbsp;ADAPTATION&nbsp;MULTIPLIER<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;multiplier&nbsp;=&nbsp;1.0<br>
+&nbsp;<br>
+<a href="#Glutamate">Glutamate</a>&nbsp;receptors&nbsp;are&nbsp;the&nbsp;baseline&nbsp;reference&nbsp;for&nbsp;adaptation&nbsp;rate.<br>
+&nbsp;<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+COUPLING:&nbsp;HOW&nbsp;OTHERS&nbsp;AFFECT&nbsp;GLUTAMATE&nbsp;(matrix&nbsp;row&nbsp;5)<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+Index&nbsp;order:&nbsp;DA,&nbsp;SRT,&nbsp;NE,&nbsp;ACh,&nbsp;GABA,&nbsp;GLU,&nbsp;CORT,&nbsp;OXY,&nbsp;END,&nbsp;HIST,<br>
+ADN,&nbsp;BDNF,&nbsp;ECB,&nbsp;VP,&nbsp;CRH,&nbsp;OX,&nbsp;EPI,&nbsp;MEL<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;DA&nbsp;&nbsp;&nbsp;-&gt;&nbsp;GLU:&nbsp;+0.05&nbsp;&nbsp;(weak&nbsp;volume&nbsp;transmission.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;SRT&nbsp;&nbsp;-&gt;&nbsp;GLU:&nbsp;-0.05&nbsp;&nbsp;(weak&nbsp;volume&nbsp;transmission.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;NE&nbsp;&nbsp;&nbsp;-&gt;&nbsp;GLU:&nbsp;+0.05&nbsp;&nbsp;(weak&nbsp;volume&nbsp;transmission.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ACh&nbsp;&nbsp;-&gt;&nbsp;GLU:&nbsp;+0.05&nbsp;&nbsp;(weak&nbsp;volume&nbsp;transmission.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;GABA&nbsp;-&gt;&nbsp;GLU:&nbsp;-0.30&nbsp;&nbsp;(THE&nbsp;primary&nbsp;inhibitory&nbsp;brake.&nbsp;Strongest<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;coupling&nbsp;in&nbsp;the&nbsp;matrix.&nbsp;GABA&nbsp;is&nbsp;the&nbsp;brain's<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;main&nbsp;mechanism&nbsp;for&nbsp;controlling&nbsp;glutamatergic<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;excitation.&nbsp;<a href="#Glutamate">Glutamate</a>&nbsp;is&nbsp;~1000x&nbsp;more<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;concentrated&nbsp;than&nbsp;monoamines.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;OXY&nbsp;&nbsp;-&gt;&nbsp;GLU:&nbsp;-0.05&nbsp;&nbsp;(weak&nbsp;volume&nbsp;transmission.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;END&nbsp;&nbsp;-&gt;&nbsp;GLU:&nbsp;-0.05&nbsp;&nbsp;(weak&nbsp;volume&nbsp;transmission.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;HIST&nbsp;-&gt;&nbsp;GLU:&nbsp;+0.05&nbsp;&nbsp;(weak&nbsp;volume&nbsp;transmission.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;BDNF&nbsp;-&gt;&nbsp;GLU:&nbsp;+0.05&nbsp;&nbsp;(weak&nbsp;volume&nbsp;transmission.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ECB&nbsp;&nbsp;-&gt;&nbsp;GLU:&nbsp;-0.05&nbsp;&nbsp;(weak&nbsp;volume&nbsp;transmission.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;OX&nbsp;&nbsp;&nbsp;-&gt;&nbsp;GLU:&nbsp;+0.05&nbsp;&nbsp;(weak&nbsp;volume&nbsp;transmission.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;EPI&nbsp;&nbsp;-&gt;&nbsp;GLU:&nbsp;+0.05&nbsp;&nbsp;(weak&nbsp;volume&nbsp;transmission.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;MEL&nbsp;&nbsp;-&gt;&nbsp;GLU:&nbsp;-0.05&nbsp;&nbsp;(weak&nbsp;volume&nbsp;transmission.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;CORT&nbsp;-&gt;&nbsp;GLU:&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ADN&nbsp;&nbsp;-&gt;&nbsp;GLU:&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;VP&nbsp;&nbsp;&nbsp;-&gt;&nbsp;GLU:&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;CRH&nbsp;&nbsp;-&gt;&nbsp;GLU:&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+COUPLING:&nbsp;HOW&nbsp;GLUTAMATE&nbsp;AFFECTS&nbsp;OTHERS&nbsp;(matrix&nbsp;column&nbsp;5)<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;GLU&nbsp;-&gt;&nbsp;DA&nbsp;:&nbsp;&nbsp;+0.05&nbsp;&nbsp;(VTA&nbsp;glutamate&nbsp;input&nbsp;drives&nbsp;DA.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;GLU&nbsp;-&gt;&nbsp;SRT:&nbsp;&nbsp;+0.05&nbsp;&nbsp;(weak&nbsp;volume&nbsp;transmission.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;GLU&nbsp;-&gt;&nbsp;NE&nbsp;:&nbsp;&nbsp;+0.05&nbsp;&nbsp;(weak&nbsp;volume&nbsp;transmission.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;GLU&nbsp;-&gt;&nbsp;ACh:&nbsp;&nbsp;+0.05&nbsp;&nbsp;(weak&nbsp;volume&nbsp;transmission.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;GLU&nbsp;-&gt;&nbsp;GABA:&nbsp;&nbsp;+0.10&nbsp;&nbsp;(activity-driven&nbsp;feedback&nbsp;inhibition&nbsp;—&nbsp;when<br>
+&nbsp;&nbsp;&nbsp;&nbsp;GLU&nbsp;rises,&nbsp;it&nbsp;drives&nbsp;GABAergic&nbsp;interneurons&nbsp;to&nbsp;fire,&nbsp;providing&nbsp;automatic&nbsp;gain&nbsp;control.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;This&nbsp;is&nbsp;the&nbsp;core&nbsp;E/I&nbsp;balance&nbsp;mechanism.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;GLU&nbsp;-&gt;&nbsp;END:&nbsp;&nbsp;-0.05&nbsp;&nbsp;(weak&nbsp;volume&nbsp;transmission.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;GLU&nbsp;-&gt;&nbsp;HIST:&nbsp;&nbsp;+0.05&nbsp;&nbsp;(weak&nbsp;volume&nbsp;transmission.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;GLU&nbsp;-&gt;&nbsp;BDNF:&nbsp;&nbsp;+0.05&nbsp;&nbsp;(trophic&nbsp;support.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;GLU&nbsp;-&gt;&nbsp;ECB:&nbsp;&nbsp;+0.05&nbsp;&nbsp;(neural&nbsp;activity&nbsp;stimulates&nbsp;eCB&nbsp;synthesis.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;GLU&nbsp;-&gt;&nbsp;OX&nbsp;:&nbsp;&nbsp;+0.05&nbsp;&nbsp;(weak&nbsp;volume&nbsp;transmission.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;GLU&nbsp;-&gt;&nbsp;EPI:&nbsp;&nbsp;+0.05&nbsp;&nbsp;(weak&nbsp;volume&nbsp;transmission.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;GLU&nbsp;-&gt;&nbsp;CORT:&nbsp;&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;GLU&nbsp;-&gt;&nbsp;OXY:&nbsp;&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;GLU&nbsp;-&gt;&nbsp;ADN:&nbsp;&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;GLU&nbsp;-&gt;&nbsp;VP&nbsp;:&nbsp;&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;GLU&nbsp;-&gt;&nbsp;CRH:&nbsp;&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;GLU&nbsp;-&gt;&nbsp;MEL:&nbsp;&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+SPECIAL&nbsp;DYNAMICS<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+GABA&nbsp;disinhibition&nbsp;target:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;When&nbsp;GABA&nbsp;is&nbsp;very&nbsp;high&nbsp;(&gt;0.8)&nbsp;AND&nbsp;ACh&nbsp;is&nbsp;high&nbsp;(&gt;0.6),&nbsp;GABA<br>
+&nbsp;&nbsp;&nbsp;&nbsp;interneurons&nbsp;inhibit&nbsp;other&nbsp;GABA&nbsp;interneurons,&nbsp;disinhibiting<br>
+&nbsp;&nbsp;&nbsp;&nbsp;glutamate.&nbsp;<a href="#Glutamate">Glutamate</a>&nbsp;is&nbsp;the&nbsp;target&nbsp;of&nbsp;this&nbsp;disinhibition.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;gaba_eff&nbsp;&gt;&nbsp;0.8&nbsp;and&nbsp;ach_eff&nbsp;&gt;&nbsp;0.6:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;disinhibition&nbsp;=&nbsp;(gaba_eff&nbsp;-&nbsp;0.8)&nbsp;*&nbsp;(ach_eff&nbsp;-&nbsp;0.6)&nbsp;*&nbsp;0.5<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;glutamate_level&nbsp;+=&nbsp;disinhibition&nbsp;*&nbsp;dt<br>
+&nbsp;<br>
+Endocannabinoid&nbsp;synthesis&nbsp;trigger:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#Glutamate">Glutamate</a>&nbsp;activity&nbsp;drives&nbsp;endocannabinoid&nbsp;synthesis.&nbsp;eCB&nbsp;is<br>
+&nbsp;&nbsp;&nbsp;&nbsp;produced&nbsp;on&nbsp;demand&nbsp;by&nbsp;postsynaptic&nbsp;neurons&nbsp;when&nbsp;strongly<br>
+&nbsp;&nbsp;&nbsp;&nbsp;activated&nbsp;by&nbsp;glutamate&nbsp;(excitation)&nbsp;or&nbsp;GABA&nbsp;(inhibition).<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;activity&nbsp;=&nbsp;eff_glu&nbsp;+&nbsp;eff_gaba<br>
+&nbsp;&nbsp;&nbsp;&nbsp;synthesis&nbsp;=&nbsp;activity&nbsp;*&nbsp;ecb_activity_coupling&nbsp;*&nbsp;dt<br>
+&nbsp;<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+MATHEMATICAL&nbsp;FORMULAS<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+Homeostatic&nbsp;force,&nbsp;effective&nbsp;level,&nbsp;coupling&nbsp;force,&nbsp;vesicular&nbsp;pool,<br>
+tonic/phasic,&nbsp;receptor&nbsp;adaptation,&nbsp;baseline&nbsp;adaptation:&nbsp;same<br>
+general&nbsp;formulas&nbsp;as&nbsp;dopamine.py.<br>
+&nbsp;<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+CIRCADIAN&nbsp;MODULATION<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;modifier&nbsp;=&nbsp;1.0&nbsp;(no&nbsp;circadian&nbsp;modulation)<br>
+&nbsp;<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+BRAIN&nbsp;WAVE&nbsp;COUPLING<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#Glutamate">Glutamate</a>&nbsp;-&gt;&nbsp;gamma&nbsp;(active&nbsp;cortical&nbsp;processing)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;High&nbsp;GLU&nbsp;+&nbsp;high&nbsp;ACh&nbsp;-&gt;&nbsp;gamma&nbsp;(attention)<br>
+&nbsp;<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+ROLE&nbsp;IN&nbsp;EMERGENT&nbsp;PHASES<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+Valence&nbsp;equation:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;valence&nbsp;=&nbsp;DA*0.25&nbsp;+&nbsp;SRT*0.25&nbsp;+&nbsp;OXY*0.10&nbsp;+&nbsp;END*0.15&nbsp;+&nbsp;NE*0.10<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;CORT*0.35&nbsp;-&nbsp;glu_excess*0.15&nbsp;+&nbsp;DA*SRT*0.10<br>
+&nbsp;&nbsp;&nbsp;&nbsp;where&nbsp;glu_excess&nbsp;=&nbsp;max(0,&nbsp;GLU&nbsp;-&nbsp;0.70)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(glutamate&nbsp;excess&nbsp;&gt;&nbsp;0.70&nbsp;contributes&nbsp;-0.15&nbsp;—&nbsp;models<br>
+&nbsp;&nbsp;&nbsp;&nbsp;excitotoxicity-adjacent&nbsp;agitation&nbsp;from&nbsp;excess&nbsp;excitatory&nbsp;drive)<br>
+&nbsp;<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+APPLICATION&nbsp;IN&nbsp;GENESIS<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+Maximum&nbsp;impulse&nbsp;magnitude:&nbsp;0.3<br>
+(Conservative&nbsp;—&nbsp;excess&nbsp;glutamate&nbsp;is&nbsp;excitotoxic)<br>
+&nbsp;<br>
+Python&nbsp;modules&nbsp;that&nbsp;send&nbsp;glutamate&nbsp;impulses:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;emotional_regulator.py:&nbsp;calming&nbsp;(negative),&nbsp;stress&nbsp;reduction<br>
+&nbsp;<br>
+Python&nbsp;modules&nbsp;that&nbsp;read&nbsp;glutamate:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;emotion.py:&nbsp;maps&nbsp;to&nbsp;EmotionalState&nbsp;(arousal,&nbsp;agitation)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;emotional_regulator.py:&nbsp;homeostatic&nbsp;regulation<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;brain_waves.py:&nbsp;gamma&nbsp;baseline<br>
+&nbsp;<br>
+Typical&nbsp;impulse&nbsp;scenarios:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Calming:&nbsp;-0.04&nbsp;(emotional_regulator)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Stress&nbsp;reduction:&nbsp;-0.04&nbsp;(emotional_regulator)</span></p>
+<p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.frontal_lobe.glutamate.html#Glutamate">Glutamate</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Glutamate">class <strong>Glutamate</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Glutamate">Glutamate</a>(index:&nbsp;'int'&nbsp;=&nbsp;5,&nbsp;name:&nbsp;'str'&nbsp;=&nbsp;'glutamate',&nbsp;baseline:&nbsp;'float'&nbsp;=&nbsp;0.6,&nbsp;receptor_adaptation_multiplier:&nbsp;'float'&nbsp;=&nbsp;1.0,&nbsp;receptor_subtypes:&nbsp;'tuple[str,&nbsp;str]'&nbsp;=&nbsp;('NMDA',&nbsp;'AMPA'),&nbsp;receptor_subtype_balance:&nbsp;'tuple[float,&nbsp;float]'&nbsp;=&nbsp;(1.0,&nbsp;1.0),&nbsp;max_impulse:&nbsp;'float'&nbsp;=&nbsp;0.3,&nbsp;origin:&nbsp;'tuple[str,&nbsp;...]'&nbsp;=&nbsp;('cortical&nbsp;pyramidal&nbsp;neurons',&nbsp;'relay'),&nbsp;projections:&nbsp;'tuple[str,&nbsp;...]'&nbsp;=&nbsp;('throughout&nbsp;brain',),&nbsp;receptors:&nbsp;'tuple[str,&nbsp;...]'&nbsp;=&nbsp;('NMDA',&nbsp;'AMPA',&nbsp;'kainate',&nbsp;'mGluR1-8'),&nbsp;brain_waves:&nbsp;'tuple[str,&nbsp;...]'&nbsp;=&nbsp;('gamma',),&nbsp;circadian_modifier:&nbsp;'str'&nbsp;=&nbsp;'1.0&nbsp;(no&nbsp;circadian&nbsp;modulation)',&nbsp;role:&nbsp;'str'&nbsp;=&nbsp;'primary&nbsp;excitation,&nbsp;E/I&nbsp;balance,&nbsp;cortical&nbsp;activity')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+<a href="#Glutamate">Glutamate</a>&nbsp;—&nbsp;primary&nbsp;excitatory&nbsp;neurotransmitter.<br>
+&nbsp;<br>
+All&nbsp;values&nbsp;synchronized&nbsp;with&nbsp;src/state/neurochemical.rs.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Glutamate-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="Glutamate-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="Glutamate-__getstate__"><strong>__getstate__</strong></a> = _dataclass_getstate(self)<span class="grey"><span class="heading-text"> from <a href="dataclasses.html">dataclasses</a></span></span></dt><dd><span class="code">#&nbsp;_dataclass_getstate&nbsp;and&nbsp;_dataclass_setstate&nbsp;are&nbsp;needed&nbsp;for&nbsp;pickling&nbsp;frozen<br>
+#&nbsp;classes&nbsp;with&nbsp;slots.&nbsp;&nbsp;These&nbsp;could&nbsp;be&nbsp;slightly&nbsp;more&nbsp;performant&nbsp;if&nbsp;we&nbsp;generated<br>
+#&nbsp;the&nbsp;code&nbsp;instead&nbsp;of&nbsp;iterating&nbsp;over&nbsp;fields.&nbsp;&nbsp;But&nbsp;that&nbsp;can&nbsp;be&nbsp;a&nbsp;project&nbsp;for<br>
+#&nbsp;another&nbsp;day,&nbsp;if&nbsp;performance&nbsp;becomes&nbsp;an&nbsp;issue.</span></dd></dl>
+
+<dl><dt><a name="Glutamate-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="Glutamate-__init__"><strong>__init__</strong></a>(self, index: 'int' = 5, name: 'str' = 'glutamate', baseline: 'float' = 0.6, receptor_adaptation_multiplier: 'float' = 1.0, receptor_subtypes: 'tuple[str, str]' = ('NMDA', 'AMPA'), receptor_subtype_balance: 'tuple[float, float]' = (1.0, 1.0), max_impulse: 'float' = 0.3, origin: 'tuple[str, ...]' = ('cortical pyramidal neurons', 'relay'), projections: 'tuple[str, ...]' = ('throughout brain',), receptors: 'tuple[str, ...]' = ('NMDA', 'AMPA', 'kainate', 'mGluR1-8'), brain_waves: 'tuple[str, ...]' = ('gamma',), circadian_modifier: 'str' = '1.0 (no circadian modulation)', role: 'str' = 'primary excitation, E/I balance, cortical activity') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Glutamate-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="Glutamate-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<dl><dt><a name="Glutamate-__setstate__"><strong>__setstate__</strong></a> = _dataclass_setstate(self, state)<span class="grey"><span class="heading-text"> from <a href="dataclasses.html">dataclasses</a></span></span></dt></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>baseline</strong></dt>
+</dl>
+<dl><dt><strong>brain_waves</strong></dt>
+</dl>
+<dl><dt><strong>circadian_modifier</strong></dt>
+</dl>
+<dl><dt><strong>index</strong></dt>
+</dl>
+<dl><dt><strong>max_impulse</strong></dt>
+</dl>
+<dl><dt><strong>name</strong></dt>
+</dl>
+<dl><dt><strong>origin</strong></dt>
+</dl>
+<dl><dt><strong>projections</strong></dt>
+</dl>
+<dl><dt><strong>receptor_adaptation_multiplier</strong></dt>
+</dl>
+<dl><dt><strong>receptor_subtype_balance</strong></dt>
+</dl>
+<dl><dt><strong>receptor_subtypes</strong></dt>
+</dl>
+<dl><dt><strong>receptors</strong></dt>
+</dl>
+<dl><dt><strong>role</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'baseline': 'float', 'brain_waves': 'tuple[str, ...]', 'circadian_modifier': 'str', 'index': 'int', 'max_impulse': 'float', 'name': 'str', 'origin': 'tuple[str, ...]', 'projections': 'tuple[str, ...]', 'receptor_adaptation_multiplier': 'float', 'receptor_subtype_balance': 'tuple[float, float]', ...}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'baseline': Field(name='baseline',type='float',default=0.6,d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'brain_waves': Field(name='brain_waves',type='tuple[str, ...]',...appingproxy({}),kw_only=False,_field_type=_FIELD), 'circadian_modifier': Field(name='circadian_modifier',type='str',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'index': Field(name='index',type='int',default=5,default_...appingproxy({}),kw_only=False,_field_type=_FIELD), 'max_impulse': Field(name='max_impulse',type='float',default=0....appingproxy({}),kw_only=False,_field_type=_FIELD), 'name': Field(name='name',type='str',default='glutamate'...appingproxy({}),kw_only=False,_field_type=_FIELD), 'origin': Field(name='origin',type='tuple[str, ...]',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'projections': Field(name='projections',type='tuple[str, ...]',...appingproxy({}),kw_only=False,_field_type=_FIELD), 'receptor_adaptation_multiplier': Field(name='receptor_adaptation_multiplier',type...appingproxy({}),kw_only=False,_field_type=_FIELD), 'receptor_subtype_balance': Field(name='receptor_subtype_balance',type='tupl...appingproxy({}),kw_only=False,_field_type=_FIELD), ...}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('index', 'name', 'baseline', 'receptor_adaptation_multiplier', 'receptor_subtypes', 'receptor_subtype_balance', 'max_impulse', 'origin', 'projections', 'receptors', 'brain_waves', 'circadian_modifier', 'role')</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>CHEM_GLUTAMATE</strong> = 5<br>
+<strong>__all__</strong> = ['CHEM_GLUTAMATE', 'Glutamate']</td></tr></table>
+</body></html>

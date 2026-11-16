@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.self.learning</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.self.html" class="white">self</a>.learning</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/self/learning.py">/home/mindyrenee/GenAnd/Genesis/Self_World/self/learning.py</a></td></tr></table>
+    <p><span class="code">Self-directed&nbsp;learning&nbsp;—&nbsp;Genesis&nbsp;improving&nbsp;its&nbsp;own&nbsp;knowledge.<br>
+&nbsp;<br>
+Unlike&nbsp;the&nbsp;AutonomousLearner&nbsp;(which&nbsp;fetches&nbsp;from&nbsp;external&nbsp;sources&nbsp;like<br>
+Wikipedia),&nbsp;this&nbsp;module&nbsp;helps&nbsp;Genesis&nbsp;learn&nbsp;from&nbsp;what&nbsp;it&nbsp;*already<br>
+knows*&nbsp;through&nbsp;reasoning,&nbsp;inference,&nbsp;and&nbsp;conversation.<br>
+&nbsp;<br>
+##&nbsp;The&nbsp;gap&nbsp;this&nbsp;fills<br>
+&nbsp;<br>
+Genesis&nbsp;has&nbsp;a&nbsp;concept&nbsp;network&nbsp;with&nbsp;600+&nbsp;concepts&nbsp;and&nbsp;2600+&nbsp;relationships.<br>
+But&nbsp;many&nbsp;concepts&nbsp;lack&nbsp;definitions,&nbsp;many&nbsp;relationships&nbsp;are&nbsp;missing&nbsp;that<br>
+could&nbsp;be&nbsp;inferred&nbsp;from&nbsp;existing&nbsp;ones,&nbsp;and&nbsp;every&nbsp;conversation&nbsp;with&nbsp;the<br>
+user&nbsp;contains&nbsp;facts&nbsp;it&nbsp;could&nbsp;extract&nbsp;but&nbsp;doesn't.<br>
+&nbsp;<br>
+This&nbsp;module&nbsp;provides&nbsp;five&nbsp;learning&nbsp;mechanisms:<br>
+&nbsp;<br>
+1.&nbsp;**Conversation&nbsp;learning**&nbsp;—&nbsp;when&nbsp;the&nbsp;user&nbsp;says&nbsp;"X&nbsp;is&nbsp;a&nbsp;Y"&nbsp;or<br>
+&nbsp;&nbsp;&nbsp;"X&nbsp;means&nbsp;Z",&nbsp;extract&nbsp;the&nbsp;fact&nbsp;and&nbsp;add&nbsp;it&nbsp;to&nbsp;the&nbsp;concept&nbsp;network.<br>
+&nbsp;&nbsp;&nbsp;This&nbsp;is&nbsp;the&nbsp;most&nbsp;direct&nbsp;path&nbsp;to&nbsp;improvement:&nbsp;every&nbsp;conversation<br>
+&nbsp;&nbsp;&nbsp;makes&nbsp;it&nbsp;smarter.<br>
+&nbsp;<br>
+2.&nbsp;**Transitive&nbsp;inference**&nbsp;—&nbsp;if&nbsp;A&nbsp;is_a&nbsp;B&nbsp;and&nbsp;B&nbsp;is_a&nbsp;C,&nbsp;infer&nbsp;A&nbsp;is_a&nbsp;C.<br>
+&nbsp;&nbsp;&nbsp;Same&nbsp;for&nbsp;PART_OF&nbsp;and&nbsp;DEPENDS_ON.&nbsp;This&nbsp;multiplies&nbsp;its&nbsp;knowledge<br>
+&nbsp;&nbsp;&nbsp;without&nbsp;any&nbsp;external&nbsp;input.<br>
+&nbsp;<br>
+3.&nbsp;**Definition&nbsp;synthesis**&nbsp;—&nbsp;for&nbsp;concepts&nbsp;that&nbsp;have&nbsp;relationships&nbsp;but<br>
+&nbsp;&nbsp;&nbsp;no&nbsp;definition,&nbsp;build&nbsp;one&nbsp;from&nbsp;the&nbsp;relationships.&nbsp;"X&nbsp;is_a&nbsp;Y,&nbsp;X<br>
+&nbsp;&nbsp;&nbsp;enables&nbsp;Z"&nbsp;→&nbsp;"X&nbsp;is&nbsp;a&nbsp;kind&nbsp;of&nbsp;Y&nbsp;that&nbsp;enables&nbsp;Z."<br>
+&nbsp;<br>
+4.&nbsp;**Analogical&nbsp;transfer**&nbsp;—&nbsp;if&nbsp;two&nbsp;concepts&nbsp;share&nbsp;many&nbsp;IS_A&nbsp;parents,<br>
+&nbsp;&nbsp;&nbsp;they're&nbsp;similar.&nbsp;Properties&nbsp;of&nbsp;one&nbsp;may&nbsp;apply&nbsp;to&nbsp;the&nbsp;other.&nbsp;This<br>
+&nbsp;&nbsp;&nbsp;is&nbsp;speculative&nbsp;(lower&nbsp;confidence)&nbsp;but&nbsp;generates&nbsp;learning&nbsp;targets.<br>
+&nbsp;<br>
+5.&nbsp;**Self-study**&nbsp;—&nbsp;review&nbsp;weak&nbsp;concepts&nbsp;(identified&nbsp;by<br>
+&nbsp;&nbsp;&nbsp;SelfAssessment),&nbsp;strengthen&nbsp;their&nbsp;edges,&nbsp;and&nbsp;synthesize<br>
+&nbsp;&nbsp;&nbsp;definitions.&nbsp;This&nbsp;is&nbsp;the&nbsp;"homework"&nbsp;it&nbsp;does&nbsp;on&nbsp;its&nbsp;own.<br>
+&nbsp;<br>
+##&nbsp;How&nbsp;it&nbsp;connects<br>
+&nbsp;<br>
+-&nbsp;**SelfAssessment**&nbsp;identifies&nbsp;gaps&nbsp;→&nbsp;this&nbsp;module&nbsp;fills&nbsp;them<br>
+-&nbsp;**FrontalLobe**&nbsp;routes&nbsp;user&nbsp;input&nbsp;→&nbsp;this&nbsp;module&nbsp;extracts&nbsp;facts<br>
+-&nbsp;**FrontalLobe**&nbsp;handles&nbsp;corrections&nbsp;→&nbsp;this&nbsp;module&nbsp;updates&nbsp;knowledge<br>
+-&nbsp;**AutonomousLearner**&nbsp;fetches&nbsp;external&nbsp;content&nbsp;→&nbsp;this&nbsp;module&nbsp;infers<br>
+&nbsp;&nbsp;new&nbsp;relationships&nbsp;from&nbsp;what&nbsp;was&nbsp;learned<br>
+-&nbsp;**Curiosity**&nbsp;generates&nbsp;questions&nbsp;→&nbsp;this&nbsp;module&nbsp;can&nbsp;answer<br>
+&nbsp;&nbsp;some&nbsp;of&nbsp;them&nbsp;through&nbsp;inference<br>
+&nbsp;<br>
+##&nbsp;Biological&nbsp;grounding<br>
+&nbsp;<br>
+This&nbsp;mirrors&nbsp;how&nbsp;the&nbsp;brain&nbsp;consolidates&nbsp;knowledge:<br>
+-&nbsp;**Systems&nbsp;consolidation**&nbsp;(McClelland&nbsp;et&nbsp;al.,&nbsp;1995):&nbsp;hippocampal<br>
+&nbsp;&nbsp;episodes&nbsp;are&nbsp;gradually&nbsp;abstracted&nbsp;into&nbsp;neocortical&nbsp;schemas.&nbsp;The<br>
+&nbsp;&nbsp;transitive&nbsp;inference&nbsp;and&nbsp;definition&nbsp;synthesis&nbsp;are&nbsp;the&nbsp;computational<br>
+&nbsp;&nbsp;analog&nbsp;—&nbsp;extracting&nbsp;general&nbsp;knowledge&nbsp;from&nbsp;specific&nbsp;facts.<br>
+-&nbsp;**Analogical&nbsp;reasoning**&nbsp;(Gentner&nbsp;&amp;&nbsp;Markman,&nbsp;1997):&nbsp;the&nbsp;brain&nbsp;uses<br>
+&nbsp;&nbsp;structural&nbsp;similarity&nbsp;to&nbsp;transfer&nbsp;knowledge.&nbsp;Our&nbsp;analogical&nbsp;transfer<br>
+&nbsp;&nbsp;does&nbsp;the&nbsp;same&nbsp;with&nbsp;concept&nbsp;network&nbsp;structure.<br>
+-&nbsp;**Spaced&nbsp;replay**&nbsp;(Tse&nbsp;et&nbsp;al.,&nbsp;2007):&nbsp;reviewing&nbsp;weak&nbsp;memories<br>
+&nbsp;&nbsp;stabilizes&nbsp;them.&nbsp;Our&nbsp;self-study&nbsp;cycle&nbsp;re-activates&nbsp;weak&nbsp;concepts.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="re.html">re</a><br>
+</td><td class="multicolumn"><a href="time.html">time</a><br>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.self.learning.html#InferenceResult">InferenceResult</a>
+</dt><dt class="heading-text"><a href="Self_World.self.learning.html#LearningEvent">LearningEvent</a>
+</dt><dt class="heading-text"><a href="Self_World.self.learning.html#SelfDirectedLearner">SelfDirectedLearner</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="InferenceResult">class <strong>InferenceResult</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#InferenceResult">InferenceResult</a>(new_edges:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;new_definitions:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;strengthened:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;contradictions_found:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;events:&nbsp;'list[<a href="#LearningEvent">LearningEvent</a>]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Result&nbsp;of&nbsp;an&nbsp;inference&nbsp;pass.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="InferenceResult-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="InferenceResult-__init__"><strong>__init__</strong></a>(self, new_edges: 'int' = 0, new_definitions: 'int' = 0, strengthened: 'int' = 0, contradictions_found: 'int' = 0, events: 'list[LearningEvent]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="InferenceResult-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>contradictions_found</strong></dt>
+</dl>
+<dl><dt><strong>events</strong></dt>
+</dl>
+<dl><dt><strong>new_definitions</strong></dt>
+</dl>
+<dl><dt><strong>new_edges</strong></dt>
+</dl>
+<dl><dt><strong>strengthened</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'contradictions_found': 'int', 'events': 'list[LearningEvent]', 'new_definitions': 'int', 'new_edges': 'int', 'strengthened': 'int'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'contradictions_found': Field(name='contradictions_found',type='int',def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'events': Field(name='events',type='list[LearningEvent]',d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'new_definitions': Field(name='new_definitions',type='int',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'new_edges': Field(name='new_edges',type='int',default=0,defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'strengthened': Field(name='strengthened',type='int',default=0,d...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('new_edges', 'new_definitions', 'strengthened', 'contradictions_found', 'events')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="LearningEvent">class <strong>LearningEvent</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#LearningEvent">LearningEvent</a>(event_type:&nbsp;'str',&nbsp;description:&nbsp;'str',&nbsp;concepts_involved:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;confidence:&nbsp;'float'&nbsp;=&nbsp;0.5,&nbsp;timestamp:&nbsp;'int'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;single&nbsp;learning&nbsp;event&nbsp;—&nbsp;something&nbsp;Genesis&nbsp;learned.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="LearningEvent-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="LearningEvent-__init__"><strong>__init__</strong></a>(self, event_type: 'str', description: 'str', concepts_involved: 'list[str]' = &lt;factory&gt;, confidence: 'float' = 0.5, timestamp: 'int' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="LearningEvent-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>concepts_involved</strong></dt>
+</dl>
+<dl><dt><strong>confidence</strong></dt>
+</dl>
+<dl><dt><strong>description</strong></dt>
+</dl>
+<dl><dt><strong>event_type</strong></dt>
+</dl>
+<dl><dt><strong>timestamp</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'concepts_involved': 'list[str]', 'confidence': 'float', 'description': 'str', 'event_type': 'str', 'timestamp': 'int'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'concepts_involved': Field(name='concepts_involved',type='list[str]',...appingproxy({}),kw_only=False,_field_type=_FIELD), 'confidence': Field(name='confidence',type='float',default=0.5...appingproxy({}),kw_only=False,_field_type=_FIELD), 'description': Field(name='description',type='str',default=&lt;dat...appingproxy({}),kw_only=False,_field_type=_FIELD), 'event_type': Field(name='event_type',type='str',default=&lt;data...appingproxy({}),kw_only=False,_field_type=_FIELD), 'timestamp': Field(name='timestamp',type='int',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('event_type', 'description', 'concepts_involved', 'confidence', 'timestamp')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SelfDirectedLearner">class <strong>SelfDirectedLearner</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SelfDirectedLearner">SelfDirectedLearner</a>(network:&nbsp;'ConceptNetwork',&nbsp;data_dir:&nbsp;'str&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Genesis's&nbsp;self-directed&nbsp;learning&nbsp;engine.<br>
+&nbsp;<br>
+This&nbsp;module&nbsp;lets&nbsp;Genesis&nbsp;improve&nbsp;its&nbsp;own&nbsp;knowledge&nbsp;through:<br>
+-&nbsp;Extracting&nbsp;facts&nbsp;from&nbsp;conversation<br>
+-&nbsp;Inferring&nbsp;new&nbsp;relationships&nbsp;from&nbsp;existing&nbsp;ones<br>
+-&nbsp;Synthesizing&nbsp;definitions&nbsp;from&nbsp;relationships<br>
+-&nbsp;Transferring&nbsp;properties&nbsp;between&nbsp;similar&nbsp;concepts<br>
+-&nbsp;Reviewing&nbsp;and&nbsp;strengthening&nbsp;weak&nbsp;concepts<br>
+-&nbsp;Learning&nbsp;from&nbsp;user&nbsp;corrections<br>
+&nbsp;<br>
+It&nbsp;operates&nbsp;on&nbsp;the&nbsp;concept&nbsp;network&nbsp;directly,&nbsp;modifying&nbsp;it&nbsp;in-place.<br>
+All&nbsp;inferred&nbsp;knowledge&nbsp;is&nbsp;marked&nbsp;with&nbsp;origin="inferred"&nbsp;so&nbsp;it&nbsp;can<br>
+be&nbsp;distinguished&nbsp;from&nbsp;directly&nbsp;learned&nbsp;knowledge.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="SelfDirectedLearner-__init__"><strong>__init__</strong></a>(self, network: 'ConceptNetwork', data_dir: 'str | None' = None) -&gt; 'None'</dt><dd><span class="code">Wire&nbsp;the&nbsp;self-directed&nbsp;learner&nbsp;to&nbsp;its&nbsp;concept&nbsp;network&nbsp;and&nbsp;data&nbsp;directory.</span></dd></dl>
+
+<dl><dt><a name="SelfDirectedLearner-consistency_sweep"><strong>consistency_sweep</strong></a>(self) -&gt; 'InferenceResult'</dt><dd><span class="code">Sweep&nbsp;the&nbsp;entire&nbsp;network&nbsp;for&nbsp;contradictions&nbsp;and&nbsp;inconsistencies.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;global&nbsp;self-healing&nbsp;mechanism.&nbsp;It&nbsp;detects:<br>
+1.&nbsp;SIMILAR_TO&nbsp;+&nbsp;OPPOSITE_OF&nbsp;between&nbsp;the&nbsp;same&nbsp;pair&nbsp;(contradiction)<br>
+2.&nbsp;IS_A&nbsp;cycles&nbsp;(A&nbsp;is_a&nbsp;B&nbsp;is_a&nbsp;...&nbsp;is_a&nbsp;A)<br>
+3.&nbsp;Orphaned&nbsp;inferred&nbsp;edges&nbsp;(weight&nbsp;decayed&nbsp;below&nbsp;0.1)<br>
+&nbsp;<br>
+Contradictions&nbsp;are&nbsp;resolved&nbsp;non-destructively&nbsp;by&nbsp;downgrading<br>
+both&nbsp;edges'&nbsp;weights&nbsp;—&nbsp;competing&nbsp;claims&nbsp;are&nbsp;preserved&nbsp;with<br>
+reduced&nbsp;confidence&nbsp;so&nbsp;the&nbsp;system&nbsp;can&nbsp;re-evaluate&nbsp;them&nbsp;as&nbsp;more<br>
+evidence&nbsp;accumulates.&nbsp;Cycles&nbsp;are&nbsp;broken&nbsp;by&nbsp;removing&nbsp;the&nbsp;weakest<br>
+edge&nbsp;in&nbsp;the&nbsp;cycle.&nbsp;Orphaned&nbsp;edges&nbsp;are&nbsp;removed&nbsp;entirely<br>
+(unlearning).</span></dd></dl>
+
+<dl><dt><a name="SelfDirectedLearner-describe_recent_learning"><strong>describe_recent_learning</strong></a>(self, n: 'int' = 10) -&gt; 'str | None'</dt><dd><span class="code">Structural&nbsp;description&nbsp;of&nbsp;recent&nbsp;learning,&nbsp;for&nbsp;introspection.<br>
+&nbsp;<br>
+Returns&nbsp;``None``&nbsp;when&nbsp;there&nbsp;is&nbsp;nothing&nbsp;to&nbsp;describe.&nbsp;The&nbsp;caller<br>
+used&nbsp;to&nbsp;pass&nbsp;this&nbsp;string&nbsp;through&nbsp;the&nbsp;``clause``&nbsp;fragment&nbsp;kind,<br>
+which&nbsp;is&nbsp;the&nbsp;verbatim&nbsp;channel&nbsp;—&nbsp;so&nbsp;the&nbsp;totals&nbsp;and&nbsp;the<br>
+newline-indented&nbsp;developer&nbsp;log&nbsp;lines&nbsp;below&nbsp;were&nbsp;read&nbsp;aloud&nbsp;as<br>
+speech,&nbsp;and&nbsp;an&nbsp;empty&nbsp;log&nbsp;produced&nbsp;the&nbsp;recited&nbsp;placeholder&nbsp;"no<br>
+self-directed&nbsp;learning&nbsp;yet".&nbsp;Returning&nbsp;``None``&nbsp;lets&nbsp;the&nbsp;caller<br>
+stay&nbsp;silent&nbsp;instead.</span></dd></dl>
+
+<dl><dt><a name="SelfDirectedLearner-extract_genus_from_definitions"><strong>extract_genus_from_definitions</strong></a>(self) -&gt; 'InferenceResult'</dt><dd><span class="code">Extract&nbsp;IS_A&nbsp;relations&nbsp;from&nbsp;concept&nbsp;and&nbsp;dictionary&nbsp;definitions.<br>
+&nbsp;<br>
+This&nbsp;deepens&nbsp;the&nbsp;semantic&nbsp;hierarchy&nbsp;by&nbsp;parsing&nbsp;the&nbsp;genus&nbsp;term<br>
+from&nbsp;definitions&nbsp;—&nbsp;the&nbsp;classic&nbsp;"X&nbsp;is&nbsp;a&nbsp;Y"&nbsp;pattern&nbsp;embedded&nbsp;in<br>
+dictionary&nbsp;entries&nbsp;and&nbsp;concept&nbsp;properties.<br>
+&nbsp;<br>
+Three&nbsp;sources&nbsp;are&nbsp;mined:<br>
+&nbsp;<br>
+1.&nbsp;**Concept&nbsp;properties**&nbsp;—&nbsp;concepts&nbsp;that&nbsp;have&nbsp;a&nbsp;``definition``<br>
+&nbsp;&nbsp;&nbsp;property&nbsp;stored&nbsp;in&nbsp;the&nbsp;network.&nbsp;E.g.,&nbsp;"serotonin"&nbsp;has<br>
+&nbsp;&nbsp;&nbsp;definition&nbsp;"a&nbsp;neurotransmitter&nbsp;involved&nbsp;in..."&nbsp;→<br>
+&nbsp;&nbsp;&nbsp;``serotonin&nbsp;IS_A&nbsp;neurotransmitter``.<br>
+&nbsp;<br>
+2.&nbsp;**Offline&nbsp;dictionary**&nbsp;—&nbsp;the&nbsp;bundled&nbsp;dictionary&nbsp;file&nbsp;contains<br>
+&nbsp;&nbsp;&nbsp;WordNet&nbsp;and&nbsp;Webster&nbsp;definitions&nbsp;with&nbsp;genus-differentia<br>
+&nbsp;&nbsp;&nbsp;structure.&nbsp;Each&nbsp;definition's&nbsp;genus&nbsp;term&nbsp;becomes&nbsp;an&nbsp;IS_A&nbsp;edge.<br>
+&nbsp;<br>
+3.&nbsp;**Man&nbsp;page&nbsp;NAME&nbsp;sections**&nbsp;—&nbsp;the&nbsp;system's&nbsp;man&nbsp;pages&nbsp;contain<br>
+&nbsp;&nbsp;&nbsp;``command&nbsp;-&nbsp;description``&nbsp;entries.&nbsp;Every&nbsp;command&nbsp;gets<br>
+&nbsp;&nbsp;&nbsp;``IS_A&nbsp;command``&nbsp;(or&nbsp;a&nbsp;more&nbsp;specific&nbsp;genus&nbsp;when&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;description&nbsp;starts&nbsp;with&nbsp;a&nbsp;noun&nbsp;phrase&nbsp;like&nbsp;"screen&nbsp;locker").<br>
+&nbsp;&nbsp;&nbsp;This&nbsp;is&nbsp;a&nbsp;rich&nbsp;offline&nbsp;source:&nbsp;~2600&nbsp;entries&nbsp;on&nbsp;a&nbsp;typical<br>
+&nbsp;&nbsp;&nbsp;Linux&nbsp;system.<br>
+&nbsp;<br>
+After&nbsp;extracting&nbsp;new&nbsp;IS_A&nbsp;edges,&nbsp;transitive&nbsp;closure&nbsp;runs<br>
+automatically&nbsp;(via&nbsp;:meth:`infer_transitive`)&nbsp;so&nbsp;that&nbsp;multi-hop<br>
+hierarchies&nbsp;form:&nbsp;if&nbsp;"serotonin&nbsp;IS_A&nbsp;neurotransmitter"&nbsp;and<br>
+"neurotransmitter&nbsp;IS_A&nbsp;chemical",&nbsp;then&nbsp;"serotonin&nbsp;IS_A&nbsp;chemical"<br>
+is&nbsp;inferred.<br>
+&nbsp;<br>
+All&nbsp;extracted&nbsp;edges&nbsp;have&nbsp;``origin="inferred"``&nbsp;and&nbsp;weight&nbsp;0.4<br>
+(lower&nbsp;than&nbsp;directly&nbsp;stated&nbsp;facts)&nbsp;so&nbsp;they&nbsp;can&nbsp;be&nbsp;distinguished<br>
+and&nbsp;validated.</span></dd></dl>
+
+<dl><dt><a name="SelfDirectedLearner-get_recent_events"><strong>get_recent_events</strong></a>(self, n: 'int' = 20) -&gt; 'list[LearningEvent]'</dt><dd><span class="code">Get&nbsp;the&nbsp;most&nbsp;recent&nbsp;learning&nbsp;events.</span></dd></dl>
+
+<dl><dt><a name="SelfDirectedLearner-get_stats"><strong>get_stats</strong></a>(self) -&gt; 'dict[str, int]'</dt><dd><span class="code">Get&nbsp;learning&nbsp;statistics.</span></dd></dl>
+
+<dl><dt><a name="SelfDirectedLearner-infer_analogical"><strong>infer_analogical</strong></a>(self, max_inferences: 'int' = 20) -&gt; 'InferenceResult'</dt><dd><span class="code">Infer&nbsp;new&nbsp;relationships&nbsp;through&nbsp;analogical&nbsp;transfer.<br>
+&nbsp;<br>
+If&nbsp;two&nbsp;concepts&nbsp;share&nbsp;many&nbsp;IS_A&nbsp;parents,&nbsp;they're&nbsp;similar.<br>
+If&nbsp;one&nbsp;has&nbsp;a&nbsp;property&nbsp;the&nbsp;other&nbsp;doesn't,&nbsp;infer&nbsp;that&nbsp;the<br>
+other&nbsp;might&nbsp;have&nbsp;it&nbsp;too.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;speculative&nbsp;—&nbsp;inferred&nbsp;edges&nbsp;have&nbsp;low&nbsp;confidence&nbsp;(0.25).<br>
+&nbsp;<br>
+To&nbsp;avoid&nbsp;O(n²)&nbsp;over&nbsp;all&nbsp;concepts,&nbsp;we&nbsp;only&nbsp;compare&nbsp;concepts<br>
+that&nbsp;share&nbsp;at&nbsp;least&nbsp;one&nbsp;IS_A&nbsp;parent.&nbsp;We&nbsp;build&nbsp;a&nbsp;parent→children<br>
+index&nbsp;and&nbsp;only&nbsp;compare&nbsp;siblings.</span></dd></dl>
+
+<dl><dt><a name="SelfDirectedLearner-infer_transitive"><strong>infer_transitive</strong></a>(self, max_inferences: 'int' = 50) -&gt; 'InferenceResult'</dt><dd><span class="code">Infer&nbsp;new&nbsp;relationships&nbsp;through&nbsp;transitivity.<br>
+&nbsp;<br>
+For&nbsp;transitive&nbsp;relations&nbsp;(IS_A,&nbsp;PART_OF,&nbsp;DEPENDS_ON):<br>
+If&nbsp;A&nbsp;is_a&nbsp;B&nbsp;and&nbsp;B&nbsp;is_a&nbsp;C,&nbsp;infer&nbsp;A&nbsp;is_a&nbsp;C.<br>
+&nbsp;<br>
+Runs&nbsp;up&nbsp;to&nbsp;3&nbsp;passes&nbsp;so&nbsp;that&nbsp;multi-hop&nbsp;inferences&nbsp;are&nbsp;found<br>
+(e.g.,&nbsp;golden&nbsp;retriever&nbsp;→&nbsp;dog&nbsp;→&nbsp;mammal&nbsp;→&nbsp;animal).<br>
+&nbsp;<br>
+Inferred&nbsp;edges&nbsp;have&nbsp;lower&nbsp;weight&nbsp;and&nbsp;origin="inferred".<br>
+Contradictions&nbsp;are&nbsp;detected&nbsp;and&nbsp;skipped.</span></dd></dl>
+
+<dl><dt><a name="SelfDirectedLearner-learn_from_correction"><strong>learn_from_correction</strong></a>(self, correction_text: 'str', original_topic: 'str' = '') -&gt; 'list[LearningEvent]'</dt><dd><span class="code">Learn&nbsp;from&nbsp;a&nbsp;user&nbsp;correction.<br>
+&nbsp;<br>
+When&nbsp;the&nbsp;user&nbsp;says&nbsp;"No,&nbsp;X&nbsp;is&nbsp;actually&nbsp;Y"&nbsp;or&nbsp;"Actually,&nbsp;X&nbsp;is&nbsp;Y",<br>
+extract&nbsp;the&nbsp;corrected&nbsp;fact&nbsp;and&nbsp;add&nbsp;it&nbsp;to&nbsp;the&nbsp;network.<br>
+&nbsp;<br>
+If&nbsp;the&nbsp;original&nbsp;topic&nbsp;is&nbsp;known,&nbsp;weaken&nbsp;inferred&nbsp;edges&nbsp;FROM&nbsp;that<br>
+topic&nbsp;that&nbsp;have&nbsp;low&nbsp;confidence&nbsp;—&nbsp;they&nbsp;might&nbsp;be&nbsp;wrong.<br>
+&nbsp;<br>
+If&nbsp;the&nbsp;correction&nbsp;contains&nbsp;a&nbsp;negation&nbsp;("not&nbsp;X",&nbsp;"X,&nbsp;not&nbsp;Y"),<br>
+explicitly&nbsp;remove&nbsp;edges&nbsp;to&nbsp;the&nbsp;negated&nbsp;concept.</span></dd></dl>
+
+<dl><dt><a name="SelfDirectedLearner-learn_from_emotion_share"><strong>learn_from_emotion_share</strong></a>(self, text: 'str', emotion_word: 'str', sentiment: 'float', sentiment_label: 'str') -&gt; 'list[LearningEvent]'</dt><dd><span class="code">Learn&nbsp;from&nbsp;an&nbsp;emotion-sharing&nbsp;statement.<br>
+&nbsp;<br>
+When&nbsp;someone&nbsp;says&nbsp;"I'm&nbsp;scared&nbsp;of&nbsp;the&nbsp;dark"&nbsp;or&nbsp;"I'm&nbsp;excited<br>
+about&nbsp;the&nbsp;project,"&nbsp;extract&nbsp;the&nbsp;emotion→subject&nbsp;relationship<br>
+and&nbsp;learn&nbsp;it.&nbsp;Also&nbsp;learn&nbsp;sentiment-based&nbsp;properties&nbsp;of&nbsp;the<br>
+emotion&nbsp;(e.g.,&nbsp;"scared"&nbsp;is&nbsp;related&nbsp;to&nbsp;"negative").<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;how&nbsp;Genesis&nbsp;learns&nbsp;emotions&nbsp;from&nbsp;natural&nbsp;conversation<br>
+—&nbsp;not&nbsp;just&nbsp;from&nbsp;explicit&nbsp;definitions,&nbsp;but&nbsp;from&nbsp;how&nbsp;people<br>
+actually&nbsp;use&nbsp;emotion&nbsp;words&nbsp;in&nbsp;context.</span></dd></dl>
+
+<dl><dt><a name="SelfDirectedLearner-learn_from_input"><strong>learn_from_input</strong></a>(self, user_input: 'str') -&gt; 'list[LearningEvent]'</dt><dd><span class="code">Extract&nbsp;facts&nbsp;from&nbsp;user&nbsp;input&nbsp;and&nbsp;add&nbsp;them&nbsp;to&nbsp;the&nbsp;network.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;called&nbsp;on&nbsp;every&nbsp;user&nbsp;message.&nbsp;It&nbsp;scans&nbsp;for&nbsp;factual<br>
+statements&nbsp;like&nbsp;"X&nbsp;is&nbsp;a&nbsp;Y",&nbsp;"X&nbsp;causes&nbsp;Y",&nbsp;"X&nbsp;means&nbsp;Z"&nbsp;and<br>
+adds&nbsp;them&nbsp;to&nbsp;the&nbsp;concept&nbsp;network.<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;list&nbsp;of&nbsp;learning&nbsp;events&nbsp;for&nbsp;introspection.</span></dd></dl>
+
+<dl><dt><a name="SelfDirectedLearner-pause"><strong>pause</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Pause&nbsp;expensive&nbsp;inference&nbsp;while&nbsp;the&nbsp;user&nbsp;is&nbsp;actively&nbsp;talking.</span></dd></dl>
+
+<dl><dt><a name="SelfDirectedLearner-queue_study_target"><strong>queue_study_target</strong></a>(self, concept: 'str') -&gt; 'None'</dt><dd><span class="code">Queue&nbsp;a&nbsp;concept&nbsp;for&nbsp;self-study&nbsp;in&nbsp;the&nbsp;next&nbsp;inference&nbsp;cycle.<br>
+&nbsp;<br>
+Called&nbsp;by&nbsp;the&nbsp;reflection&nbsp;system&nbsp;when&nbsp;a&nbsp;knowledge&nbsp;gap&nbsp;is&nbsp;detected.</span></dd></dl>
+
+<dl><dt><a name="SelfDirectedLearner-resume"><strong>resume</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Resume&nbsp;expensive&nbsp;inference&nbsp;when&nbsp;the&nbsp;conversation&nbsp;turn&nbsp;is&nbsp;done.</span></dd></dl>
+
+<dl><dt><a name="SelfDirectedLearner-run_inference_cycle"><strong>run_inference_cycle</strong></a>(self, force: 'bool' = False, brain_waves=None) -&gt; 'InferenceResult'</dt><dd><span class="code">Run&nbsp;a&nbsp;full&nbsp;inference&nbsp;cycle.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;called&nbsp;after&nbsp;interactions&nbsp;to&nbsp;let&nbsp;Genesis&nbsp;improve&nbsp;its<br>
+knowledge&nbsp;through&nbsp;all&nbsp;inference&nbsp;mechanisms:<br>
+1.&nbsp;Genus&nbsp;extraction&nbsp;from&nbsp;definitions&nbsp;(deepens&nbsp;the&nbsp;hierarchy)<br>
+2.&nbsp;Transitive&nbsp;inference&nbsp;(closes&nbsp;the&nbsp;hierarchy)<br>
+3.&nbsp;Definition&nbsp;synthesis<br>
+4.&nbsp;Analogical&nbsp;transfer<br>
+5.&nbsp;Self-study&nbsp;of&nbsp;weak&nbsp;concepts<br>
+&nbsp;<br>
+Has&nbsp;a&nbsp;cooldown&nbsp;period&nbsp;(_INFERENCE_COOLDOWN_SECONDS)&nbsp;to&nbsp;prevent<br>
+running&nbsp;expensive&nbsp;inference&nbsp;on&nbsp;every&nbsp;interaction.&nbsp;Use&nbsp;force=True<br>
+to&nbsp;bypass&nbsp;the&nbsp;cooldown.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;force:&nbsp;Bypass&nbsp;the&nbsp;cooldown&nbsp;timer.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;brain_waves:&nbsp;Optional&nbsp;BrainWaveState.&nbsp;When&nbsp;provided,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;gamma-dominant&nbsp;states&nbsp;boost&nbsp;analogical&nbsp;inference<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(gamma&nbsp;=&nbsp;binding,&nbsp;remote&nbsp;association;&nbsp;Jung-Beeman&nbsp;et<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;al.,&nbsp;2004),&nbsp;and&nbsp;delta-dominant&nbsp;states&nbsp;skip&nbsp;inference<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;entirely&nbsp;(deep&nbsp;rest,&nbsp;not&nbsp;encoding&nbsp;mode).</span></dd></dl>
+
+<dl><dt><a name="SelfDirectedLearner-self_study"><strong>self_study</strong></a>(self, weak_concepts: 'list[tuple[str, float]] | None' = None, max_concepts: 'int' = 10) -&gt; 'InferenceResult'</dt><dd><span class="code">Review&nbsp;and&nbsp;strengthen&nbsp;weak&nbsp;concepts.<br>
+&nbsp;<br>
+For&nbsp;each&nbsp;weak&nbsp;concept:<br>
+1.&nbsp;Strengthen&nbsp;existing&nbsp;edges&nbsp;(increase&nbsp;weight&nbsp;slightly)<br>
+2.&nbsp;Synthesize&nbsp;a&nbsp;definition&nbsp;if&nbsp;missing<br>
+3.&nbsp;Infer&nbsp;new&nbsp;edges&nbsp;from&nbsp;sibling&nbsp;concepts&nbsp;(concepts&nbsp;sharing<br>
+&nbsp;&nbsp;&nbsp;an&nbsp;IS_A&nbsp;parent)&nbsp;—&nbsp;if&nbsp;a&nbsp;sibling&nbsp;has&nbsp;a&nbsp;property&nbsp;the&nbsp;weak<br>
+&nbsp;&nbsp;&nbsp;concept&nbsp;lacks,&nbsp;infer&nbsp;that&nbsp;the&nbsp;weak&nbsp;concept&nbsp;might&nbsp;have&nbsp;it&nbsp;too<br>
+4.&nbsp;Mark&nbsp;as&nbsp;studied<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;"homework"&nbsp;Genesis&nbsp;does&nbsp;on&nbsp;its&nbsp;own&nbsp;to&nbsp;improve<br>
+its&nbsp;understanding&nbsp;of&nbsp;concepts&nbsp;it's&nbsp;weak&nbsp;on.&nbsp;Steps&nbsp;3-4&nbsp;are<br>
+the&nbsp;deepening:&nbsp;it&nbsp;doesn't&nbsp;just&nbsp;review,&nbsp;it&nbsp;actively&nbsp;learns<br>
+new&nbsp;things&nbsp;about&nbsp;weak&nbsp;concepts&nbsp;by&nbsp;analogy&nbsp;to&nbsp;their&nbsp;siblings.</span></dd></dl>
+
+<dl><dt><a name="SelfDirectedLearner-synthesize_definitions"><strong>synthesize_definitions</strong></a>(self, max_definitions: 'int' = 30) -&gt; 'InferenceResult'</dt><dd><span class="code">Synthesize&nbsp;definitions&nbsp;for&nbsp;concepts&nbsp;that&nbsp;lack&nbsp;them.<br>
+&nbsp;<br>
+For&nbsp;each&nbsp;concept&nbsp;without&nbsp;a&nbsp;definition,&nbsp;look&nbsp;at&nbsp;its&nbsp;relationships<br>
+and&nbsp;build&nbsp;a&nbsp;definition&nbsp;from&nbsp;them.<br>
+&nbsp;<br>
+Examples:<br>
+-&nbsp;"X&nbsp;is_a&nbsp;Y"&nbsp;→&nbsp;"X&nbsp;is&nbsp;a&nbsp;kind&nbsp;of&nbsp;Y"<br>
+-&nbsp;"X&nbsp;part_of&nbsp;Y"&nbsp;→&nbsp;"X&nbsp;is&nbsp;a&nbsp;part&nbsp;of&nbsp;Y"<br>
+-&nbsp;"X&nbsp;causes&nbsp;Y"&nbsp;→&nbsp;"X&nbsp;causes&nbsp;Y"<br>
+-&nbsp;"X&nbsp;enables&nbsp;Y"&nbsp;→&nbsp;"X&nbsp;enables&nbsp;Y"</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>paused</strong></dt>
+<dd><span class="code">True&nbsp;when&nbsp;expensive&nbsp;inference&nbsp;is&nbsp;temporarily&nbsp;paused.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__annotations__</strong> = {'_ADJECTIVE_SUFFIXES': 'tuple[str, ...]', '_ADJECTIVE_SUFFIX_NOUNS': 'frozenset[str]', '_DEGREE_ADVERBS': 'frozenset[str]', '_IRREGULAR_PLURALS': 'dict[str, str]', '_RELATION_PATTERNS': 'tuple[_RelationPattern, ...]'}<br>
+<strong>logger</strong> = &lt;Logger Self_World.self.learning (WARNING)&gt;</td></tr></table>
+</body></html>

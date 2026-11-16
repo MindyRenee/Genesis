@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["area","centroid","circumcenter","closest_pair","contains","convex_hull","dist","dist2","mean_point","orient","perimeter","segments_cross","shoelace2"],"type":["Point"]};

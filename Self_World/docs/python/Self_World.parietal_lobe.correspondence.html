@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.parietal_lobe.correspondence</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.parietal_lobe.html" class="white">parietal_lobe</a>.correspondence</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/parietal_lobe/correspondence.py">/home/mindyrenee/GenAnd/Genesis/Self_World/parietal_lobe/correspondence.py</a></td></tr></table>
+    <p><span class="code"><a href="#Correspondence">Correspondence</a>&nbsp;—&nbsp;truth&nbsp;as&nbsp;a&nbsp;relation&nbsp;between&nbsp;a&nbsp;proposition&nbsp;and&nbsp;a&nbsp;state&nbsp;of&nbsp;affairs.<br>
+&nbsp;<br>
+The&nbsp;correspondence&nbsp;theory&nbsp;of&nbsp;truth&nbsp;(Russell&nbsp;1912;&nbsp;Austin&nbsp;1950;&nbsp;Tarski's<br>
+Convention&nbsp;T)&nbsp;says&nbsp;a&nbsp;truth-bearer&nbsp;is&nbsp;true&nbsp;iff&nbsp;the&nbsp;state&nbsp;of&nbsp;affairs&nbsp;it<br>
+denotes&nbsp;obtains.&nbsp;In&nbsp;this&nbsp;architecture&nbsp;the&nbsp;truth-bearer&nbsp;is&nbsp;a<br>
+``Proposition``&nbsp;—&nbsp;comprehension's&nbsp;"smallest&nbsp;unit&nbsp;of&nbsp;meaning&nbsp;that&nbsp;can<br>
+be&nbsp;true&nbsp;or&nbsp;false"&nbsp;—&nbsp;and&nbsp;the&nbsp;state&nbsp;of&nbsp;affairs&nbsp;is&nbsp;the&nbsp;parietal&nbsp;state:<br>
+what&nbsp;the&nbsp;situation&nbsp;model&nbsp;has&nbsp;settled&nbsp;from&nbsp;discourse.<br>
+&nbsp;<br>
+Two&nbsp;of&nbsp;Austin's&nbsp;conventions&nbsp;map&nbsp;onto&nbsp;the&nbsp;implementation&nbsp;directly:<br>
+&nbsp;<br>
+-&nbsp;**Demonstrative&nbsp;conventions**&nbsp;pick&nbsp;*which*&nbsp;situation&nbsp;a&nbsp;statement<br>
+&nbsp;&nbsp;refers&nbsp;to&nbsp;—&nbsp;here,&nbsp;entity&nbsp;resolution:&nbsp;a&nbsp;proposition's&nbsp;subject&nbsp;and<br>
+&nbsp;&nbsp;<a href="builtins.html#object">object</a>&nbsp;normalize&nbsp;through&nbsp;the&nbsp;same&nbsp;``_norm``/``_place``&nbsp;the&nbsp;model<br>
+&nbsp;&nbsp;applies,&nbsp;so&nbsp;a&nbsp;claim&nbsp;binds&nbsp;the&nbsp;same&nbsp;entity&nbsp;the&nbsp;model&nbsp;stores.<br>
+-&nbsp;**Descriptive&nbsp;conventions**&nbsp;pick&nbsp;which&nbsp;*type*&nbsp;of&nbsp;situation&nbsp;the<br>
+&nbsp;&nbsp;sentence&nbsp;describes&nbsp;—&nbsp;here,&nbsp;the&nbsp;claim&nbsp;kind:&nbsp;location,&nbsp;possession,<br>
+&nbsp;&nbsp;attribute,&nbsp;positional&nbsp;relation,&nbsp;direction,&nbsp;size&nbsp;order,&nbsp;fear,&nbsp;or<br>
+&nbsp;&nbsp;attributed&nbsp;belief.&nbsp;Each&nbsp;maps&nbsp;to&nbsp;the&nbsp;predicate&nbsp;the&nbsp;model&nbsp;actually<br>
+&nbsp;&nbsp;stores,&nbsp;never&nbsp;to&nbsp;a&nbsp;substring&nbsp;of&nbsp;the&nbsp;sentence.<br>
+&nbsp;<br>
+Russell's&nbsp;congruence&nbsp;is&nbsp;the&nbsp;tuple&nbsp;check:&nbsp;claimed&nbsp;(S,&nbsp;R,&nbsp;O)&nbsp;against<br>
+the&nbsp;modeled&nbsp;fact.&nbsp;A&nbsp;state&nbsp;of&nbsp;affairs&nbsp;"obtains"&nbsp;when&nbsp;the&nbsp;model's<br>
+settled&nbsp;state&nbsp;structurally&nbsp;matches&nbsp;the&nbsp;claim&nbsp;—&nbsp;location&nbsp;equals,<br>
+holder&nbsp;equals,&nbsp;attribute&nbsp;present,&nbsp;relation&nbsp;present.<br>
+&nbsp;<br>
+Truth&nbsp;under&nbsp;partial&nbsp;observation&nbsp;is&nbsp;graded,&nbsp;not&nbsp;bivalent:<br>
+&nbsp;<br>
+-&nbsp;Each&nbsp;check&nbsp;yields&nbsp;κ&nbsp;∈&nbsp;{+1,&nbsp;−1,&nbsp;±w,&nbsp;∅}:&nbsp;the&nbsp;model&nbsp;affirms&nbsp;the&nbsp;state<br>
+&nbsp;&nbsp;(SUPPORTED),&nbsp;affirms&nbsp;its&nbsp;negation&nbsp;(CONTRADICTED),&nbsp;bears&nbsp;on&nbsp;it<br>
+&nbsp;&nbsp;equivocally&nbsp;(UNSETTLED&nbsp;—&nbsp;"maybe"),&nbsp;or&nbsp;has&nbsp;no&nbsp;bearing&nbsp;(UNKNOWN).<br>
+-&nbsp;κ&nbsp;folds&nbsp;into&nbsp;a&nbsp;Beta&nbsp;posterior&nbsp;τ(p)&nbsp;=&nbsp;α/(α+β)&nbsp;—&nbsp;the&nbsp;correspondence<br>
+&nbsp;&nbsp;*degree*,&nbsp;with&nbsp;``evidence``&nbsp;counting&nbsp;the&nbsp;observations&nbsp;behind&nbsp;it.<br>
+&nbsp;&nbsp;The&nbsp;Beta(1,1)&nbsp;prior&nbsp;is&nbsp;honest:&nbsp;a&nbsp;proposition&nbsp;never&nbsp;checked&nbsp;sits&nbsp;at<br>
+&nbsp;&nbsp;degree&nbsp;0.5&nbsp;with&nbsp;zero&nbsp;evidence&nbsp;—&nbsp;present,&nbsp;but&nbsp;unasserted.<br>
+-&nbsp;An&nbsp;UNSETTLED&nbsp;check&nbsp;counts&nbsp;a&nbsp;half-weight&nbsp;observation&nbsp;on&nbsp;*both*<br>
+&nbsp;&nbsp;sides:&nbsp;the&nbsp;model&nbsp;spoke,&nbsp;but&nbsp;equivocally&nbsp;—&nbsp;evidence&nbsp;accumulates<br>
+&nbsp;&nbsp;while&nbsp;the&nbsp;mean&nbsp;holds&nbsp;mid,&nbsp;so&nbsp;a&nbsp;contested&nbsp;claim&nbsp;reads&nbsp;as&nbsp;contested<br>
+&nbsp;&nbsp;rather&nbsp;than&nbsp;as&nbsp;unsupported.<br>
+-&nbsp;Convention&nbsp;T&nbsp;is&nbsp;the&nbsp;limit,&nbsp;not&nbsp;the&nbsp;mechanism:&nbsp;as&nbsp;confirmations<br>
+&nbsp;&nbsp;accumulate&nbsp;without&nbsp;contradiction,&nbsp;τ&nbsp;→&nbsp;1&nbsp;—&nbsp;"p&nbsp;is&nbsp;true"&nbsp;approaches<br>
+&nbsp;&nbsp;"p&nbsp;obtains".&nbsp;The&nbsp;ledger&nbsp;reports&nbsp;posterior&nbsp;mass;&nbsp;it&nbsp;never&nbsp;asserts<br>
+&nbsp;&nbsp;truth&nbsp;itself.<br>
+&nbsp;<br>
+Attribution:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"John&nbsp;believes&nbsp;that&nbsp;Mary&nbsp;is&nbsp;in&nbsp;the&nbsp;kitchen"&nbsp;claims&nbsp;something<br>
+&nbsp;&nbsp;&nbsp;&nbsp;about&nbsp;John's&nbsp;model,&nbsp;not&nbsp;the&nbsp;world&nbsp;—&nbsp;its&nbsp;state&nbsp;of&nbsp;affairs&nbsp;is<br>
+&nbsp;&nbsp;&nbsp;&nbsp;membership&nbsp;in&nbsp;John's&nbsp;stated&nbsp;belief&nbsp;set&nbsp;(``beliefs_of``),&nbsp;not<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Mary's&nbsp;location.&nbsp;Checking&nbsp;the&nbsp;embedded&nbsp;content&nbsp;against&nbsp;the&nbsp;world<br>
+&nbsp;&nbsp;&nbsp;&nbsp;would&nbsp;collapse&nbsp;"what&nbsp;John&nbsp;thinks"&nbsp;into&nbsp;"what&nbsp;is"&nbsp;—&nbsp;the&nbsp;scope<br>
+&nbsp;&nbsp;&nbsp;&nbsp;error&nbsp;the&nbsp;situation&nbsp;model's&nbsp;belief&nbsp;index&nbsp;exists&nbsp;to&nbsp;prevent.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="re.html">re</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.parietal_lobe.correspondence.html#Claim">Claim</a>
+</dt><dt class="heading-text"><a href="Self_World.parietal_lobe.correspondence.html#Correspondence">Correspondence</a>
+</dt><dt class="heading-text"><a href="Self_World.parietal_lobe.correspondence.html#CorrespondenceLedger">CorrespondenceLedger</a>
+</dt></dl>
+</dd>
+<dt class="heading-text"><a href="enum.html#Enum">enum.Enum</a>(<a href="builtins.html#object">builtins.object</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.parietal_lobe.correspondence.html#Verdict">Verdict</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Claim">class <strong>Claim</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Claim">Claim</a>(kind:&nbsp;'str',&nbsp;subject:&nbsp;'str',&nbsp;target:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;rel:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;negated:&nbsp;'bool'&nbsp;=&nbsp;False)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;state&nbsp;of&nbsp;affairs&nbsp;a&nbsp;proposition&nbsp;refers&nbsp;to.<br>
+&nbsp;<br>
+Austin's&nbsp;demonstrative&nbsp;half,&nbsp;realized:&nbsp;normalized&nbsp;relata&nbsp;plus&nbsp;the<br>
+descriptive&nbsp;kind,&nbsp;so&nbsp;the&nbsp;same&nbsp;sentence&nbsp;always&nbsp;binds&nbsp;the&nbsp;same<br>
+state&nbsp;—&nbsp;and&nbsp;so&nbsp;the&nbsp;ledger&nbsp;accumulates&nbsp;evidence&nbsp;for&nbsp;the&nbsp;*claim*,<br>
+not&nbsp;the&nbsp;string&nbsp;that&nbsp;carried&nbsp;it.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Claim-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="Claim-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="Claim-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="Claim-__init__"><strong>__init__</strong></a>(self, kind: 'str', subject: 'str', target: 'str' = '', rel: 'str' = '', negated: 'bool' = False) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Claim-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="Claim-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<dl><dt><a name="Claim-key"><strong>key</strong></a>(self) -&gt; 'tuple'</dt><dd><span class="code">Canonical&nbsp;ledger&nbsp;key&nbsp;—&nbsp;evidence&nbsp;for&nbsp;a&nbsp;claim&nbsp;pools&nbsp;across<br>
+the&nbsp;paraphrases&nbsp;that&nbsp;assert&nbsp;it.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'kind': 'str', 'negated': 'bool', 'rel': 'str', 'subject': 'str', 'target': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'kind': Field(name='kind',type='str',default=&lt;dataclasse...appingproxy({}),kw_only=False,_field_type=_FIELD), 'negated': Field(name='negated',type='bool',default=False,d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'rel': Field(name='rel',type='str',default='',default_f...appingproxy({}),kw_only=False,_field_type=_FIELD), 'subject': Field(name='subject',type='str',default=&lt;datacla...appingproxy({}),kw_only=False,_field_type=_FIELD), 'target': Field(name='target',type='str',default='',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('kind', 'subject', 'target', 'rel', 'negated')</dl>
+
+<dl><dt><strong>negated</strong> = False</dl>
+
+<dl><dt><strong>rel</strong> = ''</dl>
+
+<dl><dt><strong>target</strong> = ''</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Correspondence">class <strong>Correspondence</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Correspondence">Correspondence</a>(claim:&nbsp;'<a href="#Claim">Claim</a>&nbsp;|&nbsp;None',&nbsp;verdict:&nbsp;'<a href="#Verdict">Verdict</a>',&nbsp;degree:&nbsp;'float',&nbsp;evidence:&nbsp;'float',&nbsp;detail:&nbsp;'str'&nbsp;=&nbsp;'')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+One&nbsp;evaluation&nbsp;of&nbsp;a&nbsp;proposition&nbsp;against&nbsp;the&nbsp;modeled&nbsp;world.<br>
+&nbsp;<br>
+``verdict``&nbsp;is&nbsp;this&nbsp;check's&nbsp;bearing;&nbsp;``degree``&nbsp;and&nbsp;``evidence``<br>
+are&nbsp;the&nbsp;running&nbsp;posterior&nbsp;over&nbsp;the&nbsp;claim's&nbsp;correspondence&nbsp;—<br>
+τ(p)&nbsp;and&nbsp;how&nbsp;much&nbsp;observation&nbsp;stands&nbsp;behind&nbsp;it.&nbsp;``detail``&nbsp;names<br>
+the&nbsp;model&nbsp;state&nbsp;that&nbsp;bore&nbsp;on&nbsp;the&nbsp;check,&nbsp;so&nbsp;a&nbsp;verdict&nbsp;can&nbsp;be<br>
+traced&nbsp;to&nbsp;the&nbsp;fact&nbsp;that&nbsp;made&nbsp;it.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Correspondence-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="Correspondence-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="Correspondence-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="Correspondence-__init__"><strong>__init__</strong></a>(self, claim: 'Claim | None', verdict: 'Verdict', degree: 'float', evidence: 'float', detail: 'str' = '') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Correspondence-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="Correspondence-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>true</strong></dt>
+<dd><span class="code">The&nbsp;bivalent&nbsp;shadow&nbsp;Convention&nbsp;T&nbsp;licenses:&nbsp;True&nbsp;on<br>
+SUPPORTED,&nbsp;False&nbsp;on&nbsp;CONTRADICTED,&nbsp;None&nbsp;while&nbsp;the&nbsp;model&nbsp;is<br>
+equivocal&nbsp;or&nbsp;silent.&nbsp;The&nbsp;graded&nbsp;picture&nbsp;lives&nbsp;in&nbsp;``degree``.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'claim': 'Claim | None', 'degree': 'float', 'detail': 'str', 'evidence': 'float', 'verdict': 'Verdict'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'claim': Field(name='claim',type='Claim | None',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD), 'degree': Field(name='degree',type='float',default=&lt;datacl...appingproxy({}),kw_only=False,_field_type=_FIELD), 'detail': Field(name='detail',type='str',default='',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'evidence': Field(name='evidence',type='float',default=&lt;data...appingproxy({}),kw_only=False,_field_type=_FIELD), 'verdict': Field(name='verdict',type='Verdict',default=&lt;dat...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('claim', 'verdict', 'degree', 'evidence', 'detail')</dl>
+
+<dl><dt><strong>detail</strong> = ''</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="CorrespondenceLedger">class <strong>CorrespondenceLedger</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#CorrespondenceLedger">CorrespondenceLedger</a>(model:&nbsp;'SituationModel',&nbsp;max_propositions:&nbsp;'int'&nbsp;=&nbsp;256)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Beta&nbsp;posteriors&nbsp;over&nbsp;proposition↔world&nbsp;correspondence.<br>
+&nbsp;<br>
+Bound&nbsp;to&nbsp;one&nbsp;situation&nbsp;model&nbsp;—&nbsp;the&nbsp;discourse-described&nbsp;world&nbsp;the<br>
+claims&nbsp;are&nbsp;checked&nbsp;against.&nbsp;Each&nbsp;``check``&nbsp;evaluates&nbsp;a<br>
+proposition's&nbsp;claim&nbsp;against&nbsp;the&nbsp;model's&nbsp;settled&nbsp;state&nbsp;and&nbsp;folds<br>
+the&nbsp;bearing&nbsp;into&nbsp;the&nbsp;claim's&nbsp;running&nbsp;posterior,&nbsp;so&nbsp;evidence<br>
+accumulates&nbsp;per&nbsp;*claim*&nbsp;across&nbsp;the&nbsp;paraphrases&nbsp;that&nbsp;assert&nbsp;it.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="CorrespondenceLedger-__init__"><strong>__init__</strong></a>(self, model: 'SituationModel', max_propositions: 'int' = 256) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="CorrespondenceLedger-assess"><strong>assess</strong></a>(self, prop: 'Proposition') -&gt; 'Correspondence'</dt><dd><span class="code">Evaluate&nbsp;a&nbsp;proposition&nbsp;without&nbsp;folding&nbsp;the&nbsp;result&nbsp;in&nbsp;—<br>
+a&nbsp;read-only&nbsp;check&nbsp;that&nbsp;reports&nbsp;the&nbsp;running&nbsp;degree.</span></dd></dl>
+
+<dl><dt><a name="CorrespondenceLedger-check"><strong>check</strong></a>(self, prop: 'Proposition') -&gt; 'Correspondence'</dt><dd><span class="code">Evaluate&nbsp;a&nbsp;proposition&nbsp;and&nbsp;fold&nbsp;its&nbsp;bearing&nbsp;into&nbsp;the<br>
+claim's&nbsp;correspondence&nbsp;posterior.</span></dd></dl>
+
+<dl><dt><a name="CorrespondenceLedger-degree_of"><strong>degree_of</strong></a>(self, prop: 'Proposition') -&gt; 'float | None'</dt><dd><span class="code">The&nbsp;recorded&nbsp;correspondence&nbsp;degree&nbsp;for&nbsp;a&nbsp;proposition's<br>
+claim&nbsp;—&nbsp;None&nbsp;when&nbsp;no&nbsp;check&nbsp;has&nbsp;ever&nbsp;borne&nbsp;on&nbsp;it.</span></dd></dl>
+
+<dl><dt><a name="CorrespondenceLedger-describe"><strong>describe</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">A&nbsp;one-line&nbsp;structural&nbsp;summary&nbsp;for&nbsp;introspection.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>tracked</strong></dt>
+<dd><span class="code">How&nbsp;many&nbsp;claims&nbsp;carry&nbsp;a&nbsp;posterior.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong>TruthVerdict</strong> = <a name="TruthVerdict">class Verdict</a>(<a href="enum.html#Enum">enum.Enum</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#TruthVerdict">TruthVerdict</a>(*values)<br>
+&nbsp;<br>
+The&nbsp;model's&nbsp;bearing&nbsp;on&nbsp;a&nbsp;state&nbsp;of&nbsp;affairs&nbsp;—&nbsp;one&nbsp;check's&nbsp;κ.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.parietal_lobe.correspondence.html#Verdict">Verdict</a></dd>
+<dd><a href="enum.html#Enum">enum.Enum</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>CONTRADICTED</strong> = &lt;Verdict.CONTRADICTED: 2&gt;</dl>
+
+<dl><dt><strong>SUPPORTED</strong> = &lt;Verdict.SUPPORTED: 1&gt;</dl>
+
+<dl><dt><strong>UNKNOWN</strong> = &lt;Verdict.UNKNOWN: 4&gt;</dl>
+
+<dl><dt><strong>UNSETTLED</strong> = &lt;Verdict.UNSETTLED: 3&gt;</dl>
+
+<hr>
+Data descriptors inherited from <a href="enum.html#Enum">enum.Enum</a>:<br>
+<dl><dt><strong>name</strong></dt>
+<dd><span class="code">The&nbsp;name&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<dl><dt><strong>value</strong></dt>
+<dd><span class="code">The&nbsp;value&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<hr>
+Static methods inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><a name="Verdict-__contains__"><strong>__contains__</strong></a>(value)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;`value`&nbsp;is&nbsp;in&nbsp;`cls`.<br>
+&nbsp;<br>
+`value`&nbsp;is&nbsp;in&nbsp;`cls`&nbsp;if:<br>
+1)&nbsp;`value`&nbsp;is&nbsp;a&nbsp;member&nbsp;of&nbsp;`cls`,&nbsp;or<br>
+2)&nbsp;`value`&nbsp;is&nbsp;the&nbsp;value&nbsp;of&nbsp;one&nbsp;of&nbsp;the&nbsp;`cls`'s&nbsp;members.</span></dd></dl>
+
+<dl><dt><a name="Verdict-__getitem__"><strong>__getitem__</strong></a>(name)</dt><dd><span class="code">Return&nbsp;the&nbsp;member&nbsp;matching&nbsp;`name`.</span></dd></dl>
+
+<dl><dt><a name="Verdict-__iter__"><strong>__iter__</strong></a>()</dt><dd><span class="code">Return&nbsp;members&nbsp;in&nbsp;definition&nbsp;order.</span></dd></dl>
+
+<dl><dt><a name="Verdict-__len__"><strong>__len__</strong></a>()</dt><dd><span class="code">Return&nbsp;the&nbsp;number&nbsp;of&nbsp;members&nbsp;(no&nbsp;aliases)</span></dd></dl>
+
+<hr>
+Readonly properties inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><strong>__members__</strong></dt>
+<dd><span class="code">Returns&nbsp;a&nbsp;mapping&nbsp;of&nbsp;member&nbsp;name-&gt;value.<br>
+&nbsp;<br>
+This&nbsp;mapping&nbsp;lists&nbsp;all&nbsp;enum&nbsp;members,&nbsp;including&nbsp;aliases.&nbsp;Note&nbsp;that&nbsp;this<br>
+is&nbsp;a&nbsp;read-only&nbsp;view&nbsp;of&nbsp;the&nbsp;internal&nbsp;mapping.</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Verdict">class <strong>Verdict</strong></a>(<a href="enum.html#Enum">enum.Enum</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Verdict">Verdict</a>(*values)<br>
+&nbsp;<br>
+The&nbsp;model's&nbsp;bearing&nbsp;on&nbsp;a&nbsp;state&nbsp;of&nbsp;affairs&nbsp;—&nbsp;one&nbsp;check's&nbsp;κ.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.parietal_lobe.correspondence.html#Verdict">Verdict</a></dd>
+<dd><a href="enum.html#Enum">enum.Enum</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>CONTRADICTED</strong> = &lt;Verdict.CONTRADICTED: 2&gt;</dl>
+
+<dl><dt><strong>SUPPORTED</strong> = &lt;Verdict.SUPPORTED: 1&gt;</dl>
+
+<dl><dt><strong>UNKNOWN</strong> = &lt;Verdict.UNKNOWN: 4&gt;</dl>
+
+<dl><dt><strong>UNSETTLED</strong> = &lt;Verdict.UNSETTLED: 3&gt;</dl>
+
+<hr>
+Data descriptors inherited from <a href="enum.html#Enum">enum.Enum</a>:<br>
+<dl><dt><strong>name</strong></dt>
+<dd><span class="code">The&nbsp;name&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<dl><dt><strong>value</strong></dt>
+<dd><span class="code">The&nbsp;value&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<hr>
+Static methods inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><a name="Verdict-__contains__"><strong>__contains__</strong></a>(value)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;`value`&nbsp;is&nbsp;in&nbsp;`cls`.<br>
+&nbsp;<br>
+`value`&nbsp;is&nbsp;in&nbsp;`cls`&nbsp;if:<br>
+1)&nbsp;`value`&nbsp;is&nbsp;a&nbsp;member&nbsp;of&nbsp;`cls`,&nbsp;or<br>
+2)&nbsp;`value`&nbsp;is&nbsp;the&nbsp;value&nbsp;of&nbsp;one&nbsp;of&nbsp;the&nbsp;`cls`'s&nbsp;members.</span></dd></dl>
+
+<dl><dt><a name="Verdict-__getitem__"><strong>__getitem__</strong></a>(name)</dt><dd><span class="code">Return&nbsp;the&nbsp;member&nbsp;matching&nbsp;`name`.</span></dd></dl>
+
+<dl><dt><a name="Verdict-__iter__"><strong>__iter__</strong></a>()</dt><dd><span class="code">Return&nbsp;members&nbsp;in&nbsp;definition&nbsp;order.</span></dd></dl>
+
+<dl><dt><a name="Verdict-__len__"><strong>__len__</strong></a>()</dt><dd><span class="code">Return&nbsp;the&nbsp;number&nbsp;of&nbsp;members&nbsp;(no&nbsp;aliases)</span></dd></dl>
+
+<hr>
+Readonly properties inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><strong>__members__</strong></dt>
+<dd><span class="code">Returns&nbsp;a&nbsp;mapping&nbsp;of&nbsp;member&nbsp;name-&gt;value.<br>
+&nbsp;<br>
+This&nbsp;mapping&nbsp;lists&nbsp;all&nbsp;enum&nbsp;members,&nbsp;including&nbsp;aliases.&nbsp;Note&nbsp;that&nbsp;this<br>
+is&nbsp;a&nbsp;read-only&nbsp;view&nbsp;of&nbsp;the&nbsp;internal&nbsp;mapping.</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>TYPE_CHECKING</strong> = False</td></tr></table>
+</body></html>

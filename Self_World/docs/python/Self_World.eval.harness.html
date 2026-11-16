@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.eval.harness</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.eval.html" class="white">eval</a>.harness</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/eval/harness.py">/home/mindyrenee/GenAnd/Genesis/Self_World/eval/harness.py</a></td></tr></table>
+    <p><span class="code">Isolated-daemon&nbsp;harness&nbsp;for&nbsp;baseline&nbsp;and&nbsp;assay&nbsp;work.<br>
+&nbsp;<br>
+Every&nbsp;capture&nbsp;runs&nbsp;against&nbsp;a&nbsp;throwaway&nbsp;daemon&nbsp;in&nbsp;a&nbsp;temporary&nbsp;data<br>
+directory&nbsp;—&nbsp;never&nbsp;the&nbsp;production&nbsp;instance&nbsp;—&nbsp;so&nbsp;settling,&nbsp;impulses,<br>
+and&nbsp;washouts&nbsp;cannot&nbsp;corrupt&nbsp;real&nbsp;developmental&nbsp;state.&nbsp;Mirrors&nbsp;the<br>
+spawn/wait/teardown&nbsp;pattern&nbsp;of&nbsp;``scripts/test_integration.py``.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="socket.html">socket</a><br>
+<a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="os.html">os</a><br>
+<a href="shutil.html">shutil</a><br>
+</td><td class="multicolumn"><a href="subprocess.html">subprocess</a><br>
+<a href="tempfile.html">tempfile</a><br>
+</td><td class="multicolumn"><a href="time.html">time</a><br>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-find_daemon_binary"><strong>find_daemon_binary</strong></a>(project_root: 'str | None' = None) -&gt; 'str | None'</dt><dd><span class="code">Locate&nbsp;the&nbsp;genesis-daemon&nbsp;binary,&nbsp;or&nbsp;None&nbsp;if&nbsp;not&nbsp;built.<br>
+&nbsp;<br>
+Checks&nbsp;``GENESIS_DAEMON``&nbsp;first,&nbsp;then&nbsp;the&nbsp;release/debug&nbsp;build<br>
+outputs&nbsp;relative&nbsp;to&nbsp;the&nbsp;project&nbsp;root.</span></dd></dl>
+ <dl><dt><a name="-isolated_daemon"><strong>isolated_daemon</strong></a>(*, stm_capacity: 'int' = 64, ltm_capacity: 'int' = 256, project_root: 'str | None' = None) -&gt; 'Iterator[GenesisClient]'</dt><dd><span class="code">Spawn&nbsp;a&nbsp;throwaway&nbsp;daemon&nbsp;and&nbsp;yield&nbsp;a&nbsp;connected&nbsp;client.<br>
+&nbsp;<br>
+Uses&nbsp;a&nbsp;fresh&nbsp;temporary&nbsp;data&nbsp;directory.&nbsp;On&nbsp;exit,&nbsp;shuts&nbsp;the&nbsp;daemon<br>
+down&nbsp;via&nbsp;IPC&nbsp;and&nbsp;removes&nbsp;the&nbsp;directory.&nbsp;The&nbsp;force-kill&nbsp;fallback<br>
+applies&nbsp;only&nbsp;to&nbsp;this&nbsp;disposable&nbsp;test&nbsp;daemon&nbsp;—&nbsp;never&nbsp;to&nbsp;a<br>
+production&nbsp;instance&nbsp;carrying&nbsp;developmental&nbsp;state.</span></dd></dl>
+ <dl><dt><a name="-settle"><strong>settle</strong></a>(client: 'GenesisClient', *, ticks: 'int' = 60, dt: 'float' = 1.0) -&gt; 'None'</dt><dd><span class="code">Advance&nbsp;neurochemistry&nbsp;until&nbsp;transients&nbsp;decay&nbsp;to&nbsp;resting&nbsp;state.</span></dd></dl>
+ <dl><dt><a name="-wait_for_socket"><strong>wait_for_socket</strong></a>(socket_path: 'str', timeout: 'float' = 10.0) -&gt; 'bool'</dt><dd><span class="code">Wait&nbsp;until&nbsp;the&nbsp;daemon's&nbsp;socket&nbsp;accepts&nbsp;connections.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>logger</strong> = &lt;Logger Self_World.eval.harness (WARNING)&gt;</td></tr></table>
+</body></html>

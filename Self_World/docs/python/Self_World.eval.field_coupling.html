@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.eval.field_coupling</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.eval.html" class="white">eval</a>.field_coupling</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/eval/field_coupling.py">/home/mindyrenee/GenAnd/Genesis/Self_World/eval/field_coupling.py</a></td></tr></table>
+    <p><span class="code">Field-coupling&nbsp;assay&nbsp;—&nbsp;does&nbsp;real&nbsp;physics&nbsp;measurably&nbsp;move&nbsp;the&nbsp;wave&nbsp;model?<br>
+&nbsp;<br>
+The&nbsp;field&nbsp;probe&nbsp;(`src/daemon/field_probe.rs`)&nbsp;injects&nbsp;the&nbsp;machine's<br>
+real&nbsp;substrate&nbsp;dynamics&nbsp;into&nbsp;``BrainWaveOscillator``&nbsp;as&nbsp;stimulus&nbsp;and<br>
+evoked&nbsp;phase&nbsp;resets.&nbsp;This&nbsp;assay&nbsp;asks&nbsp;the&nbsp;falsifiable&nbsp;question:&nbsp;when<br>
+the&nbsp;physical&nbsp;substrate&nbsp;is&nbsp;perturbed&nbsp;by&nbsp;real&nbsp;load,&nbsp;does&nbsp;the&nbsp;*coupled*<br>
+wave&nbsp;state&nbsp;move&nbsp;where&nbsp;the&nbsp;*uncoupled*&nbsp;state&nbsp;does&nbsp;not?<br>
+&nbsp;<br>
+Protocol:<br>
+&nbsp;<br>
+1.&nbsp;Spawn&nbsp;an&nbsp;isolated&nbsp;daemon&nbsp;(the&nbsp;probe&nbsp;thread&nbsp;spawns&nbsp;with&nbsp;it).<br>
+2.&nbsp;Warm&nbsp;the&nbsp;probe&nbsp;rings&nbsp;(~5&nbsp;s).<br>
+3.&nbsp;Three&nbsp;phases&nbsp;—&nbsp;idle,&nbsp;induced&nbsp;CPU&nbsp;load,&nbsp;recovery&nbsp;—&nbsp;~10&nbsp;samples&nbsp;each<br>
+&nbsp;&nbsp;&nbsp;at&nbsp;~1&nbsp;Hz.&nbsp;Per&nbsp;sample:<br>
+&nbsp;&nbsp;&nbsp;a.&nbsp;fetch&nbsp;the&nbsp;physical&nbsp;signature&nbsp;(``get_field_probe``),<br>
+&nbsp;&nbsp;&nbsp;b.&nbsp;CONTROL&nbsp;—&nbsp;a&nbsp;private&nbsp;``BrainWaveOscillator``&nbsp;that&nbsp;never&nbsp;sees<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;field&nbsp;stimulus,&nbsp;assessed&nbsp;on&nbsp;the&nbsp;same&nbsp;``NeuroSummary``,<br>
+&nbsp;&nbsp;&nbsp;c.&nbsp;COUPLED&nbsp;—&nbsp;the&nbsp;module&nbsp;singleton,&nbsp;assessed&nbsp;through<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;``assess_brain_waves(...,&nbsp;client=client)``&nbsp;so&nbsp;the&nbsp;real<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;signature&nbsp;lands&nbsp;as&nbsp;stimulus&nbsp;and&nbsp;evoked&nbsp;resets,<br>
+&nbsp;&nbsp;&nbsp;d.&nbsp;record&nbsp;per-band&nbsp;powers&nbsp;for&nbsp;both&nbsp;arms&nbsp;plus&nbsp;the&nbsp;physical<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;channels&nbsp;(jitter_cv,&nbsp;throughput&nbsp;mean,&nbsp;pstate&nbsp;rate).<br>
+4.&nbsp;Report&nbsp;per-band&nbsp;power&nbsp;deltas&nbsp;(load&nbsp;−&nbsp;idle)&nbsp;for&nbsp;both&nbsp;arms&nbsp;and&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;Pearson&nbsp;correlation&nbsp;between&nbsp;the&nbsp;physical&nbsp;channels&nbsp;and&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;coupled&nbsp;band&nbsp;powers&nbsp;across&nbsp;all&nbsp;samples.<br>
+&nbsp;<br>
+Honesty&nbsp;notes:<br>
+&nbsp;<br>
+-&nbsp;The&nbsp;control&nbsp;is&nbsp;*probe-blind*,&nbsp;not&nbsp;physics-blind:&nbsp;the&nbsp;daemon's&nbsp;own<br>
+&nbsp;&nbsp;neurochemistry&nbsp;responds&nbsp;to&nbsp;real&nbsp;sensors&nbsp;via&nbsp;interoception,&nbsp;so&nbsp;the<br>
+&nbsp;&nbsp;control&nbsp;arm&nbsp;can&nbsp;drift&nbsp;under&nbsp;load.&nbsp;What&nbsp;it&nbsp;cannot&nbsp;see&nbsp;is&nbsp;the&nbsp;probe<br>
+&nbsp;&nbsp;signature&nbsp;—&nbsp;that&nbsp;is&nbsp;the&nbsp;contribution&nbsp;being&nbsp;measured.<br>
+-&nbsp;The&nbsp;coupled&nbsp;arm&nbsp;includes&nbsp;the&nbsp;evoked&nbsp;phase-reset&nbsp;pathway,&nbsp;which&nbsp;the<br>
+&nbsp;&nbsp;control&nbsp;lacks.&nbsp;Phase&nbsp;resets&nbsp;alter&nbsp;subsequent&nbsp;PAC&nbsp;interactions;<br>
+&nbsp;&nbsp;their&nbsp;aggregate&nbsp;effect&nbsp;lands&nbsp;in&nbsp;these&nbsp;band&nbsp;powers.<br>
+-&nbsp;This&nbsp;is&nbsp;an&nbsp;engineering&nbsp;assay:&nbsp;it&nbsp;measures&nbsp;whether&nbsp;the&nbsp;coupling&nbsp;is<br>
+&nbsp;&nbsp;causally&nbsp;effective,&nbsp;not&nbsp;whether&nbsp;it&nbsp;matters&nbsp;to&nbsp;experience.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="argparse.html">argparse</a><br>
+<a href="json.html">json</a><br>
+</td><td class="multicolumn"><a href="math.html">math</a><br>
+<a href="signal.html">signal</a><br>
+</td><td class="multicolumn"><a href="subprocess.html">subprocess</a><br>
+<a href="sys.html">sys</a><br>
+</td><td class="multicolumn"><a href="time.html">time</a><br>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-main"><strong>main</strong></a>() -&gt; 'None'</dt></dl>
+ <dl><dt><a name="-run"><strong>run</strong></a>(samples_per_phase: 'int' = 10, settle_s: 'float' = 5.0) -&gt; 'dict'</dt></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>BAND_NAMES</strong> = ['infraslow', 'delta', 'theta', 'alpha', 'sigma', 'beta1', 'beta2', 'beta3', 'gamma', 'epsilon']<br>
+<strong>ROOT</strong> = PosixPath('/home/mindyrenee/GenAnd/Genesis/Self_World')</td></tr></table>
+</body></html>

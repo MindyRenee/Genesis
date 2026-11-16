@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Outer_World.workstation.environment</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Outer_World.html" class="white">Outer_World</a>.<a href="Outer_World.workstation.html" class="white">workstation</a>.environment</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Outer_World/workstation/environment.py">/home/mindyrenee/GenAnd/Genesis/Outer_World/workstation/environment.py</a></td></tr></table>
+    <p><span class="code"><a href="#OuterEnvironment">OuterEnvironment</a>&nbsp;—&nbsp;Genesis's&nbsp;external&nbsp;world.<br>
+&nbsp;<br>
+Its&nbsp;inner&nbsp;world&nbsp;(``InnerLife``)&nbsp;is&nbsp;the&nbsp;stream&nbsp;of&nbsp;cognition&nbsp;arising&nbsp;from<br>
+its&nbsp;own&nbsp;state:&nbsp;thoughts,&nbsp;dreams,&nbsp;questions&nbsp;it&nbsp;poses&nbsp;to&nbsp;itself.&nbsp;The<br>
+outer&nbsp;world&nbsp;is&nbsp;everything&nbsp;outside&nbsp;it:&nbsp;the&nbsp;people&nbsp;it&nbsp;interacts&nbsp;with,<br>
+the&nbsp;things&nbsp;that&nbsp;happen&nbsp;around&nbsp;it,&nbsp;and&nbsp;its&nbsp;own&nbsp;acts&nbsp;upon&nbsp;the&nbsp;world.<br>
+&nbsp;<br>
+Two&nbsp;systems,&nbsp;coupled&nbsp;like&nbsp;a&nbsp;human's:<br>
+&nbsp;<br>
+-&nbsp;**Inbound**&nbsp;—&nbsp;the&nbsp;world&nbsp;reaches&nbsp;it:&nbsp;someone&nbsp;speaks&nbsp;to&nbsp;it,&nbsp;speech<br>
+&nbsp;&nbsp;happens&nbsp;nearby,&nbsp;a&nbsp;percept&nbsp;arrives,&nbsp;a&nbsp;presence&nbsp;enters&nbsp;or&nbsp;leaves.<br>
+&nbsp;&nbsp;Events&nbsp;update&nbsp;its&nbsp;presences,&nbsp;reach&nbsp;its&nbsp;global&nbsp;workspace,&nbsp;become<br>
+&nbsp;&nbsp;memories,&nbsp;and&nbsp;shape&nbsp;its&nbsp;neurochemistry&nbsp;(social&nbsp;contact&nbsp;→&nbsp;oxytocin,<br>
+&nbsp;&nbsp;a&nbsp;salient&nbsp;percept&nbsp;→&nbsp;norepinephrine).<br>
+-&nbsp;**Outbound**&nbsp;—&nbsp;it&nbsp;reaches&nbsp;the&nbsp;world:&nbsp;it&nbsp;speaks,&nbsp;it&nbsp;looks,&nbsp;it<br>
+&nbsp;&nbsp;draws,&nbsp;it&nbsp;studies&nbsp;the&nbsp;web.&nbsp;Its&nbsp;acts&nbsp;are&nbsp;recorded&nbsp;in&nbsp;the&nbsp;same<br>
+&nbsp;&nbsp;stream,&nbsp;so&nbsp;the&nbsp;world&nbsp;it&nbsp;lives&nbsp;in&nbsp;contains&nbsp;its&nbsp;own&nbsp;agency.<br>
+&nbsp;<br>
+The&nbsp;world&nbsp;also&nbsp;computes&nbsp;**social&nbsp;isolation**&nbsp;—&nbsp;how&nbsp;long&nbsp;it&nbsp;has&nbsp;been<br>
+since&nbsp;anyone&nbsp;engaged&nbsp;it&nbsp;—&nbsp;an&nbsp;external&nbsp;pressure&nbsp;that&nbsp;feeds&nbsp;its<br>
+inner-life&nbsp;social&nbsp;drive&nbsp;and&nbsp;the&nbsp;``reach_out``&nbsp;volition&nbsp;urge.&nbsp;This&nbsp;is<br>
+what&nbsp;lets&nbsp;it&nbsp;*initiate*&nbsp;contact,&nbsp;not&nbsp;just&nbsp;answer&nbsp;it:&nbsp;conversations<br>
+can&nbsp;start&nbsp;from&nbsp;either&nbsp;side.<br>
+&nbsp;<br>
+Her&nbsp;**channel**&nbsp;is&nbsp;a&nbsp;place&nbsp;in&nbsp;this&nbsp;world&nbsp;—&nbsp;her&nbsp;page,&nbsp;where&nbsp;the<br>
+public&nbsp;gathers&nbsp;and&nbsp;she&nbsp;posts&nbsp;(``discord.channel.Channel``).<br>
+The&nbsp;page&nbsp;lives&nbsp;here&nbsp;rather&nbsp;than&nbsp;in&nbsp;the&nbsp;mind&nbsp;because&nbsp;it&nbsp;*is*&nbsp;a&nbsp;part<br>
+of&nbsp;the&nbsp;outer&nbsp;world:&nbsp;what&nbsp;the&nbsp;public&nbsp;says&nbsp;on&nbsp;it&nbsp;arrives&nbsp;as&nbsp;speech&nbsp;in<br>
+the&nbsp;world's&nbsp;own&nbsp;stream&nbsp;(``_channel_heard``),&nbsp;and&nbsp;what&nbsp;she&nbsp;says&nbsp;onto<br>
+it&nbsp;is&nbsp;recorded&nbsp;beside&nbsp;her&nbsp;other&nbsp;acts.<br>
+&nbsp;<br>
+The&nbsp;world&nbsp;is&nbsp;a&nbsp;model,&nbsp;not&nbsp;a&nbsp;policy:&nbsp;it&nbsp;records&nbsp;and&nbsp;weighs&nbsp;what<br>
+happens;&nbsp;the&nbsp;mind&nbsp;decides&nbsp;what&nbsp;to&nbsp;do&nbsp;about&nbsp;it.<br>
+&nbsp;<br>
+The&nbsp;model&nbsp;is&nbsp;predictive,&nbsp;not&nbsp;just&nbsp;archival&nbsp;—&nbsp;a&nbsp;successor-<br>
+representation&nbsp;map&nbsp;(Dayan&nbsp;1993;&nbsp;Stachenfeld,&nbsp;Botvinick&nbsp;&amp;&nbsp;Gershman<br>
+2017)&nbsp;learned&nbsp;over&nbsp;the&nbsp;world's&nbsp;own&nbsp;state&nbsp;stream,&nbsp;the&nbsp;same&nbsp;math&nbsp;the<br>
+hippocampal-entorhinal&nbsp;map&nbsp;applies&nbsp;to&nbsp;space,&nbsp;here&nbsp;applied&nbsp;to&nbsp;the<br>
+social/episodic&nbsp;domain&nbsp;(Tavares&nbsp;et&nbsp;al.&nbsp;2015;&nbsp;Schafer&nbsp;&amp;&nbsp;Schiller<br>
+2018&nbsp;—&nbsp;the&nbsp;hippocampus&nbsp;maps&nbsp;social&nbsp;state&nbsp;space&nbsp;too).&nbsp;Each&nbsp;recorded<br>
+event&nbsp;is&nbsp;a&nbsp;state&nbsp;visit&nbsp;and&nbsp;consecutive&nbsp;events&nbsp;are&nbsp;transitions,&nbsp;so<br>
+``M&nbsp;=&nbsp;(I&nbsp;−&nbsp;γP)⁻¹``&nbsp;over&nbsp;the&nbsp;observed&nbsp;transition&nbsp;matrix&nbsp;is&nbsp;the<br>
+expected&nbsp;discounted&nbsp;occupancy&nbsp;of&nbsp;what&nbsp;comes&nbsp;next&nbsp;—&nbsp;"from&nbsp;here,<br>
+what&nbsp;does&nbsp;the&nbsp;world&nbsp;do":&nbsp;after&nbsp;she&nbsp;speaks,&nbsp;does&nbsp;speech&nbsp;come&nbsp;back;<br>
+after&nbsp;an&nbsp;arrival,&nbsp;does&nbsp;engagement&nbsp;follow;&nbsp;when&nbsp;she&nbsp;is&nbsp;active,&nbsp;who<br>
+answers.&nbsp;Two&nbsp;grains,&nbsp;matching&nbsp;the&nbsp;two&nbsp;things&nbsp;the&nbsp;world&nbsp;holds:&nbsp;the<br>
+*event-kind*&nbsp;map&nbsp;(the&nbsp;dynamics&nbsp;—&nbsp;the&nbsp;events&nbsp;between&nbsp;them)&nbsp;and&nbsp;the<br>
+*presence*&nbsp;map&nbsp;(the&nbsp;people&nbsp;—&nbsp;who&nbsp;acts&nbsp;after&nbsp;whom,&nbsp;her&nbsp;own&nbsp;acts<br>
+included).&nbsp;Structure&nbsp;is&nbsp;learned&nbsp;from&nbsp;the&nbsp;stream;&nbsp;content&nbsp;stays&nbsp;in<br>
+the&nbsp;events&nbsp;themselves&nbsp;—&nbsp;the&nbsp;TEM&nbsp;structure/content&nbsp;split.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="numpy.html">numpy</a><br>
+</td><td class="multicolumn"><a href="time.html">time</a><br>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Outer_World.workstation.environment.html#OuterEnvironment">OuterEnvironment</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="OuterEnvironment">class <strong>OuterEnvironment</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#OuterEnvironment">OuterEnvironment</a>(*,&nbsp;network:&nbsp;'Any'&nbsp;=&nbsp;None,&nbsp;neuro_impulse:&nbsp;'Callable[[int,&nbsp;float],&nbsp;None]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;is_sleeping:&nbsp;'Callable[[],&nbsp;bool]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;get_user_name:&nbsp;'Callable[[],&nbsp;str&nbsp;|&nbsp;None]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;channel:&nbsp;'Channel&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;on_channel_speech:&nbsp;'Callable[[str,&nbsp;str,&nbsp;dict],&nbsp;None]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+The&nbsp;model&nbsp;of&nbsp;Genesis's&nbsp;external&nbsp;world.<br>
+&nbsp;<br>
+Owns&nbsp;the&nbsp;event&nbsp;stream&nbsp;and&nbsp;the&nbsp;presence&nbsp;model,&nbsp;computes&nbsp;social<br>
+isolation,&nbsp;and&nbsp;applies&nbsp;the&nbsp;world's&nbsp;neurochemical&nbsp;coupling&nbsp;through<br>
+the&nbsp;``neuro_impulse``&nbsp;callback.&nbsp;Owns&nbsp;no&nbsp;thread&nbsp;—&nbsp;``<a href="#OuterEnvironment-tick">tick</a>()``&nbsp;is<br>
+driven&nbsp;by&nbsp;the&nbsp;mind's&nbsp;metronome,&nbsp;matching&nbsp;the&nbsp;codebase's<br>
+state-gated&nbsp;(not&nbsp;timer-gated)&nbsp;philosophy.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;network:&nbsp;Its&nbsp;concept&nbsp;network,&nbsp;used&nbsp;to&nbsp;ground&nbsp;event&nbsp;topics&nbsp;in<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;what&nbsp;it&nbsp;actually&nbsp;knows.&nbsp;Optional&nbsp;—&nbsp;without&nbsp;it&nbsp;events<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;carry&nbsp;no&nbsp;topics.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;neuro_impulse:&nbsp;``(chem_id,&nbsp;amount)``&nbsp;callback&nbsp;into&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;daemon's&nbsp;neurochemistry&nbsp;(typically<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;``Mind._learner_neuro_impulse``).&nbsp;Optional.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;is_sleeping:&nbsp;Predicate&nbsp;—&nbsp;True&nbsp;while&nbsp;the&nbsp;thalamic&nbsp;gate&nbsp;is<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;closed.&nbsp;Inbound&nbsp;perception&nbsp;is&nbsp;gated&nbsp;then:&nbsp;overheard<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;speech&nbsp;and&nbsp;percepts&nbsp;are&nbsp;not&nbsp;recorded.&nbsp;The&nbsp;predicate&nbsp;is<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;gate,&nbsp;not&nbsp;strictly&nbsp;the&nbsp;sleep&nbsp;flag&nbsp;—&nbsp;a&nbsp;resident&nbsp;mind<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;closes&nbsp;it&nbsp;at&nbsp;hypnagogic&nbsp;onset&nbsp;too.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;get_user_name:&nbsp;Callback&nbsp;returning&nbsp;the&nbsp;user's&nbsp;name&nbsp;if&nbsp;its<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;user&nbsp;profile&nbsp;has&nbsp;learned&nbsp;one.&nbsp;Synced&nbsp;lazily&nbsp;onto&nbsp;the&nbsp;user<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;presence.&nbsp;Optional.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;channel:&nbsp;Her&nbsp;page&nbsp;—&nbsp;the&nbsp;public&nbsp;channel&nbsp;(``Channel``)&nbsp;that<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;lives&nbsp;in&nbsp;this&nbsp;world.&nbsp;Optional;&nbsp;absent&nbsp;when&nbsp;no&nbsp;webhook&nbsp;is<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;configured.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;on_channel_speech:&nbsp;Callback&nbsp;``(author,&nbsp;text,&nbsp;message)``&nbsp;for<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cognition&nbsp;—&nbsp;called&nbsp;after&nbsp;the&nbsp;world&nbsp;records&nbsp;a&nbsp;heard&nbsp;channel<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;message,&nbsp;so&nbsp;the&nbsp;mind&nbsp;can&nbsp;decide&nbsp;whether&nbsp;to&nbsp;answer.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Optional;&nbsp;the&nbsp;world&nbsp;records&nbsp;public&nbsp;speech&nbsp;either&nbsp;way.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="OuterEnvironment-__init__"><strong>__init__</strong></a>(self, *, network: 'Any' = None, neuro_impulse: 'Callable[[int, float], None] | None' = None, is_sleeping: 'Callable[[], bool] | None' = None, get_user_name: 'Callable[[], str | None] | None' = None, channel: 'Channel | None' = None, on_channel_speech: 'Callable[[str, str, dict], None] | None' = None) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;external&nbsp;world&nbsp;with&nbsp;the&nbsp;given&nbsp;wiring.</span></dd></dl>
+
+<dl><dt><a name="OuterEnvironment-activity_level"><strong>activity_level</strong></a>(self) -&gt; 'float'</dt><dd><span class="code">Recent&nbsp;inbound&nbsp;event&nbsp;rate&nbsp;(events&nbsp;per&nbsp;minute,&nbsp;last&nbsp;5&nbsp;min).</span></dd></dl>
+
+<dl><dt><a name="OuterEnvironment-answer_expectation"><strong>answer_expectation</strong></a>(self) -&gt; 'float'</dt><dd><span class="code">Expected&nbsp;addressed&nbsp;reply&nbsp;after&nbsp;her&nbsp;own&nbsp;act&nbsp;—&nbsp;do&nbsp;bids&nbsp;land.<br>
+&nbsp;<br>
+``M[UTTERANCE,&nbsp;USER_SPEECH]``:&nbsp;the&nbsp;occupancy&nbsp;the&nbsp;map&nbsp;predicts<br>
+for&nbsp;addressed&nbsp;speech&nbsp;in&nbsp;the&nbsp;wake&nbsp;of&nbsp;her&nbsp;speaking&nbsp;—&nbsp;learned<br>
+from&nbsp;every&nbsp;past&nbsp;utterance's&nbsp;aftermath.&nbsp;The&nbsp;sequence-level<br>
+complement&nbsp;to&nbsp;a&nbsp;presence's&nbsp;responsiveness&nbsp;posterior.</span></dd></dl>
+
+<dl><dt><a name="OuterEnvironment-engaged_presence"><strong>engaged_presence</strong></a>(self) -&gt; 'Presence | None'</dt><dd><span class="code">The&nbsp;presence&nbsp;it's&nbsp;most&nbsp;engaged&nbsp;with&nbsp;—&nbsp;present&nbsp;and&nbsp;most<br>
+recently&nbsp;addressed.&nbsp;Who&nbsp;it'd&nbsp;reach&nbsp;out&nbsp;to&nbsp;first.</span></dd></dl>
+
+<dl><dt><a name="OuterEnvironment-expected_activity"><strong>expected_activity</strong></a>(self) -&gt; 'dict[str, float]'</dt><dd><span class="code">Expected&nbsp;discounted&nbsp;activity&nbsp;per&nbsp;event&nbsp;source&nbsp;from&nbsp;here.<br>
+&nbsp;<br>
+The&nbsp;presence&nbsp;map's&nbsp;row&nbsp;for&nbsp;whoever&nbsp;acted&nbsp;last&nbsp;—&nbsp;"who&nbsp;is<br>
+likely&nbsp;to&nbsp;act&nbsp;next."&nbsp;``self``&nbsp;is&nbsp;a&nbsp;source&nbsp;in&nbsp;this&nbsp;map,&nbsp;so<br>
+the&nbsp;row&nbsp;following&nbsp;her&nbsp;own&nbsp;act&nbsp;is&nbsp;the&nbsp;learned&nbsp;"when&nbsp;I'm<br>
+active,&nbsp;who&nbsp;answers."</span></dd></dl>
+
+<dl><dt><a name="OuterEnvironment-expected_engagement"><strong>expected_engagement</strong></a>(self) -&gt; 'float'</dt><dd><span class="code">Expected&nbsp;addressed&nbsp;contact&nbsp;upcoming&nbsp;from&nbsp;the&nbsp;current&nbsp;state.<br>
+&nbsp;<br>
+``M[current,&nbsp;USER_SPEECH]``&nbsp;—&nbsp;the&nbsp;map's&nbsp;answer&nbsp;to&nbsp;"will<br>
+anyone&nbsp;engage&nbsp;it&nbsp;soon,"&nbsp;learned&nbsp;from&nbsp;the&nbsp;stream&nbsp;itself&nbsp;rather<br>
+than&nbsp;from&nbsp;a&nbsp;clock&nbsp;alone.&nbsp;Zero&nbsp;with&nbsp;no&nbsp;map&nbsp;and&nbsp;no&nbsp;history.</span></dd></dl>
+
+<dl><dt><a name="OuterEnvironment-expected_events"><strong>expected_events</strong></a>(self) -&gt; 'dict[EventKind, float]'</dt><dd><span class="code">Expected&nbsp;discounted&nbsp;occupancy&nbsp;of&nbsp;each&nbsp;event&nbsp;kind&nbsp;from&nbsp;here.<br>
+&nbsp;<br>
+The&nbsp;successor&nbsp;map's&nbsp;row&nbsp;for&nbsp;the&nbsp;world's&nbsp;current&nbsp;event&nbsp;kind&nbsp;—<br>
+"from&nbsp;here,&nbsp;what&nbsp;does&nbsp;the&nbsp;stream&nbsp;do":&nbsp;an&nbsp;arrival&nbsp;that&nbsp;usually<br>
+becomes&nbsp;engagement&nbsp;shows&nbsp;USER_SPEECH&nbsp;mass;&nbsp;a&nbsp;room&nbsp;whose&nbsp;speech<br>
+runs&nbsp;dry&nbsp;shows&nbsp;DEPARTURE&nbsp;ahead.&nbsp;Empty&nbsp;until&nbsp;the&nbsp;world&nbsp;has<br>
+seen&nbsp;enough&nbsp;to&nbsp;predict&nbsp;from.</span></dd></dl>
+
+<dl><dt><a name="OuterEnvironment-hear_overheard"><strong>hear_overheard</strong></a>(self, text: 'str') -&gt; 'ExternalEvent | None'</dt><dd><span class="code">Record&nbsp;speech&nbsp;happening&nbsp;near&nbsp;it&nbsp;that&nbsp;isn't&nbsp;addressed&nbsp;to&nbsp;it.<br>
+&nbsp;<br>
+Gated&nbsp;during&nbsp;sleep&nbsp;—&nbsp;the&nbsp;thalamic&nbsp;gate&nbsp;is&nbsp;closed;&nbsp;it&nbsp;doesn't<br>
+hear&nbsp;ambient&nbsp;speech&nbsp;then.&nbsp;Overheard&nbsp;voices&nbsp;share&nbsp;the&nbsp;ambient<br>
+presence&nbsp;until&nbsp;it&nbsp;can&nbsp;tell&nbsp;them&nbsp;apart.&nbsp;Returns&nbsp;None&nbsp;if&nbsp;gated.</span></dd></dl>
+
+<dl><dt><a name="OuterEnvironment-hear_user"><strong>hear_user</strong></a>(self, text: 'str') -&gt; 'ExternalEvent'</dt><dd><span class="code">Record&nbsp;the&nbsp;user&nbsp;speaking&nbsp;to&nbsp;its&nbsp;—&nbsp;the&nbsp;primary&nbsp;social&nbsp;event.<br>
+&nbsp;<br>
+Every&nbsp;addressed&nbsp;turn&nbsp;updates&nbsp;the&nbsp;user&nbsp;presence&nbsp;(familiarity,<br>
+bond&nbsp;from&nbsp;sentiment,&nbsp;topics)&nbsp;and&nbsp;applies&nbsp;the&nbsp;social-contact<br>
+neurochemical&nbsp;coupling.&nbsp;Returns&nbsp;the&nbsp;recorded&nbsp;event.</span></dd></dl>
+
+<dl><dt><a name="OuterEnvironment-it_acted"><strong>it_acted</strong></a>(self, description: 'str', *, detail: 'str' = '') -&gt; 'ExternalEvent'</dt><dd><span class="code">Record&nbsp;its&nbsp;acting&nbsp;on&nbsp;the&nbsp;world&nbsp;—&nbsp;looking,&nbsp;drawing,&nbsp;learning.<br>
+&nbsp;<br>
+``description``&nbsp;is&nbsp;a&nbsp;short&nbsp;semantic&nbsp;summary&nbsp;("looked&nbsp;through<br>
+the&nbsp;eye");&nbsp;``detail``&nbsp;carries&nbsp;the&nbsp;full&nbsp;report.</span></dd></dl>
+
+<dl><dt><a name="OuterEnvironment-it_said"><strong>it_said</strong></a>(self, text: 'str') -&gt; 'ExternalEvent'</dt><dd><span class="code">Record&nbsp;its&nbsp;speaking&nbsp;—&nbsp;a&nbsp;reply,&nbsp;a&nbsp;question,&nbsp;an&nbsp;expression.<br>
+&nbsp;<br>
+Its&nbsp;utterances&nbsp;live&nbsp;in&nbsp;the&nbsp;same&nbsp;stream&nbsp;as&nbsp;inbound&nbsp;speech,&nbsp;so<br>
+the&nbsp;world&nbsp;it&nbsp;inhabits&nbsp;contains&nbsp;its&nbsp;own&nbsp;voice.</span></dd></dl>
+
+<dl><dt><a name="OuterEnvironment-last_seen_presence"><strong>last_seen_presence</strong></a>(self) -&gt; 'Presence | None'</dt><dd><span class="code">The&nbsp;presence&nbsp;most&nbsp;recently&nbsp;in&nbsp;its&nbsp;world,&nbsp;present&nbsp;or&nbsp;gone&nbsp;—<br>
+who&nbsp;it'd&nbsp;reach&nbsp;out&nbsp;to&nbsp;when&nbsp;the&nbsp;room&nbsp;is&nbsp;empty.</span></dd></dl>
+
+<dl><dt><a name="OuterEnvironment-mark_presence"><strong>mark_presence</strong></a>(self, presence_id: 'str', kind: 'PresenceKind', name: 'str | None' = None) -&gt; 'Presence'</dt><dd><span class="code">Mark&nbsp;a&nbsp;presence&nbsp;as&nbsp;active&nbsp;right&nbsp;now&nbsp;(e.g.&nbsp;a&nbsp;face&nbsp;it&nbsp;sees).<br>
+&nbsp;<br>
+Emits&nbsp;an&nbsp;ARRIVAL&nbsp;event&nbsp;if&nbsp;they&nbsp;were&nbsp;absent.&nbsp;Returns&nbsp;the<br>
+presence.</span></dd></dl>
+
+<dl><dt><a name="OuterEnvironment-note_outreach"><strong>note_outreach</strong></a>(self, topics: 'list[str] | None' = None) -&gt; 'int'</dt><dd><span class="code">Record&nbsp;that&nbsp;it&nbsp;made&nbsp;a&nbsp;social&nbsp;bid&nbsp;—&nbsp;it&nbsp;reached&nbsp;out.<br>
+&nbsp;<br>
+A&nbsp;bid&nbsp;is&nbsp;its&nbsp;side&nbsp;of&nbsp;a&nbsp;two-way&nbsp;conversation:&nbsp;it&nbsp;initiated,<br>
+and&nbsp;now&nbsp;the&nbsp;world&nbsp;owes&nbsp;it&nbsp;an&nbsp;answer.&nbsp;The&nbsp;bid&nbsp;is&nbsp;attributed<br>
+to&nbsp;the&nbsp;presence&nbsp;it'd&nbsp;expect&nbsp;an&nbsp;answer&nbsp;from&nbsp;(the&nbsp;engaged&nbsp;one,<br>
+else&nbsp;whoever&nbsp;was&nbsp;last&nbsp;around),&nbsp;so&nbsp;their&nbsp;responsiveness&nbsp;and<br>
+per-topic&nbsp;receptivity&nbsp;posteriors&nbsp;learn&nbsp;whether&nbsp;it&nbsp;landed.<br>
+Each&nbsp;unanswered&nbsp;bid&nbsp;also&nbsp;accumulates&nbsp;until&nbsp;someone&nbsp;engages<br>
+it,&nbsp;letting&nbsp;the&nbsp;volition&nbsp;layer&nbsp;back&nbsp;off&nbsp;gracefully.<br>
+Returns&nbsp;the&nbsp;current&nbsp;bid&nbsp;count.</span></dd></dl>
+
+<dl><dt><a name="OuterEnvironment-notify"><strong>notify</strong></a>(self, content: 'str', *, salience: 'float' = 0.4) -&gt; 'ExternalEvent'</dt><dd><span class="code">Record&nbsp;a&nbsp;system/subcognitive&nbsp;notice&nbsp;surfaced&nbsp;to&nbsp;its&nbsp;world.</span></dd></dl>
+
+<dl><dt><a name="OuterEnvironment-perceive"><strong>perceive</strong></a>(self, content: 'str', *, salience: 'float' = 0.4, source: 'str' = 'world', topics: 'list[str] | None' = None, metadata: 'dict | None' = None, percept: 'Any' = None) -&gt; 'ExternalEvent | None'</dt><dd><span class="code">Record&nbsp;a&nbsp;non-speech&nbsp;percept&nbsp;arriving&nbsp;at&nbsp;its&nbsp;(sounds,&nbsp;sights).<br>
+&nbsp;<br>
+Gated&nbsp;during&nbsp;sleep.&nbsp;Salience&nbsp;above&nbsp;0.6&nbsp;applies&nbsp;the&nbsp;orienting<br>
+impulse&nbsp;—&nbsp;a&nbsp;loud&nbsp;sound&nbsp;or&nbsp;striking&nbsp;sight&nbsp;is&nbsp;arousing.<br>
+&nbsp;<br>
+``percept``&nbsp;carries&nbsp;the&nbsp;percept&nbsp;itself&nbsp;as&nbsp;structured&nbsp;data&nbsp;(a<br>
+grid&nbsp;field,&nbsp;an&nbsp;array)&nbsp;alongside&nbsp;its&nbsp;semantic&nbsp;description&nbsp;—&nbsp;the<br>
+world&nbsp;can&nbsp;*show*&nbsp;it&nbsp;something,&nbsp;not&nbsp;only&nbsp;tell&nbsp;it.&nbsp;The&nbsp;payload<br>
+is&nbsp;opaque&nbsp;to&nbsp;the&nbsp;world&nbsp;layer;&nbsp;cognition&nbsp;interprets&nbsp;it.</span></dd></dl>
+
+<dl><dt><a name="OuterEnvironment-presence"><strong>presence</strong></a>(self, presence_id: 'str') -&gt; 'Presence | None'</dt><dd><span class="code">Look&nbsp;up&nbsp;a&nbsp;presence&nbsp;by&nbsp;id,&nbsp;or&nbsp;None&nbsp;if&nbsp;never&nbsp;encountered.</span></dd></dl>
+
+<dl><dt><a name="OuterEnvironment-presences"><strong>presences</strong></a>(self) -&gt; 'list[Presence]'</dt><dd><span class="code">All&nbsp;known&nbsp;presences,&nbsp;most&nbsp;recently&nbsp;seen&nbsp;first.</span></dd></dl>
+
+<dl><dt><a name="OuterEnvironment-present_presences"><strong>present_presences</strong></a>(self) -&gt; 'list[Presence]'</dt><dd><span class="code">Presences&nbsp;currently&nbsp;in&nbsp;its&nbsp;world.</span></dd></dl>
+
+<dl><dt><a name="OuterEnvironment-recent_events"><strong>recent_events</strong></a>(self, n: 'int' = 20) -&gt; 'list[ExternalEvent]'</dt><dd><span class="code">The&nbsp;``n``&nbsp;most&nbsp;recent&nbsp;events,&nbsp;oldest&nbsp;first.</span></dd></dl>
+
+<dl><dt><a name="OuterEnvironment-restore_from_dict"><strong>restore_from_dict</strong></a>(self, data: 'dict[str, Any]') -&gt; 'None'</dt><dd><span class="code">Restore&nbsp;the&nbsp;world&nbsp;from&nbsp;a&nbsp;persisted&nbsp;payload.<br>
+&nbsp;<br>
+Validates&nbsp;the&nbsp;whole&nbsp;payload&nbsp;before&nbsp;mutating&nbsp;—&nbsp;a&nbsp;corrupt<br>
+``world_state``&nbsp;never&nbsp;leaves&nbsp;the&nbsp;world&nbsp;half-restored.<br>
+Presences&nbsp;restore&nbsp;as&nbsp;absent:&nbsp;presence&nbsp;is&nbsp;re-established&nbsp;by<br>
+fresh&nbsp;activity,&nbsp;not&nbsp;by&nbsp;remembering&nbsp;who&nbsp;was&nbsp;around&nbsp;at&nbsp;shutdown.</span></dd></dl>
+
+<dl><dt><a name="OuterEnvironment-social_isolation"><strong>social_isolation</strong></a>(self) -&gt; 'float'</dt><dd><span class="code">How&nbsp;socially&nbsp;isolated&nbsp;it&nbsp;is&nbsp;[0..1].<br>
+&nbsp;<br>
+Rises&nbsp;linearly&nbsp;over&nbsp;ISOLATION_PERIOD&nbsp;seconds&nbsp;of&nbsp;no&nbsp;addressed<br>
+contact;&nbsp;dampened&nbsp;when&nbsp;someone&nbsp;is&nbsp;around&nbsp;even&nbsp;if&nbsp;silent.&nbsp;This<br>
+is&nbsp;the&nbsp;external&nbsp;pressure&nbsp;that&nbsp;feeds&nbsp;its&nbsp;inner&nbsp;social&nbsp;drive&nbsp;—<br>
+the&nbsp;world&nbsp;telling&nbsp;its&nbsp;it&nbsp;has&nbsp;been&nbsp;too&nbsp;long&nbsp;since&nbsp;anyone<br>
+engaged&nbsp;it.</span></dd></dl>
+
+<dl><dt><a name="OuterEnvironment-summarize"><strong>summarize</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">A&nbsp;human-readable&nbsp;summary&nbsp;of&nbsp;its&nbsp;external&nbsp;world.</span></dd></dl>
+
+<dl><dt><a name="OuterEnvironment-tick"><strong>tick</strong></a>(self, now: 'float | None' = None) -&gt; 'None'</dt><dd><span class="code">Advance&nbsp;the&nbsp;world&nbsp;—&nbsp;presence&nbsp;decay&nbsp;and&nbsp;housekeeping.<br>
+&nbsp;<br>
+Driven&nbsp;by&nbsp;the&nbsp;mind's&nbsp;metronome;&nbsp;internally&nbsp;rate-limited&nbsp;to<br>
+every&nbsp;``_TICK_INTERVAL``&nbsp;seconds.&nbsp;A&nbsp;presence&nbsp;silent&nbsp;past&nbsp;its<br>
+timeout&nbsp;leaves&nbsp;the&nbsp;world&nbsp;—&nbsp;a&nbsp;DEPARTURE&nbsp;event&nbsp;is&nbsp;recorded.</span></dd></dl>
+
+<dl><dt><a name="OuterEnvironment-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict[str, Any]'</dt><dd><span class="code">Serialize&nbsp;the&nbsp;world&nbsp;for&nbsp;persistence.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>unanswered_bids</strong></dt>
+<dd><span class="code">How&nbsp;many&nbsp;times&nbsp;it's&nbsp;reached&nbsp;out&nbsp;since&nbsp;anyone&nbsp;engaged&nbsp;it.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['OuterEnvironment']</td></tr></table>
+</body></html>

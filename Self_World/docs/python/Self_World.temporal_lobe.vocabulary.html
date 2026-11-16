@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.temporal_lobe.vocabulary</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.temporal_lobe.html" class="white">temporal_lobe</a>.vocabulary</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/vocabulary.py">/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/vocabulary.py</a></td></tr></table>
+    <p><span class="code"><a href="#Vocabulary">Vocabulary</a>&nbsp;—&nbsp;the&nbsp;flesh&nbsp;of&nbsp;Genesis's&nbsp;language.<br>
+&nbsp;<br>
+The&nbsp;vocabulary&nbsp;system&nbsp;selects&nbsp;words&nbsp;to&nbsp;fill&nbsp;the&nbsp;grammar's&nbsp;slots.<br>
+Word&nbsp;choice&nbsp;is&nbsp;grounded&nbsp;in&nbsp;three&nbsp;things:<br>
+&nbsp;<br>
+1.&nbsp;**Concept&nbsp;network**:&nbsp;what&nbsp;words&nbsp;does&nbsp;it&nbsp;know&nbsp;for&nbsp;this&nbsp;concept?<br>
+2.&nbsp;**Emotional&nbsp;state**:&nbsp;cortisol&nbsp;→&nbsp;shorter,&nbsp;blunter&nbsp;words.<br>
+&nbsp;&nbsp;&nbsp;Dopamine&nbsp;→&nbsp;more&nbsp;vivid,&nbsp;varied&nbsp;words.&nbsp;Low&nbsp;engagement&nbsp;→&nbsp;minimal.<br>
+3.&nbsp;**Personality**:&nbsp;high&nbsp;openness&nbsp;→&nbsp;abstract,&nbsp;metaphorical&nbsp;language.<br>
+&nbsp;&nbsp;&nbsp;High&nbsp;conscientiousness&nbsp;→&nbsp;precise,&nbsp;measured&nbsp;language.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;not&nbsp;a&nbsp;thesaurus.&nbsp;It's&nbsp;a&nbsp;context-sensitive&nbsp;word&nbsp;selection<br>
+system&nbsp;that&nbsp;produces&nbsp;different&nbsp;words&nbsp;for&nbsp;the&nbsp;same&nbsp;concept&nbsp;depending<br>
+on&nbsp;how&nbsp;it&nbsp;feels&nbsp;and&nbsp;who&nbsp;it&nbsp;is.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="random.html">random</a><br>
+</td><td class="multicolumn"><a href="re.html">re</a><br>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.vocabulary.html#Vocabulary">Vocabulary</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Vocabulary">class <strong>Vocabulary</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Vocabulary">Vocabulary</a>(seed:&nbsp;'int&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;network=None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Context-sensitive&nbsp;word&nbsp;selection&nbsp;for&nbsp;Genesis.<br>
+&nbsp;<br>
+Provides&nbsp;words&nbsp;for&nbsp;grammar&nbsp;slots,&nbsp;grounded&nbsp;in&nbsp;emotional&nbsp;state<br>
+and&nbsp;personality.&nbsp;The&nbsp;same&nbsp;slot&nbsp;can&nbsp;be&nbsp;filled&nbsp;differently<br>
+depending&nbsp;on&nbsp;how&nbsp;it&nbsp;feels.<br>
+&nbsp;<br>
+If&nbsp;a&nbsp;concept&nbsp;network&nbsp;is&nbsp;provided,&nbsp;certain&nbsp;slots&nbsp;(feeling_clause,<br>
+reflection_opener)&nbsp;are&nbsp;composed&nbsp;from&nbsp;its&nbsp;actual&nbsp;knowledge&nbsp;rather<br>
+than&nbsp;fixed&nbsp;word&nbsp;lists.&nbsp;The&nbsp;self_reflection_clause&nbsp;slot&nbsp;is&nbsp;composed<br>
+from&nbsp;its&nbsp;reflection&nbsp;engine&nbsp;(recent&nbsp;metacognitive&nbsp;insights)&nbsp;when&nbsp;a<br>
+self-composer&nbsp;is&nbsp;wired&nbsp;in;&nbsp;otherwise&nbsp;it&nbsp;stays&nbsp;silent&nbsp;rather&nbsp;than<br>
+reciting&nbsp;a&nbsp;canned&nbsp;phrase.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Vocabulary-__init__"><strong>__init__</strong></a>(self, seed: 'int | None' = None, network=None) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;vocabulary&nbsp;with&nbsp;a&nbsp;seeded&nbsp;RNG&nbsp;and&nbsp;optional&nbsp;concept&nbsp;network.</span></dd></dl>
+
+<dl><dt><a name="Vocabulary-acquire_utterance_words"><strong>acquire_utterance_words</strong></a>(self, text: 'str', speech_act: 'str', context_concepts: 'list[str] | None' = None) -&gt; 'None'</dt><dd><span class="code">Acquire&nbsp;lexicon&nbsp;entries&nbsp;from&nbsp;a&nbsp;speech-act&nbsp;utterance.<br>
+&nbsp;<br>
+When&nbsp;the&nbsp;user&nbsp;greets&nbsp;her&nbsp;with&nbsp;"hello",&nbsp;the&nbsp;word&nbsp;*hello*&nbsp;—&nbsp;not<br>
+the&nbsp;utterance&nbsp;—&nbsp;becomes&nbsp;a&nbsp;concept&nbsp;in&nbsp;her&nbsp;network&nbsp;linked&nbsp;to<br>
+the&nbsp;greeting&nbsp;hub.&nbsp;Word-level&nbsp;acquisition:&nbsp;the&nbsp;concept&nbsp;is&nbsp;a<br>
+normal&nbsp;node&nbsp;(it&nbsp;gets&nbsp;a&nbsp;latent&nbsp;position,&nbsp;can&nbsp;gain&nbsp;definitions<br>
+and&nbsp;edges&nbsp;like&nbsp;any&nbsp;other&nbsp;word),&nbsp;never&nbsp;a&nbsp;stored&nbsp;surface<br>
+string.<br>
+&nbsp;<br>
+Two&nbsp;wirings&nbsp;happen,&nbsp;both&nbsp;Hebbian&nbsp;—&nbsp;nodes&nbsp;that&nbsp;fire&nbsp;together<br>
+wire&nbsp;together:<br>
+&nbsp;<br>
+-&nbsp;**Function**:&nbsp;the&nbsp;word&nbsp;links&nbsp;to&nbsp;the&nbsp;speech&nbsp;act's<br>
+&nbsp;&nbsp;neighborhood&nbsp;(heard&nbsp;as&nbsp;a&nbsp;greeting&nbsp;→&nbsp;competes&nbsp;for&nbsp;greeting).<br>
+-&nbsp;**Grounding**:&nbsp;the&nbsp;word&nbsp;links&nbsp;to&nbsp;whichever&nbsp;content&nbsp;concepts<br>
+&nbsp;&nbsp;were&nbsp;co-active&nbsp;in&nbsp;the&nbsp;discourse&nbsp;(``context_concepts``&nbsp;—<br>
+&nbsp;&nbsp;the&nbsp;key&nbsp;concepts&nbsp;comprehension&nbsp;extracted).&nbsp;A&nbsp;word&nbsp;heard<br>
+&nbsp;&nbsp;while&nbsp;"water"&nbsp;was&nbsp;on&nbsp;her&nbsp;mind&nbsp;becomes&nbsp;associated&nbsp;with<br>
+&nbsp;&nbsp;water,&nbsp;so&nbsp;later&nbsp;talk&nbsp;of&nbsp;water&nbsp;primes&nbsp;the&nbsp;word.<br>
+&nbsp;<br>
+Title-cased&nbsp;non-initial&nbsp;tokens&nbsp;are&nbsp;skipped&nbsp;—&nbsp;in&nbsp;"hello<br>
+Genesis"&nbsp;the&nbsp;name&nbsp;is&nbsp;the&nbsp;addressee,&nbsp;not&nbsp;the&nbsp;greeting&nbsp;form.</span></dd></dl>
+
+<dl><dt><a name="Vocabulary-avoid"><strong>avoid</strong></a>(self, slot: 'str', word: 'str') -&gt; 'None'</dt><dd><span class="code">Weaken&nbsp;a&nbsp;word's&nbsp;link&nbsp;to&nbsp;a&nbsp;function&nbsp;—&nbsp;synaptic&nbsp;suppression.<br>
+&nbsp;<br>
+The&nbsp;EXPRESSES&nbsp;edge&nbsp;loses&nbsp;weight;&nbsp;below&nbsp;the&nbsp;competition<br>
+threshold&nbsp;the&nbsp;word&nbsp;stops&nbsp;being&nbsp;a&nbsp;candidate.&nbsp;The&nbsp;local&nbsp;set<br>
+remains&nbsp;for&nbsp;network-less&nbsp;runs&nbsp;and&nbsp;introspection.</span></dd></dl>
+
+<dl><dt><a name="Vocabulary-fill_slot"><strong>fill_slot</strong></a>(self, slot_name: 'str', context: 'dict[str, Any]', emotion: 'EmotionalState', personality: 'PersonalityTraits', prev_word: 'str' = '', prev_prev_word: 'str' = '') -&gt; 'str'</dt><dd><span class="code">Fill&nbsp;a&nbsp;grammar&nbsp;slot&nbsp;with&nbsp;a&nbsp;word&nbsp;or&nbsp;phrase.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;slot_name:&nbsp;The&nbsp;name&nbsp;of&nbsp;the&nbsp;slot&nbsp;(e.g.&nbsp;"greeting_word")<br>
+&nbsp;&nbsp;&nbsp;&nbsp;context:&nbsp;Dictionary&nbsp;of&nbsp;contextual&nbsp;info&nbsp;(content,&nbsp;topics,&nbsp;etc.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;emotion:&nbsp;Current&nbsp;emotional&nbsp;state<br>
+&nbsp;&nbsp;&nbsp;&nbsp;personality:&nbsp;Personality&nbsp;traits<br>
+&nbsp;&nbsp;&nbsp;&nbsp;prev_word:&nbsp;The&nbsp;last&nbsp;word&nbsp;emitted&nbsp;before&nbsp;this&nbsp;slot,&nbsp;used&nbsp;to<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;bias&nbsp;selection&nbsp;toward&nbsp;learned&nbsp;bigram&nbsp;transitions.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;prev_prev_word:&nbsp;The&nbsp;word&nbsp;before&nbsp;``prev_word``,&nbsp;used&nbsp;to<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;bias&nbsp;selection&nbsp;toward&nbsp;learned&nbsp;trigram&nbsp;transitions<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;when&nbsp;available.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;word&nbsp;or&nbsp;phrase&nbsp;to&nbsp;fill&nbsp;the&nbsp;slot.</span></dd></dl>
+
+<dl><dt><a name="Vocabulary-get_avoided"><strong>get_avoided</strong></a>(self) -&gt; 'dict[str, set[str]]'</dt><dd><span class="code">Get&nbsp;all&nbsp;avoided&nbsp;words&nbsp;(for&nbsp;introspection/persistence).</span></dd></dl>
+
+<dl><dt><a name="Vocabulary-get_preferred"><strong>get_preferred</strong></a>(self) -&gt; 'dict[str, list[str]]'</dt><dd><span class="code">Get&nbsp;all&nbsp;preferred&nbsp;words&nbsp;(for&nbsp;introspection/persistence).</span></dd></dl>
+
+<dl><dt><a name="Vocabulary-learn_from_response"><strong>learn_from_response</strong></a>(self, response: 'str', intent: 'str', valence: 'float') -&gt; 'None'</dt><dd><span class="code">Learn&nbsp;word&nbsp;preferences&nbsp;from&nbsp;how&nbsp;a&nbsp;response&nbsp;was&nbsp;received.<br>
+&nbsp;<br>
+If&nbsp;the&nbsp;conversation&nbsp;went&nbsp;well&nbsp;(positive&nbsp;valence),&nbsp;prefer&nbsp;the<br>
+words&nbsp;it&nbsp;used.&nbsp;If&nbsp;it&nbsp;went&nbsp;poorly&nbsp;(negative&nbsp;valence),&nbsp;avoid&nbsp;them.<br>
+This&nbsp;is&nbsp;how&nbsp;its&nbsp;vocabulary&nbsp;develops&nbsp;over&nbsp;time&nbsp;—&nbsp;it&nbsp;learns<br>
+what&nbsp;works.<br>
+&nbsp;<br>
+Which&nbsp;slot&nbsp;gets&nbsp;the&nbsp;preference&nbsp;is&nbsp;derived&nbsp;from&nbsp;the&nbsp;response's<br>
+intent,&nbsp;not&nbsp;from&nbsp;hard-coded&nbsp;word&nbsp;lists.</span></dd></dl>
+
+<dl><dt><a name="Vocabulary-learn_last_question"><strong>learn_last_question</strong></a>(self, valence: 'float') -&gt; 'None'</dt><dd><span class="code">Adjust&nbsp;preferences&nbsp;for&nbsp;the&nbsp;fragments&nbsp;used&nbsp;in&nbsp;the&nbsp;last&nbsp;question.<br>
+&nbsp;<br>
+Positive&nbsp;valence&nbsp;means&nbsp;the&nbsp;user&nbsp;responded&nbsp;well;&nbsp;prefer&nbsp;those<br>
+fragments.&nbsp;Negative&nbsp;valence&nbsp;means&nbsp;avoid&nbsp;them.</span></dd></dl>
+
+<dl><dt><a name="Vocabulary-prefer"><strong>prefer</strong></a>(self, slot: 'str', word: 'str') -&gt; 'None'</dt><dd><span class="code">Strengthen&nbsp;a&nbsp;word's&nbsp;link&nbsp;to&nbsp;a&nbsp;function&nbsp;—&nbsp;Hebbian&nbsp;learning.<br>
+&nbsp;<br>
+When&nbsp;the&nbsp;lexicon&nbsp;(concept&nbsp;network)&nbsp;is&nbsp;present,&nbsp;the&nbsp;preference<br>
+is&nbsp;written&nbsp;where&nbsp;retrieval&nbsp;reads&nbsp;it:&nbsp;the&nbsp;EXPRESSES&nbsp;edge&nbsp;gains<br>
+weight&nbsp;and&nbsp;the&nbsp;concept's&nbsp;activation&nbsp;is&nbsp;boosted,&nbsp;so&nbsp;the&nbsp;word<br>
+competes&nbsp;harder&nbsp;next&nbsp;time.&nbsp;The&nbsp;local&nbsp;deque&nbsp;remains&nbsp;for<br>
+network-less&nbsp;runs&nbsp;and&nbsp;introspection.</span></dd></dl>
+
+<dl><dt><a name="Vocabulary-set_embeddings"><strong>set_embeddings</strong></a>(self, embeddings: 'Any') -&gt; 'None'</dt><dd><span class="code">Wire&nbsp;the&nbsp;embedding&nbsp;store&nbsp;for&nbsp;latent-space&nbsp;composition.<br>
+&nbsp;<br>
+When&nbsp;available,&nbsp;the&nbsp;vocabulary&nbsp;uses&nbsp;it&nbsp;to&nbsp;find&nbsp;semantically<br>
+related&nbsp;concepts&nbsp;when&nbsp;composing&nbsp;knowledge&nbsp;content&nbsp;—&nbsp;enriching<br>
+its&nbsp;responses&nbsp;with&nbsp;connections&nbsp;it&nbsp;discovered&nbsp;through&nbsp;vector<br>
+proximity,&nbsp;not&nbsp;just&nbsp;through&nbsp;explicit&nbsp;graph&nbsp;edges.</span></dd></dl>
+
+<dl><dt><a name="Vocabulary-set_fluency_model"><strong>set_fluency_model</strong></a>(self, learner: 'Any') -&gt; 'None'</dt><dd><span class="code">Wire&nbsp;the&nbsp;statistical&nbsp;learner&nbsp;for&nbsp;n-gram&nbsp;fluency&nbsp;shaping.<br>
+&nbsp;<br>
+When&nbsp;available,&nbsp;slot&nbsp;selection&nbsp;is&nbsp;biased&nbsp;toward&nbsp;candidates<br>
+whose&nbsp;first&nbsp;word&nbsp;forms&nbsp;an&nbsp;observed&nbsp;bigram&nbsp;with&nbsp;the&nbsp;previously<br>
+emitted&nbsp;word.&nbsp;This&nbsp;shapes&nbsp;*fluency*&nbsp;—&nbsp;which&nbsp;of&nbsp;its&nbsp;own&nbsp;words<br>
+to&nbsp;pick&nbsp;—&nbsp;never&nbsp;content;&nbsp;the&nbsp;candidate&nbsp;set&nbsp;still&nbsp;comes&nbsp;from<br>
+its&nbsp;vocabulary&nbsp;and&nbsp;concept&nbsp;network.</span></dd></dl>
+
+<dl><dt><a name="Vocabulary-set_self_composer"><strong>set_self_composer</strong></a>(self, composer: 'Any', reflection: 'Any') -&gt; 'None'</dt><dd><span class="code">Wire&nbsp;the&nbsp;self-composer&nbsp;and&nbsp;reflection&nbsp;engine.<br>
+&nbsp;<br>
+When&nbsp;wired,&nbsp;the&nbsp;``self_reflection_clause``&nbsp;slot&nbsp;is&nbsp;composed<br>
+from&nbsp;its&nbsp;most&nbsp;recent&nbsp;reflection&nbsp;insight&nbsp;(a&nbsp;genuine&nbsp;product&nbsp;of<br>
+its&nbsp;metacognition)&nbsp;rather&nbsp;than&nbsp;selected&nbsp;from&nbsp;a&nbsp;fixed&nbsp;phrase<br>
+list.&nbsp;Without&nbsp;this,&nbsp;the&nbsp;slot&nbsp;stays&nbsp;silent&nbsp;—&nbsp;it&nbsp;does&nbsp;not<br>
+recite&nbsp;a&nbsp;canned&nbsp;self-reflection.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'_ACT_WORD_HUBS': 'ClassVar[dict[str, str]]', '_CAPABILITY_VERBS': 'ClassVar[dict[str, str]]', '_COUNT_NOUN_EXCEPTIONS': 'ClassVar[set[str]]', '_MASS_NOUNS': 'ClassVar[set[str]]', '_NEIGHBORHOODS': 'ClassVar[dict[str, tuple[str, ...]]]', '_PRED_TO_1SG': 'ClassVar[dict[str, str]]', '_PRED_TO_3SG': 'ClassVar[dict[str, str]]', '_PROPER_NOUNS': 'ClassVar[set[str]]', '_RELATION_VERBS': 'ClassVar[dict[str, list[str]]]', '_SUPPRESSED_WEIGHT': 'ClassVar[float]', ...}</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['Vocabulary']<br>
+<strong>__annotations__</strong> = {'_VERBATIM_FALLBACK_HITS': 'list[int]'}</td></tr></table>
+</body></html>

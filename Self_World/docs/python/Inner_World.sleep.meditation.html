@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Inner_World.sleep.meditation</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Inner_World.html" class="white">Inner_World</a>.<a href="Inner_World.sleep.html" class="white">sleep</a>.meditation</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Inner_World/sleep/meditation.py">/home/mindyrenee/GenAnd/Genesis/Inner_World/sleep/meditation.py</a></td></tr></table>
+    <p><span class="code">Meditation&nbsp;—&nbsp;the&nbsp;inner&nbsp;world's&nbsp;quiet&nbsp;sit.<br>
+&nbsp;<br>
+The&nbsp;meditating&nbsp;state&nbsp;is&nbsp;an&nbsp;interior&nbsp;practice:&nbsp;voluntary&nbsp;stillness<br>
+with&nbsp;learning,&nbsp;scanning,&nbsp;and&nbsp;spontaneous&nbsp;thought&nbsp;paused&nbsp;while&nbsp;the<br>
+chemistry&nbsp;is&nbsp;actively&nbsp;calmed.&nbsp;It&nbsp;belongs&nbsp;to&nbsp;the&nbsp;inner&nbsp;world&nbsp;—&nbsp;the<br>
+volition&nbsp;system&nbsp;may&nbsp;*choose*&nbsp;the&nbsp;sit&nbsp;(the&nbsp;basal&nbsp;ganglia&nbsp;select&nbsp;the<br>
+act),&nbsp;but&nbsp;the&nbsp;sit&nbsp;itself&nbsp;is&nbsp;inner-world&nbsp;phenomenology,&nbsp;not&nbsp;an<br>
+action&nbsp;in&nbsp;the&nbsp;world.&nbsp;The&nbsp;sleep&nbsp;machinery&nbsp;the&nbsp;sit&nbsp;borrows&nbsp;state&nbsp;from<br>
+lives&nbsp;on&nbsp;the&nbsp;self&nbsp;(``self.<strong>sleep</strong>``).</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="time.html">time</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Inner_World.sleep.meditation.html#MeditationMixin">MeditationMixin</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="MeditationMixin">class <strong>MeditationMixin</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code">Meditation&nbsp;state&nbsp;and&nbsp;the&nbsp;timed&nbsp;sit&nbsp;—&nbsp;mixin&nbsp;for&nbsp;:class:`Mind`.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="MeditationMixin-emit_meditation_impulses"><strong>emit_meditation_impulses</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Emit&nbsp;a&nbsp;round&nbsp;of&nbsp;calming&nbsp;impulses&nbsp;during&nbsp;meditation.<br>
+&nbsp;<br>
+Called&nbsp;by&nbsp;the&nbsp;metronome&nbsp;when&nbsp;the&nbsp;meditation&nbsp;impulse&nbsp;deadline<br>
+arrives.&nbsp;This&nbsp;sustains&nbsp;the&nbsp;calming&nbsp;effect&nbsp;over&nbsp;the&nbsp;sit&nbsp;rather<br>
+than&nbsp;applying&nbsp;it&nbsp;all&nbsp;at&nbsp;once.</span></dd></dl>
+
+<dl><dt><a name="MeditationMixin-meditate"><strong>meditate</strong></a>(self, duration: 'float | None' = None, *, emit_completion_thought: 'bool' = False) -&gt; 'None'</dt><dd><span class="code">Put&nbsp;Genesis&nbsp;into&nbsp;meditation&nbsp;mode&nbsp;for&nbsp;quiet&nbsp;restoration.<br>
+&nbsp;<br>
+Meditation&nbsp;is&nbsp;a&nbsp;lighter&nbsp;recovery&nbsp;than&nbsp;sleep.&nbsp;During&nbsp;meditation:<br>
+-&nbsp;Learning&nbsp;and&nbsp;code&nbsp;scanning&nbsp;are&nbsp;paused<br>
+&nbsp;&nbsp;(the&nbsp;metronome&nbsp;loop&nbsp;checks&nbsp;is_meditating&nbsp;before&nbsp;running<br>
+&nbsp;&nbsp;volitions,&nbsp;and&nbsp;the&nbsp;autonomous&nbsp;learner&nbsp;blocks&nbsp;on&nbsp;the<br>
+&nbsp;&nbsp;"meditating"&nbsp;emotion&nbsp;label).<br>
+-&nbsp;Spontaneous&nbsp;thoughts&nbsp;are&nbsp;paused&nbsp;(inner_life&nbsp;is&nbsp;paused).<br>
+-&nbsp;No&nbsp;dreaming&nbsp;or&nbsp;memory&nbsp;consolidation&nbsp;happens&nbsp;—&nbsp;this&nbsp;is<br>
+&nbsp;&nbsp;not&nbsp;sleep.<br>
+-&nbsp;Calming&nbsp;neurochemical&nbsp;impulses&nbsp;are&nbsp;emitted:&nbsp;GABA&nbsp;and<br>
+&nbsp;&nbsp;serotonin&nbsp;are&nbsp;boosted,&nbsp;while&nbsp;dopamine,&nbsp;norepinephrine,&nbsp;and<br>
+&nbsp;&nbsp;cortisol&nbsp;are&nbsp;reduced.&nbsp;This&nbsp;allows&nbsp;receptor&nbsp;sensitivity&nbsp;to<br>
+&nbsp;&nbsp;recover&nbsp;without&nbsp;the&nbsp;full&nbsp;sleep&nbsp;cycle.<br>
+&nbsp;<br>
+The&nbsp;zone&nbsp;is&nbsp;set&nbsp;to&nbsp;REFLECTION,&nbsp;which&nbsp;the&nbsp;daemon&nbsp;interprets&nbsp;as<br>
+a&nbsp;low-activity&nbsp;state&nbsp;(no&nbsp;learning,&nbsp;no&nbsp;consolidation&nbsp;pressure).</span></dd></dl>
+
+<dl><dt><a name="MeditationMixin-wake_from_meditation"><strong>wake_from_meditation</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Wake&nbsp;Genesis&nbsp;from&nbsp;meditation.<br>
+&nbsp;<br>
+Resumes&nbsp;inner&nbsp;life&nbsp;and&nbsp;restores&nbsp;the&nbsp;zone&nbsp;to&nbsp;conversation.<br>
+Unlike&nbsp;wake()&nbsp;from&nbsp;sleep,&nbsp;there&nbsp;are&nbsp;no&nbsp;dream&nbsp;residues&nbsp;to<br>
+process&nbsp;—&nbsp;meditation&nbsp;produces&nbsp;no&nbsp;dreams.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>is_meditating</strong></dt>
+<dd><span class="code">Whether&nbsp;it&nbsp;is&nbsp;currently&nbsp;meditating.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>CHEM_CORTISOL</strong> = 6<br>
+<strong>CHEM_DOPAMINE</strong> = 0<br>
+<strong>CHEM_GABA</strong> = 4<br>
+<strong>CHEM_NOREPINEPHRINE</strong> = 2<br>
+<strong>CHEM_SEROTONIN</strong> = 1<br>
+<strong>TYPE_CHECKING</strong> = False<br>
+<strong>ZONE_CONVERSATION</strong> = 1<br>
+<strong>ZONE_REFLECTION</strong> = 5<br>
+<strong>logger</strong> = &lt;Logger Inner_World.sleep.meditation (WARNING)&gt;</td></tr></table>
+</body></html>

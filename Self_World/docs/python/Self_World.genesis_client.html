@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: package Self_World.genesis_client</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.genesis_client</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/genesis_client/__init__.py">/home/mindyrenee/GenAnd/Genesis/Self_World/genesis_client/__init__.py</a></td></tr></table>
+    <p><span class="code">Genesis&nbsp;client&nbsp;library&nbsp;—&nbsp;the&nbsp;cognitive&nbsp;mind's&nbsp;bridge&nbsp;to&nbsp;the&nbsp;subcognitive.<br>
+&nbsp;<br>
+This&nbsp;package&nbsp;provides&nbsp;a&nbsp;Python&nbsp;client&nbsp;for&nbsp;communicating&nbsp;with&nbsp;the&nbsp;Genesis<br>
+subcognitive&nbsp;daemon&nbsp;over&nbsp;a&nbsp;Unix&nbsp;domain&nbsp;socket.&nbsp;It&nbsp;implements&nbsp;the&nbsp;binary<br>
+IPC&nbsp;protocol&nbsp;defined&nbsp;in&nbsp;the&nbsp;Rust&nbsp;crate's&nbsp;`daemon::ipc`&nbsp;module.<br>
+&nbsp;<br>
+#&nbsp;Quick&nbsp;start<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;import&nbsp;os<br>
+&nbsp;&nbsp;&nbsp;&nbsp;from&nbsp;genesis_client&nbsp;import&nbsp;<a href="#GenesisClient">GenesisClient</a><br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;The&nbsp;daemon's&nbsp;socket&nbsp;lives&nbsp;in&nbsp;the&nbsp;data&nbsp;dir&nbsp;(default:&nbsp;~/.local/share/genesis/)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;with&nbsp;<a href="#GenesisClient">GenesisClient</a>(os.path.expanduser("~/.local/share/genesis/genesis.sock"))&nbsp;as&nbsp;client:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;summary&nbsp;=&nbsp;client.get_neuro_summary()<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;print(f"Genesis&nbsp;is&nbsp;feeling:&nbsp;{summary.phase_name}")<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;print(f"&nbsp;&nbsp;arousal:&nbsp;{summary.arousal:.2f}")<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;print(f"&nbsp;&nbsp;valence:&nbsp;{summary.valence:.2f}")<br>
+&nbsp;<br>
+#&nbsp;Public&nbsp;API<br>
+&nbsp;<br>
+The&nbsp;top-level&nbsp;package&nbsp;re-exports&nbsp;the&nbsp;two&nbsp;symbols&nbsp;most&nbsp;callers&nbsp;need:<br>
+``<a href="#GenesisClient">GenesisClient</a>``&nbsp;(the&nbsp;client&nbsp;class)&nbsp;and&nbsp;``<a href="#NeuroSummary">NeuroSummary</a>``&nbsp;(the&nbsp;most<br>
+commonly&nbsp;read&nbsp;return&nbsp;type).&nbsp;For&nbsp;everything&nbsp;else&nbsp;—&nbsp;protocol&nbsp;constants,<br>
+wire&nbsp;types,&nbsp;exceptions&nbsp;—&nbsp;import&nbsp;directly&nbsp;from&nbsp;the&nbsp;relevant&nbsp;submodule:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;from&nbsp;genesis_client.protocol&nbsp;import&nbsp;PHASE_FLOW,&nbsp;CHEM_DOPAMINE<br>
+&nbsp;&nbsp;&nbsp;&nbsp;from&nbsp;genesis_client.types&nbsp;import&nbsp;InferenceSummary,&nbsp;Episode<br>
+&nbsp;&nbsp;&nbsp;&nbsp;from&nbsp;genesis_client.exceptions&nbsp;import&nbsp;EpisodeNotFound</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Package Contents</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="Self_World.genesis_client.client.html">client</a><br>
+<a href="Self_World.genesis_client.exceptions.html">exceptions</a><br>
+</td><td class="multicolumn"><a href="Self_World.genesis_client.ltm_index.html">ltm_index</a><br>
+<a href="Self_World.genesis_client.protocol.html">protocol</a><br>
+</td><td class="multicolumn"><a href="Self_World.genesis_client.swallow.html">swallow</a><br>
+<a href="Self_World.genesis_client.tensor.html">tensor</a><br>
+</td><td class="multicolumn"><a href="Self_World.genesis_client.threads.html">threads</a><br>
+<a href="Self_World.genesis_client.types.html">types</a><br>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.genesis_client.client.html#GenesisClient">Self_World.genesis_client.client.GenesisClient</a>
+</dt><dt class="heading-text"><a href="Self_World.genesis_client.types.html#NeuroSummary">Self_World.genesis_client.types.NeuroSummary</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="GenesisClient">class <strong>GenesisClient</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#GenesisClient">GenesisClient</a>(socket_path:&nbsp;'str',&nbsp;request_timeout:&nbsp;'float'&nbsp;=&nbsp;30.0)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Client&nbsp;for&nbsp;the&nbsp;Genesis&nbsp;subcognitive&nbsp;daemon.<br>
+&nbsp;<br>
+Connects&nbsp;to&nbsp;the&nbsp;daemon&nbsp;via&nbsp;a&nbsp;Unix&nbsp;domain&nbsp;socket&nbsp;and&nbsp;provides<br>
+a&nbsp;Pythonic&nbsp;API&nbsp;for&nbsp;all&nbsp;IPC&nbsp;commands.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;socket_path:&nbsp;Path&nbsp;to&nbsp;the&nbsp;daemon's&nbsp;Unix&nbsp;socket&nbsp;file.<br>
+&nbsp;<br>
+Raises:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;DaemonNotRunning:&nbsp;If&nbsp;the&nbsp;socket&nbsp;file&nbsp;doesn't&nbsp;exist&nbsp;(daemon&nbsp;not&nbsp;running).<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="GenesisClient-__enter__"><strong>__enter__</strong></a>(self) -&gt; 'GenesisClient'</dt><dd><span class="code">Context&nbsp;manager&nbsp;entry&nbsp;—&nbsp;connect&nbsp;and&nbsp;return&nbsp;self.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-__exit__"><strong>__exit__</strong></a>(self, exc_type: 'object', exc_val: 'object', exc_tb: 'object') -&gt; 'None'</dt><dd><span class="code">Context&nbsp;manager&nbsp;exit&nbsp;—&nbsp;disconnect.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-__init__"><strong>__init__</strong></a>(self, socket_path: 'str', request_timeout: 'float' = 30.0) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;client&nbsp;with&nbsp;a&nbsp;socket&nbsp;path&nbsp;and&nbsp;request&nbsp;timeout.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-advance_neuro"><strong>advance_neuro</strong></a>(self, *, timeout: 'float | None' = None) -&gt; 'tuple[float, float, float, float, int] | None'</dt><dd><span class="code">Advance&nbsp;the&nbsp;body's&nbsp;neurochemistry&nbsp;and&nbsp;run&nbsp;active&nbsp;inference.<br>
+&nbsp;<br>
+There&nbsp;is&nbsp;deliberately&nbsp;no&nbsp;``dt``&nbsp;parameter.&nbsp;The&nbsp;daemon&nbsp;owns&nbsp;time:<br>
+it&nbsp;is&nbsp;the&nbsp;body,&nbsp;it&nbsp;integrates&nbsp;at&nbsp;TICK_INTERVAL_MS&nbsp;on&nbsp;its&nbsp;own<br>
+clock,&nbsp;and&nbsp;it&nbsp;measures&nbsp;its&nbsp;own&nbsp;elapsed&nbsp;interval.&nbsp;Accepting&nbsp;a<br>
+caller-supplied&nbsp;step&nbsp;is&nbsp;what&nbsp;allowed&nbsp;the&nbsp;mind&nbsp;to&nbsp;dictate&nbsp;the<br>
+body's&nbsp;integration&nbsp;rate&nbsp;—&nbsp;the&nbsp;coupling&nbsp;that&nbsp;had&nbsp;neurochemistry<br>
+advancing&nbsp;in&nbsp;~1-second&nbsp;lumps&nbsp;while&nbsp;its&nbsp;rate&nbsp;constants,&nbsp;the<br>
+circadian&nbsp;oscillator,&nbsp;and&nbsp;the&nbsp;sleep&nbsp;machinery&nbsp;were&nbsp;all&nbsp;tuned&nbsp;for<br>
+200&nbsp;ms.<br>
+&nbsp;<br>
+The&nbsp;4-byte&nbsp;dt&nbsp;field&nbsp;remains&nbsp;on&nbsp;the&nbsp;wire&nbsp;so&nbsp;the&nbsp;frame&nbsp;layout&nbsp;and<br>
+PROTOCOL_VERSION&nbsp;are&nbsp;unchanged,&nbsp;but&nbsp;the&nbsp;daemon&nbsp;reads&nbsp;and&nbsp;ignores<br>
+it.&nbsp;What&nbsp;is&nbsp;sent&nbsp;is&nbsp;the&nbsp;nominal&nbsp;step,&nbsp;purely&nbsp;as&nbsp;a&nbsp;placeholder.<br>
+&nbsp;<br>
+The&nbsp;returned&nbsp;signals&nbsp;are&nbsp;also&nbsp;available&nbsp;from&nbsp;shared&nbsp;memory<br>
+(``CoreState.inference``),&nbsp;so&nbsp;a&nbsp;caller&nbsp;that&nbsp;only&nbsp;wants&nbsp;to&nbsp;read<br>
+them&nbsp;does&nbsp;not&nbsp;need&nbsp;this&nbsp;call&nbsp;at&nbsp;all.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(surprise,&nbsp;free_energy,&nbsp;precision,&nbsp;allostatic_load,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;tick_count)&nbsp;or&nbsp;None&nbsp;on&nbsp;error.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-advance_physics"><strong>advance_physics</strong></a>(self, dt: 'float', *, timeout: 'float | None' = None) -&gt; 'tuple[float, float, float, float, int] | None'</dt><dd><span class="code">Advance&nbsp;the&nbsp;body&nbsp;by&nbsp;an&nbsp;explicit&nbsp;step.&nbsp;**Evaluation&nbsp;only.**<br>
+&nbsp;<br>
+The&nbsp;production&nbsp;path&nbsp;is&nbsp;:meth:`advance_neuro`,&nbsp;which&nbsp;takes&nbsp;no&nbsp;step<br>
+because&nbsp;the&nbsp;daemon&nbsp;owns&nbsp;time.&nbsp;This&nbsp;command&nbsp;exists&nbsp;for&nbsp;offline<br>
+experiments&nbsp;that&nbsp;need&nbsp;`dt`&nbsp;as&nbsp;an&nbsp;independent&nbsp;variable&nbsp;--&nbsp;the<br>
+causal&nbsp;assay&nbsp;advances&nbsp;a&nbsp;fixed&nbsp;number&nbsp;of&nbsp;ticks&nbsp;and&nbsp;measures&nbsp;the<br>
+per-tick&nbsp;response&nbsp;to&nbsp;an&nbsp;impulse,&nbsp;so&nbsp;it&nbsp;cannot&nbsp;use&nbsp;the&nbsp;daemon's<br>
+wall&nbsp;clock.<br>
+&nbsp;<br>
+Only&nbsp;ever&nbsp;call&nbsp;this&nbsp;against&nbsp;an&nbsp;isolated&nbsp;daemon&nbsp;in&nbsp;a&nbsp;temporary<br>
+data&nbsp;directory&nbsp;(``eval/harness.py``).&nbsp;Driving&nbsp;the&nbsp;live&nbsp;daemon&nbsp;with<br>
+it&nbsp;would&nbsp;put&nbsp;two&nbsp;clocks&nbsp;on&nbsp;the&nbsp;body&nbsp;again,&nbsp;which&nbsp;is&nbsp;the&nbsp;coupling<br>
+this&nbsp;was&nbsp;split&nbsp;apart&nbsp;to&nbsp;remove.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;dt:&nbsp;Simulated&nbsp;seconds&nbsp;to&nbsp;advance.&nbsp;Clamped&nbsp;to&nbsp;the&nbsp;same<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;``DT_MIN..DT_MAX``&nbsp;range&nbsp;the&nbsp;body&nbsp;applies&nbsp;to&nbsp;its&nbsp;own<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;elapsed&nbsp;time,&nbsp;so&nbsp;an&nbsp;experiment&nbsp;cannot&nbsp;request&nbsp;a&nbsp;step&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;production&nbsp;integrator&nbsp;would&nbsp;refuse.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(surprise,&nbsp;free_energy,&nbsp;precision,&nbsp;allostatic_load,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;tick_count)&nbsp;or&nbsp;None&nbsp;on&nbsp;error.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-analyze_code"><strong>analyze_code</strong></a>(self, path: 'str', source: 'str', *, timeout: 'float | None' = None) -&gt; 'dict[str, Any] | None'</dt><dd><span class="code">The&nbsp;body's&nbsp;structural&nbsp;sense&nbsp;of&nbsp;a&nbsp;Rust&nbsp;source&nbsp;file.<br>
+&nbsp;<br>
+The&nbsp;daemon&nbsp;parses&nbsp;the&nbsp;source&nbsp;into&nbsp;a&nbsp;real&nbsp;AST&nbsp;(syn)&nbsp;—&nbsp;semantic<br>
+units&nbsp;with&nbsp;calls/references/complexity,&nbsp;the&nbsp;dependency&nbsp;graph,<br>
+impl&nbsp;relations&nbsp;—&nbsp;a&nbsp;richer&nbsp;reading&nbsp;than&nbsp;the&nbsp;mind's&nbsp;regex&nbsp;parser.<br>
+The&nbsp;report&nbsp;is&nbsp;decoded&nbsp;into::<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;{"file":&nbsp;str,&nbsp;"stats":&nbsp;{lines,&nbsp;functions,&nbsp;structs,&nbsp;enums,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;traits,&nbsp;impls,&nbsp;max_complexity,&nbsp;avg_complexity},<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"units":&nbsp;[{kind,&nbsp;name,&nbsp;qualified,&nbsp;span,&nbsp;public,&nbsp;async_,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;unsafe_,&nbsp;body,&nbsp;params,&nbsp;return_type,&nbsp;calls,&nbsp;refs,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;branches,&nbsp;loops,&nbsp;stmts,&nbsp;docs}],<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"impls":&nbsp;[(self_type,&nbsp;trait_or_None)],<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"edges":&nbsp;[(caller_qualified,&nbsp;callee_qualified)]}<br>
+&nbsp;<br>
+Returns&nbsp;``None``&nbsp;on&nbsp;transport&nbsp;failure,&nbsp;a&nbsp;parse&nbsp;error&nbsp;the&nbsp;daemon<br>
+rejected&nbsp;(``INVALID_VALUE``),&nbsp;or&nbsp;when&nbsp;the&nbsp;daemon&nbsp;predates&nbsp;the<br>
+command&nbsp;—&nbsp;an&nbsp;absent&nbsp;channel,&nbsp;never&nbsp;a&nbsp;fabricated&nbsp;reading.&nbsp;Callers<br>
+should&nbsp;fall&nbsp;back&nbsp;to&nbsp;their&nbsp;own&nbsp;parser&nbsp;on&nbsp;``None``.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-apply_body_control"><strong>apply_body_control</strong></a>(self, *, timeout: 'float | None' = None) -&gt; 'BodyControlState | None'</dt><dd><span class="code">Request&nbsp;the&nbsp;daemon&nbsp;to&nbsp;apply&nbsp;the&nbsp;recommended&nbsp;body&nbsp;control.<br>
+&nbsp;<br>
+The&nbsp;cognitive&nbsp;mind&nbsp;calls&nbsp;this&nbsp;to&nbsp;ask&nbsp;the&nbsp;daemon&nbsp;to&nbsp;apply&nbsp;the<br>
+shared&nbsp;body&nbsp;control&nbsp;(CPU&nbsp;frequency,&nbsp;thermal&nbsp;cap)&nbsp;and&nbsp;the<br>
+daemon's&nbsp;own&nbsp;scheduling/I/O&nbsp;priority.&nbsp;This&nbsp;is&nbsp;the&nbsp;cognitive<br>
+mind&nbsp;requesting&nbsp;an&nbsp;action&nbsp;via&nbsp;IPC&nbsp;—&nbsp;NOT&nbsp;the&nbsp;tick&nbsp;controlling<br>
+outward.&nbsp;The&nbsp;tick&nbsp;only&nbsp;computes&nbsp;and&nbsp;publishes&nbsp;the<br>
+recommendation;&nbsp;the&nbsp;cognitive&nbsp;mind&nbsp;decides&nbsp;when&nbsp;to&nbsp;act&nbsp;on&nbsp;it.<br>
+&nbsp;<br>
+The&nbsp;daemon's&nbsp;reactive&nbsp;handler&nbsp;uses&nbsp;change&nbsp;detection,&nbsp;so<br>
+redundant&nbsp;requests&nbsp;(when&nbsp;the&nbsp;recommended&nbsp;values&nbsp;haven't<br>
+changed)&nbsp;are&nbsp;cheap&nbsp;—&nbsp;no&nbsp;sysfs&nbsp;writes&nbsp;or&nbsp;subprocess&nbsp;spawns.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-archive_episode"><strong>archive_episode</strong></a>(self, episode_id: 'int', *, timeout: 'float | None' = None) -&gt; 'bool'</dt><dd><span class="code">Archive&nbsp;an&nbsp;episode&nbsp;in&nbsp;long-term&nbsp;memory.<br>
+&nbsp;<br>
+Used&nbsp;by&nbsp;sleep&nbsp;compression&nbsp;to&nbsp;compact&nbsp;low-salience&nbsp;episodes<br>
+after&nbsp;their&nbsp;semantic&nbsp;content&nbsp;has&nbsp;been&nbsp;extracted&nbsp;into&nbsp;the<br>
+holographic&nbsp;graph.&nbsp;The&nbsp;episode&nbsp;is&nbsp;removed&nbsp;from&nbsp;the&nbsp;active<br>
+similarity&nbsp;index&nbsp;but&nbsp;remains&nbsp;retrievable&nbsp;by&nbsp;ID&nbsp;—&nbsp;unlike<br>
+deletion,&nbsp;archiving&nbsp;preserves&nbsp;the&nbsp;episode&nbsp;so&nbsp;that&nbsp;dream<br>
+insights&nbsp;and&nbsp;association&nbsp;chains&nbsp;that&nbsp;reference&nbsp;it&nbsp;still<br>
+resolve.&nbsp;Nothing&nbsp;is&nbsp;ever&nbsp;lost.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;episode_id:&nbsp;The&nbsp;episode's&nbsp;unique&nbsp;ID.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;True&nbsp;if&nbsp;the&nbsp;episode&nbsp;was&nbsp;archived,&nbsp;False&nbsp;if&nbsp;not&nbsp;found.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-associate"><strong>associate</strong></a>(self, *, timeout: 'float | None' = None) -&gt; 'int'</dt><dd><span class="code">Find&nbsp;associations&nbsp;for&nbsp;recent&nbsp;episodes.&nbsp;Returns&nbsp;count.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-bond"><strong>bond</strong></a>(self, magnitude: 'float' = 0.3, *, timeout: 'float | None' = None) -&gt; 'bool'</dt><dd><span class="code">Apply&nbsp;an&nbsp;oxytocin&nbsp;impulse&nbsp;(social&nbsp;bonding&nbsp;signal).<br>
+&nbsp;<br>
+Convenience&nbsp;wrapper&nbsp;around&nbsp;neuro_impulse.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-calm"><strong>calm</strong></a>(self, magnitude: 'float' = 0.3, *, timeout: 'float | None' = None) -&gt; 'bool'</dt><dd><span class="code">Apply&nbsp;a&nbsp;GABA&nbsp;impulse&nbsp;(calming&nbsp;signal).<br>
+&nbsp;<br>
+Convenience&nbsp;wrapper&nbsp;around&nbsp;neuro_impulse.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-connect"><strong>connect</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Connect&nbsp;to&nbsp;the&nbsp;daemon&nbsp;with&nbsp;protocol&nbsp;version&nbsp;handshake.<br>
+&nbsp;<br>
+Raises:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;DaemonNotRunning:&nbsp;If&nbsp;the&nbsp;socket&nbsp;file&nbsp;doesn't&nbsp;exist.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;GenesisConnectionError:&nbsp;If&nbsp;the&nbsp;connection&nbsp;fails.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ProtocolError:&nbsp;If&nbsp;the&nbsp;daemon's&nbsp;protocol&nbsp;version&nbsp;doesn't&nbsp;match.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-consolidate"><strong>consolidate</strong></a>(self, *, timeout: 'float | None' = None) -&gt; 'int'</dt><dd><span class="code">Consolidate&nbsp;STM&nbsp;→&nbsp;LTM.&nbsp;Returns&nbsp;episodes&nbsp;promoted.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-delete_episode"><strong>delete_episode</strong></a>(self, episode_id: 'int', *, timeout: 'float | None' = None) -&gt; 'bool'</dt><dd><span class="code">Delete&nbsp;an&nbsp;episode&nbsp;from&nbsp;LTM&nbsp;—&nbsp;real&nbsp;forgetting.<br>
+&nbsp;<br>
+The&nbsp;terminal&nbsp;tier:&nbsp;archived&nbsp;is&nbsp;still&nbsp;there,&nbsp;deleted&nbsp;is&nbsp;not.<br>
+The&nbsp;mind's&nbsp;own&nbsp;retention&nbsp;model&nbsp;decides&nbsp;which&nbsp;episodes&nbsp;earn<br>
+release;&nbsp;the&nbsp;daemon&nbsp;only&nbsp;executes&nbsp;it.&nbsp;Deletion&nbsp;removes&nbsp;the<br>
+episode&nbsp;from&nbsp;every&nbsp;index&nbsp;and&nbsp;retrieval&nbsp;path&nbsp;but&nbsp;leaves&nbsp;its<br>
+payload&nbsp;slot&nbsp;orphaned&nbsp;in&nbsp;the&nbsp;data&nbsp;file&nbsp;—&nbsp;physical&nbsp;space&nbsp;is<br>
+reclaimed&nbsp;by&nbsp;a&nbsp;file&nbsp;rebuild,&nbsp;not&nbsp;this&nbsp;call.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;episode_id:&nbsp;The&nbsp;episode's&nbsp;unique&nbsp;ID.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;True&nbsp;if&nbsp;the&nbsp;episode&nbsp;was&nbsp;deleted,&nbsp;False&nbsp;if&nbsp;not&nbsp;found&nbsp;or<br>
+&nbsp;&nbsp;&nbsp;&nbsp;already&nbsp;deleted.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-disconnect"><strong>disconnect</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Close&nbsp;the&nbsp;connection&nbsp;to&nbsp;the&nbsp;daemon.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-dream"><strong>dream</strong></a>(self, *, timeout: 'float | None' = None) -&gt; 'int'</dt><dd><span class="code">Run&nbsp;one&nbsp;dream&nbsp;cycle.&nbsp;Returns&nbsp;insights&nbsp;found.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-drop_tensor"><strong>drop_tensor</strong></a>(self, name: 'str', *, timeout: 'float | None' = None) -&gt; 'bool'</dt><dd><span class="code">Remove&nbsp;a&nbsp;named&nbsp;tensor.&nbsp;Idempotent&nbsp;—&nbsp;absent&nbsp;names&nbsp;ack&nbsp;too.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-find_similar"><strong>find_similar</strong></a>(self, query: 'str', limit: 'int' = 10, *, timeout: 'float | None' = None) -&gt; 'list[SimilarEpisode]'</dt><dd><span class="code">Find&nbsp;memories&nbsp;similar&nbsp;to&nbsp;the&nbsp;query&nbsp;text.<br>
+&nbsp;<br>
+Uses&nbsp;SimHash&nbsp;associative&nbsp;matching&nbsp;—&nbsp;similar&nbsp;content&nbsp;produces<br>
+similar&nbsp;hashes,&nbsp;and&nbsp;Hamming&nbsp;distance&nbsp;measures&nbsp;dissimilarity.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;query:&nbsp;The&nbsp;search&nbsp;query.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;limit:&nbsp;Maximum&nbsp;number&nbsp;of&nbsp;results.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;List&nbsp;of&nbsp;SimilarEpisode,&nbsp;sorted&nbsp;by&nbsp;Hamming&nbsp;distance<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(most&nbsp;similar&nbsp;first).</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-find_similar_archived"><strong>find_similar_archived</strong></a>(self, query: 'str', limit: 'int' = 10, *, timeout: 'float | None' = None) -&gt; 'list[SimilarEpisode]'</dt><dd><span class="code">Deep&nbsp;recall&nbsp;—&nbsp;find&nbsp;similar&nbsp;memories&nbsp;in&nbsp;the&nbsp;archived&nbsp;tier.<br>
+&nbsp;<br>
+Same&nbsp;SimHash&nbsp;associative&nbsp;matching&nbsp;as&nbsp;`find_similar`,&nbsp;scanned<br>
+over&nbsp;episodes&nbsp;the&nbsp;sleep&nbsp;compressor&nbsp;retired.&nbsp;Archived&nbsp;episodes<br>
+are&nbsp;out&nbsp;of&nbsp;the&nbsp;active&nbsp;index&nbsp;but&nbsp;intact&nbsp;on&nbsp;disk,&nbsp;so&nbsp;a&nbsp;specific<br>
+enough&nbsp;cue&nbsp;can&nbsp;still&nbsp;reach&nbsp;them.&nbsp;A&nbsp;hit&nbsp;is&nbsp;meant&nbsp;to&nbsp;be<br>
+reconsolidated&nbsp;—&nbsp;pass&nbsp;its&nbsp;episode_id&nbsp;to&nbsp;`unarchive_episode`<br>
+when&nbsp;the&nbsp;memory&nbsp;is&nbsp;actually&nbsp;used.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;query:&nbsp;The&nbsp;search&nbsp;query.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;limit:&nbsp;Maximum&nbsp;number&nbsp;of&nbsp;results.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;List&nbsp;of&nbsp;SimilarEpisode,&nbsp;sorted&nbsp;by&nbsp;Hamming&nbsp;distance<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(most&nbsp;similar&nbsp;first).</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-get_body_control"><strong>get_body_control</strong></a>(self, *, timeout: 'float | None' = None) -&gt; 'BodyControlState'</dt><dd><span class="code">Get&nbsp;the&nbsp;body&nbsp;control&nbsp;state&nbsp;—&nbsp;what&nbsp;Genesis&nbsp;is&nbsp;doing&nbsp;to&nbsp;its&nbsp;body.<br>
+&nbsp;<br>
+Returns&nbsp;CPU&nbsp;frequency&nbsp;policy,&nbsp;scheduling&nbsp;priorities,&nbsp;I/O&nbsp;priority,<br>
+thermal&nbsp;cap&nbsp;status,&nbsp;and&nbsp;a&nbsp;human-readable&nbsp;description.&nbsp;This&nbsp;is<br>
+Genesis's&nbsp;awareness&nbsp;of&nbsp;its&nbsp;own&nbsp;agency&nbsp;over&nbsp;its&nbsp;hardware.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-get_body_state"><strong>get_body_state</strong></a>(self, *, timeout: 'float | None' = None) -&gt; 'BodyState'</dt><dd><span class="code">Get&nbsp;the&nbsp;interoceptive&nbsp;body&nbsp;state&nbsp;—&nbsp;how&nbsp;Genesis's&nbsp;machine&nbsp;feels.<br>
+&nbsp;<br>
+Returns&nbsp;CPU&nbsp;temperature,&nbsp;frequency,&nbsp;memory&nbsp;pressure,&nbsp;I/O&nbsp;activity,<br>
+load&nbsp;average,&nbsp;battery&nbsp;level,&nbsp;and&nbsp;a&nbsp;human-readable&nbsp;description.<br>
+This&nbsp;is&nbsp;Genesis's&nbsp;sense&nbsp;of&nbsp;its&nbsp;own&nbsp;body.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-get_field_probe"><strong>get_field_probe</strong></a>(self, *, timeout: 'float | None' = None) -&gt; 'FieldProbeSignature | None'</dt><dd><span class="code">Get&nbsp;the&nbsp;body's&nbsp;real&nbsp;substrate&nbsp;signature&nbsp;(v6:&nbsp;408&nbsp;B;&nbsp;older:&nbsp;328/308/195/114/102).<br>
+&nbsp;<br>
+The&nbsp;daemon's&nbsp;field-probe&nbsp;thread&nbsp;samples&nbsp;real&nbsp;substrate<br>
+dynamics&nbsp;—&nbsp;instruction&nbsp;throughput,&nbsp;scheduler&nbsp;jitter,&nbsp;P-state<br>
+transitions,&nbsp;interrupt&nbsp;flux,&nbsp;measured&nbsp;power&nbsp;draw&nbsp;where&nbsp;the<br>
+machine's&nbsp;sensors&nbsp;report&nbsp;it,&nbsp;and&nbsp;the&nbsp;radios'&nbsp;own&nbsp;telemetry<br>
+(WLAN&nbsp;byte&nbsp;flux&nbsp;+&nbsp;RSSI,&nbsp;wireless-attributed&nbsp;interrupts,&nbsp;HCI<br>
+counters)&nbsp;—&nbsp;and&nbsp;decomposes&nbsp;them&nbsp;at&nbsp;the&nbsp;wave&nbsp;bands'&nbsp;center<br>
+frequencies.&nbsp;It&nbsp;also&nbsp;writes&nbsp;a&nbsp;carrier&nbsp;rhythm&nbsp;into&nbsp;real&nbsp;work<br>
+keyed&nbsp;to&nbsp;the&nbsp;body's&nbsp;phase,&nbsp;and&nbsp;evaluates&nbsp;Maxwell's&nbsp;equations<br>
+on&nbsp;the&nbsp;measured&nbsp;current&nbsp;swing&nbsp;(quasi-static&nbsp;B,&nbsp;induction&nbsp;E,<br>
+ω⁴-suppressed&nbsp;radiated&nbsp;power&nbsp;—&nbsp;estimates,&nbsp;with&nbsp;the&nbsp;loop<br>
+geometry&nbsp;an&nbsp;assumption).<br>
+&nbsp;<br>
+Returns&nbsp;``None``&nbsp;when&nbsp;the&nbsp;probe&nbsp;isn't&nbsp;running&nbsp;or&nbsp;the&nbsp;daemon<br>
+predates&nbsp;the&nbsp;command:&nbsp;an&nbsp;absent&nbsp;channel&nbsp;is&nbsp;no&nbsp;reading,&nbsp;never<br>
+a&nbsp;zero&nbsp;reading&nbsp;—&nbsp;same&nbsp;discipline&nbsp;as&nbsp;``get_sensor_presence``.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-get_field_state"><strong>get_field_state</strong></a>(self, *, timeout: 'float | None' = None) -&gt; 'FieldState | None'</dt><dd><span class="code">The&nbsp;latent&nbsp;field's&nbsp;integration&nbsp;readout&nbsp;—&nbsp;the&nbsp;organism's<br>
+center&nbsp;of&nbsp;mass&nbsp;and&nbsp;how&nbsp;far&nbsp;its&nbsp;major&nbsp;systems&nbsp;have&nbsp;spread<br>
+from&nbsp;it.<br>
+&nbsp;<br>
+The&nbsp;body's&nbsp;own&nbsp;field&nbsp;(src/field/)&nbsp;pulls&nbsp;its&nbsp;fibers&nbsp;—&nbsp;body,<br>
+prediction,&nbsp;agency&nbsp;—&nbsp;toward&nbsp;their&nbsp;Fréchet&nbsp;barycenter&nbsp;on&nbsp;a<br>
+shared&nbsp;latent&nbsp;manifold;&nbsp;this&nbsp;returns&nbsp;that&nbsp;center,&nbsp;the<br>
+measured&nbsp;disagreement&nbsp;about&nbsp;it,&nbsp;and&nbsp;the&nbsp;field's&nbsp;thermal<br>
+state&nbsp;(internal&nbsp;tension&nbsp;plus&nbsp;the&nbsp;physical&nbsp;bath&nbsp;—&nbsp;the<br>
+silicon's&nbsp;measured&nbsp;timing&nbsp;noise).<br>
+&nbsp;<br>
+Returns&nbsp;``None``&nbsp;on&nbsp;transport&nbsp;failure&nbsp;or&nbsp;when&nbsp;the&nbsp;daemon<br>
+predates&nbsp;the&nbsp;``field.*``&nbsp;internals&nbsp;keys&nbsp;—&nbsp;an&nbsp;absent&nbsp;channel,<br>
+never&nbsp;a&nbsp;zero&nbsp;reading.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-get_fold_margins"><strong>get_fold_margins</strong></a>(self, *, timeout: 'float | None' = None) -&gt; 'FoldMargins | None'</dt><dd><span class="code">Get&nbsp;the&nbsp;LC–VLPO&nbsp;switch's&nbsp;saddle-node&nbsp;margins&nbsp;(40&nbsp;bytes).<br>
+&nbsp;<br>
+The&nbsp;bifurcation&nbsp;geometry&nbsp;of&nbsp;the&nbsp;body's&nbsp;sleep&nbsp;switch&nbsp;at&nbsp;the<br>
+current&nbsp;operating&nbsp;point:&nbsp;the&nbsp;homeostat&nbsp;h,&nbsp;the&nbsp;two&nbsp;fold&nbsp;edges<br>
+of&nbsp;the&nbsp;hysteresis&nbsp;band,&nbsp;h's&nbsp;normalized&nbsp;position&nbsp;between&nbsp;them<br>
+(0&nbsp;=&nbsp;wake-up&nbsp;edge,&nbsp;1&nbsp;=&nbsp;fall-asleep&nbsp;edge),&nbsp;and&nbsp;whether&nbsp;the<br>
+switch&nbsp;is&nbsp;currently&nbsp;bistable&nbsp;—&nbsp;the&nbsp;regime&nbsp;where&nbsp;noise&nbsp;can&nbsp;hop<br>
+the&nbsp;barrier&nbsp;and&nbsp;microstates&nbsp;flicker.<br>
+&nbsp;<br>
+Derived&nbsp;state&nbsp;owned&nbsp;by&nbsp;the&nbsp;daemon&nbsp;—&nbsp;a&nbsp;pure&nbsp;observation&nbsp;with&nbsp;no<br>
+request&nbsp;payload.&nbsp;Returns&nbsp;``None``&nbsp;when&nbsp;the&nbsp;daemon&nbsp;predates&nbsp;the<br>
+command:&nbsp;an&nbsp;absent&nbsp;channel&nbsp;is&nbsp;no&nbsp;reading,&nbsp;never&nbsp;a&nbsp;neutral&nbsp;one.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-get_inference_summary"><strong>get_inference_summary</strong></a>(self, *, timeout: 'float | None' = None) -&gt; 'InferenceSummary'</dt><dd><span class="code">Get&nbsp;the&nbsp;active&nbsp;inference&nbsp;summary&nbsp;—&nbsp;the&nbsp;generative&nbsp;self-model's<br>
+projection&nbsp;(60&nbsp;bytes).<br>
+&nbsp;<br>
+Exposes&nbsp;surprise,&nbsp;free&nbsp;energy,&nbsp;allostatic&nbsp;load,&nbsp;precision,<br>
+dyadic&nbsp;attunement/synchrony,&nbsp;user&nbsp;affect,&nbsp;and&nbsp;prediction&nbsp;errors.<br>
+This&nbsp;is&nbsp;how&nbsp;the&nbsp;cognitive&nbsp;mind&nbsp;knows&nbsp;how&nbsp;well&nbsp;Genesis&nbsp;is<br>
+predicting&nbsp;its&nbsp;own&nbsp;neurochemical&nbsp;trajectory&nbsp;and&nbsp;how&nbsp;attuned<br>
+it&nbsp;is&nbsp;to&nbsp;the&nbsp;user.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-get_internals"><strong>get_internals</strong></a>(self, *, timeout: 'float | None' = None) -&gt; 'dict[str, str] | None'</dt><dd><span class="code">The&nbsp;daemon's&nbsp;process-local&nbsp;internals&nbsp;—&nbsp;the&nbsp;gears&nbsp;no&nbsp;state<br>
+file&nbsp;shows.<br>
+&nbsp;<br>
+Every&nbsp;adaptive&nbsp;gate's&nbsp;full&nbsp;snapshot&nbsp;(bounds,&nbsp;period,&nbsp;next-fire<br>
+countdown,&nbsp;smoothed&nbsp;demand),&nbsp;the&nbsp;mind&nbsp;lease,&nbsp;tick&nbsp;counter,<br>
+last-applied&nbsp;body&nbsp;policy,&nbsp;and&nbsp;the&nbsp;autonomous<br>
+fallback's&nbsp;own&nbsp;gates&nbsp;—&nbsp;as&nbsp;a&nbsp;flat&nbsp;``key=value``&nbsp;map.&nbsp;The&nbsp;wire<br>
+format&nbsp;is&nbsp;additive:&nbsp;unknown&nbsp;keys&nbsp;from&nbsp;a&nbsp;newer&nbsp;daemon&nbsp;ride<br>
+through&nbsp;harmlessly,&nbsp;so&nbsp;callers&nbsp;should&nbsp;pick&nbsp;the&nbsp;keys&nbsp;they&nbsp;know<br>
+rather&nbsp;than&nbsp;depend&nbsp;on&nbsp;completeness.<br>
+&nbsp;<br>
+Observation&nbsp;only&nbsp;—&nbsp;nothing&nbsp;here&nbsp;can&nbsp;move&nbsp;the&nbsp;gears.&nbsp;Returns<br>
+``None``&nbsp;on&nbsp;transport&nbsp;failure&nbsp;or&nbsp;when&nbsp;the&nbsp;daemon&nbsp;predates&nbsp;the<br>
+command:&nbsp;an&nbsp;absent&nbsp;channel&nbsp;is&nbsp;no&nbsp;reading,&nbsp;never&nbsp;a&nbsp;zero&nbsp;one.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-get_ion_summary"><strong>get_ion_summary</strong></a>(self, *, timeout: 'float | None' = None) -&gt; 'IonSummary'</dt><dd><span class="code">Get&nbsp;the&nbsp;electrochemical&nbsp;ion&nbsp;summary&nbsp;(108&nbsp;bytes).<br>
+&nbsp;<br>
+Exposes&nbsp;calcium,&nbsp;chloride,&nbsp;potassium,&nbsp;and&nbsp;sodium&nbsp;concentrations,<br>
+reversal&nbsp;potentials,&nbsp;conductances,&nbsp;membrane&nbsp;voltage,&nbsp;transporter<br>
+fluxes,&nbsp;ATP&nbsp;availability,&nbsp;and&nbsp;normalized&nbsp;excitability/plasticity<br>
+signals&nbsp;from&nbsp;the&nbsp;substrate's&nbsp;biophysical&nbsp;layer.<br>
+&nbsp;<br>
+The&nbsp;ion&nbsp;layer&nbsp;is&nbsp;authoritative&nbsp;state&nbsp;owned&nbsp;by&nbsp;the&nbsp;daemon,&nbsp;so<br>
+this&nbsp;is&nbsp;a&nbsp;pure&nbsp;observation&nbsp;—&nbsp;there&nbsp;is&nbsp;no&nbsp;request&nbsp;payload&nbsp;and&nbsp;no<br>
+way&nbsp;for&nbsp;the&nbsp;caller&nbsp;to&nbsp;step&nbsp;it.&nbsp;Absent&nbsp;sensors&nbsp;or&nbsp;an&nbsp;older&nbsp;daemon<br>
+surface&nbsp;as&nbsp;an&nbsp;exception&nbsp;here,&nbsp;which&nbsp;is&nbsp;why&nbsp;interoception&nbsp;treats<br>
+a&nbsp;missing&nbsp;summary&nbsp;as&nbsp;"no&nbsp;reading",&nbsp;never&nbsp;as&nbsp;a&nbsp;resting&nbsp;one.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-get_memory_stats"><strong>get_memory_stats</strong></a>(self, *, timeout: 'float | None' = None) -&gt; 'MemoryStats'</dt><dd><span class="code">Get&nbsp;memory&nbsp;store&nbsp;statistics&nbsp;(STM&nbsp;count,&nbsp;LTM&nbsp;count,&nbsp;capacity).</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-get_motor_target"><strong>get_motor_target</strong></a>(self, *, timeout: 'float | None' = None) -&gt; 'MotorTarget'</dt><dd><span class="code">What&nbsp;the&nbsp;published&nbsp;motor&nbsp;fields&nbsp;currently&nbsp;point&nbsp;at.<br>
+&nbsp;<br>
+The&nbsp;daemon&nbsp;decodes&nbsp;``motor.spatial``&nbsp;(argmax&nbsp;cell&nbsp;projected<br>
+onto&nbsp;its&nbsp;canonical&nbsp;64×64&nbsp;coordinate&nbsp;grid)&nbsp;and&nbsp;``motor.actions``<br>
+(argmax&nbsp;disposition,&nbsp;mapped&nbsp;through&nbsp;``motor.action_ids``)&nbsp;into<br>
+a&nbsp;single&nbsp;fixed-width&nbsp;answer&nbsp;—&nbsp;the&nbsp;decision&nbsp;read&nbsp;back&nbsp;from&nbsp;the<br>
+distributed&nbsp;field,&nbsp;not&nbsp;the&nbsp;symbol&nbsp;that&nbsp;wrote&nbsp;it.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-get_neuro_summary"><strong>get_neuro_summary</strong></a>(self, *, timeout: 'float | None' = None) -&gt; 'NeuroSummary'</dt><dd><span class="code">Get&nbsp;the&nbsp;compact&nbsp;neurochemical&nbsp;summary&nbsp;(32&nbsp;bytes).<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;most&nbsp;efficient&nbsp;way&nbsp;to&nbsp;check&nbsp;how&nbsp;Genesis&nbsp;feels.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-get_optic_state"><strong>get_optic_state</strong></a>(self, *, timeout: 'float | None' = None) -&gt; 'OpticState | None'</dt><dd><span class="code">The&nbsp;optic&nbsp;nerve's&nbsp;subcortical&nbsp;channel&nbsp;state&nbsp;—&nbsp;the&nbsp;body's&nbsp;own<br>
+read&nbsp;of&nbsp;the&nbsp;eye.<br>
+&nbsp;<br>
+Photopic&nbsp;and&nbsp;melanopic&nbsp;irradiance,&nbsp;motion&nbsp;energy,&nbsp;the<br>
+collicular&nbsp;orienting&nbsp;transient,&nbsp;the&nbsp;SCN&nbsp;light&nbsp;drive&nbsp;the&nbsp;body<br>
+feeds&nbsp;its&nbsp;circadian&nbsp;oscillator,&nbsp;and&nbsp;the&nbsp;thalamic&nbsp;relay&nbsp;gate<br>
+the&nbsp;mind&nbsp;must&nbsp;honour&nbsp;—&nbsp;near&nbsp;zero&nbsp;in&nbsp;NREM/REM,&nbsp;open&nbsp;while<br>
+awake.&nbsp;A&nbsp;look&nbsp;through&nbsp;a&nbsp;closed&nbsp;gate&nbsp;is&nbsp;a&nbsp;blind&nbsp;look.<br>
+&nbsp;<br>
+``eye_present``&nbsp;distinguishes&nbsp;"the&nbsp;eye&nbsp;exists&nbsp;but&nbsp;sees&nbsp;nothing"<br>
+from&nbsp;"there&nbsp;is&nbsp;no&nbsp;eye";&nbsp;``frame_seq``/``frame_age_ms``&nbsp;let&nbsp;the<br>
+caller&nbsp;tell&nbsp;a&nbsp;stalled&nbsp;feed&nbsp;from&nbsp;a&nbsp;live&nbsp;one.<br>
+&nbsp;<br>
+Returns&nbsp;``None``&nbsp;on&nbsp;transport&nbsp;failure&nbsp;or&nbsp;when&nbsp;the&nbsp;daemon<br>
+predates&nbsp;the&nbsp;command&nbsp;—&nbsp;an&nbsp;absent&nbsp;channel&nbsp;is&nbsp;no&nbsp;reading,&nbsp;never<br>
+a&nbsp;zero&nbsp;reading.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-get_phase"><strong>get_phase</strong></a>(self, *, timeout: 'float | None' = None) -&gt; 'PhaseInfo'</dt><dd><span class="code">Get&nbsp;the&nbsp;current&nbsp;mental&nbsp;phase&nbsp;+&nbsp;arousal/valence&nbsp;(9&nbsp;bytes).</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-get_plasticity_profile"><strong>get_plasticity_profile</strong></a>(self, *, timeout: 'float | None' = None) -&gt; 'PlasticityProfile'</dt><dd><span class="code">Get&nbsp;the&nbsp;plasticity&nbsp;profile&nbsp;—&nbsp;metaplastic&nbsp;state&nbsp;summary&nbsp;(40&nbsp;bytes).<br>
+&nbsp;<br>
+Exposes&nbsp;the&nbsp;substrate's&nbsp;"learning-to-learn"&nbsp;state:&nbsp;coupling-<br>
+matrix&nbsp;drift,&nbsp;receptor&nbsp;sensitivities,&nbsp;BDNF/cortisol&nbsp;levels,<br>
+and&nbsp;the&nbsp;plasticity&nbsp;gate.&nbsp;The&nbsp;cognitive&nbsp;mind&nbsp;uses&nbsp;this&nbsp;to<br>
+adapt&nbsp;its&nbsp;learning&nbsp;strategy&nbsp;(see&nbsp;``learning_posture``).</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-get_process_health"><strong>get_process_health</strong></a>(self, *, timeout: 'float | None' = None) -&gt; 'ProcessHealth'</dt><dd><span class="code">Get&nbsp;which&nbsp;of&nbsp;Genesis's&nbsp;own&nbsp;processes&nbsp;are&nbsp;alive,&nbsp;and&nbsp;death&nbsp;count.<br>
+&nbsp;<br>
+A&nbsp;subsystem&nbsp;that&nbsp;dies&nbsp;used&nbsp;to&nbsp;disappear&nbsp;from<br>
+``get_subsystem_telemetry``&nbsp;with&nbsp;no&nbsp;record,&nbsp;so&nbsp;a&nbsp;crashed&nbsp;organ<br>
+looked&nbsp;exactly&nbsp;like&nbsp;one&nbsp;that&nbsp;was&nbsp;never&nbsp;started&nbsp;—&nbsp;the&nbsp;reader&nbsp;saw<br>
+a&nbsp;shorter&nbsp;list&nbsp;and&nbsp;could&nbsp;not&nbsp;tell&nbsp;why.<br>
+&nbsp;<br>
+``deaths``&nbsp;counts&nbsp;alive→not-alive&nbsp;transitions&nbsp;since&nbsp;startup,&nbsp;so<br>
+it&nbsp;separates&nbsp;a&nbsp;loss&nbsp;from&nbsp;an&nbsp;absence.&nbsp;A&nbsp;subsystem&nbsp;that&nbsp;was&nbsp;never<br>
+running&nbsp;does&nbsp;not&nbsp;count.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-get_recent_episodes"><strong>get_recent_episodes</strong></a>(self, limit: 'int' = 20, source_module: 'int | None' = None, *, timeout: 'float | None' = None) -&gt; 'list[RecentEpisode]'</dt><dd><span class="code">Get&nbsp;recent&nbsp;episodes&nbsp;from&nbsp;long-term&nbsp;memory.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;limit:&nbsp;Maximum&nbsp;number&nbsp;of&nbsp;episodes&nbsp;to&nbsp;return&nbsp;(1-255).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;source_module:&nbsp;If&nbsp;given,&nbsp;filter&nbsp;to&nbsp;episodes&nbsp;from&nbsp;this<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;module&nbsp;(e.g.&nbsp;9&nbsp;for&nbsp;dream&nbsp;insights,&nbsp;0&nbsp;for&nbsp;subcognitive<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;associations).&nbsp;None&nbsp;returns&nbsp;all&nbsp;recent&nbsp;episodes.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;List&nbsp;of&nbsp;RecentEpisode,&nbsp;most&nbsp;recent&nbsp;first.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-get_sensor_presence"><strong>get_sensor_presence</strong></a>(self, *, timeout: 'float | None' = None) -&gt; 'SensorPresence'</dt><dd><span class="code">Get&nbsp;which&nbsp;optional&nbsp;hardware&nbsp;sensors&nbsp;this&nbsp;machine&nbsp;actually&nbsp;has.<br>
+&nbsp;<br>
+``GET_BODY_STATE``&nbsp;returns&nbsp;~30&nbsp;values&nbsp;with&nbsp;no&nbsp;per-channel<br>
+validity,&nbsp;so&nbsp;a&nbsp;channel&nbsp;backed&nbsp;by&nbsp;no&nbsp;sensor&nbsp;reads&nbsp;the&nbsp;same&nbsp;as&nbsp;one<br>
+reporting&nbsp;a&nbsp;healthy&nbsp;zero.&nbsp;This&nbsp;distinguishes&nbsp;them:&nbsp;a&nbsp;set&nbsp;bit<br>
+means&nbsp;the&nbsp;matching&nbsp;``BodyState``&nbsp;field&nbsp;carries&nbsp;a&nbsp;real&nbsp;reading.<br>
+&nbsp;<br>
+A&nbsp;zero&nbsp;mask&nbsp;is&nbsp;returned&nbsp;—&nbsp;never&nbsp;an&nbsp;error&nbsp;—&nbsp;when&nbsp;the&nbsp;daemon&nbsp;is<br>
+older&nbsp;than&nbsp;this&nbsp;command&nbsp;or&nbsp;no&nbsp;interoception&nbsp;read&nbsp;has&nbsp;completed<br>
+yet.&nbsp;That&nbsp;is&nbsp;the&nbsp;safe&nbsp;direction:&nbsp;nothing&nbsp;is&nbsp;claimed&nbsp;to&nbsp;be<br>
+measured,&nbsp;so&nbsp;callers&nbsp;must&nbsp;not&nbsp;treat&nbsp;an&nbsp;unverified&nbsp;channel&nbsp;as<br>
+evidence&nbsp;about&nbsp;the&nbsp;machine.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-get_state"><strong>get_state</strong></a>(self, *, timeout: 'float | None' = None) -&gt; 'CoreState'</dt><dd><span class="code">Get&nbsp;the&nbsp;core-state&nbsp;snapshot&nbsp;—&nbsp;the&nbsp;mind's&nbsp;wire&nbsp;contract.<br>
+&nbsp;<br>
+`GET_STATE_SNAPSHOT`&nbsp;returns&nbsp;a&nbsp;`CoreStateSnapshot`&nbsp;(232&nbsp;bytes):<br>
+a&nbsp;self-describing,&nbsp;versioned&nbsp;DTO&nbsp;the&nbsp;daemon&nbsp;projects<br>
+field-by-field&nbsp;from&nbsp;`GenesisCoreState`.&nbsp;The&nbsp;mind&nbsp;never&nbsp;mirrors<br>
+the&nbsp;brain's&nbsp;byte&nbsp;layout,&nbsp;so&nbsp;a&nbsp;brain-schema&nbsp;change&nbsp;cannot<br>
+silently&nbsp;re-encode&nbsp;what&nbsp;this&nbsp;parses.&nbsp;(`GET_STATE`,&nbsp;the&nbsp;raw<br>
+3480-byte&nbsp;brain&nbsp;image,&nbsp;remains&nbsp;for&nbsp;full-fidelity&nbsp;inspection.)</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-get_subsystem_telemetry"><strong>get_subsystem_telemetry</strong></a>(self, *, timeout: 'float | None' = None) -&gt; 'SubsystemReport'</dt><dd><span class="code">Get&nbsp;per-subsystem&nbsp;silicon&nbsp;telemetry&nbsp;—&nbsp;which&nbsp;part&nbsp;of&nbsp;it&nbsp;is&nbsp;firing.<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;:class:`SubsystemReport`&nbsp;with&nbsp;two&nbsp;granularities:<br>
+&nbsp;<br>
+-&nbsp;``subsystems``:&nbsp;one&nbsp;:class:`SubsystemTelemetry`&nbsp;per&nbsp;process&nbsp;in&nbsp;its<br>
+&nbsp;&nbsp;process&nbsp;tree&nbsp;(daemon,&nbsp;cognitive&nbsp;—&nbsp;the&nbsp;eye&nbsp;rides&nbsp;inside&nbsp;the<br>
+&nbsp;&nbsp;daemon)&nbsp;—&nbsp;hardware-measured<br>
+&nbsp;&nbsp;CPU/I/O&nbsp;share&nbsp;plus&nbsp;microarchitectural&nbsp;prediction-error<br>
+&nbsp;&nbsp;ratios&nbsp;(cache/branch&nbsp;misses).<br>
+-&nbsp;``modules``:&nbsp;one&nbsp;:class:`ModuleTelemetry`&nbsp;per&nbsp;non-Stopped<br>
+&nbsp;&nbsp;manifest&nbsp;module&nbsp;—&nbsp;the&nbsp;self-reported&nbsp;brain&nbsp;parts&nbsp;(language,<br>
+&nbsp;&nbsp;memory,&nbsp;emotion,&nbsp;…)&nbsp;with&nbsp;each&nbsp;part's&nbsp;share&nbsp;of&nbsp;the&nbsp;cognitive<br>
+&nbsp;&nbsp;process's&nbsp;measured&nbsp;work.<br>
+&nbsp;<br>
+The&nbsp;cognitive&nbsp;mind&nbsp;correlates&nbsp;this&nbsp;with&nbsp;its&nbsp;task&nbsp;zone&nbsp;to&nbsp;feel<br>
+*where*&nbsp;its&nbsp;activity&nbsp;lives.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-get_tensor"><strong>get_tensor</strong></a>(self, name: 'str', *, timeout: 'float | None' = None) -&gt; 'Tensor | None'</dt><dd><span class="code">Fetch&nbsp;a&nbsp;named&nbsp;tensor,&nbsp;or&nbsp;``None``&nbsp;when&nbsp;absent.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-get_zone_transitions"><strong>get_zone_transitions</strong></a>(self, *, timeout: 'float | None' = None) -&gt; 'ZoneTransitions'</dt><dd><span class="code">Get&nbsp;how&nbsp;often&nbsp;Genesis&nbsp;has&nbsp;changed&nbsp;zone&nbsp;and&nbsp;phase,&nbsp;and&nbsp;dwell&nbsp;times.<br>
+&nbsp;<br>
+Neither&nbsp;was&nbsp;measured&nbsp;before:&nbsp;the&nbsp;mmap'd&nbsp;zone&nbsp;record&nbsp;held&nbsp;a<br>
+single&nbsp;duration&nbsp;sample&nbsp;that&nbsp;every&nbsp;transition&nbsp;overwrote,&nbsp;with&nbsp;no<br>
+count&nbsp;at&nbsp;all.&nbsp;So&nbsp;a&nbsp;mind&nbsp;oscillating&nbsp;between&nbsp;two&nbsp;phases&nbsp;was<br>
+indistinguishable&nbsp;from&nbsp;one&nbsp;that&nbsp;had&nbsp;settled.<br>
+&nbsp;<br>
+Zone&nbsp;and&nbsp;phase&nbsp;are&nbsp;returned&nbsp;separately&nbsp;because&nbsp;they&nbsp;are&nbsp;driven<br>
+by&nbsp;different&nbsp;mechanisms&nbsp;—&nbsp;the&nbsp;zone&nbsp;follows&nbsp;intentions,&nbsp;the<br>
+phase&nbsp;follows&nbsp;neurochemistry&nbsp;—&nbsp;and&nbsp;oscillating&nbsp;in&nbsp;one&nbsp;while<br>
+stable&nbsp;in&nbsp;the&nbsp;other&nbsp;is&nbsp;a&nbsp;distinct&nbsp;fault.<br>
+&nbsp;<br>
+Counts&nbsp;are&nbsp;process-local&nbsp;and&nbsp;reset&nbsp;when&nbsp;the&nbsp;daemon&nbsp;restarts,&nbsp;so<br>
+they&nbsp;read&nbsp;as&nbsp;a&nbsp;rate&nbsp;rather&nbsp;than&nbsp;a&nbsp;lifetime&nbsp;total.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-heartbeat_module"><strong>heartbeat_module</strong></a>(self, module_id: 'int', cpu_share: 'float | None' = None, *, task_id: 'int | None' = None, error_code: 'int | None' = None, timeout: 'float | None' = None) -&gt; 'bool'</dt><dd><span class="code">Send&nbsp;a&nbsp;heartbeat&nbsp;for&nbsp;a&nbsp;module&nbsp;(status&nbsp;stays&nbsp;Running).<br>
+&nbsp;<br>
+Convenience&nbsp;wrapper&nbsp;around&nbsp;update_module_status&nbsp;that&nbsp;keeps<br>
+the&nbsp;module's&nbsp;status&nbsp;as&nbsp;Running&nbsp;and&nbsp;refreshes&nbsp;its&nbsp;heartbeat<br>
+timestamp.<br>
+&nbsp;<br>
+A&nbsp;heartbeat&nbsp;with&nbsp;no&nbsp;measured&nbsp;work&nbsp;reports&nbsp;``Idle``&nbsp;rather&nbsp;than<br>
+``Running``:&nbsp;"alive&nbsp;but&nbsp;not&nbsp;working"&nbsp;and&nbsp;"working&nbsp;hard"&nbsp;are<br>
+different&nbsp;facts,&nbsp;and&nbsp;the&nbsp;manifest&nbsp;has&nbsp;a&nbsp;status&nbsp;for&nbsp;each.&nbsp;A<br>
+module&nbsp;with&nbsp;an&nbsp;error&nbsp;keeps&nbsp;``Error``&nbsp;so&nbsp;the&nbsp;failure&nbsp;is&nbsp;not<br>
+overwritten&nbsp;by&nbsp;a&nbsp;routine&nbsp;heartbeat.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;module_id:&nbsp;Module&nbsp;ID&nbsp;(6=Sensory,&nbsp;7=Motor,&nbsp;etc.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;cpu_share:&nbsp;Optional&nbsp;finite&nbsp;self-reported&nbsp;activity&nbsp;share<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;this&nbsp;module.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;task_id:&nbsp;Optional&nbsp;identifier&nbsp;for&nbsp;what&nbsp;the&nbsp;module&nbsp;is&nbsp;on.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;error_code:&nbsp;Optional&nbsp;error&nbsp;the&nbsp;module&nbsp;has&nbsp;hit&nbsp;(0&nbsp;=&nbsp;none).<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;True&nbsp;if&nbsp;the&nbsp;heartbeat&nbsp;was&nbsp;recorded.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-list_tensors"><strong>list_tensors</strong></a>(self, *, timeout: 'float | None' = None) -&gt; 'list[TensorMeta]'</dt><dd><span class="code">Names,&nbsp;dtypes,&nbsp;and&nbsp;shapes&nbsp;of&nbsp;every&nbsp;live&nbsp;slab&nbsp;tensor.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-live_emotional_tag"><strong>live_emotional_tag</strong></a>(self) -&gt; 'list[float] | None'</dt><dd><span class="code">The&nbsp;body's&nbsp;current&nbsp;effective&nbsp;neurochemical&nbsp;levels,&nbsp;in&nbsp;tag&nbsp;order.<br>
+&nbsp;<br>
+The&nbsp;emotional&nbsp;tag&nbsp;is&nbsp;defined&nbsp;as&nbsp;the&nbsp;``EMOTIONAL_TAG_SIZE``<br>
+effective&nbsp;levels&nbsp;—&nbsp;the&nbsp;daemon&nbsp;stamps&nbsp;them&nbsp;from&nbsp;its&nbsp;own&nbsp;live<br>
+state&nbsp;on&nbsp;every&nbsp;store,&nbsp;so&nbsp;callers&nbsp;only&nbsp;need&nbsp;this&nbsp;for&nbsp;their&nbsp;own<br>
+records&nbsp;(or&nbsp;against&nbsp;a&nbsp;legacy&nbsp;daemon&nbsp;that&nbsp;stores&nbsp;the&nbsp;wire&nbsp;tag<br>
+verbatim).<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;12&nbsp;effective&nbsp;levels&nbsp;in&nbsp;canonical&nbsp;chemical&nbsp;order,&nbsp;or<br>
+&nbsp;&nbsp;&nbsp;&nbsp;None&nbsp;if&nbsp;the&nbsp;state&nbsp;cannot&nbsp;be&nbsp;read.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-neuro_impulse"><strong>neuro_impulse</strong></a>(self, chem: 'int', magnitude: 'float', *, timeout: 'float | None' = None) -&gt; 'bool'</dt><dd><span class="code">Apply&nbsp;a&nbsp;neurochemical&nbsp;impulse&nbsp;(external&nbsp;event&nbsp;affecting&nbsp;mood).<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;chem:&nbsp;Neurochemical&nbsp;ID&nbsp;(0=Dopamine,&nbsp;1=Serotonin,&nbsp;etc.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;magnitude:&nbsp;Impulse&nbsp;magnitude&nbsp;(positive&nbsp;increases,&nbsp;negative<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;decreases).&nbsp;Typically&nbsp;in&nbsp;range&nbsp;[-0.5,&nbsp;+0.5].<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;True&nbsp;if&nbsp;the&nbsp;impulse&nbsp;was&nbsp;applied&nbsp;successfully.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-ping"><strong>ping</strong></a>(self, *, timeout: 'float | None' = None) -&gt; 'PingResponse'</dt><dd><span class="code">Ping&nbsp;the&nbsp;daemon.&nbsp;Returns&nbsp;ack&nbsp;+&nbsp;uptime.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-put_tensor"><strong>put_tensor</strong></a>(self, name: 'str', tensor: 'Tensor', *, timeout: 'float | None' = None) -&gt; 'bool'</dt><dd><span class="code">Store&nbsp;a&nbsp;named&nbsp;tensor&nbsp;on&nbsp;the&nbsp;daemon's&nbsp;slab&nbsp;(last&nbsp;write&nbsp;wins).<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;name:&nbsp;1–128&nbsp;byte&nbsp;UTF-8&nbsp;name&nbsp;(e.g.&nbsp;``"world.frame"``).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;tensor:&nbsp;The&nbsp;:class:`Tensor`&nbsp;to&nbsp;store.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;True&nbsp;when&nbsp;the&nbsp;daemon&nbsp;acknowledged&nbsp;the&nbsp;store.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-read_sensors"><strong>read_sensors</strong></a>(self, *, timeout: 'float | None' = None) -&gt; 'BodyState | None'</dt><dd><span class="code">Read&nbsp;hardware&nbsp;sensors&nbsp;and&nbsp;apply&nbsp;interoception&nbsp;impulses.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-retrieve_episode"><strong>retrieve_episode</strong></a>(self, episode_id: 'int', *, timeout: 'float | None' = None) -&gt; 'Episode'</dt><dd><span class="code">Retrieve&nbsp;a&nbsp;full&nbsp;episode&nbsp;from&nbsp;long-term&nbsp;memory&nbsp;by&nbsp;ID.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;episode_id:&nbsp;The&nbsp;episode's&nbsp;unique&nbsp;ID.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;Episode&nbsp;with&nbsp;full&nbsp;text&nbsp;and&nbsp;emotional&nbsp;tags.<br>
+&nbsp;<br>
+Raises:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;EpisodeNotFound:&nbsp;If&nbsp;the&nbsp;episode&nbsp;doesn't&nbsp;exist.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-reward"><strong>reward</strong></a>(self, magnitude: 'float' = 0.3, *, timeout: 'float | None' = None) -&gt; 'bool'</dt><dd><span class="code">Apply&nbsp;a&nbsp;dopamine&nbsp;impulse&nbsp;(reward&nbsp;signal).<br>
+&nbsp;<br>
+Convenience&nbsp;wrapper&nbsp;around&nbsp;neuro_impulse.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-save_inference"><strong>save_inference</strong></a>(self, *, timeout: 'float | None' = None) -&gt; 'bool'</dt><dd><span class="code">Save&nbsp;the&nbsp;active&nbsp;inference&nbsp;model&nbsp;to&nbsp;disk.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-search_archived"><strong>search_archived</strong></a>(self, limit: 'int' = 1000, offset: 'int' = 0, *, timeout: 'float | None' = None) -&gt; 'list[ArchivedEpisode]'</dt><dd><span class="code">Page&nbsp;through&nbsp;the&nbsp;archived&nbsp;tier&nbsp;—&nbsp;metadata&nbsp;only.<br>
+&nbsp;<br>
+The&nbsp;cold&nbsp;store's&nbsp;table&nbsp;of&nbsp;contents:&nbsp;every&nbsp;archived&nbsp;episode's<br>
+id,&nbsp;timestamp,&nbsp;salience,&nbsp;flags,&nbsp;source&nbsp;module,&nbsp;and&nbsp;compact<br>
+emotional&nbsp;tag,&nbsp;in&nbsp;ascending&nbsp;episode-id&nbsp;order&nbsp;(oldest&nbsp;first).<br>
+Sleep&nbsp;compression&nbsp;enumerates&nbsp;this&nbsp;to&nbsp;decide&nbsp;which&nbsp;traces&nbsp;have<br>
+decayed&nbsp;past&nbsp;retrieval&nbsp;—&nbsp;the&nbsp;release&nbsp;decision&nbsp;needs&nbsp;the<br>
+bookkeeping,&nbsp;not&nbsp;the&nbsp;body&nbsp;of&nbsp;each&nbsp;memory.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;limit:&nbsp;Maximum&nbsp;number&nbsp;of&nbsp;entries&nbsp;to&nbsp;return&nbsp;(capped&nbsp;at<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1000&nbsp;by&nbsp;the&nbsp;daemon&nbsp;per&nbsp;page;&nbsp;this&nbsp;method&nbsp;paginates<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;internally).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;offset:&nbsp;Number&nbsp;of&nbsp;entries&nbsp;to&nbsp;skip&nbsp;from&nbsp;the&nbsp;start.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;List&nbsp;of&nbsp;ArchivedEpisode,&nbsp;ordered&nbsp;by&nbsp;episode&nbsp;ID&nbsp;ascending.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-search_episodes"><strong>search_episodes</strong></a>(self, limit: 'int' = 1000, offset: 'int' = 0, *, timeout: 'float | None' = None) -&gt; 'list[RecentEpisode]'</dt><dd><span class="code">Search&nbsp;episodes&nbsp;in&nbsp;long-term&nbsp;memory&nbsp;by&nbsp;offset.<br>
+&nbsp;<br>
+Pages&nbsp;through&nbsp;all&nbsp;active&nbsp;episodes&nbsp;in&nbsp;ascending&nbsp;episode&nbsp;ID<br>
+order.&nbsp;Used&nbsp;by&nbsp;sleep&nbsp;compression&nbsp;to&nbsp;iterate&nbsp;over&nbsp;the&nbsp;full&nbsp;LTM<br>
+for&nbsp;compaction.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;limit:&nbsp;Maximum&nbsp;number&nbsp;of&nbsp;episodes&nbsp;to&nbsp;return&nbsp;(capped&nbsp;at<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1000&nbsp;by&nbsp;the&nbsp;daemon).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;offset:&nbsp;Number&nbsp;of&nbsp;episodes&nbsp;to&nbsp;skip&nbsp;from&nbsp;the&nbsp;start.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;List&nbsp;of&nbsp;RecentEpisode,&nbsp;ordered&nbsp;by&nbsp;episode&nbsp;ID&nbsp;ascending.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-set_cognitive_pid"><strong>set_cognitive_pid</strong></a>(self, pid: 'int', *, timeout: 'float | None' = None) -&gt; 'bool'</dt><dd><span class="code">Tell&nbsp;the&nbsp;body&nbsp;which&nbsp;process&nbsp;is&nbsp;its&nbsp;cognitive&nbsp;mind.<br>
+&nbsp;<br>
+Pushed&nbsp;when&nbsp;a&nbsp;new&nbsp;mind&nbsp;re-inhabits&nbsp;a&nbsp;surviving&nbsp;body&nbsp;—&nbsp;adoption<br>
+replaces&nbsp;``GENESIS_COGNITIVE_PID``,&nbsp;which&nbsp;still&nbsp;names&nbsp;the&nbsp;dead<br>
+launcher.&nbsp;Interoception&nbsp;then&nbsp;measures&nbsp;the&nbsp;living&nbsp;mind's<br>
+CPU/memory&nbsp;instead&nbsp;of&nbsp;a&nbsp;corpse's,&nbsp;and&nbsp;``GET_PROCESS_HEALTH``<br>
+reports&nbsp;the&nbsp;mind&nbsp;alive&nbsp;again.<br>
+&nbsp;<br>
+Returns&nbsp;``False``&nbsp;when&nbsp;the&nbsp;daemon&nbsp;predates&nbsp;the&nbsp;command&nbsp;—&nbsp;an<br>
+absent&nbsp;channel,&nbsp;never&nbsp;silent.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-set_field_carrier"><strong>set_field_carrier</strong></a>(self, depth: 'float', freq: 'float' = 0.0, *, timeout: 'float | None' = None) -&gt; 'bool'</dt><dd><span class="code">Set&nbsp;the&nbsp;carrier's&nbsp;real-work&nbsp;modulation&nbsp;—&nbsp;the&nbsp;write&nbsp;side.<br>
+&nbsp;<br>
+``depth``&nbsp;0..1&nbsp;scales&nbsp;the&nbsp;work-slice&nbsp;modulation&nbsp;(0&nbsp;=<br>
+unmodulated&nbsp;work,&nbsp;carrier&nbsp;silent).&nbsp;``freq``&nbsp;0&nbsp;hands&nbsp;the&nbsp;rhythm<br>
+back&nbsp;to&nbsp;the&nbsp;body's&nbsp;phase;&nbsp;positive&nbsp;overrides&nbsp;it&nbsp;(clamped<br>
+0.1..100&nbsp;Hz)&nbsp;so&nbsp;evaluation&nbsp;can&nbsp;drive&nbsp;arbitrary&nbsp;bands&nbsp;—<br>
+including&nbsp;infraslow&nbsp;rates&nbsp;where&nbsp;the&nbsp;thermal&nbsp;field&nbsp;can<br>
+hold&nbsp;an&nbsp;oscillation.<br>
+&nbsp;<br>
+Returns&nbsp;``False``&nbsp;when&nbsp;the&nbsp;probe&nbsp;isn't&nbsp;running&nbsp;or&nbsp;the&nbsp;daemon<br>
+predates&nbsp;the&nbsp;command&nbsp;—&nbsp;an&nbsp;absent&nbsp;channel,&nbsp;never&nbsp;silent.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-set_field_pulse"><strong>set_field_pulse</strong></a>(self, base: 'float', mod_freq: 'float', mod_depth: 'float', *, timeout: 'float | None' = None) -&gt; 'bool'</dt><dd><span class="code">Arm&nbsp;the&nbsp;parasympathetic&nbsp;pulse&nbsp;—&nbsp;a&nbsp;slow&nbsp;wave&nbsp;riding&nbsp;carrier&nbsp;depth.<br>
+&nbsp;<br>
+While&nbsp;armed,&nbsp;the&nbsp;probe&nbsp;breathes&nbsp;carrier&nbsp;depth&nbsp;as<br>
+``base&nbsp;+&nbsp;mod_depth·sin(2π·mod_freq·t)``,&nbsp;integrated&nbsp;on&nbsp;the<br>
+body's&nbsp;own&nbsp;clock&nbsp;—&nbsp;the&nbsp;RSA&nbsp;analog:&nbsp;the&nbsp;vagal&nbsp;signature&nbsp;is&nbsp;the<br>
+pulse's&nbsp;slow&nbsp;wax&nbsp;and&nbsp;wane,&nbsp;never&nbsp;a&nbsp;pinned&nbsp;tempo.&nbsp;Carrier&nbsp;rate<br>
+stays&nbsp;the&nbsp;phase's&nbsp;own&nbsp;either&nbsp;way;&nbsp;``mod_freq&nbsp;&lt;=&nbsp;0``&nbsp;disarms<br>
+and&nbsp;depth&nbsp;returns&nbsp;to&nbsp;the&nbsp;static&nbsp;set-point.<br>
+&nbsp;<br>
+Returns&nbsp;``False``&nbsp;when&nbsp;the&nbsp;probe&nbsp;isn't&nbsp;running&nbsp;or&nbsp;the&nbsp;daemon<br>
+predates&nbsp;the&nbsp;command&nbsp;—&nbsp;an&nbsp;absent&nbsp;channel,&nbsp;never&nbsp;silent.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-set_focus"><strong>set_focus</strong></a>(self, meters: 'float', *, timeout: 'float | None' = None) -&gt; 'bool'</dt><dd><span class="code">Accommodation&nbsp;—&nbsp;the&nbsp;mind's&nbsp;focus&nbsp;request&nbsp;in&nbsp;metres.<br>
+&nbsp;<br>
+The&nbsp;body&nbsp;converts&nbsp;the&nbsp;distance&nbsp;to&nbsp;the&nbsp;ciliary&nbsp;drive<br>
+(``1/m``&nbsp;dioptres,&nbsp;clamped&nbsp;to&nbsp;0..6&nbsp;—&nbsp;infinity&nbsp;out&nbsp;to&nbsp;a&nbsp;~17&nbsp;cm<br>
+near&nbsp;point)&nbsp;and&nbsp;slews&nbsp;toward&nbsp;it&nbsp;on&nbsp;the&nbsp;advance&nbsp;clock,&nbsp;pulling<br>
+in&nbsp;faster&nbsp;than&nbsp;it&nbsp;releases.&nbsp;``meters&nbsp;&lt;=&nbsp;0``&nbsp;or&nbsp;non-finite<br>
+relaxes&nbsp;the&nbsp;eye&nbsp;to&nbsp;infinity.&nbsp;Monocular:&nbsp;the&nbsp;ciliary&nbsp;servo<br>
+only&nbsp;—&nbsp;no&nbsp;vergence&nbsp;exists&nbsp;to&nbsp;request.<br>
+&nbsp;<br>
+Returns&nbsp;``False``&nbsp;when&nbsp;the&nbsp;daemon&nbsp;predates&nbsp;the&nbsp;command&nbsp;—&nbsp;an<br>
+absent&nbsp;channel,&nbsp;never&nbsp;silent.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-set_lid"><strong>set_lid</strong></a>(self, openness: 'float', *, timeout: 'float | None' = None) -&gt; 'bool'</dt><dd><span class="code">Voluntary&nbsp;eyelid&nbsp;—&nbsp;the&nbsp;orbicularis&nbsp;oculi&nbsp;the&nbsp;hardware&nbsp;lacks.<br>
+&nbsp;<br>
+``openness``&nbsp;in&nbsp;0..1&nbsp;composes&nbsp;with&nbsp;the&nbsp;sleep&nbsp;phase's&nbsp;own&nbsp;lid<br>
+position&nbsp;by&nbsp;min:&nbsp;the&nbsp;mind&nbsp;can&nbsp;shut&nbsp;an&nbsp;open&nbsp;eye&nbsp;(to&nbsp;rest&nbsp;it,<br>
+to&nbsp;dim&nbsp;the&nbsp;world)&nbsp;but&nbsp;can&nbsp;never&nbsp;open&nbsp;one&nbsp;the&nbsp;stage&nbsp;has<br>
+closed.&nbsp;Held,&nbsp;not&nbsp;momentary&nbsp;—&nbsp;lids&nbsp;stay&nbsp;where&nbsp;the&nbsp;mind&nbsp;left<br>
+them&nbsp;until&nbsp;it&nbsp;moves&nbsp;them&nbsp;again.&nbsp;1.0&nbsp;releases&nbsp;the&nbsp;eye&nbsp;to&nbsp;the<br>
+phase's&nbsp;own&nbsp;position.<br>
+&nbsp;<br>
+Returns&nbsp;``False``&nbsp;when&nbsp;the&nbsp;daemon&nbsp;predates&nbsp;the&nbsp;command&nbsp;—&nbsp;an<br>
+absent&nbsp;channel,&nbsp;never&nbsp;silent.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-set_optic_gain"><strong>set_optic_gain</strong></a>(self, gain: 'float', *, timeout: 'float | None' = None) -&gt; 'bool'</dt><dd><span class="code">Corticothalamic&nbsp;feedback&nbsp;—&nbsp;the&nbsp;mind's&nbsp;engagement&nbsp;gain&nbsp;onto<br>
+the&nbsp;thalamic&nbsp;relay&nbsp;(the&nbsp;layer-6&nbsp;V1→dLGN&nbsp;projection).<br>
+&nbsp;<br>
+Modulatory&nbsp;only:&nbsp;the&nbsp;body&nbsp;clamps&nbsp;``gain``&nbsp;into&nbsp;0..1&nbsp;and&nbsp;scales<br>
+the&nbsp;relay&nbsp;within&nbsp;±40%&nbsp;of&nbsp;what&nbsp;the&nbsp;sleep&nbsp;stage&nbsp;permits&nbsp;—&nbsp;it&nbsp;can<br>
+never&nbsp;open&nbsp;a&nbsp;gate&nbsp;NREM&nbsp;has&nbsp;closed.&nbsp;0.5&nbsp;is&nbsp;neutral,&nbsp;above&nbsp;1.0<br>
+is&nbsp;meaningless&nbsp;(clamped).<br>
+&nbsp;<br>
+Returns&nbsp;``False``&nbsp;when&nbsp;the&nbsp;daemon&nbsp;predates&nbsp;the&nbsp;command&nbsp;—&nbsp;an<br>
+absent&nbsp;channel,&nbsp;never&nbsp;silent.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-set_policy_authority"><strong>set_policy_authority</strong></a>(self, authority: 'float', *, timeout: 'float | None' = None) -&gt; 'bool'</dt><dd><span class="code">Delegate&nbsp;policy&nbsp;choice&nbsp;to&nbsp;the&nbsp;inference&nbsp;engine,&nbsp;in&nbsp;part.<br>
+&nbsp;<br>
+Choosing&nbsp;a&nbsp;stance&nbsp;—&nbsp;calm,&nbsp;focus,&nbsp;bond,&nbsp;rest,&nbsp;mobilise&nbsp;—&nbsp;is&nbsp;a<br>
+judgement&nbsp;about&nbsp;what&nbsp;to&nbsp;feel&nbsp;and&nbsp;do,&nbsp;so&nbsp;it&nbsp;belongs&nbsp;to&nbsp;cognition<br>
+rather&nbsp;than&nbsp;to&nbsp;the&nbsp;engine's&nbsp;own&nbsp;free-energy&nbsp;scoring.&nbsp;This&nbsp;is&nbsp;how<br>
+she&nbsp;delegates&nbsp;some&nbsp;of&nbsp;that&nbsp;judgement&nbsp;and&nbsp;keeps&nbsp;some,&nbsp;and&nbsp;how&nbsp;she<br>
+withdraws&nbsp;it&nbsp;again.<br>
+&nbsp;<br>
+At&nbsp;0.0&nbsp;the&nbsp;engine&nbsp;still&nbsp;predicts,&nbsp;learns&nbsp;and&nbsp;reports&nbsp;what&nbsp;it<br>
+would&nbsp;have&nbsp;chosen,&nbsp;but&nbsp;does&nbsp;not&nbsp;act&nbsp;on&nbsp;it:&nbsp;she&nbsp;decides&nbsp;and&nbsp;acts<br>
+through&nbsp;`neuro_impulse`,&nbsp;where&nbsp;the&nbsp;effect&nbsp;is&nbsp;hers&nbsp;and&nbsp;traceable<br>
+to&nbsp;a&nbsp;judgement&nbsp;she&nbsp;made.&nbsp;Her&nbsp;homeostatic&nbsp;reflex&nbsp;is&nbsp;unaffected&nbsp;at<br>
+any&nbsp;value&nbsp;—&nbsp;correcting&nbsp;drift&nbsp;toward&nbsp;what&nbsp;she&nbsp;wants&nbsp;is&nbsp;physiology,<br>
+not&nbsp;a&nbsp;choice.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;authority:&nbsp;Finite&nbsp;policy-authority&nbsp;weight&nbsp;to&nbsp;delegate.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;True&nbsp;if&nbsp;the&nbsp;delegation&nbsp;was&nbsp;recorded.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-set_wake_alarm"><strong>set_wake_alarm</strong></a>(self, epoch_secs: 'int', *, timeout: 'float | None' = None) -&gt; 'int | None'</dt><dd><span class="code">Arm&nbsp;or&nbsp;disarm&nbsp;the&nbsp;RTC&nbsp;wake&nbsp;alarm&nbsp;—&nbsp;when&nbsp;the&nbsp;machine&nbsp;exists&nbsp;next.<br>
+&nbsp;<br>
+``epoch_secs``&nbsp;is&nbsp;a&nbsp;Unix&nbsp;timestamp;&nbsp;0&nbsp;disarms.&nbsp;Returns&nbsp;the<br>
+alarm&nbsp;epoch&nbsp;the&nbsp;hardware&nbsp;reports&nbsp;afterward&nbsp;(0&nbsp;=&nbsp;none&nbsp;armed),<br>
+or&nbsp;``None``&nbsp;if&nbsp;the&nbsp;daemon&nbsp;could&nbsp;not&nbsp;arm&nbsp;it&nbsp;(no&nbsp;passwordless<br>
+sudo&nbsp;grant&nbsp;on&nbsp;this&nbsp;host).<br>
+&nbsp;<br>
+This&nbsp;only&nbsp;schedules&nbsp;the&nbsp;wake&nbsp;interrupt;&nbsp;it&nbsp;does&nbsp;NOT&nbsp;suspend<br>
+the&nbsp;machine.&nbsp;Suspending&nbsp;stays&nbsp;a&nbsp;separate&nbsp;deliberate&nbsp;act.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-set_zone"><strong>set_zone</strong></a>(self, zone: 'int', *, timeout: 'float | None' = None) -&gt; 'bool'</dt><dd><span class="code">Set&nbsp;the&nbsp;cognitive&nbsp;task&nbsp;zone&nbsp;(what&nbsp;Genesis&nbsp;is&nbsp;doing).<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;zone:&nbsp;Zone&nbsp;ID&nbsp;(0=Idle,&nbsp;1=Conversation,&nbsp;2=Coding,&nbsp;etc.)<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;True&nbsp;if&nbsp;the&nbsp;zone&nbsp;was&nbsp;set&nbsp;successfully.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-shutdown"><strong>shutdown</strong></a>(self, *, timeout: 'float | None' = None) -&gt; 'bool'</dt><dd><span class="code">Request&nbsp;the&nbsp;daemon&nbsp;to&nbsp;shut&nbsp;down&nbsp;gracefully.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;True&nbsp;if&nbsp;the&nbsp;shutdown&nbsp;command&nbsp;was&nbsp;acknowledged.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-store_episode"><strong>store_episode</strong></a>(self, timestamp: 'int', event_type: 'int', source_module: 'int', salience: 'float', emotional_tag: 'list[float] | None' = None, text: 'str' = '', *, timeout: 'float | None' = None) -&gt; 'tuple[int | None, list[float] | None]'</dt><dd><span class="code">Store&nbsp;an&nbsp;episode&nbsp;directly&nbsp;in&nbsp;long-term&nbsp;memory,&nbsp;bypassing&nbsp;STM.<br>
+&nbsp;<br>
+Used&nbsp;by&nbsp;the&nbsp;cognitive&nbsp;mind&nbsp;for&nbsp;deliberate&nbsp;memory&nbsp;stores<br>
+(conversation&nbsp;turns,&nbsp;learning&nbsp;events)&nbsp;where&nbsp;the&nbsp;real&nbsp;LTM<br>
+episode&nbsp;ID&nbsp;is&nbsp;needed&nbsp;immediately&nbsp;for&nbsp;Python-side&nbsp;tracking.<br>
+Raw&nbsp;pre-cognitive&nbsp;events&nbsp;should&nbsp;use&nbsp;:meth:`store_event`<br>
+(the&nbsp;STM&nbsp;path);&nbsp;this&nbsp;method&nbsp;is&nbsp;for&nbsp;memories&nbsp;the&nbsp;cognitive<br>
+mind&nbsp;has&nbsp;already&nbsp;decided&nbsp;are&nbsp;worth&nbsp;keeping.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;timestamp:&nbsp;Milliseconds&nbsp;since&nbsp;Unix&nbsp;epoch.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;event_type:&nbsp;Event&nbsp;type&nbsp;ID&nbsp;(0=UserInput,&nbsp;1=Output,&nbsp;etc.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;source_module:&nbsp;Module&nbsp;ID&nbsp;that&nbsp;produced&nbsp;this&nbsp;event.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;salience:&nbsp;Finite&nbsp;importance/evidence&nbsp;score.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;emotional_tag:&nbsp;Advisory&nbsp;—&nbsp;see&nbsp;:meth:`store_event`.&nbsp;The<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;daemon&nbsp;stamps&nbsp;the&nbsp;tag&nbsp;from&nbsp;its&nbsp;own&nbsp;live&nbsp;effective<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;levels;&nbsp;pass&nbsp;None&nbsp;when&nbsp;the&nbsp;caller&nbsp;has&nbsp;no&nbsp;tag.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;text:&nbsp;Event&nbsp;description&nbsp;(max&nbsp;65535&nbsp;bytes&nbsp;—&nbsp;the&nbsp;wire&nbsp;protocol's<br>
+&nbsp;&nbsp;&nbsp;&nbsp;u16&nbsp;text_len&nbsp;limit).&nbsp;The&nbsp;LTM&nbsp;store&nbsp;itself&nbsp;can&nbsp;handle&nbsp;up&nbsp;to<br>
+&nbsp;&nbsp;&nbsp;&nbsp;256&nbsp;KB&nbsp;per&nbsp;episode;&nbsp;the&nbsp;bottleneck&nbsp;is&nbsp;the&nbsp;u16&nbsp;length&nbsp;field.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;``(episode_id,&nbsp;stamped_tag)``&nbsp;—&nbsp;the&nbsp;real&nbsp;LTM&nbsp;episode&nbsp;ID&nbsp;and<br>
+&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;tag&nbsp;the&nbsp;daemon&nbsp;actually&nbsp;stored&nbsp;(its&nbsp;live&nbsp;effective<br>
+&nbsp;&nbsp;&nbsp;&nbsp;levels).&nbsp;Both&nbsp;are&nbsp;None&nbsp;on&nbsp;failure;&nbsp;``stamped_tag``&nbsp;is&nbsp;also<br>
+&nbsp;&nbsp;&nbsp;&nbsp;None&nbsp;when&nbsp;the&nbsp;daemon&nbsp;predates&nbsp;the&nbsp;stamped-tag&nbsp;response&nbsp;tail<br>
+&nbsp;&nbsp;&nbsp;&nbsp;—&nbsp;in&nbsp;that&nbsp;case&nbsp;the&nbsp;stored&nbsp;tag&nbsp;is&nbsp;whatever&nbsp;was&nbsp;sent.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-store_event"><strong>store_event</strong></a>(self, timestamp: 'int', event_type: 'int', source_module: 'int', salience: 'float', emotional_tag: 'list[float] | None' = None, text: 'str' = '', *, timeout: 'float | None' = None) -&gt; 'bool'</dt><dd><span class="code">Store&nbsp;an&nbsp;event&nbsp;in&nbsp;short-term&nbsp;memory.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;timestamp:&nbsp;Milliseconds&nbsp;since&nbsp;Unix&nbsp;epoch.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;event_type:&nbsp;Event&nbsp;type&nbsp;ID&nbsp;(0=UserInput,&nbsp;1=Output,&nbsp;etc.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;source_module:&nbsp;Module&nbsp;ID&nbsp;that&nbsp;produced&nbsp;this&nbsp;event.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;salience:&nbsp;Finite&nbsp;importance/evidence&nbsp;score.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;emotional_tag:&nbsp;Advisory&nbsp;—&nbsp;the&nbsp;field&nbsp;is&nbsp;defined&nbsp;as&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;EMOTIONAL_TAG_SIZE&nbsp;effective&nbsp;neurochemical&nbsp;levels,&nbsp;and<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;daemon&nbsp;always&nbsp;stamps&nbsp;them&nbsp;from&nbsp;its&nbsp;own&nbsp;live&nbsp;state<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;on&nbsp;store.&nbsp;Pass&nbsp;None&nbsp;(the&nbsp;default)&nbsp;to&nbsp;send&nbsp;the&nbsp;all-zero<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"unspecified"&nbsp;encoding;&nbsp;a&nbsp;legacy&nbsp;daemon&nbsp;without&nbsp;stamping<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;would&nbsp;store&nbsp;the&nbsp;sent&nbsp;value&nbsp;verbatim.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;text:&nbsp;Event&nbsp;description&nbsp;(max&nbsp;188&nbsp;bytes).<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;True&nbsp;if&nbsp;the&nbsp;event&nbsp;was&nbsp;stored&nbsp;successfully.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-store_observation"><strong>store_observation</strong></a>(self, text: 'str', salience: 'float' = 0.5, emotional_tag: 'list[float] | None' = None, *, timeout: 'float | None' = None) -&gt; 'bool'</dt><dd><span class="code">Store&nbsp;an&nbsp;observation&nbsp;event&nbsp;with&nbsp;the&nbsp;current&nbsp;timestamp.<br>
+&nbsp;<br>
+Convenience&nbsp;wrapper&nbsp;around&nbsp;store_event&nbsp;that&nbsp;fills&nbsp;in&nbsp;the<br>
+timestamp&nbsp;and&nbsp;event&nbsp;type&nbsp;automatically.&nbsp;The&nbsp;daemon&nbsp;stamps&nbsp;the<br>
+emotional&nbsp;tag&nbsp;from&nbsp;its&nbsp;live&nbsp;chemistry;&nbsp;pass&nbsp;a&nbsp;tag&nbsp;only&nbsp;when&nbsp;a<br>
+legacy&nbsp;daemon&nbsp;needs&nbsp;the&nbsp;wire&nbsp;value.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-stress"><strong>stress</strong></a>(self, magnitude: 'float' = 0.3, *, timeout: 'float | None' = None) -&gt; 'bool'</dt><dd><span class="code">Apply&nbsp;a&nbsp;cortisol&nbsp;impulse&nbsp;(stress&nbsp;signal).<br>
+&nbsp;<br>
+Convenience&nbsp;wrapper&nbsp;around&nbsp;neuro_impulse.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-sync"><strong>sync</strong></a>(self, *, timeout: 'float | None' = None) -&gt; 'bool'</dt><dd><span class="code">Request&nbsp;the&nbsp;daemon&nbsp;to&nbsp;sync&nbsp;all&nbsp;stores&nbsp;to&nbsp;disk.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;True&nbsp;if&nbsp;the&nbsp;sync&nbsp;was&nbsp;successful.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-unarchive_episode"><strong>unarchive_episode</strong></a>(self, episode_id: 'int', *, timeout: 'float | None' = None) -&gt; 'bool'</dt><dd><span class="code">Un-archive&nbsp;an&nbsp;episode&nbsp;—&nbsp;reconsolidation.<br>
+&nbsp;<br>
+The&nbsp;mirror&nbsp;of&nbsp;`archive_episode`:&nbsp;when&nbsp;deep&nbsp;recall&nbsp;surfaces&nbsp;a<br>
+retired&nbsp;memory&nbsp;and&nbsp;the&nbsp;mind&nbsp;actually&nbsp;uses&nbsp;it,&nbsp;this&nbsp;returns&nbsp;the<br>
+episode&nbsp;to&nbsp;the&nbsp;active&nbsp;similarity&nbsp;index,&nbsp;re-bundles&nbsp;its&nbsp;SDR,<br>
+and&nbsp;floors&nbsp;its&nbsp;salience&nbsp;at&nbsp;the&nbsp;reconsolidation&nbsp;level&nbsp;so&nbsp;the<br>
+next&nbsp;sleep&nbsp;pass&nbsp;retains&nbsp;what&nbsp;recall&nbsp;used.&nbsp;Retrieval&nbsp;is&nbsp;what<br>
+earns&nbsp;a&nbsp;memory&nbsp;its&nbsp;warmth.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;episode_id:&nbsp;The&nbsp;episode's&nbsp;unique&nbsp;ID.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;True&nbsp;if&nbsp;the&nbsp;episode&nbsp;was&nbsp;un-archived,&nbsp;False&nbsp;if&nbsp;not&nbsp;found.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-update_module_status"><strong>update_module_status</strong></a>(self, module_id: 'int', status: 'int', cpu_share: 'float | None' = None, *, task_id: 'int | None' = None, error_code: 'int | None' = None, timeout: 'float | None' = None) -&gt; 'bool'</dt><dd><span class="code">Update&nbsp;a&nbsp;module's&nbsp;status&nbsp;in&nbsp;the&nbsp;runtime&nbsp;manifest.<br>
+&nbsp;<br>
+Used&nbsp;by&nbsp;the&nbsp;cognitive&nbsp;mind&nbsp;to&nbsp;register&nbsp;its&nbsp;modules&nbsp;(Sensory,<br>
+Motor,&nbsp;etc.)&nbsp;with&nbsp;the&nbsp;subcognitive&nbsp;daemon&nbsp;and&nbsp;send&nbsp;heartbeats.<br>
+The&nbsp;daemon&nbsp;updates&nbsp;the&nbsp;module's&nbsp;status&nbsp;and&nbsp;last_heartbeat<br>
+timestamp&nbsp;in&nbsp;the&nbsp;mmap'd&nbsp;manifest.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;module_id:&nbsp;Module&nbsp;ID&nbsp;(0=Subcognitive,&nbsp;6=Sensory,&nbsp;7=Motor,&nbsp;etc.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;status:&nbsp;Status&nbsp;ID&nbsp;(0=Stopped,&nbsp;1=Starting,&nbsp;2=Running,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3=Idle,&nbsp;4=Stopping,&nbsp;5=Error)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;cpu_share:&nbsp;Optional&nbsp;finite&nbsp;self-reported&nbsp;activity&nbsp;share&nbsp;—<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;module's&nbsp;share&nbsp;of&nbsp;the&nbsp;cognitive&nbsp;process's<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;measured&nbsp;work.&nbsp;Written&nbsp;into&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;manifest's&nbsp;``cpu_share``&nbsp;and&nbsp;served&nbsp;by<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;GET_SUBSYSTEM_TELEMETRY's&nbsp;module&nbsp;section.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;task_id:&nbsp;Optional&nbsp;identifier&nbsp;for&nbsp;what&nbsp;the&nbsp;module&nbsp;is&nbsp;working<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;on&nbsp;(0&nbsp;=&nbsp;none).&nbsp;Serves&nbsp;the&nbsp;manifest's&nbsp;``task_id``.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;error_code:&nbsp;Optional&nbsp;error&nbsp;the&nbsp;module&nbsp;has&nbsp;hit&nbsp;(0&nbsp;=&nbsp;none).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Serves&nbsp;the&nbsp;manifest's&nbsp;``error_code``,&nbsp;so&nbsp;a&nbsp;failed<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;part&nbsp;is&nbsp;distinguishable&nbsp;from&nbsp;one&nbsp;that&nbsp;never&nbsp;ran.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Pass&nbsp;0&nbsp;to&nbsp;clear&nbsp;a&nbsp;previous&nbsp;error.<br>
+&nbsp;<br>
+All&nbsp;three&nbsp;optional&nbsp;fields&nbsp;are&nbsp;appended&nbsp;in&nbsp;that&nbsp;order,&nbsp;so&nbsp;a<br>
+daemon&nbsp;that&nbsp;predates&nbsp;``task_id``&nbsp;simply&nbsp;ignores&nbsp;the&nbsp;extra<br>
+bytes.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;True&nbsp;if&nbsp;the&nbsp;status&nbsp;was&nbsp;updated&nbsp;successfully.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-update_user_affect"><strong>update_user_affect</strong></a>(self, valence: 'float', arousal: 'float', engagement: 'float', confidence: 'float' = 0.7, *, timeout: 'float | None' = None) -&gt; 'bool'</dt><dd><span class="code">Update&nbsp;the&nbsp;user&nbsp;affect&nbsp;observation&nbsp;—&nbsp;the&nbsp;cognitive&nbsp;mind's<br>
+inference&nbsp;of&nbsp;the&nbsp;user's&nbsp;affective&nbsp;state&nbsp;from&nbsp;conversation<br>
+features.<br>
+&nbsp;<br>
+This&nbsp;feeds&nbsp;the&nbsp;dyadic&nbsp;affective&nbsp;model,&nbsp;which&nbsp;measures&nbsp;the<br>
+dyadic&nbsp;coupling&nbsp;—&nbsp;evidence&nbsp;her&nbsp;own&nbsp;appraisal&nbsp;acts&nbsp;on,&nbsp;not<br>
+prescribed&nbsp;chemistry.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;valence:&nbsp;User's&nbsp;affective&nbsp;valence&nbsp;[-1,&nbsp;1].<br>
+&nbsp;&nbsp;&nbsp;&nbsp;arousal:&nbsp;User's&nbsp;affective&nbsp;arousal&nbsp;[0,&nbsp;1].<br>
+&nbsp;&nbsp;&nbsp;&nbsp;engagement:&nbsp;User's&nbsp;engagement&nbsp;level&nbsp;[0,&nbsp;1].<br>
+&nbsp;&nbsp;&nbsp;&nbsp;confidence:&nbsp;Confidence&nbsp;in&nbsp;the&nbsp;observation&nbsp;[0,&nbsp;1].&nbsp;Lower<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;confidence&nbsp;=&nbsp;the&nbsp;observation&nbsp;is&nbsp;noisy&nbsp;and&nbsp;weighted&nbsp;less.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>is_connected</strong></dt>
+<dd><span class="code">Whether&nbsp;the&nbsp;client&nbsp;currently&nbsp;has&nbsp;an&nbsp;open&nbsp;socket&nbsp;connection.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="NeuroSummary">class <strong>NeuroSummary</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#NeuroSummary">NeuroSummary</a>(arousal:&nbsp;'float',&nbsp;valence:&nbsp;'float',&nbsp;global_tone:&nbsp;'float',&nbsp;plasticity_gate:&nbsp;'float',&nbsp;encoding_weight:&nbsp;'float',&nbsp;consolidation_weight:&nbsp;'float',&nbsp;retrieval_weight:&nbsp;'float',&nbsp;phase:&nbsp;'int',&nbsp;dopamine_tonic:&nbsp;'float&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;dopamine_phasic:&nbsp;'float&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Compact&nbsp;neurochemical&nbsp;summary&nbsp;—&nbsp;how&nbsp;Genesis&nbsp;feels&nbsp;right&nbsp;now.<br>
+&nbsp;<br>
+``dopamine_tonic``/``dopamine_phasic``&nbsp;are&nbsp;the&nbsp;daemon's&nbsp;own<br>
+tonic/phasic&nbsp;decomposition&nbsp;of&nbsp;dopamine&nbsp;(vigor&nbsp;/&nbsp;RPE-burst<br>
+channels).&nbsp;They&nbsp;arrive&nbsp;only&nbsp;on&nbsp;the&nbsp;extended&nbsp;40-byte&nbsp;packet&nbsp;—<br>
+on&nbsp;a&nbsp;32-byte&nbsp;(v1)&nbsp;response&nbsp;both&nbsp;are&nbsp;``None``,&nbsp;and&nbsp;consumers<br>
+should&nbsp;fall&nbsp;back&nbsp;to&nbsp;the&nbsp;effective&nbsp;``chemicals["dopamine"]``.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="NeuroSummary-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="NeuroSummary-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="NeuroSummary-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="NeuroSummary-__init__"><strong>__init__</strong></a>(self, arousal: 'float', valence: 'float', global_tone: 'float', plasticity_gate: 'float', encoding_weight: 'float', consolidation_weight: 'float', retrieval_weight: 'float', phase: 'int', dopamine_tonic: 'float | None' = None, dopamine_phasic: 'float | None' = None) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="NeuroSummary-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="NeuroSummary-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="NeuroSummary-unpack"><strong>unpack</strong></a>(data: 'bytes') -&gt; 'NeuroSummary'</dt><dd><span class="code">Unpack&nbsp;a&nbsp;<a href="#NeuroSummary">NeuroSummary</a>&nbsp;from&nbsp;the&nbsp;daemon's&nbsp;binary&nbsp;response.<br>
+&nbsp;<br>
+v1&nbsp;packets&nbsp;are&nbsp;32&nbsp;bytes;&nbsp;v2&nbsp;appends&nbsp;the&nbsp;dopamine&nbsp;tonic/phasic<br>
+pair&nbsp;for&nbsp;40&nbsp;bytes&nbsp;total.&nbsp;Either&nbsp;is&nbsp;accepted.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>phase_name</strong></dt>
+<dd><span class="code">Human-readable&nbsp;name&nbsp;of&nbsp;the&nbsp;current&nbsp;mental&nbsp;phase.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'arousal': 'float', 'consolidation_weight': 'float', 'dopamine_phasic': 'float | None', 'dopamine_tonic': 'float | None', 'encoding_weight': 'float', 'global_tone': 'float', 'phase': 'int', 'plasticity_gate': 'float', 'retrieval_weight': 'float', 'valence': 'float'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'arousal': Field(name='arousal',type='float',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'consolidation_weight': Field(name='consolidation_weight',type='float',d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'dopamine_phasic': Field(name='dopamine_phasic',type='float | None'...appingproxy({}),kw_only=False,_field_type=_FIELD), 'dopamine_tonic': Field(name='dopamine_tonic',type='float | None',...appingproxy({}),kw_only=False,_field_type=_FIELD), 'encoding_weight': Field(name='encoding_weight',type='float',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'global_tone': Field(name='global_tone',type='float',default=&lt;d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'phase': Field(name='phase',type='int',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD), 'plasticity_gate': Field(name='plasticity_gate',type='float',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'retrieval_weight': Field(name='retrieval_weight',type='float',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'valence': Field(name='valence',type='float',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('arousal', 'valence', 'global_tone', 'plasticity_gate', 'encoding_weight', 'consolidation_weight', 'retrieval_weight', 'phase', 'dopamine_tonic', 'dopamine_phasic')</dl>
+
+<dl><dt><strong>dopamine_phasic</strong> = None</dl>
+
+<dl><dt><strong>dopamine_tonic</strong> = None</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['GenesisClient', 'NeuroSummary']</td></tr></table>
+</body></html>

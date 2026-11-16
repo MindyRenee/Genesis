@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.genesis_client.exceptions</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.genesis_client.html" class="white">genesis_client</a>.exceptions</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/genesis_client/exceptions.py">/home/mindyrenee/GenAnd/Genesis/Self_World/genesis_client/exceptions.py</a></td></tr></table>
+    <p><span class="code">Exceptions&nbsp;for&nbsp;the&nbsp;Genesis&nbsp;client&nbsp;library.<br>
+&nbsp;<br>
+#&nbsp;Hierarchy<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#GenesisError">GenesisError</a>(<a href="builtins.html#Exception">Exception</a>)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;├──&nbsp;<a href="#ConnectionError">ConnectionError</a>(<a href="#GenesisError">GenesisError</a>,&nbsp;<a href="builtins.html#OSError">OSError</a>)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;└──&nbsp;<a href="#DaemonNotRunning">DaemonNotRunning</a>(<a href="#ConnectionError">ConnectionError</a>)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;├──&nbsp;<a href="#ProtocolError">ProtocolError</a>(<a href="#GenesisError">GenesisError</a>,&nbsp;<a href="builtins.html#OSError">OSError</a>)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;└──&nbsp;<a href="#EpisodeNotFound">EpisodeNotFound</a>(<a href="#GenesisError">GenesisError</a>,&nbsp;<a href="builtins.html#LookupError">LookupError</a>)<br>
+&nbsp;<br>
+Design&nbsp;principles:<br>
+&nbsp;<br>
+-&nbsp;**I/O&nbsp;errors&nbsp;inherit&nbsp;from&nbsp;``<a href="builtins.html#OSError">OSError</a>``**&nbsp;so&nbsp;that&nbsp;the&nbsp;pervasive<br>
+&nbsp;&nbsp;``except&nbsp;(<a href="builtins.html#OSError">OSError</a>,&nbsp;<a href="#ConnectionError">ConnectionError</a>)``&nbsp;clauses&nbsp;in&nbsp;the&nbsp;cognitive&nbsp;mind<br>
+&nbsp;&nbsp;catch&nbsp;them.&nbsp;&nbsp;The&nbsp;cognitive&nbsp;mind's&nbsp;background&nbsp;threads&nbsp;(inner&nbsp;life,<br>
+&nbsp;&nbsp;learner,&nbsp;regulator)&nbsp;all&nbsp;use&nbsp;this&nbsp;pattern&nbsp;to&nbsp;tolerate&nbsp;daemon<br>
+&nbsp;&nbsp;disconnects&nbsp;without&nbsp;crashing.<br>
+&nbsp;<br>
+-&nbsp;**``<a href="#DaemonNotRunning">DaemonNotRunning</a>``&nbsp;inherits&nbsp;from&nbsp;``<a href="#ConnectionError">ConnectionError</a>``**&nbsp;—&nbsp;it&nbsp;is<br>
+&nbsp;&nbsp;the&nbsp;most&nbsp;fundamental&nbsp;connection&nbsp;failure&nbsp;(the&nbsp;socket&nbsp;doesn't&nbsp;exist<br>
+&nbsp;&nbsp;because&nbsp;the&nbsp;daemon&nbsp;isn't&nbsp;running).&nbsp;&nbsp;This&nbsp;lets&nbsp;``genesis_cli.py``'s<br>
+&nbsp;&nbsp;``except&nbsp;(<a href="builtins.html#OSError">OSError</a>,&nbsp;<a href="#ConnectionError">ConnectionError</a>)``&nbsp;around&nbsp;``mind.start()``&nbsp;catch<br>
+&nbsp;&nbsp;it&nbsp;and&nbsp;print&nbsp;a&nbsp;clean&nbsp;error&nbsp;message&nbsp;instead&nbsp;of&nbsp;an&nbsp;unhandled<br>
+&nbsp;&nbsp;traceback.<br>
+&nbsp;<br>
+-&nbsp;**``<a href="#EpisodeNotFound">EpisodeNotFound</a>``&nbsp;inherits&nbsp;from&nbsp;``<a href="builtins.html#LookupError">LookupError</a>``**&nbsp;—&nbsp;the&nbsp;Python<br>
+&nbsp;&nbsp;convention&nbsp;for&nbsp;"key/index&nbsp;not&nbsp;found"&nbsp;errors&nbsp;(the&nbsp;same&nbsp;base&nbsp;as<br>
+&nbsp;&nbsp;``KeyError``&nbsp;and&nbsp;``IndexError``).&nbsp;&nbsp;This&nbsp;lets&nbsp;callers&nbsp;catch&nbsp;it&nbsp;with<br>
+&nbsp;&nbsp;``except&nbsp;<a href="builtins.html#LookupError">LookupError</a>``&nbsp;if&nbsp;they&nbsp;want&nbsp;to&nbsp;handle&nbsp;all&nbsp;not-found<br>
+&nbsp;&nbsp;conditions&nbsp;uniformly.<br>
+&nbsp;<br>
+-&nbsp;**``<a href="#ConnectionError">ConnectionError</a>``&nbsp;shadows&nbsp;the&nbsp;built-in.**&nbsp;&nbsp;This&nbsp;is&nbsp;deliberate:<br>
+&nbsp;&nbsp;the&nbsp;custom&nbsp;``<a href="#ConnectionError">ConnectionError</a>``&nbsp;inherits&nbsp;from&nbsp;``<a href="builtins.html#OSError">OSError</a>``,&nbsp;so<br>
+&nbsp;&nbsp;``except&nbsp;<a href="builtins.html#OSError">OSError</a>``&nbsp;catches&nbsp;both&nbsp;the&nbsp;custom&nbsp;and&nbsp;built-in&nbsp;variants.<br>
+&nbsp;&nbsp;``client.py``&nbsp;aliases&nbsp;the&nbsp;import&nbsp;as&nbsp;``GenesisConnectionError``&nbsp;to<br>
+&nbsp;&nbsp;keep&nbsp;the&nbsp;built-in&nbsp;``<a href="#ConnectionError">ConnectionError</a>``&nbsp;name&nbsp;available&nbsp;for&nbsp;catching<br>
+&nbsp;&nbsp;socket-level&nbsp;errors&nbsp;(``BrokenPipeError``,&nbsp;etc.)&nbsp;in&nbsp;the&nbsp;same<br>
+&nbsp;&nbsp;``except``&nbsp;clause.</span></p>
+<p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#Exception">builtins.Exception</a>(<a href="builtins.html#BaseException">builtins.BaseException</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.genesis_client.exceptions.html#GenesisError">GenesisError</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.genesis_client.exceptions.html#ConnectionError">ConnectionError</a>(<a href="Self_World.genesis_client.exceptions.html#GenesisError">GenesisError</a>, <a href="builtins.html#OSError">builtins.OSError</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.genesis_client.exceptions.html#DaemonNotRunning">DaemonNotRunning</a>
+</dt></dl>
+</dd>
+<dt class="heading-text"><a href="Self_World.genesis_client.exceptions.html#EpisodeNotFound">EpisodeNotFound</a>(<a href="Self_World.genesis_client.exceptions.html#GenesisError">GenesisError</a>, <a href="builtins.html#LookupError">builtins.LookupError</a>)
+</dt><dt class="heading-text"><a href="Self_World.genesis_client.exceptions.html#ProtocolError">ProtocolError</a>(<a href="Self_World.genesis_client.exceptions.html#GenesisError">GenesisError</a>, <a href="builtins.html#OSError">builtins.OSError</a>)
+</dt></dl>
+</dd>
+</dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ConnectionError">class <strong>ConnectionError</strong></a>(<a href="Self_World.genesis_client.exceptions.html#GenesisError">GenesisError</a>, <a href="builtins.html#OSError">builtins.OSError</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code">Failed&nbsp;to&nbsp;connect&nbsp;to&nbsp;the&nbsp;Genesis&nbsp;daemon.<br>
+&nbsp;<br>
+Inherits&nbsp;from&nbsp;both&nbsp;<a href="#GenesisError">GenesisError</a>&nbsp;and&nbsp;<a href="builtins.html#OSError">OSError</a>&nbsp;so&nbsp;that&nbsp;existing<br>
+`except&nbsp;(<a href="builtins.html#OSError">OSError</a>,&nbsp;<a href="#ConnectionError">ConnectionError</a>)`&nbsp;clauses&nbsp;in&nbsp;calling&nbsp;code<br>
+catch&nbsp;this&nbsp;custom&nbsp;exception&nbsp;correctly.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.genesis_client.exceptions.html#ConnectionError">ConnectionError</a></dd>
+<dd><a href="Self_World.genesis_client.exceptions.html#GenesisError">GenesisError</a></dd>
+<dd><a href="builtins.html#OSError">builtins.OSError</a></dd>
+<dd><a href="builtins.html#Exception">builtins.Exception</a></dd>
+<dd><a href="builtins.html#BaseException">builtins.BaseException</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Methods inherited from <a href="builtins.html#OSError">builtins.OSError</a>:<br>
+<dl><dt><a name="ConnectionError-__init__"><strong>__init__</strong></a>(self, /, *args, **kwargs)</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="ConnectionError-__reduce__"><strong>__reduce__</strong></a>(...)</dt><dd><span class="code">Helper&nbsp;for&nbsp;pickle.</span></dd></dl>
+
+<dl><dt><a name="ConnectionError-__str__"><strong>__str__</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;str(self).</span></dd></dl>
+
+<hr>
+Static methods inherited from <a href="builtins.html#OSError">builtins.OSError</a>:<br>
+<dl><dt><a name="ConnectionError-__new__"><strong>__new__</strong></a>(*args, **kwargs)<span class="grey"><span class="heading-text"> class method of <a href="builtins.html#OSError">builtins.OSError</a></span></span></dt><dd><span class="code">Create&nbsp;and&nbsp;return&nbsp;a&nbsp;new&nbsp;object.&nbsp;&nbsp;See&nbsp;help(type)&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="builtins.html#OSError">builtins.OSError</a>:<br>
+<dl><dt><strong>characters_written</strong></dt>
+</dl>
+<dl><dt><strong>errno</strong></dt>
+<dd><span class="code">POSIX&nbsp;exception&nbsp;code</span></dd>
+</dl>
+<dl><dt><strong>filename</strong></dt>
+<dd><span class="code">exception&nbsp;filename</span></dd>
+</dl>
+<dl><dt><strong>filename2</strong></dt>
+<dd><span class="code">second&nbsp;exception&nbsp;filename</span></dd>
+</dl>
+<dl><dt><strong>strerror</strong></dt>
+<dd><span class="code">exception&nbsp;strerror</span></dd>
+</dl>
+<hr>
+Methods inherited from <a href="builtins.html#BaseException">builtins.BaseException</a>:<br>
+<dl><dt><a name="ConnectionError-__delattr__"><strong>__delattr__</strong></a>(self, name, /)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="ConnectionError-__getattribute__"><strong>__getattribute__</strong></a>(self, name, /)</dt><dd><span class="code">Return&nbsp;getattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="ConnectionError-__repr__"><strong>__repr__</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="ConnectionError-__setattr__"><strong>__setattr__</strong></a>(self, name, value, /)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<dl><dt><a name="ConnectionError-__setstate__"><strong>__setstate__</strong></a>(...)</dt></dl>
+
+<dl><dt><a name="ConnectionError-add_note"><strong>add_note</strong></a>(...)</dt><dd><span class="code"><a href="builtins.html#Exception">Exception</a>.<a href="#ConnectionError-add_note">add_note</a>(note)&nbsp;--<br>
+add&nbsp;a&nbsp;note&nbsp;to&nbsp;the&nbsp;exception</span></dd></dl>
+
+<dl><dt><a name="ConnectionError-with_traceback"><strong>with_traceback</strong></a>(...)</dt><dd><span class="code"><a href="builtins.html#Exception">Exception</a>.<a href="#ConnectionError-with_traceback">with_traceback</a>(tb)&nbsp;--<br>
+set&nbsp;self.<strong>__traceback__</strong>&nbsp;to&nbsp;tb&nbsp;and&nbsp;return&nbsp;self.</span></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="builtins.html#BaseException">builtins.BaseException</a>:<br>
+<dl><dt><strong>__cause__</strong></dt>
+<dd><span class="code">exception&nbsp;cause</span></dd>
+</dl>
+<dl><dt><strong>__context__</strong></dt>
+<dd><span class="code">exception&nbsp;context</span></dd>
+</dl>
+<dl><dt><strong>__dict__</strong></dt>
+</dl>
+<dl><dt><strong>__suppress_context__</strong></dt>
+</dl>
+<dl><dt><strong>__traceback__</strong></dt>
+</dl>
+<dl><dt><strong>args</strong></dt>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="DaemonNotRunning">class <strong>DaemonNotRunning</strong></a>(<a href="Self_World.genesis_client.exceptions.html#ConnectionError">ConnectionError</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code">The&nbsp;daemon&nbsp;is&nbsp;not&nbsp;running&nbsp;or&nbsp;the&nbsp;socket&nbsp;doesn't&nbsp;exist.<br>
+&nbsp;<br>
+Inherits&nbsp;from&nbsp;``<a href="#ConnectionError">ConnectionError</a>``&nbsp;(and&nbsp;transitively&nbsp;from<br>
+``<a href="builtins.html#OSError">OSError</a>``)&nbsp;because&nbsp;it&nbsp;is&nbsp;the&nbsp;most&nbsp;fundamental&nbsp;connection<br>
+failure&nbsp;—&nbsp;the&nbsp;socket&nbsp;file&nbsp;doesn't&nbsp;exist&nbsp;because&nbsp;the&nbsp;daemon<br>
+process&nbsp;isn't&nbsp;running.&nbsp;&nbsp;This&nbsp;lets&nbsp;``except&nbsp;(<a href="builtins.html#OSError">OSError</a>,<br>
+<a href="#ConnectionError">ConnectionError</a>)``&nbsp;clauses&nbsp;catch&nbsp;it,&nbsp;which&nbsp;is&nbsp;critical&nbsp;for<br>
+``genesis_cli.py``'s&nbsp;startup&nbsp;error&nbsp;handling.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.genesis_client.exceptions.html#DaemonNotRunning">DaemonNotRunning</a></dd>
+<dd><a href="Self_World.genesis_client.exceptions.html#ConnectionError">ConnectionError</a></dd>
+<dd><a href="Self_World.genesis_client.exceptions.html#GenesisError">GenesisError</a></dd>
+<dd><a href="builtins.html#OSError">builtins.OSError</a></dd>
+<dd><a href="builtins.html#Exception">builtins.Exception</a></dd>
+<dd><a href="builtins.html#BaseException">builtins.BaseException</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Data descriptors inherited from <a href="Self_World.genesis_client.exceptions.html#ConnectionError">ConnectionError</a>:<br>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Methods inherited from <a href="builtins.html#OSError">builtins.OSError</a>:<br>
+<dl><dt><a name="DaemonNotRunning-__init__"><strong>__init__</strong></a>(self, /, *args, **kwargs)</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="DaemonNotRunning-__reduce__"><strong>__reduce__</strong></a>(...)</dt><dd><span class="code">Helper&nbsp;for&nbsp;pickle.</span></dd></dl>
+
+<dl><dt><a name="DaemonNotRunning-__str__"><strong>__str__</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;str(self).</span></dd></dl>
+
+<hr>
+Static methods inherited from <a href="builtins.html#OSError">builtins.OSError</a>:<br>
+<dl><dt><a name="DaemonNotRunning-__new__"><strong>__new__</strong></a>(*args, **kwargs)<span class="grey"><span class="heading-text"> class method of <a href="builtins.html#OSError">builtins.OSError</a></span></span></dt><dd><span class="code">Create&nbsp;and&nbsp;return&nbsp;a&nbsp;new&nbsp;object.&nbsp;&nbsp;See&nbsp;help(type)&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="builtins.html#OSError">builtins.OSError</a>:<br>
+<dl><dt><strong>characters_written</strong></dt>
+</dl>
+<dl><dt><strong>errno</strong></dt>
+<dd><span class="code">POSIX&nbsp;exception&nbsp;code</span></dd>
+</dl>
+<dl><dt><strong>filename</strong></dt>
+<dd><span class="code">exception&nbsp;filename</span></dd>
+</dl>
+<dl><dt><strong>filename2</strong></dt>
+<dd><span class="code">second&nbsp;exception&nbsp;filename</span></dd>
+</dl>
+<dl><dt><strong>strerror</strong></dt>
+<dd><span class="code">exception&nbsp;strerror</span></dd>
+</dl>
+<hr>
+Methods inherited from <a href="builtins.html#BaseException">builtins.BaseException</a>:<br>
+<dl><dt><a name="DaemonNotRunning-__delattr__"><strong>__delattr__</strong></a>(self, name, /)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="DaemonNotRunning-__getattribute__"><strong>__getattribute__</strong></a>(self, name, /)</dt><dd><span class="code">Return&nbsp;getattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="DaemonNotRunning-__repr__"><strong>__repr__</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="DaemonNotRunning-__setattr__"><strong>__setattr__</strong></a>(self, name, value, /)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<dl><dt><a name="DaemonNotRunning-__setstate__"><strong>__setstate__</strong></a>(...)</dt></dl>
+
+<dl><dt><a name="DaemonNotRunning-add_note"><strong>add_note</strong></a>(...)</dt><dd><span class="code"><a href="builtins.html#Exception">Exception</a>.<a href="#DaemonNotRunning-add_note">add_note</a>(note)&nbsp;--<br>
+add&nbsp;a&nbsp;note&nbsp;to&nbsp;the&nbsp;exception</span></dd></dl>
+
+<dl><dt><a name="DaemonNotRunning-with_traceback"><strong>with_traceback</strong></a>(...)</dt><dd><span class="code"><a href="builtins.html#Exception">Exception</a>.<a href="#DaemonNotRunning-with_traceback">with_traceback</a>(tb)&nbsp;--<br>
+set&nbsp;self.<strong>__traceback__</strong>&nbsp;to&nbsp;tb&nbsp;and&nbsp;return&nbsp;self.</span></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="builtins.html#BaseException">builtins.BaseException</a>:<br>
+<dl><dt><strong>__cause__</strong></dt>
+<dd><span class="code">exception&nbsp;cause</span></dd>
+</dl>
+<dl><dt><strong>__context__</strong></dt>
+<dd><span class="code">exception&nbsp;context</span></dd>
+</dl>
+<dl><dt><strong>__dict__</strong></dt>
+</dl>
+<dl><dt><strong>__suppress_context__</strong></dt>
+</dl>
+<dl><dt><strong>__traceback__</strong></dt>
+</dl>
+<dl><dt><strong>args</strong></dt>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="EpisodeNotFound">class <strong>EpisodeNotFound</strong></a>(<a href="Self_World.genesis_client.exceptions.html#GenesisError">GenesisError</a>, <a href="builtins.html#LookupError">builtins.LookupError</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code">The&nbsp;requested&nbsp;episode&nbsp;does&nbsp;not&nbsp;exist&nbsp;in&nbsp;LTM.<br>
+&nbsp;<br>
+Inherits&nbsp;from&nbsp;both&nbsp;<a href="#GenesisError">GenesisError</a>&nbsp;and&nbsp;<a href="builtins.html#LookupError">LookupError</a>&nbsp;so&nbsp;that&nbsp;callers<br>
+can&nbsp;catch&nbsp;it&nbsp;with&nbsp;either&nbsp;``except&nbsp;<a href="#GenesisError">GenesisError</a>``&nbsp;(for&nbsp;all&nbsp;Genesis<br>
+errors)&nbsp;or&nbsp;``except&nbsp;<a href="builtins.html#LookupError">LookupError</a>``&nbsp;(the&nbsp;Python&nbsp;convention&nbsp;for<br>
+"not&nbsp;found"&nbsp;errors,&nbsp;shared&nbsp;with&nbsp;``KeyError``&nbsp;and&nbsp;``IndexError``).<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.genesis_client.exceptions.html#EpisodeNotFound">EpisodeNotFound</a></dd>
+<dd><a href="Self_World.genesis_client.exceptions.html#GenesisError">GenesisError</a></dd>
+<dd><a href="builtins.html#LookupError">builtins.LookupError</a></dd>
+<dd><a href="builtins.html#Exception">builtins.Exception</a></dd>
+<dd><a href="builtins.html#BaseException">builtins.BaseException</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Data descriptors inherited from <a href="Self_World.genesis_client.exceptions.html#GenesisError">GenesisError</a>:<br>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Methods inherited from <a href="builtins.html#LookupError">builtins.LookupError</a>:<br>
+<dl><dt><a name="EpisodeNotFound-__init__"><strong>__init__</strong></a>(self, /, *args, **kwargs)</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<hr>
+Static methods inherited from <a href="builtins.html#LookupError">builtins.LookupError</a>:<br>
+<dl><dt><a name="EpisodeNotFound-__new__"><strong>__new__</strong></a>(*args, **kwargs)<span class="grey"><span class="heading-text"> class method of <a href="builtins.html#LookupError">builtins.LookupError</a></span></span></dt><dd><span class="code">Create&nbsp;and&nbsp;return&nbsp;a&nbsp;new&nbsp;object.&nbsp;&nbsp;See&nbsp;help(type)&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<hr>
+Methods inherited from <a href="builtins.html#BaseException">builtins.BaseException</a>:<br>
+<dl><dt><a name="EpisodeNotFound-__delattr__"><strong>__delattr__</strong></a>(self, name, /)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="EpisodeNotFound-__getattribute__"><strong>__getattribute__</strong></a>(self, name, /)</dt><dd><span class="code">Return&nbsp;getattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="EpisodeNotFound-__reduce__"><strong>__reduce__</strong></a>(...)</dt><dd><span class="code">Helper&nbsp;for&nbsp;pickle.</span></dd></dl>
+
+<dl><dt><a name="EpisodeNotFound-__repr__"><strong>__repr__</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="EpisodeNotFound-__setattr__"><strong>__setattr__</strong></a>(self, name, value, /)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<dl><dt><a name="EpisodeNotFound-__setstate__"><strong>__setstate__</strong></a>(...)</dt></dl>
+
+<dl><dt><a name="EpisodeNotFound-__str__"><strong>__str__</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;str(self).</span></dd></dl>
+
+<dl><dt><a name="EpisodeNotFound-add_note"><strong>add_note</strong></a>(...)</dt><dd><span class="code"><a href="builtins.html#Exception">Exception</a>.<a href="#EpisodeNotFound-add_note">add_note</a>(note)&nbsp;--<br>
+add&nbsp;a&nbsp;note&nbsp;to&nbsp;the&nbsp;exception</span></dd></dl>
+
+<dl><dt><a name="EpisodeNotFound-with_traceback"><strong>with_traceback</strong></a>(...)</dt><dd><span class="code"><a href="builtins.html#Exception">Exception</a>.<a href="#EpisodeNotFound-with_traceback">with_traceback</a>(tb)&nbsp;--<br>
+set&nbsp;self.<strong>__traceback__</strong>&nbsp;to&nbsp;tb&nbsp;and&nbsp;return&nbsp;self.</span></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="builtins.html#BaseException">builtins.BaseException</a>:<br>
+<dl><dt><strong>__cause__</strong></dt>
+<dd><span class="code">exception&nbsp;cause</span></dd>
+</dl>
+<dl><dt><strong>__context__</strong></dt>
+<dd><span class="code">exception&nbsp;context</span></dd>
+</dl>
+<dl><dt><strong>__dict__</strong></dt>
+</dl>
+<dl><dt><strong>__suppress_context__</strong></dt>
+</dl>
+<dl><dt><strong>__traceback__</strong></dt>
+</dl>
+<dl><dt><strong>args</strong></dt>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="GenesisError">class <strong>GenesisError</strong></a>(<a href="builtins.html#Exception">builtins.Exception</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code">Base&nbsp;exception&nbsp;for&nbsp;all&nbsp;Genesis&nbsp;client&nbsp;errors.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.genesis_client.exceptions.html#GenesisError">GenesisError</a></dd>
+<dd><a href="builtins.html#Exception">builtins.Exception</a></dd>
+<dd><a href="builtins.html#BaseException">builtins.BaseException</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Methods inherited from <a href="builtins.html#Exception">builtins.Exception</a>:<br>
+<dl><dt><a name="GenesisError-__init__"><strong>__init__</strong></a>(self, /, *args, **kwargs)</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<hr>
+Static methods inherited from <a href="builtins.html#Exception">builtins.Exception</a>:<br>
+<dl><dt><a name="GenesisError-__new__"><strong>__new__</strong></a>(*args, **kwargs)<span class="grey"><span class="heading-text"> class method of <a href="builtins.html#Exception">builtins.Exception</a></span></span></dt><dd><span class="code">Create&nbsp;and&nbsp;return&nbsp;a&nbsp;new&nbsp;object.&nbsp;&nbsp;See&nbsp;help(type)&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<hr>
+Methods inherited from <a href="builtins.html#BaseException">builtins.BaseException</a>:<br>
+<dl><dt><a name="GenesisError-__delattr__"><strong>__delattr__</strong></a>(self, name, /)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="GenesisError-__getattribute__"><strong>__getattribute__</strong></a>(self, name, /)</dt><dd><span class="code">Return&nbsp;getattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="GenesisError-__reduce__"><strong>__reduce__</strong></a>(...)</dt><dd><span class="code">Helper&nbsp;for&nbsp;pickle.</span></dd></dl>
+
+<dl><dt><a name="GenesisError-__repr__"><strong>__repr__</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="GenesisError-__setattr__"><strong>__setattr__</strong></a>(self, name, value, /)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<dl><dt><a name="GenesisError-__setstate__"><strong>__setstate__</strong></a>(...)</dt></dl>
+
+<dl><dt><a name="GenesisError-__str__"><strong>__str__</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;str(self).</span></dd></dl>
+
+<dl><dt><a name="GenesisError-add_note"><strong>add_note</strong></a>(...)</dt><dd><span class="code"><a href="builtins.html#Exception">Exception</a>.<a href="#GenesisError-add_note">add_note</a>(note)&nbsp;--<br>
+add&nbsp;a&nbsp;note&nbsp;to&nbsp;the&nbsp;exception</span></dd></dl>
+
+<dl><dt><a name="GenesisError-with_traceback"><strong>with_traceback</strong></a>(...)</dt><dd><span class="code"><a href="builtins.html#Exception">Exception</a>.<a href="#GenesisError-with_traceback">with_traceback</a>(tb)&nbsp;--<br>
+set&nbsp;self.<strong>__traceback__</strong>&nbsp;to&nbsp;tb&nbsp;and&nbsp;return&nbsp;self.</span></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="builtins.html#BaseException">builtins.BaseException</a>:<br>
+<dl><dt><strong>__cause__</strong></dt>
+<dd><span class="code">exception&nbsp;cause</span></dd>
+</dl>
+<dl><dt><strong>__context__</strong></dt>
+<dd><span class="code">exception&nbsp;context</span></dd>
+</dl>
+<dl><dt><strong>__dict__</strong></dt>
+</dl>
+<dl><dt><strong>__suppress_context__</strong></dt>
+</dl>
+<dl><dt><strong>__traceback__</strong></dt>
+</dl>
+<dl><dt><strong>args</strong></dt>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ProtocolError">class <strong>ProtocolError</strong></a>(<a href="Self_World.genesis_client.exceptions.html#GenesisError">GenesisError</a>, <a href="builtins.html#OSError">builtins.OSError</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code">Malformed&nbsp;message&nbsp;or&nbsp;unexpected&nbsp;response&nbsp;from&nbsp;the&nbsp;daemon.<br>
+&nbsp;<br>
+Inherits&nbsp;from&nbsp;both&nbsp;<a href="#GenesisError">GenesisError</a>&nbsp;and&nbsp;<a href="builtins.html#OSError">OSError</a>&nbsp;so&nbsp;that&nbsp;existing<br>
+``except&nbsp;(<a href="builtins.html#OSError">OSError</a>,&nbsp;<a href="#ConnectionError">ConnectionError</a>)``&nbsp;clauses&nbsp;in&nbsp;calling&nbsp;code<br>
+catch&nbsp;protocol&nbsp;errors&nbsp;correctly&nbsp;—&nbsp;a&nbsp;malformed&nbsp;or&nbsp;error&nbsp;response<br>
+from&nbsp;the&nbsp;daemon&nbsp;is&nbsp;an&nbsp;I/O-level&nbsp;failure,&nbsp;not&nbsp;a&nbsp;logic&nbsp;error&nbsp;the<br>
+caller&nbsp;should&nbsp;have&nbsp;to&nbsp;handle&nbsp;separately.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.genesis_client.exceptions.html#ProtocolError">ProtocolError</a></dd>
+<dd><a href="Self_World.genesis_client.exceptions.html#GenesisError">GenesisError</a></dd>
+<dd><a href="builtins.html#OSError">builtins.OSError</a></dd>
+<dd><a href="builtins.html#Exception">builtins.Exception</a></dd>
+<dd><a href="builtins.html#BaseException">builtins.BaseException</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Methods inherited from <a href="builtins.html#OSError">builtins.OSError</a>:<br>
+<dl><dt><a name="ProtocolError-__init__"><strong>__init__</strong></a>(self, /, *args, **kwargs)</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="ProtocolError-__reduce__"><strong>__reduce__</strong></a>(...)</dt><dd><span class="code">Helper&nbsp;for&nbsp;pickle.</span></dd></dl>
+
+<dl><dt><a name="ProtocolError-__str__"><strong>__str__</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;str(self).</span></dd></dl>
+
+<hr>
+Static methods inherited from <a href="builtins.html#OSError">builtins.OSError</a>:<br>
+<dl><dt><a name="ProtocolError-__new__"><strong>__new__</strong></a>(*args, **kwargs)<span class="grey"><span class="heading-text"> class method of <a href="builtins.html#OSError">builtins.OSError</a></span></span></dt><dd><span class="code">Create&nbsp;and&nbsp;return&nbsp;a&nbsp;new&nbsp;object.&nbsp;&nbsp;See&nbsp;help(type)&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="builtins.html#OSError">builtins.OSError</a>:<br>
+<dl><dt><strong>characters_written</strong></dt>
+</dl>
+<dl><dt><strong>errno</strong></dt>
+<dd><span class="code">POSIX&nbsp;exception&nbsp;code</span></dd>
+</dl>
+<dl><dt><strong>filename</strong></dt>
+<dd><span class="code">exception&nbsp;filename</span></dd>
+</dl>
+<dl><dt><strong>filename2</strong></dt>
+<dd><span class="code">second&nbsp;exception&nbsp;filename</span></dd>
+</dl>
+<dl><dt><strong>strerror</strong></dt>
+<dd><span class="code">exception&nbsp;strerror</span></dd>
+</dl>
+<hr>
+Methods inherited from <a href="builtins.html#BaseException">builtins.BaseException</a>:<br>
+<dl><dt><a name="ProtocolError-__delattr__"><strong>__delattr__</strong></a>(self, name, /)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="ProtocolError-__getattribute__"><strong>__getattribute__</strong></a>(self, name, /)</dt><dd><span class="code">Return&nbsp;getattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="ProtocolError-__repr__"><strong>__repr__</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="ProtocolError-__setattr__"><strong>__setattr__</strong></a>(self, name, value, /)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<dl><dt><a name="ProtocolError-__setstate__"><strong>__setstate__</strong></a>(...)</dt></dl>
+
+<dl><dt><a name="ProtocolError-add_note"><strong>add_note</strong></a>(...)</dt><dd><span class="code"><a href="builtins.html#Exception">Exception</a>.<a href="#ProtocolError-add_note">add_note</a>(note)&nbsp;--<br>
+add&nbsp;a&nbsp;note&nbsp;to&nbsp;the&nbsp;exception</span></dd></dl>
+
+<dl><dt><a name="ProtocolError-with_traceback"><strong>with_traceback</strong></a>(...)</dt><dd><span class="code"><a href="builtins.html#Exception">Exception</a>.<a href="#ProtocolError-with_traceback">with_traceback</a>(tb)&nbsp;--<br>
+set&nbsp;self.<strong>__traceback__</strong>&nbsp;to&nbsp;tb&nbsp;and&nbsp;return&nbsp;self.</span></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="builtins.html#BaseException">builtins.BaseException</a>:<br>
+<dl><dt><strong>__cause__</strong></dt>
+<dd><span class="code">exception&nbsp;cause</span></dd>
+</dl>
+<dl><dt><strong>__context__</strong></dt>
+<dd><span class="code">exception&nbsp;context</span></dd>
+</dl>
+<dl><dt><strong>__dict__</strong></dt>
+</dl>
+<dl><dt><strong>__suppress_context__</strong></dt>
+</dl>
+<dl><dt><strong>__traceback__</strong></dt>
+</dl>
+<dl><dt><strong>args</strong></dt>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['ConnectionError', 'DaemonNotRunning', 'EpisodeNotFound', 'GenesisError', 'ProtocolError']</td></tr></table>
+</body></html>

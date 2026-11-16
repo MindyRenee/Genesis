@@ -1,0 +1,42 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Active zones — what Genesis is cognitively attending to vs what its subcognitive is processing in the background, plus its emergent mental phase."><title>genesis::state::zones - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-203241e4.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="genesis" data-themes="" data-resource-suffix="" data-rustdoc-version="1.100.0 (0ef1bc386 2026-11-09)" data-channel="1.100.0" data-search-js="search-b167f383.js" data-stringdex-js="stringdex-b5109af9.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../../static.files/main-1814ead3.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-9f56287d.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module zones</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../genesis/index.html">genesis</a><span class="version">0.2.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module zones</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#modeling-note" title="Modeling note">Modeling note</a></li><li><a href="#two-independent-axes" title="Two independent axes">Two independent axes</a></li></ul><h3><a href="#modules">Module Items</a></h3><ul class="block"><li><a href="#modules" title="Modules">Modules</a></li><li><a href="#structs" title="Structs">Structs</a></li><li><a href="#enums" title="Enums">Enums</a></li><li><a href="#constants" title="Constants">Constants</a></li></ul></section><div id="rustdoc-modnav"><h2><a href="../index.html">In genesis::<wbr>state</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../index.html">genesis</a>::<wbr><a href="../index.html">state</a></div><h1>Module <span>zones</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/genesis/state/zones.rs.html#1-540">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Active zones — what Genesis is cognitively attending to vs what its
+subcognitive is processing in the background, plus its emergent
+mental phase.</p>
+<h3 id="modeling-note"><a class="doc-anchor" href="#modeling-note">§</a>Modeling note</h3>
+<p>The <code>NREM</code> and <code>REM</code> phases below are <strong>computational states</strong>
+assigned by neurochemical thresholds, not clinical sleep stages
+scored from EEG/EOG/EMG polysomnography. They are control modes —
+labels for regions of the neurochemical state space that gate
+background processing — not sleep architecture in the
+electrophysiological sense. Real NREM comprises N1–N3 stages with
+distinct slow-wave and spindle signatures, and real REM involves
+muscle atonia, rapid eye movements, and pontine-geniculate-
+occipital waves. The names are borrowed as analogues because the
+neurochemical profiles (low ACh + high GABA for NREM; high ACh +
+aminergic silence for REM) are inspired by those states, but the
+assignment is threshold-based, not signal-based.</p>
+<h2 id="two-independent-axes"><a class="doc-anchor" href="#two-independent-axes">§</a>Two independent axes</h2>
+<p>Genesis’s state has two orthogonal axes:</p>
+<ol>
+<li>
+<p><strong>Task zone</strong> (<a href="enum.CognitiveZone.html" title="enum genesis::state::zones::CognitiveZone"><code>CognitiveZone</code></a>) — what it’s <em>doing</em>. This is
+manually set when a task starts (e.g., it enters <code>Coding</code> when
+it begins writing code). It’s the “what” of cognition.</p>
+</li>
+<li>
+<p><strong>Mental phase</strong> (<a href="enum.MentalPhase.html" title="enum genesis::state::zones::MentalPhase"><code>MentalPhase</code></a>) — what mental state it’s <em>in</em>.
+This is not manually set — it <em>emerges</em> from the neurochemical
+dynamics. It doesn’t choose to be in “flow” — flow emerges when
+dopamine, ACh, and NE are high while cortisol is low. It’s the
+“how” of cognition.</p>
+</li>
+</ol>
+<p>These are independent: it can be coding while stressed, or coding
+while in flow. The task is the same; the mental state changes how
+it performs it.</p>
+</div></details><h2 id="modules" class="section-header">Modules<a href="#modules" class="anchor">§</a></h2><dl class="item-table"><dt><a class="mod" href="subcognitive_flag/index.html" title="mod genesis::state::zones::subcognitive_flag">subcognitive_<wbr>flag</a></dt><dd>Bitflags for subcognitive background processes.</dd></dl><h2 id="structs" class="section-header">Structs<a href="#structs" class="anchor">§</a></h2><dl class="item-table"><dt><a class="struct" href="struct.ActiveZones.html" title="struct genesis::state::zones::ActiveZones">Active<wbr>Zones</a></dt><dd>The active zone state — cognitive task, emergent mental phase, and
+subcognitive background processes.</dd><dt><a class="struct" href="struct.TransitionTally.html" title="struct genesis::state::zones::TransitionTally">Transition<wbr>Tally</a></dt><dd>Transition counts and accumulated dwell time, per state index.</dd></dl><h2 id="enums" class="section-header">Enums<a href="#enums" class="anchor">§</a></h2><dl class="item-table"><dt><a class="enum" href="enum.CognitiveZone.html" title="enum genesis::state::zones::CognitiveZone">Cognitive<wbr>Zone</a></dt><dd>What Genesis is cognitively focused on right now.</dd><dt><a class="enum" href="enum.MentalPhase.html" title="enum genesis::state::zones::MentalPhase">Mental<wbr>Phase</a></dt><dd>Genesis’s emergent mental phase — its qualitative state of mind.</dd></dl><h2 id="constants" class="section-header">Constants<a href="#constants" class="anchor">§</a></h2><dl class="item-table"><dt><a class="constant" href="constant.MAX_SUBCOGNITIVE_TASKS.html" title="constant genesis::state::zones::MAX_SUBCOGNITIVE_TASKS">MAX_<wbr>SUBCOGNITIVE_<wbr>TASKS</a></dt><dd>Maximum number of subcognitive task IDs tracked in the state struct.</dd><dt><a class="constant" href="constant.TRACKED_STATES.html" title="constant genesis::state::zones::TRACKED_STATES">TRACKED_<wbr>STATES</a></dt><dd>How many distinct zones/phases are tracked. Sized to the wider of
+the two enums: <code>CognitiveZone</code> runs to <code>Sleeping = 8</code>, so nine slots
+are needed; <code>MentalPhase</code> tops out at <code>Overwhelmed = 7</code> and leaves
+index 8 unused. An index beyond this is ignored rather than
+panicking, since a new variant must not be able to fault the
+telemetry path.</dd></dl></section></div></main></body></html>

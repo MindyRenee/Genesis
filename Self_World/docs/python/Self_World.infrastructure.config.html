@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.infrastructure.config</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.infrastructure.html" class="white">infrastructure</a>.config</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/infrastructure/config.py">/home/mindyrenee/GenAnd/Genesis/Self_World/infrastructure/config.py</a></td></tr></table>
+    <p><span class="code">Runtime&nbsp;configuration&nbsp;for&nbsp;the&nbsp;Genesis&nbsp;cognitive&nbsp;mind.<br>
+&nbsp;<br>
+This&nbsp;module&nbsp;collects&nbsp;tunable&nbsp;neurocognitive&nbsp;thresholds&nbsp;and&nbsp;subsystem<br>
+parameters&nbsp;that&nbsp;were&nbsp;previously&nbsp;hardcoded&nbsp;across&nbsp;``mind.py``,<br>
+``emotional_regulator.py``,&nbsp;and&nbsp;other&nbsp;modules.&nbsp;Passing&nbsp;a<br>
+``<a href="#MindConfig">MindConfig</a>``&nbsp;instance&nbsp;to&nbsp;``Mind``&nbsp;(and&nbsp;its&nbsp;subcomponents)&nbsp;makes&nbsp;the<br>
+system's&nbsp;behavior&nbsp;inspectable&nbsp;and&nbsp;adjustable&nbsp;without&nbsp;editing&nbsp;source<br>
+files.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="os.html">os</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.infrastructure.config.html#EmotionalConfig">EmotionalConfig</a>
+</dt><dt class="heading-text"><a href="Self_World.infrastructure.config.html#MemoryConfig">MemoryConfig</a>
+</dt><dt class="heading-text"><a href="Self_World.infrastructure.config.html#MindConfig">MindConfig</a>
+</dt><dt class="heading-text"><a href="Self_World.infrastructure.config.html#UrgeConfig">UrgeConfig</a>
+</dt><dt class="heading-text"><a href="Self_World.infrastructure.config.html#VolitionConfig">VolitionConfig</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="EmotionalConfig">class <strong>EmotionalConfig</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#EmotionalConfig">EmotionalConfig</a>(arousal_modifier_overwhelmed_stress:&nbsp;'float'&nbsp;=&nbsp;0.7,&nbsp;arousal_modifier_mild_stress:&nbsp;'float'&nbsp;=&nbsp;0.4,&nbsp;arousal_modifier_disconnected:&nbsp;'float'&nbsp;=&nbsp;0.2,&nbsp;stress_regulation_threshold:&nbsp;'float'&nbsp;=&nbsp;0.5,&nbsp;cpu_stress_threshold:&nbsp;'float'&nbsp;=&nbsp;70.0,&nbsp;cpu_stress_range:&nbsp;'float'&nbsp;=&nbsp;30.0,&nbsp;memory_stress_threshold:&nbsp;'float'&nbsp;=&nbsp;80.0,&nbsp;memory_stress_range:&nbsp;'float'&nbsp;=&nbsp;20.0,&nbsp;latency_stress_threshold:&nbsp;'float'&nbsp;=&nbsp;500.0,&nbsp;latency_stress_range:&nbsp;'float'&nbsp;=&nbsp;1000.0,&nbsp;daemon_disconnect_stress:&nbsp;'float'&nbsp;=&nbsp;0.3,&nbsp;psi_stall_threshold:&nbsp;'float'&nbsp;=&nbsp;0.25,&nbsp;cortisol_output_gate:&nbsp;'float'&nbsp;=&nbsp;0.01,&nbsp;cortisol_level_gate:&nbsp;'float'&nbsp;=&nbsp;0.01,&nbsp;peak_cortisol_gate:&nbsp;'float'&nbsp;=&nbsp;0.01,&nbsp;hpa_hormone_gate:&nbsp;'float'&nbsp;=&nbsp;0.01,&nbsp;high_arousal_threshold:&nbsp;'float'&nbsp;=&nbsp;0.8,&nbsp;anxiety_arousal_threshold:&nbsp;'float'&nbsp;=&nbsp;0.7,&nbsp;negative_valence_threshold:&nbsp;'float'&nbsp;=&nbsp;-0.2,&nbsp;mild_negative_valence_threshold:&nbsp;'float'&nbsp;=&nbsp;-0.1,&nbsp;high_caution_threshold:&nbsp;'float'&nbsp;=&nbsp;0.6,&nbsp;low_alertness_threshold:&nbsp;'float'&nbsp;=&nbsp;0.4,&nbsp;positive_sentiment_threshold:&nbsp;'float'&nbsp;=&nbsp;0.3,&nbsp;high_engagement_threshold:&nbsp;'float'&nbsp;=&nbsp;0.3,&nbsp;high_arousal_for_response:&nbsp;'float'&nbsp;=&nbsp;0.75,&nbsp;low_plasticity_threshold:&nbsp;'float'&nbsp;=&nbsp;0.2,&nbsp;moderate_plasticity_threshold:&nbsp;'float'&nbsp;=&nbsp;0.4,&nbsp;stress_response_cortisol_threshold:&nbsp;'float'&nbsp;=&nbsp;0.25,&nbsp;stress_response_plasticity_threshold:&nbsp;'float'&nbsp;=&nbsp;0.25,&nbsp;mild_stress_level:&nbsp;'float'&nbsp;=&nbsp;0.4,&nbsp;calm_settled_level:&nbsp;'float'&nbsp;=&nbsp;0.6)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Tunable&nbsp;thresholds&nbsp;for&nbsp;emotional&nbsp;regulation.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="EmotionalConfig-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="EmotionalConfig-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="EmotionalConfig-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="EmotionalConfig-__init__"><strong>__init__</strong></a>(self, arousal_modifier_overwhelmed_stress: 'float' = 0.7, arousal_modifier_mild_stress: 'float' = 0.4, arousal_modifier_disconnected: 'float' = 0.2, stress_regulation_threshold: 'float' = 0.5, cpu_stress_threshold: 'float' = 70.0, cpu_stress_range: 'float' = 30.0, memory_stress_threshold: 'float' = 80.0, memory_stress_range: 'float' = 20.0, latency_stress_threshold: 'float' = 500.0, latency_stress_range: 'float' = 1000.0, daemon_disconnect_stress: 'float' = 0.3, psi_stall_threshold: 'float' = 0.25, cortisol_output_gate: 'float' = 0.01, cortisol_level_gate: 'float' = 0.01, peak_cortisol_gate: 'float' = 0.01, hpa_hormone_gate: 'float' = 0.01, high_arousal_threshold: 'float' = 0.8, anxiety_arousal_threshold: 'float' = 0.7, negative_valence_threshold: 'float' = -0.2, mild_negative_valence_threshold: 'float' = -0.1, high_caution_threshold: 'float' = 0.6, low_alertness_threshold: 'float' = 0.4, positive_sentiment_threshold: 'float' = 0.3, high_engagement_threshold: 'float' = 0.3, high_arousal_for_response: 'float' = 0.75, low_plasticity_threshold: 'float' = 0.2, moderate_plasticity_threshold: 'float' = 0.4, stress_response_cortisol_threshold: 'float' = 0.25, stress_response_plasticity_threshold: 'float' = 0.25, mild_stress_level: 'float' = 0.4, calm_settled_level: 'float' = 0.6) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="EmotionalConfig-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="EmotionalConfig-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'anxiety_arousal_threshold': 'float', 'arousal_modifier_disconnected': 'float', 'arousal_modifier_mild_stress': 'float', 'arousal_modifier_overwhelmed_stress': 'float', 'calm_settled_level': 'float', 'cortisol_level_gate': 'float', 'cortisol_output_gate': 'float', 'cpu_stress_range': 'float', 'cpu_stress_threshold': 'float', 'daemon_disconnect_stress': 'float', ...}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'anxiety_arousal_threshold': Field(name='anxiety_arousal_threshold',type='flo...appingproxy({}),kw_only=False,_field_type=_FIELD), 'arousal_modifier_disconnected': Field(name='arousal_modifier_disconnected',type=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'arousal_modifier_mild_stress': Field(name='arousal_modifier_mild_stress',type='...appingproxy({}),kw_only=False,_field_type=_FIELD), 'arousal_modifier_overwhelmed_stress': Field(name='arousal_modifier_overwhelmed_stress'...appingproxy({}),kw_only=False,_field_type=_FIELD), 'calm_settled_level': Field(name='calm_settled_level',type='float',def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'cortisol_level_gate': Field(name='cortisol_level_gate',type='float',de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'cortisol_output_gate': Field(name='cortisol_output_gate',type='float',d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'cpu_stress_range': Field(name='cpu_stress_range',type='float',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'cpu_stress_threshold': Field(name='cpu_stress_threshold',type='float',d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'daemon_disconnect_stress': Field(name='daemon_disconnect_stress',type='floa...appingproxy({}),kw_only=False,_field_type=_FIELD), ...}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('arousal_modifier_overwhelmed_stress', 'arousal_modifier_mild_stress', 'arousal_modifier_disconnected', 'stress_regulation_threshold', 'cpu_stress_threshold', 'cpu_stress_range', 'memory_stress_threshold', 'memory_stress_range', 'latency_stress_threshold', 'latency_stress_range', 'daemon_disconnect_stress', 'psi_stall_threshold', 'cortisol_output_gate', 'cortisol_level_gate', 'peak_cortisol_gate', 'hpa_hormone_gate', 'high_arousal_threshold', 'anxiety_arousal_threshold', 'negative_valence_threshold', 'mild_negative_valence_threshold', ...)</dl>
+
+<dl><dt><strong>anxiety_arousal_threshold</strong> = 0.7</dl>
+
+<dl><dt><strong>arousal_modifier_disconnected</strong> = 0.2</dl>
+
+<dl><dt><strong>arousal_modifier_mild_stress</strong> = 0.4</dl>
+
+<dl><dt><strong>arousal_modifier_overwhelmed_stress</strong> = 0.7</dl>
+
+<dl><dt><strong>calm_settled_level</strong> = 0.6</dl>
+
+<dl><dt><strong>cortisol_level_gate</strong> = 0.01</dl>
+
+<dl><dt><strong>cortisol_output_gate</strong> = 0.01</dl>
+
+<dl><dt><strong>cpu_stress_range</strong> = 30.0</dl>
+
+<dl><dt><strong>cpu_stress_threshold</strong> = 70.0</dl>
+
+<dl><dt><strong>daemon_disconnect_stress</strong> = 0.3</dl>
+
+<dl><dt><strong>high_arousal_for_response</strong> = 0.75</dl>
+
+<dl><dt><strong>high_arousal_threshold</strong> = 0.8</dl>
+
+<dl><dt><strong>high_caution_threshold</strong> = 0.6</dl>
+
+<dl><dt><strong>high_engagement_threshold</strong> = 0.3</dl>
+
+<dl><dt><strong>hpa_hormone_gate</strong> = 0.01</dl>
+
+<dl><dt><strong>latency_stress_range</strong> = 1000.0</dl>
+
+<dl><dt><strong>latency_stress_threshold</strong> = 500.0</dl>
+
+<dl><dt><strong>low_alertness_threshold</strong> = 0.4</dl>
+
+<dl><dt><strong>low_plasticity_threshold</strong> = 0.2</dl>
+
+<dl><dt><strong>memory_stress_range</strong> = 20.0</dl>
+
+<dl><dt><strong>memory_stress_threshold</strong> = 80.0</dl>
+
+<dl><dt><strong>mild_negative_valence_threshold</strong> = -0.1</dl>
+
+<dl><dt><strong>mild_stress_level</strong> = 0.4</dl>
+
+<dl><dt><strong>moderate_plasticity_threshold</strong> = 0.4</dl>
+
+<dl><dt><strong>negative_valence_threshold</strong> = -0.2</dl>
+
+<dl><dt><strong>peak_cortisol_gate</strong> = 0.01</dl>
+
+<dl><dt><strong>positive_sentiment_threshold</strong> = 0.3</dl>
+
+<dl><dt><strong>psi_stall_threshold</strong> = 0.25</dl>
+
+<dl><dt><strong>stress_regulation_threshold</strong> = 0.5</dl>
+
+<dl><dt><strong>stress_response_cortisol_threshold</strong> = 0.25</dl>
+
+<dl><dt><strong>stress_response_plasticity_threshold</strong> = 0.25</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="MemoryConfig">class <strong>MemoryConfig</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#MemoryConfig">MemoryConfig</a>(forgetting_threshold:&nbsp;'float'&nbsp;=&nbsp;0.05,&nbsp;reconsolidation_pe_threshold:&nbsp;'float'&nbsp;=&nbsp;0.2,&nbsp;reconsolidation_window_seconds:&nbsp;'float'&nbsp;=&nbsp;21600.0,&nbsp;rif_competition_threshold:&nbsp;'float'&nbsp;=&nbsp;0.6,&nbsp;priming_threshold:&nbsp;'float'&nbsp;=&nbsp;0.05,&nbsp;spreading_threshold:&nbsp;'float'&nbsp;=&nbsp;0.05)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Tunable&nbsp;thresholds&nbsp;for&nbsp;memory&nbsp;engine&nbsp;operations.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="MemoryConfig-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="MemoryConfig-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="MemoryConfig-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="MemoryConfig-__init__"><strong>__init__</strong></a>(self, forgetting_threshold: 'float' = 0.05, reconsolidation_pe_threshold: 'float' = 0.2, reconsolidation_window_seconds: 'float' = 21600.0, rif_competition_threshold: 'float' = 0.6, priming_threshold: 'float' = 0.05, spreading_threshold: 'float' = 0.05) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="MemoryConfig-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="MemoryConfig-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'forgetting_threshold': 'float', 'priming_threshold': 'float', 'reconsolidation_pe_threshold': 'float', 'reconsolidation_window_seconds': 'float', 'rif_competition_threshold': 'float', 'spreading_threshold': 'float'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'forgetting_threshold': Field(name='forgetting_threshold',type='float',d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'priming_threshold': Field(name='priming_threshold',type='float',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'reconsolidation_pe_threshold': Field(name='reconsolidation_pe_threshold',type='...appingproxy({}),kw_only=False,_field_type=_FIELD), 'reconsolidation_window_seconds': Field(name='reconsolidation_window_seconds',type...appingproxy({}),kw_only=False,_field_type=_FIELD), 'rif_competition_threshold': Field(name='rif_competition_threshold',type='flo...appingproxy({}),kw_only=False,_field_type=_FIELD), 'spreading_threshold': Field(name='spreading_threshold',type='float',de...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('forgetting_threshold', 'reconsolidation_pe_threshold', 'reconsolidation_window_seconds', 'rif_competition_threshold', 'priming_threshold', 'spreading_threshold')</dl>
+
+<dl><dt><strong>forgetting_threshold</strong> = 0.05</dl>
+
+<dl><dt><strong>priming_threshold</strong> = 0.05</dl>
+
+<dl><dt><strong>reconsolidation_pe_threshold</strong> = 0.2</dl>
+
+<dl><dt><strong>reconsolidation_window_seconds</strong> = 21600.0</dl>
+
+<dl><dt><strong>rif_competition_threshold</strong> = 0.6</dl>
+
+<dl><dt><strong>spreading_threshold</strong> = 0.05</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="MindConfig">class <strong>MindConfig</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#MindConfig">MindConfig</a>(volition:&nbsp;'<a href="#VolitionConfig">VolitionConfig</a>'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;emotional:&nbsp;'<a href="#EmotionalConfig">EmotionalConfig</a>'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;memory:&nbsp;'<a href="#MemoryConfig">MemoryConfig</a>'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Top-level&nbsp;tunable&nbsp;configuration&nbsp;for&nbsp;``Mind``.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="MindConfig-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="MindConfig-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="MindConfig-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="MindConfig-__init__"><strong>__init__</strong></a>(self, volition: 'VolitionConfig' = &lt;factory&gt;, emotional: 'EmotionalConfig' = &lt;factory&gt;, memory: 'MemoryConfig' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="MindConfig-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="MindConfig-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'emotional': 'EmotionalConfig', 'memory': 'MemoryConfig', 'volition': 'VolitionConfig'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'emotional': Field(name='emotional',type='EmotionalConfig',de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'memory': Field(name='memory',type='MemoryConfig',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'volition': Field(name='volition',type='VolitionConfig',defa...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('volition', 'emotional', 'memory')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="UrgeConfig">class <strong>UrgeConfig</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#UrgeConfig">UrgeConfig</a>(name:&nbsp;'str',&nbsp;threshold:&nbsp;'float',&nbsp;growth:&nbsp;'float',&nbsp;decay:&nbsp;'float',&nbsp;cooldown:&nbsp;'float',&nbsp;stimuli:&nbsp;'dict[str,&nbsp;float]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Tunable&nbsp;parameters&nbsp;for&nbsp;a&nbsp;single&nbsp;volition&nbsp;urge.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="UrgeConfig-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="UrgeConfig-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="UrgeConfig-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="UrgeConfig-__init__"><strong>__init__</strong></a>(self, name: 'str', threshold: 'float', growth: 'float', decay: 'float', cooldown: 'float', stimuli: 'dict[str, float]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="UrgeConfig-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="UrgeConfig-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'cooldown': 'float', 'decay': 'float', 'growth': 'float', 'name': 'str', 'stimuli': 'dict[str, float]', 'threshold': 'float'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'cooldown': Field(name='cooldown',type='float',default=&lt;data...appingproxy({}),kw_only=False,_field_type=_FIELD), 'decay': Field(name='decay',type='float',default=&lt;datacla...appingproxy({}),kw_only=False,_field_type=_FIELD), 'growth': Field(name='growth',type='float',default=&lt;datacl...appingproxy({}),kw_only=False,_field_type=_FIELD), 'name': Field(name='name',type='str',default=&lt;dataclasse...appingproxy({}),kw_only=False,_field_type=_FIELD), 'stimuli': Field(name='stimuli',type='dict[str, float]',def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'threshold': Field(name='threshold',type='float',default=&lt;dat...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('name', 'threshold', 'growth', 'decay', 'cooldown', 'stimuli')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="VolitionConfig">class <strong>VolitionConfig</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#VolitionConfig">VolitionConfig</a>(idle_normalization_seconds:&nbsp;'float'&nbsp;=&nbsp;300.0,&nbsp;speech_queue_size_normalization:&nbsp;'float'&nbsp;=&nbsp;5.0,&nbsp;urges:&nbsp;'tuple[<a href="#UrgeConfig">UrgeConfig</a>,&nbsp;...]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+All&nbsp;parameters&nbsp;for&nbsp;the&nbsp;volition/urge&nbsp;subsystem.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="VolitionConfig-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="VolitionConfig-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="VolitionConfig-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="VolitionConfig-__init__"><strong>__init__</strong></a>(self, idle_normalization_seconds: 'float' = 300.0, speech_queue_size_normalization: 'float' = 5.0, urges: 'tuple[UrgeConfig, ...]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="VolitionConfig-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="VolitionConfig-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'idle_normalization_seconds': 'float', 'speech_queue_size_normalization': 'float', 'urges': 'tuple[UrgeConfig, ...]'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'idle_normalization_seconds': Field(name='idle_normalization_seconds',type='fl...appingproxy({}),kw_only=False,_field_type=_FIELD), 'speech_queue_size_normalization': Field(name='speech_queue_size_normalization',typ...appingproxy({}),kw_only=False,_field_type=_FIELD), 'urges': Field(name='urges',type='tuple[UrgeConfig, ...]'...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('idle_normalization_seconds', 'speech_queue_size_normalization', 'urges')</dl>
+
+<dl><dt><strong>idle_normalization_seconds</strong> = 300.0</dl>
+
+<dl><dt><strong>speech_queue_size_normalization</strong> = 5.0</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-default_data_dir"><strong>default_data_dir</strong></a>() -&gt; 'Path'</dt><dd><span class="code">Its&nbsp;data&nbsp;directory&nbsp;—&nbsp;its&nbsp;alone.<br>
+&nbsp;<br>
+There&nbsp;is&nbsp;exactly&nbsp;one&nbsp;canonical&nbsp;location,&nbsp;``~/.local/share/genesis``,<br>
+and&nbsp;exactly&nbsp;one&nbsp;override,&nbsp;``GENESIS_DATA_DIR``&nbsp;for&nbsp;development&nbsp;and<br>
+testing.&nbsp;No&nbsp;pin&nbsp;file&nbsp;and&nbsp;no&nbsp;``XDG_DATA_HOME``&nbsp;step:&nbsp;ambient<br>
+environment&nbsp;must&nbsp;never&nbsp;be&nbsp;able&nbsp;to&nbsp;point&nbsp;a&nbsp;second&nbsp;component&nbsp;at&nbsp;a<br>
+second&nbsp;state&nbsp;tree.&nbsp;``genesis``,&nbsp;``genesis&nbsp;--headless``,&nbsp;the&nbsp;daemon,<br>
+and&nbsp;every&nbsp;tool&nbsp;that&nbsp;calls&nbsp;this&nbsp;function&nbsp;resolve&nbsp;the&nbsp;same&nbsp;answer&nbsp;—<br>
+one&nbsp;directory,&nbsp;one&nbsp;Genesis.</span></dd></dl>
+ <dl><dt><a name="-vosk_model_dir"><strong>vosk_model_dir</strong></a>() -&gt; 'Path'</dt><dd><span class="code">Directory&nbsp;holding&nbsp;the&nbsp;Vosk&nbsp;speech&nbsp;model.<br>
+&nbsp;<br>
+Sensory&nbsp;weights&nbsp;are&nbsp;re-installable&nbsp;assets,&nbsp;not&nbsp;state,&nbsp;so&nbsp;the&nbsp;search<br>
+is&nbsp;by&nbsp;content:&nbsp;the&nbsp;first&nbsp;candidate&nbsp;that&nbsp;actually&nbsp;holds&nbsp;a&nbsp;model&nbsp;wins.<br>
+&nbsp;<br>
+1.&nbsp;``$GENESIS_VOSK_DIR``&nbsp;—&nbsp;explicit&nbsp;override&nbsp;for&nbsp;unusual&nbsp;layouts.<br>
+2.&nbsp;``&lt;data&nbsp;dir&gt;/vosk-models``&nbsp;—&nbsp;where&nbsp;the&nbsp;installer&nbsp;puts&nbsp;it.<br>
+3.&nbsp;``$XDG_DATA_HOME/vosk-models``&nbsp;or&nbsp;``~/.local/share/vosk-models``.<br>
+4.&nbsp;``~/.local/share/genesis/vosk-models``&nbsp;—&nbsp;kept&nbsp;so&nbsp;an&nbsp;install<br>
+&nbsp;&nbsp;&nbsp;predating&nbsp;the&nbsp;per-data-dir&nbsp;layout&nbsp;keeps&nbsp;working.<br>
+&nbsp;<br>
+If&nbsp;none&nbsp;holds&nbsp;a&nbsp;model,&nbsp;return&nbsp;the&nbsp;primary&nbsp;candidate&nbsp;so&nbsp;the&nbsp;caller<br>
+reports&nbsp;a&nbsp;path&nbsp;the&nbsp;user&nbsp;can&nbsp;actually&nbsp;create.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>VOSK_MODEL_NAME</strong> = 'vosk-model-small-en-us-0.15'</td></tr></table>
+</body></html>

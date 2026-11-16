@@ -1,0 +1,32 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Compute a compact 4-element emotional tag from the full 12-element tag."><title>expand_emotional_tag in genesis::daemon::consolidation - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-203241e4.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="genesis" data-themes="" data-resource-suffix="" data-rustdoc-version="1.100.0 (0ef1bc386 2026-11-09)" data-channel="1.100.0" data-search-js="search-b167f383.js" data-stringdex-js="stringdex-b5109af9.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../../static.files/main-1814ead3.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-9f56287d.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc fn"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">expand_emotional_tag</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../genesis/index.html">genesis</a><span class="version">0.2.0</span></h2></div><div class="sidebar-elems"><div id="rustdoc-modnav"><h2><a href="index.html">In genesis::<wbr>daemon::<wbr>consolidation</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../index.html">genesis</a>::<wbr><a href="../index.html">daemon</a>::<wbr><a href="index.html">consolidation</a></div><h1>Function <span class="fn">expand_<wbr>emotional_<wbr>tag</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/genesis/daemon/consolidation.rs.html#251-256">Source</a> </span></div><pre class="rust item-decl"><code>pub fn expand_emotional_tag(tag: &amp;[<a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.array.html">12</a>]) -&gt; [<a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.array.html">12</a>]</code></pre><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Compute a compact 4-element emotional tag from the full 12-element tag.</p>
+<p>[arousal, valence, cortisol, dopamine] — the four dimensions that
+most influence memory retrieval and behaviour.</p>
+<p>The arousal and valence formulas here <strong>must match</strong> the corrected
+formulas in <code>NeurochemicalVector::recompute_derived</code> (see
+<code>state/neurochemical.rs</code>). They were previously out of sync — the
+compact tag used the deprecated equations that the neurobiology
+audit corrected (see AGENTS.md). This caused every consolidated
+LTM episode to carry inaccurate arousal/valence metadata.</p>
+<p>The emotional tag only stores 12 chemicals (the original v2 set).
+The 6 chemicals added in v3 (endocannabinoid, vasopressin, CRH,
+orexin, epinephrine, melatonin) are not in the tag, so we use
+their genetic default values. This means the compact tag’s
+arousal/valence are approximate for episodes encoded with non-
+default levels of the 6 new chemicals. The approximation error
+is small for typical operation (the 6 new chemicals are usually
+near their defaults) but could be significant during extreme
+states (e.g., very high orexin during prolonged wakefulness).</p>
+<p>The bistable flip-flop hysteresis in <code>recompute_derived</code> requires
+the previous arousal value, which is not available from a static
+emotional tag. We use the non-hysteretic formula (no ±0.10 bias),
+which gives the “neutral” arousal — the value the system would
+converge to if it had no memory of its previous state.
+Expand a 12-element emotional tag (the STM/IPC wire format) into
+the full <code>LTM_EMOTIONAL_TAG_SIZE</code>-element tag used by <code>LtmStore::store</code>.</p>
+<p>The STM ring buffer and the IPC wire format carry 12 effective levels
+(the original v2 chemical set). <code>LtmStore</code> stores
+<code>LTM_EMOTIONAL_TAG_SIZE</code> elements (currently also 12, but the store
+is the authority on the on-disk width). This helper centralises the
+expansion so that both the consolidation engine and the direct
+<code>STORE_EPISODE</code> IPC path produce identical LTM payloads.</p>
+</div></details></section></div></main></body></html>

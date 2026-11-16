@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.limbic_system.amygdala</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.limbic_system.html" class="white">limbic_system</a>.amygdala</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/limbic_system/amygdala.py">/home/mindyrenee/GenAnd/Genesis/Self_World/limbic_system/amygdala.py</a></td></tr></table>
+    <p><span class="code"><a href="#Amygdala">Amygdala</a>&nbsp;—&nbsp;the&nbsp;organ.&nbsp;A&nbsp;container&nbsp;for&nbsp;conditioned&nbsp;value.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;structure&nbsp;only:&nbsp;the&nbsp;fields&nbsp;a&nbsp;signed-value&nbsp;associative<br>
+learner&nbsp;must&nbsp;hold,&nbsp;with&nbsp;no&nbsp;behavior&nbsp;attached.&nbsp;The&nbsp;math&nbsp;that&nbsp;animates<br>
+it&nbsp;—&nbsp;Rescorla-Wagner&nbsp;acquisition,&nbsp;Pearce-Hall&nbsp;associability,<br>
+context-keyed&nbsp;ITC&nbsp;extinction&nbsp;—&nbsp;is&nbsp;documented&nbsp;here&nbsp;so&nbsp;whoever&nbsp;wires<br>
+the&nbsp;functions&nbsp;later&nbsp;knows&nbsp;what&nbsp;each&nbsp;field&nbsp;is&nbsp;FOR:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;δa&nbsp;=&nbsp;λa&nbsp;−&nbsp;net_a&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;net_a&nbsp;=&nbsp;Va[cs]&nbsp;−&nbsp;w_e&nbsp;·&nbsp;Ea[ctx][cs]<br>
+&nbsp;&nbsp;&nbsp;&nbsp;δr&nbsp;=&nbsp;λr&nbsp;−&nbsp;net_r&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;net_r&nbsp;=&nbsp;Vr[cs]&nbsp;−&nbsp;w_e&nbsp;·&nbsp;Er[ctx][cs]<br>
+&nbsp;&nbsp;&nbsp;&nbsp;λa&nbsp;=&nbsp;max(0,&nbsp;−λ),&nbsp;&nbsp;λr&nbsp;=&nbsp;max(0,&nbsp;λ)&nbsp;&nbsp;&nbsp;&nbsp;(signed&nbsp;US&nbsp;splits&nbsp;into&nbsp;channels)<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;δa&nbsp;&gt;&nbsp;0&nbsp;→&nbsp;Va[cs]&nbsp;+=&nbsp;α·β·δa&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;aversive&nbsp;acquisition&nbsp;(BLA)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;δa&nbsp;&lt;&nbsp;0&nbsp;→&nbsp;Ea[ctx][cs]&nbsp;+=&nbsp;η·(−δa)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;safety&nbsp;learning&nbsp;(ITC/vmPFC)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;δr&nbsp;&gt;&nbsp;0&nbsp;→&nbsp;Vr[cs]&nbsp;+=&nbsp;α·β·δr&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;appetitive&nbsp;acquisition&nbsp;(BLA)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;δr&nbsp;&lt;&nbsp;0&nbsp;→&nbsp;Er[ctx][cs]&nbsp;+=&nbsp;η·(−δr)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;reward&nbsp;omission&nbsp;→&nbsp;extinction<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;α[cs]&nbsp;←&nbsp;γ·|δ|&nbsp;+&nbsp;(1−γ)·α[cs]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;associability&nbsp;(Pearce-Hall&nbsp;1980)<br>
+&nbsp;<br>
+Design&nbsp;invariants&nbsp;the&nbsp;fields&nbsp;encode:<br>
+&nbsp;<br>
+-&nbsp;**Opponent&nbsp;channels.**&nbsp;Va&nbsp;and&nbsp;Vr&nbsp;are&nbsp;separate&nbsp;populations,&nbsp;not&nbsp;one<br>
+&nbsp;&nbsp;signed&nbsp;dial&nbsp;—&nbsp;appetitive&nbsp;and&nbsp;aversive&nbsp;learning&nbsp;have&nbsp;independent<br>
+&nbsp;&nbsp;dynamics&nbsp;and&nbsp;independent&nbsp;extinction&nbsp;traces.<br>
+-&nbsp;**Extinction&nbsp;is&nbsp;new&nbsp;inhibitory&nbsp;learning.**&nbsp;E&nbsp;lives&nbsp;apart&nbsp;from&nbsp;V&nbsp;and<br>
+&nbsp;&nbsp;is&nbsp;keyed&nbsp;by&nbsp;context;&nbsp;V&nbsp;is&nbsp;never&nbsp;decremented.&nbsp;Renewal&nbsp;and&nbsp;spontaneous<br>
+&nbsp;&nbsp;recovery&nbsp;fall&nbsp;out&nbsp;of&nbsp;that&nbsp;structure.<br>
+-&nbsp;**Associability.**&nbsp;α&nbsp;tracks&nbsp;recent&nbsp;surprise&nbsp;—&nbsp;cues&nbsp;that&nbsp;mispredicted<br>
+&nbsp;&nbsp;learn&nbsp;fastest.</span></p>
+<p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.limbic_system.amygdala.html#Amygdala">Amygdala</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Amygdala">class <strong>Amygdala</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Amygdala">Amygdala</a>(v_aversive:&nbsp;'dict[str,&nbsp;float]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;v_appetitive:&nbsp;'dict[str,&nbsp;float]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;associability:&nbsp;'dict[str,&nbsp;float]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;e_aversive:&nbsp;'dict[str,&nbsp;dict[str,&nbsp;float]]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;e_appetitive:&nbsp;'dict[str,&nbsp;dict[str,&nbsp;float]]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;conditioning_events:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;extinction_events:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;low_road_fires:&nbsp;'int'&nbsp;=&nbsp;0)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;organ:&nbsp;BLA&nbsp;value&nbsp;channels,&nbsp;CeA&nbsp;associability,&nbsp;ITC&nbsp;traces.<br>
+&nbsp;<br>
+Basolateral&nbsp;complex&nbsp;—&nbsp;conditioned&nbsp;value,&nbsp;opponent&nbsp;channels:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;v_aversive:&nbsp;&nbsp;&nbsp;cue&nbsp;→&nbsp;learned&nbsp;aversive&nbsp;strength&nbsp;Va[cs]&nbsp;&nbsp;[0,1]<br>
+&nbsp;&nbsp;&nbsp;&nbsp;v_appetitive:&nbsp;cue&nbsp;→&nbsp;learned&nbsp;appetitive&nbsp;strength&nbsp;Vr[cs]&nbsp;[0,1]<br>
+&nbsp;<br>
+Central&nbsp;nucleus&nbsp;—&nbsp;associability&nbsp;(Pearce-Hall),&nbsp;the&nbsp;attention&nbsp;gate:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;associability:&nbsp;cue&nbsp;→&nbsp;learning-rate&nbsp;multiplier&nbsp;α[cs]&nbsp;&nbsp;[0,1]<br>
+&nbsp;<br>
+Intercalated&nbsp;cells&nbsp;/&nbsp;vmPFC&nbsp;—&nbsp;context-keyed&nbsp;safety&nbsp;learning.<br>
+Extinction&nbsp;is&nbsp;a&nbsp;separate&nbsp;inhibitory&nbsp;trace,&nbsp;never&nbsp;unlearning:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;e_aversive:&nbsp;&nbsp;&nbsp;context&nbsp;→&nbsp;cue&nbsp;→&nbsp;inhibitory&nbsp;strength&nbsp;Ea[ctx][cs]<br>
+&nbsp;&nbsp;&nbsp;&nbsp;e_appetitive:&nbsp;context&nbsp;→&nbsp;cue&nbsp;→&nbsp;inhibitory&nbsp;strength&nbsp;Er[ctx][cs]<br>
+&nbsp;<br>
+Counters&nbsp;—&nbsp;introspection&nbsp;counters&nbsp;only;&nbsp;they&nbsp;gate&nbsp;nothing.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Amygdala-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="Amygdala-__init__"><strong>__init__</strong></a>(self, v_aversive: 'dict[str, float]' = &lt;factory&gt;, v_appetitive: 'dict[str, float]' = &lt;factory&gt;, associability: 'dict[str, float]' = &lt;factory&gt;, e_aversive: 'dict[str, dict[str, float]]' = &lt;factory&gt;, e_appetitive: 'dict[str, dict[str, float]]' = &lt;factory&gt;, conditioning_events: 'int' = 0, extinction_events: 'int' = 0, low_road_fires: 'int' = 0) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Amygdala-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="Amygdala-condition"><strong>condition</strong></a>(self, cue: 'str', us: 'float', ctx: 'str') -&gt; 'None'</dt><dd><span class="code">Rescorla-Wagner&nbsp;acquisition&nbsp;+&nbsp;Pearce-Hall&nbsp;associability.<br>
+&nbsp;<br>
+``us``&nbsp;is&nbsp;the&nbsp;signed&nbsp;unconditioned-stimulus&nbsp;value&nbsp;for&nbsp;this<br>
+pairing&nbsp;(negative&nbsp;=&nbsp;aversive,&nbsp;positive&nbsp;=&nbsp;appetitive);&nbsp;the<br>
+channel&nbsp;split&nbsp;(λa&nbsp;=&nbsp;max(0,&nbsp;−λ),&nbsp;λr&nbsp;=&nbsp;max(0,&nbsp;λ))&nbsp;is&nbsp;applied<br>
+inside.&nbsp;Negative&nbsp;prediction&nbsp;errors&nbsp;write&nbsp;*extinction*&nbsp;—&nbsp;a&nbsp;new<br>
+context-keyed&nbsp;inhibitory&nbsp;trace&nbsp;—&nbsp;and&nbsp;never&nbsp;decrement&nbsp;V,&nbsp;so<br>
+renewal&nbsp;and&nbsp;spontaneous&nbsp;recovery&nbsp;fall&nbsp;out&nbsp;of&nbsp;the&nbsp;structure.</span></dd></dl>
+
+<dl><dt><a name="Amygdala-low_road"><strong>low_road</strong></a>(self, cue: 'str', ctx: 'str') -&gt; 'float'</dt><dd><span class="code">Fast&nbsp;pre-cortical&nbsp;aversive&nbsp;output&nbsp;(LeDoux's&nbsp;low&nbsp;road).<br>
+&nbsp;<br>
+Returns&nbsp;the&nbsp;aversive&nbsp;net&nbsp;when&nbsp;it&nbsp;crosses&nbsp;the&nbsp;impulse&nbsp;floor,<br>
+else&nbsp;0.0&nbsp;—&nbsp;a&nbsp;sub-threshold&nbsp;conditioned&nbsp;cue&nbsp;biases&nbsp;encoding&nbsp;but<br>
+does&nbsp;not&nbsp;startle.</span></dd></dl>
+
+<dl><dt><a name="Amygdala-net_appetitive"><strong>net_appetitive</strong></a>(self, cue: 'str', ctx: 'str') -&gt; 'float'</dt><dd><span class="code">net_r&nbsp;=&nbsp;Vr[cs]&nbsp;−&nbsp;w_e&nbsp;·&nbsp;Er[ctx][cs].</span></dd></dl>
+
+<dl><dt><a name="Amygdala-net_aversive"><strong>net_aversive</strong></a>(self, cue: 'str', ctx: 'str') -&gt; 'float'</dt><dd><span class="code">net_a&nbsp;=&nbsp;Va[cs]&nbsp;−&nbsp;w_e&nbsp;·&nbsp;Ea[ctx][cs].</span></dd></dl>
+
+<dl><dt><a name="Amygdala-restore"><strong>restore</strong></a>(self, data: 'dict') -&gt; 'None'</dt><dd><span class="code">Restore&nbsp;associative&nbsp;weights&nbsp;and&nbsp;counters&nbsp;from&nbsp;a&nbsp;saved&nbsp;dict.</span></dd></dl>
+
+<dl><dt><a name="Amygdala-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict'</dt></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>associability</strong></dt>
+</dl>
+<dl><dt><strong>conditioning_events</strong></dt>
+</dl>
+<dl><dt><strong>e_appetitive</strong></dt>
+</dl>
+<dl><dt><strong>e_aversive</strong></dt>
+</dl>
+<dl><dt><strong>extinction_events</strong></dt>
+</dl>
+<dl><dt><strong>low_road_fires</strong></dt>
+</dl>
+<dl><dt><strong>v_appetitive</strong></dt>
+</dl>
+<dl><dt><strong>v_aversive</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'associability': 'dict[str, float]', 'conditioning_events': 'int', 'e_appetitive': 'dict[str, dict[str, float]]', 'e_aversive': 'dict[str, dict[str, float]]', 'extinction_events': 'int', 'low_road_fires': 'int', 'v_appetitive': 'dict[str, float]', 'v_aversive': 'dict[str, float]'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'associability': Field(name='associability',type='dict[str, float...appingproxy({}),kw_only=False,_field_type=_FIELD), 'conditioning_events': Field(name='conditioning_events',type='int',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'e_appetitive': Field(name='e_appetitive',type='dict[str, dict[s...appingproxy({}),kw_only=False,_field_type=_FIELD), 'e_aversive': Field(name='e_aversive',type='dict[str, dict[str...appingproxy({}),kw_only=False,_field_type=_FIELD), 'extinction_events': Field(name='extinction_events',type='int',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'low_road_fires': Field(name='low_road_fires',type='int',default=0...appingproxy({}),kw_only=False,_field_type=_FIELD), 'v_appetitive': Field(name='v_appetitive',type='dict[str, float]...appingproxy({}),kw_only=False,_field_type=_FIELD), 'v_aversive': Field(name='v_aversive',type='dict[str, float]',...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('v_aversive', 'v_appetitive', 'associability', 'e_aversive', 'e_appetitive', 'conditioning_events', 'extinction_events', 'low_road_fires')</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['Amygdala']</td></tr></table>
+</body></html>

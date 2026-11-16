@@ -1,0 +1,52 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Inhibition — the body’s coordination substrate."><title>genesis::inhibition - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-203241e4.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="genesis" data-themes="" data-resource-suffix="" data-rustdoc-version="1.100.0 (0ef1bc386 2026-11-09)" data-channel="1.100.0" data-search-js="search-b167f383.js" data-stringdex-js="stringdex-b5109af9.js" data-settings-js="settings-170eb4bf.js" ><script src="../../static.files/storage-41dd4d93.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../static.files/main-1814ead3.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-9f56287d.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module inhibition</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../genesis/index.html">genesis</a><span class="version">0.2.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module inhibition</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#the-circuits" title="The circuits">The circuits</a></li><li><a href="#the-mathematics" title="The mathematics">The mathematics</a></li><li><a href="#embodiment-exclusivity" title="Embodiment exclusivity">Embodiment exclusivity</a></li></ul><h3><a href="#structs">Module Items</a></h3><ul class="block"><li><a href="#structs" title="Structs">Structs</a></li><li><a href="#types" title="Type Aliases">Type Aliases</a></li></ul></section><div id="rustdoc-modnav"><h2 class="in-crate"><a href="../index.html">In crate genesis</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../index.html">genesis</a></div><h1>Module <span>inhibition</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../src/genesis/inhibition.rs.html#1-237">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Inhibition — the body’s coordination substrate.</p>
+<p>What an operating system calls a mutex, a nervous system calls
+inhibition. This module is the Rust half of <code>Self_World/inhibition.py</code>;
+the two files are one mechanism seen from both sides of the
+organism — here the math, there the words.</p>
+<h2 id="the-circuits"><a class="doc-anchor" href="#the-circuits">§</a>The circuits</h2>
+<ul>
+<li>
+<p><a href="struct.Inhibition.html" title="struct genesis::inhibition::Inhibition"><code>Inhibition&lt;T&gt;</code></a> — fast GABAergic mutual exclusion. Serializes
+access to shared state the way striatal lateral inhibition
+serializes competing drive: the conducting unit’s neighbours
+wait in the inhibitory shadow (Groves 1983; Wickens et al. 1991;
+Koós &amp; Tepper 1999). Wraps <a href="https://doc.rust-lang.org/1.100.0/std/sync/poison/mutex/struct.Mutex.html" title="struct std::sync::poison::mutex::Mutex"><code>std::sync::Mutex</code></a> and keeps the
+same API — <code>lock</code>, <code>try_lock</code>, <code>into_inner</code>, <code>get_mut</code> — so it
+is a drop-in mechanism, not a re-implementation.</p>
+</li>
+<li>
+<p><a href="type.Innate.html" title="type genesis::inhibition::Innate"><code>Innate&lt;T&gt;</code></a> — wiring fixed once, then immutable. <code>OnceLock</code>
+under its biological name: an innately wired quantity is
+established at genesis and never re-learned. A type alias, so
+every <code>OnceLock</code> API is inherited unchanged.</p>
+</li>
+</ul>
+<h2 id="the-mathematics"><a class="doc-anchor" href="#the-mathematics">§</a>The mathematics</h2>
+<p>Every <a href="struct.Inhibition.html" title="struct genesis::inhibition::Inhibition"><code>Inhibition</code></a> counts its own contention with lock-free
+<code>Relaxed</code> counters — the measurement adds no synchronization of
+its own, the same way an electrode does not change the neuron it
+records:</p>
+<ul>
+<li><code>acquisitions</code> — completed admissions</li>
+<li><code>contended</code> — admissions that found the gate already conducting</li>
+<li><code>wait_nanos</code> — total time competitors spent in the shadow</li>
+</ul>
+<p>From these, per the Python side:</p>
+<ul>
+<li>contention <code>c = contended / max(1, acquisitions)</code></li>
+<li>mean wait <code>W̄ = wait_seconds / max(1, contended)</code></li>
+<li>arrival rate <code>λ = acquisitions / elapsed</code></li>
+</ul>
+<p>and Little’s law <code>L = λ·W̄</code> (Little 1961) gives the expected number
+of competitors held in the shadow, mapped into the interoceptive
+range by the Naka–Rushton <code>tone = L/(1+L)</code> (1966) — see
+<a href="struct.Inhibition.html#method.stats" title="method genesis::inhibition::Inhibition::stats"><code>Inhibition::stats</code></a>.</p>
+<h2 id="embodiment-exclusivity"><a class="doc-anchor" href="#embodiment-exclusivity">§</a>Embodiment exclusivity</h2>
+<p>One organism, one body. The <code>flock(LOCK_EX | LOCK_NB)</code> on the
+memory-mapped state file in <code>store/mmap_state.rs</code> is not a lock
+the substrate could route around — it is the physical law of
+exclusive embodiment, enforced by the kernel the way a skull
+enforces it anatomically: exactly one process may map and mutate
+her persistent state.</p>
+</div></details><h2 id="structs" class="section-header">Structs<a href="#structs" class="anchor">§</a></h2><dl class="item-table"><dt><a class="struct" href="struct.Inhibition.html" title="struct genesis::inhibition::Inhibition">Inhibition</a></dt><dd>Fast GABAergic mutual exclusion — the mutex, observed.</dd><dt><a class="struct" href="struct.InhibitoryStats.html" title="struct genesis::inhibition::InhibitoryStats">Inhibitory<wbr>Stats</a></dt><dd>Contention statistics for one <a href="struct.Inhibition.html" title="struct genesis::inhibition::Inhibition"><code>Inhibition</code></a>.</dd></dl><h2 id="types" class="section-header">Type Aliases<a href="#types" class="anchor">§</a></h2><dl class="item-table"><dt><a class="type" href="type.InhibitionGuard.html" title="type genesis::inhibition::InhibitionGuard">Inhibition<wbr>Guard</a></dt><dd>The conducting axon — exclusive access while held.</dd><dt><a class="type" href="type.Innate.html" title="type genesis::inhibition::Innate">Innate</a></dt><dd>Innately wired state — established once at genesis, immutable
+thereafter.</dd></dl></section></div></main></body></html>

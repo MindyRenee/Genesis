@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.temporal_lobe.concepts.consolidation</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.temporal_lobe.html" class="white">temporal_lobe</a>.<a href="Self_World.temporal_lobe.concepts.html" class="white">concepts</a>.consolidation</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/concepts/consolidation.py">/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/concepts/consolidation.py</a></td></tr></table>
+    <p><span class="code">Concept&nbsp;consolidation&nbsp;—&nbsp;sleep&nbsp;processing,&nbsp;bridges,&nbsp;review.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="sqlite3.html">sqlite3</a><br>
+</td><td class="multicolumn"><a href="time.html">time</a><br>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.concepts.consolidation.html#ConsolidationMixin">ConsolidationMixin</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ConsolidationMixin">class <strong>ConsolidationMixin</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code">Mixin&nbsp;for&nbsp;:class:`ConceptNetwork`&nbsp;—&nbsp;see&nbsp;module&nbsp;docstring.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ConsolidationMixin-backfill_columns"><strong>backfill_columns</strong></a>(self) -&gt; 'dict[str, int]'</dt><dd><span class="code">Backfill&nbsp;column&nbsp;membership&nbsp;for&nbsp;all&nbsp;existing&nbsp;concepts.<br>
+&nbsp;<br>
+Concepts&nbsp;loaded&nbsp;from&nbsp;persistence&nbsp;(before&nbsp;the&nbsp;`columns`&nbsp;field<br>
+existed)&nbsp;have&nbsp;empty&nbsp;column&nbsp;sets.&nbsp;This&nbsp;method&nbsp;populates&nbsp;each<br>
+concept's&nbsp;`columns`&nbsp;set&nbsp;based&nbsp;on&nbsp;its&nbsp;origin&nbsp;and&nbsp;ID&nbsp;prefix.<br>
+&nbsp;<br>
+Also&nbsp;creates&nbsp;pioneer&nbsp;bridges&nbsp;between&nbsp;concepts&nbsp;that&nbsp;share&nbsp;the<br>
+same&nbsp;base&nbsp;name&nbsp;but&nbsp;live&nbsp;in&nbsp;different&nbsp;columns&nbsp;(e.g.,&nbsp;"mind"&nbsp;in<br>
+dictionary&nbsp;vs&nbsp;"python:Mind"&nbsp;in&nbsp;code).<br>
+&nbsp;<br>
+**Bridge&nbsp;creation&nbsp;only&nbsp;runs&nbsp;for&nbsp;concepts&nbsp;that&nbsp;were&nbsp;actually<br>
+backfilled**&nbsp;(had&nbsp;empty&nbsp;`columns`).&nbsp;If&nbsp;no&nbsp;backfilling&nbsp;was<br>
+needed,&nbsp;bridges&nbsp;are&nbsp;not&nbsp;recreated&nbsp;—&nbsp;they&nbsp;either&nbsp;already&nbsp;exist<br>
+or&nbsp;were&nbsp;shed&nbsp;to&nbsp;a&nbsp;compressed&nbsp;store&nbsp;during&nbsp;sleep&nbsp;consolidation.<br>
+Recreating&nbsp;them&nbsp;every&nbsp;startup&nbsp;would&nbsp;undo&nbsp;that&nbsp;migration&nbsp;and<br>
+cause&nbsp;unbounded&nbsp;edge&nbsp;growth&nbsp;(13K&nbsp;bridges&nbsp;per&nbsp;startup).<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;dict&nbsp;with&nbsp;backfill&nbsp;statistics.</span></dd></dl>
+
+<dl><dt><a name="ConsolidationMixin-connect_all_orphans"><strong>connect_all_orphans</strong></a>(self) -&gt; 'int'</dt><dd><span class="code">One-shot:&nbsp;connect&nbsp;EVERY&nbsp;weakly-connected&nbsp;concept&nbsp;to&nbsp;super&nbsp;hubs.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;nuclear&nbsp;option&nbsp;—&nbsp;after&nbsp;all&nbsp;learning&nbsp;is&nbsp;done,<br>
+run&nbsp;this&nbsp;to&nbsp;guarantee&nbsp;every&nbsp;concept&nbsp;is&nbsp;within&nbsp;2-3&nbsp;hops<br>
+of&nbsp;the&nbsp;network&nbsp;core.&nbsp;No&nbsp;caps,&nbsp;no&nbsp;limits.<br>
+&nbsp;<br>
+Connects&nbsp;concepts&nbsp;with&nbsp;≤5&nbsp;edges&nbsp;to&nbsp;3&nbsp;super&nbsp;hubs&nbsp;each.<br>
+Under&nbsp;the&nbsp;canonical&nbsp;edge&nbsp;log&nbsp;this&nbsp;is&nbsp;a&nbsp;no-op:&nbsp;super-hub<br>
+attachment&nbsp;edges&nbsp;are&nbsp;pipeline&nbsp;geometry&nbsp;(origin<br>
+``global_connect``&nbsp;→&nbsp;derivable),&nbsp;and&nbsp;reachability&nbsp;is&nbsp;served<br>
+by&nbsp;the&nbsp;similarity&nbsp;provider&nbsp;instead&nbsp;of&nbsp;materialized&nbsp;edges.</span></dd></dl>
+
+<dl><dt><a name="ConsolidationMixin-consolidate_during_sleep"><strong>consolidate_during_sleep</strong></a>(self, max_in_memory: 'int | None' = None, policy: 'Any' = None) -&gt; 'dict[str, int]'</dt><dd><span class="code">Consolidate&nbsp;the&nbsp;concept&nbsp;network&nbsp;during&nbsp;sleep.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;concept-network&nbsp;analogue&nbsp;of&nbsp;the&nbsp;Rust&nbsp;daemon's<br>
+dreaming&nbsp;pass,&nbsp;modelled&nbsp;on&nbsp;what&nbsp;sleep&nbsp;actually&nbsp;does&nbsp;to&nbsp;a<br>
+brain&nbsp;(Diekelmann&nbsp;&amp;&nbsp;Born,&nbsp;2010).&nbsp;During&nbsp;sleep,&nbsp;the&nbsp;network:<br>
+&nbsp;<br>
+1.&nbsp;**Strengthens**&nbsp;edges&nbsp;whose&nbsp;endpoints&nbsp;were&nbsp;co-active&nbsp;—<br>
+&nbsp;&nbsp;&nbsp;replay-driven&nbsp;potentiation&nbsp;(Hebbian&nbsp;LTP),&nbsp;plus&nbsp;established<br>
+&nbsp;&nbsp;&nbsp;traces&nbsp;(w&nbsp;&gt;&nbsp;0.4)&nbsp;modelling&nbsp;spontaneous&nbsp;replay.&nbsp;There&nbsp;is&nbsp;no<br>
+&nbsp;&nbsp;&nbsp;deletion&nbsp;pass:&nbsp;human&nbsp;forgetting&nbsp;is&nbsp;decay,&nbsp;interference,<br>
+&nbsp;&nbsp;&nbsp;and&nbsp;demotion,&nbsp;not&nbsp;a&nbsp;threshold&nbsp;sweep.<br>
+2.&nbsp;**Boosts**&nbsp;confidence&nbsp;of&nbsp;well-connected&nbsp;concepts.&nbsp;Concepts<br>
+&nbsp;&nbsp;&nbsp;with&nbsp;many&nbsp;connections&nbsp;are&nbsp;probably&nbsp;real&nbsp;and&nbsp;important.<br>
+3.&nbsp;**Decays**&nbsp;activation&nbsp;of&nbsp;all&nbsp;concepts.&nbsp;Sleep&nbsp;clears<br>
+&nbsp;&nbsp;&nbsp;short-term&nbsp;activation,&nbsp;preparing&nbsp;for&nbsp;a&nbsp;fresh&nbsp;day.<br>
+4.&nbsp;**Bridges**&nbsp;—&nbsp;REM-style&nbsp;associative&nbsp;recombination:&nbsp;links<br>
+&nbsp;&nbsp;&nbsp;concepts&nbsp;that&nbsp;share&nbsp;neighbors&nbsp;and&nbsp;attaches&nbsp;orphans&nbsp;to<br>
+&nbsp;&nbsp;&nbsp;hubs&nbsp;(schema&nbsp;assimilation;&nbsp;Lewis&nbsp;&amp;&nbsp;Durrant,&nbsp;2011).<br>
+5.&nbsp;**Removes**&nbsp;isolated&nbsp;low-confidence&nbsp;concepts&nbsp;(calls<br>
+&nbsp;&nbsp;&nbsp;clean_noise,&nbsp;which&nbsp;archives&nbsp;them&nbsp;first).&nbsp;Sleep&nbsp;is&nbsp;when<br>
+&nbsp;&nbsp;&nbsp;the&nbsp;brain&nbsp;takes&nbsp;out&nbsp;the&nbsp;trash&nbsp;—&nbsp;into&nbsp;long-term&nbsp;storage.<br>
+6.&nbsp;**Spills**&nbsp;dormant&nbsp;concepts&nbsp;to&nbsp;the&nbsp;long-term&nbsp;archive&nbsp;(if<br>
+&nbsp;&nbsp;&nbsp;attached).&nbsp;Instead&nbsp;of&nbsp;deleting&nbsp;dormant&nbsp;knowledge,&nbsp;it&nbsp;moves<br>
+&nbsp;&nbsp;&nbsp;to&nbsp;disk&nbsp;where&nbsp;it&nbsp;can&nbsp;be&nbsp;recalled&nbsp;on&nbsp;demand.&nbsp;This&nbsp;is&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;brain's&nbsp;consolidation&nbsp;of&nbsp;short-term&nbsp;to&nbsp;long-term&nbsp;memory.<br>
+7.&nbsp;**Vacuums**&nbsp;the&nbsp;archive&nbsp;(if&nbsp;attached&nbsp;and&nbsp;modified&nbsp;this<br>
+&nbsp;&nbsp;&nbsp;cycle)&nbsp;to&nbsp;reclaim&nbsp;disk&nbsp;space&nbsp;from&nbsp;recalled&nbsp;or&nbsp;deleted&nbsp;rows.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;max_in_memory:&nbsp;Maximum&nbsp;concepts&nbsp;to&nbsp;keep&nbsp;in&nbsp;working&nbsp;memory.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;the&nbsp;network&nbsp;exceeds&nbsp;this,&nbsp;dormant&nbsp;concepts&nbsp;are<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;spilled&nbsp;to&nbsp;the&nbsp;archive.&nbsp;``None``&nbsp;uses&nbsp;the&nbsp;policy's<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;``max_in_memory``.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;policy:&nbsp;A&nbsp;``MaintenancePolicy``&nbsp;—&nbsp;her&nbsp;own&nbsp;upkeep&nbsp;knobs<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(``infrastructure/maintenance_policy.py``).&nbsp;``None``<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;uses&nbsp;the&nbsp;defaults.<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;dict&nbsp;with&nbsp;counts:<br>
+-&nbsp;'strengthened':&nbsp;number&nbsp;of&nbsp;edges&nbsp;strengthened<br>
+-&nbsp;'boosted':&nbsp;number&nbsp;of&nbsp;concepts&nbsp;boosted<br>
+-&nbsp;'decay_cleared':&nbsp;number&nbsp;of&nbsp;concepts&nbsp;decayed<br>
+-&nbsp;'noise_removed':&nbsp;number&nbsp;of&nbsp;noise&nbsp;concepts&nbsp;removed<br>
+-&nbsp;'bridges_created':&nbsp;number&nbsp;of&nbsp;associative&nbsp;+&nbsp;hub&nbsp;bridges&nbsp;created<br>
+-&nbsp;'spilled':&nbsp;number&nbsp;of&nbsp;concepts&nbsp;moved&nbsp;to&nbsp;long-term&nbsp;archive</span></dd></dl>
+
+<dl><dt><a name="ConsolidationMixin-consolidate_during_sleep_steps"><strong>consolidate_during_sleep_steps</strong></a>(self, max_in_memory: 'int | None' = None, policy: 'Any' = None) -&gt; 'Iterator[tuple[str, dict[str, int]]]'</dt><dd><span class="code">The&nbsp;same&nbsp;consolidation&nbsp;as&nbsp;self-limiting&nbsp;physiology.<br>
+&nbsp;<br>
+Yields&nbsp;``(phase,&nbsp;stats)``&nbsp;after&nbsp;each&nbsp;committed&nbsp;micro-phase,&nbsp;so<br>
+a&nbsp;sleep&nbsp;loop&nbsp;can&nbsp;advance&nbsp;it&nbsp;gradually&nbsp;—&nbsp;one&nbsp;phase&nbsp;per&nbsp;credit&nbsp;—<br>
+and&nbsp;drop&nbsp;it&nbsp;mid-yield&nbsp;when&nbsp;the&nbsp;stage&nbsp;ends.&nbsp;Human&nbsp;N3&nbsp;has&nbsp;no<br>
+"pass&nbsp;that&nbsp;must&nbsp;finish":&nbsp;each&nbsp;slice&nbsp;here&nbsp;is&nbsp;safe&nbsp;on&nbsp;its&nbsp;own,<br>
+and&nbsp;whatever&nbsp;remains&nbsp;unrun&nbsp;is&nbsp;simply&nbsp;consolidation&nbsp;that&nbsp;did<br>
+not&nbsp;happen&nbsp;tonight.</span></dd></dl>
+
+<dl><dt><a name="ConsolidationMixin-create_bridge"><strong>create_bridge</strong></a>(self, concept_a: 'str', concept_b: 'str', weight: 'float' = 0.3) -&gt; 'Edge | None'</dt><dd><span class="code">Create&nbsp;a&nbsp;pioneer&nbsp;bridge&nbsp;between&nbsp;two&nbsp;concepts&nbsp;in&nbsp;different&nbsp;columns.<br>
+&nbsp;<br>
+Bridges&nbsp;are&nbsp;inter-column&nbsp;connections&nbsp;(like&nbsp;cortical&nbsp;association<br>
+fibers).&nbsp;They&nbsp;connect&nbsp;the&nbsp;same&nbsp;concept&nbsp;across&nbsp;different&nbsp;domains<br>
+(e.g.,&nbsp;"cognition"&nbsp;in&nbsp;dictionary&nbsp;↔&nbsp;"cognition"&nbsp;in&nbsp;identity).<br>
+&nbsp;<br>
+Bridge&nbsp;weight&nbsp;starts&nbsp;low&nbsp;(0.3)&nbsp;and&nbsp;strengthens&nbsp;through&nbsp;Hebbian<br>
+co-activation&nbsp;during&nbsp;conversations.&nbsp;This&nbsp;mirrors&nbsp;how&nbsp;pioneer<br>
+neurons&nbsp;create&nbsp;initial&nbsp;pathways&nbsp;that&nbsp;are&nbsp;later&nbsp;refined&nbsp;by<br>
+experience.</span></dd></dl>
+
+<dl><dt><a name="ConsolidationMixin-get_bridges"><strong>get_bridges</strong></a>(self, concept_id: 'str') -&gt; 'list[Edge]'</dt><dd><span class="code">Get&nbsp;all&nbsp;bridge&nbsp;edges&nbsp;connected&nbsp;to&nbsp;a&nbsp;concept&nbsp;(deduplicated).</span></dd></dl>
+
+<dl><dt><a name="ConsolidationMixin-get_review_queue"><strong>get_review_queue</strong></a>(self, now_ms: 'int | None' = None, max_items: 'int' = 10) -&gt; 'list[str]'</dt><dd><span class="code">Get&nbsp;concepts&nbsp;due&nbsp;for&nbsp;review&nbsp;(spaced&nbsp;repetition).<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;list&nbsp;of&nbsp;concept&nbsp;IDs&nbsp;that&nbsp;are&nbsp;due&nbsp;for&nbsp;review,<br>
+sorted&nbsp;by&nbsp;urgency&nbsp;(most&nbsp;overdue&nbsp;first).<br>
+&nbsp;<br>
+A&nbsp;concept&nbsp;is&nbsp;due&nbsp;for&nbsp;review&nbsp;if:<br>
+-&nbsp;It&nbsp;has&nbsp;been&nbsp;reviewed&nbsp;before&nbsp;and&nbsp;enough&nbsp;time&nbsp;has&nbsp;passed<br>
+&nbsp;&nbsp;since&nbsp;the&nbsp;last&nbsp;review&nbsp;based&nbsp;on&nbsp;the&nbsp;spaced&nbsp;repetition&nbsp;schedule<br>
+-&nbsp;OR&nbsp;it&nbsp;has&nbsp;never&nbsp;been&nbsp;reviewed&nbsp;(review_count&nbsp;==&nbsp;0)&nbsp;and&nbsp;was<br>
+&nbsp;&nbsp;created&nbsp;more&nbsp;than&nbsp;1&nbsp;minute&nbsp;ago<br>
+&nbsp;<br>
+Concepts&nbsp;with&nbsp;high&nbsp;confidence&nbsp;are&nbsp;reviewed&nbsp;less&nbsp;frequently.<br>
+Concepts&nbsp;with&nbsp;low&nbsp;confidence&nbsp;are&nbsp;reviewed&nbsp;more&nbsp;frequently.</span></dd></dl>
+
+<dl><dt><a name="ConsolidationMixin-review_concept"><strong>review_concept</strong></a>(self, concept_id: 'str', success: 'bool' = True, now_ms: 'int | None' = None) -&gt; 'None'</dt><dd><span class="code">Mark&nbsp;a&nbsp;concept&nbsp;as&nbsp;reviewed.<br>
+&nbsp;<br>
+If&nbsp;success=True,&nbsp;increment&nbsp;the&nbsp;review&nbsp;count&nbsp;(which&nbsp;extends<br>
+the&nbsp;next&nbsp;review&nbsp;interval).&nbsp;If&nbsp;success=False,&nbsp;reset&nbsp;the<br>
+review&nbsp;count&nbsp;(which&nbsp;shortens&nbsp;the&nbsp;next&nbsp;review&nbsp;interval)&nbsp;and<br>
+slightly&nbsp;lower&nbsp;confidence.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;called&nbsp;when&nbsp;Genesis&nbsp;actively&nbsp;thinks&nbsp;about&nbsp;or&nbsp;uses<br>
+a&nbsp;concept&nbsp;—&nbsp;confirming&nbsp;it&nbsp;still&nbsp;"knows"&nbsp;it.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>TYPE_CHECKING</strong> = False<br>
+<strong>logger</strong> = &lt;Logger Self_World.temporal_lobe.concepts.consolidation (WARNING)&gt;</td></tr></table>
+</body></html>

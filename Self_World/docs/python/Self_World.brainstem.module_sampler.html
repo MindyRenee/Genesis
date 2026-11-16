@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.brainstem.module_sampler</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.brainstem.html" class="white">brainstem</a>.module_sampler</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/brainstem/module_sampler.py">/home/mindyrenee/GenAnd/Genesis/Self_World/brainstem/module_sampler.py</a></td></tr></table>
+    <p><span class="code">Module&nbsp;sampler&nbsp;—&nbsp;statistical&nbsp;attribution&nbsp;of&nbsp;execution&nbsp;to&nbsp;brain&nbsp;parts.<br>
+&nbsp;<br>
+Hardware&nbsp;telemetry&nbsp;can&nbsp;see&nbsp;which&nbsp;*process*&nbsp;is&nbsp;firing&nbsp;(per-lobe<br>
+telemetry),&nbsp;but&nbsp;not&nbsp;which&nbsp;*subsystem*&nbsp;inside&nbsp;the&nbsp;conscious&nbsp;process&nbsp;is<br>
+doing&nbsp;the&nbsp;work.&nbsp;This&nbsp;sampler&nbsp;closes&nbsp;that&nbsp;gap&nbsp;the&nbsp;way&nbsp;neuroscience<br>
+does:&nbsp;it&nbsp;doesn't&nbsp;declare&nbsp;which&nbsp;region&nbsp;is&nbsp;active,&nbsp;it&nbsp;*observes*&nbsp;where<br>
+execution&nbsp;lives.<br>
+&nbsp;<br>
+A&nbsp;daemon&nbsp;thread&nbsp;samples&nbsp;``sys._current_frames()``&nbsp;at&nbsp;a&nbsp;fixed&nbsp;rate.&nbsp;A<br>
+thread&nbsp;is&nbsp;credited&nbsp;only&nbsp;when&nbsp;its&nbsp;*leaf*&nbsp;frame&nbsp;is&nbsp;executing&nbsp;Genesis<br>
+bytecode&nbsp;—&nbsp;under&nbsp;the&nbsp;GIL&nbsp;at&nbsp;most&nbsp;one&nbsp;thread&nbsp;runs&nbsp;at&nbsp;a&nbsp;time,&nbsp;so&nbsp;each<br>
+sample&nbsp;answers&nbsp;"which&nbsp;brain&nbsp;part&nbsp;is&nbsp;executing&nbsp;right&nbsp;now".&nbsp;Threads<br>
+parked&nbsp;in&nbsp;``sleep``/``recv``/``join``&nbsp;contribute&nbsp;nothing,&nbsp;exactly&nbsp;like<br>
+an&nbsp;idle&nbsp;region&nbsp;contributes&nbsp;nothing&nbsp;to&nbsp;an&nbsp;EEG&nbsp;trace:&nbsp;a&nbsp;C-level&nbsp;wait<br>
+pushes&nbsp;no&nbsp;Python&nbsp;frame,&nbsp;so&nbsp;a&nbsp;parked&nbsp;leaf&nbsp;sits&nbsp;on&nbsp;the&nbsp;same&nbsp;instruction<br>
+sample&nbsp;after&nbsp;sample,&nbsp;and&nbsp;a&nbsp;frame&nbsp;is&nbsp;credited&nbsp;only&nbsp;when&nbsp;it&nbsp;has&nbsp;moved<br>
+since&nbsp;the&nbsp;last&nbsp;tick.&nbsp;When&nbsp;the&nbsp;leaf&nbsp;is<br>
+inside&nbsp;``genesis_client``&nbsp;(an&nbsp;IPC&nbsp;call&nbsp;in&nbsp;flight),&nbsp;the&nbsp;sample&nbsp;is<br>
+credited&nbsp;to&nbsp;the&nbsp;deepest&nbsp;cognitive&nbsp;frame&nbsp;—&nbsp;the&nbsp;module&nbsp;that<br>
+initiated&nbsp;the&nbsp;call.<br>
+&nbsp;<br>
+Because&nbsp;attribution&nbsp;follows&nbsp;the&nbsp;package&nbsp;layout&nbsp;—&nbsp;which&nbsp;already&nbsp;mirrors<br>
+her&nbsp;brain&nbsp;anatomy&nbsp;—&nbsp;it&nbsp;survives&nbsp;refactors,&nbsp;catches&nbsp;work&nbsp;nobody&nbsp;thought<br>
+to&nbsp;instrument&nbsp;(learner,&nbsp;inner&nbsp;life,&nbsp;speech,&nbsp;the&nbsp;sampler&nbsp;itself),&nbsp;and<br>
+can&nbsp;never&nbsp;drift&nbsp;from&nbsp;a&nbsp;hand-maintained&nbsp;stage&nbsp;table.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="genesis_client.html">genesis_client</a><br>
+<a href="importlib.html">importlib</a><br>
+</td><td class="multicolumn"><a href="logging.html">logging</a><br>
+<a href="os.html">os</a><br>
+</td><td class="multicolumn"><a href="sys.html">sys</a><br>
+<a href="threading.html">threading</a><br>
+</td><td class="multicolumn"><a href="time.html">time</a><br>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.brainstem.module_sampler.html#ModuleSampler">ModuleSampler</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ModuleSampler">class <strong>ModuleSampler</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ModuleSampler">ModuleSampler</a>(credit:&nbsp;'Callable[[int,&nbsp;float],&nbsp;None]')&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Samples&nbsp;running&nbsp;threads&nbsp;and&nbsp;credits&nbsp;execution&nbsp;time&nbsp;to&nbsp;modules.<br>
+&nbsp;<br>
+``credit``&nbsp;is&nbsp;called&nbsp;as&nbsp;``credit(module_id,&nbsp;seconds)``&nbsp;—&nbsp;in&nbsp;the<br>
+Mind&nbsp;this&nbsp;is&nbsp;``_credit_module``,&nbsp;accumulating&nbsp;into&nbsp;the&nbsp;per-module<br>
+work&nbsp;counter&nbsp;that&nbsp;the&nbsp;metronome&nbsp;normalizes&nbsp;into&nbsp;``cpu_share``&nbsp;for<br>
+UPDATE_MODULE_STATUS&nbsp;/&nbsp;GET_LOBE_TELEMETRY.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ModuleSampler-__init__"><strong>__init__</strong></a>(self, credit: 'Callable[[int, float], None]') -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;sampler&nbsp;with&nbsp;the&nbsp;callback&nbsp;receiving&nbsp;module-time&nbsp;credit.</span></dd></dl>
+
+<dl><dt><a name="ModuleSampler-start"><strong>start</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Start&nbsp;the&nbsp;sampling&nbsp;thread&nbsp;(idempotent).</span></dd></dl>
+
+<dl><dt><a name="ModuleSampler-stop"><strong>stop</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Signal&nbsp;the&nbsp;sampling&nbsp;thread&nbsp;to&nbsp;exit&nbsp;and&nbsp;join&nbsp;it.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>SAMPLE_HZ</strong> = 25.0</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>MODULE_ATTENTION</strong> = 1<br>
+<strong>MODULE_DREAMING</strong> = 9<br>
+<strong>MODULE_EMOTION</strong> = 3<br>
+<strong>MODULE_INTENTION</strong> = 10<br>
+<strong>MODULE_LANGUAGE</strong> = 4<br>
+<strong>MODULE_MEMORY</strong> = 2<br>
+<strong>MODULE_METACOGNITION</strong> = 8<br>
+<strong>MODULE_MOTOR</strong> = 7<br>
+<strong>MODULE_REASONING</strong> = 5<br>
+<strong>MODULE_SENSORY</strong> = 6<br>
+<strong>__annotations__</strong> = {'_ROOT_FILE_MODULE': 'dict[str, int]'}<br>
+<strong>logger</strong> = &lt;Logger Self_World.brainstem.module_sampler (WARNING)&gt;</td></tr></table>
+</body></html>

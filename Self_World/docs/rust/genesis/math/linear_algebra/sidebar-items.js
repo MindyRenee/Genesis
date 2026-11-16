@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["cosine","cross3","dot","eigenvalues_2x2","norm","vector_angle"],"struct":["Matrix"]};

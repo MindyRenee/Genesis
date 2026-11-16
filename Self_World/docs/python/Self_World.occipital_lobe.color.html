@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.occipital_lobe.color</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.occipital_lobe.html" class="white">occipital_lobe</a>.color</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/occipital_lobe/color.py">/home/mindyrenee/GenAnd/Genesis/Self_World/occipital_lobe/color.py</a></td></tr></table>
+    <p><span class="code">Color&nbsp;as&nbsp;the&nbsp;nervous&nbsp;system&nbsp;computes&nbsp;it&nbsp;—&nbsp;cone&nbsp;excitations&nbsp;to&nbsp;opponent&nbsp;space.<br>
+&nbsp;<br>
+The&nbsp;pipeline&nbsp;mirrors&nbsp;the&nbsp;physiology:&nbsp;display&nbsp;light&nbsp;is&nbsp;decomposed&nbsp;into<br>
+cone&nbsp;excitations&nbsp;first,&nbsp;then&nbsp;re-coded&nbsp;onto&nbsp;the&nbsp;opponent&nbsp;axes&nbsp;the&nbsp;LGN<br>
+actually&nbsp;carries,&nbsp;then&nbsp;compressed&nbsp;into&nbsp;the&nbsp;perceptual&nbsp;uniformities&nbsp;V4<br>
+represents:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;sRGB&nbsp;&nbsp;→(inverse&nbsp;EOTF)→&nbsp;&nbsp;linear&nbsp;RGB&nbsp;&nbsp;→(M_sRGB)→&nbsp;&nbsp;XYZ(D65)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;XYZ&nbsp;&nbsp;&nbsp;→(M_HPE)→&nbsp;&nbsp;LMS&nbsp;cone&nbsp;excitations<br>
+&nbsp;&nbsp;&nbsp;&nbsp;LMS&nbsp;&nbsp;&nbsp;→(von&nbsp;Kries,&nbsp;vs&nbsp;adapting&nbsp;white)→&nbsp;&nbsp;cone-contrast&nbsp;space<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→&nbsp;&nbsp;luminance&nbsp;L+M&nbsp;·&nbsp;red-green&nbsp;L−M&nbsp;·&nbsp;blue-yellow&nbsp;S−(L+M)<br>
+&nbsp;<br>
+The&nbsp;opponent&nbsp;stage&nbsp;is&nbsp;a&nbsp;change&nbsp;of&nbsp;basis&nbsp;in&nbsp;*normalized*&nbsp;cone&nbsp;space&nbsp;—<br>
+the&nbsp;DKL&nbsp;construction&nbsp;(Derrington,&nbsp;Krauskopf&nbsp;&amp;&nbsp;Lennie&nbsp;1984,&nbsp;J.<br>
+Physiol.&nbsp;357,&nbsp;241):&nbsp;two&nbsp;isoluminant&nbsp;chromatic&nbsp;axes&nbsp;and&nbsp;one&nbsp;achromatic<br>
+axis&nbsp;meeting&nbsp;at&nbsp;the&nbsp;adapting&nbsp;white&nbsp;point.&nbsp;The&nbsp;von&nbsp;Kries&nbsp;step&nbsp;is&nbsp;the<br>
+physiological&nbsp;gain&nbsp;control&nbsp;—&nbsp;each&nbsp;cone&nbsp;class&nbsp;divided&nbsp;by&nbsp;its&nbsp;own<br>
+excitation&nbsp;under&nbsp;the&nbsp;adapting&nbsp;field&nbsp;—&nbsp;so&nbsp;the&nbsp;white&nbsp;point&nbsp;sits&nbsp;at&nbsp;the<br>
+origin&nbsp;of&nbsp;the&nbsp;opponent&nbsp;plane&nbsp;by&nbsp;construction.<br>
+&nbsp;<br>
+Constants&nbsp;are&nbsp;drawn&nbsp;from&nbsp;the&nbsp;CIE-sanctioned&nbsp;standards:&nbsp;the&nbsp;sRGB<br>
+encoding&nbsp;(IEC&nbsp;61966-2-1),&nbsp;the&nbsp;D65&nbsp;illuminant,&nbsp;the&nbsp;Hunt–Pointer–<br>
+Estevez&nbsp;cone-response&nbsp;matrix&nbsp;(CIE&nbsp;159:2004&nbsp;Table&nbsp;1),&nbsp;and&nbsp;CIELAB<br>
+(CIE&nbsp;1976)&nbsp;for&nbsp;perceptual&nbsp;distance.&nbsp;Hue&nbsp;lives&nbsp;on&nbsp;a&nbsp;circle;&nbsp;its<br>
+summary&nbsp;statistics&nbsp;are&nbsp;circular&nbsp;statistics&nbsp;(mean&nbsp;resultant&nbsp;vector,<br>
+Mardia&nbsp;&amp;&nbsp;Jupp)&nbsp;—&nbsp;never&nbsp;the&nbsp;linear&nbsp;mean&nbsp;of&nbsp;an&nbsp;angle.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="numpy.html">numpy</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-chroma"><strong>chroma</strong></a>(rg: 'np.ndarray', by: 'np.ndarray') -&gt; 'np.ndarray'</dt><dd><span class="code">Eccentricity&nbsp;on&nbsp;the&nbsp;opponent&nbsp;plane&nbsp;—&nbsp;distance&nbsp;from&nbsp;white.</span></dd></dl>
+ <dl><dt><a name="-circular_mean"><strong>circular_mean</strong></a>(angles: 'np.ndarray') -&gt; 'float'</dt><dd><span class="code">Mean&nbsp;direction&nbsp;of&nbsp;angles&nbsp;(radians)&nbsp;—&nbsp;the&nbsp;resultant&nbsp;vector's&nbsp;angle.<br>
+&nbsp;<br>
+A&nbsp;linear&nbsp;mean&nbsp;of&nbsp;hue&nbsp;is&nbsp;undefined:&nbsp;350°&nbsp;and&nbsp;10°&nbsp;average&nbsp;to&nbsp;0°,<br>
+not&nbsp;180°.&nbsp;The&nbsp;circular&nbsp;mean&nbsp;is&nbsp;atan2&nbsp;of&nbsp;the&nbsp;component&nbsp;sums.</span></dd></dl>
+ <dl><dt><a name="-circular_resultant"><strong>circular_resultant</strong></a>(angles: 'np.ndarray') -&gt; 'float'</dt><dd><span class="code">Mean&nbsp;resultant&nbsp;length&nbsp;R&nbsp;∈&nbsp;[0,1]&nbsp;—&nbsp;hue&nbsp;concentration.<br>
+&nbsp;<br>
+1.0&nbsp;when&nbsp;every&nbsp;hue&nbsp;agrees&nbsp;(a&nbsp;saturated&nbsp;field),&nbsp;→0&nbsp;as&nbsp;hues&nbsp;spread<br>
+around&nbsp;the&nbsp;circle&nbsp;(an&nbsp;achromatic&nbsp;or&nbsp;mixed&nbsp;field).&nbsp;Doubles&nbsp;as&nbsp;the<br>
+confidence&nbsp;that&nbsp;the&nbsp;circular&nbsp;mean&nbsp;means&nbsp;anything.</span></dd></dl>
+ <dl><dt><a name="-cone_opponent"><strong>cone_opponent</strong></a>(rgb: 'np.ndarray', white_rgb: 'np.ndarray | None' = None) -&gt; 'tuple[np.ndarray, np.ndarray, np.ndarray]'</dt><dd><span class="code">Cone-opponent&nbsp;channels&nbsp;for&nbsp;sRGB&nbsp;input,&nbsp;von&nbsp;Kries&nbsp;adapted.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;rgb:&nbsp;sRGB&nbsp;in&nbsp;[0,1],&nbsp;shape&nbsp;(...,&nbsp;3).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;white_rgb:&nbsp;the&nbsp;adapting&nbsp;field's&nbsp;white&nbsp;(sRGB&nbsp;[0,1])&nbsp;—&nbsp;the&nbsp;frame<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mean&nbsp;serves&nbsp;as&nbsp;the&nbsp;illuminant&nbsp;estimate&nbsp;(grey-world);&nbsp;None<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;adapts&nbsp;to&nbsp;the&nbsp;D65&nbsp;reference&nbsp;white&nbsp;the&nbsp;display&nbsp;is&nbsp;calibrated<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(luminance,&nbsp;red_green,&nbsp;blue_yellow)&nbsp;arrays&nbsp;shaped&nbsp;rgb.shape[:-1]:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;``luminance``&nbsp;=&nbsp;cL&nbsp;+&nbsp;cM&nbsp;(achromatic,&nbsp;≈1.0&nbsp;at&nbsp;the&nbsp;white&nbsp;point),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;``red_green``&nbsp;=&nbsp;cL&nbsp;−&nbsp;cM&nbsp;(DKL&nbsp;constant-B&nbsp;axis,&nbsp;azimuth&nbsp;0/180),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;``blue_yellow``&nbsp;=&nbsp;cS&nbsp;−&nbsp;(cL&nbsp;+&nbsp;cM)/2&nbsp;(DKL&nbsp;constant-R&amp;G&nbsp;axis,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;azimuth&nbsp;90/270),&nbsp;where&nbsp;cK&nbsp;=&nbsp;K/K_white&nbsp;are&nbsp;the&nbsp;von&nbsp;Kries&nbsp;cone<br>
+&nbsp;&nbsp;&nbsp;&nbsp;excitations&nbsp;—&nbsp;each&nbsp;cone&nbsp;class&nbsp;gain-normalized&nbsp;by&nbsp;the&nbsp;adapting<br>
+&nbsp;&nbsp;&nbsp;&nbsp;field,&nbsp;which&nbsp;is&nbsp;what&nbsp;places&nbsp;the&nbsp;origin&nbsp;at&nbsp;white.</span></dd></dl>
+ <dl><dt><a name="-delta_e"><strong>delta_e</strong></a>(lab_a: 'np.ndarray', lab_b: 'np.ndarray') -&gt; 'np.ndarray'</dt><dd><span class="code">CIE76&nbsp;ΔE&nbsp;—&nbsp;Euclidean&nbsp;distance&nbsp;in&nbsp;L*a*b*.<br>
+&nbsp;<br>
+The&nbsp;canonical&nbsp;perceptual-difference&nbsp;metric:&nbsp;one&nbsp;unit&nbsp;≈&nbsp;one<br>
+just-noticeable&nbsp;difference.&nbsp;Used&nbsp;wherever&nbsp;"how&nbsp;different&nbsp;do&nbsp;these<br>
+two&nbsp;colors&nbsp;*look*"&nbsp;is&nbsp;the&nbsp;question,&nbsp;not&nbsp;the&nbsp;pixel-distance&nbsp;proxy.</span></dd></dl>
+ <dl><dt><a name="-hue_angle"><strong>hue_angle</strong></a>(rg: 'np.ndarray', by: 'np.ndarray') -&gt; 'np.ndarray'</dt><dd><span class="code">Azimuth&nbsp;on&nbsp;the&nbsp;isoluminant&nbsp;opponent&nbsp;plane,&nbsp;∈&nbsp;[0,&nbsp;2π).</span></dd></dl>
+ <dl><dt><a name="-nearest_palette"><strong>nearest_palette</strong></a>(rgb: 'np.ndarray', palette_lab: 'np.ndarray') -&gt; 'np.ndarray'</dt><dd><span class="code">Nearest&nbsp;palette&nbsp;index&nbsp;per&nbsp;color,&nbsp;by&nbsp;ΔE.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;rgb:&nbsp;(...,&nbsp;3)&nbsp;sRGB&nbsp;[0,1]&nbsp;samples.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;palette_lab:&nbsp;(N,&nbsp;3)&nbsp;CIELAB&nbsp;coordinates,&nbsp;from<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;``palette_lab_table``&nbsp;—&nbsp;indexing&nbsp;palette&nbsp;index&nbsp;N.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(...)&nbsp;int&nbsp;array&nbsp;of&nbsp;the&nbsp;argmin-ΔE&nbsp;palette&nbsp;index&nbsp;per&nbsp;sample.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Classification&nbsp;in&nbsp;a&nbsp;perceptually&nbsp;uniform&nbsp;space&nbsp;—&nbsp;antialiasing,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;compositing,&nbsp;and&nbsp;gamma&nbsp;drift&nbsp;bend&nbsp;RGB&nbsp;distances&nbsp;where&nbsp;they<br>
+&nbsp;&nbsp;&nbsp;&nbsp;don't&nbsp;bend&nbsp;perceived&nbsp;color.</span></dd></dl>
+ <dl><dt><a name="-palette_lab_table"><strong>palette_lab_table</strong></a>(palette_rgb: 'np.ndarray') -&gt; 'np.ndarray'</dt><dd><span class="code">Precompute&nbsp;CIELAB&nbsp;coordinates&nbsp;for&nbsp;a&nbsp;palette&nbsp;(N×3&nbsp;sRGB&nbsp;[0,1]).</span></dd></dl>
+ <dl><dt><a name="-srgb_to_lab"><strong>srgb_to_lab</strong></a>(rgb: 'np.ndarray', white_xyz: 'np.ndarray' = array([0.95047, 1.     , 1.08883])) -&gt; 'np.ndarray'</dt><dd><span class="code">sRGB&nbsp;[0,1]&nbsp;→&nbsp;CIELAB&nbsp;L*a*b*.</span></dd></dl>
+ <dl><dt><a name="-srgb_to_linear"><strong>srgb_to_linear</strong></a>(rgb: 'np.ndarray') -&gt; 'np.ndarray'</dt><dd><span class="code">Decode&nbsp;sRGB-encoded&nbsp;intensities&nbsp;[0,1]&nbsp;to&nbsp;linear-light&nbsp;values.<br>
+&nbsp;<br>
+The&nbsp;inverse&nbsp;of&nbsp;the&nbsp;IEC&nbsp;61966-2-1&nbsp;electro-optical&nbsp;transfer<br>
+function:&nbsp;a&nbsp;linear&nbsp;toe&nbsp;segment&nbsp;below&nbsp;0.04045,&nbsp;a&nbsp;γ2.4&nbsp;power&nbsp;above.</span></dd></dl>
+ <dl><dt><a name="-srgb_to_lms"><strong>srgb_to_lms</strong></a>(rgb: 'np.ndarray') -&gt; 'np.ndarray'</dt><dd><span class="code">sRGB&nbsp;[0,1]&nbsp;→&nbsp;L,&nbsp;M,&nbsp;S&nbsp;cone&nbsp;excitations.</span></dd></dl>
+ <dl><dt><a name="-srgb_to_xyz"><strong>srgb_to_xyz</strong></a>(rgb: 'np.ndarray') -&gt; 'np.ndarray'</dt><dd><span class="code">sRGB&nbsp;[0,1]&nbsp;(any&nbsp;leading&nbsp;shape)&nbsp;→&nbsp;CIE&nbsp;XYZ,&nbsp;Y≈1&nbsp;scale.</span></dd></dl>
+ <dl><dt><a name="-xyz_to_lab"><strong>xyz_to_lab</strong></a>(xyz: 'np.ndarray', white_xyz: 'np.ndarray' = array([0.95047, 1.     , 1.08883])) -&gt; 'np.ndarray'</dt><dd><span class="code">CIE&nbsp;XYZ&nbsp;(Y≈1)&nbsp;→&nbsp;CIELAB&nbsp;L*a*b*&nbsp;(CIE&nbsp;1976,&nbsp;D65&nbsp;by&nbsp;default).<br>
+&nbsp;<br>
+The&nbsp;cube-root&nbsp;compression&nbsp;models&nbsp;the&nbsp;cone&nbsp;signal's&nbsp;nonlinear<br>
+response&nbsp;range;&nbsp;normalization&nbsp;by&nbsp;the&nbsp;adapted&nbsp;white&nbsp;is&nbsp;again&nbsp;von<br>
+Kries.&nbsp;``L*``&nbsp;is&nbsp;lightness&nbsp;0–100,&nbsp;``a*``/``b*``&nbsp;the&nbsp;opponent<br>
+coordinates.</span></dd></dl>
+ <dl><dt><a name="-xyz_to_lms"><strong>xyz_to_lms</strong></a>(xyz: 'np.ndarray') -&gt; 'np.ndarray'</dt><dd><span class="code">CIE&nbsp;XYZ&nbsp;→&nbsp;L,&nbsp;M,&nbsp;S&nbsp;cone&nbsp;excitations&nbsp;(Hunt–Pointer–Estevez).</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>D65_XYZ</strong> = array([0.95047, 1.     , 1.08883])</td></tr></table>
+</body></html>

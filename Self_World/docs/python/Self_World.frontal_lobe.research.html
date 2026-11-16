@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.frontal_lobe.research</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.frontal_lobe.html" class="white">frontal_lobe</a>.research</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/research.py">/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/research.py</a></td></tr></table>
+    <p><span class="code">Research&nbsp;workbench&nbsp;—&nbsp;long-horizon&nbsp;mathematical&nbsp;inquiry,&nbsp;persisted.<br>
+&nbsp;<br>
+A&nbsp;heard&nbsp;sentence&nbsp;compiles&nbsp;into&nbsp;a&nbsp;task&nbsp;spec&nbsp;that&nbsp;lives&nbsp;for&nbsp;minutes.<br>
+This&nbsp;is&nbsp;the&nbsp;same&nbsp;act&nbsp;at&nbsp;research&nbsp;scale:&nbsp;a&nbsp;thread<br>
+is&nbsp;an&nbsp;open&nbsp;problem&nbsp;that&nbsp;persists&nbsp;across&nbsp;sessions&nbsp;and&nbsp;sleep&nbsp;cycles,<br>
+keeping&nbsp;its&nbsp;claims,&nbsp;its&nbsp;evidence,&nbsp;and&nbsp;its&nbsp;failures&nbsp;together&nbsp;so&nbsp;that<br>
+nothing&nbsp;is&nbsp;ever&nbsp;paid&nbsp;for&nbsp;twice&nbsp;—&nbsp;the&nbsp;graveyard&nbsp;of&nbsp;attempts&nbsp;is&nbsp;part<br>
+of&nbsp;the&nbsp;state,&nbsp;not&nbsp;noise.<br>
+&nbsp;<br>
+The&nbsp;discipline&nbsp;is&nbsp;provenance:&nbsp;the&nbsp;writer&nbsp;never&nbsp;grants&nbsp;its&nbsp;own<br>
+authority.&nbsp;``record_conjecture``,<br>
+``record_reading``,&nbsp;and&nbsp;``mark_empirical``&nbsp;can&nbsp;only&nbsp;create&nbsp;claims<br>
+that&nbsp;are&nbsp;conjectured,&nbsp;read,&nbsp;or&nbsp;empirically&nbsp;supported;&nbsp;the&nbsp;terminal<br>
+verdicts&nbsp;"verified"&nbsp;and&nbsp;"refuted"&nbsp;are&nbsp;written&nbsp;only&nbsp;by&nbsp;``verify``,<br>
+which&nbsp;consults&nbsp;the&nbsp;symbolic&nbsp;oracle&nbsp;(``parietal_lobe.math.symbolic``)<br>
+itself.&nbsp;Resolving&nbsp;a&nbsp;thread&nbsp;requires&nbsp;at&nbsp;least&nbsp;one&nbsp;terminal-verdict<br>
+claim&nbsp;—&nbsp;the&nbsp;workbench&nbsp;will&nbsp;not&nbsp;let&nbsp;cognition&nbsp;declare&nbsp;victory&nbsp;without<br>
+the&nbsp;oracle&nbsp;agreeing.<br>
+&nbsp;<br>
+The&nbsp;oracle&nbsp;speaks&nbsp;the&nbsp;equational&nbsp;fragment:&nbsp;it&nbsp;can&nbsp;judge&nbsp;"lhs&nbsp;=&nbsp;rhs".<br>
+Richer&nbsp;claims&nbsp;—&nbsp;inequalities,&nbsp;existence&nbsp;statements,&nbsp;asymptotics&nbsp;—<br>
+accumulate&nbsp;evidence&nbsp;but&nbsp;cannot&nbsp;be&nbsp;verified&nbsp;until&nbsp;a&nbsp;real&nbsp;proof<br>
+kernel&nbsp;arrives.&nbsp;That&nbsp;limitation&nbsp;is&nbsp;kept&nbsp;visible&nbsp;rather&nbsp;than<br>
+pretended&nbsp;away.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="json.html">json</a><br>
+<a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="random.html">random</a><br>
+<a href="re.html">re</a><br>
+</td><td class="multicolumn"><a href="time.html">time</a><br>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.frontal_lobe.research.html#Attempt">Attempt</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.research.html#Claim">Claim</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.research.html#ResearchThread">ResearchThread</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.research.html#ResearchWorkbench">ResearchWorkbench</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Attempt">class <strong>Attempt</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Attempt">Attempt</a>(id:&nbsp;'str',&nbsp;approach:&nbsp;'str',&nbsp;outcome:&nbsp;'str',&nbsp;note:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;created:&nbsp;'float'&nbsp;=&nbsp;0.0)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;failed&nbsp;or&nbsp;partial&nbsp;approach&nbsp;—&nbsp;kept&nbsp;so&nbsp;it&nbsp;is&nbsp;never&nbsp;retried&nbsp;blind.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Attempt-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="Attempt-__init__"><strong>__init__</strong></a>(self, id: 'str', approach: 'str', outcome: 'str', note: 'str' = '', created: 'float' = 0.0) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Attempt-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="Attempt-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict[str, Any]'</dt><dd><span class="code">Serialize&nbsp;to&nbsp;a&nbsp;JSON-safe&nbsp;dict.</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="Attempt-from_dict"><strong>from_dict</strong></a>(d: 'dict[str, Any]') -&gt; 'Attempt'</dt><dd><span class="code">Rebuild&nbsp;an&nbsp;attempt&nbsp;from&nbsp;its&nbsp;serialized&nbsp;form.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'approach': 'str', 'created': 'float', 'id': 'str', 'note': 'str', 'outcome': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'approach': Field(name='approach',type='str',default=&lt;datacl...appingproxy({}),kw_only=False,_field_type=_FIELD), 'created': Field(name='created',type='float',default=0.0,de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'id': Field(name='id',type='str',default=&lt;dataclasses....appingproxy({}),kw_only=False,_field_type=_FIELD), 'note': Field(name='note',type='str',default='',default_...appingproxy({}),kw_only=False,_field_type=_FIELD), 'outcome': Field(name='outcome',type='str',default=&lt;datacla...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('id', 'approach', 'outcome', 'note', 'created')</dl>
+
+<dl><dt><strong>created</strong> = 0.0</dl>
+
+<dl><dt><strong>note</strong> = ''</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Claim">class <strong>Claim</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Claim">Claim</a>(id:&nbsp;'str',&nbsp;statement:&nbsp;'str',&nbsp;provenance:&nbsp;'str',&nbsp;note:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;source:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;evidence:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;verification:&nbsp;'dict[str,&nbsp;Any]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;created:&nbsp;'float'&nbsp;=&nbsp;0.0)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;single&nbsp;mathematical&nbsp;assertion&nbsp;inside&nbsp;a&nbsp;thread.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Claim-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="Claim-__init__"><strong>__init__</strong></a>(self, id: 'str', statement: 'str', provenance: 'str', note: 'str' = '', source: 'str' = '', evidence: 'list[str]' = &lt;factory&gt;, verification: 'dict[str, Any] | None' = None, created: 'float' = 0.0) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Claim-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="Claim-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict[str, Any]'</dt><dd><span class="code">Serialize&nbsp;to&nbsp;a&nbsp;JSON-safe&nbsp;dict.</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="Claim-from_dict"><strong>from_dict</strong></a>(d: 'dict[str, Any]') -&gt; 'Claim'</dt><dd><span class="code">Rebuild&nbsp;a&nbsp;claim&nbsp;from&nbsp;its&nbsp;serialized&nbsp;form.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'created': 'float', 'evidence': 'list[str]', 'id': 'str', 'note': 'str', 'provenance': 'str', 'source': 'str', 'statement': 'str', 'verification': 'dict[str, Any] | None'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'created': Field(name='created',type='float',default=0.0,de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'evidence': Field(name='evidence',type='list[str]',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD), 'id': Field(name='id',type='str',default=&lt;dataclasses....appingproxy({}),kw_only=False,_field_type=_FIELD), 'note': Field(name='note',type='str',default='',default_...appingproxy({}),kw_only=False,_field_type=_FIELD), 'provenance': Field(name='provenance',type='str',default=&lt;data...appingproxy({}),kw_only=False,_field_type=_FIELD), 'source': Field(name='source',type='str',default='',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'statement': Field(name='statement',type='str',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'verification': Field(name='verification',type='dict[str, Any] |...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('id', 'statement', 'provenance', 'note', 'source', 'evidence', 'verification', 'created')</dl>
+
+<dl><dt><strong>created</strong> = 0.0</dl>
+
+<dl><dt><strong>note</strong> = ''</dl>
+
+<dl><dt><strong>source</strong> = ''</dl>
+
+<dl><dt><strong>verification</strong> = None</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ResearchThread">class <strong>ResearchThread</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ResearchThread">ResearchThread</a>(id:&nbsp;'str',&nbsp;statement:&nbsp;'str',&nbsp;status:&nbsp;'str'&nbsp;=&nbsp;'open',&nbsp;claims:&nbsp;'list[<a href="#Claim">Claim</a>]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;attempts:&nbsp;'list[<a href="#Attempt">Attempt</a>]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;created:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;touched:&nbsp;'float'&nbsp;=&nbsp;0.0)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+One&nbsp;open&nbsp;problem:&nbsp;its&nbsp;statement,&nbsp;claims,&nbsp;and&nbsp;attempt&nbsp;graveyard.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ResearchThread-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="ResearchThread-__init__"><strong>__init__</strong></a>(self, id: 'str', statement: 'str', status: 'str' = 'open', claims: 'list[Claim]' = &lt;factory&gt;, attempts: 'list[Attempt]' = &lt;factory&gt;, created: 'float' = 0.0, touched: 'float' = 0.0) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="ResearchThread-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="ResearchThread-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict[str, Any]'</dt><dd><span class="code">Serialize&nbsp;to&nbsp;a&nbsp;JSON-safe&nbsp;dict.</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="ResearchThread-from_dict"><strong>from_dict</strong></a>(d: 'dict[str, Any]') -&gt; 'ResearchThread'</dt><dd><span class="code">Rebuild&nbsp;a&nbsp;thread&nbsp;from&nbsp;its&nbsp;serialized&nbsp;form.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'attempts': 'list[Attempt]', 'claims': 'list[Claim]', 'created': 'float', 'id': 'str', 'statement': 'str', 'status': 'str', 'touched': 'float'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'attempts': Field(name='attempts',type='list[Attempt]',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'claims': Field(name='claims',type='list[Claim]',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD), 'created': Field(name='created',type='float',default=0.0,de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'id': Field(name='id',type='str',default=&lt;dataclasses....appingproxy({}),kw_only=False,_field_type=_FIELD), 'statement': Field(name='statement',type='str',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'status': Field(name='status',type='str',default='open',de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'touched': Field(name='touched',type='float',default=0.0,de...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('id', 'statement', 'status', 'claims', 'attempts', 'created', 'touched')</dl>
+
+<dl><dt><strong>created</strong> = 0.0</dl>
+
+<dl><dt><strong>status</strong> = 'open'</dl>
+
+<dl><dt><strong>touched</strong> = 0.0</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ResearchWorkbench">class <strong>ResearchWorkbench</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ResearchWorkbench">ResearchWorkbench</a>(data_dir:&nbsp;'str&nbsp;|&nbsp;Path&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Persistent&nbsp;research&nbsp;state&nbsp;rooted&nbsp;at&nbsp;``&lt;data_dir&gt;/research``.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ResearchWorkbench-__init__"><strong>__init__</strong></a>(self, data_dir: 'str | Path | None' = None) -&gt; 'None'</dt><dd><span class="code">Load&nbsp;existing&nbsp;threads&nbsp;from&nbsp;the&nbsp;data&nbsp;dir,&nbsp;if&nbsp;any.</span></dd></dl>
+
+<dl><dt><a name="ResearchWorkbench-digest"><strong>digest</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">A&nbsp;truncated&nbsp;SHA-256&nbsp;of&nbsp;the&nbsp;workbench&nbsp;file&nbsp;on&nbsp;disk.<br>
+&nbsp;<br>
+Publicly&nbsp;anchoring&nbsp;this&nbsp;digest&nbsp;(e.g.&nbsp;on&nbsp;her&nbsp;channel&nbsp;board)<br>
+means&nbsp;the&nbsp;ledger&nbsp;cannot&nbsp;be&nbsp;quietly&nbsp;rewritten&nbsp;afterward&nbsp;—<br>
+anyone&nbsp;holding&nbsp;the&nbsp;file&nbsp;can&nbsp;recompute&nbsp;the&nbsp;hash&nbsp;and&nbsp;confirm<br>
+the&nbsp;verdicts&nbsp;shown&nbsp;are&nbsp;the&nbsp;verdicts&nbsp;recorded.&nbsp;Returns&nbsp;""<br>
+when&nbsp;the&nbsp;file&nbsp;does&nbsp;not&nbsp;exist&nbsp;yet&nbsp;(nothing&nbsp;to&nbsp;anchor).</span></dd></dl>
+
+<dl><dt><a name="ResearchWorkbench-mark_empirical"><strong>mark_empirical</strong></a>(self, thread_id: 'str', claim_id: 'str', evidence: 'str' = '') -&gt; 'Claim'</dt><dd><span class="code">Mark&nbsp;a&nbsp;conjecture&nbsp;as&nbsp;numerically&nbsp;supported&nbsp;—&nbsp;still&nbsp;not&nbsp;proven.</span></dd></dl>
+
+<dl><dt><a name="ResearchWorkbench-open_problem"><strong>open_problem</strong></a>(self, statement: 'str') -&gt; 'ResearchThread'</dt><dd><span class="code">Open&nbsp;a&nbsp;thread&nbsp;for&nbsp;a&nbsp;problem&nbsp;statement.<br>
+&nbsp;<br>
+The&nbsp;same&nbsp;statement&nbsp;reopens&nbsp;the&nbsp;same&nbsp;thread&nbsp;rather&nbsp;than<br>
+duplicating&nbsp;it&nbsp;—&nbsp;a&nbsp;problem&nbsp;returned&nbsp;to&nbsp;is&nbsp;a&nbsp;problem&nbsp;resumed.</span></dd></dl>
+
+<dl><dt><a name="ResearchWorkbench-pause"><strong>pause</strong></a>(self, thread_id: 'str') -&gt; 'ResearchThread'</dt><dd><span class="code">Set&nbsp;a&nbsp;thread&nbsp;aside&nbsp;without&nbsp;closing&nbsp;it.</span></dd></dl>
+
+<dl><dt><a name="ResearchWorkbench-record_attempt"><strong>record_attempt</strong></a>(self, thread_id: 'str', approach: 'str', outcome: 'str' = 'failed', note: 'str' = '') -&gt; 'Attempt'</dt><dd><span class="code">Log&nbsp;an&nbsp;approach&nbsp;into&nbsp;the&nbsp;graveyard&nbsp;(or&nbsp;the&nbsp;rare&nbsp;success).</span></dd></dl>
+
+<dl><dt><a name="ResearchWorkbench-record_conjecture"><strong>record_conjecture</strong></a>(self, thread_id: 'str', statement: 'str', note: 'str' = '') -&gt; 'Claim'</dt><dd><span class="code">Record&nbsp;something&nbsp;she&nbsp;suspects&nbsp;is&nbsp;true&nbsp;—&nbsp;unverified&nbsp;by&nbsp;birth.</span></dd></dl>
+
+<dl><dt><a name="ResearchWorkbench-record_reading"><strong>record_reading</strong></a>(self, thread_id: 'str', statement: 'str', source: 'str' = '', note: 'str' = '') -&gt; 'Claim'</dt><dd><span class="code">Record&nbsp;something&nbsp;taken&nbsp;from&nbsp;literature,&nbsp;with&nbsp;its&nbsp;source.</span></dd></dl>
+
+<dl><dt><a name="ResearchWorkbench-resolve"><strong>resolve</strong></a>(self, thread_id: 'str') -&gt; 'ResearchThread'</dt><dd><span class="code">Close&nbsp;a&nbsp;thread&nbsp;as&nbsp;resolved.<br>
+&nbsp;<br>
+Refused&nbsp;unless&nbsp;at&nbsp;least&nbsp;one&nbsp;claim&nbsp;carries&nbsp;a&nbsp;terminal&nbsp;verdict&nbsp;—<br>
+victory&nbsp;is&nbsp;the&nbsp;oracle's&nbsp;to&nbsp;declare.</span></dd></dl>
+
+<dl><dt><a name="ResearchWorkbench-status"><strong>status</strong></a>(self, thread_id: 'str | None' = None) -&gt; 'dict[str, Any]'</dt><dd><span class="code">Summarize&nbsp;one&nbsp;thread,&nbsp;or&nbsp;the&nbsp;whole&nbsp;bench.</span></dd></dl>
+
+<dl><dt><a name="ResearchWorkbench-thread"><strong>thread</strong></a>(self, thread_id: 'str') -&gt; 'ResearchThread | None'</dt><dd><span class="code">Return&nbsp;a&nbsp;thread&nbsp;by&nbsp;id,&nbsp;or&nbsp;None.</span></dd></dl>
+
+<dl><dt><a name="ResearchWorkbench-threads"><strong>threads</strong></a>(self) -&gt; 'list[ResearchThread]'</dt><dd><span class="code">Return&nbsp;every&nbsp;thread,&nbsp;most&nbsp;recently&nbsp;touched&nbsp;first.</span></dd></dl>
+
+<dl><dt><a name="ResearchWorkbench-verify"><strong>verify</strong></a>(self, thread_id: 'str', claim_id: 'str', lhs: 'str', rhs: 'str', op: 'str' = '=', var: 'str | None' = None, lo: 'int' = 1, hi: 'int' = 100) -&gt; 'dict[str, Any]'</dt><dd><span class="code">Ask&nbsp;the&nbsp;oracle&nbsp;to&nbsp;judge&nbsp;a&nbsp;claim.<br>
+&nbsp;<br>
+Dispatches&nbsp;on&nbsp;the&nbsp;claim's&nbsp;shape:&nbsp;equalities&nbsp;go&nbsp;to<br>
+``check_equality``,&nbsp;inequalities&nbsp;(``&lt;``,&nbsp;``&lt;=``,&nbsp;``&gt;``,<br>
+``&gt;=``)&nbsp;to&nbsp;``check_inequality``,&nbsp;and&nbsp;a&nbsp;claim&nbsp;carrying&nbsp;a<br>
+bounded&nbsp;variable&nbsp;(``for&nbsp;n&nbsp;&lt;=&nbsp;K``)&nbsp;to&nbsp;``check_bounded_equality``<br>
+—&nbsp;an&nbsp;exhaustive&nbsp;check&nbsp;over&nbsp;the&nbsp;integer&nbsp;range&nbsp;that&nbsp;can&nbsp;only<br>
+refute&nbsp;(with&nbsp;a&nbsp;witness)&nbsp;or&nbsp;accumulate&nbsp;bounded&nbsp;evidence;&nbsp;it<br>
+never&nbsp;writes&nbsp;"verified"&nbsp;for&nbsp;a&nbsp;bounded&nbsp;pass.<br>
+&nbsp;<br>
+"verified"&nbsp;or&nbsp;"refuted"&nbsp;are&nbsp;terminal;&nbsp;"undecided"&nbsp;leaves&nbsp;the<br>
+claim&nbsp;as&nbsp;it&nbsp;was,&nbsp;with&nbsp;the&nbsp;oracle's&nbsp;detail&nbsp;noted&nbsp;as&nbsp;evidence.<br>
+A&nbsp;claim&nbsp;already&nbsp;carrying&nbsp;a&nbsp;terminal&nbsp;verdict&nbsp;is&nbsp;not&nbsp;re-judged&nbsp;—<br>
+the&nbsp;oracle's&nbsp;word,&nbsp;once&nbsp;given,&nbsp;stands.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;only&nbsp;path&nbsp;to&nbsp;terminal&nbsp;provenance&nbsp;anywhere&nbsp;in&nbsp;the<br>
+workbench.</span></dd></dl>
+
+<dl><dt><a name="ResearchWorkbench-work"><strong>work</strong></a>(self, thread_id: 'str | None' = None, rng: 'random.Random | None' = None, max_judge: 'int' = 3) -&gt; 'dict[str, Any]'</dt><dd><span class="code">One&nbsp;bounded&nbsp;work&nbsp;session&nbsp;on&nbsp;an&nbsp;open&nbsp;thread.<br>
+&nbsp;<br>
+First&nbsp;judges&nbsp;every&nbsp;unjudged&nbsp;claim&nbsp;it&nbsp;can&nbsp;reach&nbsp;—<br>
+conjectured,&nbsp;read,&nbsp;or&nbsp;empirically&nbsp;supported&nbsp;claims&nbsp;whose<br>
+statement&nbsp;parses&nbsp;as&nbsp;a&nbsp;relation&nbsp;or&nbsp;bounded&nbsp;universal&nbsp;—<br>
+through&nbsp;the&nbsp;oracle.&nbsp;If<br>
+nothing&nbsp;was&nbsp;judged&nbsp;and&nbsp;a&nbsp;verified&nbsp;claim&nbsp;exists,&nbsp;it&nbsp;varies<br>
+that&nbsp;claim&nbsp;into&nbsp;a&nbsp;new&nbsp;conjecture&nbsp;(sound&nbsp;moves&nbsp;mostly&nbsp;verify,<br>
+free&nbsp;mutations&nbsp;mostly&nbsp;refute&nbsp;—&nbsp;both&nbsp;are&nbsp;knowledge)&nbsp;and&nbsp;judges<br>
+it.&nbsp;A&nbsp;session&nbsp;can&nbsp;legitimately&nbsp;produce&nbsp;nothing:&nbsp;prose-only<br>
+threads&nbsp;wait&nbsp;for&nbsp;a&nbsp;richer&nbsp;oracle.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-get_workbench"><strong>get_workbench</strong></a>() -&gt; 'ResearchWorkbench'</dt><dd><span class="code">Return&nbsp;the&nbsp;shared&nbsp;workbench,&nbsp;bound&nbsp;to&nbsp;the&nbsp;default&nbsp;data&nbsp;dir.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>RECORDABLE_PROVENANCE</strong> = frozenset({'conjectured', 'empirical', 'read'})<br>
+<strong>TERMINAL_PROVENANCE</strong> = frozenset({'refuted', 'verified'})<br>
+<strong>__annotations__</strong> = {'_GLOBAL_WORKBENCH': 'ResearchWorkbench | None'}<br>
+<strong>logger</strong> = &lt;Logger Self_World.frontal_lobe.research (WARNING)&gt;</td></tr></table>
+</body></html>

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.temporal_lobe.vtc</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.temporal_lobe.html" class="white">temporal_lobe</a>.vtc</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/vtc.py">/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/vtc.py</a></td></tr></table>
+    <p><span class="code">VTC&nbsp;—&nbsp;Ventral&nbsp;temporal&nbsp;cortex.<br>
+&nbsp;<br>
+Incremental&nbsp;PCA&nbsp;of&nbsp;V4&nbsp;activations&nbsp;creates&nbsp;a&nbsp;low-dimensional&nbsp;feature<br>
+space&nbsp;whose&nbsp;axes&nbsp;capture&nbsp;the&nbsp;principal&nbsp;variations&nbsp;in&nbsp;mid-level&nbsp;visual<br>
+features.&nbsp;See&nbsp;vision/__init__.py&nbsp;for&nbsp;the&nbsp;full&nbsp;mathematical<br>
+foundation.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="numpy.html">numpy</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.vtc.html#VTCFeatureSpace">VTCFeatureSpace</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="VTCFeatureSpace">class <strong>VTCFeatureSpace</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#VTCFeatureSpace">VTCFeatureSpace</a>(input_dim:&nbsp;'int'&nbsp;=&nbsp;64,&nbsp;n_components:&nbsp;'int'&nbsp;=&nbsp;32,&nbsp;forgetting_factor:&nbsp;'float'&nbsp;=&nbsp;0.99)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Ventral&nbsp;temporal&nbsp;cortex&nbsp;—&nbsp;axis-based&nbsp;feature&nbsp;space.<br>
+&nbsp;<br>
+PCA&nbsp;of&nbsp;V4&nbsp;activations&nbsp;creates&nbsp;a&nbsp;low-dimensional&nbsp;feature&nbsp;space<br>
+whose&nbsp;axes&nbsp;capture&nbsp;the&nbsp;principal&nbsp;variations&nbsp;in&nbsp;mid-level&nbsp;visual<br>
+features.&nbsp;This&nbsp;mirrors&nbsp;the&nbsp;axis-based&nbsp;organization&nbsp;reported&nbsp;for<br>
+primate&nbsp;inferotemporal&nbsp;cortex&nbsp;(Bao&nbsp;et&nbsp;al.,&nbsp;2020,&nbsp;Nature&nbsp;—&nbsp;a&nbsp;map<br>
+of&nbsp;<a href="builtins.html#object">object</a>&nbsp;space):&nbsp;neurons&nbsp;are&nbsp;organized&nbsp;along&nbsp;feature&nbsp;dimensions<br>
+(shape,&nbsp;texture,&nbsp;color,&nbsp;curvature),&nbsp;and&nbsp;the&nbsp;space&nbsp;is&nbsp;where<br>
+objects&nbsp;cluster&nbsp;by&nbsp;category.<br>
+&nbsp;<br>
+The&nbsp;space&nbsp;is&nbsp;learned&nbsp;incrementally&nbsp;—&nbsp;each&nbsp;new&nbsp;image&nbsp;updates&nbsp;the<br>
+PCA&nbsp;basis&nbsp;via&nbsp;incremental&nbsp;PCA.&nbsp;This&nbsp;mirrors&nbsp;how&nbsp;the&nbsp;visual&nbsp;system<br>
+refines&nbsp;its&nbsp;feature&nbsp;space&nbsp;through&nbsp;experience.<br>
+&nbsp;<br>
+The&nbsp;output&nbsp;is&nbsp;a&nbsp;fixed-dimensional&nbsp;vector&nbsp;(vtc_vector)&nbsp;that&nbsp;serves<br>
+as&nbsp;the&nbsp;input&nbsp;to&nbsp;the&nbsp;MTL&nbsp;bridge.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="VTCFeatureSpace-__init__"><strong>__init__</strong></a>(self, input_dim: 'int' = 64, n_components: 'int' = 32, forgetting_factor: 'float' = 0.99) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;VTC&nbsp;feature&nbsp;space.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;input_dim:&nbsp;dimensionality&nbsp;of&nbsp;V4&nbsp;latent&nbsp;vectors.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;n_components:&nbsp;number&nbsp;of&nbsp;PCA&nbsp;components&nbsp;(VTC&nbsp;axes).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;forgetting_factor:&nbsp;EMA&nbsp;forgetting&nbsp;factor&nbsp;for&nbsp;incremental<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;updates&nbsp;(0.99&nbsp;=&nbsp;slow&nbsp;adaptation,&nbsp;preserves&nbsp;long-term<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;structure&nbsp;while&nbsp;allowing&nbsp;gradual&nbsp;refinement).</span></dd></dl>
+
+<dl><dt><a name="VTCFeatureSpace-load"><strong>load</strong></a>(self, path: 'Path' = PosixPath('/home/mindyrenee/.local/share/genesis/visual_cortex/vtc_space.npz')) -&gt; 'bool'</dt><dd><span class="code">Load&nbsp;VTC&nbsp;PCA&nbsp;state&nbsp;from&nbsp;disk.&nbsp;Returns&nbsp;True&nbsp;if&nbsp;loaded.</span></dd></dl>
+
+<dl><dt><a name="VTCFeatureSpace-process"><strong>process</strong></a>(self, v4_latents: 'np.ndarray', learn: 'bool' = True) -&gt; 'np.ndarray'</dt><dd><span class="code">Project&nbsp;V4&nbsp;activations&nbsp;into&nbsp;the&nbsp;VTC&nbsp;feature&nbsp;space.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;v4_latents:&nbsp;(n_v4_units,&nbsp;n_v4_features)&nbsp;V4&nbsp;latent&nbsp;activations.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;learn:&nbsp;if&nbsp;True,&nbsp;update&nbsp;the&nbsp;PCA&nbsp;basis.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;vtc_vector:&nbsp;(n_components,)&nbsp;—&nbsp;the&nbsp;visual&nbsp;feature&nbsp;vector<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;in&nbsp;VTC&nbsp;space.&nbsp;This&nbsp;is&nbsp;a&nbsp;global&nbsp;descriptor&nbsp;of&nbsp;the&nbsp;image,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;computed&nbsp;as&nbsp;the&nbsp;mean&nbsp;V4&nbsp;activation&nbsp;projected&nbsp;through&nbsp;PCA.</span></dd></dl>
+
+<dl><dt><a name="VTCFeatureSpace-save"><strong>save</strong></a>(self, path: 'Path' = PosixPath('/home/mindyrenee/.local/share/genesis/visual_cortex/vtc_space.npz')) -&gt; 'None'</dt><dd><span class="code">Save&nbsp;VTC&nbsp;PCA&nbsp;state&nbsp;to&nbsp;disk.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>logger</strong> = &lt;Logger Self_World.temporal_lobe.vtc (WARNING)&gt;</td></tr></table>
+</body></html>

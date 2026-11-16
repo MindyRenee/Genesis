@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["NICE_LEVELS","SYSTEM_BUS_PATH"],"enum":["Reply"],"fn":["align_up","connect","dbus_call","enc_sig","enc_str","grant_high_priority","marshal_call","marshal_field","pad","read_message","sasl_auth"],"struct":["CallSpec","Msg"]};

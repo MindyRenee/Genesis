@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.temporal_lobe.concept_learner</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.temporal_lobe.html" class="white">temporal_lobe</a>.concept_learner</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/concept_learner.py">/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/concept_learner.py</a></td></tr></table>
+    <p><span class="code">Concept&nbsp;learning&nbsp;—&nbsp;word&nbsp;labeling&nbsp;and&nbsp;activation&nbsp;spreading.<br>
+&nbsp;<br>
+Extracted&nbsp;from&nbsp;FrontalLobe&nbsp;as&nbsp;a&nbsp;focused&nbsp;subsystem.&nbsp;When&nbsp;the&nbsp;user<br>
+labels&nbsp;Genesis's&nbsp;experience&nbsp;("you&nbsp;seem&nbsp;stressed",&nbsp;"your&nbsp;thinking&nbsp;is<br>
+rigid"),&nbsp;it&nbsp;learns&nbsp;the&nbsp;word&nbsp;and&nbsp;connects&nbsp;it&nbsp;to&nbsp;the&nbsp;appropriate<br>
+structural&nbsp;category&nbsp;hub&nbsp;via&nbsp;EXPRESSES&nbsp;edges.&nbsp;Words&nbsp;for&nbsp;the&nbsp;same<br>
+category&nbsp;are&nbsp;connected&nbsp;via&nbsp;SIMILAR_TO&nbsp;edges.<br>
+&nbsp;<br>
+Also&nbsp;handles&nbsp;activation&nbsp;spreading&nbsp;for&nbsp;mentioned&nbsp;topics&nbsp;with&nbsp;the<br>
+cortical&nbsp;columnar&nbsp;circuit:&nbsp;column-aware&nbsp;spreading,&nbsp;lateral&nbsp;inhibition,<br>
+winner-take-all,&nbsp;and&nbsp;context&nbsp;disinhibition.<br>
+&nbsp;<br>
+Dependencies&nbsp;(passed&nbsp;to&nbsp;``__init__``):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;network:&nbsp;ConceptNetwork&nbsp;for&nbsp;concept&nbsp;creation,&nbsp;edge&nbsp;creation,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;activation&nbsp;spreading,&nbsp;lateral&nbsp;inhibition,&nbsp;and&nbsp;word-category&nbsp;lookups</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="re.html">re</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.concept_learner.html#ConceptLearner">ConceptLearner</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ConceptLearner">class <strong>ConceptLearner</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ConceptLearner">ConceptLearner</a>(network:&nbsp;'ConceptNetwork',&nbsp;synapses:&nbsp;'SynapticStore&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Learn&nbsp;words&nbsp;from&nbsp;social&nbsp;labeling&nbsp;and&nbsp;spread&nbsp;concept&nbsp;activation.<br>
+&nbsp;<br>
+Word&nbsp;learning&nbsp;follows&nbsp;the&nbsp;pattern&nbsp;children&nbsp;use:&nbsp;when&nbsp;someone&nbsp;says<br>
+"you&nbsp;seem&nbsp;stressed",&nbsp;it&nbsp;associates&nbsp;the&nbsp;word&nbsp;"stressed"&nbsp;with&nbsp;the<br>
+emotion&nbsp;category.&nbsp;Words&nbsp;for&nbsp;the&nbsp;same&nbsp;category&nbsp;are&nbsp;connected&nbsp;via<br>
+SIMILAR_TO&nbsp;edges&nbsp;so&nbsp;it&nbsp;learns&nbsp;that&nbsp;"content"&nbsp;and&nbsp;"calm"&nbsp;are&nbsp;related.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ConceptLearner-__init__"><strong>__init__</strong></a>(self, network: 'ConceptNetwork', synapses: 'SynapticStore | None' = None) -&gt; 'None'</dt><dd><span class="code">Wire&nbsp;the&nbsp;learner&nbsp;to&nbsp;semantic&nbsp;and&nbsp;learned&nbsp;synaptic&nbsp;substrates.</span></dd></dl>
+
+<dl><dt><a name="ConceptLearner-condition_word_valence"><strong>condition_word_valence</strong></a>(self, word: 'str', felt_valence: 'float') -&gt; 'float'</dt><dd><span class="code">Nudge&nbsp;a&nbsp;word's&nbsp;sentiment&nbsp;score&nbsp;by&nbsp;a&nbsp;felt&nbsp;valence.<br>
+&nbsp;<br>
+Satiation-scaled:&nbsp;scores&nbsp;near&nbsp;the&nbsp;±4&nbsp;clamp&nbsp;resist&nbsp;further<br>
+drift,&nbsp;so&nbsp;explicitly&nbsp;taught&nbsp;anchors&nbsp;(±2.0)&nbsp;move&nbsp;slowly&nbsp;under<br>
+conditioning&nbsp;while&nbsp;novel&nbsp;words&nbsp;respond&nbsp;quickly&nbsp;to&nbsp;a&nbsp;few<br>
+pairings.&nbsp;Returns&nbsp;the&nbsp;new&nbsp;score.</span></dd></dl>
+
+<dl><dt><a name="ConceptLearner-connect_word_to_category"><strong>connect_word_to_category</strong></a>(self, word: 'str', kind: 'str', category_value: 'str') -&gt; 'None'</dt><dd><span class="code">Connect&nbsp;a&nbsp;learned&nbsp;word&nbsp;to&nbsp;a&nbsp;category&nbsp;hub&nbsp;via&nbsp;EXPRESSES&nbsp;edge.<br>
+&nbsp;<br>
+Creates&nbsp;the&nbsp;word&nbsp;concept&nbsp;if&nbsp;it&nbsp;doesn't&nbsp;exist,&nbsp;sets&nbsp;the<br>
+property&nbsp;(backward&nbsp;compat),&nbsp;creates&nbsp;the&nbsp;EXPRESSES&nbsp;edge&nbsp;to<br>
+the&nbsp;hub,&nbsp;and&nbsp;creates&nbsp;SIMILAR_TO&nbsp;edges&nbsp;to&nbsp;other&nbsp;words&nbsp;for<br>
+the&nbsp;same&nbsp;category.</span></dd></dl>
+
+<dl><dt><a name="ConceptLearner-connect_word_to_valence"><strong>connect_word_to_valence</strong></a>(self, word: 'str', valence_state: 'str', score: 'float') -&gt; 'None'</dt><dd><span class="code">Learn&nbsp;a&nbsp;word's&nbsp;sentiment&nbsp;polarity&nbsp;(positive/negative).<br>
+&nbsp;<br>
+Writes&nbsp;to&nbsp;BOTH&nbsp;substrates:<br>
+1.&nbsp;The&nbsp;learned&nbsp;sentiment&nbsp;lexicon&nbsp;(learn_sentiment)&nbsp;—&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;canonical&nbsp;source&nbsp;analyze_sentiment&nbsp;consults&nbsp;(seed&nbsp;lexicon<br>
+&nbsp;&nbsp;&nbsp;removed;&nbsp;all&nbsp;scores&nbsp;are&nbsp;learned).<br>
+2.&nbsp;The&nbsp;concept&nbsp;network&nbsp;(EXPRESSES&nbsp;→&nbsp;_cat:valence:&lt;state&gt;)&nbsp;—<br>
+&nbsp;&nbsp;&nbsp;persistent&nbsp;graph&nbsp;knowledge&nbsp;with&nbsp;SIMILAR_TO&nbsp;links&nbsp;to&nbsp;other<br>
+&nbsp;&nbsp;&nbsp;words&nbsp;of&nbsp;the&nbsp;same&nbsp;polarity.</span></dd></dl>
+
+<dl><dt><a name="ConceptLearner-learn_concepts"><strong>learn_concepts</strong></a>(self, perception: 'Perception') -&gt; 'None'</dt><dd><span class="code">Activate&nbsp;concepts&nbsp;from&nbsp;the&nbsp;user's&nbsp;input.<br>
+&nbsp;<br>
+Fact&nbsp;extraction&nbsp;and&nbsp;relationship&nbsp;learning&nbsp;is&nbsp;handled&nbsp;by&nbsp;the<br>
+self-directed&nbsp;learner&nbsp;which&nbsp;runs&nbsp;earlier&nbsp;in&nbsp;the&nbsp;think&nbsp;loop.<br>
+This&nbsp;method&nbsp;only&nbsp;handles&nbsp;activation&nbsp;spreading&nbsp;and&nbsp;column-aware<br>
+processing&nbsp;of&nbsp;mentioned&nbsp;topics.<br>
+&nbsp;<br>
+The&nbsp;cortical&nbsp;columnar&nbsp;circuit&nbsp;is&nbsp;applied&nbsp;after&nbsp;activation:<br>
+1.&nbsp;Column-aware&nbsp;spreading&nbsp;(dense&nbsp;intra-column,&nbsp;sparse&nbsp;inter-column)<br>
+2.&nbsp;Lateral&nbsp;inhibition&nbsp;(SOM:&nbsp;suppress&nbsp;competing&nbsp;columns)&nbsp;with<br>
+&nbsp;&nbsp;&nbsp;context&nbsp;disinhibition&nbsp;(VIP:&nbsp;protect&nbsp;context-relevant&nbsp;columns<br>
+&nbsp;&nbsp;&nbsp;via&nbsp;the&nbsp;context_columns&nbsp;parameter)<br>
+3.&nbsp;Winner-take-all&nbsp;(PV:&nbsp;sharpen&nbsp;within&nbsp;dominant&nbsp;column)</span></dd></dl>
+
+<dl><dt><a name="ConceptLearner-learn_verb"><strong>learn_verb</strong></a>(self, base: 'str') -&gt; 'None'</dt><dd><span class="code">Learn&nbsp;a&nbsp;verb&nbsp;base&nbsp;form&nbsp;from&nbsp;explicit&nbsp;teaching.<br>
+&nbsp;<br>
+Registers&nbsp;in&nbsp;the&nbsp;morphology&nbsp;overlay&nbsp;(fast&nbsp;path&nbsp;for&nbsp;parsing)<br>
+AND&nbsp;in&nbsp;the&nbsp;concept&nbsp;network&nbsp;so&nbsp;it&nbsp;persists&nbsp;across&nbsp;restarts.</span></dd></dl>
+
+<dl><dt><a name="ConceptLearner-learn_word_from_labeling"><strong>learn_word_from_labeling</strong></a>(self, user_input: 'str', emotion: 'EmotionalState') -&gt; 'None'</dt><dd><span class="code">Learn&nbsp;state&nbsp;words&nbsp;when&nbsp;the&nbsp;user&nbsp;labels&nbsp;its&nbsp;experience.<br>
+&nbsp;<br>
+When&nbsp;the&nbsp;user&nbsp;says&nbsp;something&nbsp;like&nbsp;"you&nbsp;seem&nbsp;stressed"&nbsp;or<br>
+"your&nbsp;thinking&nbsp;is&nbsp;rigid"&nbsp;or&nbsp;"what's&nbsp;causing&nbsp;this&nbsp;is&nbsp;overwhelm"<br>
+or&nbsp;"your&nbsp;learning&nbsp;is&nbsp;blocked",&nbsp;it&nbsp;associates&nbsp;the&nbsp;word&nbsp;with<br>
+the&nbsp;appropriate&nbsp;structural&nbsp;category&nbsp;in&nbsp;the&nbsp;concept&nbsp;network.<br>
+This&nbsp;is&nbsp;how&nbsp;children&nbsp;learn&nbsp;words&nbsp;—&nbsp;through&nbsp;social&nbsp;labeling.<br>
+&nbsp;<br>
+The&nbsp;association&nbsp;is&nbsp;stored&nbsp;two&nbsp;ways:<br>
+1.&nbsp;A&nbsp;property&nbsp;on&nbsp;the&nbsp;word&nbsp;concept&nbsp;(backward&nbsp;compatibility)<br>
+2.&nbsp;An&nbsp;EXPRESSES&nbsp;edge&nbsp;from&nbsp;the&nbsp;word&nbsp;to&nbsp;the&nbsp;category&nbsp;hub&nbsp;(the<br>
+&nbsp;&nbsp;&nbsp;new&nbsp;graph-based&nbsp;path,&nbsp;enabling&nbsp;traversal&nbsp;and&nbsp;spreading<br>
+&nbsp;&nbsp;&nbsp;activation)<br>
+&nbsp;<br>
+Words&nbsp;for&nbsp;the&nbsp;same&nbsp;category&nbsp;are&nbsp;also&nbsp;connected&nbsp;via&nbsp;SIMILAR_TO<br>
+edges,&nbsp;so&nbsp;it&nbsp;learns&nbsp;that&nbsp;"content"&nbsp;and&nbsp;"calm"&nbsp;are&nbsp;related.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['ConceptLearner']</td></tr></table>
+</body></html>

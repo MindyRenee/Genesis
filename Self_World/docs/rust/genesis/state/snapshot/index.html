@@ -1,0 +1,79 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Core-state snapshot — the mind’s wire contract for `GET_STATE_SNAPSHOT`."><title>genesis::state::snapshot - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-203241e4.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="genesis" data-themes="" data-resource-suffix="" data-rustdoc-version="1.100.0 (0ef1bc386 2026-11-09)" data-channel="1.100.0" data-search-js="search-b167f383.js" data-stringdex-js="stringdex-b5109af9.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../../static.files/main-1814ead3.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-9f56287d.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module snapshot</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../genesis/index.html">genesis</a><span class="version">0.2.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module snapshot</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#why-this-type-exists" title="Why this type exists">Why this type exists</a></li><li><a href="#layout-232-bytes" title="Layout (232 bytes)">Layout (232 bytes)</a></li></ul><h3><a href="#structs">Module Items</a></h3><ul class="block"><li><a href="#structs" title="Structs">Structs</a></li><li><a href="#constants" title="Constants">Constants</a></li></ul></section><div id="rustdoc-modnav"><h2><a href="../index.html">In genesis::<wbr>state</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../index.html">genesis</a>::<wbr><a href="../index.html">state</a></div><h1>Module <span>snapshot</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/genesis/state/snapshot.rs.html#1-300">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Core-state snapshot — the mind’s wire contract for <code>GET_STATE_SNAPSHOT</code>.</p>
+<h3 id="why-this-type-exists"><a class="doc-anchor" href="#why-this-type-exists">§</a>Why this type exists</h3>
+<p><code>GET_STATE</code> returns the raw <a href="../core_state/struct.GenesisCoreState.html" title="struct genesis::state::core_state::GenesisCoreState"><code>GenesisCoreState</code></a> — the brain’s
+authoritative memory image, schema-versioned by <code>header.version</code>.
+That is the right payload for body inspection (the Rust test
+harness and forensics read it that way), but it is the wrong
+payload for the cognitive mind: every consumer then has to mirror
+the brain’s byte layout in its own language, and the mirror has no
+tripwire. A schema bump does not fail — it returns plausible
+numbers read from the wrong fields. That has happened twice
+(v3→v4 and v4→v5 offset bugs) and nearly a third time (the
+transient v6 layout).</p>
+<p>This struct is the anti-corruption layer between the two: a
+fixed-layout DTO that carries exactly what the mind consumes,
+mapped field-by-field in <a href="https://doc.rust-lang.org/1.100.0/core/convert/trait.From.html" title="trait core::convert::From"><code>From&lt;&amp;GenesisCoreState&gt;</code></a>. The brain’s
+schema can evolve — fields move, blocks insert, versions bump —
+and the wire contract only changes when this file intentionally
+changes, under its own <a href="constant.SNAPSHOT_VERSION.html" title="constant genesis::state::snapshot::SNAPSHOT_VERSION"><code>SNAPSHOT_VERSION</code></a>. A renamed or
+retyped source field fails to compile here; it cannot silently
+re-encode on the wire.</p>
+<p>The payload is self-describing: <code>magic</code>, <code>version</code>, and
+<code>state_size</code> lead the struct so a mismatched or foreign buffer
+is rejected before a single field offset is trusted.</p>
+<h3 id="layout-232-bytes"><a class="doc-anchor" href="#layout-232-bytes">§</a>Layout (232 bytes)</h3><div class="example-wrap"><pre class="language-text"><code>offset  field                     type
+------  -----                     ----
+   0    magic                     [u8;4]   b&quot;GSS1&quot;
+   4    version                   u32      SNAPSHOT_VERSION
+   8    state_size                u32      size_of::&lt;Self&gt;()
+  12    _pad                      u32      alignment
+  16    created_at                u64      ms epoch
+  24    last_updated              u64      ms epoch
+  32    heartbeat                 u64      tick counter
+  40    instance_id               u64
+  48    ltm_episode_count         u64
+  56    effective_levels          [f32;18] level × sensitivity ×
+                                         desensitization ×
+                                         internalization, per
+                                         NeurochemicalId order
+ 128    global_tone               f32
+ 132    arousal                   f32
+ 136    valence                   f32
+ 140    plasticity_gate           f32      neurochemical gate
+ 144    surprise_ema              f32      ┐
+ 148    free_energy               f32      │
+ 152    expected_free_energy      f32      │
+ 156    allostasis_load           f32      │
+ 160    precision                 f32      │  InferenceSignals,
+ 164    attunement                f32      │  flattened so the
+ 168    dyadic_synchrony          f32      │  brain block can
+ 172    user_valence              f32      │  evolve without
+ 176    user_arousal              f32      │  moving the wire
+ 180    user_engagement           f32      │
+ 184    prediction_error_dopamine f32      │
+ 188    prediction_error_cortisol f32      │
+ 192    prediction_error_serotonin f32     │
+ 196    model_maturity            f32      │
+ 200    policy_authority          f32      ┘
+ 204    inference_tick_count      u32
+ 208    encoding_weight           f32      ┐
+ 212    consolidation_weight      f32      │  MemoryPointers
+ 216    retrieval_weight          f32      ┘  gating weights
+ 220    sleep_pressure            f32      h / H_MAX ∈ [0,1]
+ 224    stm_count                 u32
+ 228    cognitive_zone            u8       CognitiveZone
+ 229    emergent_phase            u8       MentalPhase
+ 230    _pad_tail                 [u8;2]
+ 232    TOTAL</code></pre></div>
+<p>Deliberately absent: the coupling matrix, per-chemical dynamics
+(level/baseline/velocity/tonic/phasic/vesicular), the manifest,
+ions, zones’ task bookkeeping, and every other field the mind does
+not read. The snapshot is a projection, not a copy — fields are
+added here when a consumer needs them, never because the brain
+gained them.</p>
+</div></details><h2 id="structs" class="section-header">Structs<a href="#structs" class="anchor">§</a></h2><dl class="item-table"><dt><a class="struct" href="struct.CoreStateSnapshot.html" title="struct genesis::state::snapshot::CoreStateSnapshot">Core<wbr>State<wbr>Snapshot</a></dt><dd>The mind’s view of the core state — see the module docs for why
+this is a separate type from <a href="../core_state/struct.GenesisCoreState.html" title="struct genesis::state::core_state::GenesisCoreState"><code>GenesisCoreState</code></a>.</dd></dl><h2 id="constants" class="section-header">Constants<a href="#constants" class="anchor">§</a></h2><dl class="item-table"><dt><a class="constant" href="constant.SNAPSHOT_MAGIC.html" title="constant genesis::state::snapshot::SNAPSHOT_MAGIC">SNAPSHOT_<wbr>MAGIC</a></dt><dd>Magic bytes identifying a <a href="struct.CoreStateSnapshot.html" title="struct genesis::state::snapshot::CoreStateSnapshot"><code>CoreStateSnapshot</code></a> payload. ASCII
+<code>"GSS1"</code> — distinct from the state file’s <code>"GNSX"</code> so a raw
+<code>GenesisCoreState</code> can never be mistaken for a snapshot.</dd><dt><a class="constant" href="constant.SNAPSHOT_VERSION.html" title="constant genesis::state::snapshot::SNAPSHOT_VERSION">SNAPSHOT_<wbr>VERSION</a></dt><dd>Snapshot schema version. Bump when this layout changes in any way
+that breaks binary compatibility — independently of the brain’s
+<code>SCHEMA_VERSION</code>, which this type exists to decouple from.</dd></dl></section></div></main></body></html>

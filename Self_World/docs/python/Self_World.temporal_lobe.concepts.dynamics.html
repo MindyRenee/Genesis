@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.temporal_lobe.concepts.dynamics</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.temporal_lobe.html" class="white">temporal_lobe</a>.<a href="Self_World.temporal_lobe.concepts.html" class="white">concepts</a>.dynamics</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/concepts/dynamics.py">/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/concepts/dynamics.py</a></td></tr></table>
+    <p><span class="code">Concept&nbsp;dynamics&nbsp;—&nbsp;spreading&nbsp;activation&nbsp;and&nbsp;cortical&nbsp;ticks.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="heapq.html">heapq</a><br>
+</td><td class="multicolumn"><a href="math.html">math</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.concepts.dynamics.html#DynamicsMixin">DynamicsMixin</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="DynamicsMixin">class <strong>DynamicsMixin</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code">Mixin&nbsp;for&nbsp;:class:`ConceptNetwork`&nbsp;—&nbsp;see&nbsp;module&nbsp;docstring.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="DynamicsMixin-apply_lateral_inhibition"><strong>apply_lateral_inhibition</strong></a>(self, context_columns: 'set[str] | None' = None, inhibition_strength: 'float' = 0.4) -&gt; 'dict[str, float]'</dt><dd><span class="code">Apply&nbsp;lateral&nbsp;inhibition&nbsp;between&nbsp;cortical&nbsp;columns&nbsp;(SOM&nbsp;interneurons).<br>
+&nbsp;<br>
+When&nbsp;one&nbsp;column&nbsp;is&nbsp;highly&nbsp;active,&nbsp;other&nbsp;columns&nbsp;are&nbsp;suppressed.<br>
+This&nbsp;is&nbsp;the&nbsp;mechanism&nbsp;that&nbsp;makes&nbsp;columns&nbsp;functionally&nbsp;separate&nbsp;—<br>
+the&nbsp;dictionary&nbsp;column&nbsp;doesn't&nbsp;compete&nbsp;with&nbsp;the&nbsp;code&nbsp;column&nbsp;because<br>
+the&nbsp;code&nbsp;column&nbsp;actively&nbsp;inhibits&nbsp;it.<br>
+&nbsp;<br>
+The&nbsp;inhibition&nbsp;is&nbsp;MULTIPLICATIVE,&nbsp;not&nbsp;additive.&nbsp;Each&nbsp;concept&nbsp;in&nbsp;a<br>
+non-dominant&nbsp;column&nbsp;has&nbsp;its&nbsp;activation&nbsp;scaled&nbsp;by:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(1&nbsp;-&nbsp;inhibition_strength&nbsp;*&nbsp;dominance_ratio)<br>
+where&nbsp;dominance_ratio&nbsp;=&nbsp;dominant_mean_activation&nbsp;/&nbsp;concept_activation.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;biologically&nbsp;grounded:&nbsp;inhibitory&nbsp;interneurons&nbsp;reduce<br>
+firing&nbsp;rate&nbsp;proportionally,&nbsp;not&nbsp;by&nbsp;a&nbsp;fixed&nbsp;amount.&nbsp;A&nbsp;concept&nbsp;at<br>
+activation&nbsp;0.8&nbsp;in&nbsp;a&nbsp;suppressed&nbsp;column&nbsp;loses&nbsp;more&nbsp;absolute<br>
+activation&nbsp;than&nbsp;one&nbsp;at&nbsp;0.1,&nbsp;but&nbsp;the&nbsp;relative&nbsp;reduction&nbsp;is&nbsp;the<br>
+same&nbsp;—&nbsp;mirroring&nbsp;how&nbsp;inhibition&nbsp;scales&nbsp;with&nbsp;excitatory&nbsp;input.<br>
+&nbsp;<br>
+Context&nbsp;disinhibition&nbsp;(VIP):&nbsp;columns&nbsp;in&nbsp;context_columns&nbsp;receive<br>
+reduced&nbsp;inhibition&nbsp;(multiplied&nbsp;by&nbsp;0.2,&nbsp;an&nbsp;80%&nbsp;reduction).&nbsp;This<br>
+is&nbsp;the&nbsp;top-down&nbsp;attention&nbsp;signal&nbsp;—&nbsp;the&nbsp;prefrontal&nbsp;cortex&nbsp;sends<br>
+a&nbsp;signal&nbsp;that&nbsp;disinhibits&nbsp;the&nbsp;relevant&nbsp;column,&nbsp;allowing&nbsp;it&nbsp;to<br>
+win&nbsp;the&nbsp;competition&nbsp;even&nbsp;against&nbsp;a&nbsp;larger,&nbsp;more&nbsp;active&nbsp;column.<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;dict&nbsp;of&nbsp;{column:&nbsp;mean_activation}&nbsp;for&nbsp;all&nbsp;columns<br>
+(measured&nbsp;BEFORE&nbsp;inhibition&nbsp;is&nbsp;applied).</span></dd></dl>
+
+<dl><dt><a name="DynamicsMixin-apply_winner_take_all"><strong>apply_winner_take_all</strong></a>(self, column: 'str', top_k: 'int' = 3, suppression: 'float' = 0.5) -&gt; 'None'</dt><dd><span class="code">Apply&nbsp;winner-take-all&nbsp;dynamics&nbsp;within&nbsp;a&nbsp;column&nbsp;(PV&nbsp;interneurons).<br>
+&nbsp;<br>
+Within&nbsp;a&nbsp;cortical&nbsp;column,&nbsp;the&nbsp;most&nbsp;activated&nbsp;concepts&nbsp;suppress<br>
+less-activated&nbsp;competitors.&nbsp;This&nbsp;sharpens&nbsp;the&nbsp;response&nbsp;—&nbsp;instead<br>
+of&nbsp;many&nbsp;weakly-activated&nbsp;concepts,&nbsp;you&nbsp;get&nbsp;a&nbsp;few&nbsp;strongly-activated<br>
+ones.&nbsp;This&nbsp;is&nbsp;what&nbsp;makes&nbsp;a&nbsp;column's&nbsp;output&nbsp;coherent&nbsp;rather&nbsp;than<br>
+diffuse.<br>
+&nbsp;<br>
+Distance-dependent&nbsp;suppression:&nbsp;instead&nbsp;of&nbsp;a&nbsp;flat&nbsp;suppression&nbsp;for<br>
+all&nbsp;concepts&nbsp;below&nbsp;top_k,&nbsp;each&nbsp;concept&nbsp;is&nbsp;suppressed&nbsp;proportional<br>
+to&nbsp;its&nbsp;distance&nbsp;from&nbsp;the&nbsp;winner's&nbsp;activation&nbsp;level.&nbsp;Concepts&nbsp;close<br>
+to&nbsp;the&nbsp;winner&nbsp;are&nbsp;lightly&nbsp;suppressed;&nbsp;concepts&nbsp;far&nbsp;below&nbsp;are<br>
+heavily&nbsp;suppressed.&nbsp;This&nbsp;mirrors&nbsp;how&nbsp;PV&nbsp;interneurons&nbsp;create&nbsp;a<br>
+suppression&nbsp;gradient&nbsp;—&nbsp;the&nbsp;winner's&nbsp;inhibitory&nbsp;output&nbsp;scales&nbsp;with<br>
+its&nbsp;own&nbsp;activation,&nbsp;so&nbsp;nearby&nbsp;competitors&nbsp;receive&nbsp;more&nbsp;inhibition<br>
+than&nbsp;distant&nbsp;ones.<br>
+&nbsp;<br>
+Formula&nbsp;for&nbsp;concept&nbsp;at&nbsp;rank&nbsp;i&nbsp;(0-indexed,&nbsp;sorted&nbsp;by&nbsp;activation):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;i&nbsp;&lt;&nbsp;top_k:&nbsp;preserved&nbsp;at&nbsp;full&nbsp;activation<br>
+&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;i&nbsp;&gt;=&nbsp;top_k:&nbsp;activation&nbsp;*=&nbsp;(1&nbsp;-&nbsp;suppression&nbsp;*&nbsp;gap_ratio)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;where&nbsp;gap_ratio&nbsp;=&nbsp;(winner_activation&nbsp;-&nbsp;concept_activation)&nbsp;/&nbsp;winner_activation<br>
+&nbsp;<br>
+gap_ratio&nbsp;∈&nbsp;[0,&nbsp;1]:&nbsp;0&nbsp;means&nbsp;the&nbsp;concept&nbsp;is&nbsp;as&nbsp;active&nbsp;as&nbsp;the<br>
+winner&nbsp;(minimal&nbsp;suppression),&nbsp;1&nbsp;means&nbsp;it's&nbsp;at&nbsp;zero&nbsp;(maximal<br>
+suppression).&nbsp;This&nbsp;is&nbsp;the&nbsp;standard&nbsp;winner-take-all&nbsp;circuit&nbsp;from<br>
+computational&nbsp;neuroscience&nbsp;(Douglas&nbsp;&amp;&nbsp;Martin,&nbsp;2004).</span></dd></dl>
+
+<dl><dt><a name="DynamicsMixin-context_reset"><strong>context_reset</strong></a>(self, strength: 'float' = 0.5) -&gt; 'None'</dt><dd><span class="code">Attenuate&nbsp;the&nbsp;persistent&nbsp;activation&nbsp;field&nbsp;—&nbsp;a&nbsp;context&nbsp;reset.<br>
+&nbsp;<br>
+Yu&nbsp;&amp;&nbsp;Dayan&nbsp;(2005):&nbsp;phasic&nbsp;noradrenaline&nbsp;reports&nbsp;*unexpected*<br>
+uncertainty&nbsp;—&nbsp;a&nbsp;prediction&nbsp;error&nbsp;too&nbsp;large&nbsp;to&nbsp;explain&nbsp;by&nbsp;the<br>
+current&nbsp;context's&nbsp;known&nbsp;unreliability.&nbsp;The&nbsp;appropriate<br>
+response&nbsp;is&nbsp;to&nbsp;reset&nbsp;the&nbsp;context&nbsp;model:&nbsp;the&nbsp;lingering<br>
+activation&nbsp;field&nbsp;that&nbsp;biases&nbsp;processing&nbsp;toward&nbsp;the&nbsp;old<br>
+interpretation&nbsp;is&nbsp;attenuated&nbsp;so&nbsp;incoming&nbsp;evidence&nbsp;can&nbsp;form&nbsp;a<br>
+new&nbsp;context.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;a&nbsp;soft&nbsp;reset&nbsp;—&nbsp;activation&nbsp;is&nbsp;scaled&nbsp;by<br>
+``(1&nbsp;-&nbsp;strength)``,&nbsp;not&nbsp;zeroed.&nbsp;NE&nbsp;phasic&nbsp;signals&nbsp;doubt&nbsp;about<br>
+the&nbsp;current&nbsp;frame,&nbsp;not&nbsp;amnesia&nbsp;for&nbsp;the&nbsp;content:&nbsp;concepts&nbsp;that<br>
+were&nbsp;genuinely&nbsp;strong&nbsp;retain&nbsp;proportional&nbsp;activation&nbsp;and&nbsp;can<br>
+re-enter&nbsp;the&nbsp;new&nbsp;context&nbsp;through&nbsp;the&nbsp;normal&nbsp;spread&nbsp;path.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;strength:&nbsp;Attenuation&nbsp;fraction&nbsp;in&nbsp;[0,&nbsp;1].&nbsp;0&nbsp;=&nbsp;no-op,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1&nbsp;=&nbsp;full&nbsp;collapse&nbsp;of&nbsp;the&nbsp;field.</span></dd></dl>
+
+<dl><dt><a name="DynamicsMixin-cortical_tick"><strong>cortical_tick</strong></a>(self, arousal: 'float' = 0.5, gaba: 'float' = 0.3, ach: 'float' = 0.3, serotonin: 'float' = 0.4, noise: 'float' = 0.01, spark_rate: 'float | None' = None) -&gt; 'dict[str, float]'</dt><dd><span class="code">Evolve&nbsp;the&nbsp;network's&nbsp;activation&nbsp;state&nbsp;by&nbsp;one&nbsp;tick.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;cortical&nbsp;tick&nbsp;—&nbsp;the&nbsp;continuous&nbsp;dynamics&nbsp;that&nbsp;make<br>
+the&nbsp;concept&nbsp;network&nbsp;a&nbsp;living&nbsp;system&nbsp;rather&nbsp;than&nbsp;an&nbsp;inert&nbsp;data<br>
+structure.&nbsp;Every&nbsp;call&nbsp;advances&nbsp;activation&nbsp;by&nbsp;one&nbsp;step:<br>
+&nbsp;<br>
+1.&nbsp;**Spreading**:&nbsp;Each&nbsp;concept&nbsp;with&nbsp;activation&nbsp;above&nbsp;a<br>
+&nbsp;&nbsp;&nbsp;threshold&nbsp;spreads&nbsp;a&nbsp;fraction&nbsp;of&nbsp;its&nbsp;activation&nbsp;to<br>
+&nbsp;&nbsp;&nbsp;neighbors,&nbsp;proportional&nbsp;to&nbsp;edge&nbsp;weight&nbsp;with&nbsp;fan-out<br>
+&nbsp;&nbsp;&nbsp;normalization.&nbsp;This&nbsp;is&nbsp;the&nbsp;same&nbsp;principle&nbsp;as<br>
+&nbsp;&nbsp;&nbsp;``spread_activation``&nbsp;but&nbsp;applied&nbsp;continuously&nbsp;to&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;stored&nbsp;activations,&nbsp;not&nbsp;as&nbsp;a&nbsp;one-shot&nbsp;BFS.<br>
+&nbsp;<br>
+2.&nbsp;**Decay**:&nbsp;All&nbsp;activations&nbsp;decay&nbsp;exponentially.&nbsp;The&nbsp;decay<br>
+&nbsp;&nbsp;&nbsp;rate&nbsp;is&nbsp;modulated&nbsp;by&nbsp;GABA&nbsp;(more&nbsp;GABA&nbsp;→&nbsp;faster&nbsp;decay,&nbsp;it's<br>
+&nbsp;&nbsp;&nbsp;calming&nbsp;down)&nbsp;and&nbsp;arousal&nbsp;(more&nbsp;arousal&nbsp;→&nbsp;slower&nbsp;decay,<br>
+&nbsp;&nbsp;&nbsp;it's&nbsp;alert&nbsp;and&nbsp;things&nbsp;stay&nbsp;in&nbsp;mind).<br>
+&nbsp;<br>
+3.&nbsp;**Noise**:&nbsp;Two&nbsp;channels.&nbsp;Graded&nbsp;perturbation&nbsp;applies&nbsp;to&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;*active*&nbsp;field&nbsp;(fluctuation&nbsp;of&nbsp;live&nbsp;representations).&nbsp;The<br>
+&nbsp;&nbsp;&nbsp;dormant&nbsp;field&nbsp;ignites&nbsp;sparsely&nbsp;via&nbsp;Poisson&nbsp;events&nbsp;scaled<br>
+&nbsp;&nbsp;&nbsp;by&nbsp;the&nbsp;same&nbsp;noise&nbsp;amplitude&nbsp;—&nbsp;spontaneous&nbsp;activation<br>
+&nbsp;&nbsp;&nbsp;arrives&nbsp;as&nbsp;discrete&nbsp;sparks,&nbsp;not&nbsp;analog&nbsp;static&nbsp;on&nbsp;the&nbsp;whole<br>
+&nbsp;&nbsp;&nbsp;network.&nbsp;Serotonin&nbsp;modulates&nbsp;both&nbsp;(low&nbsp;serotonin&nbsp;→<br>
+&nbsp;&nbsp;&nbsp;noisier,&nbsp;more&nbsp;ruminative).<br>
+&nbsp;<br>
+4.&nbsp;**Re-digitization**:&nbsp;Activation&nbsp;below<br>
+&nbsp;&nbsp;&nbsp;``ACTIVATION_NOISE_FLOOR``&nbsp;snaps&nbsp;to&nbsp;zero&nbsp;each&nbsp;tick&nbsp;—&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;sub-noise&nbsp;tail&nbsp;cannot&nbsp;accumulate.&nbsp;Every<br>
+&nbsp;&nbsp;&nbsp;``SWEEP_INTERVAL_TICKS``&nbsp;the&nbsp;whole&nbsp;field&nbsp;is&nbsp;rescanned&nbsp;and<br>
+&nbsp;&nbsp;&nbsp;the&nbsp;active&nbsp;set&nbsp;rebuilt.<br>
+&nbsp;<br>
+5.&nbsp;**Neurochemical&nbsp;modulation**:<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;**Arousal**&nbsp;(NE&nbsp;+&nbsp;DA):&nbsp;scales&nbsp;the&nbsp;spread&nbsp;rate.&nbsp;High<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;arousal&nbsp;→&nbsp;activation&nbsp;spreads&nbsp;faster&nbsp;and&nbsp;further.<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;**GABA**:&nbsp;scales&nbsp;the&nbsp;decay&nbsp;rate.&nbsp;High&nbsp;GABA&nbsp;→&nbsp;faster<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;decay,&nbsp;the&nbsp;mind&nbsp;quiets&nbsp;down.<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;**ACh**&nbsp;(acetylcholine):&nbsp;focuses&nbsp;activation.&nbsp;High&nbsp;ACh<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sharpens&nbsp;the&nbsp;winner-take-all&nbsp;dynamics&nbsp;—&nbsp;the&nbsp;most&nbsp;active<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;concepts&nbsp;get&nbsp;a&nbsp;boost,&nbsp;the&nbsp;rest&nbsp;get&nbsp;suppressed.&nbsp;This<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;models&nbsp;the&nbsp;cholinergic&nbsp;attention&nbsp;signal&nbsp;from&nbsp;the&nbsp;basal<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;forebrain.<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;**Serotonin**:&nbsp;modulates&nbsp;noise.&nbsp;Low&nbsp;serotonin&nbsp;→&nbsp;more<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;noise&nbsp;(noisy,&nbsp;ruminative).&nbsp;High&nbsp;serotonin&nbsp;→&nbsp;less&nbsp;noise<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(stable,&nbsp;calm).<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;dict&nbsp;of&nbsp;{concept_id:&nbsp;activation}&nbsp;for&nbsp;concepts&nbsp;that<br>
+are&nbsp;currently&nbsp;above&nbsp;the&nbsp;activation&nbsp;threshold&nbsp;(0.1).&nbsp;This&nbsp;lets<br>
+the&nbsp;caller&nbsp;know&nbsp;what's&nbsp;"on&nbsp;its&nbsp;mind"&nbsp;right&nbsp;now.</span></dd></dl>
+
+<dl><dt><a name="DynamicsMixin-decay_activation"><strong>decay_activation</strong></a>(self, rate: 'float' = 0.05) -&gt; 'None'</dt><dd><span class="code">Decay&nbsp;all&nbsp;concept&nbsp;activations&nbsp;using&nbsp;exponential&nbsp;decay.<br>
+&nbsp;<br>
+Exponential&nbsp;decay:&nbsp;a(t+1)&nbsp;=&nbsp;a(t)&nbsp;*&nbsp;(1&nbsp;-&nbsp;rate)<br>
+This&nbsp;is&nbsp;biologically&nbsp;plausible&nbsp;—&nbsp;neural&nbsp;activation&nbsp;decays<br>
+proportionally&nbsp;to&nbsp;its&nbsp;current&nbsp;level,&nbsp;not&nbsp;by&nbsp;a&nbsp;fixed&nbsp;amount.<br>
+A&nbsp;concept&nbsp;at&nbsp;activation&nbsp;1.0&nbsp;loses&nbsp;0.05,&nbsp;but&nbsp;a&nbsp;concept&nbsp;at&nbsp;0.1<br>
+loses&nbsp;only&nbsp;0.005.&nbsp;This&nbsp;preserves&nbsp;recently-activated&nbsp;concepts<br>
+longer&nbsp;than&nbsp;ones&nbsp;that&nbsp;were&nbsp;barely&nbsp;activated.<br>
+&nbsp;<br>
+Semantic&nbsp;hubs&nbsp;decay&nbsp;more&nbsp;slowly&nbsp;(0.7x&nbsp;decay&nbsp;rate)&nbsp;—&nbsp;they&nbsp;are<br>
+convergence&nbsp;zones&nbsp;that&nbsp;maintain&nbsp;activation&nbsp;longer&nbsp;to&nbsp;integrate<br>
+information&nbsp;across&nbsp;the&nbsp;network&nbsp;(Damasio,&nbsp;1989).<br>
+&nbsp;<br>
+Motor&nbsp;concepts&nbsp;have&nbsp;shorter&nbsp;decay&nbsp;(1.3x&nbsp;decay&nbsp;rate)&nbsp;—&nbsp;motor<br>
+representations&nbsp;are&nbsp;transient,&nbsp;activating&nbsp;briefly&nbsp;for&nbsp;action<br>
+execution&nbsp;then&nbsp;fading&nbsp;quickly&nbsp;(motor&nbsp;cortex&nbsp;shows&nbsp;rapid<br>
+onset-offset&nbsp;dynamics).</span></dd></dl>
+
+<dl><dt><a name="DynamicsMixin-ground_activation"><strong>ground_activation</strong></a>(self, boost: 'float' = 0.05) -&gt; 'dict[str, float]'</dt><dd><span class="code">Apply&nbsp;modality-specific&nbsp;activation&nbsp;boosts&nbsp;(sensorimotor&nbsp;grounding).<br>
+&nbsp;<br>
+When&nbsp;concepts&nbsp;in&nbsp;a&nbsp;given&nbsp;modality&nbsp;are&nbsp;active,&nbsp;other&nbsp;concepts&nbsp;in<br>
+the&nbsp;same&nbsp;modality&nbsp;receive&nbsp;a&nbsp;small&nbsp;activation&nbsp;boost.&nbsp;This&nbsp;models<br>
+within-modality&nbsp;priming&nbsp;—&nbsp;the&nbsp;sensorimotor&nbsp;grounding&nbsp;of&nbsp;concepts<br>
+means&nbsp;that&nbsp;activating&nbsp;one&nbsp;visual&nbsp;concept&nbsp;slightly&nbsp;primes&nbsp;other<br>
+visual&nbsp;concepts,&nbsp;one&nbsp;motor&nbsp;concept&nbsp;primes&nbsp;other&nbsp;motor&nbsp;concepts,&nbsp;etc.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;mechanism&nbsp;by&nbsp;which&nbsp;action&nbsp;concepts&nbsp;get&nbsp;sensorimotor<br>
+grounding:&nbsp;when&nbsp;a&nbsp;MOTOR&nbsp;concept&nbsp;activates,&nbsp;it&nbsp;slightly&nbsp;activates<br>
+other&nbsp;MOTOR&nbsp;concepts&nbsp;(within-modality&nbsp;spreading),&nbsp;simulating&nbsp;the<br>
+weak&nbsp;activation&nbsp;of&nbsp;related&nbsp;motor&nbsp;representations.<br>
+&nbsp;<br>
+Only&nbsp;concepts&nbsp;with&nbsp;activation&nbsp;above&nbsp;a&nbsp;threshold&nbsp;(0.1)&nbsp;contribute<br>
+to&nbsp;the&nbsp;priming.&nbsp;The&nbsp;boost&nbsp;is&nbsp;proportional&nbsp;to&nbsp;the&nbsp;mean&nbsp;activation<br>
+of&nbsp;active&nbsp;concepts&nbsp;in&nbsp;that&nbsp;modality.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;boost:&nbsp;Maximum&nbsp;boost&nbsp;amount&nbsp;per&nbsp;modality&nbsp;(default&nbsp;0.05).<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;dict&nbsp;mapping&nbsp;modality&nbsp;names&nbsp;to&nbsp;the&nbsp;boost&nbsp;applied.</span></dd></dl>
+
+<dl><dt><a name="DynamicsMixin-most_activated"><strong>most_activated</strong></a>(self, n: 'int' = 10) -&gt; 'list[tuple[str, float]]'</dt><dd><span class="code">Return&nbsp;the&nbsp;N&nbsp;most&nbsp;activated&nbsp;concepts.</span></dd></dl>
+
+<dl><dt><a name="DynamicsMixin-spread_activation"><strong>spread_activation</strong></a>(self, concepts: 'list[str]', amount: 'float' = 0.2, depth: 'int' = 2, column_context: 'set[str] | None' = None) -&gt; 'dict[str, float]'</dt><dd><span class="code">Spread&nbsp;activation&nbsp;from&nbsp;given&nbsp;concepts&nbsp;through&nbsp;the&nbsp;network.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;spreading&nbsp;activation&nbsp;—&nbsp;a&nbsp;classic&nbsp;cognitive&nbsp;science<br>
+model&nbsp;where&nbsp;activating&nbsp;one&nbsp;concept&nbsp;primes&nbsp;related&nbsp;concepts.<br>
+Used&nbsp;to&nbsp;find&nbsp;what's&nbsp;relevant&nbsp;to&nbsp;the&nbsp;current&nbsp;conversation.<br>
+&nbsp;<br>
+Column-aware&nbsp;spreading&nbsp;(cortical&nbsp;column&nbsp;model):<br>
+-&nbsp;Activation&nbsp;spreads&nbsp;densely&nbsp;within&nbsp;the&nbsp;same&nbsp;column&nbsp;(full&nbsp;strength)<br>
+-&nbsp;Activation&nbsp;crosses&nbsp;bridge&nbsp;edges&nbsp;to&nbsp;other&nbsp;columns&nbsp;at&nbsp;reduced<br>
+&nbsp;&nbsp;strength&nbsp;(BRIDGE_ATTENUATION&nbsp;=&nbsp;0.3),&nbsp;mirroring&nbsp;how&nbsp;cortical<br>
+&nbsp;&nbsp;association&nbsp;fibers&nbsp;are&nbsp;weaker&nbsp;than&nbsp;intra-column&nbsp;connections<br>
+-&nbsp;When&nbsp;column_context&nbsp;is&nbsp;provided&nbsp;(the&nbsp;VIP&nbsp;disinhibition&nbsp;signal),<br>
+&nbsp;&nbsp;concepts&nbsp;in&nbsp;context&nbsp;columns&nbsp;receive&nbsp;full&nbsp;activation&nbsp;while<br>
+&nbsp;&nbsp;concepts&nbsp;in&nbsp;non-context&nbsp;columns&nbsp;receive&nbsp;attenuated&nbsp;activation<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;dict&nbsp;of&nbsp;{concept_id:&nbsp;activation_level}&nbsp;for&nbsp;all<br>
+activated&nbsp;concepts.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {}</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>ACTIVATION_NOISE_FLOOR</strong> = 0.005<br>
+<strong>DORMANT_SPARK_COEFF</strong> = 2.5e-05<br>
+<strong>FIELD_ENERGY_BUDGET</strong> = 4.0<br>
+<strong>NORMALIZATION_GAIN</strong> = 0.05<br>
+<strong>RECURRENCE_GAIN</strong> = 0.4<br>
+<strong>SPARK_MAX</strong> = 0.14<br>
+<strong>SPARK_MIN</strong> = 0.06<br>
+<strong>SUSTAIN_THRESHOLD</strong> = 0.25<br>
+<strong>SWEEP_INTERVAL_TICKS</strong> = 20<br>
+<strong>TYPE_CHECKING</strong> = False</td></tr></table>
+</body></html>

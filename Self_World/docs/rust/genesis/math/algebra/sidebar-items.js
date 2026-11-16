@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["solve_linear","solve_quadratic"],"struct":["Poly"]};

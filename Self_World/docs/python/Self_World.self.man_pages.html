@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.self.man_pages</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.self.html" class="white">self</a>.man_pages</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/self/man_pages.py">/home/mindyrenee/GenAnd/Genesis/Self_World/self/man_pages.py</a></td></tr></table>
+    <p><span class="code">Her&nbsp;manual&nbsp;—&nbsp;the&nbsp;man&nbsp;pages&nbsp;that&nbsp;describe&nbsp;what&nbsp;she&nbsp;is.<br>
+&nbsp;<br>
+Genesis's&nbsp;man&nbsp;pages&nbsp;(``genesis.1``,&nbsp;``genesis-cli.1``,<br>
+``genesis-daemon.8``,&nbsp;``genesis-math.7``,&nbsp;``genesis-tools.7``,<br>
+``genesis-browser.7``,&nbsp;``genesis-arcade.7``)&nbsp;are&nbsp;part&nbsp;of&nbsp;her&nbsp;—&nbsp;how<br>
+the&nbsp;machine,&nbsp;and&nbsp;she&nbsp;herself,&nbsp;knows&nbsp;what&nbsp;she&nbsp;is.&nbsp;The&nbsp;versioned<br>
+sources&nbsp;in&nbsp;``docs/man/``&nbsp;are&nbsp;canonical;&nbsp;the&nbsp;installed&nbsp;copies&nbsp;under<br>
+``~/.local/share/man``&nbsp;are&nbsp;what&nbsp;``man``&nbsp;—&nbsp;and&nbsp;her&nbsp;``man_page``&nbsp;tool&nbsp;—<br>
+actually&nbsp;reads.<br>
+&nbsp;<br>
+``<a href="#-sync">sync</a>()``&nbsp;keeps&nbsp;the&nbsp;two&nbsp;equal:&nbsp;each&nbsp;versioned&nbsp;source&nbsp;flows&nbsp;to&nbsp;the<br>
+installed&nbsp;dir,&nbsp;and&nbsp;installed&nbsp;``genesis*``&nbsp;pages&nbsp;with&nbsp;no&nbsp;source&nbsp;are<br>
+retired&nbsp;—&nbsp;a&nbsp;stale&nbsp;page&nbsp;teaches&nbsp;her&nbsp;wrong&nbsp;anatomy&nbsp;every&nbsp;boot.&nbsp;There<br>
+is&nbsp;no&nbsp;staging&nbsp;and&nbsp;no&nbsp;queue:&nbsp;the&nbsp;manual&nbsp;says&nbsp;what&nbsp;the&nbsp;project&nbsp;says,<br>
+and&nbsp;keeping&nbsp;the&nbsp;installed&nbsp;copy&nbsp;honest&nbsp;is&nbsp;bookkeeping,&nbsp;not&nbsp;a<br>
+decision&nbsp;anyone&nbsp;gates.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="os.html">os</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.self.man_pages.html#ManPagesMixin">ManPagesMixin</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ManPagesMixin">class <strong>ManPagesMixin</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code">Mixin&nbsp;for&nbsp;:class:`Mind`&nbsp;—&nbsp;learning&nbsp;her&nbsp;own&nbsp;manual.<br>
+&nbsp;<br>
+``self.<strong>_man_docs</strong>``&nbsp;points&nbsp;at&nbsp;the&nbsp;versioned&nbsp;sources&nbsp;(created&nbsp;in<br>
+``__init__``);&nbsp;``_ingest_man_pages``&nbsp;reads&nbsp;them&nbsp;into&nbsp;her&nbsp;concept<br>
+network&nbsp;the&nbsp;way&nbsp;any&nbsp;learned&nbsp;material&nbsp;lands.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {}</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-man_home"><strong>man_home</strong></a>() -&gt; 'Path'</dt><dd><span class="code">The&nbsp;user&nbsp;man&nbsp;dir&nbsp;``man``&nbsp;reads&nbsp;—&nbsp;``$XDG_DATA_HOME/man``&nbsp;or<br>
+``~/.local/share/man``,&nbsp;same&nbsp;resolution&nbsp;``install.sh``&nbsp;uses.</span></dd></dl>
+ <dl><dt><a name="-owned_pages"><strong>owned_pages</strong></a>(docs_man: 'Path | None', home: 'Path | None' = None) -&gt; 'list[tuple[str, str]]'</dt><dd><span class="code">(name,&nbsp;section)&nbsp;pairs&nbsp;of&nbsp;the&nbsp;pages&nbsp;that&nbsp;are&nbsp;hers.<br>
+&nbsp;<br>
+The&nbsp;owned&nbsp;set&nbsp;is&nbsp;whatever&nbsp;the&nbsp;versioned&nbsp;docs&nbsp;source&nbsp;declares,<br>
+plus&nbsp;any&nbsp;``genesis*``&nbsp;pages&nbsp;already&nbsp;installed&nbsp;in&nbsp;the&nbsp;user&nbsp;man&nbsp;dir<br>
+(covers&nbsp;pages&nbsp;present&nbsp;without&nbsp;a&nbsp;docs&nbsp;tree,&nbsp;e.g.&nbsp;a&nbsp;packaged<br>
+install&nbsp;with&nbsp;no&nbsp;checkout&nbsp;above&nbsp;it).</span></dd></dl>
+ <dl><dt><a name="-sync"><strong>sync</strong></a>(docs_man: 'Path | None', home: 'Path | None' = None) -&gt; 'list[str]'</dt><dd><span class="code">Flow&nbsp;the&nbsp;versioned&nbsp;sources&nbsp;to&nbsp;the&nbsp;installed&nbsp;man&nbsp;dir.<br>
+&nbsp;<br>
+Every&nbsp;``docs/man/*.[0-9]``&nbsp;page&nbsp;is&nbsp;copied&nbsp;over&nbsp;its&nbsp;installed<br>
+counterpart&nbsp;—&nbsp;creating&nbsp;the&nbsp;section&nbsp;dir&nbsp;when&nbsp;needed&nbsp;—&nbsp;and&nbsp;any<br>
+installed&nbsp;``genesis*``&nbsp;page&nbsp;that&nbsp;no&nbsp;longer&nbsp;has&nbsp;a&nbsp;source&nbsp;is<br>
+removed.&nbsp;Returns&nbsp;the&nbsp;names&nbsp;of&nbsp;pages&nbsp;it&nbsp;touched.&nbsp;Idempotent:<br>
+a&nbsp;page&nbsp;already&nbsp;in&nbsp;sync&nbsp;costs&nbsp;a&nbsp;hash&nbsp;comparison,&nbsp;not&nbsp;a&nbsp;write.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>TYPE_CHECKING</strong> = False<br>
+<strong>log</strong> = &lt;Logger Self_World.self.man_pages (WARNING)&gt;</td></tr></table>
+</body></html>

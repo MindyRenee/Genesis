@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.occipital_lobe.v4</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.occipital_lobe.html" class="white">occipital_lobe</a>.v4</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/occipital_lobe/v4.py">/home/mindyrenee/GenAnd/Genesis/Self_World/occipital_lobe/v4.py</a></td></tr></table>
+    <p><span class="code">V4&nbsp;—&nbsp;Mid-level&nbsp;visual&nbsp;cortex.<br>
+&nbsp;<br>
+Pools&nbsp;V1&nbsp;latents&nbsp;into&nbsp;larger&nbsp;receptive&nbsp;fields&nbsp;and&nbsp;learns&nbsp;a&nbsp;dictionary<br>
+of&nbsp;mid-level&nbsp;features&nbsp;(curvature,&nbsp;texture,&nbsp;shape&nbsp;complexes,&nbsp;color<br>
+blobs)&nbsp;via&nbsp;unsupervised&nbsp;sparse&nbsp;coding.&nbsp;See&nbsp;vision/__init__.py<br>
+for&nbsp;the&nbsp;full&nbsp;mathematical&nbsp;foundation.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="numpy.html">numpy</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.occipital_lobe.v4.html#V4Model">V4Model</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="V4Model">class <strong>V4Model</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#V4Model">V4Model</a>(n_v1_features:&nbsp;'int'&nbsp;=&nbsp;32,&nbsp;pool_size:&nbsp;'int'&nbsp;=&nbsp;2,&nbsp;n_features:&nbsp;'int'&nbsp;=&nbsp;64,&nbsp;sparsity:&nbsp;'float'&nbsp;=&nbsp;0.1,&nbsp;step:&nbsp;'float'&nbsp;=&nbsp;0.2,&nbsp;n_ista_iters:&nbsp;'int'&nbsp;=&nbsp;30,&nbsp;color_dims:&nbsp;'int'&nbsp;=&nbsp;12,&nbsp;seed:&nbsp;'int&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Mid-level&nbsp;visual&nbsp;cortex&nbsp;—&nbsp;learns&nbsp;features&nbsp;from&nbsp;V1&nbsp;latents.<br>
+&nbsp;<br>
+V4&nbsp;pools&nbsp;V1&nbsp;patch&nbsp;activations&nbsp;into&nbsp;larger&nbsp;receptive&nbsp;fields&nbsp;and<br>
+learns&nbsp;a&nbsp;dictionary&nbsp;of&nbsp;mid-level&nbsp;features&nbsp;(curvature,&nbsp;texture<br>
+patterns,&nbsp;shape&nbsp;complexes,&nbsp;color&nbsp;blobs)&nbsp;via&nbsp;unsupervised&nbsp;sparse<br>
+coding.&nbsp;This&nbsp;mirrors&nbsp;how&nbsp;V4&nbsp;in&nbsp;the&nbsp;primate&nbsp;brain&nbsp;integrates&nbsp;V1<br>
+outputs&nbsp;into&nbsp;more&nbsp;complex&nbsp;shape&nbsp;and&nbsp;texture&nbsp;selectivity.<br>
+&nbsp;<br>
+The&nbsp;dictionary&nbsp;is&nbsp;learned&nbsp;from&nbsp;natural&nbsp;image&nbsp;statistics&nbsp;—&nbsp;the<br>
+same&nbsp;principle&nbsp;as&nbsp;V1's&nbsp;Gabor&nbsp;dictionary,&nbsp;but&nbsp;operating&nbsp;on&nbsp;V1<br>
+latents&nbsp;instead&nbsp;of&nbsp;pixels.&nbsp;Features&nbsp;that&nbsp;co-occur&nbsp;in&nbsp;natural<br>
+scenes&nbsp;become&nbsp;V4&nbsp;dictionary&nbsp;elements.<br>
+&nbsp;<br>
+Color&nbsp;channels&nbsp;are&nbsp;added&nbsp;at&nbsp;V4&nbsp;(not&nbsp;V1)&nbsp;because&nbsp;V4&nbsp;contains&nbsp;the<br>
+earliest&nbsp;substantial&nbsp;population&nbsp;of&nbsp;color-selective&nbsp;neurons&nbsp;with<br>
+large&nbsp;enough&nbsp;receptive&nbsp;fields&nbsp;to&nbsp;integrate&nbsp;color&nbsp;over&nbsp;regions.<br>
+&nbsp;<br>
+Architecture:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;V1&nbsp;latents&nbsp;(n_patches&nbsp;×&nbsp;n_v1_features)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;pool&nbsp;2×2&nbsp;groups&nbsp;of&nbsp;adjacent&nbsp;patches<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;▼<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Pooled&nbsp;V1&nbsp;(n_v4_units&nbsp;×&nbsp;n_v1_features&nbsp;×&nbsp;pool_size)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;concatenate&nbsp;with&nbsp;color&nbsp;statistics&nbsp;per&nbsp;pool<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;▼<br>
+&nbsp;&nbsp;&nbsp;&nbsp;V4&nbsp;input&nbsp;(n_v4_units&nbsp;×&nbsp;v4_input_dim)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;sparse&nbsp;code&nbsp;with&nbsp;learned&nbsp;dictionary&nbsp;Φ4<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;▼<br>
+&nbsp;&nbsp;&nbsp;&nbsp;V4&nbsp;latents&nbsp;(n_v4_units&nbsp;×&nbsp;n_v4_features)<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="V4Model-__init__"><strong>__init__</strong></a>(self, n_v1_features: 'int' = 32, pool_size: 'int' = 2, n_features: 'int' = 64, sparsity: 'float' = 0.1, step: 'float' = 0.2, n_ista_iters: 'int' = 30, color_dims: 'int' = 12, seed: 'int | None' = None) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;V4.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;n_v1_features:&nbsp;number&nbsp;of&nbsp;V1&nbsp;latent&nbsp;features&nbsp;(from&nbsp;occipital&nbsp;subsystem).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;pool_size:&nbsp;how&nbsp;many&nbsp;V1&nbsp;patches&nbsp;to&nbsp;pool&nbsp;into&nbsp;one&nbsp;V4&nbsp;unit&nbsp;(per&nbsp;axis).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;n_features:&nbsp;number&nbsp;of&nbsp;V4&nbsp;dictionary&nbsp;elements&nbsp;to&nbsp;learn.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;sparsity:&nbsp;L1&nbsp;sparsity&nbsp;weight&nbsp;for&nbsp;V4&nbsp;sparse&nbsp;coding.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;step:&nbsp;ISTA&nbsp;step&nbsp;size.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;n_ista_iters:&nbsp;number&nbsp;of&nbsp;ISTA&nbsp;iterations&nbsp;for&nbsp;inference.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;color_dims:&nbsp;dimensionality&nbsp;of&nbsp;the&nbsp;color&nbsp;statistics&nbsp;vector<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;appended&nbsp;to&nbsp;each&nbsp;pooled&nbsp;unit.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;seed:&nbsp;random&nbsp;seed.</span></dd></dl>
+
+<dl><dt><a name="V4Model-load"><strong>load</strong></a>(self, path: 'Path' = PosixPath('/home/mindyrenee/.local/share/genesis/visual_cortex/v4_dictionary.npz')) -&gt; 'bool'</dt><dd><span class="code">Load&nbsp;V4&nbsp;dictionary&nbsp;from&nbsp;disk.&nbsp;Returns&nbsp;True&nbsp;if&nbsp;loaded.</span></dd></dl>
+
+<dl><dt><a name="V4Model-process"><strong>process</strong></a>(self, v1_latents: 'np.ndarray', v1_grid_shape: 'tuple[int, int]', frame: 'np.ndarray | None' = None, learn: 'bool' = True) -&gt; 'np.ndarray'</dt><dd><span class="code">Process&nbsp;V1&nbsp;latents&nbsp;through&nbsp;V4.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;v1_latents:&nbsp;(n_patches,&nbsp;n_v1_features)&nbsp;V1&nbsp;latent&nbsp;activations.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;v1_grid_shape:&nbsp;(n_rows,&nbsp;n_cols)&nbsp;shape&nbsp;of&nbsp;the&nbsp;V1&nbsp;patch&nbsp;grid.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;frame:&nbsp;optional&nbsp;original&nbsp;RGB&nbsp;frame&nbsp;for&nbsp;color&nbsp;statistics.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;learn:&nbsp;if&nbsp;True,&nbsp;update&nbsp;the&nbsp;dictionary.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;v4_latents:&nbsp;(n_v4_units,&nbsp;n_features)&nbsp;V4&nbsp;latent&nbsp;activations.</span></dd></dl>
+
+<dl><dt><a name="V4Model-save"><strong>save</strong></a>(self, path: 'Path' = PosixPath('/home/mindyrenee/.local/share/genesis/visual_cortex/v4_dictionary.npz')) -&gt; 'None'</dt><dd><span class="code">Save&nbsp;V4&nbsp;dictionary&nbsp;to&nbsp;disk.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>reconstruction_cosine</strong></dt>
+</dl>
+<dl><dt><strong>reconstruction_mse</strong></dt>
+</dl>
+<dl><dt><strong>relative_reconstruction_error</strong></dt>
+</dl>
+<dl><dt><strong>sparsity_fraction</strong></dt>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>logger</strong> = &lt;Logger Self_World.occipital_lobe.v4 (WARNING)&gt;</td></tr></table>
+</body></html>

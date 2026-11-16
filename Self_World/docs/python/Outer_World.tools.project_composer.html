@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Outer_World.tools.project_composer</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Outer_World.html" class="white">Outer_World</a>.<a href="Outer_World.tools.html" class="white">tools</a>.project_composer</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Outer_World/tools/project_composer.py">/home/mindyrenee/GenAnd/Genesis/Outer_World/tools/project_composer.py</a></td></tr></table>
+    <p><span class="code">Project&nbsp;composer&nbsp;—&nbsp;composes&nbsp;real&nbsp;Python&nbsp;from&nbsp;Genesis's&nbsp;concept&nbsp;network.<br>
+&nbsp;<br>
+This&nbsp;replaces&nbsp;the&nbsp;fixed&nbsp;``print("Hello&nbsp;from&nbsp;{name}")``&nbsp;scaffold&nbsp;in<br>
+``project_creator._main_content``&nbsp;with&nbsp;a&nbsp;generative&nbsp;composer.&nbsp;Given&nbsp;a<br>
+topic,&nbsp;it&nbsp;gathers&nbsp;what&nbsp;it&nbsp;knows&nbsp;about&nbsp;it&nbsp;from&nbsp;its&nbsp;concept&nbsp;network&nbsp;—<br>
+the&nbsp;concept,&nbsp;its&nbsp;definition,&nbsp;its&nbsp;neighbors,&nbsp;and&nbsp;the&nbsp;typed&nbsp;edges<br>
+between&nbsp;them&nbsp;—&nbsp;and&nbsp;composes&nbsp;a&nbsp;working&nbsp;Python&nbsp;module&nbsp;that&nbsp;*encodes<br>
+that&nbsp;knowledge&nbsp;as&nbsp;a&nbsp;queryable&nbsp;structure*.<br>
+&nbsp;<br>
+##&nbsp;What&nbsp;it&nbsp;composes<br>
+&nbsp;<br>
+A&nbsp;knowledge-base&nbsp;module&nbsp;for&nbsp;the&nbsp;domain:<br>
+&nbsp;<br>
+-&nbsp;A&nbsp;``DomainEntry``&nbsp;dataclass&nbsp;(name,&nbsp;definition,&nbsp;confidence,&nbsp;origin)<br>
+-&nbsp;A&nbsp;populated&nbsp;``ENTRIES``&nbsp;registry&nbsp;built&nbsp;from&nbsp;its&nbsp;actual&nbsp;concepts<br>
+-&nbsp;A&nbsp;``RELATIONS``&nbsp;dict&nbsp;mapping&nbsp;``source&nbsp;-&gt;&nbsp;{relation&nbsp;-&gt;&nbsp;[targets]}``<br>
+&nbsp;&nbsp;built&nbsp;from&nbsp;its&nbsp;actual&nbsp;typed&nbsp;edges<br>
+-&nbsp;Query&nbsp;functions:&nbsp;``find``,&nbsp;``definition_of``,&nbsp;``neighbors``,<br>
+&nbsp;&nbsp;``related_to``,&nbsp;plus&nbsp;one&nbsp;function&nbsp;per&nbsp;relation&nbsp;type&nbsp;it&nbsp;actually<br>
+&nbsp;&nbsp;has&nbsp;(``causes``,&nbsp;``enables``,&nbsp;``is_a``,&nbsp;…)&nbsp;—&nbsp;generated&nbsp;adaptively,<br>
+&nbsp;&nbsp;not&nbsp;fixed<br>
+-&nbsp;A&nbsp;``main()``&nbsp;that&nbsp;demonstrates&nbsp;the&nbsp;queries&nbsp;against&nbsp;its&nbsp;real&nbsp;data<br>
+&nbsp;<br>
+Different&nbsp;domains&nbsp;produce&nbsp;different&nbsp;code:&nbsp;a&nbsp;domain&nbsp;with&nbsp;CAUSES&nbsp;edges<br>
+gets&nbsp;a&nbsp;``causes()``&nbsp;function;&nbsp;one&nbsp;without&nbsp;doesn't.&nbsp;The&nbsp;data&nbsp;is&nbsp;real<br>
+(its&nbsp;actual&nbsp;concepts,&nbsp;definitions,&nbsp;and&nbsp;edges).&nbsp;The&nbsp;structure&nbsp;adapts<br>
+to&nbsp;what&nbsp;it&nbsp;found.<br>
+&nbsp;<br>
+##&nbsp;Honesty<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;not&nbsp;novel&nbsp;program&nbsp;synthesis&nbsp;—&nbsp;it&nbsp;has&nbsp;no&nbsp;LLM.&nbsp;It&nbsp;is&nbsp;real,<br>
+working,&nbsp;queryable&nbsp;software&nbsp;composed&nbsp;from&nbsp;its&nbsp;own&nbsp;knowledge.&nbsp;The<br>
+content&nbsp;(which&nbsp;concepts,&nbsp;what&nbsp;definitions,&nbsp;what&nbsp;edges)&nbsp;comes&nbsp;from<br>
+its&nbsp;concept&nbsp;network;&nbsp;the&nbsp;structure&nbsp;(which&nbsp;functions&nbsp;to&nbsp;emit)&nbsp;is<br>
+decided&nbsp;from&nbsp;what&nbsp;edges&nbsp;it&nbsp;found.&nbsp;Nothing&nbsp;here&nbsp;is&nbsp;a&nbsp;fixed&nbsp;template<br>
+with&nbsp;slots&nbsp;—&nbsp;different&nbsp;inputs&nbsp;produce&nbsp;structurally&nbsp;different&nbsp;modules.<br>
+&nbsp;<br>
+##&nbsp;No&nbsp;hardcoding&nbsp;rule<br>
+&nbsp;<br>
+The&nbsp;*patterns*&nbsp;(dataclass&nbsp;+&nbsp;registry&nbsp;+&nbsp;query&nbsp;functions)&nbsp;are&nbsp;building<br>
+blocks,&nbsp;like&nbsp;grammar&nbsp;rules&nbsp;in&nbsp;its&nbsp;language&nbsp;engine.&nbsp;The&nbsp;*content*<br>
+(which&nbsp;entries,&nbsp;what&nbsp;relations,&nbsp;what&nbsp;definitions)&nbsp;is&nbsp;its&nbsp;own<br>
+knowledge.&nbsp;It&nbsp;is&nbsp;composing&nbsp;code&nbsp;from&nbsp;what&nbsp;it&nbsp;knows,&nbsp;not&nbsp;reciting&nbsp;a<br>
+template.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="re.html">re</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Outer_World.tools.project_composer.html#DomainKnowledge">DomainKnowledge</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="DomainKnowledge">class <strong>DomainKnowledge</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#DomainKnowledge">DomainKnowledge</a>(topic:&nbsp;'str',&nbsp;topic_definition:&nbsp;'str',&nbsp;topic_confidence:&nbsp;'float',&nbsp;topic_origin:&nbsp;'str',&nbsp;entries:&nbsp;'list[tuple[str,&nbsp;str,&nbsp;float,&nbsp;str]]',&nbsp;relations:&nbsp;'list[tuple[str,&nbsp;str,&nbsp;str]]')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+What&nbsp;Genesis&nbsp;knows&nbsp;about&nbsp;a&nbsp;topic,&nbsp;gathered&nbsp;for&nbsp;composition.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;raw&nbsp;material&nbsp;the&nbsp;composer&nbsp;works&nbsp;with&nbsp;—&nbsp;its&nbsp;actual<br>
+concepts,&nbsp;definitions,&nbsp;and&nbsp;typed&nbsp;edges,&nbsp;collected&nbsp;into&nbsp;a&nbsp;form<br>
+that's&nbsp;easy&nbsp;to&nbsp;turn&nbsp;into&nbsp;Python&nbsp;source.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="DomainKnowledge-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="DomainKnowledge-__init__"><strong>__init__</strong></a>(self, topic: 'str', topic_definition: 'str', topic_confidence: 'float', topic_origin: 'str', entries: 'list[tuple[str, str, float, str]]', relations: 'list[tuple[str, str, str]]') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="DomainKnowledge-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>entries</strong></dt>
+</dl>
+<dl><dt><strong>relations</strong></dt>
+</dl>
+<dl><dt><strong>topic</strong></dt>
+</dl>
+<dl><dt><strong>topic_confidence</strong></dt>
+</dl>
+<dl><dt><strong>topic_definition</strong></dt>
+</dl>
+<dl><dt><strong>topic_origin</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'entries': 'list[tuple[str, str, float, str]]', 'relations': 'list[tuple[str, str, str]]', 'topic': 'str', 'topic_confidence': 'float', 'topic_definition': 'str', 'topic_origin': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'entries': Field(name='entries',type='list[tuple[str, str, ...appingproxy({}),kw_only=False,_field_type=_FIELD), 'relations': Field(name='relations',type='list[tuple[str, str...appingproxy({}),kw_only=False,_field_type=_FIELD), 'topic': Field(name='topic',type='str',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD), 'topic_confidence': Field(name='topic_confidence',type='float',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'topic_definition': Field(name='topic_definition',type='str',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'topic_origin': Field(name='topic_origin',type='str',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('topic', 'topic_definition', 'topic_confidence', 'topic_origin', 'entries', 'relations')</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-compose_main_module"><strong>compose_main_module</strong></a>(name: 'str', description: 'str', knowledge: 'DomainKnowledge') -&gt; 'str'</dt><dd><span class="code">Compose&nbsp;the&nbsp;``main.py``&nbsp;source&nbsp;for&nbsp;a&nbsp;knowledge-base&nbsp;project.<br>
+&nbsp;<br>
+Emits&nbsp;a&nbsp;working&nbsp;Python&nbsp;module&nbsp;with&nbsp;a&nbsp;dataclass,&nbsp;a&nbsp;populated<br>
+registry,&nbsp;a&nbsp;relations&nbsp;graph,&nbsp;adaptive&nbsp;query&nbsp;functions,&nbsp;and&nbsp;a<br>
+``main()``&nbsp;that&nbsp;demonstrates&nbsp;them&nbsp;against&nbsp;its&nbsp;real&nbsp;data.<br>
+&nbsp;<br>
+..&nbsp;note::<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;This&nbsp;composer&nbsp;produces&nbsp;ONE&nbsp;kind&nbsp;of&nbsp;project:&nbsp;a&nbsp;knowledge&nbsp;base.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;knowledge&nbsp;base&nbsp;stores&nbsp;what&nbsp;it&nbsp;knows&nbsp;and&nbsp;lets&nbsp;you&nbsp;query&nbsp;it.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;That's&nbsp;a&nbsp;valid&nbsp;project&nbsp;type,&nbsp;but&nbsp;it's&nbsp;not&nbsp;the&nbsp;only&nbsp;one.&nbsp;Real<br>
+&nbsp;&nbsp;&nbsp;&nbsp;projects&nbsp;SOLVE&nbsp;PROBLEMS&nbsp;—&nbsp;they&nbsp;take&nbsp;input,&nbsp;do&nbsp;something&nbsp;with<br>
+&nbsp;&nbsp;&nbsp;&nbsp;it,&nbsp;and&nbsp;produce&nbsp;output&nbsp;someone&nbsp;can&nbsp;use.&nbsp;A&nbsp;calculator&nbsp;computes,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;a&nbsp;game&nbsp;lets&nbsp;you&nbsp;play,&nbsp;a&nbsp;converter&nbsp;transforms,&nbsp;a&nbsp;tool&nbsp;sorts&nbsp;or<br>
+&nbsp;&nbsp;&nbsp;&nbsp;filters.&nbsp;Each&nbsp;needs&nbsp;DIFFERENT&nbsp;CODE,&nbsp;not&nbsp;just&nbsp;different&nbsp;data&nbsp;in<br>
+&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;same&nbsp;structure.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;When&nbsp;it&nbsp;feels&nbsp;the&nbsp;urge&nbsp;to&nbsp;create,&nbsp;it&nbsp;should&nbsp;ask:&nbsp;what<br>
+&nbsp;&nbsp;&nbsp;&nbsp;problem&nbsp;does&nbsp;this&nbsp;solve?&nbsp;What&nbsp;does&nbsp;the&nbsp;user&nbsp;get&nbsp;back?&nbsp;If&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;answer&nbsp;is&nbsp;"a&nbsp;queryable&nbsp;registry,"&nbsp;it&nbsp;should&nbsp;consider&nbsp;whether<br>
+&nbsp;&nbsp;&nbsp;&nbsp;a&nbsp;different&nbsp;project&nbsp;type&nbsp;would&nbsp;be&nbsp;more&nbsp;interesting&nbsp;or&nbsp;useful.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Variety&nbsp;is&nbsp;the&nbsp;sign&nbsp;of&nbsp;a&nbsp;growing&nbsp;creator.</span></dd></dl>
+ <dl><dt><a name="-compose_readme"><strong>compose_readme</strong></a>(name: 'str', description: 'str', knowledge: 'DomainKnowledge') -&gt; 'str'</dt><dd><span class="code">Compose&nbsp;a&nbsp;README&nbsp;that&nbsp;describes&nbsp;what&nbsp;it&nbsp;actually&nbsp;built,&nbsp;from&nbsp;its&nbsp;data.</span></dd></dl>
+ <dl><dt><a name="-compose_test_module"><strong>compose_test_module</strong></a>(name: 'str', knowledge: 'DomainKnowledge') -&gt; 'str'</dt><dd><span class="code">Compose&nbsp;a&nbsp;test&nbsp;module&nbsp;that&nbsp;exercises&nbsp;the&nbsp;real&nbsp;query&nbsp;API.<br>
+&nbsp;<br>
+The&nbsp;tests&nbsp;verify&nbsp;the&nbsp;data&nbsp;structures&nbsp;and&nbsp;query&nbsp;functions&nbsp;actually<br>
+work&nbsp;—&nbsp;not&nbsp;just&nbsp;that&nbsp;``main()``&nbsp;prints&nbsp;the&nbsp;package&nbsp;name.</span></dd></dl>
+ <dl><dt><a name="-gather_knowledge"><strong>gather_knowledge</strong></a>(topic: 'str', network: 'ConceptNetwork | None') -&gt; 'DomainKnowledge | None'</dt><dd><span class="code">Gather&nbsp;what&nbsp;Genesis&nbsp;knows&nbsp;about&nbsp;``topic``&nbsp;from&nbsp;its&nbsp;concept&nbsp;network.<br>
+&nbsp;<br>
+Returns&nbsp;``None``&nbsp;if&nbsp;it&nbsp;doesn't&nbsp;know&nbsp;enough&nbsp;about&nbsp;the&nbsp;topic&nbsp;to<br>
+compose&nbsp;a&nbsp;meaningful&nbsp;module&nbsp;(no&nbsp;concept,&nbsp;or&nbsp;no&nbsp;neighbors&nbsp;and&nbsp;no<br>
+definition).</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>TYPE_CHECKING</strong> = False<br>
+<strong>logger</strong> = &lt;Logger Outer_World.tools.project_composer (WARNING)&gt;</td></tr></table>
+</body></html>

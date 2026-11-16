@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.optic_nerve</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.optic_nerve</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/optic_nerve.py">/home/mindyrenee/GenAnd/Genesis/Self_World/optic_nerve.py</a></td></tr></table>
+    <p><span class="code">Optic&nbsp;nerve&nbsp;—&nbsp;the&nbsp;mind's&nbsp;end&nbsp;of&nbsp;the&nbsp;afferent&nbsp;path.<br>
+&nbsp;<br>
+The&nbsp;body's&nbsp;optic&nbsp;nerve&nbsp;(``src/daemon/optic_nerve.rs``&nbsp;—&nbsp;the&nbsp;daemon&nbsp;owns<br>
+the&nbsp;camera&nbsp;now,&nbsp;a&nbsp;capture&nbsp;thread&nbsp;inside&nbsp;the&nbsp;body&nbsp;rather&nbsp;than&nbsp;a&nbsp;separate<br>
+process)&nbsp;writes&nbsp;raw&nbsp;frames&nbsp;into&nbsp;the&nbsp;POSIX&nbsp;shared-memory&nbsp;segment<br>
+``/genesis_optic_nerve``.&nbsp;This&nbsp;module&nbsp;attaches&nbsp;to&nbsp;that&nbsp;segment&nbsp;and&nbsp;wraps<br>
+the&nbsp;live&nbsp;frame&nbsp;directly&nbsp;into&nbsp;a&nbsp;NumPy&nbsp;array&nbsp;without&nbsp;any&nbsp;serialization,<br>
+JSON,&nbsp;or&nbsp;socket&nbsp;round-trips.<br>
+&nbsp;<br>
+The&nbsp;frame&nbsp;counter&nbsp;is&nbsp;a&nbsp;plain&nbsp;sequence&nbsp;number:&nbsp;the&nbsp;writer&nbsp;bumps&nbsp;it&nbsp;once<br>
+per&nbsp;published&nbsp;frame,&nbsp;after&nbsp;the&nbsp;frame&nbsp;bytes&nbsp;land.&nbsp;A&nbsp;read&nbsp;that&nbsp;races&nbsp;a<br>
+writer&nbsp;may&nbsp;observe&nbsp;a&nbsp;torn&nbsp;frame&nbsp;—&nbsp;the&nbsp;consumers&nbsp;pool&nbsp;statistics&nbsp;over<br>
+subsampled&nbsp;pixels,&nbsp;so&nbsp;a&nbsp;transient&nbsp;artifact&nbsp;averages&nbsp;out.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;afferent&nbsp;wire&nbsp;only&nbsp;—&nbsp;it&nbsp;delivers&nbsp;pixels.&nbsp;What&nbsp;the&nbsp;pixels<br>
+*mean*&nbsp;lives&nbsp;in&nbsp;the&nbsp;visual&nbsp;cortex&nbsp;(``occipital_lobe/perception/vision.py``),<br>
+which&nbsp;is&nbsp;the&nbsp;words&nbsp;side.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="numpy.html">numpy</a><br>
+</td><td class="multicolumn"><a href="multiprocessing.resource_tracker.html">multiprocessing.resource_tracker</a><br>
+</td><td class="multicolumn"><a href="multiprocessing.shared_memory.html">multiprocessing.shared_memory</a><br>
+</td><td class="multicolumn"><a href="struct.html">struct</a><br>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.optic_nerve.html#OpticNerve">OpticNerve</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="OpticNerve">class <strong>OpticNerve</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#OpticNerve">OpticNerve</a>(name:&nbsp;'str'&nbsp;=&nbsp;'genesis_optic_nerve')&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Attach&nbsp;to&nbsp;the&nbsp;live&nbsp;optic-nerve&nbsp;segment&nbsp;and&nbsp;expose&nbsp;frames&nbsp;as&nbsp;numpy&nbsp;arrays.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="OpticNerve-__init__"><strong>__init__</strong></a>(self, name: 'str' = 'genesis_optic_nerve') -&gt; 'None'</dt><dd><span class="code">Attach&nbsp;to&nbsp;the&nbsp;named&nbsp;optic-nerve&nbsp;shared-memory&nbsp;segment&nbsp;without&nbsp;creating&nbsp;it.</span></dd></dl>
+
+<dl><dt><a name="OpticNerve-close"><strong>close</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Detach&nbsp;from&nbsp;the&nbsp;shared&nbsp;memory.&nbsp;The&nbsp;underlying&nbsp;segment&nbsp;survives.</span></dd></dl>
+
+<dl><dt><a name="OpticNerve-latest"><strong>latest</strong></a>(self, copy: 'bool' = False) -&gt; 'np.ndarray | None'</dt><dd><span class="code">Return&nbsp;the&nbsp;latest&nbsp;frame&nbsp;as&nbsp;an&nbsp;HWC&nbsp;uint8&nbsp;numpy&nbsp;array.<br>
+&nbsp;<br>
+A&nbsp;single&nbsp;snapshot:&nbsp;read&nbsp;the&nbsp;frame&nbsp;counter&nbsp;(0&nbsp;means&nbsp;no&nbsp;frame&nbsp;has<br>
+ever&nbsp;been&nbsp;published&nbsp;→&nbsp;``None``),&nbsp;then&nbsp;the&nbsp;header&nbsp;and&nbsp;payload&nbsp;in<br>
+one&nbsp;pass.&nbsp;There&nbsp;is&nbsp;no&nbsp;write-in-progress&nbsp;marker,&nbsp;so&nbsp;a&nbsp;read&nbsp;that<br>
+races&nbsp;a&nbsp;writer&nbsp;may&nbsp;return&nbsp;a&nbsp;frame&nbsp;composited&nbsp;from&nbsp;two&nbsp;captures&nbsp;—<br>
+the&nbsp;consumers&nbsp;treat&nbsp;pixels&nbsp;as&nbsp;statistics,&nbsp;not&nbsp;truth.<br>
+&nbsp;<br>
+The&nbsp;array&nbsp;is&nbsp;a&nbsp;zero-copy&nbsp;view&nbsp;of&nbsp;the&nbsp;shared&nbsp;memory&nbsp;unless&nbsp;``copy=True``.<br>
+The&nbsp;shape&nbsp;always&nbsp;matches&nbsp;the&nbsp;exact&nbsp;byte&nbsp;allocation&nbsp;advertised&nbsp;by&nbsp;the<br>
+nerve's&nbsp;header.</span></dd></dl>
+
+<dl><dt><a name="OpticNerve-read_header"><strong>read_header</strong></a>(self) -&gt; 'tuple[int, int, int, bytes, int, int]'</dt><dd><span class="code">Return&nbsp;counter,&nbsp;width,&nbsp;height,&nbsp;fourcc,&nbsp;size,&nbsp;stride.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-latest_frame"><strong>latest_frame</strong></a>(copy: 'bool' = True, name: 'str' = 'genesis_optic_nerve') -&gt; 'np.ndarray | None'</dt><dd><span class="code">One-shot:&nbsp;return&nbsp;the&nbsp;latest&nbsp;frame.<br>
+&nbsp;<br>
+Always&nbsp;returns&nbsp;a&nbsp;copy.&nbsp;The&nbsp;``copy``&nbsp;parameter&nbsp;is&nbsp;accepted&nbsp;for<br>
+backward&nbsp;compatibility&nbsp;but&nbsp;a&nbsp;zero-copy&nbsp;view&nbsp;is&nbsp;unsafe&nbsp;in&nbsp;this<br>
+one-shot&nbsp;helper:&nbsp;the&nbsp;``<a href="#OpticNerve">OpticNerve</a>``&nbsp;<a href="builtins.html#object">object</a>&nbsp;is&nbsp;local&nbsp;and&nbsp;goes&nbsp;out&nbsp;of<br>
+scope&nbsp;when&nbsp;the&nbsp;function&nbsp;returns,&nbsp;which&nbsp;unmaps&nbsp;the&nbsp;shared&nbsp;memory<br>
+backing&nbsp;the&nbsp;view&nbsp;and&nbsp;leaves&nbsp;the&nbsp;caller&nbsp;with&nbsp;a&nbsp;dangling&nbsp;pointer<br>
+(use-after-unmap).&nbsp;Callers&nbsp;that&nbsp;need&nbsp;a&nbsp;zero-copy&nbsp;view&nbsp;should<br>
+construct&nbsp;an&nbsp;``<a href="#OpticNerve">OpticNerve</a>``&nbsp;directly&nbsp;and&nbsp;keep&nbsp;it&nbsp;alive&nbsp;for&nbsp;the<br>
+lifetime&nbsp;of&nbsp;the&nbsp;view.<br>
+&nbsp;<br>
+``name``&nbsp;selects&nbsp;the&nbsp;nerve&nbsp;segment&nbsp;—&nbsp;the&nbsp;default&nbsp;is&nbsp;the&nbsp;body's&nbsp;own<br>
+eye;&nbsp;``SCREEN_NAME``&nbsp;reads&nbsp;the&nbsp;screen-capture&nbsp;nerve&nbsp;when&nbsp;a&nbsp;relay<br>
+feeds&nbsp;it.<br>
+&nbsp;<br>
+Returns&nbsp;``None``&nbsp;if&nbsp;the&nbsp;nerve&nbsp;segment&nbsp;is&nbsp;absent&nbsp;or&nbsp;no&nbsp;frame&nbsp;has<br>
+ever&nbsp;been&nbsp;published.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>HEADER</strong> = 28<br>
+<strong>NAME</strong> = 'genesis_optic_nerve'<br>
+<strong>SCREEN_NAME</strong> = 'genesis_screen_nerve'</td></tr></table>
+</body></html>

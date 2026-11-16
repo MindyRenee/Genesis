@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["SNAPSHOT_MAGIC","SNAPSHOT_VERSION"],"struct":["CoreStateSnapshot"]};

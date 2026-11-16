@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["chi_from_counts"],"struct":["SimplicialComplex","Topology"],"type":["Subset"]};

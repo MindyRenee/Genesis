@@ -1,0 +1,330 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Active inference engine — the generative self-model."><title>genesis::daemon::active_inference - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-203241e4.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="genesis" data-themes="" data-resource-suffix="" data-rustdoc-version="1.100.0 (0ef1bc386 2026-11-09)" data-channel="1.100.0" data-search-js="search-b167f383.js" data-stringdex-js="stringdex-b5109af9.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../../static.files/main-1814ead3.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-9f56287d.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module active_inference</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../genesis/index.html">genesis</a><span class="version">0.2.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module active_<wbr>inference</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#variational-implementation" title="Variational implementation">Variational implementation</a><ul><li><a href="#what-is-and-isnt-variational" title="What is and isn’t variational">What is and isn’t variational</a></li></ul></li><li><a href="#overview" title="Overview">Overview</a></li><li><a href="#the-generative-model" title="The generative model">The generative model</a></li><li><a href="#precision-dynamics" title="Precision dynamics">Precision dynamics</a></li><li><a href="#free-energy" title="Free energy">Free energy</a></li><li><a href="#allostatic-load" title="Allostatic load">Allostatic load</a></li><li><a href="#active-inference--policy-selection" title="Active inference — policy selection">Active inference — policy selection</a><ul><li><a href="#policy-repertoire" title="Policy repertoire">Policy repertoire</a></li><li><a href="#policy-evaluation" title="Policy evaluation">Policy evaluation</a></li><li><a href="#policy-selection" title="Policy selection">Policy selection</a></li></ul></li></ul><h3><a href="#structs">Module Items</a></h3><ul class="block"><li><a href="#structs" title="Structs">Structs</a></li><li><a href="#constants" title="Constants">Constants</a></li><li><a href="#statics" title="Statics">Statics</a></li><li><a href="#functions" title="Functions">Functions</a></li></ul></section><div id="rustdoc-modnav"><h2><a href="../index.html">In genesis::<wbr>daemon</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../index.html">genesis</a>::<wbr><a href="../index.html">daemon</a></div><h1>Module <span>active_<wbr>inference</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/genesis/daemon/active_inference.rs.html#1-4430">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Active inference engine — the generative self-model.</p>
+<h3 id="variational-implementation"><a class="doc-anchor" href="#variational-implementation">§</a>Variational implementation</h3>
+<p>This module uses a <strong>diagonal Gaussian state estimate</strong> over the
+hidden neurochemical state. The generative predictor is a learned
+linear state-space model. Covariance propagation retains the diagonal
+of A P A^T + Q; off-diagonal posterior covariance is discarded.
+This is a diagonal-projected filter for coupled dynamics. For the
+represented Gaussian prior, <code>variational_free_energy_nats</code> computes
+full KL[q||p] plus expected negative log-likelihood, including
+posterior variance and Gaussian normalization. <code>free_energy</code> maps
+its excess above a matched observation into bounded control output.
+Policy selection uses expected negative log Gaussian preferences
+minus next-observation information gain. Additive controls make
+the information gain policy-independent.</p>
+<h4 id="what-is-and-isnt-variational"><a class="doc-anchor" href="#what-is-and-isnt-variational">§</a>What is and isn’t variational</h4>
+<p><strong>Is variational:</strong></p>
+<ul>
+<li>The estimate q(s) = N(belief_mean, diag(belief_var)) is Gaussian.
+It uses a diagonal-projected Kalman filter, with prior variance
+diag(A diag(belief_var) A^T) + Q and scalar observation updates
+of gain, mean, and variance. Uncertainty is propagated each
+tick, making the gain adaptive rather than fixed.</li>
+<li>VFE is KL[q(s)||p(s)] - E_q[log p(o|s)], evaluated explicitly
+for the represented diagonal Gaussian prior and posterior.
+The likelihood expectation includes squared residuals and
+posterior variance. Bounded control telemetry is a separate
+monotonic transformation of excess VFE; raw VFE is in nats.</li>
+<li><code>precision</code> is normalized confidence mapped to observation variance;
+actual likelihood precision is 1 / obs_var, not this [0, 1] score.</li>
+<li>Policy selection minimizes Gaussian expected free energy
+over the action-conditioned generative model. Exploration is kept
+as a separate temperature-controlled sampling mechanism because
+this model class has additive controls.</li>
+</ul>
+<p><strong>Is simplified (not full Friston):</strong></p>
+<ul>
+<li>
+<p>The posterior is diagonal (mean-field), not full-covariance.
+This is a common approximation in variational Bayes.</p>
+</li>
+<li>
+<p>The predictor is linear before bounds are applied; discarding
+covariance and clipping the means make its filter approximate.</p>
+</li>
+<li>
+<p>KL uses both mean and variance terms, with diagonal covariance.
+The covariance projection loses cross-dimensional correlations;
+full-covariance filtering would retain those correlations.
+Observation noise is adapted rather than inferred hierarchically.</p>
+</li>
+<li>
+<p>The policy repertoire is discrete and fixed (9 policies), not
+a continuous action space.</p>
+</li>
+<li>
+<p>Epistemic value is the expected information gain computed
+properly as the entropy reduction of the variational posterior
+(<code>0.5·mean(ln(prior_var/belief_var))</code>), not a novelty heuristic.
+For this model class (linear-Gaussian, additive controls) that
+quantity is provably policy-independent (Koudahl, Kouw &amp; de
+Vries, 2021: the posterior covariance update does not depend on
+the observation value), so it enters the published EFE
+decomposition but cannot arbitrate — ranking falls back to the
+pragmatic cost, honestly. An earlier revision substituted an
+uncertainty-weighted novelty term that was inverted relative to
+true information gain and outweighed the pragmatic term 10–100×;
+it now serves as the cautionary example in the scoring loop.
+Exploration lives where it belongs: the precision-weighted
+softmax temperature, which samples when confidence is low and
+exploits when it is high.</p>
+<p>There is a real result behind the attempt, but it is narrower
+than “necessary”: in linear-Gaussian state-space models driven
+by <strong>additive</strong> controls, the epistemic terms of the expected
+free energy are <strong>constant</strong> with respect to policy, so plain
+EFE minimisation reduces to KL control with no exploratory
+drive (Koudahl, Kouw &amp; de Vries, 2021). The constancy is a
+property of that specific model class and control parameterisation,
+not of epistemic value in general: multiplicative controls (e.g.
+switching transition matrices) do admit an epistemic drive in the
+same model class, and generalized Bayesian filtering reinstates
+it by making observation precision policy-dependent
+(Millidge, Tschantz &amp; Buckley, 2021). Genesis uses additive
+controls and does not implement precision-modulated policies, so
+it does fall inside the degenerate case — and the honest fix is
+the one taken here: compute the information gain properly,
+observe that it is policy-independent, keep it in the published
+decomposition, and let ranking fall back to the pragmatic cost
+with exploration carried by the precision-weighted temperature.</p>
+</li>
+</ul>
+<p>These simplifications make the implementation tractable at the 5 Hz body tick
+on a single machine while preserving the core mathematical
+motifs of active inference: approximate state estimation, bounded
+regulatory demand, and homeostatic policy selection.</p>
+<p>This is the “strange loop”: a generative model that predicts
+Genesis’s <strong>own</strong> neurochemical trajectory, computes prediction
+errors, and feeds them back into the very dynamics it models.</p>
+<h2 id="overview"><a class="doc-anchor" href="#overview">§</a>Overview</h2>
+<p>Before each neurochemical tick, the engine predicts where the 18
+effective levels will move. After the tick, it computes the
+prediction error (surprise) and uses it to:</p>
+<ol>
+<li><strong>Update the generative model</strong> — the transition matrix learns
+from prediction error (delta rule / Rescorla-Wagner).</li>
+<li><strong>Drive neuromodulation</strong> — dopamine reward prediction error,
+norepinephrine orienting, metaplasticity acceleration.</li>
+<li><strong>Track allostatic load</strong> — sustained high expected free energy
+accumulates as allostatic load, which upregulates cortisol
+baseline (anticipatory stress).</li>
+<li><strong>Active inference</strong> — when expected future free energy is high,
+the system generates small impulses toward its predicted
+homeostatic state, actively minimizing future surprise.</li>
+</ol>
+<h2 id="the-generative-model"><a class="doc-anchor" href="#the-generative-model">§</a>The generative model</h2>
+<p>The model is a linear state-space predictor:</p>
+<div class="example-wrap"><pre class="language-text"><code>predicted_next[i] = sum_j (A[i][j] * current[j]) + bias[i]</code></pre></div>
+<ul>
+<li><code>A</code> is an 18×18 weight matrix (the learned transition model)</li>
+<li><code>bias</code> is an 18-element vector (the learned offset)</li>
+<li>Initialized as identity + zero bias (predict “no change”)</li>
+</ul>
+<p>The model is updated via the delta rule:</p>
+<div class="example-wrap"><pre class="language-text"><code>A[i][j] += lr * precision * error[i] * current[j]
+bias[i] += lr * precision * error[i] * 0.1</code></pre></div>
+<p>where <code>error[i] = actual[i] - predicted[i]</code>, <code>lr</code> is the learning
+rate, and <code>precision</code> is the model’s confidence in its predictions.</p>
+<h2 id="precision-dynamics"><a class="doc-anchor" href="#precision-dynamics">§</a>Precision dynamics</h2>
+<p>Precision is the model’s confidence, maintained as the
+inverse-variance target <code>1 / (1 + err_var / 0.0004)</code> where
+err_var is the slow EMA of squared surprise. It adapts:</p>
+<ul>
+<li>Sustained low surprise → err_var drains → target rises toward
+1.0 → precision slews up (slowly: regaining confidence is slow).</li>
+<li>Sustained high surprise → err_var fills → target falls →
+precision slews down (quickly: losing confidence is fast).
+Saturation at 1.0 at rest is correct — the model genuinely
+predicts the resting trajectory — and it is reversible: any
+sustained surprise above ~0.01 RMS pulls precision back under the
+0.8 exploitation threshold, re-opening stochastic exploration.</li>
+</ul>
+<p>This is the precision-weighted prediction error of predictive
+coding (Friston, 2010): the brain modulates how much it learns
+from prediction errors based on its confidence in the predictions.</p>
+<h2 id="free-energy"><a class="doc-anchor" href="#free-energy">§</a>Free energy</h2>
+<p>The formal variational free energy, NOT the bounded telemetry proxy, is:</p>
+<div class="example-wrap"><pre class="language-text"><code>F = KL[q(s) || p(s)] - E_q[log p(o | s)]</code></pre></div>
+<p>where q(s) = N(belief_mean, diag(belief_var)) is the posterior,
+p(s) = N(predicted, diag(prior_var)) is the prior (generative
+model’s prediction), and the accuracy term is the expectation
+of negative log-likelihood p(o|s), taken over q(s).</p>
+<p><strong>KL divergence (complexity term):</strong> measures how far the
+posterior differs from the prior in mean AND variance. Even if
+an observation matches the predicted mean, it generally reduces
+variance, so posterior and prior differ and the full KL is nonzero.</p>
+<p><strong>NLL (accuracy term):</strong> the precision-weighted prediction error.
+When precision is high (the model trusts its predictions), the
+same prediction error produces higher NLL — the system is more
+surprised by errors it should have predicted. When precision is
+low, errors are expected and produce lower NLL.</p>
+<p>Both terms are normalized per dimension and clamped to [0, 1],
+then summed and clamped to [0, 1] for the signals projection.</p>
+<h2 id="allostatic-load"><a class="doc-anchor" href="#allostatic-load">§</a>Allostatic load</h2>
+<p>Allostatic load is the cumulative regulatory burden, integrated
+over time around a measured resting baseline:</p>
+<div class="example-wrap"><pre class="language-text"><code>burden  = mediator elevation (2*cortisol + epi + 0.5*norepinephrine,
+          each normalised over its resting level)
+        * context amplifier (bounded, from expected-fe and surprise EMAs)
+
+if burden &gt; rest + deadband:  load += RATE * (burden - rest - deadband) * dt_scale
+elif burden &lt; rest - deadband: load -= RECOVERY * depth * dt_scale
+else:                         load unchanged (neutral variation)</code></pre></div>
+<p>Per McEwen the mediators <em>are</em> cortisol, epinephrine and
+norepinephrine; anticipated demand (expected free energy) and
+unexpectedness (surprise) are circumstances that drive the axis,
+not mediators in their own right, so they enter only through a
+bounded multiplicative amplifier — context can never manufacture
+burden from nothing. <code>rest</code> is the system’s own measured resting
+burden (a slow tracker, <code>rest_baseline</code>), and the dead-band keeps
+ordinary physiological variation from integrating without bound.</p>
+<p>Sustained load upregulates the cortisol baseline, modeling the
+chronic stress → HPA axis sensitization pathway (McEwen &amp;
+Stellar, 1993).</p>
+<p>This engine’s load is the <strong>substrate-scoped</strong> view. The cognitive
+mind keeps a whole-system view that also folds in endocrine and
+computational-body stress; both are calibrated to the same
+timescale so they move together.</p>
+<h2 id="active-inference--policy-selection"><a class="doc-anchor" href="#active-inference--policy-selection">§</a>Active inference — policy selection</h2>
+<p>The system doesn’t just generate a single set of impulses toward
+a predicted state. It performs <strong>policy selection</strong>: it evaluates
+multiple candidate policies (actions), predicts each one’s outcome
+using the generative model, computes expected free energy for each,
+and selects the policy with lowest expected free energy.</p>
+<p>This is the core of Fristonian active inference (Friston, Daunizeau
+&amp; Kiebel, 2010): action selection minimizes expected free energy.
+The system explores its action space and chooses based on predicted
+outcomes, not just current error.</p>
+<h3 id="policy-repertoire"><a class="doc-anchor" href="#policy-repertoire">§</a>Policy repertoire</h3>
+<p>The system has 9 candidate policies, each targeting a specific
+neuromodulatory pathway:</p>
+<ul>
+<li><strong>noop</strong>: no impulses (let dynamics run naturally)</li>
+<li><strong>engage</strong>: DA + NE boost (arousal, approach behavior)</li>
+<li><strong>calm</strong>: GABA + 5-HT boost (inhibition, serotonergic stabilization)</li>
+<li><strong>focus</strong>: ACh + DA boost (attentional engagement)</li>
+<li><strong>bond</strong>: OXY boost (social attunement)</li>
+<li><strong>soothe</strong>: END boost (endorphin-mediated self-soothing)</li>
+<li><strong>rest</strong>: ADN + MEL boost (sleep pressure, circadian)</li>
+<li><strong>mobilize</strong>: CORT + CRH boost (stress response, HPA activation)</li>
+<li><strong>explore</strong>: DA + ACh boost, GABA reduction (curiosity, exploration)</li>
+</ul>
+<h3 id="policy-evaluation"><a class="doc-anchor" href="#policy-evaluation">§</a>Policy evaluation</h3>
+<p>For each policy, the system:</p>
+<ol>
+<li>Simulates applying the policy’s impulses to the current state</li>
+<li>Predicts the resulting next state using the generative model</li>
+<li>Computes expected free energy (distance from homeostatic target
+<ul>
+<li>model uncertainty)</li>
+</ul>
+</li>
+</ol>
+<h3 id="policy-selection"><a class="doc-anchor" href="#policy-selection">§</a>Policy selection</h3>
+<p>The policy with lowest expected free energy is selected via softmax.
+The softmax temperature is precision-dependent: high precision →
+low temperature → exploitative (pick the best); low precision →
+high temperature → exploratory (sometimes pick suboptimal policies
+to explore). This is the precision-weighted policy selection of
+active inference (Friston et al., 2010; Schwartenbeck et al., 2015).</p>
+<p>Policy selection runs every inference cycle. In a predictable
+regime the “noop” policy wins (doing nothing is optimal — every
+policy predicts ~the current state and noop moves nothing) and
+under deviation a corrective policy wins (whichever the learned
+action model predicts will close the distance fastest). Early in
+life, before the action model is learned, all policies predict
+identically and selection falls through to noop while the
+low-precision softmax branch explores stochastically — a reflexive
+developmental phase that gives way to deliberative selection as
+the action effects are learned.</p>
+<p>References:</p>
+<ul>
+<li>Friston, K. (2010). The free-energy principle. Nat Rev Neurosci.</li>
+<li>Friston, K., Daunizeau, J. &amp; Kiebel, S. (2010). Active inference
+and the free-energy principle. Neuroimage.</li>
+<li>Schwartenbeck, P. et al. (2015). Dopamine, precision, and policy
+selection in active inference. Front Psychol.</li>
+<li>Schultz, W. (2016). Dopamine reward prediction error coding.
+Dialogues Clin Neurosci.</li>
+<li>Aston-Jones, G. &amp; Cohen, J. D. (2005). Locus coeruleus function.
+Annu Rev Neurosci.</li>
+<li>McEwen, B. S. &amp; Stellar, E. (1993). Stress and the individual.
+Arch Intern Med.</li>
+<li>Pezzulo, G., Rigoli, F. &amp; Friston, K. (2015). Active inference,
+homeostatic and allostatic control. Prog Neurobiol.</li>
+<li>Friston, K., Rigoli, F., Ognibene, D., Mathys, C., Fitzgerald, T.
+&amp; Pezzulo, G. (2015). Active inference and epistemic value.
+Cognitive Neuroscience, 6(4), 187–214.</li>
+<li>Koudahl, M. T., Kouw, W. M. &amp; de Vries, B. (2021). On epistemics in
+expected free energy for linear Gaussian state space models.
+Entropy, 23(12), 1565.</li>
+<li>Särkkä, S. (2013). Bayesian Filtering and Smoothing. Cambridge
+University Press.</li>
+<li>Millidge, T. S., Tschantz, A. &amp; Buckley, C. L. (2021). A
+whack-a-mole re-derivation of the FEP, and how to pound the
+hole. Neural Computation, 33(2), 447–482.</li>
+</ul>
+</div></details><h2 id="structs" class="section-header">Structs<a href="#structs" class="anchor">§</a></h2><dl class="item-table"><dt><a class="struct" href="struct.ActiveInferenceEngine.html" title="struct genesis::daemon::active_inference::ActiveInferenceEngine">Active<wbr>Inference<wbr>Engine</a></dt><dd>The active inference engine — a generative model of Genesis’s own
+neurochemical trajectory.</dd><dt><a class="struct" href="struct.DyadicSignals.html" title="struct genesis::daemon::active_inference::DyadicSignals">Dyadic<wbr>Signals</a></dt><dd>Dyadic affective signals projected into the inference signals.</dd><dt><a class="struct" href="struct.InferenceResult.html" title="struct genesis::daemon::active_inference::InferenceResult">Inference<wbr>Result</a></dt><dd>The result of one inference cycle.</dd><dt><a class="struct" href="struct.Policy.html" title="struct genesis::daemon::active_inference::Policy">Policy</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>A candidate policy — a named action with associated neurochemical
+impulses.</dd><dt><a class="struct" href="struct.PolicyEvaluation.html" title="struct genesis::daemon::active_inference::PolicyEvaluation">Policy<wbr>Evaluation</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>The result of policy evaluation — the selected policy and its
+expected free energy.</dd><dt><a class="struct" href="struct.RestBaseline.html" title="struct genesis::daemon::active_inference::RestBaseline">Rest<wbr>Baseline</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>A slow-tracking estimate of her resting burden.</dd></dl><h2 id="constants" class="section-header">Constants<a href="#constants" class="anchor">§</a></h2><dl class="item-table"><dt><a class="constant" href="constant.ALLOSTASIS_ACCUMULATION_RATE.html" title="constant genesis::daemon::active_inference::ALLOSTASIS_ACCUMULATION_RATE">ALLOSTASIS_<wbr>ACCUMULATION_<wbr>RATE</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Rate at which allostatic load accumulates per unit of burden above
+rest. Sets the timescale over which sustained activation becomes
+wear.</dd><dt><a class="constant" href="constant.ALLOSTASIS_RECOVERY_RATE.html" title="constant genesis::daemon::active_inference::ALLOSTASIS_RECOVERY_RATE">ALLOSTASIS_<wbr>RECOVERY_<wbr>RATE</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Rate at which allostatic load recovers per unit of burden below
+rest. Faster than accumulation, so a system that is no longer
+stressed sheds its load — the body heals faster than it breaks
+down, given the chance (McEwen 1998; McEwen &amp; Wingfield 2003).
+This is what prevents the allostatic trap in which load persists
+indefinitely after the stressor has gone.</dd><dt><a class="constant" href="constant.CONTEXT_FE_ACTIVATION.html" title="constant genesis::daemon::active_inference::CONTEXT_FE_ACTIVATION">CONTEXT_<wbr>FE_<wbr>ACTIVATION</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Anticipated-demand level at which allostatic amplification begins.</dd><dt><a class="constant" href="constant.CONTEXT_GAIN_EXPECTED_FE.html" title="constant genesis::daemon::active_inference::CONTEXT_GAIN_EXPECTED_FE">CONTEXT_<wbr>GAIN_<wbr>EXPECTED_<wbr>FE</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="constant" href="constant.CONTEXT_GAIN_MAX.html" title="constant genesis::daemon::active_inference::CONTEXT_GAIN_MAX">CONTEXT_<wbr>GAIN_<wbr>MAX</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Hard ceiling on the context amplifier. With both gains at 0.5 the
+unclamped maximum is 2.0; capping at 1.5 guarantees the amplifier
+can never contribute more burden than the physiological measure
+itself, so a demand signal can never outvote the body.</dd><dt><a class="constant" href="constant.CONTEXT_GAIN_SURPRISE.html" title="constant genesis::daemon::active_inference::CONTEXT_GAIN_SURPRISE">CONTEXT_<wbr>GAIN_<wbr>SURPRISE</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="constant" href="constant.DA_PE_IMPULSE_THRESHOLD.html" title="constant genesis::daemon::active_inference::DA_PE_IMPULSE_THRESHOLD">DA_<wbr>PE_<wbr>IMPULSE_<wbr>THRESHOLD</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Threshold for dopamine reward prediction error impulses. Only
+positive prediction errors above this magnitude generate a DA
+impulse (Schultz, 2016 — dopamine fires for better-than-expected).</dd><dt><a class="constant" href="constant.DIM.html" title="constant genesis::daemon::active_inference::DIM">DIM</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>The dimensionality of the state vector (18 neurochemicals).</dd><dt><a class="constant" href="constant.EFE_SCORE_LIMIT.html" title="constant genesis::daemon::active_inference::EFE_SCORE_LIMIT">EFE_<wbr>SCORE_<wbr>LIMIT</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Symmetric magnitude bound applied to a policy’s expected free energy.</dd><dt><a class="constant" href="constant.EXPECTED_FE_DECAY.html" title="constant genesis::daemon::active_inference::EXPECTED_FE_DECAY">EXPECTED_<wbr>FE_<wbr>DECAY</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>The EMA decay rate for expected free energy prediction. This
+tracks the trend of surprise to predict future surprise.</dd><dt><a class="constant" href="constant.EXPLOITATION_PRECISION_THRESHOLD.html" title="constant genesis::daemon::active_inference::EXPLOITATION_PRECISION_THRESHOLD">EXPLOITATION_<wbr>PRECISION_<wbr>THRESHOLD</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Engine confidence above which policy selection is exploitative
+(argmin) rather than exploratory (softmax sample).</dd><dt><a class="constant" href="constant.KL_SCALE.html" title="constant genesis::daemon::active_inference::KL_SCALE">KL_<wbr>SCALE</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Scale in nats for the exponential map of per-dimension excess VFE.
+Raw Gaussian VFE is retained separately and is not range-clamped.
+One nat per dimension gives an excess control level of 1-exp(-1).
+This scale changes control amplitude, not the variational objective.</dd><dt><a class="constant" href="constant.MATURITY_ERROR_EMA_RATE.html" title="constant genesis::daemon::active_inference::MATURITY_ERROR_EMA_RATE">MATURITY_<wbr>ERROR_<wbr>EMA_<wbr>RATE</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>EMA rate for the <code>maturity_error_ema</code> tracker. At dt_scale = 1 the
+time constant is ~500 ticks, which is the timescale on which
+<code>model_maturity</code> is earned: a fresh engine starts at
+<code>MATURITY_ERROR_INIT</code> (0.5) and sustained accuracy has to pull that
+down before fit approaches 1, so a handful of early predictions
+cannot claim maturity.</dd><dt><a class="constant" href="constant.MATURITY_ERROR_INIT.html" title="constant genesis::daemon::active_inference::MATURITY_ERROR_INIT">MATURITY_<wbr>ERROR_<wbr>INIT</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Initial value of <code>maturity_error_ema</code>. A fresh engine starts
+maximally unproven (0.5 → exp(-50) ≈ 0 fit), and sustained accuracy
+has to pull the EMA down before maturity rises.</dd><dt><a class="constant" href="constant.MATURITY_ERROR_SCALE.html" title="constant genesis::daemon::active_inference::MATURITY_ERROR_SCALE">MATURITY_<wbr>ERROR_<wbr>SCALE</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Scale of the live maturity fit mapping <code>exp(-err / this)</code> used by
+<code>_update_maturity</code>, and of its inverse in the pre-v4 model-file
+load path (<code>err = -scale * ln(maturity)</code>), where a stored maturity
+is converted back into an error estimate.</dd><dt><a class="constant" href="constant.MAX_BELIEF_VAR.html" title="constant genesis::daemon::active_inference::MAX_BELIEF_VAR">MAX_<wbr>BELIEF_<wbr>VAR</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>An identity-model reference steady-state posterior variance, used to
+normalize <code>belief_var</code> into [0, 1] for the free-energy uncertainty
+and epistemic-value computations. This is the steady-state
+<code>belief_var</code> at minimum precision (0.1) and maximum observation
+noise (<code>MAX_OBS_NOISE</code>), derived from the discrete algebraic
+Riccati equation for the diagonal Kalman filter with identity
+transition (A = I, the initialization case):</dd><dt><a class="constant" href="constant.MAX_OBS_NOISE.html" title="constant genesis::daemon::active_inference::MAX_OBS_NOISE">MAX_<wbr>OBS_<wbr>NOISE</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Maximum observation noise per dimension. The actual observation
+noise is <code>MIN_OBS_NOISE + (1 - precision) * (MAX_OBS_NOISE - MIN_OBS_NOISE)</code>.
+When precision is high (the model trusts its predictions), obs_var
+is low. When precision is low, obs_var is high.</dd><dt><a class="constant" href="constant.METAPLASTICITY_BOOST.html" title="constant genesis::daemon::active_inference::METAPLASTICITY_BOOST">METAPLASTICITY_<wbr>BOOST</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>The metaplasticity boost factor. When surprise is high, the
+engine requests a temporary increase in the metaplasticity rate
+so the coupling matrix adapts faster to the unexpected regime.</dd><dt><a class="constant" href="constant.MIN_OBS_NOISE.html" title="constant genesis::daemon::active_inference::MIN_OBS_NOISE">MIN_<wbr>OBS_<wbr>NOISE</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Minimum observation noise. Even at full precision, there’s a tiny
+amount of observation noise to prevent division-by-zero and to
+model the fact that no observation is perfectly reliable.</dd><dt><a class="constant" href="constant.MODEL_FORGETTING.html" title="constant genesis::daemon::active_inference::MODEL_FORGETTING">MODEL_<wbr>FORGETTING</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Per-cycle multiplicative decay of learned weights.</dd><dt><a class="constant" href="constant.MODEL_LEARNING_RATE.html" title="constant genesis::daemon::active_inference::MODEL_LEARNING_RATE">MODEL_<wbr>LEARNING_<wbr>RATE</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>The learning rate for the generative model’s delta-rule updates.
+Higher = faster learning but noisier; lower = slower but more
+stable. 0.02 gives smooth adaptation over ~50 ticks.</dd><dt><a class="constant" href="constant.NE_SURPRISE_THRESHOLD.html" title="constant genesis::daemon::active_inference::NE_SURPRISE_THRESHOLD">NE_<wbr>SURPRISE_<wbr>THRESHOLD</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Threshold for norepinephrine orienting impulses. Surprise above
+this generates an NE impulse (Aston-Jones &amp; Cohen, 2005).</dd><dt><a class="constant" href="constant.NUM_POLICIES.html" title="constant genesis::daemon::active_inference::NUM_POLICIES">NUM_<wbr>POLICIES</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>The number of policies in the repertoire.</dd><dt><a class="constant" href="constant.POLICY_HEADROOM_SCALE.html" title="constant genesis::daemon::active_inference::POLICY_HEADROOM_SCALE">POLICY_<wbr>HEADROOM_<wbr>SCALE</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Deviation below a chemical’s homeostatic target at which a policy’s
+positive impulse reaches full strength.</dd><dt><a class="constant" href="constant.POLICY_SOFTMAX_TEMPERATURE.html" title="constant genesis::daemon::active_inference::POLICY_SOFTMAX_TEMPERATURE">POLICY_<wbr>SOFTMAX_<wbr>TEMPERATURE</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>The temperature for policy selection softmax. Lower = more greedy
+(always pick the best policy); higher = more exploratory (sometimes
+pick suboptimal policies to explore). This is the precision of
+policy selection in Friston’s framework — high precision →
+exploitative, low precision → exploratory.</dd><dt><a class="constant" href="constant.PRECISION_DECAY_RATE.html" title="constant genesis::daemon::active_inference::PRECISION_DECAY_RATE">PRECISION_<wbr>DECAY_<wbr>RATE</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>The rate at which precision decreases when surprise is high.
+Faster than recovery — losing confidence is quick, regaining it
+is slow (asymmetric, like receptor adaptation).</dd><dt><a class="constant" href="constant.PRECISION_RECOVERY_RATE.html" title="constant genesis::daemon::active_inference::PRECISION_RECOVERY_RATE">PRECISION_<wbr>RECOVERY_<wbr>RATE</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>The rate at which precision increases when surprise is low.
+Precision slowly recovers as the model proves it can predict
+the system’s trajectory.</dd><dt><a class="constant" href="constant.PRECISION_REFERENCE_VAR.html" title="constant genesis::daemon::active_inference::PRECISION_REFERENCE_VAR">PRECISION_<wbr>REFERENCE_<wbr>VAR</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Reference error variance for precision targeting.</dd><dt><a class="constant" href="constant.PRECISION_VAR_EMA_RATE.html" title="constant genesis::daemon::active_inference::PRECISION_VAR_EMA_RATE">PRECISION_<wbr>VAR_<wbr>EMA_<wbr>RATE</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>EMA rate for the slow surprise-variance tracker that drives the
+precision target (see <code>PRECISION_REFERENCE_VAR</code>). At dt_scale = 1
+the time constant is ~200 ticks; slow enough that single impulses
+don’t move it, fast enough that a genuine regime change registers
+within minutes.</dd><dt><a class="constant" href="constant.PREFERENCE_ADAPT_LOAD_CEILING.html" title="constant genesis::daemon::active_inference::PREFERENCE_ADAPT_LOAD_CEILING">PREFERENCE_<wbr>ADAPT_<wbr>LOAD_<wbr>CEILING</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Allostatic load above which her preference stops adapting.</dd><dt><a class="constant" href="constant.PREFERENCE_ADAPT_RATE.html" title="constant genesis::daemon::active_inference::PREFERENCE_ADAPT_RATE">PREFERENCE_<wbr>ADAPT_<wbr>RATE</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>How fast her preference moves toward states she demonstrably fares
+well in.</dd><dt><a class="constant" href="constant.PREFERENCE_PRECISION_INIT.html" title="constant genesis::daemon::active_inference::PREFERENCE_PRECISION_INIT">PREFERENCE_<wbr>PRECISION_<wbr>INIT</a></dt><dd>Initial confidence in the preference term.</dd><dt><a class="constant" href="constant.PREFERENCE_RESTORE_RATE.html" title="constant genesis::daemon::active_inference::PREFERENCE_RESTORE_RATE">PREFERENCE_<wbr>RESTORE_<wbr>RATE</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Restoring pull of her preference toward the genetic seed.</dd><dt><a class="constant" href="constant.PROCESS_NOISE.html" title="constant genesis::daemon::active_inference::PROCESS_NOISE">PROCESS_<wbr>NOISE</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Base process noise per dimension. Represents the inherent
+unpredictability of the neurochemical dynamics between ticks.</dd><dt><a class="constant" href="constant.REFLEX_COEFF_BASE.html" title="constant genesis::daemon::active_inference::REFLEX_COEFF_BASE">REFLEX_<wbr>COEFF_<wbr>BASE</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Base strength of the homeostatic reflex toward her preference.</dd><dt><a class="constant" href="constant.REFLEX_COEFF_PRECISION.html" title="constant genesis::daemon::active_inference::REFLEX_COEFF_PRECISION">REFLEX_<wbr>COEFF_<wbr>PRECISION</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Additional reflex strength from confidence in her generative model.</dd><dt><a class="constant" href="constant.REFLEX_COEFF_PREFERENCE.html" title="constant genesis::daemon::active_inference::REFLEX_COEFF_PREFERENCE">REFLEX_<wbr>COEFF_<wbr>PREFERENCE</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Additional reflex strength from confidence in her preference.</dd><dt><a class="constant" href="constant.REST_BURDEN_INITIAL.html" title="constant genesis::daemon::active_inference::REST_BURDEN_INITIAL">REST_<wbr>BURDEN_<wbr>INITIAL</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Initial resting-burden estimate before any history exists.</dd><dt><a class="constant" href="constant.REST_DEADBAND_FRACTION.html" title="constant genesis::daemon::active_inference::REST_DEADBAND_FRACTION">REST_<wbr>DEADBAND_<wbr>FRACTION</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Fraction of the resting burden treated as neutral variation.</dd><dt><a class="constant" href="constant.REST_TRACK_RATE.html" title="constant genesis::daemon::active_inference::REST_TRACK_RATE">REST_<wbr>TRACK_<wbr>RATE</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Rate at which the resting-burden estimate follows the burden.</dd><dt><a class="constant" href="constant.SURPRISE_EMA_DECAY.html" title="constant genesis::daemon::active_inference::SURPRISE_EMA_DECAY">SURPRISE_<wbr>EMA_<wbr>DECAY</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>The EMA decay rate for surprise. Lower = longer memory of past
+surprise; higher = more reactive to recent surprise.</dd></dl><h2 id="statics" class="section-header">Statics<a href="#statics" class="anchor">§</a></h2><dl class="item-table"><dt><a class="static" href="static.POLICIES.html" title="static genesis::daemon::active_inference::POLICIES">POLICIES</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>The policy repertoire — the set of candidate actions.</dd></dl><h2 id="functions" class="section-header">Functions<a href="#functions" class="anchor">§</a></h2><dl class="item-table"><dt><a class="fn" href="fn.apply_inference_feedback.html" title="fn genesis::daemon::active_inference::apply_inference_feedback">apply_<wbr>inference_<wbr>feedback</a></dt><dt><a class="fn" href="fn.effective_coordinate.html" title="fn genesis::daemon::active_inference::effective_coordinate">effective_<wbr>coordinate</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Sanitize one effective-level coordinate for the generative model.
+Dopamine is finite but unclamped; every other channel retains the
+neurochemical system’s [0, 2] effective-level contract.</dd><dt><a class="fn" href="fn.genetic_preference_seed.html" title="fn genesis::daemon::active_inference::genetic_preference_seed">genetic_<wbr>preference_<wbr>seed</a></dt><dd>Her starting preference: the genetic defaults.</dd><dt><a class="fn" href="fn.impulse_offset_to_rate.html" title="fn genesis::daemon::active_inference::impulse_offset_to_rate">impulse_<wbr>offset_<wbr>to_<wbr>rate</a></dt><dd>Apply the inference result’s feedback to the neurochemical system.</dd><dt><a class="fn" href="fn.integrate_allostasis.html" title="fn genesis::daemon::active_inference::integrate_allostasis">integrate_<wbr>allostasis</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Advance allostatic load by one step under the hysteresis band.</dd></dl></section></div></main></body></html>

@@ -1,0 +1,39 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Basal forebrain — cortical acetylcholine, attention, encoding, and the somnogenic A1 site of action."><title>genesis::basal_forebrain - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-203241e4.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="genesis" data-themes="" data-resource-suffix="" data-rustdoc-version="1.100.0 (0ef1bc386 2026-11-09)" data-channel="1.100.0" data-search-js="search-b167f383.js" data-stringdex-js="stringdex-b5109af9.js" data-settings-js="settings-170eb4bf.js" ><script src="../../static.files/storage-41dd4d93.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../static.files/main-1814ead3.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-9f56287d.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module basal_forebrain</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../genesis/index.html">genesis</a><span class="version">0.2.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module basal_<wbr>forebrain</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#what-lives-here-implementation-stays-in-cratestate-this" title="What lives here (implementation stays in `crate::state`; this">What lives here (implementation stays in <code>crate::state</code>; this</a></li></ul><h3><a href="#reexports">Module Items</a></h3><ul class="block"><li><a href="#reexports" title="Re-exports">Re-exports</a></li></ul></section><div id="rustdoc-modnav"><h2 class="in-crate"><a href="../index.html">In crate genesis</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../index.html">genesis</a></div><h1>Module <span>basal_<wbr>forebrain</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../src/genesis/basal_forebrain/mod.rs.html#1-45">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Basal forebrain — cortical acetylcholine, attention, encoding, and
+the somnogenic A1 site of action.</p>
+<p>Anatomy: the basal forebrain lies ventral to the striatum and
+anterior to the hypothalamus. It holds the major cholinergic
+projection to cortex and hippocampus (Ch4 nucleus basalis →
+neocortex and amygdala; Ch1/Ch2 septal and diagonal-band nuclei →
+hippocampus). It is also a sleep-wake structure — wake/REM-active
+cholinergic, parvalbumin GABAergic, and glutamatergic populations
+intermingled with somatostatin+ GABAergic sleep-promoting neurons
+(Xu et al., 2015) — and the best-characterized site where the
+homeostatic sleep-pressure signal acts: extracellular adenosine
+rises there with time awake and A1-inhibits the wake-active
+neurons, so the somnogenic signal silences the arousal output this
+same region produces.</p>
+<p>The mind’s mirror is <code>Self_World/basal_forebrain</code> — the words; the
+math is here.</p>
+<h3 id="what-lives-here-implementation-stays-in-cratestate-this"><a class="doc-anchor" href="#what-lives-here-implementation-stays-in-cratestate-this">§</a>What lives here (implementation stays in <code>crate::state</code>; this</h3>
+<p>region is the anatomical view)</p>
+<ul>
+<li><code>basal_forebrain</code> — the region’s own math: the cholinergic
+release equation (LC/REM-on release map modulated by A1 adenosine
+occupancy and by the expected-uncertainty drive, Yu &amp; Dayan
+2005), the waking set-point for the network-free path, the
+cholinergic sensory-precision gain that <code>daemon::active_inference</code>
+applies to its observation channel, and the α = 1 − precision
+uncertainty signal.</li>
+<li><code>neurochemical</code> — the level dynamics the release equation feeds:
+the dedicated adenosine mechanism is Process S itself
+(saturating-exponential accumulation, exponential glymphatic
+clearance — Daan, Beersma &amp; Borbély 1984), and the AChE excess
+decay is this region’s enzymatic fast decay.</li>
+<li><code>sleep_network</code> — the populations whose <code>lc</code>/<code>rem</code> drive the
+release map’s state profile (NREM 0.34, waking 0.58, REM 0.77 —
+Vazquez &amp; Baghdoyan 2001).</li>
+<li><code>memory</code> — the encoding gate cholinergic tone sets: high ACh
+biases encoding over retrieval (Hasselmo), held here as the
+encoding/consolidation/retrieval weights the pointers carry.</li>
+</ul>
+</div></details><h2 id="reexports" class="section-header">Re-exports<a href="#reexports" class="anchor">§</a></h2><dl class="item-table reexports"><dt id="reexport.basal_forebrain"><code>pub use crate::state::<a class="mod" href="../state/basal_forebrain/index.html" title="mod genesis::state::basal_forebrain">basal_forebrain</a>;</code></dt><dt id="reexport.memory"><code>pub use crate::state::<a class="mod" href="../state/memory/index.html" title="mod genesis::state::memory">memory</a>;</code></dt><dt id="reexport.neurochemical"><code>pub use crate::state::<a class="mod" href="../state/neurochemical/index.html" title="mod genesis::state::neurochemical">neurochemical</a>;</code></dt><dt id="reexport.sleep_network"><code>pub use crate::state::<a class="mod" href="../state/sleep_network/index.html" title="mod genesis::state::sleep_network">sleep_network</a>;</code></dt></dl></section></div></main></body></html>

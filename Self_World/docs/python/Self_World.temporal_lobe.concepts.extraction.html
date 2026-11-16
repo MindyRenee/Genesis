@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.temporal_lobe.concepts.extraction</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.temporal_lobe.html" class="white">temporal_lobe</a>.<a href="Self_World.temporal_lobe.concepts.html" class="white">concepts</a>.extraction</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/concepts/extraction.py">/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/concepts/extraction.py</a></td></tr></table>
+    <p><span class="code">Concept&nbsp;extraction&nbsp;—&nbsp;text&nbsp;parsing,&nbsp;learning,&nbsp;and&nbsp;teaching.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="re.html">re</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.concepts.extraction.html#ExtractionMixin">ExtractionMixin</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ExtractionMixin">class <strong>ExtractionMixin</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code">Mixin&nbsp;for&nbsp;:class:`ConceptNetwork`&nbsp;—&nbsp;see&nbsp;module&nbsp;docstring.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ExtractionMixin-extract_from_text"><strong>extract_from_text</strong></a>(self, text: 'str') -&gt; 'list[str]'</dt><dd><span class="code">Extract&nbsp;potential&nbsp;concepts&nbsp;(noun&nbsp;phrases)&nbsp;from&nbsp;text.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;a&nbsp;heuristic&nbsp;noun-phrase&nbsp;extractor.&nbsp;Without&nbsp;a&nbsp;POS&nbsp;tagger<br>
+or&nbsp;dependency&nbsp;parser,&nbsp;we&nbsp;use&nbsp;patterns:<br>
+&nbsp;<br>
+1.&nbsp;Capitalized&nbsp;sequences:&nbsp;"United&nbsp;States",&nbsp;"Supreme&nbsp;Court"<br>
+2.&nbsp;"of"&nbsp;phrases:&nbsp;"bill&nbsp;of&nbsp;rights",&nbsp;"court&nbsp;of&nbsp;appeals"<br>
+3.&nbsp;Noun-noun&nbsp;compounds:&nbsp;"case&nbsp;law",&nbsp;"property&nbsp;tax"&nbsp;(lowercase<br>
+&nbsp;&nbsp;&nbsp;words&nbsp;&gt;&nbsp;3&nbsp;chars&nbsp;adjacent&nbsp;to&nbsp;each&nbsp;other)<br>
+4.&nbsp;Single&nbsp;long&nbsp;words:&nbsp;"cognition",&nbsp;"neurochemistry"<br>
+5.&nbsp;Adjective&nbsp;+&nbsp;noun:&nbsp;"neural&nbsp;activity",&nbsp;"emotional&nbsp;state"<br>
+&nbsp;<br>
+Single&nbsp;short&nbsp;words&nbsp;(&lt;&nbsp;4&nbsp;chars),&nbsp;verbs,&nbsp;and&nbsp;function&nbsp;words&nbsp;are<br>
+excluded.&nbsp;This&nbsp;prevents&nbsp;the&nbsp;noise&nbsp;that&nbsp;plagued&nbsp;the&nbsp;old&nbsp;extractor<br>
+(e.g.&nbsp;"United"&nbsp;and&nbsp;"States"&nbsp;as&nbsp;separate&nbsp;concepts).<br>
+&nbsp;<br>
+Returns&nbsp;concept&nbsp;names&nbsp;only.&nbsp;Use&nbsp;:meth:`extract_from_text_typed`<br>
+to&nbsp;also&nbsp;get&nbsp;the&nbsp;learned&nbsp;proper-noun&nbsp;flag&nbsp;for&nbsp;each&nbsp;concept.</span></dd></dl>
+
+<dl><dt><a name="ExtractionMixin-extract_from_text_typed"><strong>extract_from_text_typed</strong></a>(self, text: 'str') -&gt; 'list[tuple[str, bool]]'</dt><dd><span class="code">Extract&nbsp;concepts&nbsp;with&nbsp;a&nbsp;learned&nbsp;proper-noun&nbsp;flag.<br>
+&nbsp;<br>
+Like&nbsp;:meth:`extract_from_text`&nbsp;but&nbsp;returns&nbsp;``(name,&nbsp;is_proper)``<br>
+tuples.&nbsp;``is_proper``&nbsp;is&nbsp;True&nbsp;when&nbsp;the&nbsp;concept&nbsp;was&nbsp;extracted&nbsp;from<br>
+a&nbsp;non-sentence-initial&nbsp;capitalized&nbsp;token&nbsp;—&nbsp;the&nbsp;unambiguous<br>
+proper-noun&nbsp;signal.&nbsp;The&nbsp;language&nbsp;engine&nbsp;uses&nbsp;this&nbsp;to&nbsp;capitalize<br>
+learned&nbsp;proper&nbsp;nouns&nbsp;mid-sentence&nbsp;while&nbsp;keeping&nbsp;common&nbsp;nouns<br>
+lowercase.<br>
+&nbsp;<br>
+The&nbsp;flag&nbsp;is&nbsp;ORed&nbsp;across&nbsp;occurrences:&nbsp;if&nbsp;a&nbsp;concept&nbsp;appears&nbsp;both<br>
+sentence-initial&nbsp;(ambiguous)&nbsp;and&nbsp;mid-sentence&nbsp;capitalized,&nbsp;the<br>
+mid-sentence&nbsp;occurrence&nbsp;confirms&nbsp;it&nbsp;as&nbsp;proper.</span></dd></dl>
+
+<dl><dt><a name="ExtractionMixin-learn_from_statement"><strong>learn_from_statement</strong></a>(self, subject: 'str', relation: 'str', obj: 'str') -&gt; 'Edge | None'</dt><dd><span class="code">Learn&nbsp;a&nbsp;relationship&nbsp;from&nbsp;a&nbsp;parsed&nbsp;statement.<br>
+&nbsp;<br>
+Attempts&nbsp;to&nbsp;map&nbsp;a&nbsp;natural&nbsp;language&nbsp;relation&nbsp;to&nbsp;a&nbsp;RelationType<br>
+and&nbsp;add&nbsp;it&nbsp;to&nbsp;the&nbsp;network.</span></dd></dl>
+
+<dl><dt><a name="ExtractionMixin-learn_from_text"><strong>learn_from_text</strong></a>(self, text: 'str') -&gt; 'list[Edge]'</dt><dd><span class="code">Extract&nbsp;and&nbsp;learn&nbsp;both&nbsp;concepts&nbsp;and&nbsp;relationships&nbsp;from&nbsp;text.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;main&nbsp;entry&nbsp;point&nbsp;for&nbsp;learning&nbsp;from&nbsp;a&nbsp;natural&nbsp;language<br>
+statement.&nbsp;It:<br>
+1.&nbsp;Extracts&nbsp;noun&nbsp;phrases&nbsp;as&nbsp;concepts<br>
+2.&nbsp;Parses&nbsp;relationships&nbsp;between&nbsp;concepts<br>
+3.&nbsp;Adds&nbsp;everything&nbsp;to&nbsp;the&nbsp;network<br>
+&nbsp;<br>
+Concepts&nbsp;extracted&nbsp;from&nbsp;a&nbsp;non-sentence-initial&nbsp;capitalized<br>
+token&nbsp;are&nbsp;marked&nbsp;as&nbsp;proper&nbsp;nouns&nbsp;(``properties["proper_noun"]``),<br>
+so&nbsp;the&nbsp;language&nbsp;engine&nbsp;capitalizes&nbsp;them&nbsp;mid-sentence&nbsp;while<br>
+keeping&nbsp;common&nbsp;nouns&nbsp;lowercase.<br>
+&nbsp;<br>
+Returns&nbsp;the&nbsp;list&nbsp;of&nbsp;edges&nbsp;created&nbsp;(may&nbsp;be&nbsp;empty).</span></dd></dl>
+
+<dl><dt><a name="ExtractionMixin-parse_relationships"><strong>parse_relationships</strong></a>(self, text: 'str') -&gt; 'list[tuple[str, RelationType, str]]'</dt><dd><span class="code">Parse&nbsp;relationships&nbsp;from&nbsp;a&nbsp;natural&nbsp;language&nbsp;statement.<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;list&nbsp;of&nbsp;(subject,&nbsp;relation_type,&nbsp;<a href="builtins.html#object">object</a>)&nbsp;tuples.<br>
+A&nbsp;single&nbsp;sentence&nbsp;may&nbsp;yield&nbsp;multiple&nbsp;relationships&nbsp;if&nbsp;it<br>
+contains&nbsp;multiple&nbsp;clauses&nbsp;or&nbsp;compound&nbsp;subjects/objects.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;pattern-based,&nbsp;not&nbsp;dependency-parsed.&nbsp;It&nbsp;handles<br>
+common&nbsp;declarative&nbsp;statements&nbsp;like&nbsp;"X&nbsp;is&nbsp;a&nbsp;Y",&nbsp;"X&nbsp;causes&nbsp;Y",<br>
+"X&nbsp;depends&nbsp;on&nbsp;Y",&nbsp;etc.<br>
+&nbsp;<br>
+Improvements&nbsp;over&nbsp;the&nbsp;original&nbsp;single-match&nbsp;parser:<br>
+-&nbsp;Splits&nbsp;sentences&nbsp;on&nbsp;clause&nbsp;boundaries&nbsp;(";",&nbsp;"&nbsp;and&nbsp;",&nbsp;"&nbsp;but&nbsp;")<br>
+&nbsp;&nbsp;so&nbsp;"X&nbsp;causes&nbsp;Y&nbsp;and&nbsp;Z&nbsp;enables&nbsp;W"&nbsp;yields&nbsp;two&nbsp;relationships.<br>
+-&nbsp;Expands&nbsp;gapping:&nbsp;"X&nbsp;verb&nbsp;A,&nbsp;verb&nbsp;B,&nbsp;and&nbsp;verb&nbsp;C"&nbsp;→<br>
+&nbsp;&nbsp;X&nbsp;verb&nbsp;A,&nbsp;X&nbsp;verb&nbsp;B,&nbsp;X&nbsp;verb&nbsp;C.<br>
+-&nbsp;Splits&nbsp;compound&nbsp;subjects/objects&nbsp;on&nbsp;","&nbsp;/&nbsp;"&nbsp;and&nbsp;"&nbsp;so<br>
+&nbsp;&nbsp;"X,&nbsp;Y,&nbsp;and&nbsp;Z&nbsp;are&nbsp;W"&nbsp;yields&nbsp;is_a(X,W),&nbsp;is_a(Y,W),&nbsp;is_a(Z,W).<br>
+-&nbsp;Strips&nbsp;leading&nbsp;articles&nbsp;and&nbsp;skips&nbsp;embedded&nbsp;clauses<br>
+&nbsp;&nbsp;("which&nbsp;...",&nbsp;"that&nbsp;...").<br>
+-&nbsp;Once&nbsp;a&nbsp;pattern&nbsp;matches&nbsp;a&nbsp;clause,&nbsp;it&nbsp;takes&nbsp;the&nbsp;most&nbsp;specific<br>
+&nbsp;&nbsp;match&nbsp;and&nbsp;breaks;&nbsp;compound&nbsp;items&nbsp;are&nbsp;then&nbsp;expanded.</span></dd></dl>
+
+<dl><dt><a name="ExtractionMixin-summarize"><strong>summarize</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Human-readable&nbsp;summary&nbsp;of&nbsp;the&nbsp;concept&nbsp;network.</span></dd></dl>
+
+<dl><dt><a name="ExtractionMixin-teach"><strong>teach</strong></a>(self, subject: 'str', relation: 'RelationType', obj: 'str', confidence: 'float' = 0.8, origin: 'str' = 'taught') -&gt; 'Edge | None'</dt><dd><span class="code">Directly&nbsp;teach&nbsp;a&nbsp;relationship&nbsp;with&nbsp;high&nbsp;confidence.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;programmatic&nbsp;teaching&nbsp;interface.&nbsp;Unlike<br>
+learn_from_statement&nbsp;(which&nbsp;maps&nbsp;natural&nbsp;language),&nbsp;this<br>
+takes&nbsp;a&nbsp;RelationType&nbsp;directly&nbsp;and&nbsp;adds&nbsp;it&nbsp;with&nbsp;higher<br>
+confidence&nbsp;than&nbsp;conversation-derived&nbsp;knowledge.<br>
+&nbsp;<br>
+Both&nbsp;concepts&nbsp;are&nbsp;created&nbsp;if&nbsp;they&nbsp;don't&nbsp;exist,&nbsp;with&nbsp;the<br>
+given&nbsp;confidence&nbsp;level.</span></dd></dl>
+
+<dl><dt><a name="ExtractionMixin-teach_concept"><strong>teach_concept</strong></a>(self, name: 'str', confidence: 'float' = 0.8, aliases: 'set[str] | None' = None, origin: 'str' = 'taught') -&gt; 'Concept'</dt><dd><span class="code">Directly&nbsp;teach&nbsp;a&nbsp;concept&nbsp;with&nbsp;high&nbsp;confidence.<br>
+&nbsp;<br>
+Unlike&nbsp;conversation-derived&nbsp;concepts&nbsp;(confidence&nbsp;0.4),<br>
+taught&nbsp;concepts&nbsp;start&nbsp;with&nbsp;high&nbsp;confidence.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>TYPE_CHECKING</strong> = False<br>
+<strong>__annotations__</strong> = {'_SUBJECT_PRONOUNS': 'frozenset[str]'}</td></tr></table>
+</body></html>

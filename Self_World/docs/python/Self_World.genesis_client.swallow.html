@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.genesis_client.swallow</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.genesis_client.html" class="white">genesis_client</a>.swallow</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/genesis_client/swallow.py">/home/mindyrenee/GenAnd/Genesis/Self_World/genesis_client/swallow.py</a></td></tr></table>
+    <p><span class="code">Durable,&nbsp;bounded&nbsp;record&nbsp;of&nbsp;exceptions&nbsp;the&nbsp;mind&nbsp;swallowed.<br>
+&nbsp;<br>
+Genesis&nbsp;swallows&nbsp;exceptions&nbsp;in&nbsp;hundreds&nbsp;of&nbsp;places&nbsp;—&nbsp;a&nbsp;failed&nbsp;sensor<br>
+read,&nbsp;a&nbsp;retry&nbsp;that&nbsp;did&nbsp;not&nbsp;succeed,&nbsp;an&nbsp;optional&nbsp;dependency&nbsp;that&nbsp;is&nbsp;not<br>
+installed.&nbsp;That&nbsp;is&nbsp;correct:&nbsp;a&nbsp;mind&nbsp;must&nbsp;not&nbsp;die&nbsp;because&nbsp;a<br>
+``/proc``&nbsp;read&nbsp;failed.&nbsp;But&nbsp;every&nbsp;one&nbsp;of&nbsp;those&nbsp;sites&nbsp;logged&nbsp;at&nbsp;DEBUG,<br>
+and&nbsp;the&nbsp;default&nbsp;log&nbsp;level&nbsp;is&nbsp;INFO,&nbsp;so&nbsp;the&nbsp;overwhelming&nbsp;majority&nbsp;were<br>
+invisible.&nbsp;A&nbsp;subsystem&nbsp;could&nbsp;fail&nbsp;silently&nbsp;on&nbsp;every&nbsp;cycle&nbsp;indefinitely<br>
+and&nbsp;nothing&nbsp;anywhere&nbsp;would&nbsp;say&nbsp;so.<br>
+&nbsp;<br>
+Writing&nbsp;each&nbsp;occurrence&nbsp;to&nbsp;the&nbsp;journal&nbsp;is&nbsp;not&nbsp;the&nbsp;answer&nbsp;either.&nbsp;A&nbsp;site<br>
+that&nbsp;raises&nbsp;once&nbsp;per&nbsp;second&nbsp;would&nbsp;write&nbsp;86,400&nbsp;lines&nbsp;a&nbsp;day,&nbsp;burying<br>
+everything&nbsp;worth&nbsp;reading&nbsp;—&nbsp;trading&nbsp;invisibility&nbsp;for&nbsp;noise,&nbsp;which&nbsp;is&nbsp;not<br>
+an&nbsp;improvement.<br>
+&nbsp;<br>
+The&nbsp;fix&nbsp;is&nbsp;a&nbsp;*count*&nbsp;rather&nbsp;than&nbsp;a&nbsp;transcript.&nbsp;Every&nbsp;swallowed<br>
+exception&nbsp;increments&nbsp;a&nbsp;per-site&nbsp;tally,&nbsp;and&nbsp;the&nbsp;journal&nbsp;receives&nbsp;a<br>
+record&nbsp;on&nbsp;the&nbsp;first&nbsp;failure&nbsp;and&nbsp;then&nbsp;at&nbsp;exponentially&nbsp;spaced<br>
+occurrences&nbsp;(2,&nbsp;4,&nbsp;8,&nbsp;16,&nbsp;…&nbsp;4096,&nbsp;then&nbsp;every&nbsp;4096).&nbsp;A&nbsp;site&nbsp;that&nbsp;fails<br>
+a&nbsp;million&nbsp;times&nbsp;produces&nbsp;a&nbsp;few&nbsp;hundred&nbsp;lines,&nbsp;the&nbsp;last&nbsp;of&nbsp;which&nbsp;states<br>
+the&nbsp;running&nbsp;count.&nbsp;The&nbsp;failure&nbsp;is&nbsp;durable,&nbsp;the&nbsp;growth&nbsp;is&nbsp;logarithmic,<br>
+and&nbsp;the&nbsp;count&nbsp;itself&nbsp;is&nbsp;better&nbsp;telemetry&nbsp;than&nbsp;a&nbsp;pile&nbsp;of&nbsp;stack<br>
+traces:&nbsp;"this&nbsp;site&nbsp;has&nbsp;failed&nbsp;1,247&nbsp;times"&nbsp;says&nbsp;something&nbsp;a&nbsp;reader&nbsp;can<br>
+act&nbsp;on&nbsp;in&nbsp;a&nbsp;way&nbsp;that&nbsp;1,247&nbsp;identical&nbsp;lines&nbsp;do&nbsp;not.<br>
+&nbsp;<br>
+The&nbsp;tally&nbsp;is&nbsp;also&nbsp;directly&nbsp;queryable,&nbsp;via&nbsp;:func:`swallow_report`,&nbsp;so<br>
+introspection&nbsp;can&nbsp;name&nbsp;which&nbsp;subsystems&nbsp;are&nbsp;quietly&nbsp;failing&nbsp;without<br>
+anyone&nbsp;reading&nbsp;the&nbsp;journal&nbsp;at&nbsp;all.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="time.html">time</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-failing_sites"><strong>failing_sites</strong></a>(limit: 'int | None' = None) -&gt; 'list[tuple[str, int]]'</dt><dd><span class="code">Sites&nbsp;that&nbsp;have&nbsp;swallowed&nbsp;exceptions,&nbsp;busiest&nbsp;first.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;query&nbsp;that&nbsp;makes&nbsp;the&nbsp;failures&nbsp;visible&nbsp;without&nbsp;reading<br>
+the&nbsp;journal:&nbsp;a&nbsp;site&nbsp;appearing&nbsp;here&nbsp;has&nbsp;swallowed&nbsp;something,&nbsp;and&nbsp;a<br>
+large&nbsp;count&nbsp;means&nbsp;it&nbsp;is&nbsp;failing&nbsp;continuously&nbsp;rather&nbsp;than&nbsp;once.</span></dd></dl>
+ <dl><dt><a name="-iter_sites"><strong>iter_sites</strong></a>() -&gt; 'Iterator[str]'</dt><dd><span class="code">Iterate&nbsp;the&nbsp;site&nbsp;names&nbsp;seen&nbsp;so&nbsp;far.</span></dd></dl>
+ <dl><dt><a name="-note_swallowed"><strong>note_swallowed</strong></a>(site: 'str', exc: 'BaseException') -&gt; 'None'</dt><dd><span class="code">Record&nbsp;that&nbsp;``site``&nbsp;swallowed&nbsp;``exc``.<br>
+&nbsp;<br>
+Always&nbsp;logs&nbsp;at&nbsp;debug&nbsp;—&nbsp;so&nbsp;the&nbsp;per-occurrence&nbsp;detail&nbsp;is&nbsp;still<br>
+available&nbsp;when&nbsp;someone&nbsp;raises&nbsp;the&nbsp;log&nbsp;level&nbsp;—&nbsp;and&nbsp;journals&nbsp;on&nbsp;the<br>
+first&nbsp;failure&nbsp;and&nbsp;then&nbsp;on&nbsp;exponentially&nbsp;spaced&nbsp;repeats.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;site:&nbsp;A&nbsp;stable&nbsp;identifier&nbsp;for&nbsp;the&nbsp;catch&nbsp;site,&nbsp;conventionally<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;``module.function``.&nbsp;It&nbsp;is&nbsp;the&nbsp;key&nbsp;the&nbsp;tally&nbsp;is&nbsp;grouped&nbsp;by,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;so&nbsp;it&nbsp;should&nbsp;name&nbsp;the&nbsp;place&nbsp;rather&nbsp;than&nbsp;the&nbsp;condition.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;exc:&nbsp;The&nbsp;exception&nbsp;that&nbsp;was&nbsp;swallowed.</span></dd></dl>
+ <dl><dt><a name="-reset_swallow_tallies"><strong>reset_swallow_tallies</strong></a>() -&gt; 'None'</dt><dd><span class="code">Clear&nbsp;the&nbsp;tallies.&nbsp;For&nbsp;tests;&nbsp;the&nbsp;journal&nbsp;is&nbsp;not&nbsp;cleared.</span></dd></dl>
+ <dl><dt><a name="-set_swallow_sink"><strong>set_swallow_sink</strong></a>(sink: 'Callable[[str, int, BaseException], None] | None') -&gt; 'None'</dt><dd><span class="code">Register&nbsp;where&nbsp;swallowed-exception&nbsp;records&nbsp;are&nbsp;written.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;sink:&nbsp;Called&nbsp;as&nbsp;``sink(site,&nbsp;count,&nbsp;exc)``&nbsp;each&nbsp;time&nbsp;a&nbsp;site&nbsp;is&nbsp;due<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;a&nbsp;record,&nbsp;or&nbsp;``None``&nbsp;to&nbsp;detach.</span></dd></dl>
+ <dl><dt><a name="-swallow_count"><strong>swallow_count</strong></a>(site: 'str') -&gt; 'int'</dt><dd><span class="code">How&nbsp;many&nbsp;exceptions&nbsp;``site``&nbsp;has&nbsp;swallowed&nbsp;this&nbsp;process.</span></dd></dl>
+ <dl><dt><a name="-swallow_report"><strong>swallow_report</strong></a>() -&gt; 'dict[str, object]'</dt><dd><span class="code">A&nbsp;summary&nbsp;of&nbsp;swallowed&nbsp;exceptions,&nbsp;for&nbsp;introspection.<br>
+&nbsp;<br>
+Shaped&nbsp;for&nbsp;a&nbsp;status&nbsp;display:&nbsp;the&nbsp;totals&nbsp;answer&nbsp;"is&nbsp;anything&nbsp;wrong",<br>
+and&nbsp;the&nbsp;per-site&nbsp;breakdown&nbsp;answers&nbsp;"where".</span></dd></dl>
+ <dl><dt><a name="-total_swallowed"><strong>total_swallowed</strong></a>() -&gt; 'int'</dt><dd><span class="code">Total&nbsp;swallowed&nbsp;exceptions&nbsp;across&nbsp;all&nbsp;sites.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__annotations__</strong> = {'_counts': 'dict[str, int]', '_reported_at': 'dict[str, float]', '_reported_upto': 'dict[str, int]', '_sink': 'Callable[[str, int, BaseException], None] | None'}<br>
+<strong>logger</strong> = &lt;Logger Self_World.genesis_client.swallow (WARNING)&gt;</td></tr></table>
+</body></html>

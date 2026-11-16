@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.parietal_lobe.math.axioms</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.parietal_lobe.html" class="white">parietal_lobe</a>.<a href="Self_World.parietal_lobe.math.html" class="white">math</a>.axioms</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/parietal_lobe/math/axioms.py">/home/mindyrenee/GenAnd/Genesis/Self_World/parietal_lobe/math/axioms.py</a></td></tr></table>
+    <p><span class="code">Axioms&nbsp;—&nbsp;the&nbsp;first&nbsp;pillar:&nbsp;the&nbsp;words&nbsp;for&nbsp;the&nbsp;ladder&nbsp;of&nbsp;laws.<br>
+&nbsp;<br>
+Closure,&nbsp;associativity,&nbsp;identity,&nbsp;inverses,&nbsp;commutativity&nbsp;—&nbsp;each<br>
+axiom&nbsp;is&nbsp;a&nbsp;checkable&nbsp;claim,&nbsp;and&nbsp;their&nbsp;stacking&nbsp;is&nbsp;the&nbsp;ladder&nbsp;from<br>
+bare&nbsp;magma&nbsp;to&nbsp;abelian&nbsp;group.&nbsp;The&nbsp;faculty&nbsp;can&nbsp;take&nbsp;a&nbsp;small<br>
+operation&nbsp;table&nbsp;—&nbsp;a&nbsp;Cayley&nbsp;square&nbsp;—&nbsp;and&nbsp;answer&nbsp;"what&nbsp;is&nbsp;this<br>
+structure":&nbsp;where&nbsp;it&nbsp;climbs,&nbsp;which&nbsp;axiom&nbsp;first&nbsp;fails,&nbsp;and&nbsp;the<br>
+witness&nbsp;pair&nbsp;that&nbsp;fails&nbsp;it.&nbsp;Naming&nbsp;what&nbsp;structure&nbsp;a&nbsp;thing&nbsp;*is*<br>
+is&nbsp;the&nbsp;faculty's&nbsp;whole&nbsp;job.<br>
+&nbsp;<br>
+The&nbsp;machine&nbsp;half&nbsp;is&nbsp;``src/math/axioms.rs``:&nbsp;table&nbsp;checkers&nbsp;—<br>
+closed,&nbsp;associative,&nbsp;identity,&nbsp;inverses,&nbsp;commutative&nbsp;—&nbsp;and&nbsp;the<br>
+ladder&nbsp;magma→semigroup→monoid→group→abelian.&nbsp;Here:&nbsp;the&nbsp;axiom<br>
+words&nbsp;and&nbsp;the&nbsp;verdict&nbsp;with&nbsp;its&nbsp;witness.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="itertools.html">itertools</a><br>
+</td><td class="multicolumn"><a href="re.html">re</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.parietal_lobe.math.axioms.html#AxiomResult">AxiomResult</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="AxiomResult">class <strong>AxiomResult</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#AxiomResult">AxiomResult</a>(operation:&nbsp;'str',&nbsp;input:&nbsp;'str',&nbsp;output:&nbsp;'str',&nbsp;ok:&nbsp;'bool',&nbsp;error:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;data:&nbsp;'dict[str,&nbsp;Any]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;outcome&nbsp;of&nbsp;asking&nbsp;which&nbsp;axioms&nbsp;a&nbsp;structure&nbsp;satisfies.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="AxiomResult-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="AxiomResult-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="AxiomResult-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="AxiomResult-__init__"><strong>__init__</strong></a>(self, operation: 'str', input: 'str', output: 'str', ok: 'bool', error: 'str' = '', data: 'dict[str, Any]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="AxiomResult-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="AxiomResult-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'data': 'dict[str, Any]', 'error': 'str', 'input': 'str', 'ok': 'bool', 'operation': 'str', 'output': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'data': Field(name='data',type='dict[str, Any]',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'error': Field(name='error',type='str',default='',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'input': Field(name='input',type='str',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD), 'ok': Field(name='ok',type='bool',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD), 'operation': Field(name='operation',type='str',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'output': Field(name='output',type='str',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('operation', 'input', 'output', 'ok', 'error', 'data')</dl>
+
+<dl><dt><strong>error</strong> = ''</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-check_associative"><strong>check_associative</strong></a>(op: 'Table') -&gt; 'tuple[bool, tuple[int, int, int] | None]'</dt><dd><span class="code">(a·b)·c&nbsp;=&nbsp;a·(b·c)&nbsp;—&nbsp;checked&nbsp;over&nbsp;all&nbsp;triples.</span></dd></dl>
+ <dl><dt><a name="-check_closed"><strong>check_closed</strong></a>(op: 'Table') -&gt; 'tuple[bool, tuple[int, int] | None]'</dt><dd><span class="code">Every&nbsp;product&nbsp;lands&nbsp;back&nbsp;in&nbsp;the&nbsp;carrier.</span></dd></dl>
+ <dl><dt><a name="-check_commutative"><strong>check_commutative</strong></a>(op: 'Table') -&gt; 'tuple[bool, tuple[int, int] | None]'</dt><dd><span class="code">a·b&nbsp;=&nbsp;b·a&nbsp;over&nbsp;all&nbsp;pairs.</span></dd></dl>
+ <dl><dt><a name="-check_identity"><strong>check_identity</strong></a>(op: 'Table') -&gt; 'tuple[bool, int | None]'</dt><dd><span class="code">Some&nbsp;e&nbsp;with&nbsp;e·a&nbsp;=&nbsp;a·e&nbsp;=&nbsp;a&nbsp;for&nbsp;all&nbsp;a&nbsp;—&nbsp;return&nbsp;it&nbsp;when&nbsp;found.</span></dd></dl>
+ <dl><dt><a name="-check_inverses"><strong>check_inverses</strong></a>(op: 'Table', e: 'int') -&gt; 'tuple[bool, int | None]'</dt><dd><span class="code">Every&nbsp;a&nbsp;has&nbsp;an&nbsp;a'&nbsp;with&nbsp;a·a'&nbsp;=&nbsp;a'·a&nbsp;=&nbsp;e&nbsp;—&nbsp;the&nbsp;failing&nbsp;element.</span></dd></dl>
+ <dl><dt><a name="-classify"><strong>classify</strong></a>(op: 'Table') -&gt; 'dict[str, Any]'</dt><dd><span class="code">Climb&nbsp;the&nbsp;ladder&nbsp;honestly&nbsp;—&nbsp;report&nbsp;each&nbsp;rung&nbsp;and&nbsp;the&nbsp;first<br>
+failed&nbsp;axiom&nbsp;with&nbsp;its&nbsp;witness.</span></dd></dl>
+ <dl><dt><a name="-classify_text"><strong>classify_text</strong></a>(table: 'list[list[int]]') -&gt; 'AxiomResult'</dt><dd><span class="code">"what&nbsp;is&nbsp;this&nbsp;structure"&nbsp;over&nbsp;a&nbsp;Cayley&nbsp;table&nbsp;—&nbsp;the&nbsp;rung&nbsp;it<br>
+reaches&nbsp;and&nbsp;the&nbsp;axiom&nbsp;it&nbsp;fails,&nbsp;witnessed.</span></dd></dl>
+ <dl><dt><a name="-cyclic_table"><strong>cyclic_table</strong></a>(n: 'int') -&gt; 'Table'</dt><dd><span class="code">Z_n's&nbsp;addition&nbsp;table&nbsp;—&nbsp;the&nbsp;canonical&nbsp;small&nbsp;group.</span></dd></dl>
+ <dl><dt><a name="-klein_table"><strong>klein_table</strong></a>() -&gt; 'Table'</dt><dd><span class="code">Klein's&nbsp;four-group&nbsp;—&nbsp;the&nbsp;other&nbsp;order-4&nbsp;group.</span></dd></dl>
+ <dl><dt><a name="-looks_like_axioms"><strong>looks_like_axioms</strong></a>(text: 'str') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;the&nbsp;text&nbsp;asks&nbsp;about&nbsp;algebraic&nbsp;structure&nbsp;—&nbsp;axioms,<br>
+tables,&nbsp;the&nbsp;ladder's&nbsp;rungs.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>Table</strong> = list[list[int]]</td></tr></table>
+</body></html>

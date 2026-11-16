@@ -1,0 +1,28 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Apply a frequency policy to the hardware. Returns true if successful."><title>apply_policy in genesis::daemon::cpufreq - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-203241e4.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="genesis" data-themes="" data-resource-suffix="" data-rustdoc-version="1.100.0 (0ef1bc386 2026-11-09)" data-channel="1.100.0" data-search-js="search-b167f383.js" data-stringdex-js="stringdex-b5109af9.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../../static.files/main-1814ead3.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-9f56287d.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc fn"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">apply_policy</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../genesis/index.html">genesis</a><span class="version">0.2.0</span></h2></div><div class="sidebar-elems"><div id="rustdoc-modnav"><h2><a href="index.html">In genesis::<wbr>daemon::<wbr>cpufreq</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../index.html">genesis</a>::<wbr><a href="../index.html">daemon</a>::<wbr><a href="index.html">cpufreq</a></div><h1>Function <span class="fn">apply_<wbr>policy</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/genesis/daemon/cpufreq.rs.html#744-785">Source</a> </span></div><pre class="rust item-decl"><code>pub fn apply_policy(policy: &amp;<a class="struct" href="struct.FreqPolicy.html" title="struct genesis::daemon::cpufreq::FreqPolicy">FreqPolicy</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.bool.html">bool</a></code></pre><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Apply a frequency policy to the hardware. Returns true if successful.</p>
+<p><strong>Write order matters</strong>: the Linux kernel enforces
+<code>scaling_min_freq &lt;= scaling_max_freq</code> at all times. Writing a
+min_freq higher than the <em>current</em> sysfs max_freq fails with
+<code>-EINVAL</code>, and vice versa. Since we don’t read the current sysfs
+state before writing, we must use an order that works regardless
+of the current state:</p>
+<ol>
+<li><strong>Set max to the higher of (new_min, new_max)</strong> — raises the
+ceiling so that setting min won’t fail (min &lt;= ceiling is
+guaranteed).</li>
+<li><strong>Set min to new_min</strong> — now min &lt;= max (guaranteed, since
+max was set to at least new_min in step 1, and derive_policy
+ensures new_min &lt;= new_max).</li>
+<li><strong>Set max to new_max</strong> — always retry after min is set. If
+step 1 failed because new_max &lt; the <em>current</em> sysfs min_freq,
+step 2 has now lowered min, so this retry succeeds. If step 1
+succeeded, this is a harmless no-op (sets max to the same value).</li>
+</ol>
+<p>This 3-step sequence handles all transitions correctly:</p>
+<ul>
+<li>Raising min above current max: step 1 raises max first</li>
+<li>Lowering max below current min: step 1 fails (max &lt; current min),
+step 2 lowers min, step 3 retries and succeeds</li>
+<li>Normal case where min &lt;= current max: step 1 sets the final max,
+step 2 sets min, step 3 is a harmless no-op</li>
+</ul>
+</div></details></section></div></main></body></html>

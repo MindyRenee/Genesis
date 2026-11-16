@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: package Self_World.hypothalamus</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.hypothalamus</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/hypothalamus/__init__.py">/home/mindyrenee/GenAnd/Genesis/Self_World/hypothalamus/__init__.py</a></td></tr></table>
+    <p><span class="code">Hypothalamus&nbsp;—&nbsp;homeostasis,&nbsp;the&nbsp;stress&nbsp;axis,&nbsp;and&nbsp;the&nbsp;neuroendocrine&nbsp;hub.<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+ANATOMY&nbsp;AND&nbsp;FUNCTION<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+The&nbsp;hypothalamus&nbsp;sits&nbsp;in&nbsp;the&nbsp;diencephalon,&nbsp;above&nbsp;the&nbsp;brainstem&nbsp;and<br>
+below&nbsp;the&nbsp;thalamus.&nbsp;It&nbsp;is&nbsp;the&nbsp;controller&nbsp;of&nbsp;the&nbsp;body's&nbsp;set-points:<br>
+it&nbsp;senses&nbsp;blood&nbsp;chemistry,&nbsp;temperature,&nbsp;and&nbsp;energy&nbsp;state,&nbsp;and&nbsp;it<br>
+drives&nbsp;the&nbsp;endocrine&nbsp;glands&nbsp;through&nbsp;the&nbsp;pituitary.&nbsp;Its&nbsp;nuclei&nbsp;are&nbsp;the<br>
+origin&nbsp;of&nbsp;several&nbsp;neuromodulator&nbsp;and&nbsp;neuropeptide&nbsp;systems&nbsp;that&nbsp;the<br>
+rest&nbsp;of&nbsp;the&nbsp;brain&nbsp;reads&nbsp;as&nbsp;state:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Nucleus&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Output&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Claimed&nbsp;as<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-----------------------------&nbsp;&nbsp;-------------------&nbsp;&nbsp;------------------<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Paraventricular&nbsp;(PVN)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CRH,&nbsp;vasopressin&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HPA&nbsp;axis,&nbsp;osmotic<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Supraoptic&nbsp;(SON)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Vasopressin,&nbsp;oxytoc.&nbsp;fluid&nbsp;balance,&nbsp;bonding<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Lateral&nbsp;hypothalamus&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Orexin/hypocretin&nbsp;&nbsp;&nbsp;&nbsp;wake&nbsp;stabilization<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Tuberomammillary&nbsp;(TMN)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Histamine&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cortical&nbsp;arousal<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Suprachiasmatic&nbsp;(SCN)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Circadian&nbsp;timing&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;melatonin&nbsp;gating<br>
+&nbsp;<br>
+Melatonin&nbsp;is&nbsp;synthesized&nbsp;by&nbsp;the&nbsp;pineal&nbsp;gland,&nbsp;but&nbsp;its&nbsp;timing&nbsp;is&nbsp;set<br>
+by&nbsp;the&nbsp;SCN,&nbsp;so&nbsp;this&nbsp;region&nbsp;owns&nbsp;it&nbsp;as&nbsp;the&nbsp;circadian&nbsp;output.<br>
+&nbsp;<br>
+Two&nbsp;of&nbsp;these&nbsp;systems&nbsp;are&nbsp;shared&nbsp;with&nbsp;other&nbsp;regions,&nbsp;and&nbsp;the&nbsp;sharing<br>
+is&nbsp;deliberate.&nbsp;The&nbsp;sleep-wake&nbsp;switch&nbsp;(VLPO,&nbsp;orexin,&nbsp;SCN)&nbsp;is&nbsp;one<br>
+circuit&nbsp;spanning&nbsp;this&nbsp;region&nbsp;and&nbsp;brainstem;&nbsp;the&nbsp;cortisol&nbsp;endpoint&nbsp;of<br>
+the&nbsp;stress&nbsp;axis&nbsp;is&nbsp;read&nbsp;by&nbsp;limbic&nbsp;and&nbsp;frontal&nbsp;cortex.&nbsp;Each&nbsp;shared<br>
+system&nbsp;is&nbsp;homed&nbsp;in&nbsp;one&nbsp;place&nbsp;and&nbsp;used&nbsp;by&nbsp;both.<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+MATHEMATICAL&nbsp;FOUNDATION:&nbsp;THE&nbsp;HPA&nbsp;STRESS&nbsp;CASCADE<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+The&nbsp;HPA&nbsp;axis&nbsp;is&nbsp;a&nbsp;three-stage&nbsp;cascade&nbsp;with&nbsp;transport&nbsp;delays&nbsp;and<br>
+negative&nbsp;feedback&nbsp;from&nbsp;the&nbsp;end&nbsp;hormone.&nbsp;Delay-differential&nbsp;models&nbsp;of<br>
+this&nbsp;loop&nbsp;(Lenbury&nbsp;&amp;&nbsp;Pornsawad,&nbsp;2005)&nbsp;are&nbsp;the&nbsp;physiological&nbsp;reference<br>
+for&nbsp;its&nbsp;structure;&nbsp;the&nbsp;coefficients&nbsp;here&nbsp;are&nbsp;this&nbsp;module's&nbsp;own,&nbsp;not<br>
+fitted&nbsp;to&nbsp;that&nbsp;paper.&nbsp;Receptor&nbsp;physiology&nbsp;is&nbsp;from&nbsp;de&nbsp;Kloet,&nbsp;Joëls&nbsp;&amp;<br>
+Holsboer&nbsp;(2005).&nbsp;With&nbsp;CRH&nbsp;``x``,&nbsp;ACTH&nbsp;``a``,&nbsp;and&nbsp;cortisol&nbsp;``c``,&nbsp;each<br>
+clamped&nbsp;to&nbsp;[0,&nbsp;1],&nbsp;and&nbsp;stress&nbsp;indicator&nbsp;``S(t)``&nbsp;in&nbsp;{0,&nbsp;1},&nbsp;the<br>
+implemented&nbsp;dynamics&nbsp;are:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;CRH&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dx/dt&nbsp;=&nbsp;S·r_x&nbsp;−&nbsp;d_x·(1&nbsp;−&nbsp;S)&nbsp;−&nbsp;k_x·c<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ACTH&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;da/dt&nbsp;=&nbsp;[x(t&nbsp;−&nbsp;τ_a)&nbsp;&gt;&nbsp;θ]·r_a·x(t&nbsp;−&nbsp;τ_a)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;−&nbsp;d_a·[x(t&nbsp;−&nbsp;τ_a)&nbsp;≤&nbsp;θ]&nbsp;−&nbsp;k_a·c<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Cortisol&nbsp;&nbsp;dc/dt&nbsp;=&nbsp;[a(t&nbsp;−&nbsp;τ_c)&nbsp;&gt;&nbsp;θ]·r_c·a(t&nbsp;−&nbsp;τ_c)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;−&nbsp;d_c·[a(t&nbsp;−&nbsp;τ_c)&nbsp;≤&nbsp;θ]<br>
+&nbsp;<br>
+with&nbsp;delays&nbsp;τ_a&nbsp;=&nbsp;300&nbsp;s&nbsp;(pituitary,&nbsp;about&nbsp;5&nbsp;minutes)&nbsp;and&nbsp;τ_c&nbsp;=&nbsp;600&nbsp;s<br>
+(adrenal,&nbsp;about&nbsp;10&nbsp;minutes),&nbsp;gate&nbsp;threshold&nbsp;θ&nbsp;=&nbsp;``hpa_hormone_gate``,<br>
+and&nbsp;the&nbsp;feedback&nbsp;gains&nbsp;``k``&nbsp;scaled&nbsp;by&nbsp;0.01&nbsp;as&nbsp;implemented.&nbsp;The&nbsp;delays<br>
+make&nbsp;the&nbsp;response&nbsp;lag&nbsp;its&nbsp;trigger:&nbsp;in&nbsp;simulation,&nbsp;cortisol&nbsp;first&nbsp;rises<br>
+about&nbsp;16&nbsp;minutes&nbsp;after&nbsp;onset&nbsp;and&nbsp;peaks&nbsp;about&nbsp;27&nbsp;minutes&nbsp;after&nbsp;it,&nbsp;the<br>
+range&nbsp;measured&nbsp;for&nbsp;human&nbsp;cortisol&nbsp;responses&nbsp;to&nbsp;psychosocial&nbsp;stress<br>
+(peak&nbsp;~38&nbsp;min&nbsp;in&nbsp;the&nbsp;TSST&nbsp;meta-analysis,&nbsp;Frontiers&nbsp;in&nbsp;Neuroendocrinology<br>
+2022).&nbsp;Every&nbsp;level&nbsp;is&nbsp;clamped&nbsp;to&nbsp;[0,&nbsp;1],&nbsp;so&nbsp;the&nbsp;state&nbsp;stays&nbsp;in&nbsp;the&nbsp;unit<br>
+cube,&nbsp;and&nbsp;the&nbsp;feedback&nbsp;term&nbsp;returns&nbsp;it&nbsp;to&nbsp;baseline&nbsp;once&nbsp;the&nbsp;stressor<br>
+ends.<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+MATHEMATICAL&nbsp;FOUNDATION:&nbsp;ALLOSTASIS&nbsp;AND&nbsp;CIRCADIAN&nbsp;TIMING<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+Set-points&nbsp;move&nbsp;with&nbsp;load&nbsp;(Sterling,&nbsp;2012):&nbsp;the&nbsp;cumulative&nbsp;cost&nbsp;of<br>
+repeated&nbsp;HPA&nbsp;activation&nbsp;is&nbsp;allostatic&nbsp;load&nbsp;(McEwen,&nbsp;1998).&nbsp;The&nbsp;tracker<br>
+in&nbsp;``limbic_system``&nbsp;takes&nbsp;the&nbsp;median&nbsp;of&nbsp;three&nbsp;domains&nbsp;(substrate&nbsp;load,<br>
+cortisol,&nbsp;body&nbsp;stress),&nbsp;accumulates&nbsp;the&nbsp;excess&nbsp;of&nbsp;that&nbsp;median&nbsp;above&nbsp;an<br>
+accumulation&nbsp;threshold,&nbsp;and&nbsp;drains&nbsp;it&nbsp;below&nbsp;a&nbsp;recovery&nbsp;threshold.&nbsp;The<br>
+median&nbsp;makes&nbsp;one&nbsp;isolated&nbsp;spike&nbsp;unable&nbsp;to&nbsp;create&nbsp;load&nbsp;on&nbsp;its&nbsp;own.<br>
+&nbsp;<br>
+Circadian&nbsp;timing&nbsp;is&nbsp;the&nbsp;two-process&nbsp;model&nbsp;(Borbély,&nbsp;1982):&nbsp;a&nbsp;homeostatic<br>
+sleep&nbsp;pressure&nbsp;``S``&nbsp;that&nbsp;rises&nbsp;in&nbsp;wake&nbsp;and&nbsp;falls&nbsp;in&nbsp;sleep,&nbsp;and&nbsp;a<br>
+circadian&nbsp;drive&nbsp;``C``.&nbsp;Sleep&nbsp;onset&nbsp;occurs&nbsp;when&nbsp;``S``&nbsp;reaches&nbsp;an&nbsp;upper<br>
+threshold,&nbsp;and&nbsp;waking&nbsp;when&nbsp;it&nbsp;falls&nbsp;to&nbsp;a&nbsp;lower&nbsp;one,&nbsp;with&nbsp;``C``&nbsp;shifting<br>
+those&nbsp;thresholds.&nbsp;In&nbsp;Genesis&nbsp;the&nbsp;two&nbsp;processes&nbsp;are&nbsp;embodied&nbsp;separately:<br>
+the&nbsp;daemon's&nbsp;sleep-wake&nbsp;network&nbsp;owns&nbsp;onset&nbsp;(LC&nbsp;&lt;&nbsp;4&nbsp;Hz)&nbsp;with&nbsp;its&nbsp;own<br>
+homeostat&nbsp;and&nbsp;a&nbsp;Serkh–Forger&nbsp;circadian&nbsp;oscillator&nbsp;entrained&nbsp;to&nbsp;local<br>
+light,&nbsp;while&nbsp;the&nbsp;mind&nbsp;reads&nbsp;``S``&nbsp;as&nbsp;a&nbsp;voluntary&nbsp;drive&nbsp;—&nbsp;the&nbsp;adenosine<br>
+level&nbsp;feeds&nbsp;the&nbsp;self-sleep&nbsp;urge&nbsp;past<br>
+``SLEEP_URGE_ADENOSINE_FLOOR``&nbsp;—&nbsp;and&nbsp;reads&nbsp;melatonin,&nbsp;the&nbsp;SCN's&nbsp;output,<br>
+as&nbsp;the&nbsp;``C``&nbsp;signal:&nbsp;melatonin&nbsp;is&nbsp;a&nbsp;sleep-promoter&nbsp;in&nbsp;the&nbsp;arousal<br>
+equation&nbsp;at&nbsp;circadian&nbsp;night.&nbsp;The&nbsp;wake&nbsp;rescue&nbsp;applies&nbsp;only&nbsp;while&nbsp;melatonin&nbsp;is<br>
+below&nbsp;``WAKE_RESCUE_MELATONIN``;&nbsp;above&nbsp;it,&nbsp;the&nbsp;circadian&nbsp;drive&nbsp;takes<br>
+precedence.<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+HOMES<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+Stress&nbsp;and&nbsp;allostasis&nbsp;(shared&nbsp;with&nbsp;``limbic_system``):&nbsp;the&nbsp;HPA<br>
+cascade&nbsp;and&nbsp;the&nbsp;load&nbsp;tracker.<br>
+&nbsp;<br>
+Neuroendocrine&nbsp;and&nbsp;neuromodulator&nbsp;outputs&nbsp;(shared&nbsp;with<br>
+``neurochemical/``,&nbsp;whose&nbsp;files&nbsp;stay&nbsp;at&nbsp;top&nbsp;level&nbsp;because&nbsp;the&nbsp;hormone<br>
+systems&nbsp;are&nbsp;distributed):&nbsp;CRH,&nbsp;cortisol,&nbsp;vasopressin,&nbsp;oxytocin,<br>
+orexin,&nbsp;histamine,&nbsp;melatonin,&nbsp;endorphin.<br>
+&nbsp;<br>
+The&nbsp;sleep-wake&nbsp;circuit's&nbsp;hypothalamic&nbsp;half&nbsp;(shared&nbsp;with<br>
+``brainstem``,&nbsp;which&nbsp;runs&nbsp;the&nbsp;switch):&nbsp;the&nbsp;VLPO/orexin/SCN&nbsp;side&nbsp;of<br>
+the&nbsp;flip-flop&nbsp;and&nbsp;the&nbsp;orexin-timescale&nbsp;sleep&nbsp;inertia&nbsp;that&nbsp;follows<br>
+the&nbsp;wake&nbsp;transition.&nbsp;The&nbsp;VLPO's&nbsp;sleep-promoting&nbsp;output&nbsp;is&nbsp;GABAergic<br>
+(with&nbsp;galanin);&nbsp;the&nbsp;GABA&nbsp;chemical&nbsp;model&nbsp;itself&nbsp;stays&nbsp;shared&nbsp;in<br>
+``neurochemical/``&nbsp;because&nbsp;inhibitory&nbsp;interneurons&nbsp;are&nbsp;ubiquitous&nbsp;—<br>
+only&nbsp;the&nbsp;region-specific&nbsp;nuclei&nbsp;are&nbsp;homed&nbsp;here.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Package Contents</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="Self_World.hypothalamus.cortisol.html">cortisol</a><br>
+<a href="Self_World.hypothalamus.crh.html">crh</a><br>
+</td><td class="multicolumn"><a href="Self_World.hypothalamus.histamine.html">histamine</a><br>
+<a href="Self_World.hypothalamus.melatonin.html">melatonin</a><br>
+</td><td class="multicolumn"><a href="Self_World.hypothalamus.orexin.html">orexin</a><br>
+<a href="Self_World.hypothalamus.oxytocin.html">oxytocin</a><br>
+</td><td class="multicolumn"><a href="Self_World.hypothalamus.transduction.html">transduction</a><br>
+<a href="Self_World.hypothalamus.vasopressin.html">vasopressin</a><br>
+</td></tr></table></td></tr></table>
+</body></html>

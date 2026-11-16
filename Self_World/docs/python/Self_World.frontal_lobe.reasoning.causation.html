@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.frontal_lobe.reasoning.causation</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.frontal_lobe.html" class="white">frontal_lobe</a>.<a href="Self_World.frontal_lobe.reasoning.html" class="white">reasoning</a>.causation</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/reasoning/causation.py">/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/reasoning/causation.py</a></td></tr></table>
+    <p><span class="code">Causation&nbsp;—&nbsp;the&nbsp;analytic&nbsp;counterfactual&nbsp;theory&nbsp;(Lewis&nbsp;1973,&nbsp;2000).<br>
+&nbsp;<br>
+Lewis's&nbsp;analysis:&nbsp;*c*&nbsp;causes&nbsp;*e*&nbsp;iff&nbsp;there&nbsp;is&nbsp;a&nbsp;chain&nbsp;of<br>
+counterfactual&nbsp;dependencies&nbsp;from&nbsp;c&nbsp;to&nbsp;e&nbsp;—&nbsp;causation&nbsp;is&nbsp;the&nbsp;ancestral<br>
+(transitive&nbsp;closure)&nbsp;of&nbsp;counterfactual&nbsp;dependence.&nbsp;Dependence:&nbsp;had&nbsp;c<br>
+not&nbsp;occurred,&nbsp;e&nbsp;would&nbsp;not&nbsp;have&nbsp;occurred&nbsp;—&nbsp;evaluated&nbsp;at&nbsp;the&nbsp;closest<br>
+¬c-world.<br>
+&nbsp;<br>
+The&nbsp;evaluation&nbsp;needs&nbsp;more&nbsp;than&nbsp;belief&nbsp;revision:&nbsp;a&nbsp;Ramsey-style<br>
+minimal&nbsp;mutilation&nbsp;of&nbsp;a&nbsp;flat&nbsp;belief&nbsp;set&nbsp;leaves&nbsp;*e*&nbsp;standing&nbsp;when&nbsp;its<br>
+support&nbsp;is&nbsp;merely&nbsp;removed&nbsp;—&nbsp;logic&nbsp;alone&nbsp;cannot&nbsp;retract&nbsp;a&nbsp;conclusion<br>
+whose&nbsp;ground&nbsp;is&nbsp;cut.&nbsp;What&nbsp;the&nbsp;counterfactual&nbsp;needs&nbsp;is&nbsp;a&nbsp;mechanism:<br>
+a&nbsp;**structural&nbsp;causal&nbsp;model**&nbsp;(Pearl's&nbsp;equations&nbsp;are&nbsp;the&nbsp;machine<br>
+version&nbsp;of&nbsp;Lewis's&nbsp;similarity&nbsp;ordering&nbsp;—&nbsp;the&nbsp;closest&nbsp;antecedent<br>
+world&nbsp;keeps&nbsp;the&nbsp;mechanisms&nbsp;and&nbsp;perturbs&nbsp;only&nbsp;the&nbsp;cause).&nbsp;Each<br>
+variable&nbsp;carries&nbsp;an&nbsp;equation&nbsp;over&nbsp;its&nbsp;parents;&nbsp;intervening<br>
+do(c&nbsp;=&nbsp;v)&nbsp;cuts&nbsp;c's&nbsp;equation&nbsp;and&nbsp;fixes&nbsp;its&nbsp;value,&nbsp;then&nbsp;the&nbsp;mechanism<br>
+recomputes&nbsp;downstream.&nbsp;Counterfactual&nbsp;dependence&nbsp;is&nbsp;read&nbsp;off&nbsp;the<br>
+surgically&nbsp;altered&nbsp;model&nbsp;directly.<br>
+&nbsp;<br>
+What&nbsp;this&nbsp;implements:<br>
+&nbsp;<br>
+-&nbsp;``<a href="#-depends">depends</a>(c,&nbsp;e)``&nbsp;—&nbsp;e&nbsp;obtains&nbsp;actually&nbsp;and&nbsp;fails&nbsp;in&nbsp;the&nbsp;do(¬c)<br>
+&nbsp;&nbsp;world.&nbsp;Both&nbsp;must&nbsp;actually&nbsp;occur:&nbsp;causation&nbsp;relates&nbsp;events,&nbsp;and&nbsp;an<br>
+&nbsp;&nbsp;event&nbsp;that&nbsp;never&nbsp;happened&nbsp;causes&nbsp;nothing.<br>
+-&nbsp;``<a href="#-causes">causes</a>(c,&nbsp;e)``&nbsp;—&nbsp;the&nbsp;ancestral:&nbsp;a&nbsp;chain&nbsp;c&nbsp;→&nbsp;d₁&nbsp;→&nbsp;…&nbsp;→&nbsp;e&nbsp;of<br>
+&nbsp;&nbsp;dependencies,&nbsp;so&nbsp;causation&nbsp;reaches&nbsp;where&nbsp;direct&nbsp;dependence&nbsp;is&nbsp;cut.<br>
+&nbsp;&nbsp;This&nbsp;is&nbsp;Lewis's&nbsp;answer&nbsp;to&nbsp;early&nbsp;preemption:&nbsp;the&nbsp;preempted&nbsp;backup<br>
+&nbsp;&nbsp;leaves&nbsp;dependence&nbsp;broken,&nbsp;but&nbsp;the&nbsp;actual&nbsp;process&nbsp;stands&nbsp;as&nbsp;a&nbsp;chain<br>
+&nbsp;&nbsp;of&nbsp;dependencies&nbsp;through&nbsp;its&nbsp;intermediates.<br>
+&nbsp;<br>
+What&nbsp;it&nbsp;does&nbsp;not&nbsp;decide:&nbsp;*trumping*&nbsp;(two&nbsp;perfectly&nbsp;adequate<br>
+simultaneous&nbsp;causes,&nbsp;neither&nbsp;needed)&nbsp;and&nbsp;*late&nbsp;preemption*&nbsp;with&nbsp;no<br>
+intermediate&nbsp;to&nbsp;carry&nbsp;the&nbsp;chain&nbsp;are&nbsp;the&nbsp;cases&nbsp;where&nbsp;the<br>
+counterfactual&nbsp;theory&nbsp;needs&nbsp;Lewis's&nbsp;later&nbsp;refinement&nbsp;—&nbsp;causation&nbsp;as<br>
+*influence*&nbsp;("Causation&nbsp;as&nbsp;Influence",&nbsp;2000)&nbsp;—&nbsp;graded&nbsp;ranges&nbsp;of<br>
+whether/when/how&nbsp;alterations.&nbsp;The&nbsp;dependence&nbsp;graph&nbsp;exposes&nbsp;that<br>
+boundary&nbsp;honestly&nbsp;rather&nbsp;than&nbsp;papering&nbsp;over&nbsp;it.</span></p>
+<p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.causation.html#StructuralModel">StructuralModel</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="StructuralModel">class <strong>StructuralModel</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#StructuralModel">StructuralModel</a>(equations:&nbsp;'Mapping[str,&nbsp;Formula]',&nbsp;exogenous:&nbsp;'Mapping[str,&nbsp;bool]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;structural&nbsp;causal&nbsp;model&nbsp;—&nbsp;variables&nbsp;and&nbsp;the&nbsp;mechanisms<br>
+(formulas&nbsp;over&nbsp;parents)&nbsp;that&nbsp;produce&nbsp;them.<br>
+&nbsp;<br>
+``equations``&nbsp;maps&nbsp;each&nbsp;endogenous&nbsp;variable&nbsp;to&nbsp;the&nbsp;mechanism<br>
+determining&nbsp;it;&nbsp;``exogenous``&nbsp;holds&nbsp;the&nbsp;background&nbsp;values&nbsp;no<br>
+mechanism&nbsp;explains.&nbsp;Values&nbsp;are&nbsp;Boolean&nbsp;—&nbsp;an&nbsp;event&nbsp;either&nbsp;occurs<br>
+or&nbsp;does&nbsp;not,&nbsp;which&nbsp;is&nbsp;the&nbsp;granularity&nbsp;Lewis's&nbsp;analysis&nbsp;assumes.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="StructuralModel-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="StructuralModel-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="StructuralModel-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="StructuralModel-__init__"><strong>__init__</strong></a>(self, equations: 'Mapping[str, Formula]', exogenous: 'Mapping[str, bool] | None' = None) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="StructuralModel-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="StructuralModel-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<dl><dt><a name="StructuralModel-causal_chain"><strong>causal_chain</strong></a>(self, c: 'str', e: 'str', events: 'Iterable[str] | None' = None, actual: 'Model | None' = None) -&gt; 'tuple[str, ...] | None'</dt><dd><span class="code">The&nbsp;witnessing&nbsp;chain&nbsp;for&nbsp;causation,&nbsp;or&nbsp;None&nbsp;—&nbsp;a&nbsp;path<br>
+through&nbsp;the&nbsp;dependence&nbsp;graph&nbsp;from&nbsp;c&nbsp;to&nbsp;e&nbsp;(shortest&nbsp;first).</span></dd></dl>
+
+<dl><dt><a name="StructuralModel-causes"><strong>causes</strong></a>(self, c: 'str', e: 'str', events: 'Iterable[str] | None' = None, actual: 'Model | None' = None) -&gt; 'bool'</dt><dd><span class="code">Causation&nbsp;as&nbsp;the&nbsp;ancestral&nbsp;of&nbsp;dependence&nbsp;—&nbsp;BFS&nbsp;over<br>
+intermediate&nbsp;events;&nbsp;c&nbsp;causes&nbsp;e&nbsp;iff&nbsp;some&nbsp;chain&nbsp;of<br>
+dependencies&nbsp;runs&nbsp;from&nbsp;c&nbsp;to&nbsp;e.&nbsp;This&nbsp;is&nbsp;Lewis's&nbsp;handling&nbsp;of<br>
+early&nbsp;preemption:&nbsp;the&nbsp;backup&nbsp;process&nbsp;breaks&nbsp;direct<br>
+dependence,&nbsp;but&nbsp;the&nbsp;actual&nbsp;mechanism&nbsp;remains&nbsp;a&nbsp;chain.</span></dd></dl>
+
+<dl><dt><a name="StructuralModel-depends"><strong>depends</strong></a>(self, c: 'str', e: 'str', actual: 'Model | None' = None) -&gt; 'bool'</dt><dd><span class="code">Counterfactual&nbsp;dependence&nbsp;—&nbsp;e&nbsp;obtains&nbsp;actually,&nbsp;and&nbsp;at&nbsp;the<br>
+closest&nbsp;world&nbsp;where&nbsp;c&nbsp;does&nbsp;not&nbsp;occur,&nbsp;e&nbsp;does&nbsp;not&nbsp;either.</span></dd></dl>
+
+<dl><dt><a name="StructuralModel-evaluate"><strong>evaluate</strong></a>(self, evidence: 'Mapping[str, bool] | None' = None) -&gt; 'Model'</dt><dd><span class="code">Solve&nbsp;the&nbsp;model&nbsp;—&nbsp;propagate&nbsp;exogenous&nbsp;evidence&nbsp;through&nbsp;the<br>
+mechanisms&nbsp;by&nbsp;fixpoint.&nbsp;Acyclic&nbsp;models&nbsp;converge&nbsp;within&nbsp;their<br>
+depth;&nbsp;a&nbsp;model&nbsp;that&nbsp;fails&nbsp;to&nbsp;converge&nbsp;is&nbsp;cyclic,&nbsp;and&nbsp;cycles<br>
+are&nbsp;reported&nbsp;rather&nbsp;than&nbsp;silently&nbsp;halved.</span></dd></dl>
+
+<dl><dt><a name="StructuralModel-intervene"><strong>intervene</strong></a>(self, var: 'str', value: 'bool') -&gt; 'tuple[StructuralModel, Model]'</dt><dd><span class="code">do(var&nbsp;=&nbsp;value)&nbsp;—&nbsp;cut&nbsp;the&nbsp;variable's&nbsp;mechanism&nbsp;and&nbsp;hold&nbsp;it<br>
+fixed.&nbsp;Surgery,&nbsp;not&nbsp;conditioning:&nbsp;downstream&nbsp;variables&nbsp;keep<br>
+their&nbsp;own&nbsp;mechanisms;&nbsp;only&nbsp;the&nbsp;intervened&nbsp;variable's&nbsp;incoming<br>
+arrows&nbsp;are&nbsp;severed&nbsp;—&nbsp;the&nbsp;closest-world&nbsp;semantics&nbsp;Lewis's<br>
+similarity&nbsp;ordering&nbsp;describes.</span></dd></dl>
+
+<dl><dt><a name="StructuralModel-variables"><strong>variables</strong></a>(self) -&gt; 'frozenset[str]'</dt></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'equations': 'Mapping[str, Formula]', 'exogenous': 'Mapping[str, bool] | None'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'equations': Field(name='equations',type='Mapping[str, Formul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'exogenous': Field(name='exogenous',type='Mapping[str, bool] ...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('equations', 'exogenous')</dl>
+
+<dl><dt><strong>exogenous</strong> = None</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-causes"><strong>causes</strong></a>(model: 'StructuralModel', c: 'str', e: 'str', events: 'Iterable[str] | None' = None, actual: 'Model | None' = None) -&gt; 'bool'</dt><dd><span class="code">Functional&nbsp;shorthand&nbsp;for&nbsp;``model.causes``.</span></dd></dl>
+ <dl><dt><a name="-depends"><strong>depends</strong></a>(model: 'StructuralModel', c: 'str', e: 'str', actual: 'Model | None' = None) -&gt; 'bool'</dt><dd><span class="code">Functional&nbsp;shorthand&nbsp;for&nbsp;``model.depends``.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['StructuralModel', 'causes', 'depends']</td></tr></table>
+</body></html>

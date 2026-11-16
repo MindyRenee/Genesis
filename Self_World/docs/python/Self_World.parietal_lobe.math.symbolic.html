@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.parietal_lobe.math.symbolic</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.parietal_lobe.html" class="white">parietal_lobe</a>.<a href="Self_World.parietal_lobe.math.html" class="white">math</a>.symbolic</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/parietal_lobe/math/symbolic.py">/home/mindyrenee/GenAnd/Genesis/Self_World/parietal_lobe/math/symbolic.py</a></td></tr></table>
+    <p><span class="code">Symbolic&nbsp;mathematics&nbsp;—&nbsp;the&nbsp;parietal&nbsp;faculty's&nbsp;formal&nbsp;layer.<br>
+&nbsp;<br>
+Where&nbsp;``arithmetic.py``&nbsp;computes&nbsp;exact&nbsp;numbers&nbsp;and<br>
+``number_sense.py``&nbsp;estimates&nbsp;magnitudes,&nbsp;this&nbsp;module&nbsp;manipulates<br>
+structure:&nbsp;algebraic&nbsp;simplification,&nbsp;calculus,&nbsp;equation&nbsp;solving,<br>
+matrix&nbsp;operations,&nbsp;and&nbsp;exact-equality&nbsp;checking.&nbsp;It&nbsp;is&nbsp;the&nbsp;seed&nbsp;of&nbsp;a<br>
+proof&nbsp;substrate&nbsp;—&nbsp;the&nbsp;part&nbsp;of&nbsp;mathematical&nbsp;thought&nbsp;that&nbsp;does&nbsp;not<br>
+guess.<br>
+&nbsp;<br>
+Verification&nbsp;is&nbsp;separated&nbsp;from&nbsp;generation&nbsp;on&nbsp;purpose.&nbsp;Cognition<br>
+proposes&nbsp;expressions;&nbsp;``check_equality``&nbsp;alone&nbsp;returns&nbsp;the&nbsp;verdict,<br>
+and&nbsp;"undecided"&nbsp;is&nbsp;reported&nbsp;honestly&nbsp;rather&nbsp;than&nbsp;rounded&nbsp;into&nbsp;a&nbsp;yes.<br>
+That&nbsp;mirrors&nbsp;the&nbsp;provenance&nbsp;discipline&nbsp;used&nbsp;elsewhere&nbsp;in&nbsp;the<br>
+architecture&nbsp;—&nbsp;a&nbsp;claim&nbsp;earns&nbsp;"verified"&nbsp;only&nbsp;through&nbsp;the&nbsp;oracle,<br>
+never&nbsp;by&nbsp;assertion.<br>
+&nbsp;<br>
+Backed&nbsp;by&nbsp;SymPy.&nbsp;The&nbsp;library&nbsp;is&nbsp;imported&nbsp;lazily&nbsp;so&nbsp;this&nbsp;module&nbsp;loads<br>
+in&nbsp;environments&nbsp;where&nbsp;the&nbsp;CAS&nbsp;wheel&nbsp;is&nbsp;absent;&nbsp;callers&nbsp;then&nbsp;get&nbsp;a<br>
+clean&nbsp;failure&nbsp;rather&nbsp;than&nbsp;a&nbsp;crash&nbsp;at&nbsp;import.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="itertools.html">itertools</a><br>
+</td><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="random.html">random</a><br>
+</td><td class="multicolumn"><a href="re.html">re</a><br>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.parietal_lobe.math.symbolic.html#SymbolicResult">SymbolicResult</a>
+</dt><dt class="heading-text"><a href="Self_World.parietal_lobe.math.symbolic.html#Verdict">Verdict</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SymbolicResult">class <strong>SymbolicResult</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SymbolicResult">SymbolicResult</a>(operation:&nbsp;'str',&nbsp;input:&nbsp;'str',&nbsp;output:&nbsp;'str',&nbsp;ok:&nbsp;'bool',&nbsp;error:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;data:&nbsp;'dict[str,&nbsp;Any]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;outcome&nbsp;of&nbsp;a&nbsp;symbolic&nbsp;operation.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="SymbolicResult-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="SymbolicResult-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="SymbolicResult-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="SymbolicResult-__init__"><strong>__init__</strong></a>(self, operation: 'str', input: 'str', output: 'str', ok: 'bool', error: 'str' = '', data: 'dict[str, Any]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="SymbolicResult-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="SymbolicResult-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'data': 'dict[str, Any]', 'error': 'str', 'input': 'str', 'ok': 'bool', 'operation': 'str', 'output': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'data': Field(name='data',type='dict[str, Any]',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'error': Field(name='error',type='str',default='',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'input': Field(name='input',type='str',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD), 'ok': Field(name='ok',type='bool',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD), 'operation': Field(name='operation',type='str',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'output': Field(name='output',type='str',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('operation', 'input', 'output', 'ok', 'error', 'data')</dl>
+
+<dl><dt><strong>error</strong> = ''</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Verdict">class <strong>Verdict</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Verdict">Verdict</a>(status:&nbsp;'str',&nbsp;lhs:&nbsp;'str',&nbsp;rhs:&nbsp;'str',&nbsp;detail:&nbsp;'str',&nbsp;witness:&nbsp;'dict[str,&nbsp;Any]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;oracle's&nbsp;answer&nbsp;on&nbsp;a&nbsp;claimed&nbsp;equality.<br>
+&nbsp;<br>
+``status``&nbsp;is&nbsp;one&nbsp;of&nbsp;"verified"&nbsp;(the&nbsp;oracle&nbsp;proved&nbsp;the&nbsp;sides<br>
+equal),&nbsp;"refuted"&nbsp;(proved&nbsp;unequal,&nbsp;with&nbsp;a&nbsp;numeric&nbsp;``witness``<br>
+when&nbsp;one&nbsp;could&nbsp;be&nbsp;produced),&nbsp;or&nbsp;"undecided"&nbsp;(the&nbsp;oracle&nbsp;could<br>
+not&nbsp;tell&nbsp;—&nbsp;the&nbsp;honest&nbsp;third&nbsp;answer).<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Verdict-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="Verdict-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="Verdict-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="Verdict-__init__"><strong>__init__</strong></a>(self, status: 'str', lhs: 'str', rhs: 'str', detail: 'str', witness: 'dict[str, Any] | None' = None) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Verdict-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="Verdict-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'detail': 'str', 'lhs': 'str', 'rhs': 'str', 'status': 'str', 'witness': 'dict[str, Any] | None'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'detail': Field(name='detail',type='str',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD), 'lhs': Field(name='lhs',type='str',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD), 'rhs': Field(name='rhs',type='str',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD), 'status': Field(name='status',type='str',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD), 'witness': Field(name='witness',type='dict[str, Any] | None...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('status', 'lhs', 'rhs', 'detail', 'witness')</dl>
+
+<dl><dt><strong>witness</strong> = None</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-check_bounded_equality"><strong>check_bounded_equality</strong></a>(lhs: 'str', rhs: 'str', var: 'str' = 'n', lo: 'int' = 1, hi: 'int' = 100) -&gt; 'Verdict'</dt><dd><span class="code">Check&nbsp;``lhs&nbsp;=&nbsp;rhs``&nbsp;at&nbsp;every&nbsp;integer&nbsp;``var``&nbsp;in&nbsp;``[lo,&nbsp;hi]``.<br>
+&nbsp;<br>
+One&nbsp;failing&nbsp;point&nbsp;is&nbsp;a&nbsp;real&nbsp;refutation&nbsp;—&nbsp;the&nbsp;witness&nbsp;is&nbsp;the<br>
+failing&nbsp;integer.&nbsp;Every&nbsp;point&nbsp;passing&nbsp;is&nbsp;strong&nbsp;evidence&nbsp;but<br>
+*not*&nbsp;a&nbsp;proof:&nbsp;the&nbsp;verdict&nbsp;stays&nbsp;``undecided``&nbsp;with&nbsp;the&nbsp;checked<br>
+range&nbsp;in&nbsp;its&nbsp;detail,&nbsp;so&nbsp;bounded&nbsp;support&nbsp;can&nbsp;never&nbsp;masquerade<br>
+as&nbsp;a&nbsp;terminal&nbsp;verdict.&nbsp;Raises&nbsp;``ValueError``&nbsp;on&nbsp;unparseable<br>
+input;&nbsp;``hi``&nbsp;is&nbsp;capped&nbsp;at&nbsp;10&nbsp;000&nbsp;to&nbsp;bound&nbsp;the&nbsp;work.</span></dd></dl>
+ <dl><dt><a name="-check_equality"><strong>check_equality</strong></a>(lhs: 'str', rhs: 'str') -&gt; 'Verdict'</dt><dd><span class="code">Decide&nbsp;whether&nbsp;two&nbsp;expressions&nbsp;are&nbsp;exactly&nbsp;equal.<br>
+&nbsp;<br>
+The&nbsp;oracle&nbsp;is&nbsp;sympy's&nbsp;``equals``&nbsp;(simplification&nbsp;plus&nbsp;numeric<br>
+evaluation)&nbsp;backed&nbsp;by&nbsp;a&nbsp;``simplify(lhs&nbsp;-&nbsp;rhs)``&nbsp;second&nbsp;opinion.<br>
+A&nbsp;``refuted``&nbsp;verdict&nbsp;tries&nbsp;to&nbsp;carry&nbsp;a&nbsp;witness:&nbsp;a&nbsp;substitution<br>
+where&nbsp;the&nbsp;two&nbsp;sides&nbsp;numerically&nbsp;differ.&nbsp;Raises&nbsp;``ValueError``<br>
+when&nbsp;a&nbsp;side&nbsp;cannot&nbsp;be&nbsp;parsed.</span></dd></dl>
+ <dl><dt><a name="-check_inequality"><strong>check_inequality</strong></a>(lhs: 'str', rhs: 'str', op: 'str') -&gt; 'Verdict'</dt><dd><span class="code">Judge&nbsp;``lhs&nbsp;op&nbsp;rhs``&nbsp;symbolically&nbsp;for&nbsp;``op``&nbsp;in&nbsp;&lt;,&nbsp;&lt;=,&nbsp;&gt;,&nbsp;&gt;=.<br>
+&nbsp;<br>
+The&nbsp;oracle&nbsp;asks&nbsp;sympy&nbsp;whether&nbsp;``simplify(lhs&nbsp;-&nbsp;rhs)``&nbsp;carries<br>
+the&nbsp;required&nbsp;sign;&nbsp;a&nbsp;``refuted``&nbsp;verdict&nbsp;tries&nbsp;to&nbsp;carry&nbsp;a<br>
+witness&nbsp;—&nbsp;a&nbsp;substitution&nbsp;where&nbsp;the&nbsp;sign&nbsp;fails.&nbsp;Raises<br>
+``ValueError``&nbsp;when&nbsp;a&nbsp;side&nbsp;cannot&nbsp;be&nbsp;parsed.</span></dd></dl>
+ <dl><dt><a name="-compute"><strong>compute</strong></a>(operation: 'str', expression: 'str', variable: 'str' = 'x', point: 'str' = '0', order: 'int' = 0, lower: 'str' = '', upper: 'str' = '') -&gt; 'SymbolicResult'</dt><dd><span class="code">Run&nbsp;one&nbsp;symbolic&nbsp;operation&nbsp;on&nbsp;an&nbsp;expression&nbsp;string.<br>
+&nbsp;<br>
+Operations:&nbsp;simplify,&nbsp;expand,&nbsp;factor,&nbsp;cancel,&nbsp;apart,&nbsp;together,<br>
+trigsimp,&nbsp;diff&nbsp;(order&nbsp;=&nbsp;nth&nbsp;derivative),&nbsp;integrate&nbsp;(indefinite,<br>
+or&nbsp;definite&nbsp;when&nbsp;``lower``/``upper``&nbsp;are&nbsp;both&nbsp;given),&nbsp;solve<br>
+(an&nbsp;equation&nbsp;"lhs&nbsp;=&nbsp;rhs"&nbsp;or&nbsp;an&nbsp;expression&nbsp;set&nbsp;to&nbsp;zero),&nbsp;limit<br>
+(at&nbsp;``point``),&nbsp;series&nbsp;(about&nbsp;``point``,&nbsp;``order``&nbsp;terms),<br>
+evalf&nbsp;(20-digit&nbsp;value),&nbsp;and&nbsp;the&nbsp;matrix&nbsp;ops&nbsp;det,&nbsp;eigenvals,<br>
+trace,&nbsp;inv,&nbsp;charpoly&nbsp;on&nbsp;a&nbsp;"[[a,&nbsp;b],&nbsp;[c,&nbsp;d]]"&nbsp;literal.</span></dd></dl>
+ <dl><dt><a name="-mutate_identity"><strong>mutate_identity</strong></a>(lhs: 'str', rhs: 'str', rng: 'random.Random | None' = None, variable: 'str' = 'x') -&gt; 'dict[str, Any] | None'</dt><dd><span class="code">Vary&nbsp;a&nbsp;known&nbsp;identity&nbsp;into&nbsp;a&nbsp;candidate&nbsp;conjecture.<br>
+&nbsp;<br>
+Sound&nbsp;moves&nbsp;apply&nbsp;the&nbsp;same&nbsp;transformation&nbsp;to&nbsp;both&nbsp;sides&nbsp;—<br>
+differentiate,&nbsp;scale,&nbsp;shift&nbsp;the&nbsp;variable,&nbsp;square,&nbsp;exponentiate,<br>
+add&nbsp;a&nbsp;shared&nbsp;term&nbsp;—&nbsp;so&nbsp;the&nbsp;candidate&nbsp;inherits&nbsp;truth&nbsp;and&nbsp;the<br>
+oracle&nbsp;usually&nbsp;confirms&nbsp;it.&nbsp;Free&nbsp;moves&nbsp;perturb&nbsp;one&nbsp;side&nbsp;only;<br>
+the&nbsp;oracle&nbsp;usually&nbsp;refutes&nbsp;them&nbsp;with&nbsp;a&nbsp;counterexample.&nbsp;Both<br>
+outcomes&nbsp;are&nbsp;knowledge:&nbsp;sound&nbsp;moves&nbsp;extend&nbsp;what&nbsp;is&nbsp;proven,&nbsp;free<br>
+moves&nbsp;map&nbsp;where&nbsp;the&nbsp;identity's&nbsp;boundary&nbsp;actually&nbsp;sits.<br>
+&nbsp;<br>
+Returns&nbsp;{"lhs",&nbsp;"rhs",&nbsp;"method",&nbsp;"sound"}&nbsp;or&nbsp;None&nbsp;when&nbsp;sympy&nbsp;is<br>
+absent,&nbsp;a&nbsp;side&nbsp;won't&nbsp;parse,&nbsp;or&nbsp;the&nbsp;result&nbsp;is&nbsp;too&nbsp;large&nbsp;to&nbsp;be&nbsp;a<br>
+useful&nbsp;claim.</span></dd></dl>
+ <dl><dt><a name="-split_claim"><strong>split_claim</strong></a>(text: 'str') -&gt; 'dict[str, Any] | None'</dt><dd><span class="code">Split&nbsp;a&nbsp;research&nbsp;claim&nbsp;into&nbsp;judgeable&nbsp;form,&nbsp;or&nbsp;None.<br>
+&nbsp;<br>
+Two&nbsp;claim&nbsp;shapes&nbsp;are&nbsp;understood:<br>
+&nbsp;<br>
+*&nbsp;``lhs&nbsp;op&nbsp;rhs``&nbsp;—&nbsp;an&nbsp;equality&nbsp;or&nbsp;inequality&nbsp;(``=``,&nbsp;``&lt;=``,<br>
+&nbsp;&nbsp;``&gt;=``,&nbsp;``&lt;``,&nbsp;``&gt;``)&nbsp;judged&nbsp;symbolically.<br>
+*&nbsp;``lhs&nbsp;=&nbsp;rhs&nbsp;for&nbsp;n&nbsp;&lt;=&nbsp;K``&nbsp;/&nbsp;``for&nbsp;n&nbsp;&lt;=&nbsp;K:&nbsp;lhs&nbsp;=&nbsp;rhs``&nbsp;—&nbsp;a<br>
+&nbsp;&nbsp;bounded&nbsp;universal&nbsp;over&nbsp;integers,&nbsp;checked&nbsp;exhaustively.<br>
+&nbsp;<br>
+``!=``&nbsp;and&nbsp;``==``&nbsp;are&nbsp;deliberately&nbsp;not&nbsp;relations&nbsp;the&nbsp;oracle<br>
+judges;&nbsp;unparseable&nbsp;or&nbsp;non-relational&nbsp;text&nbsp;returns&nbsp;None.</span></dd></dl>
+ <dl><dt><a name="-split_equality"><strong>split_equality</strong></a>(text: 'str') -&gt; 'tuple[str, str] | None'</dt><dd><span class="code">Split&nbsp;"lhs&nbsp;=&nbsp;rhs"&nbsp;into&nbsp;its&nbsp;sides,&nbsp;or&nbsp;None&nbsp;if&nbsp;not&nbsp;equational.<br>
+&nbsp;<br>
+Only&nbsp;a&nbsp;bare&nbsp;single&nbsp;``=``&nbsp;splits&nbsp;—&nbsp;``&lt;=``,&nbsp;``&gt;=``,&nbsp;``!=``,&nbsp;``==``<br>
+are&nbsp;not&nbsp;equations&nbsp;and&nbsp;return&nbsp;None,&nbsp;which&nbsp;keeps&nbsp;non-equational<br>
+claims&nbsp;out&nbsp;of&nbsp;the&nbsp;oracle's&nbsp;reach&nbsp;rather&nbsp;than&nbsp;misjudging&nbsp;them.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>logger</strong> = &lt;Logger Self_World.parietal_lobe.math.symbolic (WARNING)&gt;</td></tr></table>
+</body></html>

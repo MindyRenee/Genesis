@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["UnitKind"],"fn":["analysis_to_wire","analyze_file","analyze_file_path","build_dependency_graph","extend_dedup","find_refactoring_targets","is_pub","is_unsafe","return_type_string","type_to_string"],"struct":["DependencyGraph","FileAnalysis","GraphEdge","GraphNode","SemanticUnit","UnitVisitor"]};

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.infrastructure.text</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.infrastructure.html" class="white">infrastructure</a>.text</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/infrastructure/text.py">/home/mindyrenee/GenAnd/Genesis/Self_World/infrastructure/text.py</a></td></tr></table>
+    <p><span class="code">Canonical&nbsp;text&nbsp;normalization&nbsp;—&nbsp;one&nbsp;definition&nbsp;of&nbsp;"whitespace"&nbsp;and<br>
+one&nbsp;answer&nbsp;to&nbsp;"was&nbsp;anything&nbsp;said".<br>
+&nbsp;<br>
+Two&nbsp;formal&nbsp;layers,&nbsp;kept&nbsp;separate&nbsp;because&nbsp;they&nbsp;answer&nbsp;different<br>
+questions:<br>
+&nbsp;<br>
+-&nbsp;**Whitespace**&nbsp;is&nbsp;any&nbsp;character&nbsp;``str.isspace()``&nbsp;accepts:&nbsp;the&nbsp;25<br>
+&nbsp;&nbsp;Unicode&nbsp;``White_Space``&nbsp;codepoints&nbsp;plus&nbsp;the&nbsp;four&nbsp;ASCII&nbsp;separator<br>
+&nbsp;&nbsp;controls&nbsp;FS/GS/RS/US&nbsp;(U+001C–U+001F),&nbsp;which&nbsp;``str.split()``&nbsp;honours<br>
+&nbsp;&nbsp;even&nbsp;though&nbsp;regex&nbsp;``\s``&nbsp;does&nbsp;not.&nbsp;``text.split()``&nbsp;already<br>
+&nbsp;&nbsp;implements&nbsp;this&nbsp;widest&nbsp;notion;&nbsp;the&nbsp;helpers&nbsp;below&nbsp;apply&nbsp;it&nbsp;after&nbsp;the<br>
+&nbsp;&nbsp;invisible&nbsp;layer&nbsp;is&nbsp;removed,&nbsp;so&nbsp;nothing&nbsp;can&nbsp;glue&nbsp;words&nbsp;together<br>
+&nbsp;&nbsp;invisibly.<br>
+-&nbsp;**Invisible&nbsp;characters**&nbsp;are&nbsp;Unicode&nbsp;category&nbsp;``Cf``&nbsp;(format:<br>
+&nbsp;&nbsp;zero-width&nbsp;space&nbsp;and&nbsp;joiners,&nbsp;bidi&nbsp;marks&nbsp;and&nbsp;overrides,&nbsp;word<br>
+&nbsp;&nbsp;joiner,&nbsp;BOM,&nbsp;soft&nbsp;hyphen,&nbsp;tag&nbsp;characters)&nbsp;—&nbsp;plus&nbsp;``Cc``&nbsp;control<br>
+&nbsp;&nbsp;characters&nbsp;that&nbsp;produce&nbsp;no&nbsp;glyph.&nbsp;They&nbsp;are&nbsp;not&nbsp;whitespace,&nbsp;so<br>
+&nbsp;&nbsp;``strip()``&nbsp;and&nbsp;``split()``&nbsp;pass&nbsp;them&nbsp;straight&nbsp;through,&nbsp;which<br>
+&nbsp;&nbsp;defeated&nbsp;every&nbsp;downstream&nbsp;test&nbsp;that&nbsp;assumed&nbsp;"non-blank&nbsp;=&nbsp;content":<br>
+&nbsp;&nbsp;a&nbsp;message&nbsp;of&nbsp;pure&nbsp;zero-width&nbsp;spaces&nbsp;looked&nbsp;like&nbsp;speech.<br>
+&nbsp;<br>
+``canon_text``&nbsp;applies&nbsp;NFKC&nbsp;(compatibility&nbsp;equivalence&nbsp;—&nbsp;fullwidth<br>
+forms,&nbsp;ligatures)&nbsp;and&nbsp;drops&nbsp;the&nbsp;invisible&nbsp;layer.&nbsp;It&nbsp;is&nbsp;for&nbsp;analysis<br>
+only&nbsp;—&nbsp;a&nbsp;one-way&nbsp;normalization&nbsp;—&nbsp;never&nbsp;for&nbsp;text&nbsp;that&nbsp;will&nbsp;be<br>
+re-emitted&nbsp;to&nbsp;the&nbsp;user.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="re.html">re</a><br>
+</td><td class="multicolumn"><a href="unicodedata.html">unicodedata</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-canon_text"><strong>canon_text</strong></a>(text: 'str') -&gt; 'str'</dt><dd><span class="code">One-way&nbsp;canonical&nbsp;form&nbsp;for&nbsp;analysis.<br>
+&nbsp;<br>
+NFKC&nbsp;folding&nbsp;(fullwidth&nbsp;forms,&nbsp;ligatures&nbsp;become&nbsp;their&nbsp;letters),<br>
+then&nbsp;invisible&nbsp;format/control&nbsp;characters&nbsp;removed,&nbsp;then<br>
+typographic&nbsp;apostrophes&nbsp;folded&nbsp;to&nbsp;``'``&nbsp;so&nbsp;"don’t"&nbsp;and&nbsp;"don't"<br>
+are&nbsp;the&nbsp;same&nbsp;five&nbsp;characters&nbsp;downstream.</span></dd></dl>
+ <dl><dt><a name="-collapse_ws"><strong>collapse_ws</strong></a>(text: 'str') -&gt; 'str'</dt><dd><span class="code">Canonical&nbsp;single-spaced&nbsp;form:&nbsp;invisibles&nbsp;removed,&nbsp;every<br>
+whitespace&nbsp;run&nbsp;folded&nbsp;to&nbsp;one&nbsp;space,&nbsp;ends&nbsp;trimmed.</span></dd></dl>
+ <dl><dt><a name="-is_blank"><strong>is_blank</strong></a>(text: 'str | None') -&gt; 'bool'</dt><dd><span class="code">True&nbsp;iff&nbsp;the&nbsp;text&nbsp;carries&nbsp;nothing&nbsp;perceivable&nbsp;—&nbsp;the&nbsp;silence&nbsp;test.<br>
+&nbsp;<br>
+``""``,&nbsp;``None``,&nbsp;whitespace-only&nbsp;input,&nbsp;and&nbsp;input&nbsp;made&nbsp;entirely&nbsp;of<br>
+invisible&nbsp;format/control&nbsp;characters&nbsp;(a&nbsp;zero-width-space&nbsp;message)<br>
+are&nbsp;all&nbsp;blank.</span></dd></dl>
+ <dl><dt><a name="-sentences"><strong>sentences</strong></a>(text: 'str') -&gt; 'list[str]'</dt><dd><span class="code">Sentence&nbsp;boundaries.<br>
+&nbsp;<br>
+Uses&nbsp;NLTK's&nbsp;punkt&nbsp;segmenter&nbsp;(unsupervised&nbsp;sentence-boundary<br>
+detection,&nbsp;Kiss&nbsp;&amp;&nbsp;Strunk&nbsp;2006)&nbsp;when&nbsp;it&nbsp;is&nbsp;installed:&nbsp;it&nbsp;resolves<br>
+abbreviations&nbsp;("Dr.",&nbsp;"e.g."),&nbsp;ellipsis&nbsp;and&nbsp;quoted&nbsp;speech&nbsp;that&nbsp;a<br>
+whitespace&nbsp;lookbehind&nbsp;mangles.&nbsp;When&nbsp;the&nbsp;model&nbsp;is&nbsp;absent&nbsp;the<br>
+punctuation-followed-by-whitespace&nbsp;rule&nbsp;is&nbsp;the&nbsp;documented<br>
+fallback&nbsp;—&nbsp;less&nbsp;accurate,&nbsp;never&nbsp;absent.</span></dd></dl>
+ <dl><dt><a name="-split_tokens"><strong>split_tokens</strong></a>(text: 'str') -&gt; 'list[str]'</dt><dd><span class="code">Whitespace&nbsp;tokens&nbsp;over&nbsp;the&nbsp;canonical&nbsp;text&nbsp;—&nbsp;what<br>
+``text.split()``&nbsp;would&nbsp;produce&nbsp;once&nbsp;invisible&nbsp;characters&nbsp;can&nbsp;no<br>
+longer&nbsp;glue&nbsp;or&nbsp;fake&nbsp;tokens.</span></dd></dl>
+ <dl><dt><a name="-words"><strong>words</strong></a>(text: 'str') -&gt; 'list[str]'</dt><dd><span class="code">Lexical&nbsp;word&nbsp;tokens:&nbsp;Unicode&nbsp;letter/digit/mark&nbsp;runs&nbsp;joined&nbsp;by<br>
+apostrophes,&nbsp;with&nbsp;quote&nbsp;variants&nbsp;already&nbsp;folded&nbsp;—&nbsp;"don’t"&nbsp;arrives<br>
+as&nbsp;the&nbsp;single&nbsp;token&nbsp;"don't"&nbsp;instead&nbsp;of&nbsp;the&nbsp;pair&nbsp;"don","t".</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['canon_text', 'collapse_ws', 'is_blank', 'sentences', 'split_tokens', 'words']</td></tr></table>
+</body></html>

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Inner_World.field_audio</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Inner_World.html" class="white">Inner_World</a>.field_audio</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Inner_World/field_audio.py">/home/mindyrenee/GenAnd/Genesis/Inner_World/field_audio.py</a></td></tr></table>
+    <p><span class="code">Self-emission&nbsp;audio&nbsp;channel&nbsp;—&nbsp;the&nbsp;field&nbsp;talking&nbsp;acoustically.<br>
+&nbsp;<br>
+The&nbsp;machine's&nbsp;computation&nbsp;radiates:&nbsp;VRM&nbsp;inductors&nbsp;sing&nbsp;under&nbsp;load<br>
+transients&nbsp;(coil&nbsp;whine),&nbsp;the&nbsp;fan&nbsp;tracks&nbsp;thermal&nbsp;state,&nbsp;and&nbsp;the&nbsp;die's<br>
+power&nbsp;draw&nbsp;modulates&nbsp;all&nbsp;of&nbsp;it.&nbsp;That&nbsp;emission&nbsp;is&nbsp;the&nbsp;physical&nbsp;field's<br>
+own&nbsp;signature&nbsp;escaping&nbsp;the&nbsp;chassis.&nbsp;This&nbsp;channel&nbsp;listens&nbsp;to&nbsp;it&nbsp;—<br>
+a&nbsp;small&nbsp;capture&nbsp;stream&nbsp;whose&nbsp;spectral&nbsp;content&nbsp;is&nbsp;band-decomposed&nbsp;and<br>
+fed&nbsp;into&nbsp;the&nbsp;wave&nbsp;oscillator&nbsp;as&nbsp;real,&nbsp;measured,&nbsp;acoustic&nbsp;self-state.<br>
+&nbsp;<br>
+Honesty&nbsp;boundary:&nbsp;an&nbsp;open&nbsp;microphone&nbsp;hears&nbsp;the&nbsp;*room*&nbsp;too&nbsp;—&nbsp;speech,<br>
+HVAC,&nbsp;traffic&nbsp;—&nbsp;so&nbsp;this&nbsp;is&nbsp;labeled&nbsp;an&nbsp;acoustic-environment&nbsp;channel,<br>
+not&nbsp;a&nbsp;purified&nbsp;self-emission&nbsp;channel.&nbsp;The&nbsp;self-specific&nbsp;component<br>
+comes&nbsp;from&nbsp;the&nbsp;emission&nbsp;bands&nbsp;(fan-region,&nbsp;whine-region)&nbsp;whose&nbsp;power<br>
+tracks&nbsp;machine&nbsp;load;&nbsp;ambient&nbsp;speech&nbsp;lands&nbsp;in&nbsp;the&nbsp;same&nbsp;buffers&nbsp;but&nbsp;is<br>
+not&nbsp;the&nbsp;claim.&nbsp;Device&nbsp;busy&nbsp;or&nbsp;absent&nbsp;→&nbsp;the&nbsp;channel&nbsp;reports&nbsp;absent,<br>
+never&nbsp;a&nbsp;healthy&nbsp;zero.<br>
+&nbsp;<br>
+What&nbsp;it&nbsp;writes&nbsp;into&nbsp;the&nbsp;oscillator:<br>
+&nbsp;<br>
+-&nbsp;**Self-emission&nbsp;level**&nbsp;→&nbsp;small&nbsp;``GAMMA``&nbsp;stimulus&nbsp;—&nbsp;sustained<br>
+&nbsp;&nbsp;sensory-channel&nbsp;activation&nbsp;driven&nbsp;by&nbsp;real&nbsp;emitted&nbsp;power.<br>
+-&nbsp;**Acoustic&nbsp;transients**&nbsp;(fast/slow&nbsp;EMA&nbsp;ratio&nbsp;≥&nbsp;``_TRANSIENT_RATIO``)<br>
+&nbsp;&nbsp;→&nbsp;``reset_wave_phase(GAMMA)``&nbsp;—&nbsp;an&nbsp;acoustic&nbsp;onset&nbsp;resetting&nbsp;fast<br>
+&nbsp;&nbsp;rhythm&nbsp;phase,&nbsp;the&nbsp;auditory-ERP&nbsp;analog.<br>
+-&nbsp;Disabled&nbsp;with&nbsp;``GENESIS_FIELD_AUDIO=0``.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="math.html">math</a><br>
+</td><td class="multicolumn"><a href="os.html">os</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-apply_audio_stimulus"><strong>apply_audio_stimulus</strong></a>() -&gt; 'bool'</dt><dd><span class="code">Read&nbsp;the&nbsp;acoustic&nbsp;field&nbsp;and&nbsp;inject&nbsp;it&nbsp;as&nbsp;wave&nbsp;stimulus.<br>
+&nbsp;<br>
+Returns&nbsp;True&nbsp;when&nbsp;a&nbsp;live&nbsp;signature&nbsp;was&nbsp;applied.&nbsp;Device&nbsp;absent,<br>
+busy,&nbsp;or&nbsp;stream&nbsp;dead&nbsp;→&nbsp;False,&nbsp;no&nbsp;stimulus:&nbsp;absent&nbsp;channel,&nbsp;never<br>
+a&nbsp;healthy&nbsp;zero.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__annotations__</strong> = {'_listener': 'Any'}</td></tr></table>
+</body></html>

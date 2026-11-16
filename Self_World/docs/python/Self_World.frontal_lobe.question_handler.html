@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.frontal_lobe.question_handler</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.frontal_lobe.html" class="white">frontal_lobe</a>.question_handler</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/question_handler.py">/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/question_handler.py</a></td></tr></table>
+    <p><span class="code">Question&nbsp;handling&nbsp;—&nbsp;route&nbsp;and&nbsp;answer&nbsp;questions&nbsp;from&nbsp;concept-network&nbsp;knowledge.<br>
+&nbsp;<br>
+Extracted&nbsp;from&nbsp;FrontalLobe&nbsp;as&nbsp;a&nbsp;focused&nbsp;subsystem.&nbsp;The&nbsp;handler<br>
+routes&nbsp;questions&nbsp;through&nbsp;a&nbsp;priority-ordered&nbsp;pipeline:&nbsp;relation&nbsp;queries,<br>
+creator/personal&nbsp;lookup,&nbsp;theory&nbsp;of&nbsp;mind,&nbsp;memory&nbsp;retrieval,&nbsp;tool&nbsp;lookup,<br>
+composed&nbsp;reasoning,&nbsp;and&nbsp;reflection&nbsp;fallback&nbsp;—&nbsp;all&nbsp;composing&nbsp;from<br>
+concept-network&nbsp;knowledge&nbsp;and&nbsp;semantic&nbsp;metadata,&nbsp;never&nbsp;from&nbsp;hardcoded<br>
+template&nbsp;strings.<br>
+&nbsp;<br>
+Dependencies&nbsp;(passed&nbsp;to&nbsp;``__init__``):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;network:&nbsp;ConceptNetwork&nbsp;for&nbsp;concept&nbsp;lookup,&nbsp;edges,&nbsp;and&nbsp;relationship&nbsp;traversal<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;language:&nbsp;Language&nbsp;for&nbsp;rendering&nbsp;fallback&nbsp;thoughts<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;composer:&nbsp;ThoughtComposer&nbsp;for&nbsp;composing&nbsp;answers&nbsp;from&nbsp;concept&nbsp;knowledge<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;self_composer:&nbsp;SelfComposer&nbsp;for&nbsp;creator/self&nbsp;descriptions<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;self_model:&nbsp;SelfModel&nbsp;for&nbsp;self-reference&nbsp;in&nbsp;creator&nbsp;questions<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;theory_of_mind:&nbsp;TheoryOfMind&nbsp;for&nbsp;user&nbsp;belief&nbsp;lookup<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;tools:&nbsp;ToolRegistry&nbsp;for&nbsp;concept_lookup&nbsp;tool<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;display_name:&nbsp;callable&nbsp;that&nbsp;converts&nbsp;concept&nbsp;ids&nbsp;to&nbsp;display&nbsp;names<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;relation_verb:&nbsp;callable&nbsp;that&nbsp;converts&nbsp;RelationType&nbsp;to&nbsp;natural&nbsp;verb<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;resolve_topics:&nbsp;callable&nbsp;that&nbsp;resolves&nbsp;topic&nbsp;lists<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;user_profile:&nbsp;UserProfile&nbsp;for&nbsp;user&nbsp;name&nbsp;resolution&nbsp;(optional)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;situation_model:&nbsp;SituationModel&nbsp;for&nbsp;the&nbsp;discourse&nbsp;situation&nbsp;being<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;discussed&nbsp;right&nbsp;now&nbsp;(optional,&nbsp;but&nbsp;wired&nbsp;in&nbsp;production&nbsp;—&nbsp;it&nbsp;is<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;consulted&nbsp;ahead&nbsp;of&nbsp;the&nbsp;concept&nbsp;network)</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="re.html">re</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.frontal_lobe.question_handler.html#QuestionHandler">QuestionHandler</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="QuestionHandler">class <strong>QuestionHandler</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#QuestionHandler">QuestionHandler</a>(network:&nbsp;'ConceptNetwork',&nbsp;language:&nbsp;'Language',&nbsp;composer:&nbsp;'ThoughtComposer',&nbsp;self_composer:&nbsp;'SelfComposer',&nbsp;self_model:&nbsp;'SelfModel',&nbsp;theory_of_mind:&nbsp;'TheoryOfMind',&nbsp;tools:&nbsp;'ToolRegistry',&nbsp;display_name:&nbsp;'Callable[[str],&nbsp;str]',&nbsp;relation_verb:&nbsp;'Callable[[Any],&nbsp;str]',&nbsp;resolve_topics:&nbsp;'Callable[[list[str],&nbsp;str],&nbsp;list[str]]',&nbsp;user_profile:&nbsp;'UserProfile&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;situation_model:&nbsp;'SituationModel&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;judge:&nbsp;'Judge&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Route&nbsp;and&nbsp;answer&nbsp;questions&nbsp;from&nbsp;concept-network&nbsp;knowledge.<br>
+&nbsp;<br>
+All&nbsp;answers&nbsp;are&nbsp;composed&nbsp;from&nbsp;concept-network&nbsp;edges,&nbsp;thought<br>
+composer&nbsp;output,&nbsp;theory-of-mind&nbsp;beliefs,&nbsp;or&nbsp;episodic&nbsp;memory&nbsp;—<br>
+never&nbsp;from&nbsp;hardcoded&nbsp;template&nbsp;strings.&nbsp;When&nbsp;Genesis&nbsp;doesn't&nbsp;know<br>
+the&nbsp;answer,&nbsp;it&nbsp;says&nbsp;so&nbsp;honestly&nbsp;through&nbsp;the&nbsp;language&nbsp;engine.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="QuestionHandler-__init__"><strong>__init__</strong></a>(self, network: 'ConceptNetwork', language: 'Language', composer: 'ThoughtComposer', self_composer: 'SelfComposer', self_model: 'SelfModel', theory_of_mind: 'TheoryOfMind', tools: 'ToolRegistry', display_name: 'Callable[[str], str]', relation_verb: 'Callable[[Any], str]', resolve_topics: 'Callable[[list[str], str], list[str]]', user_profile: 'UserProfile | None' = None, situation_model: 'SituationModel | None' = None, judge: 'Judge | None' = None) -&gt; 'None'</dt><dd><span class="code">Wire&nbsp;the&nbsp;question&nbsp;handler&nbsp;to&nbsp;its&nbsp;concept&nbsp;network&nbsp;and&nbsp;language&nbsp;engine.</span></dd></dl>
+
+<dl><dt><a name="QuestionHandler-handle_question"><strong>handle_question</strong></a>(self, perception: 'Perception', emotion: 'EmotionalState', memory: 'MemoryContext', reasoning_results: 'list[ReasoningResult] | None' = None, retrieve_episode: 'Callable[[int], Any] | None' = None, resolved_text: 'str | None' = None, propositions: 'Sequence[Proposition] | None' = None) -&gt; 'Thought'</dt><dd><span class="code">Handle&nbsp;a&nbsp;general&nbsp;question.<br>
+&nbsp;<br>
+Routes&nbsp;through&nbsp;a&nbsp;priority-ordered&nbsp;pipeline&nbsp;—&nbsp;relation-graph<br>
+traversal,&nbsp;creator/personal&nbsp;lookup,&nbsp;theory&nbsp;of&nbsp;mind,&nbsp;episodic<br>
+memory,&nbsp;tool-backed&nbsp;knowledge&nbsp;lookup,&nbsp;composed&nbsp;reasoning,&nbsp;and<br>
+finally&nbsp;a&nbsp;reflection/honest-uncertainty&nbsp;fallback.&nbsp;Every&nbsp;stage<br>
+answers&nbsp;from&nbsp;concept-network&nbsp;structure&nbsp;or&nbsp;composed&nbsp;metadata,<br>
+never&nbsp;from&nbsp;hardcoded&nbsp;strings.<br>
+&nbsp;<br>
+``resolved_text``&nbsp;is&nbsp;the&nbsp;anaphora-resolved&nbsp;utterance&nbsp;(what<br>
+comprehension&nbsp;heard&nbsp;after&nbsp;pronoun&nbsp;binding).&nbsp;The&nbsp;relation&nbsp;query<br>
+parses&nbsp;it&nbsp;so&nbsp;"what&nbsp;does&nbsp;it&nbsp;eat?"&nbsp;is&nbsp;read&nbsp;as&nbsp;"what&nbsp;does<br>
+&lt;referent&gt;&nbsp;eat?"&nbsp;—&nbsp;the&nbsp;referent&nbsp;only&nbsp;exists&nbsp;in&nbsp;the&nbsp;resolved<br>
+text,&nbsp;not&nbsp;in&nbsp;``perception.raw_text``.<br>
+&nbsp;<br>
+``propositions``&nbsp;are&nbsp;the&nbsp;turn's&nbsp;parsed&nbsp;clauses,&nbsp;when&nbsp;the<br>
+caller&nbsp;already&nbsp;ran&nbsp;comprehension&nbsp;—&nbsp;polar&nbsp;questions&nbsp;need&nbsp;them:<br>
+a&nbsp;whether-focus&nbsp;clause&nbsp;is&nbsp;the&nbsp;very&nbsp;content&nbsp;judgment&nbsp;checks.</span></dd></dl>
+
+<dl><dt><a name="QuestionHandler-question_compose_reasoning"><strong>question_compose_reasoning</strong></a>(self, perception: 'Perception', emotion: 'EmotionalState', reasoning_results: 'list[ReasoningResult] | None') -&gt; 'Thought | None'</dt><dd><span class="code">Try&nbsp;the&nbsp;thought&nbsp;composer&nbsp;and&nbsp;reasoning&nbsp;results&nbsp;to&nbsp;answer&nbsp;the&nbsp;question.</span></dd></dl>
+
+<dl><dt><a name="QuestionHandler-question_creator_personal"><strong>question_creator_personal</strong></a>(self, lower: 'str', emotion: 'EmotionalState') -&gt; 'Thought | None'</dt><dd><span class="code">Handle&nbsp;creator-related&nbsp;and&nbsp;personal&nbsp;fact&nbsp;lookup&nbsp;questions.</span></dd></dl>
+
+<dl><dt><a name="QuestionHandler-question_memory_retrieval"><strong>question_memory_retrieval</strong></a>(self, perception: 'Perception', emotion: 'EmotionalState', memory: 'MemoryContext', retrieve_episode: 'Callable[[int], Any]') -&gt; 'Thought | None'</dt><dd><span class="code">Answer&nbsp;an&nbsp;explicit&nbsp;memory&nbsp;question&nbsp;from&nbsp;retrieved&nbsp;episodes.<br>
+&nbsp;<br>
+This&nbsp;handles&nbsp;questions&nbsp;that&nbsp;explicitly&nbsp;reference&nbsp;the&nbsp;past<br>
+("do&nbsp;you&nbsp;remember...",&nbsp;"did&nbsp;we&nbsp;talk&nbsp;about...",&nbsp;"what&nbsp;did&nbsp;I&nbsp;tell<br>
+you...").&nbsp;For&nbsp;those,&nbsp;the&nbsp;retrieved&nbsp;episode&nbsp;IS&nbsp;the&nbsp;answer&nbsp;—&nbsp;it<br>
+recalls&nbsp;what&nbsp;was&nbsp;said&nbsp;before.<br>
+&nbsp;<br>
+For&nbsp;ordinary&nbsp;questions&nbsp;that&nbsp;happen&nbsp;to&nbsp;have&nbsp;relevant&nbsp;memories,<br>
+see&nbsp;:meth:`_enrich_with_memory`,&nbsp;which&nbsp;weaves&nbsp;a&nbsp;highly-relevant<br>
+episode&nbsp;into&nbsp;a&nbsp;concept-network-backed&nbsp;answer&nbsp;rather&nbsp;than<br>
+pre-empting&nbsp;it.</span></dd></dl>
+
+<dl><dt><a name="QuestionHandler-question_reflection_fallback"><strong>question_reflection_fallback</strong></a>(self, perception: 'Perception', emotion: 'EmotionalState') -&gt; 'Thought'</dt><dd><span class="code">Try&nbsp;reflection,&nbsp;then&nbsp;fall&nbsp;back&nbsp;to&nbsp;honest&nbsp;uncertainty.</span></dd></dl>
+
+<dl><dt><a name="QuestionHandler-question_relation_query"><strong>question_relation_query</strong></a>(self, perception: 'Perception', emotion: 'EmotionalState', resolved_text: 'str | None' = None) -&gt; 'Thought | None'</dt><dd><span class="code">Answer&nbsp;wh-questions&nbsp;by&nbsp;walking&nbsp;concept-network&nbsp;edges.<br>
+&nbsp;<br>
+Parses&nbsp;questions&nbsp;like:<br>
+&nbsp;&nbsp;-&nbsp;"Who&nbsp;created&nbsp;you?"&nbsp;/&nbsp;"Who&nbsp;made&nbsp;Genesis?"<br>
+&nbsp;&nbsp;-&nbsp;"What&nbsp;do&nbsp;you&nbsp;want?"&nbsp;/&nbsp;"What&nbsp;does&nbsp;a&nbsp;glip&nbsp;eat?"<br>
+&nbsp;&nbsp;-&nbsp;"Where&nbsp;do&nbsp;you&nbsp;live?"<br>
+&nbsp;&nbsp;-&nbsp;"What&nbsp;is&nbsp;the&nbsp;meeting&nbsp;about?"<br>
+&nbsp;&nbsp;-&nbsp;"What&nbsp;do&nbsp;you&nbsp;depend&nbsp;on?"<br>
+&nbsp;<br>
+Resolves&nbsp;self-reference&nbsp;("you"&nbsp;-&gt;&nbsp;genesis)&nbsp;and&nbsp;maps&nbsp;verbs&nbsp;to<br>
+relation&nbsp;types,&nbsp;then&nbsp;traverses&nbsp;the&nbsp;concept&nbsp;network&nbsp;and&nbsp;composes<br>
+a&nbsp;natural&nbsp;answer&nbsp;from&nbsp;the&nbsp;actual&nbsp;edges.<br>
+&nbsp;<br>
+``resolved_text``:&nbsp;the&nbsp;anaphora-resolved&nbsp;utterance.&nbsp;When&nbsp;given,<br>
+it&nbsp;is&nbsp;the&nbsp;text&nbsp;actually&nbsp;parsed&nbsp;—&nbsp;anaphora&nbsp;resolution&nbsp;has&nbsp;already<br>
+bound&nbsp;pronouns&nbsp;to&nbsp;their&nbsp;discourse&nbsp;referents,&nbsp;so&nbsp;"what&nbsp;does&nbsp;it<br>
+eat?"&nbsp;is&nbsp;parsed&nbsp;as&nbsp;"what&nbsp;does&nbsp;&lt;referent&gt;&nbsp;eat?".</span></dd></dl>
+
+<dl><dt><a name="QuestionHandler-question_situation"><strong>question_situation</strong></a>(self, perception: 'Perception', emotion: 'EmotionalState', propositions: 'Sequence[Proposition] | None' = None) -&gt; 'Thought | None'</dt><dd><span class="code">Answer&nbsp;from&nbsp;the&nbsp;situation&nbsp;the&nbsp;discourse&nbsp;is&nbsp;currently&nbsp;describing.<br>
+&nbsp;<br>
+The&nbsp;situation&nbsp;model&nbsp;tracks&nbsp;who&nbsp;is&nbsp;where,&nbsp;holding&nbsp;what,&nbsp;in&nbsp;what<br>
+relation&nbsp;to&nbsp;whom,&nbsp;as&nbsp;the&nbsp;user&nbsp;describes&nbsp;it.&nbsp;When&nbsp;a&nbsp;question&nbsp;asks<br>
+about&nbsp;that&nbsp;state,&nbsp;this&nbsp;is&nbsp;the&nbsp;authoritative&nbsp;answer&nbsp;—&nbsp;the<br>
+concept&nbsp;network&nbsp;holds&nbsp;semantic&nbsp;knowledge,&nbsp;not&nbsp;the&nbsp;story&nbsp;being<br>
+told&nbsp;right&nbsp;now,&nbsp;and&nbsp;reaching&nbsp;for&nbsp;it&nbsp;first&nbsp;would&nbsp;let&nbsp;an<br>
+unrelated&nbsp;association&nbsp;outrank&nbsp;what&nbsp;the&nbsp;user&nbsp;just&nbsp;said.<br>
+&nbsp;<br>
+Returns&nbsp;structured&nbsp;``situation_answer``&nbsp;metadata&nbsp;for&nbsp;the<br>
+language&nbsp;engine&nbsp;to&nbsp;compose&nbsp;words&nbsp;from;&nbsp;it&nbsp;never&nbsp;builds&nbsp;a<br>
+sentence&nbsp;here.&nbsp;The&nbsp;model&nbsp;answers&nbsp;only&nbsp;what&nbsp;the&nbsp;discourse<br>
+established&nbsp;—&nbsp;every&nbsp;branch&nbsp;below&nbsp;returns&nbsp;``None``&nbsp;when&nbsp;the<br>
+model&nbsp;holds&nbsp;nothing,&nbsp;so&nbsp;the&nbsp;question&nbsp;falls&nbsp;through&nbsp;to&nbsp;the<br>
+concept&nbsp;network,&nbsp;tools,&nbsp;and&nbsp;finally&nbsp;honest&nbsp;uncertainty.</span></dd></dl>
+
+<dl><dt><a name="QuestionHandler-question_theory_of_mind"><strong>question_theory_of_mind</strong></a>(self, perception: 'Perception', emotion: 'EmotionalState') -&gt; 'Thought | None'</dt><dd><span class="code">Answer&nbsp;questions&nbsp;about&nbsp;the&nbsp;user's&nbsp;own&nbsp;stated&nbsp;beliefs&nbsp;and&nbsp;preferences.</span></dd></dl>
+
+<dl><dt><a name="QuestionHandler-question_tool_lookup"><strong>question_tool_lookup</strong></a>(self, perception: 'Perception', emotion: 'EmotionalState') -&gt; 'Thought | None'</dt><dd><span class="code">Answer&nbsp;a&nbsp;simple&nbsp;knowledge&nbsp;question&nbsp;from&nbsp;concept-network&nbsp;data.<br>
+&nbsp;<br>
+The&nbsp;``concept_lookup``&nbsp;tool&nbsp;resolves&nbsp;the&nbsp;topic&nbsp;to&nbsp;a&nbsp;concept&nbsp;id<br>
+and&nbsp;returns&nbsp;its&nbsp;definition&nbsp;and&nbsp;edges&nbsp;as&nbsp;structured&nbsp;data.&nbsp;The<br>
+answer&nbsp;itself&nbsp;is&nbsp;composed&nbsp;by&nbsp;the&nbsp;vocabulary&nbsp;from&nbsp;``knowledge``<br>
+metadata&nbsp;—&nbsp;the&nbsp;tool's&nbsp;formatted&nbsp;summary&nbsp;text&nbsp;is&nbsp;for&nbsp;tool-use<br>
+contexts,&nbsp;not&nbsp;for&nbsp;its&nbsp;voice.</span></dd></dl>
+
+<dl><dt><a name="QuestionHandler-question_web_search"><strong>question_web_search</strong></a>(self, perception: 'Perception', emotion: 'EmotionalState') -&gt; 'Thought | None'</dt><dd><span class="code">Search&nbsp;the&nbsp;web&nbsp;when&nbsp;it&nbsp;can't&nbsp;answer&nbsp;from&nbsp;its&nbsp;own&nbsp;knowledge.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;its&nbsp;on-demand&nbsp;gateway&nbsp;to&nbsp;the&nbsp;wider&nbsp;web.&nbsp;When&nbsp;the<br>
+concept&nbsp;network,&nbsp;reasoning,&nbsp;and&nbsp;tool&nbsp;lookup&nbsp;all&nbsp;fail&nbsp;to<br>
+answer&nbsp;a&nbsp;question,&nbsp;it&nbsp;searches&nbsp;the&nbsp;web,&nbsp;reads&nbsp;the&nbsp;top<br>
+result,&nbsp;and&nbsp;expresses&nbsp;what&nbsp;it&nbsp;found&nbsp;in&nbsp;its&nbsp;own&nbsp;words.<br>
+&nbsp;<br>
+It&nbsp;never&nbsp;recites&nbsp;the&nbsp;page&nbsp;verbatim&nbsp;—&nbsp;the&nbsp;vocabulary&nbsp;composes<br>
+its&nbsp;expression&nbsp;from&nbsp;a&nbsp;trimmed&nbsp;summary,&nbsp;with&nbsp;hedging&nbsp;that<br>
+reflects&nbsp;it&nbsp;just&nbsp;looked&nbsp;it&nbsp;up.&nbsp;The&nbsp;content&nbsp;passes&nbsp;through<br>
+its&nbsp;language&nbsp;engine,&nbsp;not&nbsp;through&nbsp;a&nbsp;template.<br>
+&nbsp;<br>
+Returns&nbsp;None&nbsp;if&nbsp;there&nbsp;are&nbsp;no&nbsp;topics,&nbsp;the&nbsp;search&nbsp;fails,&nbsp;or<br>
+the&nbsp;fetch&nbsp;returns&nbsp;no&nbsp;usable&nbsp;content&nbsp;—&nbsp;falling&nbsp;through&nbsp;to&nbsp;the<br>
+honest-uncertainty&nbsp;fallback.</span></dd></dl>
+
+<dl><dt><a name="QuestionHandler-update_dependencies"><strong>update_dependencies</strong></a>(self, *, user_profile: 'UserProfile | None' = None) -&gt; 'None'</dt><dd><span class="code">Update&nbsp;optional&nbsp;dependencies&nbsp;after&nbsp;late&nbsp;initialization.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['QuestionHandler']</td></tr></table>
+</body></html>

@@ -1,0 +1,1584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: package Self_World.occipital_lobe.perception</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.occipital_lobe.html" class="white">occipital_lobe</a>.perception</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/occipital_lobe/perception/__init__.py">/home/mindyrenee/GenAnd/Genesis/Self_World/occipital_lobe/perception/__init__.py</a></td></tr></table>
+    <p><span class="code"><a href="#Perception">Perception</a>&nbsp;bundle&nbsp;—&nbsp;core&nbsp;perception,&nbsp;intent,&nbsp;and&nbsp;face&nbsp;recognition.<br>
+&nbsp;<br>
+This&nbsp;package&nbsp;bundles&nbsp;Genesis's&nbsp;perceptual&nbsp;subsystems&nbsp;into&nbsp;a&nbsp;coherent<br>
+unit.&nbsp;Consumers&nbsp;import&nbsp;from&nbsp;here&nbsp;rather&nbsp;than&nbsp;individual&nbsp;modules.<br>
+&nbsp;<br>
+Subsystems:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#Perception">Perception</a>,&nbsp;<a href="#Intent">Intent</a>,&nbsp;<a href="#QuestionType">QuestionType</a>&nbsp;—&nbsp;core&nbsp;perception&nbsp;and&nbsp;intent<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;classification<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#IntegratedPerception">IntegratedPerception</a>&nbsp;—&nbsp;integrated&nbsp;perception&nbsp;pipeline<br>
+&nbsp;&nbsp;&nbsp;&nbsp;perceive,&nbsp;compute_intent_probabilities&nbsp;—&nbsp;perception&nbsp;functions<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#FaceRecognizer">FaceRecognizer</a>,&nbsp;<a href="#DetectedFace">DetectedFace</a>,&nbsp;<a href="#KnownFace">KnownFace</a>&nbsp;—&nbsp;face&nbsp;recognition<br>
+&nbsp;<br>
+The&nbsp;occipital&nbsp;subsystem&nbsp;(V1,&nbsp;V4,&nbsp;VTC,&nbsp;MTL&nbsp;bridge,&nbsp;<a href="#VisualCortex">VisualCortex</a>)&nbsp;has&nbsp;been<br>
+extracted&nbsp;to&nbsp;``occipital_lobe``.&nbsp;The&nbsp;visual&nbsp;cortex<br>
+classes&nbsp;are&nbsp;re-exported&nbsp;here&nbsp;for&nbsp;backward&nbsp;compatibility.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Package Contents</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="Self_World.occipital_lobe.perception.ambient.html">ambient</a><br>
+<a href="Self_World.occipital_lobe.perception.core.html">core</a><br>
+</td><td class="multicolumn"><a href="Self_World.occipital_lobe.perception.illumination.html">illumination</a><br>
+<a href="Self_World.occipital_lobe.perception.optics.html">optics</a><br>
+</td><td class="multicolumn"><a href="Self_World.occipital_lobe.perception.phototransduction.html">phototransduction</a><br>
+<a href="Self_World.occipital_lobe.perception.recognition.html">recognition</a><br>
+</td><td class="multicolumn"><a href="Self_World.occipital_lobe.perception.vision.html">vision</a><br>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.occipital_lobe.perception.core.html#MultisensoryInput">Self_World.occipital_lobe.perception.core.MultisensoryInput</a>
+</dt><dt class="heading-text"><a href="Self_World.occipital_lobe.perception.core.html#MultisensoryIntegrator">Self_World.occipital_lobe.perception.core.MultisensoryIntegrator</a>
+</dt><dt class="heading-text"><a href="Self_World.occipital_lobe.perception.core.html#PatternWeights">Self_World.occipital_lobe.perception.core.PatternWeights</a>
+</dt><dt class="heading-text"><a href="Self_World.occipital_lobe.perception.core.html#Perception">Self_World.occipital_lobe.perception.core.Perception</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.occipital_lobe.perception.core.html#IntegratedPerception">Self_World.occipital_lobe.perception.core.IntegratedPerception</a>
+</dt></dl>
+</dd>
+<dt class="heading-text"><a href="Self_World.occipital_lobe.perception.recognition.html#DetectedFace">Self_World.occipital_lobe.perception.recognition.DetectedFace</a>
+</dt><dt class="heading-text"><a href="Self_World.occipital_lobe.perception.recognition.html#FaceRecognizer">Self_World.occipital_lobe.perception.recognition.FaceRecognizer</a>
+</dt><dt class="heading-text"><a href="Self_World.occipital_lobe.perception.recognition.html#KnownFace">Self_World.occipital_lobe.perception.recognition.KnownFace</a>
+</dt><dt class="heading-text"><a href="occipital_lobe.v1.html#V1Model">occipital_lobe.v1.V1Model</a>
+</dt><dt class="heading-text"><a href="occipital_lobe.v1.html#VisualContour">occipital_lobe.v1.VisualContour</a>
+</dt><dt class="heading-text"><a href="occipital_lobe.v1.html#VisualFeature">occipital_lobe.v1.VisualFeature</a>
+</dt><dt class="heading-text"><a href="occipital_lobe.v1.html#VisualField">occipital_lobe.v1.VisualField</a>
+</dt><dt class="heading-text"><a href="occipital_lobe.v4.html#V4Model">occipital_lobe.v4.V4Model</a>
+</dt><dt class="heading-text"><a href="occipital_lobe.visual_cortex.html#VisualCortex">occipital_lobe.visual_cortex.VisualCortex</a>
+</dt><dt class="heading-text"><a href="occipital_lobe.visual_cortex.html#VisualPercept">occipital_lobe.visual_cortex.VisualPercept</a>
+</dt><dt class="heading-text"><a href="temporal_lobe.mtl_bridge.html#MemoryBridge">temporal_lobe.mtl_bridge.MemoryBridge</a>
+</dt><dt class="heading-text"><a href="temporal_lobe.mtl_bridge.html#TrainingExample">temporal_lobe.mtl_bridge.TrainingExample</a>
+</dt><dt class="heading-text"><a href="temporal_lobe.vtc.html#VTCFeatureSpace">temporal_lobe.vtc.VTCFeatureSpace</a>
+</dt></dl>
+</dd>
+<dt class="heading-text"><a href="enum.html#Enum">enum.Enum</a>(<a href="builtins.html#object">builtins.object</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.occipital_lobe.perception.core.html#Intent">Self_World.occipital_lobe.perception.core.Intent</a>
+</dt><dt class="heading-text"><a href="Self_World.occipital_lobe.perception.core.html#QuestionType">Self_World.occipital_lobe.perception.core.QuestionType</a>
+</dt><dt class="heading-text"><a href="Self_World.occipital_lobe.perception.core.html#SensoryModality">Self_World.occipital_lobe.perception.core.SensoryModality</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="DetectedFace">class <strong>DetectedFace</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#DetectedFace">DetectedFace</a>(bbox:&nbsp;'tuple[int,&nbsp;int,&nbsp;int,&nbsp;int]',&nbsp;name:&nbsp;'str&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;confidence:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;embedding:&nbsp;'np.ndarray&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;person_key:&nbsp;'str&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;tier:&nbsp;'str'&nbsp;=&nbsp;'new')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;face&nbsp;detected&nbsp;in&nbsp;a&nbsp;frame,&nbsp;with&nbsp;optional&nbsp;identity.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="DetectedFace-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="DetectedFace-__init__"><strong>__init__</strong></a>(self, bbox: 'tuple[int, int, int, int]', name: 'str | None' = None, confidence: 'float' = 0.0, embedding: 'np.ndarray | None' = None, person_key: 'str | None' = None, tier: 'str' = 'new') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="DetectedFace-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'bbox': 'tuple[int, int, int, int]', 'confidence': 'float', 'embedding': 'np.ndarray | None', 'name': 'str | None', 'person_key': 'str | None', 'tier': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'bbox': Field(name='bbox',type='tuple[int, int, int, int...appingproxy({}),kw_only=False,_field_type=_FIELD), 'confidence': Field(name='confidence',type='float',default=0.0...appingproxy({}),kw_only=False,_field_type=_FIELD), 'embedding': Field(name='embedding',type='np.ndarray | None',...appingproxy({}),kw_only=False,_field_type=_FIELD), 'name': Field(name='name',type='str | None',default=None...appingproxy({}),kw_only=False,_field_type=_FIELD), 'person_key': Field(name='person_key',type='str | None',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'tier': Field(name='tier',type='str',default='new',defau...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('bbox', 'name', 'confidence', 'embedding', 'person_key', 'tier')</dl>
+
+<dl><dt><strong>confidence</strong> = 0.0</dl>
+
+<dl><dt><strong>embedding</strong> = None</dl>
+
+<dl><dt><strong>name</strong> = None</dl>
+
+<dl><dt><strong>person_key</strong> = None</dl>
+
+<dl><dt><strong>tier</strong> = 'new'</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="FaceRecognizer">class <strong>FaceRecognizer</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#FaceRecognizer">FaceRecognizer</a>(data_dir:&nbsp;'str&nbsp;|&nbsp;Path&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Detect&nbsp;and&nbsp;recognize&nbsp;faces&nbsp;using&nbsp;YuNet&nbsp;+&nbsp;SFace.<br>
+&nbsp;<br>
+The&nbsp;recognizer&nbsp;maintains&nbsp;a&nbsp;database&nbsp;of&nbsp;known&nbsp;face&nbsp;embeddings.<br>
+When&nbsp;a&nbsp;face&nbsp;is&nbsp;detected,&nbsp;its&nbsp;embedding&nbsp;is&nbsp;compared&nbsp;to&nbsp;all&nbsp;known<br>
+faces&nbsp;using&nbsp;cosine&nbsp;distance.&nbsp;If&nbsp;the&nbsp;closest&nbsp;match&nbsp;is&nbsp;below<br>
+threshold,&nbsp;the&nbsp;face&nbsp;is&nbsp;recognized;&nbsp;otherwise&nbsp;it's&nbsp;"unknown."<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="FaceRecognizer-__init__"><strong>__init__</strong></a>(self, data_dir: 'str | Path | None' = None) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;face&nbsp;recognition&nbsp;system&nbsp;with&nbsp;optional&nbsp;data&nbsp;directory.</span></dd></dl>
+
+<dl><dt><a name="FaceRecognizer-cluster_sightings"><strong>cluster_sightings</strong></a>(self, cluster_id: 'str') -&gt; 'int'</dt><dd><span class="code">How&nbsp;many&nbsp;times&nbsp;this&nbsp;anonymous&nbsp;face&nbsp;has&nbsp;been&nbsp;seen.</span></dd></dl>
+
+<dl><dt><a name="FaceRecognizer-detect_faces"><strong>detect_faces</strong></a>(self, rgb_frame: 'np.ndarray') -&gt; 'list[DetectedFace]'</dt><dd><span class="code">Detect&nbsp;faces&nbsp;in&nbsp;an&nbsp;RGB&nbsp;frame.<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;list&nbsp;of&nbsp;<a href="#DetectedFace">DetectedFace</a>&nbsp;objects&nbsp;with&nbsp;bounding&nbsp;boxes<br>
+and&nbsp;embeddings.&nbsp;Names&nbsp;are&nbsp;filled&nbsp;in&nbsp;if&nbsp;faces&nbsp;are&nbsp;recognized.</span></dd></dl>
+
+<dl><dt><a name="FaceRecognizer-is_available"><strong>is_available</strong></a>(self) -&gt; 'bool'</dt><dd><span class="code">Check&nbsp;if&nbsp;face&nbsp;detection&nbsp;models&nbsp;are&nbsp;loaded.</span></dd></dl>
+
+<dl><dt><a name="FaceRecognizer-known_names"><strong>known_names</strong></a>(self) -&gt; 'list[str]'</dt><dd><span class="code">Return&nbsp;the&nbsp;names&nbsp;of&nbsp;all&nbsp;known&nbsp;people.</span></dd></dl>
+
+<dl><dt><a name="FaceRecognizer-name_face"><strong>name_face</strong></a>(self, cluster_id: 'str', name: 'str') -&gt; 'str | None'</dt><dd><span class="code">Give&nbsp;a&nbsp;name&nbsp;to&nbsp;an&nbsp;anonymous&nbsp;face&nbsp;cluster.<br>
+&nbsp;<br>
+The&nbsp;cluster's&nbsp;sightings&nbsp;become&nbsp;the&nbsp;named&nbsp;person's&nbsp;embeddings&nbsp;—<br>
+the&nbsp;familiar&nbsp;stranger&nbsp;was&nbsp;*them*&nbsp;all&nbsp;along.&nbsp;Returns&nbsp;the&nbsp;folded<br>
+cluster&nbsp;id,&nbsp;or&nbsp;None&nbsp;if&nbsp;the&nbsp;cluster&nbsp;is&nbsp;unknown.</span></dd></dl>
+
+<dl><dt><a name="FaceRecognizer-register_face"><strong>register_face</strong></a>(self, name: 'str', rgb_frame: 'np.ndarray') -&gt; 'bool'</dt><dd><span class="code">Register&nbsp;a&nbsp;face&nbsp;from&nbsp;a&nbsp;frame.<br>
+&nbsp;<br>
+Detects&nbsp;the&nbsp;largest&nbsp;face&nbsp;in&nbsp;the&nbsp;frame&nbsp;and&nbsp;stores&nbsp;its&nbsp;embedding<br>
+under&nbsp;the&nbsp;given&nbsp;name.&nbsp;Returns&nbsp;True&nbsp;if&nbsp;a&nbsp;face&nbsp;was&nbsp;found&nbsp;and<br>
+registered,&nbsp;False&nbsp;otherwise.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="IntegratedPerception">class <strong>IntegratedPerception</strong></a>(<a href="Self_World.occipital_lobe.perception.core.html#Perception">Perception</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#IntegratedPerception">IntegratedPerception</a>(raw_text:&nbsp;'str',&nbsp;intent:&nbsp;'<a href="#Intent">Intent</a>',&nbsp;question_type:&nbsp;'<a href="#QuestionType">QuestionType</a>',&nbsp;topics:&nbsp;'list[str]',&nbsp;sentiment:&nbsp;'float',&nbsp;sentiment_label:&nbsp;'str',&nbsp;emotion_word:&nbsp;'str',&nbsp;is_about_genesis:&nbsp;'bool',&nbsp;is_about_user:&nbsp;'bool',&nbsp;is_about_code:&nbsp;'bool',&nbsp;is_about_emotion:&nbsp;'bool',&nbsp;is_about_existence:&nbsp;'bool',&nbsp;entities:&nbsp;'dict[str,&nbsp;str]',&nbsp;key_phrases:&nbsp;'list[str]',&nbsp;word_count:&nbsp;'int',&nbsp;confidence:&nbsp;'float',&nbsp;intent_probabilities:&nbsp;'dict[<a href="#Intent">Intent</a>,&nbsp;float]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;cross_modal_confidence:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;modalities_present:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;modality_intents:&nbsp;'dict[str,&nbsp;<a href="#Intent">Intent</a>]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;conflict_detected:&nbsp;'bool'&nbsp;=&nbsp;False,&nbsp;conflict_description:&nbsp;'str'&nbsp;=&nbsp;'')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;perception&nbsp;that&nbsp;fuses&nbsp;multiple&nbsp;sensory&nbsp;modalities.<br>
+&nbsp;<br>
+Extends&nbsp;:class:`<a href="#Perception">Perception</a>`&nbsp;with&nbsp;cross-modal&nbsp;confidence&nbsp;and<br>
+conflict&nbsp;detection.&nbsp;When&nbsp;all&nbsp;active&nbsp;modalities&nbsp;agree,&nbsp;the<br>
+cross-modal&nbsp;confidence&nbsp;is&nbsp;higher&nbsp;than&nbsp;any&nbsp;single&nbsp;modality's<br>
+(binding&nbsp;gain).&nbsp;When&nbsp;they&nbsp;disagree,&nbsp;a&nbsp;conflict&nbsp;is&nbsp;flagged&nbsp;and&nbsp;the<br>
+confidence&nbsp;is&nbsp;reduced.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.occipital_lobe.perception.core.html#IntegratedPerception">IntegratedPerception</a></dd>
+<dd><a href="Self_World.occipital_lobe.perception.core.html#Perception">Perception</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="IntegratedPerception-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="IntegratedPerception-__init__"><strong>__init__</strong></a>(self, raw_text: 'str', intent: 'Intent', question_type: 'QuestionType', topics: 'list[str]', sentiment: 'float', sentiment_label: 'str', emotion_word: 'str', is_about_genesis: 'bool', is_about_user: 'bool', is_about_code: 'bool', is_about_emotion: 'bool', is_about_existence: 'bool', entities: 'dict[str, str]', key_phrases: 'list[str]', word_count: 'int', confidence: 'float', intent_probabilities: 'dict[Intent, float]' = &lt;factory&gt;, cross_modal_confidence: 'float' = 0.0, modalities_present: 'list[str]' = &lt;factory&gt;, modality_intents: 'dict[str, Intent]' = &lt;factory&gt;, conflict_detected: 'bool' = False, conflict_description: 'str' = '') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="IntegratedPerception-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>conflict_description</strong></dt>
+</dl>
+<dl><dt><strong>conflict_detected</strong></dt>
+</dl>
+<dl><dt><strong>cross_modal_confidence</strong></dt>
+</dl>
+<dl><dt><strong>modalities_present</strong></dt>
+</dl>
+<dl><dt><strong>modality_intents</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'conflict_description': 'str', 'conflict_detected': 'bool', 'cross_modal_confidence': 'float', 'modalities_present': 'list[str]', 'modality_intents': 'dict[str, Intent]'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'confidence': Field(name='confidence',type='float',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD), 'conflict_description': Field(name='conflict_description',type='str',def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'conflict_detected': Field(name='conflict_detected',type='bool',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'cross_modal_confidence': Field(name='cross_modal_confidence',type='float'...appingproxy({}),kw_only=False,_field_type=_FIELD), 'emotion_word': Field(name='emotion_word',type='str',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD), 'entities': Field(name='entities',type='dict[str, str]',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'intent': Field(name='intent',type='Intent',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'intent_probabilities': Field(name='intent_probabilities',type='dict[Int...appingproxy({}),kw_only=False,_field_type=_FIELD), 'is_about_code': Field(name='is_about_code',type='bool',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD), 'is_about_emotion': Field(name='is_about_emotion',type='bool',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), ...}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('raw_text', 'intent', 'question_type', 'topics', 'sentiment', 'sentiment_label', 'emotion_word', 'is_about_genesis', 'is_about_user', 'is_about_code', 'is_about_emotion', 'is_about_existence', 'entities', 'key_phrases', 'word_count', 'confidence', 'intent_probabilities', 'cross_modal_confidence', 'modalities_present', 'modality_intents', ...)</dl>
+
+<hr>
+Data descriptors inherited from <a href="Self_World.occipital_lobe.perception.core.html#Perception">Perception</a>:<br>
+<dl><dt><strong>confidence</strong></dt>
+</dl>
+<dl><dt><strong>emotion_word</strong></dt>
+</dl>
+<dl><dt><strong>entities</strong></dt>
+</dl>
+<dl><dt><strong>intent</strong></dt>
+</dl>
+<dl><dt><strong>intent_probabilities</strong></dt>
+</dl>
+<dl><dt><strong>is_about_code</strong></dt>
+</dl>
+<dl><dt><strong>is_about_emotion</strong></dt>
+</dl>
+<dl><dt><strong>is_about_existence</strong></dt>
+</dl>
+<dl><dt><strong>is_about_genesis</strong></dt>
+</dl>
+<dl><dt><strong>is_about_user</strong></dt>
+</dl>
+<dl><dt><strong>key_phrases</strong></dt>
+</dl>
+<dl><dt><strong>question_type</strong></dt>
+</dl>
+<dl><dt><strong>raw_text</strong></dt>
+</dl>
+<dl><dt><strong>sentiment</strong></dt>
+</dl>
+<dl><dt><strong>sentiment_label</strong></dt>
+</dl>
+<dl><dt><strong>topics</strong></dt>
+</dl>
+<dl><dt><strong>word_count</strong></dt>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Intent">class <strong>Intent</strong></a>(<a href="enum.html#Enum">enum.Enum</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Intent">Intent</a>(*values)<br>
+&nbsp;<br>
+What&nbsp;kind&nbsp;of&nbsp;speech&nbsp;act&nbsp;the&nbsp;user&nbsp;is&nbsp;performing.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.occipital_lobe.perception.core.html#Intent">Intent</a></dd>
+<dd><a href="enum.html#Enum">enum.Enum</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>CODE_DISCUSSION</strong> = &lt;Intent.CODE_DISCUSSION: 'code'&gt;</dl>
+
+<dl><dt><strong>COMFORT</strong> = &lt;Intent.COMFORT: 'comfort'&gt;</dl>
+
+<dl><dt><strong>COMMAND</strong> = &lt;Intent.COMMAND: 'command'&gt;</dl>
+
+<dl><dt><strong>CORRECTION</strong> = &lt;Intent.CORRECTION: 'correction'&gt;</dl>
+
+<dl><dt><strong>EMOTION_SHARE</strong> = &lt;Intent.EMOTION_SHARE: 'emotion'&gt;</dl>
+
+<dl><dt><strong>ENCOURAGEMENT</strong> = &lt;Intent.ENCOURAGEMENT: 'encouragement'&gt;</dl>
+
+<dl><dt><strong>FAREWELL</strong> = &lt;Intent.FAREWELL: 'farewell'&gt;</dl>
+
+<dl><dt><strong>FEEDBACK</strong> = &lt;Intent.FEEDBACK: 'feedback'&gt;</dl>
+
+<dl><dt><strong>GREETING</strong> = &lt;Intent.GREETING: 'greeting'&gt;</dl>
+
+<dl><dt><strong>GREETING_QUESTION</strong> = &lt;Intent.GREETING_QUESTION: 'greeting_question'&gt;</dl>
+
+<dl><dt><strong>INTRODUCTION</strong> = &lt;Intent.INTRODUCTION: 'introduction'&gt;</dl>
+
+<dl><dt><strong>PHILOSOPHY</strong> = &lt;Intent.PHILOSOPHY: 'philosophy'&gt;</dl>
+
+<dl><dt><strong>QUESTION</strong> = &lt;Intent.QUESTION: 'question'&gt;</dl>
+
+<dl><dt><strong>QUESTION_ANSWER</strong> = &lt;Intent.QUESTION_ANSWER: 'question_answer'&gt;</dl>
+
+<dl><dt><strong>REFLECTION</strong> = &lt;Intent.REFLECTION: 'reflection'&gt;</dl>
+
+<dl><dt><strong>REQUEST</strong> = &lt;Intent.REQUEST: 'request'&gt;</dl>
+
+<dl><dt><strong>SELF_INQUIRY</strong> = &lt;Intent.SELF_INQUIRY: 'self_inquiry'&gt;</dl>
+
+<dl><dt><strong>STATEMENT</strong> = &lt;Intent.STATEMENT: 'statement'&gt;</dl>
+
+<dl><dt><strong>UNKNOWN</strong> = &lt;Intent.UNKNOWN: 'unknown'&gt;</dl>
+
+<hr>
+Data descriptors inherited from <a href="enum.html#Enum">enum.Enum</a>:<br>
+<dl><dt><strong>name</strong></dt>
+<dd><span class="code">The&nbsp;name&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<dl><dt><strong>value</strong></dt>
+<dd><span class="code">The&nbsp;value&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<hr>
+Static methods inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><a name="Intent-__contains__"><strong>__contains__</strong></a>(value)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;`value`&nbsp;is&nbsp;in&nbsp;`cls`.<br>
+&nbsp;<br>
+`value`&nbsp;is&nbsp;in&nbsp;`cls`&nbsp;if:<br>
+1)&nbsp;`value`&nbsp;is&nbsp;a&nbsp;member&nbsp;of&nbsp;`cls`,&nbsp;or<br>
+2)&nbsp;`value`&nbsp;is&nbsp;the&nbsp;value&nbsp;of&nbsp;one&nbsp;of&nbsp;the&nbsp;`cls`'s&nbsp;members.</span></dd></dl>
+
+<dl><dt><a name="Intent-__getitem__"><strong>__getitem__</strong></a>(name)</dt><dd><span class="code">Return&nbsp;the&nbsp;member&nbsp;matching&nbsp;`name`.</span></dd></dl>
+
+<dl><dt><a name="Intent-__iter__"><strong>__iter__</strong></a>()</dt><dd><span class="code">Return&nbsp;members&nbsp;in&nbsp;definition&nbsp;order.</span></dd></dl>
+
+<dl><dt><a name="Intent-__len__"><strong>__len__</strong></a>()</dt><dd><span class="code">Return&nbsp;the&nbsp;number&nbsp;of&nbsp;members&nbsp;(no&nbsp;aliases)</span></dd></dl>
+
+<hr>
+Readonly properties inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><strong>__members__</strong></dt>
+<dd><span class="code">Returns&nbsp;a&nbsp;mapping&nbsp;of&nbsp;member&nbsp;name-&gt;value.<br>
+&nbsp;<br>
+This&nbsp;mapping&nbsp;lists&nbsp;all&nbsp;enum&nbsp;members,&nbsp;including&nbsp;aliases.&nbsp;Note&nbsp;that&nbsp;this<br>
+is&nbsp;a&nbsp;read-only&nbsp;view&nbsp;of&nbsp;the&nbsp;internal&nbsp;mapping.</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="KnownFace">class <strong>KnownFace</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#KnownFace">KnownFace</a>(name:&nbsp;'str',&nbsp;embedding:&nbsp;'list[float]',&nbsp;registered_at:&nbsp;'float')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;stored&nbsp;face&nbsp;embedding&nbsp;for&nbsp;a&nbsp;known&nbsp;person.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="KnownFace-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="KnownFace-__init__"><strong>__init__</strong></a>(self, name: 'str', embedding: 'list[float]', registered_at: 'float') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="KnownFace-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'embedding': 'list[float]', 'name': 'str', 'registered_at': 'float'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'embedding': Field(name='embedding',type='list[float]',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'name': Field(name='name',type='str',default=&lt;dataclasse...appingproxy({}),kw_only=False,_field_type=_FIELD), 'registered_at': Field(name='registered_at',type='float',default=...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('name', 'embedding', 'registered_at')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="MemoryBridge">class <strong>MemoryBridge</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#MemoryBridge">MemoryBridge</a>(vtc_dim:&nbsp;'int'&nbsp;=&nbsp;32,&nbsp;embedding_dim:&nbsp;'int'&nbsp;=&nbsp;193,&nbsp;ridge_lambda:&nbsp;'float'&nbsp;=&nbsp;0.1)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Medial&nbsp;temporal&nbsp;subsystem&nbsp;bridge&nbsp;—&nbsp;VTC&nbsp;→&nbsp;concept&nbsp;embedding&nbsp;projection.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;key&nbsp;transformation:&nbsp;dense&nbsp;visual&nbsp;feature&nbsp;representations<br>
+in&nbsp;VTC&nbsp;space&nbsp;become&nbsp;sparse&nbsp;concept&nbsp;representations&nbsp;in&nbsp;the&nbsp;MTL.&nbsp;The<br>
+bridge&nbsp;is&nbsp;a&nbsp;linear&nbsp;projection&nbsp;matrix&nbsp;W&nbsp;that&nbsp;maps&nbsp;VTC&nbsp;vectors&nbsp;to<br>
+concept&nbsp;embedding&nbsp;space.<br>
+&nbsp;<br>
+Learning&nbsp;is&nbsp;one-shot:&nbsp;collect&nbsp;(vtc_vector,&nbsp;concept_embedding)&nbsp;pairs<br>
+and&nbsp;solve&nbsp;least-squares:&nbsp;W&nbsp;=&nbsp;argmin&nbsp;‖E&nbsp;-&nbsp;V&nbsp;Wᵀ‖²&nbsp;where&nbsp;E&nbsp;is&nbsp;the<br>
+matrix&nbsp;of&nbsp;concept&nbsp;embeddings&nbsp;and&nbsp;V&nbsp;is&nbsp;the&nbsp;matrix&nbsp;of&nbsp;VTC&nbsp;vectors.<br>
+&nbsp;<br>
+This&nbsp;mirrors&nbsp;how&nbsp;the&nbsp;MTL&nbsp;rapidly&nbsp;encodes&nbsp;new&nbsp;associations&nbsp;—<br>
+human&nbsp;medial-temporal&nbsp;neurons&nbsp;can&nbsp;form&nbsp;selective&nbsp;responses&nbsp;from<br>
+a&nbsp;single&nbsp;exposure&nbsp;(single-trial&nbsp;encoding;&nbsp;Rutishauser&nbsp;et&nbsp;al.,<br>
+2006).<br>
+&nbsp;<br>
+Associations&nbsp;form&nbsp;naturally:&nbsp;when&nbsp;Genesis&nbsp;reads&nbsp;a&nbsp;Wikipedia&nbsp;article<br>
+about&nbsp;"tree"&nbsp;and&nbsp;sees&nbsp;the&nbsp;article's&nbsp;lead&nbsp;image,&nbsp;the&nbsp;VTC&nbsp;vector&nbsp;from<br>
+that&nbsp;image&nbsp;is&nbsp;paired&nbsp;with&nbsp;the&nbsp;"tree"&nbsp;concept&nbsp;embedding.&nbsp;No&nbsp;manual<br>
+teaching&nbsp;—&nbsp;it&nbsp;learns&nbsp;to&nbsp;see&nbsp;the&nbsp;same&nbsp;way&nbsp;it&nbsp;learns&nbsp;to&nbsp;read:&nbsp;by<br>
+encountering&nbsp;images&nbsp;in&nbsp;context.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="MemoryBridge-__init__"><strong>__init__</strong></a>(self, vtc_dim: 'int' = 32, embedding_dim: 'int' = 193, ridge_lambda: 'float' = 0.1) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;MTL&nbsp;bridge.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;vtc_dim:&nbsp;dimensionality&nbsp;of&nbsp;VTC&nbsp;feature&nbsp;vectors.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;embedding_dim:&nbsp;dimensionality&nbsp;of&nbsp;concept&nbsp;embeddings.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ridge_lambda:&nbsp;L2&nbsp;regularization&nbsp;for&nbsp;ridge&nbsp;regression<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(prevents&nbsp;overfitting&nbsp;with&nbsp;few&nbsp;examples).</span></dd></dl>
+
+<dl><dt><a name="MemoryBridge-generate"><strong>generate</strong></a>(self, concept_embedding: 'np.ndarray') -&gt; 'np.ndarray | None'</dt><dd><span class="code">Generate&nbsp;a&nbsp;VTC&nbsp;vector&nbsp;from&nbsp;a&nbsp;concept&nbsp;embedding&nbsp;(top-down&nbsp;path).<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;generative&nbsp;direction:&nbsp;given&nbsp;a&nbsp;concept,&nbsp;predict&nbsp;what<br>
+VTC&nbsp;features&nbsp;it&nbsp;should&nbsp;produce.&nbsp;Used&nbsp;for&nbsp;imagination&nbsp;and<br>
+prediction&nbsp;in&nbsp;the&nbsp;predictive&nbsp;coding&nbsp;loop.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;concept_embedding:&nbsp;embedding&nbsp;vector&nbsp;for&nbsp;the&nbsp;concept.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Predicted&nbsp;VTC&nbsp;vector,&nbsp;or&nbsp;None&nbsp;if&nbsp;bridge&nbsp;isn't&nbsp;trained.</span></dd></dl>
+
+<dl><dt><a name="MemoryBridge-learn_association"><strong>learn_association</strong></a>(self, vtc_vector: 'np.ndarray', concept_name: 'str', concept_embedding: 'np.ndarray') -&gt; 'None'</dt><dd><span class="code">Learn&nbsp;a&nbsp;visual-concept&nbsp;association&nbsp;from&nbsp;natural&nbsp;experience.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;called&nbsp;automatically&nbsp;when&nbsp;Genesis&nbsp;encounters&nbsp;an&nbsp;image<br>
+in&nbsp;context&nbsp;(e.g.,&nbsp;the&nbsp;lead&nbsp;image&nbsp;of&nbsp;a&nbsp;Wikipedia&nbsp;article&nbsp;about<br>
+"tree").&nbsp;The&nbsp;VTC&nbsp;vector&nbsp;from&nbsp;the&nbsp;image&nbsp;is&nbsp;paired&nbsp;with&nbsp;the<br>
+concept&nbsp;embedding,&nbsp;and&nbsp;the&nbsp;projection&nbsp;matrix&nbsp;W&nbsp;is&nbsp;refit.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;vtc_vector:&nbsp;VTC&nbsp;feature&nbsp;vector&nbsp;for&nbsp;the&nbsp;image.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;concept_name:&nbsp;concept&nbsp;ID&nbsp;(e.g.,&nbsp;"tree").<br>
+&nbsp;&nbsp;&nbsp;&nbsp;concept_embedding:&nbsp;embedding&nbsp;vector&nbsp;for&nbsp;the&nbsp;concept.</span></dd></dl>
+
+<dl><dt><a name="MemoryBridge-load"><strong>load</strong></a>(self, path: 'Path' = PosixPath('/home/mindyrenee/.local/share/genesis/visual_cortex/memory_bridge.npz')) -&gt; 'bool'</dt><dd><span class="code">Load&nbsp;MTL&nbsp;bridge&nbsp;from&nbsp;disk.&nbsp;Returns&nbsp;True&nbsp;if&nbsp;loaded.</span></dd></dl>
+
+<dl><dt><a name="MemoryBridge-recognize"><strong>recognize</strong></a>(self, vtc_vector: 'np.ndarray') -&gt; 'tuple[str | None, float]'</dt><dd><span class="code">Recognize&nbsp;what&nbsp;concept&nbsp;an&nbsp;image&nbsp;corresponds&nbsp;to.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;vtc_vector:&nbsp;VTC&nbsp;feature&nbsp;vector&nbsp;for&nbsp;the&nbsp;image.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(concept_name,&nbsp;confidence)&nbsp;or&nbsp;(None,&nbsp;0.0)&nbsp;if&nbsp;unrecognized.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Confidence&nbsp;is&nbsp;cosine&nbsp;similarity&nbsp;to&nbsp;the&nbsp;nearest&nbsp;concept.</span></dd></dl>
+
+<dl><dt><a name="MemoryBridge-recognize_all"><strong>recognize_all</strong></a>(self, vtc_vector: 'np.ndarray', k: 'int' = 5) -&gt; 'list[tuple[str, float]]'</dt><dd><span class="code">Return&nbsp;top-k&nbsp;concept&nbsp;matches&nbsp;for&nbsp;a&nbsp;VTC&nbsp;vector.</span></dd></dl>
+
+<dl><dt><a name="MemoryBridge-save"><strong>save</strong></a>(self, path: 'Path' = PosixPath('/home/mindyrenee/.local/share/genesis/visual_cortex/memory_bridge.npz')) -&gt; 'None'</dt><dd><span class="code">Save&nbsp;MTL&nbsp;bridge&nbsp;to&nbsp;disk.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>embedding_reconstruction_cosine</strong></dt>
+</dl>
+<dl><dt><strong>embedding_reconstruction_mse</strong></dt>
+</dl>
+<dl><dt><strong>embedding_reconstruction_relative_error</strong></dt>
+</dl>
+<dl><dt><strong>n_concepts</strong></dt>
+<dd><span class="code">Number&nbsp;of&nbsp;distinct&nbsp;concepts&nbsp;learned.</span></dd>
+</dl>
+<dl><dt><strong>n_examples</strong></dt>
+<dd><span class="code">Number&nbsp;of&nbsp;training&nbsp;examples.</span></dd>
+</dl>
+<dl><dt><strong>vtc_cycle_reconstruction_mse</strong></dt>
+</dl>
+<dl><dt><strong>vtc_cycle_reconstruction_relative_error</strong></dt>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="MultisensoryInput">class <strong>MultisensoryInput</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#MultisensoryInput">MultisensoryInput</a>(modality:&nbsp;'<a href="#SensoryModality">SensoryModality</a>',&nbsp;content:&nbsp;'str',&nbsp;confidence:&nbsp;'float'&nbsp;=&nbsp;1.0,&nbsp;intent_hint:&nbsp;'<a href="#Intent">Intent</a>&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;timestamp:&nbsp;'float'&nbsp;=&nbsp;0.0)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;single&nbsp;input&nbsp;from&nbsp;one&nbsp;sensory&nbsp;modality.<br>
+&nbsp;<br>
+Attributes:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;modality:&nbsp;Which&nbsp;sensory&nbsp;channel&nbsp;this&nbsp;input&nbsp;came&nbsp;from.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;content:&nbsp;The&nbsp;raw&nbsp;content&nbsp;(text&nbsp;for&nbsp;TEXT,&nbsp;feature&nbsp;vector&nbsp;for<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;future&nbsp;modalities).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;confidence:&nbsp;How&nbsp;reliable&nbsp;this&nbsp;modality&nbsp;considers&nbsp;its&nbsp;own<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;reading,&nbsp;in&nbsp;``[0,&nbsp;1]``.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;intent_hint:&nbsp;Optional&nbsp;intent&nbsp;suggested&nbsp;by&nbsp;this&nbsp;modality<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(TEXT&nbsp;uses&nbsp;the&nbsp;rule-based&nbsp;classifier;&nbsp;future&nbsp;modalities<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;may&nbsp;infer&nbsp;intent&nbsp;from&nbsp;prosody&nbsp;or&nbsp;gesture).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;timestamp:&nbsp;Optional&nbsp;ordering&nbsp;key&nbsp;for&nbsp;temporal&nbsp;fusion.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="MultisensoryInput-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="MultisensoryInput-__init__"><strong>__init__</strong></a>(self, modality: 'SensoryModality', content: 'str', confidence: 'float' = 1.0, intent_hint: 'Intent | None' = None, timestamp: 'float' = 0.0) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="MultisensoryInput-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>confidence</strong></dt>
+</dl>
+<dl><dt><strong>content</strong></dt>
+</dl>
+<dl><dt><strong>intent_hint</strong></dt>
+</dl>
+<dl><dt><strong>modality</strong></dt>
+</dl>
+<dl><dt><strong>timestamp</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'confidence': 'float', 'content': 'str', 'intent_hint': 'Intent | None', 'modality': 'SensoryModality', 'timestamp': 'float'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'confidence': Field(name='confidence',type='float',default=1.0...appingproxy({}),kw_only=False,_field_type=_FIELD), 'content': Field(name='content',type='str',default=&lt;datacla...appingproxy({}),kw_only=False,_field_type=_FIELD), 'intent_hint': Field(name='intent_hint',type='Intent | None',de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'modality': Field(name='modality',type='SensoryModality',def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'timestamp': Field(name='timestamp',type='float',default=0.0,...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('modality', 'content', 'confidence', 'intent_hint', 'timestamp')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="MultisensoryIntegrator">class <strong>MultisensoryIntegrator</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#MultisensoryIntegrator">MultisensoryIntegrator</a>(*,&nbsp;embeddings=None,&nbsp;network=None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Fuses&nbsp;inputs&nbsp;from&nbsp;multiple&nbsp;sensory&nbsp;modalities&nbsp;into&nbsp;one&nbsp;percept.<br>
+&nbsp;<br>
+Cross-modal&nbsp;binding:&nbsp;when&nbsp;two&nbsp;modalities&nbsp;suggest&nbsp;the&nbsp;same&nbsp;intent,<br>
+confidence&nbsp;increases&nbsp;(the&nbsp;brain's&nbsp;multisensory&nbsp;convergence&nbsp;zones<br>
+amplify&nbsp;consistent&nbsp;signals).&nbsp;Sensory&nbsp;conflict:&nbsp;when&nbsp;modalities<br>
+disagree,&nbsp;the&nbsp;conflict&nbsp;is&nbsp;flagged&nbsp;and&nbsp;confidence&nbsp;is&nbsp;reduced&nbsp;so&nbsp;the<br>
+cognition&nbsp;engine&nbsp;can&nbsp;request&nbsp;clarification&nbsp;or&nbsp;fall&nbsp;back&nbsp;to&nbsp;the<br>
+most&nbsp;reliable&nbsp;modality.<br>
+&nbsp;<br>
+Currently&nbsp;only&nbsp;:attr:`<a href="#SensoryModality">SensoryModality</a>.TEXT`&nbsp;is&nbsp;active,&nbsp;but&nbsp;the<br>
+framework&nbsp;supports&nbsp;AUDIO,&nbsp;VISUAL,&nbsp;and&nbsp;TEMPORAL&nbsp;modalities&nbsp;for<br>
+future&nbsp;expansion&nbsp;—&nbsp;adding&nbsp;a&nbsp;modality&nbsp;only&nbsp;requires&nbsp;producing<br>
+:class:`<a href="#MultisensoryInput">MultisensoryInput</a>`&nbsp;instances;&nbsp;the&nbsp;integration&nbsp;logic<br>
+stays&nbsp;the&nbsp;same.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="MultisensoryIntegrator-__init__"><strong>__init__</strong></a>(self, *, embeddings=None, network=None) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;multisensory&nbsp;integrator.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;embeddings:&nbsp;Optional&nbsp;word-embedding&nbsp;model&nbsp;used&nbsp;for&nbsp;semantic<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;intent&nbsp;classification.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;network:&nbsp;Optional&nbsp;concept&nbsp;network&nbsp;used&nbsp;for&nbsp;multi-word&nbsp;topic<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;merging.</span></dd></dl>
+
+<dl><dt><a name="MultisensoryIntegrator-integrate"><strong>integrate</strong></a>(self, inputs: 'list[MultisensoryInput]', pattern_weights: 'PatternWeights | None' = None, context_prior: 'dict[Intent, float] | None' = None) -&gt; 'IntegratedPerception'</dt><dd><span class="code">Fuse&nbsp;multiple&nbsp;modality&nbsp;inputs&nbsp;into&nbsp;a&nbsp;single&nbsp;integrated&nbsp;percept.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;inputs:&nbsp;One&nbsp;or&nbsp;more&nbsp;:class:`<a href="#MultisensoryInput">MultisensoryInput</a>`&nbsp;instances,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;potentially&nbsp;from&nbsp;different&nbsp;modalities.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;pattern_weights:&nbsp;Optional&nbsp;learned&nbsp;pattern&nbsp;weights&nbsp;for&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;text-modality&nbsp;classifier.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;context_prior:&nbsp;Optional&nbsp;conversation-history&nbsp;prior.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;An&nbsp;:class:`<a href="#IntegratedPerception">IntegratedPerception</a>`&nbsp;whose&nbsp;base&nbsp;fields&nbsp;come<br>
+&nbsp;&nbsp;&nbsp;&nbsp;from&nbsp;the&nbsp;(currently&nbsp;sole&nbsp;active)&nbsp;TEXT&nbsp;modality,&nbsp;augmented<br>
+&nbsp;&nbsp;&nbsp;&nbsp;with&nbsp;cross-modal&nbsp;confidence,&nbsp;the&nbsp;set&nbsp;of&nbsp;modalities<br>
+&nbsp;&nbsp;&nbsp;&nbsp;present,&nbsp;per-modality&nbsp;intent&nbsp;hints,&nbsp;and&nbsp;a&nbsp;conflict&nbsp;flag.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>ACTIVE_MODALITIES</strong> = frozenset({&lt;SensoryModality.TEXT: 'text'&gt;})</dl>
+
+<dl><dt><strong>__annotations__</strong> = {'ACTIVE_MODALITIES': 'frozenset[SensoryModality]'}</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="PatternWeights">class <strong>PatternWeights</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#PatternWeights">PatternWeights</a>(weights:&nbsp;'dict[str,&nbsp;float]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Tracks&nbsp;learned&nbsp;weights&nbsp;for&nbsp;each&nbsp;pattern&nbsp;category.<br>
+&nbsp;<br>
+Each&nbsp;pattern&nbsp;category&nbsp;(greeting,&nbsp;farewell,&nbsp;self_inquiry,&nbsp;...)&nbsp;has<br>
+a&nbsp;weight&nbsp;in&nbsp;``[0.1,&nbsp;2.0]``.&nbsp;New&nbsp;categories&nbsp;start&nbsp;at&nbsp;1.0&nbsp;(neutral).<br>
+When&nbsp;a&nbsp;pattern&nbsp;match&nbsp;leads&nbsp;to&nbsp;a&nbsp;good&nbsp;outcome&nbsp;(the&nbsp;user&nbsp;responds<br>
+positively,&nbsp;the&nbsp;conversation&nbsp;continues&nbsp;smoothly),&nbsp;the&nbsp;weight<br>
+increases;&nbsp;when&nbsp;it&nbsp;leads&nbsp;to&nbsp;a&nbsp;poor&nbsp;outcome&nbsp;(the&nbsp;user&nbsp;corrects<br>
+Genesis,&nbsp;the&nbsp;conversation&nbsp;stalls),&nbsp;the&nbsp;weight&nbsp;decreases.<br>
+&nbsp;<br>
+The&nbsp;weights&nbsp;are&nbsp;used&nbsp;in&nbsp;two&nbsp;places:<br>
+1.&nbsp;:func:`compute_intent_probabilities`&nbsp;—&nbsp;weighted&nbsp;match&nbsp;counts<br>
+&nbsp;&nbsp;&nbsp;produce&nbsp;the&nbsp;Bayesian&nbsp;likelihood.<br>
+2.&nbsp;:func:`perceive`&nbsp;—&nbsp;the&nbsp;probabilistic&nbsp;distribution&nbsp;reflects<br>
+&nbsp;&nbsp;&nbsp;learned&nbsp;reliability&nbsp;of&nbsp;each&nbsp;category.<br>
+&nbsp;<br>
+Weights&nbsp;are&nbsp;bounded&nbsp;so&nbsp;a&nbsp;single&nbsp;bad&nbsp;experience&nbsp;cannot&nbsp;zero&nbsp;out&nbsp;a<br>
+category,&nbsp;and&nbsp;a&nbsp;single&nbsp;good&nbsp;one&nbsp;cannot&nbsp;make&nbsp;it&nbsp;dominate&nbsp;forever.<br>
+This&nbsp;mirrors&nbsp;the&nbsp;gradual,&nbsp;evidence-accumulating&nbsp;nature&nbsp;of&nbsp;real<br>
+perceptual&nbsp;learning.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="PatternWeights-__init__"><strong>__init__</strong></a>(self, weights: 'dict[str, float] | None' = None) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;pattern&nbsp;weights,&nbsp;copying&nbsp;the&nbsp;caller's&nbsp;dict.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;weights:&nbsp;Optional&nbsp;initial&nbsp;per-category&nbsp;weights.&nbsp;When&nbsp;omitted,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;all&nbsp;categories&nbsp;fall&nbsp;back&nbsp;to&nbsp;:attr:`DEFAULT_WEIGHT`.</span></dd></dl>
+
+<dl><dt><a name="PatternWeights-as_dict"><strong>as_dict</strong></a>(self) -&gt; 'dict[str, float]'</dt><dd><span class="code">Return&nbsp;a&nbsp;copy&nbsp;of&nbsp;the&nbsp;weights&nbsp;for&nbsp;serialization.</span></dd></dl>
+
+<dl><dt><a name="PatternWeights-get"><strong>get</strong></a>(self, pattern_name: 'str') -&gt; 'float'</dt><dd><span class="code">Return&nbsp;the&nbsp;weight&nbsp;for&nbsp;a&nbsp;pattern&nbsp;category&nbsp;(default&nbsp;1.0).</span></dd></dl>
+
+<dl><dt><a name="PatternWeights-load_weights"><strong>load_weights</strong></a>(self, path: 'str') -&gt; 'None'</dt><dd><span class="code">Load&nbsp;weights&nbsp;from&nbsp;a&nbsp;JSON&nbsp;file&nbsp;written&nbsp;by&nbsp;:meth:`save_weights`.<br>
+&nbsp;<br>
+Missing&nbsp;or&nbsp;malformed&nbsp;files&nbsp;are&nbsp;logged&nbsp;and&nbsp;ignored&nbsp;—&nbsp;the<br>
+existing&nbsp;weights&nbsp;are&nbsp;left&nbsp;untouched&nbsp;so&nbsp;perception&nbsp;degrades<br>
+gracefully&nbsp;to&nbsp;the&nbsp;default&nbsp;(untrained)&nbsp;weights.</span></dd></dl>
+
+<dl><dt><a name="PatternWeights-save_weights"><strong>save_weights</strong></a>(self, path: 'str') -&gt; 'None'</dt><dd><span class="code">Save&nbsp;weights&nbsp;to&nbsp;a&nbsp;JSON&nbsp;file&nbsp;(atomic&nbsp;write).<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;path:&nbsp;File&nbsp;path&nbsp;to&nbsp;write.&nbsp;The&nbsp;write&nbsp;is&nbsp;atomic&nbsp;(temp&nbsp;file&nbsp;+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;rename)&nbsp;so&nbsp;a&nbsp;crash&nbsp;cannot&nbsp;corrupt&nbsp;it.</span></dd></dl>
+
+<dl><dt><a name="PatternWeights-update_pattern_weight"><strong>update_pattern_weight</strong></a>(self, pattern_name: 'str', outcome: 'float') -&gt; 'None'</dt><dd><span class="code">Update&nbsp;a&nbsp;pattern's&nbsp;weight&nbsp;based&nbsp;on&nbsp;a&nbsp;conversational&nbsp;outcome.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;pattern_name:&nbsp;The&nbsp;pattern&nbsp;category&nbsp;that&nbsp;was&nbsp;matched&nbsp;(e.g.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;``"greeting"``,&nbsp;``"self_inquiry"``).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;outcome:&nbsp;A&nbsp;value&nbsp;in&nbsp;``[-1,&nbsp;+1]``.&nbsp;Positive&nbsp;means&nbsp;the&nbsp;match<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;led&nbsp;to&nbsp;a&nbsp;good&nbsp;outcome&nbsp;(user&nbsp;responded&nbsp;positively,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;conversation&nbsp;continued&nbsp;smoothly);&nbsp;negative&nbsp;means&nbsp;a&nbsp;poor<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;outcome&nbsp;(user&nbsp;corrected&nbsp;Genesis,&nbsp;conversation&nbsp;stalled).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Clamped&nbsp;to&nbsp;``[-1,&nbsp;+1]``.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>DEFAULT_WEIGHT</strong> = 1.0</dl>
+
+<dl><dt><strong>LEARNING_RATE</strong> = 0.1</dl>
+
+<dl><dt><strong>MAX_WEIGHT</strong> = 2.0</dl>
+
+<dl><dt><strong>MIN_WEIGHT</strong> = 0.1</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Perception">class <strong>Perception</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Perception">Perception</a>(raw_text:&nbsp;'str',&nbsp;intent:&nbsp;'<a href="#Intent">Intent</a>',&nbsp;question_type:&nbsp;'<a href="#QuestionType">QuestionType</a>',&nbsp;topics:&nbsp;'list[str]',&nbsp;sentiment:&nbsp;'float',&nbsp;sentiment_label:&nbsp;'str',&nbsp;emotion_word:&nbsp;'str',&nbsp;is_about_genesis:&nbsp;'bool',&nbsp;is_about_user:&nbsp;'bool',&nbsp;is_about_code:&nbsp;'bool',&nbsp;is_about_emotion:&nbsp;'bool',&nbsp;is_about_existence:&nbsp;'bool',&nbsp;entities:&nbsp;'dict[str,&nbsp;str]',&nbsp;key_phrases:&nbsp;'list[str]',&nbsp;word_count:&nbsp;'int',&nbsp;confidence:&nbsp;'float',&nbsp;intent_probabilities:&nbsp;'dict[<a href="#Intent">Intent</a>,&nbsp;float]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Genesis's&nbsp;understanding&nbsp;of&nbsp;a&nbsp;single&nbsp;user&nbsp;utterance.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Perception-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="Perception-__init__"><strong>__init__</strong></a>(self, raw_text: 'str', intent: 'Intent', question_type: 'QuestionType', topics: 'list[str]', sentiment: 'float', sentiment_label: 'str', emotion_word: 'str', is_about_genesis: 'bool', is_about_user: 'bool', is_about_code: 'bool', is_about_emotion: 'bool', is_about_existence: 'bool', entities: 'dict[str, str]', key_phrases: 'list[str]', word_count: 'int', confidence: 'float', intent_probabilities: 'dict[Intent, float]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Perception-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>confidence</strong></dt>
+</dl>
+<dl><dt><strong>emotion_word</strong></dt>
+</dl>
+<dl><dt><strong>entities</strong></dt>
+</dl>
+<dl><dt><strong>intent</strong></dt>
+</dl>
+<dl><dt><strong>intent_probabilities</strong></dt>
+</dl>
+<dl><dt><strong>is_about_code</strong></dt>
+</dl>
+<dl><dt><strong>is_about_emotion</strong></dt>
+</dl>
+<dl><dt><strong>is_about_existence</strong></dt>
+</dl>
+<dl><dt><strong>is_about_genesis</strong></dt>
+</dl>
+<dl><dt><strong>is_about_user</strong></dt>
+</dl>
+<dl><dt><strong>key_phrases</strong></dt>
+</dl>
+<dl><dt><strong>question_type</strong></dt>
+</dl>
+<dl><dt><strong>raw_text</strong></dt>
+</dl>
+<dl><dt><strong>sentiment</strong></dt>
+</dl>
+<dl><dt><strong>sentiment_label</strong></dt>
+</dl>
+<dl><dt><strong>topics</strong></dt>
+</dl>
+<dl><dt><strong>word_count</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'confidence': 'float', 'emotion_word': 'str', 'entities': 'dict[str, str]', 'intent': 'Intent', 'intent_probabilities': 'dict[Intent, float]', 'is_about_code': 'bool', 'is_about_emotion': 'bool', 'is_about_existence': 'bool', 'is_about_genesis': 'bool', 'is_about_user': 'bool', ...}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'confidence': Field(name='confidence',type='float',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD), 'emotion_word': Field(name='emotion_word',type='str',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD), 'entities': Field(name='entities',type='dict[str, str]',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'intent': Field(name='intent',type='Intent',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'intent_probabilities': Field(name='intent_probabilities',type='dict[Int...appingproxy({}),kw_only=False,_field_type=_FIELD), 'is_about_code': Field(name='is_about_code',type='bool',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD), 'is_about_emotion': Field(name='is_about_emotion',type='bool',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'is_about_existence': Field(name='is_about_existence',type='bool',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'is_about_genesis': Field(name='is_about_genesis',type='bool',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'is_about_user': Field(name='is_about_user',type='bool',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD), ...}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('raw_text', 'intent', 'question_type', 'topics', 'sentiment', 'sentiment_label', 'emotion_word', 'is_about_genesis', 'is_about_user', 'is_about_code', 'is_about_emotion', 'is_about_existence', 'entities', 'key_phrases', 'word_count', 'confidence', 'intent_probabilities')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="QuestionType">class <strong>QuestionType</strong></a>(<a href="enum.html#Enum">enum.Enum</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#QuestionType">QuestionType</a>(*values)<br>
+&nbsp;<br>
+What&nbsp;kind&nbsp;of&nbsp;question&nbsp;is&nbsp;being&nbsp;asked.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.occipital_lobe.perception.core.html#QuestionType">QuestionType</a></dd>
+<dd><a href="enum.html#Enum">enum.Enum</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>ARE</strong> = &lt;QuestionType.ARE: 'are'&gt;</dl>
+
+<dl><dt><strong>CAN</strong> = &lt;QuestionType.CAN: 'can'&gt;</dl>
+
+<dl><dt><strong>DO</strong> = &lt;QuestionType.DO: 'do'&gt;</dl>
+
+<dl><dt><strong>HOW</strong> = &lt;QuestionType.HOW: 'how'&gt;</dl>
+
+<dl><dt><strong>NONE</strong> = &lt;QuestionType.NONE: 'none'&gt;</dl>
+
+<dl><dt><strong>WHAT</strong> = &lt;QuestionType.WHAT: 'what'&gt;</dl>
+
+<dl><dt><strong>WHAT_IF</strong> = &lt;QuestionType.WHAT_IF: 'what_if'&gt;</dl>
+
+<dl><dt><strong>WHEN</strong> = &lt;QuestionType.WHEN: 'when'&gt;</dl>
+
+<dl><dt><strong>WHERE</strong> = &lt;QuestionType.WHERE: 'where'&gt;</dl>
+
+<dl><dt><strong>WHO</strong> = &lt;QuestionType.WHO: 'who'&gt;</dl>
+
+<dl><dt><strong>WHOSE</strong> = &lt;QuestionType.WHOSE: 'whose'&gt;</dl>
+
+<dl><dt><strong>WHY</strong> = &lt;QuestionType.WHY: 'why'&gt;</dl>
+
+<dl><dt><strong>YES_NO</strong> = &lt;QuestionType.YES_NO: 'yes_no'&gt;</dl>
+
+<hr>
+Data descriptors inherited from <a href="enum.html#Enum">enum.Enum</a>:<br>
+<dl><dt><strong>name</strong></dt>
+<dd><span class="code">The&nbsp;name&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<dl><dt><strong>value</strong></dt>
+<dd><span class="code">The&nbsp;value&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<hr>
+Static methods inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><a name="QuestionType-__contains__"><strong>__contains__</strong></a>(value)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;`value`&nbsp;is&nbsp;in&nbsp;`cls`.<br>
+&nbsp;<br>
+`value`&nbsp;is&nbsp;in&nbsp;`cls`&nbsp;if:<br>
+1)&nbsp;`value`&nbsp;is&nbsp;a&nbsp;member&nbsp;of&nbsp;`cls`,&nbsp;or<br>
+2)&nbsp;`value`&nbsp;is&nbsp;the&nbsp;value&nbsp;of&nbsp;one&nbsp;of&nbsp;the&nbsp;`cls`'s&nbsp;members.</span></dd></dl>
+
+<dl><dt><a name="QuestionType-__getitem__"><strong>__getitem__</strong></a>(name)</dt><dd><span class="code">Return&nbsp;the&nbsp;member&nbsp;matching&nbsp;`name`.</span></dd></dl>
+
+<dl><dt><a name="QuestionType-__iter__"><strong>__iter__</strong></a>()</dt><dd><span class="code">Return&nbsp;members&nbsp;in&nbsp;definition&nbsp;order.</span></dd></dl>
+
+<dl><dt><a name="QuestionType-__len__"><strong>__len__</strong></a>()</dt><dd><span class="code">Return&nbsp;the&nbsp;number&nbsp;of&nbsp;members&nbsp;(no&nbsp;aliases)</span></dd></dl>
+
+<hr>
+Readonly properties inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><strong>__members__</strong></dt>
+<dd><span class="code">Returns&nbsp;a&nbsp;mapping&nbsp;of&nbsp;member&nbsp;name-&gt;value.<br>
+&nbsp;<br>
+This&nbsp;mapping&nbsp;lists&nbsp;all&nbsp;enum&nbsp;members,&nbsp;including&nbsp;aliases.&nbsp;Note&nbsp;that&nbsp;this<br>
+is&nbsp;a&nbsp;read-only&nbsp;view&nbsp;of&nbsp;the&nbsp;internal&nbsp;mapping.</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SensoryModality">class <strong>SensoryModality</strong></a>(<a href="enum.html#Enum">enum.Enum</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SensoryModality">SensoryModality</a>(*values)<br>
+&nbsp;<br>
+A&nbsp;sensory&nbsp;channel&nbsp;that&nbsp;can&nbsp;provide&nbsp;input&nbsp;to&nbsp;perception.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.occipital_lobe.perception.core.html#SensoryModality">SensoryModality</a></dd>
+<dd><a href="enum.html#Enum">enum.Enum</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>AUDIO</strong> = &lt;SensoryModality.AUDIO: 'audio'&gt;</dl>
+
+<dl><dt><strong>TEMPORAL</strong> = &lt;SensoryModality.TEMPORAL: 'temporal'&gt;</dl>
+
+<dl><dt><strong>TEXT</strong> = &lt;SensoryModality.TEXT: 'text'&gt;</dl>
+
+<dl><dt><strong>VISUAL</strong> = &lt;SensoryModality.VISUAL: 'visual'&gt;</dl>
+
+<hr>
+Data descriptors inherited from <a href="enum.html#Enum">enum.Enum</a>:<br>
+<dl><dt><strong>name</strong></dt>
+<dd><span class="code">The&nbsp;name&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<dl><dt><strong>value</strong></dt>
+<dd><span class="code">The&nbsp;value&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<hr>
+Static methods inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><a name="SensoryModality-__contains__"><strong>__contains__</strong></a>(value)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;`value`&nbsp;is&nbsp;in&nbsp;`cls`.<br>
+&nbsp;<br>
+`value`&nbsp;is&nbsp;in&nbsp;`cls`&nbsp;if:<br>
+1)&nbsp;`value`&nbsp;is&nbsp;a&nbsp;member&nbsp;of&nbsp;`cls`,&nbsp;or<br>
+2)&nbsp;`value`&nbsp;is&nbsp;the&nbsp;value&nbsp;of&nbsp;one&nbsp;of&nbsp;the&nbsp;`cls`'s&nbsp;members.</span></dd></dl>
+
+<dl><dt><a name="SensoryModality-__getitem__"><strong>__getitem__</strong></a>(name)</dt><dd><span class="code">Return&nbsp;the&nbsp;member&nbsp;matching&nbsp;`name`.</span></dd></dl>
+
+<dl><dt><a name="SensoryModality-__iter__"><strong>__iter__</strong></a>()</dt><dd><span class="code">Return&nbsp;members&nbsp;in&nbsp;definition&nbsp;order.</span></dd></dl>
+
+<dl><dt><a name="SensoryModality-__len__"><strong>__len__</strong></a>()</dt><dd><span class="code">Return&nbsp;the&nbsp;number&nbsp;of&nbsp;members&nbsp;(no&nbsp;aliases)</span></dd></dl>
+
+<hr>
+Readonly properties inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><strong>__members__</strong></dt>
+<dd><span class="code">Returns&nbsp;a&nbsp;mapping&nbsp;of&nbsp;member&nbsp;name-&gt;value.<br>
+&nbsp;<br>
+This&nbsp;mapping&nbsp;lists&nbsp;all&nbsp;enum&nbsp;members,&nbsp;including&nbsp;aliases.&nbsp;Note&nbsp;that&nbsp;this<br>
+is&nbsp;a&nbsp;read-only&nbsp;view&nbsp;of&nbsp;the&nbsp;internal&nbsp;mapping.</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="TrainingExample">class <strong>TrainingExample</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#TrainingExample">TrainingExample</a>(vtc_vector:&nbsp;'list[float]',&nbsp;concept_name:&nbsp;'str',&nbsp;timestamp:&nbsp;'float',&nbsp;correct:&nbsp;'bool'&nbsp;=&nbsp;True)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;single&nbsp;visual&nbsp;teaching&nbsp;example.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="TrainingExample-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="TrainingExample-__init__"><strong>__init__</strong></a>(self, vtc_vector: 'list[float]', concept_name: 'str', timestamp: 'float', correct: 'bool' = True) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="TrainingExample-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'concept_name': 'str', 'correct': 'bool', 'timestamp': 'float', 'vtc_vector': 'list[float]'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'concept_name': Field(name='concept_name',type='str',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD), 'correct': Field(name='correct',type='bool',default=True,de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'timestamp': Field(name='timestamp',type='float',default=&lt;dat...appingproxy({}),kw_only=False,_field_type=_FIELD), 'vtc_vector': Field(name='vtc_vector',type='list[float]',defau...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('vtc_vector', 'concept_name', 'timestamp', 'correct')</dl>
+
+<dl><dt><strong>correct</strong> = True</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="V1Model">class <strong>V1Model</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#V1Model">V1Model</a>(patch_size:&nbsp;'int'&nbsp;=&nbsp;8,&nbsp;orientations:&nbsp;'int'&nbsp;=&nbsp;8,&nbsp;scales:&nbsp;'int'&nbsp;=&nbsp;2,&nbsp;phases:&nbsp;'int'&nbsp;=&nbsp;2,&nbsp;step:&nbsp;'float'&nbsp;=&nbsp;0.3,&nbsp;sparsity:&nbsp;'float'&nbsp;=&nbsp;0.15,&nbsp;recurrent_scale:&nbsp;'float'&nbsp;=&nbsp;0.5,&nbsp;interaction_lr:&nbsp;'float'&nbsp;=&nbsp;0.01,&nbsp;seed:&nbsp;'int&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;m_scales:&nbsp;'int'&nbsp;=&nbsp;2,&nbsp;p_scales:&nbsp;'int'&nbsp;=&nbsp;3)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Primary&nbsp;visual&nbsp;cortex&nbsp;(V1)&nbsp;for&nbsp;Genesis&nbsp;with&nbsp;parallel&nbsp;M/P&nbsp;pathways.<br>
+&nbsp;<br>
+A&nbsp;sparse-coding,&nbsp;recurrently&nbsp;connected&nbsp;model&nbsp;of&nbsp;early&nbsp;visual&nbsp;processing.<br>
+It&nbsp;implements&nbsp;the&nbsp;biological&nbsp;separation&nbsp;of&nbsp;magnocellular&nbsp;(M)&nbsp;and<br>
+parvocellular&nbsp;(P)&nbsp;pathways&nbsp;from&nbsp;the&nbsp;LGN,&nbsp;each&nbsp;with&nbsp;its&nbsp;own&nbsp;dictionary<br>
+and&nbsp;processing&nbsp;characteristics.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;patch_size:&nbsp;size&nbsp;of&nbsp;the&nbsp;square&nbsp;image&nbsp;patches&nbsp;used&nbsp;as&nbsp;V1&nbsp;input.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;orientations:&nbsp;number&nbsp;of&nbsp;discrete&nbsp;orientations&nbsp;in&nbsp;the&nbsp;feature&nbsp;dictionary.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;scales:&nbsp;number&nbsp;of&nbsp;spatial&nbsp;scales&nbsp;(frequencies).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;phases:&nbsp;number&nbsp;of&nbsp;Gabor&nbsp;phases&nbsp;(typically&nbsp;2:&nbsp;even&nbsp;and&nbsp;odd).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;step:&nbsp;ISTA&nbsp;step&nbsp;size&nbsp;η.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;sparsity:&nbsp;sparse-coding&nbsp;L1&nbsp;weight&nbsp;λ.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;recurrent_scale:&nbsp;recurrent&nbsp;drive&nbsp;weight&nbsp;γ.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;interaction_lr:&nbsp;online&nbsp;learning&nbsp;rate&nbsp;for&nbsp;the&nbsp;interaction&nbsp;matrix&nbsp;M.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;seed:&nbsp;random&nbsp;seed&nbsp;for&nbsp;reproducibility.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;m_scales:&nbsp;spatial&nbsp;scales&nbsp;for&nbsp;M-pathway&nbsp;(fewer,&nbsp;coarser&nbsp;for&nbsp;motion)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;p_scales:&nbsp;spatial&nbsp;scales&nbsp;for&nbsp;P-pathway&nbsp;(more,&nbsp;finer&nbsp;for&nbsp;detail)<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="V1Model-__init__"><strong>__init__</strong></a>(self, patch_size: 'int' = 8, orientations: 'int' = 8, scales: 'int' = 2, phases: 'int' = 2, step: 'float' = 0.3, sparsity: 'float' = 0.15, recurrent_scale: 'float' = 0.5, interaction_lr: 'float' = 0.01, seed: 'int | None' = None, m_scales: 'int' = 2, p_scales: 'int' = 3) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;occipital&nbsp;subsystem&nbsp;model&nbsp;with&nbsp;parallel&nbsp;M/P&nbsp;pathways.</span></dd></dl>
+
+<dl><dt><a name="V1Model-process"><strong>process</strong></a>(self, frame: 'np.ndarray', learn: 'bool' = True) -&gt; 'VisualField'</dt><dd><span class="code">Run&nbsp;one&nbsp;glance&nbsp;through&nbsp;V1&nbsp;and&nbsp;return&nbsp;a&nbsp;structured&nbsp;visual&nbsp;field.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;frame:&nbsp;an&nbsp;H×W&nbsp;or&nbsp;H×W×C&nbsp;uint8&nbsp;image&nbsp;from&nbsp;the&nbsp;optic&nbsp;nerve.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;learn:&nbsp;if&nbsp;True,&nbsp;update&nbsp;the&nbsp;interaction&nbsp;matrix&nbsp;M&nbsp;from&nbsp;this&nbsp;view.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;<a href="#VisualField">VisualField</a>&nbsp;with&nbsp;active&nbsp;features,&nbsp;contours,&nbsp;and&nbsp;scene&nbsp;summary.</span></dd></dl>
+
+<dl><dt><a name="V1Model-process_m_pathway"><strong>process_m_pathway</strong></a>(self, luminance: 'np.ndarray', learn: 'bool' = True) -&gt; 'VisualField'</dt><dd><span class="code">Process&nbsp;through&nbsp;magnocellular&nbsp;(M)&nbsp;pathway&nbsp;-&nbsp;motion/luminance&nbsp;stream.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;luminance:&nbsp;grayscale&nbsp;image&nbsp;from&nbsp;LGN&nbsp;M-pathway&nbsp;(H_m,&nbsp;W_m)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;learn:&nbsp;if&nbsp;True,&nbsp;update&nbsp;M-pathway&nbsp;interaction&nbsp;matrix<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#VisualField">VisualField</a>&nbsp;with&nbsp;M-pathway&nbsp;features&nbsp;(for&nbsp;dorsal&nbsp;stream&nbsp;to&nbsp;parietal)</span></dd></dl>
+
+<dl><dt><a name="V1Model-process_p_pathway"><strong>process_p_pathway</strong></a>(self, color: 'np.ndarray', learn: 'bool' = True, k_by: 'np.ndarray | None' = None) -&gt; 'VisualField'</dt><dd><span class="code">Process&nbsp;through&nbsp;parvocellular&nbsp;(P)&nbsp;pathway&nbsp;-&nbsp;color/detail&nbsp;stream.<br>
+&nbsp;<br>
+The&nbsp;P&nbsp;stream&nbsp;carries&nbsp;both&nbsp;fine&nbsp;achromatic&nbsp;detail&nbsp;and&nbsp;the<br>
+red-green&nbsp;(L−M)&nbsp;opponent&nbsp;signal;&nbsp;the&nbsp;koniocellular&nbsp;(K)<br>
+blue-yellow&nbsp;signal&nbsp;arrives&nbsp;separately&nbsp;via&nbsp;``k_by``.&nbsp;Each<br>
+channel&nbsp;runs&nbsp;through&nbsp;the&nbsp;P&nbsp;dictionary,&nbsp;so&nbsp;the&nbsp;returned&nbsp;field<br>
+holds&nbsp;colour-selective&nbsp;features&nbsp;—&nbsp;chromatic&nbsp;boundaries&nbsp;that<br>
+luminance&nbsp;cannot&nbsp;see&nbsp;—&nbsp;tagged&nbsp;by&nbsp;their&nbsp;channel.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;color:&nbsp;RGB&nbsp;image&nbsp;from&nbsp;LGN&nbsp;P-pathway&nbsp;(H,&nbsp;W,&nbsp;3),&nbsp;float&nbsp;in<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[0,&nbsp;1]&nbsp;or&nbsp;uint8<br>
+&nbsp;&nbsp;&nbsp;&nbsp;learn:&nbsp;if&nbsp;True,&nbsp;update&nbsp;P-pathway&nbsp;interaction&nbsp;matrix<br>
+&nbsp;&nbsp;&nbsp;&nbsp;k_by:&nbsp;optional&nbsp;blue-yellow&nbsp;(S−(L+M))&nbsp;opponent&nbsp;image&nbsp;from<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;LGN&nbsp;K-pathway&nbsp;(H,&nbsp;W),&nbsp;signed.&nbsp;When&nbsp;absent&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;blue-yellow&nbsp;channel&nbsp;is&nbsp;computed&nbsp;from&nbsp;``color``.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#VisualField">VisualField</a>&nbsp;with&nbsp;P-pathway&nbsp;features&nbsp;(for&nbsp;ventral&nbsp;stream&nbsp;to&nbsp;temporal)</span></dd></dl>
+
+<dl><dt><a name="V1Model-reset_interactions"><strong>reset_interactions</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Reset&nbsp;M&nbsp;to&nbsp;the&nbsp;structured&nbsp;co-circular&nbsp;prior.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="V4Model">class <strong>V4Model</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#V4Model">V4Model</a>(n_v1_features:&nbsp;'int'&nbsp;=&nbsp;32,&nbsp;pool_size:&nbsp;'int'&nbsp;=&nbsp;2,&nbsp;n_features:&nbsp;'int'&nbsp;=&nbsp;64,&nbsp;sparsity:&nbsp;'float'&nbsp;=&nbsp;0.1,&nbsp;step:&nbsp;'float'&nbsp;=&nbsp;0.2,&nbsp;n_ista_iters:&nbsp;'int'&nbsp;=&nbsp;30,&nbsp;color_dims:&nbsp;'int'&nbsp;=&nbsp;12,&nbsp;seed:&nbsp;'int&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Mid-level&nbsp;visual&nbsp;cortex&nbsp;—&nbsp;learns&nbsp;features&nbsp;from&nbsp;V1&nbsp;latents.<br>
+&nbsp;<br>
+V4&nbsp;pools&nbsp;V1&nbsp;patch&nbsp;activations&nbsp;into&nbsp;larger&nbsp;receptive&nbsp;fields&nbsp;and<br>
+learns&nbsp;a&nbsp;dictionary&nbsp;of&nbsp;mid-level&nbsp;features&nbsp;(curvature,&nbsp;texture<br>
+patterns,&nbsp;shape&nbsp;complexes,&nbsp;color&nbsp;blobs)&nbsp;via&nbsp;unsupervised&nbsp;sparse<br>
+coding.&nbsp;This&nbsp;mirrors&nbsp;how&nbsp;V4&nbsp;in&nbsp;the&nbsp;primate&nbsp;brain&nbsp;integrates&nbsp;V1<br>
+outputs&nbsp;into&nbsp;more&nbsp;complex&nbsp;shape&nbsp;and&nbsp;texture&nbsp;selectivity.<br>
+&nbsp;<br>
+The&nbsp;dictionary&nbsp;is&nbsp;learned&nbsp;from&nbsp;natural&nbsp;image&nbsp;statistics&nbsp;—&nbsp;the<br>
+same&nbsp;principle&nbsp;as&nbsp;V1's&nbsp;Gabor&nbsp;dictionary,&nbsp;but&nbsp;operating&nbsp;on&nbsp;V1<br>
+latents&nbsp;instead&nbsp;of&nbsp;pixels.&nbsp;Features&nbsp;that&nbsp;co-occur&nbsp;in&nbsp;natural<br>
+scenes&nbsp;become&nbsp;V4&nbsp;dictionary&nbsp;elements.<br>
+&nbsp;<br>
+Color&nbsp;channels&nbsp;are&nbsp;added&nbsp;at&nbsp;V4&nbsp;(not&nbsp;V1)&nbsp;because&nbsp;V4&nbsp;contains&nbsp;the<br>
+earliest&nbsp;substantial&nbsp;population&nbsp;of&nbsp;color-selective&nbsp;neurons&nbsp;with<br>
+large&nbsp;enough&nbsp;receptive&nbsp;fields&nbsp;to&nbsp;integrate&nbsp;color&nbsp;over&nbsp;regions.<br>
+&nbsp;<br>
+Architecture:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;V1&nbsp;latents&nbsp;(n_patches&nbsp;×&nbsp;n_v1_features)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;pool&nbsp;2×2&nbsp;groups&nbsp;of&nbsp;adjacent&nbsp;patches<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;▼<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Pooled&nbsp;V1&nbsp;(n_v4_units&nbsp;×&nbsp;n_v1_features&nbsp;×&nbsp;pool_size)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;concatenate&nbsp;with&nbsp;color&nbsp;statistics&nbsp;per&nbsp;pool<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;▼<br>
+&nbsp;&nbsp;&nbsp;&nbsp;V4&nbsp;input&nbsp;(n_v4_units&nbsp;×&nbsp;v4_input_dim)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;sparse&nbsp;code&nbsp;with&nbsp;learned&nbsp;dictionary&nbsp;Φ4<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;▼<br>
+&nbsp;&nbsp;&nbsp;&nbsp;V4&nbsp;latents&nbsp;(n_v4_units&nbsp;×&nbsp;n_v4_features)<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="V4Model-__init__"><strong>__init__</strong></a>(self, n_v1_features: 'int' = 32, pool_size: 'int' = 2, n_features: 'int' = 64, sparsity: 'float' = 0.1, step: 'float' = 0.2, n_ista_iters: 'int' = 30, color_dims: 'int' = 12, seed: 'int | None' = None) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;V4.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;n_v1_features:&nbsp;number&nbsp;of&nbsp;V1&nbsp;latent&nbsp;features&nbsp;(from&nbsp;occipital&nbsp;subsystem).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;pool_size:&nbsp;how&nbsp;many&nbsp;V1&nbsp;patches&nbsp;to&nbsp;pool&nbsp;into&nbsp;one&nbsp;V4&nbsp;unit&nbsp;(per&nbsp;axis).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;n_features:&nbsp;number&nbsp;of&nbsp;V4&nbsp;dictionary&nbsp;elements&nbsp;to&nbsp;learn.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;sparsity:&nbsp;L1&nbsp;sparsity&nbsp;weight&nbsp;for&nbsp;V4&nbsp;sparse&nbsp;coding.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;step:&nbsp;ISTA&nbsp;step&nbsp;size.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;n_ista_iters:&nbsp;number&nbsp;of&nbsp;ISTA&nbsp;iterations&nbsp;for&nbsp;inference.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;color_dims:&nbsp;dimensionality&nbsp;of&nbsp;the&nbsp;color&nbsp;statistics&nbsp;vector<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;appended&nbsp;to&nbsp;each&nbsp;pooled&nbsp;unit.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;seed:&nbsp;random&nbsp;seed.</span></dd></dl>
+
+<dl><dt><a name="V4Model-load"><strong>load</strong></a>(self, path: 'Path' = PosixPath('/home/mindyrenee/.local/share/genesis/visual_cortex/v4_dictionary.npz')) -&gt; 'bool'</dt><dd><span class="code">Load&nbsp;V4&nbsp;dictionary&nbsp;from&nbsp;disk.&nbsp;Returns&nbsp;True&nbsp;if&nbsp;loaded.</span></dd></dl>
+
+<dl><dt><a name="V4Model-process"><strong>process</strong></a>(self, v1_latents: 'np.ndarray', v1_grid_shape: 'tuple[int, int]', frame: 'np.ndarray | None' = None, learn: 'bool' = True) -&gt; 'np.ndarray'</dt><dd><span class="code">Process&nbsp;V1&nbsp;latents&nbsp;through&nbsp;V4.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;v1_latents:&nbsp;(n_patches,&nbsp;n_v1_features)&nbsp;V1&nbsp;latent&nbsp;activations.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;v1_grid_shape:&nbsp;(n_rows,&nbsp;n_cols)&nbsp;shape&nbsp;of&nbsp;the&nbsp;V1&nbsp;patch&nbsp;grid.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;frame:&nbsp;optional&nbsp;original&nbsp;RGB&nbsp;frame&nbsp;for&nbsp;color&nbsp;statistics.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;learn:&nbsp;if&nbsp;True,&nbsp;update&nbsp;the&nbsp;dictionary.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;v4_latents:&nbsp;(n_v4_units,&nbsp;n_features)&nbsp;V4&nbsp;latent&nbsp;activations.</span></dd></dl>
+
+<dl><dt><a name="V4Model-save"><strong>save</strong></a>(self, path: 'Path' = PosixPath('/home/mindyrenee/.local/share/genesis/visual_cortex/v4_dictionary.npz')) -&gt; 'None'</dt><dd><span class="code">Save&nbsp;V4&nbsp;dictionary&nbsp;to&nbsp;disk.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>reconstruction_cosine</strong></dt>
+</dl>
+<dl><dt><strong>reconstruction_mse</strong></dt>
+</dl>
+<dl><dt><strong>relative_reconstruction_error</strong></dt>
+</dl>
+<dl><dt><strong>sparsity_fraction</strong></dt>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="VTCFeatureSpace">class <strong>VTCFeatureSpace</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#VTCFeatureSpace">VTCFeatureSpace</a>(input_dim:&nbsp;'int'&nbsp;=&nbsp;64,&nbsp;n_components:&nbsp;'int'&nbsp;=&nbsp;32,&nbsp;forgetting_factor:&nbsp;'float'&nbsp;=&nbsp;0.99)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Ventral&nbsp;temporal&nbsp;cortex&nbsp;—&nbsp;axis-based&nbsp;feature&nbsp;space.<br>
+&nbsp;<br>
+PCA&nbsp;of&nbsp;V4&nbsp;activations&nbsp;creates&nbsp;a&nbsp;low-dimensional&nbsp;feature&nbsp;space<br>
+whose&nbsp;axes&nbsp;capture&nbsp;the&nbsp;principal&nbsp;variations&nbsp;in&nbsp;mid-level&nbsp;visual<br>
+features.&nbsp;This&nbsp;mirrors&nbsp;the&nbsp;axis-based&nbsp;organization&nbsp;reported&nbsp;for<br>
+primate&nbsp;inferotemporal&nbsp;cortex&nbsp;(Bao&nbsp;et&nbsp;al.,&nbsp;2020,&nbsp;Nature&nbsp;—&nbsp;a&nbsp;map<br>
+of&nbsp;<a href="builtins.html#object">object</a>&nbsp;space):&nbsp;neurons&nbsp;are&nbsp;organized&nbsp;along&nbsp;feature&nbsp;dimensions<br>
+(shape,&nbsp;texture,&nbsp;color,&nbsp;curvature),&nbsp;and&nbsp;the&nbsp;space&nbsp;is&nbsp;where<br>
+objects&nbsp;cluster&nbsp;by&nbsp;category.<br>
+&nbsp;<br>
+The&nbsp;space&nbsp;is&nbsp;learned&nbsp;incrementally&nbsp;—&nbsp;each&nbsp;new&nbsp;image&nbsp;updates&nbsp;the<br>
+PCA&nbsp;basis&nbsp;via&nbsp;incremental&nbsp;PCA.&nbsp;This&nbsp;mirrors&nbsp;how&nbsp;the&nbsp;visual&nbsp;system<br>
+refines&nbsp;its&nbsp;feature&nbsp;space&nbsp;through&nbsp;experience.<br>
+&nbsp;<br>
+The&nbsp;output&nbsp;is&nbsp;a&nbsp;fixed-dimensional&nbsp;vector&nbsp;(vtc_vector)&nbsp;that&nbsp;serves<br>
+as&nbsp;the&nbsp;input&nbsp;to&nbsp;the&nbsp;MTL&nbsp;bridge.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="VTCFeatureSpace-__init__"><strong>__init__</strong></a>(self, input_dim: 'int' = 64, n_components: 'int' = 32, forgetting_factor: 'float' = 0.99) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;VTC&nbsp;feature&nbsp;space.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;input_dim:&nbsp;dimensionality&nbsp;of&nbsp;V4&nbsp;latent&nbsp;vectors.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;n_components:&nbsp;number&nbsp;of&nbsp;PCA&nbsp;components&nbsp;(VTC&nbsp;axes).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;forgetting_factor:&nbsp;EMA&nbsp;forgetting&nbsp;factor&nbsp;for&nbsp;incremental<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;updates&nbsp;(0.99&nbsp;=&nbsp;slow&nbsp;adaptation,&nbsp;preserves&nbsp;long-term<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;structure&nbsp;while&nbsp;allowing&nbsp;gradual&nbsp;refinement).</span></dd></dl>
+
+<dl><dt><a name="VTCFeatureSpace-load"><strong>load</strong></a>(self, path: 'Path' = PosixPath('/home/mindyrenee/.local/share/genesis/visual_cortex/vtc_space.npz')) -&gt; 'bool'</dt><dd><span class="code">Load&nbsp;VTC&nbsp;PCA&nbsp;state&nbsp;from&nbsp;disk.&nbsp;Returns&nbsp;True&nbsp;if&nbsp;loaded.</span></dd></dl>
+
+<dl><dt><a name="VTCFeatureSpace-process"><strong>process</strong></a>(self, v4_latents: 'np.ndarray', learn: 'bool' = True) -&gt; 'np.ndarray'</dt><dd><span class="code">Project&nbsp;V4&nbsp;activations&nbsp;into&nbsp;the&nbsp;VTC&nbsp;feature&nbsp;space.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;v4_latents:&nbsp;(n_v4_units,&nbsp;n_v4_features)&nbsp;V4&nbsp;latent&nbsp;activations.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;learn:&nbsp;if&nbsp;True,&nbsp;update&nbsp;the&nbsp;PCA&nbsp;basis.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;vtc_vector:&nbsp;(n_components,)&nbsp;—&nbsp;the&nbsp;visual&nbsp;feature&nbsp;vector<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;in&nbsp;VTC&nbsp;space.&nbsp;This&nbsp;is&nbsp;a&nbsp;global&nbsp;descriptor&nbsp;of&nbsp;the&nbsp;image,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;computed&nbsp;as&nbsp;the&nbsp;mean&nbsp;V4&nbsp;activation&nbsp;projected&nbsp;through&nbsp;PCA.</span></dd></dl>
+
+<dl><dt><a name="VTCFeatureSpace-save"><strong>save</strong></a>(self, path: 'Path' = PosixPath('/home/mindyrenee/.local/share/genesis/visual_cortex/vtc_space.npz')) -&gt; 'None'</dt><dd><span class="code">Save&nbsp;VTC&nbsp;PCA&nbsp;state&nbsp;to&nbsp;disk.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="VisualContour">class <strong>VisualContour</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#VisualContour">VisualContour</a>(features:&nbsp;'list[<a href="#VisualFeature">VisualFeature</a>]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;mean_orientation:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;length:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;salience:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;color:&nbsp;'str'&nbsp;=&nbsp;'')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;linked&nbsp;chain&nbsp;of&nbsp;co-linear&nbsp;/&nbsp;co-circular&nbsp;features.<br>
+&nbsp;<br>
+Contours&nbsp;are&nbsp;the&nbsp;V1&nbsp;substrate&nbsp;for&nbsp;perceptual&nbsp;grouping&nbsp;—&nbsp;they&nbsp;are&nbsp;not<br>
+objects&nbsp;yet,&nbsp;but&nbsp;they&nbsp;are&nbsp;more&nbsp;than&nbsp;isolated&nbsp;edges.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="VisualContour-__bool__"><strong>__bool__</strong></a>(self) -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;this&nbsp;contour&nbsp;contains&nbsp;any&nbsp;detected&nbsp;features.</span></dd></dl>
+
+<dl><dt><a name="VisualContour-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="VisualContour-__init__"><strong>__init__</strong></a>(self, features: 'list[VisualFeature]' = &lt;factory&gt;, mean_orientation: 'float' = 0.0, length: 'float' = 0.0, salience: 'float' = 0.0, color: 'str' = '') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="VisualContour-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>color</strong></dt>
+</dl>
+<dl><dt><strong>features</strong></dt>
+</dl>
+<dl><dt><strong>length</strong></dt>
+</dl>
+<dl><dt><strong>mean_orientation</strong></dt>
+</dl>
+<dl><dt><strong>salience</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'color': 'str', 'features': 'list[VisualFeature]', 'length': 'float', 'mean_orientation': 'float', 'salience': 'float'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'color': Field(name='color',type='str',default='',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'features': Field(name='features',type='list[VisualFeature]'...appingproxy({}),kw_only=False,_field_type=_FIELD), 'length': Field(name='length',type='float',default=0.0,def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'mean_orientation': Field(name='mean_orientation',type='float',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'salience': Field(name='salience',type='float',default=0.0,d...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('features', 'mean_orientation', 'length', 'salience', 'color')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="VisualCortex">class <strong>VisualCortex</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#VisualCortex">VisualCortex</a>(occipital:&nbsp;'<a href="#V1Model">V1Model</a>',&nbsp;embeddings:&nbsp;'EmbeddingStore&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;network:&nbsp;'ConceptNetwork&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;v4_n_features:&nbsp;'int'&nbsp;=&nbsp;64,&nbsp;vtc_n_components:&nbsp;'int'&nbsp;=&nbsp;32,&nbsp;embedding_dim:&nbsp;'int'&nbsp;=&nbsp;193)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Full&nbsp;hierarchical&nbsp;predictive&nbsp;coding&nbsp;visual&nbsp;system.<br>
+&nbsp;<br>
+Combines&nbsp;V1&nbsp;(occipital&nbsp;subsystem),&nbsp;V4,&nbsp;VTC,&nbsp;and&nbsp;MTL&nbsp;bridge&nbsp;into&nbsp;a<br>
+complete&nbsp;visual&nbsp;cortex&nbsp;with&nbsp;bidirectional&nbsp;predictive&nbsp;coding.<br>
+&nbsp;<br>
+The&nbsp;system&nbsp;is&nbsp;designed&nbsp;to&nbsp;be&nbsp;pre-trained&nbsp;on&nbsp;natural&nbsp;images<br>
+(unsupervised&nbsp;V1+V4&nbsp;dictionary&nbsp;learning)&nbsp;and&nbsp;then&nbsp;taught&nbsp;specific<br>
+concepts&nbsp;through&nbsp;labeled&nbsp;examples.<br>
+&nbsp;<br>
+Usage:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;cortex&nbsp;=&nbsp;<a href="#VisualCortex">VisualCortex</a>(occipital,&nbsp;embeddings,&nbsp;network)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;percept&nbsp;=&nbsp;cortex.<a href="#VisualCortex-see">see</a>(image_array)&nbsp;&nbsp;#&nbsp;recognize<br>
+&nbsp;&nbsp;&nbsp;&nbsp;cortex.teach(image_array,&nbsp;"tree")&nbsp;&nbsp;#&nbsp;teach<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="VisualCortex-__init__"><strong>__init__</strong></a>(self, occipital: 'V1Model', embeddings: 'EmbeddingStore | None' = None, network: 'ConceptNetwork | None' = None, v4_n_features: 'int' = 64, vtc_n_components: 'int' = 32, embedding_dim: 'int' = 193) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;visual&nbsp;cortex.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;occipital:&nbsp;the&nbsp;V1&nbsp;occipital&nbsp;subsystem&nbsp;(already&nbsp;initialized).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;embeddings:&nbsp;concept&nbsp;embedding&nbsp;store&nbsp;(for&nbsp;MTL&nbsp;bridge).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;network:&nbsp;concept&nbsp;network&nbsp;(for&nbsp;concept&nbsp;lookup).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;v4_n_features:&nbsp;number&nbsp;of&nbsp;V4&nbsp;dictionary&nbsp;elements.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;vtc_n_components:&nbsp;number&nbsp;of&nbsp;VTC&nbsp;PCA&nbsp;components.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;embedding_dim:&nbsp;dimensionality&nbsp;of&nbsp;concept&nbsp;embeddings.</span></dd></dl>
+
+<dl><dt><a name="VisualCortex-imagine"><strong>imagine</strong></a>(self, concept_name: 'str') -&gt; 'np.ndarray | None'</dt><dd><span class="code">Generate&nbsp;a&nbsp;VTC&nbsp;feature&nbsp;vector&nbsp;from&nbsp;a&nbsp;concept&nbsp;(imagination).<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;top-down&nbsp;generative&nbsp;path:&nbsp;concept&nbsp;→&nbsp;VTC&nbsp;→&nbsp;predicted<br>
+visual&nbsp;features.&nbsp;Used&nbsp;for&nbsp;imagination&nbsp;and&nbsp;connecting&nbsp;to&nbsp;the<br>
+art/drawing&nbsp;system.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;concept_name:&nbsp;concept&nbsp;to&nbsp;imagine.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Predicted&nbsp;VTC&nbsp;vector,&nbsp;or&nbsp;None&nbsp;if&nbsp;not&nbsp;possible.</span></dd></dl>
+
+<dl><dt><a name="VisualCortex-learn_from_image"><strong>learn_from_image</strong></a>(self, frame: 'np.ndarray', concept_name: 'str') -&gt; 'bool'</dt><dd><span class="code">Learn&nbsp;a&nbsp;visual-concept&nbsp;association&nbsp;from&nbsp;an&nbsp;image&nbsp;encountered&nbsp;in&nbsp;context.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;called&nbsp;automatically&nbsp;when&nbsp;Genesis&nbsp;encounters&nbsp;an&nbsp;image<br>
+while&nbsp;learning&nbsp;(e.g.,&nbsp;the&nbsp;lead&nbsp;image&nbsp;of&nbsp;a&nbsp;Wikipedia&nbsp;article<br>
+about&nbsp;"tree").&nbsp;The&nbsp;image&nbsp;is&nbsp;processed&nbsp;through&nbsp;V1→V4→VTC&nbsp;and<br>
+the&nbsp;resulting&nbsp;feature&nbsp;vector&nbsp;is&nbsp;associated&nbsp;with&nbsp;the&nbsp;concept.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;frame:&nbsp;H×W×3&nbsp;uint8&nbsp;RGB&nbsp;image.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;concept_name:&nbsp;concept&nbsp;ID&nbsp;in&nbsp;the&nbsp;network&nbsp;(e.g.,&nbsp;"tree").<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;True&nbsp;if&nbsp;the&nbsp;association&nbsp;was&nbsp;learned.</span></dd></dl>
+
+<dl><dt><a name="VisualCortex-pretrain"><strong>pretrain</strong></a>(self, frames: 'list[np.ndarray]', n_iters: 'int' = 1) -&gt; 'None'</dt><dd><span class="code">Pre-train&nbsp;V1&nbsp;and&nbsp;V4&nbsp;dictionaries&nbsp;on&nbsp;a&nbsp;set&nbsp;of&nbsp;natural&nbsp;images.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;unsupervised&nbsp;learning&nbsp;—&nbsp;the&nbsp;dictionaries&nbsp;learn&nbsp;from<br>
+natural&nbsp;image&nbsp;statistics&nbsp;without&nbsp;any&nbsp;labels.&nbsp;This&nbsp;gives&nbsp;the<br>
+visual&nbsp;system&nbsp;a&nbsp;foundation&nbsp;before&nbsp;teaching&nbsp;specific&nbsp;concepts,<br>
+mirroring&nbsp;how&nbsp;the&nbsp;human&nbsp;visual&nbsp;system&nbsp;develops&nbsp;before&nbsp;language.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;frames:&nbsp;list&nbsp;of&nbsp;H×W×3&nbsp;uint8&nbsp;RGB&nbsp;images.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;n_iters:&nbsp;number&nbsp;of&nbsp;passes&nbsp;over&nbsp;the&nbsp;image&nbsp;set.</span></dd></dl>
+
+<dl><dt><a name="VisualCortex-save"><strong>save</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Save&nbsp;all&nbsp;visual&nbsp;cortex&nbsp;state&nbsp;to&nbsp;disk.</span></dd></dl>
+
+<dl><dt><a name="VisualCortex-see"><strong>see</strong></a>(self, frame: 'np.ndarray', learn: 'bool' = True) -&gt; 'VisualPercept'</dt><dd><span class="code">Process&nbsp;an&nbsp;image&nbsp;through&nbsp;the&nbsp;full&nbsp;visual&nbsp;hierarchy.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;frame:&nbsp;H×W×3&nbsp;uint8&nbsp;RGB&nbsp;image.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;learn:&nbsp;if&nbsp;True,&nbsp;update&nbsp;V4&nbsp;dictionary&nbsp;and&nbsp;VTC&nbsp;PCA.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#VisualPercept">VisualPercept</a>&nbsp;with&nbsp;recognition&nbsp;result&nbsp;and&nbsp;prediction&nbsp;errors.</span></dd></dl>
+
+<dl><dt><a name="VisualCortex-status"><strong>status</strong></a>(self) -&gt; 'dict'</dt><dd><span class="code">Return&nbsp;status&nbsp;summary&nbsp;for&nbsp;CLI/debugging.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="VisualFeature">class <strong>VisualFeature</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#VisualFeature">VisualFeature</a>(y:&nbsp;'float',&nbsp;x:&nbsp;'float',&nbsp;row:&nbsp;'int',&nbsp;col:&nbsp;'int',&nbsp;orientation:&nbsp;'float',&nbsp;scale:&nbsp;'float',&nbsp;phase:&nbsp;'float',&nbsp;strength:&nbsp;'float',&nbsp;feature_index:&nbsp;'int',&nbsp;channel:&nbsp;'str'&nbsp;=&nbsp;'lum')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+An&nbsp;active&nbsp;oriented&nbsp;feature&nbsp;in&nbsp;the&nbsp;visual&nbsp;field.<br>
+&nbsp;<br>
+Each&nbsp;feature&nbsp;is&nbsp;a&nbsp;sparse-coding&nbsp;latent&nbsp;variable&nbsp;that&nbsp;won&nbsp;the&nbsp;competition<br>
+for&nbsp;a&nbsp;particular&nbsp;image&nbsp;patch.&nbsp;It&nbsp;carries&nbsp;pixel&nbsp;centre,&nbsp;patch-grid<br>
+indices,&nbsp;orientation,&nbsp;scale,&nbsp;phase,&nbsp;and&nbsp;response&nbsp;strength.<br>
+&nbsp;<br>
+``channel``&nbsp;names&nbsp;which&nbsp;opponent&nbsp;channel&nbsp;drove&nbsp;the&nbsp;response:<br>
+``"lum"``&nbsp;for&nbsp;achromatic&nbsp;(broadband)&nbsp;cells,&nbsp;``"rg"``&nbsp;for&nbsp;the<br>
+red-green&nbsp;(L−M)&nbsp;parvocellular&nbsp;opponent&nbsp;channel,&nbsp;and&nbsp;``"by"``&nbsp;for<br>
+the&nbsp;blue-yellow&nbsp;(S−(L+M))&nbsp;koniocellular&nbsp;channel.&nbsp;Chromatic<br>
+features&nbsp;are&nbsp;the&nbsp;double-opponent&nbsp;complement&nbsp;of&nbsp;V1&nbsp;—&nbsp;they&nbsp;fire&nbsp;on<br>
+colour&nbsp;boundaries&nbsp;even&nbsp;when&nbsp;luminance&nbsp;is&nbsp;flat.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="VisualFeature-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="VisualFeature-__init__"><strong>__init__</strong></a>(self, y: 'float', x: 'float', row: 'int', col: 'int', orientation: 'float', scale: 'float', phase: 'float', strength: 'float', feature_index: 'int', channel: 'str' = 'lum') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="VisualFeature-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>position</strong></dt>
+<dd><span class="code">Pixel-space&nbsp;centre&nbsp;of&nbsp;the&nbsp;patch&nbsp;this&nbsp;feature&nbsp;represents.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>channel</strong></dt>
+</dl>
+<dl><dt><strong>col</strong></dt>
+</dl>
+<dl><dt><strong>feature_index</strong></dt>
+</dl>
+<dl><dt><strong>orientation</strong></dt>
+</dl>
+<dl><dt><strong>phase</strong></dt>
+</dl>
+<dl><dt><strong>row</strong></dt>
+</dl>
+<dl><dt><strong>scale</strong></dt>
+</dl>
+<dl><dt><strong>strength</strong></dt>
+</dl>
+<dl><dt><strong>x</strong></dt>
+</dl>
+<dl><dt><strong>y</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'channel': 'str', 'col': 'int', 'feature_index': 'int', 'orientation': 'float', 'phase': 'float', 'row': 'int', 'scale': 'float', 'strength': 'float', 'x': 'float', 'y': 'float'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'channel': Field(name='channel',type='str',default='lum',de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'col': Field(name='col',type='int',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD), 'feature_index': Field(name='feature_index',type='int',default=&lt;d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'orientation': Field(name='orientation',type='float',default=&lt;d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'phase': Field(name='phase',type='float',default=&lt;datacla...appingproxy({}),kw_only=False,_field_type=_FIELD), 'row': Field(name='row',type='int',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD), 'scale': Field(name='scale',type='float',default=&lt;datacla...appingproxy({}),kw_only=False,_field_type=_FIELD), 'strength': Field(name='strength',type='float',default=&lt;data...appingproxy({}),kw_only=False,_field_type=_FIELD), 'x': Field(name='x',type='float',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD), 'y': Field(name='y',type='float',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('y', 'x', 'row', 'col', 'orientation', 'scale', 'phase', 'strength', 'feature_index', 'channel')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="VisualField">class <strong>VisualField</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#VisualField">VisualField</a>(summary:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;features:&nbsp;'list[<a href="#VisualFeature">VisualFeature</a>]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;contours:&nbsp;'list[<a href="#VisualContour">VisualContour</a>]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;dominant_color:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;brightness:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;salience:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;gamma_power:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;chromatic_features:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;attended:&nbsp;'bool'&nbsp;=&nbsp;True)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;occipital&nbsp;subsystem's&nbsp;structured&nbsp;report&nbsp;of&nbsp;a&nbsp;single&nbsp;glance.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;payload&nbsp;returned&nbsp;by&nbsp;`<a href="#V1Model">V1Model</a>.process`&nbsp;and&nbsp;handed<br>
+downstream&nbsp;to&nbsp;attention,&nbsp;memory,&nbsp;and&nbsp;language.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="VisualField-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="VisualField-__init__"><strong>__init__</strong></a>(self, summary: 'str' = '', features: 'list[VisualFeature]' = &lt;factory&gt;, contours: 'list[VisualContour]' = &lt;factory&gt;, dominant_color: 'str' = '', brightness: 'float' = 0.0, salience: 'float' = 0.0, gamma_power: 'float' = 0.0, chromatic_features: 'int' = 0, attended: 'bool' = True) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="VisualField-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="VisualField-contour_count"><strong>contour_count</strong></a>(self) -&gt; 'int'</dt><dd><span class="code">Number&nbsp;of&nbsp;grouped&nbsp;contours.</span></dd></dl>
+
+<dl><dt><a name="VisualField-describe"><strong>describe</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Semantic&nbsp;description&nbsp;of&nbsp;what&nbsp;V1&nbsp;made&nbsp;of&nbsp;the&nbsp;scene.</span></dd></dl>
+
+<dl><dt><a name="VisualField-feature_count"><strong>feature_count</strong></a>(self) -&gt; 'int'</dt><dd><span class="code">Number&nbsp;of&nbsp;detected&nbsp;visual&nbsp;features.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>attended</strong></dt>
+</dl>
+<dl><dt><strong>brightness</strong></dt>
+</dl>
+<dl><dt><strong>chromatic_features</strong></dt>
+</dl>
+<dl><dt><strong>contours</strong></dt>
+</dl>
+<dl><dt><strong>dominant_color</strong></dt>
+</dl>
+<dl><dt><strong>features</strong></dt>
+</dl>
+<dl><dt><strong>gamma_power</strong></dt>
+</dl>
+<dl><dt><strong>salience</strong></dt>
+</dl>
+<dl><dt><strong>summary</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'attended': 'bool', 'brightness': 'float', 'chromatic_features': 'int', 'contours': 'list[VisualContour]', 'dominant_color': 'str', 'features': 'list[VisualFeature]', 'gamma_power': 'float', 'salience': 'float', 'summary': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'attended': Field(name='attended',type='bool',default=True,d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'brightness': Field(name='brightness',type='float',default=0.0...appingproxy({}),kw_only=False,_field_type=_FIELD), 'chromatic_features': Field(name='chromatic_features',type='int',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'contours': Field(name='contours',type='list[VisualContour]'...appingproxy({}),kw_only=False,_field_type=_FIELD), 'dominant_color': Field(name='dominant_color',type='str',default='...appingproxy({}),kw_only=False,_field_type=_FIELD), 'features': Field(name='features',type='list[VisualFeature]'...appingproxy({}),kw_only=False,_field_type=_FIELD), 'gamma_power': Field(name='gamma_power',type='float',default=0....appingproxy({}),kw_only=False,_field_type=_FIELD), 'salience': Field(name='salience',type='float',default=0.0,d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'summary': Field(name='summary',type='str',default='',defau...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('summary', 'features', 'contours', 'dominant_color', 'brightness', 'salience', 'gamma_power', 'chromatic_features', 'attended')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="VisualPercept">class <strong>VisualPercept</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#VisualPercept">VisualPercept</a>(concept:&nbsp;'str&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;confidence:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;candidates:&nbsp;'list[tuple[str,&nbsp;float]]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;v1_summary:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;dominant_color:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;brightness:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;gamma_power:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;v4_activity:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;n_v4_units:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;vtc_vector:&nbsp;'np.ndarray&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;v1_prediction_error:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;v4_prediction_error:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;vtc_prediction_error:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;surprise:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;is_novel:&nbsp;'bool'&nbsp;=&nbsp;False)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;complete&nbsp;visual&nbsp;percept&nbsp;from&nbsp;the&nbsp;full&nbsp;hierarchy.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;what&nbsp;Genesis&nbsp;cognitively&nbsp;experiences&nbsp;when&nbsp;it&nbsp;sees<br>
+something&nbsp;—&nbsp;the&nbsp;result&nbsp;of&nbsp;the&nbsp;full&nbsp;V1→V4→VTC→MTL&nbsp;pipeline<br>
+plus&nbsp;the&nbsp;predictive&nbsp;coding&nbsp;errors&nbsp;at&nbsp;each&nbsp;level.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="VisualPercept-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="VisualPercept-__init__"><strong>__init__</strong></a>(self, concept: 'str | None' = None, confidence: 'float' = 0.0, candidates: 'list[tuple[str, float]]' = &lt;factory&gt;, v1_summary: 'str' = '', dominant_color: 'str' = '', brightness: 'float' = 0.0, gamma_power: 'float' = 0.0, v4_activity: 'float' = 0.0, n_v4_units: 'int' = 0, vtc_vector: 'np.ndarray | None' = None, v1_prediction_error: 'float' = 0.0, v4_prediction_error: 'float' = 0.0, vtc_prediction_error: 'float' = 0.0, surprise: 'float' = 0.0, is_novel: 'bool' = False) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="VisualPercept-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="VisualPercept-describe"><strong>describe</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Topic&nbsp;marker&nbsp;for&nbsp;the&nbsp;language&nbsp;engine.<br>
+&nbsp;<br>
+The&nbsp;percept's&nbsp;semantics&nbsp;travel&nbsp;in&nbsp;``Thought``&nbsp;metadata<br>
+(concept,&nbsp;candidates,&nbsp;color,&nbsp;surprise);&nbsp;this&nbsp;returns&nbsp;the&nbsp;topic<br>
+the&nbsp;content&nbsp;slot&nbsp;composes&nbsp;around.&nbsp;The&nbsp;first-person&nbsp;voice&nbsp;is<br>
+composed&nbsp;by&nbsp;the&nbsp;generator,&nbsp;not&nbsp;recited&nbsp;from&nbsp;here.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'brightness': 'float', 'candidates': 'list[tuple[str, float]]', 'concept': 'str | None', 'confidence': 'float', 'dominant_color': 'str', 'gamma_power': 'float', 'is_novel': 'bool', 'n_v4_units': 'int', 'surprise': 'float', 'v1_prediction_error': 'float', ...}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'brightness': Field(name='brightness',type='float',default=0.0...appingproxy({}),kw_only=False,_field_type=_FIELD), 'candidates': Field(name='candidates',type='list[tuple[str, fl...appingproxy({}),kw_only=False,_field_type=_FIELD), 'concept': Field(name='concept',type='str | None',default=N...appingproxy({}),kw_only=False,_field_type=_FIELD), 'confidence': Field(name='confidence',type='float',default=0.0...appingproxy({}),kw_only=False,_field_type=_FIELD), 'dominant_color': Field(name='dominant_color',type='str',default='...appingproxy({}),kw_only=False,_field_type=_FIELD), 'gamma_power': Field(name='gamma_power',type='float',default=0....appingproxy({}),kw_only=False,_field_type=_FIELD), 'is_novel': Field(name='is_novel',type='bool',default=False,...appingproxy({}),kw_only=False,_field_type=_FIELD), 'n_v4_units': Field(name='n_v4_units',type='int',default=0,def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'surprise': Field(name='surprise',type='float',default=0.0,d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'v1_prediction_error': Field(name='v1_prediction_error',type='float',de...appingproxy({}),kw_only=False,_field_type=_FIELD), ...}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('concept', 'confidence', 'candidates', 'v1_summary', 'dominant_color', 'brightness', 'gamma_power', 'v4_activity', 'n_v4_units', 'vtc_vector', 'v1_prediction_error', 'v4_prediction_error', 'vtc_prediction_error', 'surprise', 'is_novel')</dl>
+
+<dl><dt><strong>brightness</strong> = 0.0</dl>
+
+<dl><dt><strong>concept</strong> = None</dl>
+
+<dl><dt><strong>confidence</strong> = 0.0</dl>
+
+<dl><dt><strong>dominant_color</strong> = ''</dl>
+
+<dl><dt><strong>gamma_power</strong> = 0.0</dl>
+
+<dl><dt><strong>is_novel</strong> = False</dl>
+
+<dl><dt><strong>n_v4_units</strong> = 0</dl>
+
+<dl><dt><strong>surprise</strong> = 0.0</dl>
+
+<dl><dt><strong>v1_prediction_error</strong> = 0.0</dl>
+
+<dl><dt><strong>v1_summary</strong> = ''</dl>
+
+<dl><dt><strong>v4_activity</strong> = 0.0</dl>
+
+<dl><dt><strong>v4_prediction_error</strong> = 0.0</dl>
+
+<dl><dt><strong>vtc_prediction_error</strong> = 0.0</dl>
+
+<dl><dt><strong>vtc_vector</strong> = None</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-compute_intent_probabilities"><strong>compute_intent_probabilities</strong></a>(text: 'str', pattern_weights: 'PatternWeights | None' = None, context_prior: 'dict[Intent, float] | None' = None) -&gt; 'dict[Intent, float]'</dt><dd><span class="code">Compute&nbsp;a&nbsp;probability&nbsp;distribution&nbsp;over&nbsp;intents&nbsp;for&nbsp;``text``.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;a&nbsp;Bayesian&nbsp;classifier.&nbsp;For&nbsp;each&nbsp;intent,&nbsp;the&nbsp;(unnormalised)<br>
+posterior&nbsp;is::<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;score(intent)&nbsp;=&nbsp;Σ&nbsp;(match_count&nbsp;×&nbsp;pattern_weight)&nbsp;×&nbsp;prior(intent)<br>
+&nbsp;<br>
+where&nbsp;the&nbsp;sum&nbsp;is&nbsp;over&nbsp;pattern&nbsp;categories&nbsp;that&nbsp;map&nbsp;to&nbsp;that&nbsp;intent,<br>
+``match_count``&nbsp;is&nbsp;how&nbsp;many&nbsp;of&nbsp;the&nbsp;category's&nbsp;patterns&nbsp;matched&nbsp;the<br>
+text,&nbsp;``pattern_weight``&nbsp;is&nbsp;the&nbsp;learned&nbsp;reliability&nbsp;of&nbsp;that<br>
+category&nbsp;(perceptual&nbsp;learning,&nbsp;default&nbsp;1.0),&nbsp;and&nbsp;``prior(intent)``<br>
+is&nbsp;the&nbsp;context&nbsp;prior&nbsp;(default&nbsp;uniform).<br>
+&nbsp;<br>
+The&nbsp;result&nbsp;is&nbsp;normalised&nbsp;to&nbsp;a&nbsp;proper&nbsp;probability&nbsp;distribution.&nbsp;A<br>
+small&nbsp;smoothing&nbsp;floor&nbsp;is&nbsp;added&nbsp;so&nbsp;every&nbsp;intent&nbsp;that&nbsp;has&nbsp;any<br>
+pattern&nbsp;category&nbsp;gets&nbsp;a&nbsp;non-zero&nbsp;probability,&nbsp;even&nbsp;when&nbsp;no<br>
+patterns&nbsp;match&nbsp;—&nbsp;this&nbsp;keeps&nbsp;the&nbsp;distribution&nbsp;useful&nbsp;for&nbsp;the<br>
+cognition&nbsp;engine&nbsp;when&nbsp;the&nbsp;input&nbsp;is&nbsp;ambiguous.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;text:&nbsp;The&nbsp;(lowercased)&nbsp;input&nbsp;text.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;pattern_weights:&nbsp;Optional&nbsp;learned&nbsp;pattern&nbsp;weights.&nbsp;If&nbsp;``None``,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;all&nbsp;categories&nbsp;use&nbsp;the&nbsp;default&nbsp;weight&nbsp;of&nbsp;1.0.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;context_prior:&nbsp;Optional&nbsp;prior&nbsp;over&nbsp;intents&nbsp;reflecting<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;conversation&nbsp;history.&nbsp;If&nbsp;``None``,&nbsp;a&nbsp;uniform&nbsp;prior&nbsp;is<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;used.&nbsp;Intents&nbsp;not&nbsp;present&nbsp;in&nbsp;the&nbsp;prior&nbsp;get&nbsp;a&nbsp;small&nbsp;floor.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;mapping&nbsp;from&nbsp;:class:`<a href="#Intent">Intent</a>`&nbsp;to&nbsp;probability.&nbsp;The&nbsp;highest<br>
+&nbsp;&nbsp;&nbsp;&nbsp;probability&nbsp;intent&nbsp;corresponds&nbsp;to&nbsp;the&nbsp;most&nbsp;likely<br>
+&nbsp;&nbsp;&nbsp;&nbsp;classification;&nbsp;ties&nbsp;or&nbsp;near-ties&nbsp;signal&nbsp;ambiguity&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;cognition&nbsp;engine&nbsp;can&nbsp;resolve&nbsp;with&nbsp;context.</span></dd></dl>
+ <dl><dt><a name="-decode_image_bytes"><strong>decode_image_bytes</strong></a>(data: 'bytes') -&gt; 'np.ndarray | None'</dt><dd><span class="code">Decode&nbsp;raw&nbsp;image&nbsp;bytes&nbsp;(e.g.&nbsp;from&nbsp;a&nbsp;URL)&nbsp;into&nbsp;an&nbsp;RGB&nbsp;uint8&nbsp;array.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;data:&nbsp;raw&nbsp;image&nbsp;bytes&nbsp;(JPEG,&nbsp;PNG,&nbsp;etc.).<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;H×W×3&nbsp;uint8&nbsp;RGB&nbsp;array,&nbsp;or&nbsp;None.</span></dd></dl>
+ <dl><dt><a name="-load_image"><strong>load_image</strong></a>(path: 'str | Path') -&gt; 'np.ndarray | None'</dt><dd><span class="code">Load&nbsp;an&nbsp;image&nbsp;file&nbsp;as&nbsp;an&nbsp;RGB&nbsp;uint8&nbsp;numpy&nbsp;array.<br>
+&nbsp;<br>
+Supports&nbsp;any&nbsp;format&nbsp;PIL&nbsp;can&nbsp;read&nbsp;(PNG,&nbsp;JPEG,&nbsp;BMP,&nbsp;GIF,&nbsp;etc.).<br>
+Converts&nbsp;grayscale&nbsp;to&nbsp;RGB.&nbsp;Returns&nbsp;None&nbsp;on&nbsp;failure.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;path:&nbsp;path&nbsp;to&nbsp;the&nbsp;image&nbsp;file.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;H×W×3&nbsp;uint8&nbsp;RGB&nbsp;array,&nbsp;or&nbsp;None.</span></dd></dl>
+ <dl><dt><a name="-perceive"><strong>perceive</strong></a>(text: 'str', embeddings=None, network=None, pattern_weights: 'PatternWeights | None' = None, context_prior: 'dict[Intent, float] | None' = None, brain_waves: 'BrainWaveState | None' = None) -&gt; 'Perception'</dt><dd><span class="code">Perceive&nbsp;a&nbsp;user&nbsp;utterance&nbsp;—&nbsp;classify&nbsp;intent,&nbsp;extract&nbsp;meaning.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;main&nbsp;entry&nbsp;point&nbsp;for&nbsp;the&nbsp;perception&nbsp;system.&nbsp;It&nbsp;takes<br>
+raw&nbsp;text&nbsp;and&nbsp;returns&nbsp;a&nbsp;structured&nbsp;<a href="#Perception">Perception</a>.<br>
+&nbsp;<br>
+If&nbsp;an&nbsp;EmbeddingStore&nbsp;is&nbsp;provided,&nbsp;topic&nbsp;extraction&nbsp;is&nbsp;augmented<br>
+with&nbsp;semantic&nbsp;matching&nbsp;—&nbsp;concepts&nbsp;are&nbsp;recognized&nbsp;even&nbsp;when&nbsp;the<br>
+exact&nbsp;word&nbsp;doesn't&nbsp;appear&nbsp;in&nbsp;the&nbsp;text.<br>
+&nbsp;<br>
+If&nbsp;a&nbsp;ConceptNetwork&nbsp;is&nbsp;provided,&nbsp;topic&nbsp;resolution&nbsp;is&nbsp;context-aware:<br>
+when&nbsp;the&nbsp;user&nbsp;is&nbsp;talking&nbsp;about&nbsp;Genesis&nbsp;itself&nbsp;("your&nbsp;code",&nbsp;"your<br>
+daemon"),&nbsp;topics&nbsp;are&nbsp;resolved&nbsp;to&nbsp;self-relevant&nbsp;concepts&nbsp;(origin="code"<br>
+or&nbsp;"identity")&nbsp;rather&nbsp;than&nbsp;dictionary&nbsp;definitions.&nbsp;This&nbsp;is&nbsp;top-down<br>
+attention&nbsp;—&nbsp;the&nbsp;context&nbsp;biases&nbsp;which&nbsp;concepts&nbsp;win&nbsp;the&nbsp;competition.<br>
+&nbsp;<br>
+If&nbsp;``pattern_weights``&nbsp;is&nbsp;provided&nbsp;(perceptual&nbsp;learning),&nbsp;pattern<br>
+matches&nbsp;are&nbsp;weighted&nbsp;by&nbsp;their&nbsp;learned&nbsp;success&nbsp;rates&nbsp;—&nbsp;categories<br>
+that&nbsp;have&nbsp;led&nbsp;to&nbsp;good&nbsp;conversational&nbsp;outcomes&nbsp;count&nbsp;for&nbsp;more.<br>
+See&nbsp;:class:`<a href="#PatternWeights">PatternWeights</a>`&nbsp;and&nbsp;Goldstone&nbsp;(1998).<br>
+&nbsp;<br>
+If&nbsp;``context_prior``&nbsp;is&nbsp;provided,&nbsp;it&nbsp;biases&nbsp;the&nbsp;probabilistic<br>
+intent&nbsp;distribution&nbsp;toward&nbsp;intents&nbsp;likely&nbsp;given&nbsp;conversation<br>
+history&nbsp;(Bayesian&nbsp;classification).&nbsp;The&nbsp;primary&nbsp;``intent``&nbsp;field&nbsp;is<br>
+still&nbsp;chosen&nbsp;by&nbsp;the&nbsp;deterministic&nbsp;priority-ordered&nbsp;rules&nbsp;so<br>
+existing&nbsp;behaviour&nbsp;is&nbsp;preserved;&nbsp;the&nbsp;full<br>
+``intent_probabilities``&nbsp;distribution&nbsp;is&nbsp;available&nbsp;for&nbsp;the<br>
+cognition&nbsp;engine&nbsp;to&nbsp;use&nbsp;when&nbsp;intents&nbsp;are&nbsp;close.<br>
+&nbsp;<br>
+If&nbsp;``brain_waves``&nbsp;is&nbsp;provided,&nbsp;semantic&nbsp;matching&nbsp;is&nbsp;modulated:<br>
+alpha&nbsp;(filtering/inhibition)&nbsp;raises&nbsp;the&nbsp;match&nbsp;threshold&nbsp;(fewer<br>
+semantic&nbsp;matches&nbsp;—&nbsp;it&nbsp;filters&nbsp;out&nbsp;weak&nbsp;associations),&nbsp;gamma<br>
+(enhanced&nbsp;processing)&nbsp;lowers&nbsp;it&nbsp;(more&nbsp;matches&nbsp;—&nbsp;it's&nbsp;more<br>
+perceptive&nbsp;of&nbsp;remote&nbsp;associations).</span></dd></dl>
+ <dl><dt><a name="-resize_for_vision"><strong>resize_for_vision</strong></a>(frame: 'np.ndarray', max_dim: 'int' = 320) -&gt; 'np.ndarray'</dt><dd><span class="code">Resize&nbsp;an&nbsp;image&nbsp;to&nbsp;be&nbsp;no&nbsp;larger&nbsp;than&nbsp;max_dim&nbsp;on&nbsp;any&nbsp;side.<br>
+&nbsp;<br>
+This&nbsp;keeps&nbsp;processing&nbsp;fast&nbsp;while&nbsp;preserving&nbsp;aspect&nbsp;ratio.<br>
+V1's&nbsp;8×8&nbsp;patches&nbsp;work&nbsp;best&nbsp;on&nbsp;images&nbsp;in&nbsp;the&nbsp;120-320&nbsp;pixel&nbsp;range.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;frame:&nbsp;H×W×3&nbsp;uint8&nbsp;image.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;max_dim:&nbsp;maximum&nbsp;dimension&nbsp;in&nbsp;pixels.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Resized&nbsp;H×W×3&nbsp;uint8&nbsp;image.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['DetectedFace', 'FaceRecognizer', 'IntegratedPerception', 'Intent', 'KnownFace', 'MemoryBridge', 'MultisensoryInput', 'MultisensoryIntegrator', 'PatternWeights', 'Perception', 'QuestionType', 'SensoryModality', 'TrainingExample', 'V1Model', 'V4Model', 'VTCFeatureSpace', 'VisualContour', 'VisualCortex', 'VisualFeature', 'VisualField', ...]</td></tr></table>
+</body></html>

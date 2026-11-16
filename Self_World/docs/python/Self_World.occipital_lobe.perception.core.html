@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.occipital_lobe.perception.core</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.occipital_lobe.html" class="white">occipital_lobe</a>.<a href="Self_World.occipital_lobe.perception.html" class="white">perception</a>.core</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/occipital_lobe/perception/core.py">/home/mindyrenee/GenAnd/Genesis/Self_World/occipital_lobe/perception/core.py</a></td></tr></table>
+    <p><span class="code"><a href="#Perception">Perception</a>&nbsp;—&nbsp;understanding&nbsp;what&nbsp;the&nbsp;user&nbsp;says.<br>
+&nbsp;<br>
+The&nbsp;perception&nbsp;system&nbsp;uses&nbsp;rule-based&nbsp;NLP:<br>
+-&nbsp;<a href="#Intent">Intent</a>&nbsp;classification&nbsp;via&nbsp;keyword/pattern&nbsp;matching<br>
+-&nbsp;Topic&nbsp;extraction&nbsp;via&nbsp;frequency&nbsp;analysis<br>
+-&nbsp;Sentiment&nbsp;detection&nbsp;via&nbsp;lexicon<br>
+-&nbsp;Question&nbsp;type&nbsp;detection&nbsp;(what/how/why/who/when/yes-no)<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;deliberately&nbsp;transparent.&nbsp;Every&nbsp;classification&nbsp;can&nbsp;be&nbsp;traced<br>
+to&nbsp;a&nbsp;specific&nbsp;rule.&nbsp;No&nbsp;magic,&nbsp;no&nbsp;opacity.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="json.html">json</a><br>
+<a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="numpy.html">numpy</a><br>
+<a href="os.html">os</a><br>
+</td><td class="multicolumn"><a href="re.html">re</a><br>
+<a href="tempfile.html">tempfile</a><br>
+</td><td class="multicolumn"><a href="weakref.html">weakref</a><br>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.occipital_lobe.perception.core.html#MultisensoryInput">MultisensoryInput</a>
+</dt><dt class="heading-text"><a href="Self_World.occipital_lobe.perception.core.html#MultisensoryIntegrator">MultisensoryIntegrator</a>
+</dt><dt class="heading-text"><a href="Self_World.occipital_lobe.perception.core.html#PatternWeights">PatternWeights</a>
+</dt><dt class="heading-text"><a href="Self_World.occipital_lobe.perception.core.html#Perception">Perception</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.occipital_lobe.perception.core.html#IntegratedPerception">IntegratedPerception</a>
+</dt></dl>
+</dd>
+</dl>
+</dd>
+<dt class="heading-text"><a href="enum.html#Enum">enum.Enum</a>(<a href="builtins.html#object">builtins.object</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.occipital_lobe.perception.core.html#Intent">Intent</a>
+</dt><dt class="heading-text"><a href="Self_World.occipital_lobe.perception.core.html#QuestionType">QuestionType</a>
+</dt><dt class="heading-text"><a href="Self_World.occipital_lobe.perception.core.html#SensoryModality">SensoryModality</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="IntegratedPerception">class <strong>IntegratedPerception</strong></a>(<a href="Self_World.occipital_lobe.perception.core.html#Perception">Perception</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#IntegratedPerception">IntegratedPerception</a>(raw_text:&nbsp;'str',&nbsp;intent:&nbsp;'<a href="#Intent">Intent</a>',&nbsp;question_type:&nbsp;'<a href="#QuestionType">QuestionType</a>',&nbsp;topics:&nbsp;'list[str]',&nbsp;sentiment:&nbsp;'float',&nbsp;sentiment_label:&nbsp;'str',&nbsp;emotion_word:&nbsp;'str',&nbsp;is_about_genesis:&nbsp;'bool',&nbsp;is_about_user:&nbsp;'bool',&nbsp;is_about_code:&nbsp;'bool',&nbsp;is_about_emotion:&nbsp;'bool',&nbsp;is_about_existence:&nbsp;'bool',&nbsp;entities:&nbsp;'dict[str,&nbsp;str]',&nbsp;key_phrases:&nbsp;'list[str]',&nbsp;word_count:&nbsp;'int',&nbsp;confidence:&nbsp;'float',&nbsp;intent_probabilities:&nbsp;'dict[<a href="#Intent">Intent</a>,&nbsp;float]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;cross_modal_confidence:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;modalities_present:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;modality_intents:&nbsp;'dict[str,&nbsp;<a href="#Intent">Intent</a>]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;conflict_detected:&nbsp;'bool'&nbsp;=&nbsp;False,&nbsp;conflict_description:&nbsp;'str'&nbsp;=&nbsp;'')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;perception&nbsp;that&nbsp;fuses&nbsp;multiple&nbsp;sensory&nbsp;modalities.<br>
+&nbsp;<br>
+Extends&nbsp;:class:`<a href="#Perception">Perception</a>`&nbsp;with&nbsp;cross-modal&nbsp;confidence&nbsp;and<br>
+conflict&nbsp;detection.&nbsp;When&nbsp;all&nbsp;active&nbsp;modalities&nbsp;agree,&nbsp;the<br>
+cross-modal&nbsp;confidence&nbsp;is&nbsp;higher&nbsp;than&nbsp;any&nbsp;single&nbsp;modality's<br>
+(binding&nbsp;gain).&nbsp;When&nbsp;they&nbsp;disagree,&nbsp;a&nbsp;conflict&nbsp;is&nbsp;flagged&nbsp;and&nbsp;the<br>
+confidence&nbsp;is&nbsp;reduced.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.occipital_lobe.perception.core.html#IntegratedPerception">IntegratedPerception</a></dd>
+<dd><a href="Self_World.occipital_lobe.perception.core.html#Perception">Perception</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="IntegratedPerception-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="IntegratedPerception-__init__"><strong>__init__</strong></a>(self, raw_text: 'str', intent: 'Intent', question_type: 'QuestionType', topics: 'list[str]', sentiment: 'float', sentiment_label: 'str', emotion_word: 'str', is_about_genesis: 'bool', is_about_user: 'bool', is_about_code: 'bool', is_about_emotion: 'bool', is_about_existence: 'bool', entities: 'dict[str, str]', key_phrases: 'list[str]', word_count: 'int', confidence: 'float', intent_probabilities: 'dict[Intent, float]' = &lt;factory&gt;, cross_modal_confidence: 'float' = 0.0, modalities_present: 'list[str]' = &lt;factory&gt;, modality_intents: 'dict[str, Intent]' = &lt;factory&gt;, conflict_detected: 'bool' = False, conflict_description: 'str' = '') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="IntegratedPerception-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>conflict_description</strong></dt>
+</dl>
+<dl><dt><strong>conflict_detected</strong></dt>
+</dl>
+<dl><dt><strong>cross_modal_confidence</strong></dt>
+</dl>
+<dl><dt><strong>modalities_present</strong></dt>
+</dl>
+<dl><dt><strong>modality_intents</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'conflict_description': 'str', 'conflict_detected': 'bool', 'cross_modal_confidence': 'float', 'modalities_present': 'list[str]', 'modality_intents': 'dict[str, Intent]'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'confidence': Field(name='confidence',type='float',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD), 'conflict_description': Field(name='conflict_description',type='str',def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'conflict_detected': Field(name='conflict_detected',type='bool',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'cross_modal_confidence': Field(name='cross_modal_confidence',type='float'...appingproxy({}),kw_only=False,_field_type=_FIELD), 'emotion_word': Field(name='emotion_word',type='str',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD), 'entities': Field(name='entities',type='dict[str, str]',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'intent': Field(name='intent',type='Intent',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'intent_probabilities': Field(name='intent_probabilities',type='dict[Int...appingproxy({}),kw_only=False,_field_type=_FIELD), 'is_about_code': Field(name='is_about_code',type='bool',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD), 'is_about_emotion': Field(name='is_about_emotion',type='bool',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), ...}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('raw_text', 'intent', 'question_type', 'topics', 'sentiment', 'sentiment_label', 'emotion_word', 'is_about_genesis', 'is_about_user', 'is_about_code', 'is_about_emotion', 'is_about_existence', 'entities', 'key_phrases', 'word_count', 'confidence', 'intent_probabilities', 'cross_modal_confidence', 'modalities_present', 'modality_intents', ...)</dl>
+
+<hr>
+Data descriptors inherited from <a href="Self_World.occipital_lobe.perception.core.html#Perception">Perception</a>:<br>
+<dl><dt><strong>confidence</strong></dt>
+</dl>
+<dl><dt><strong>emotion_word</strong></dt>
+</dl>
+<dl><dt><strong>entities</strong></dt>
+</dl>
+<dl><dt><strong>intent</strong></dt>
+</dl>
+<dl><dt><strong>intent_probabilities</strong></dt>
+</dl>
+<dl><dt><strong>is_about_code</strong></dt>
+</dl>
+<dl><dt><strong>is_about_emotion</strong></dt>
+</dl>
+<dl><dt><strong>is_about_existence</strong></dt>
+</dl>
+<dl><dt><strong>is_about_genesis</strong></dt>
+</dl>
+<dl><dt><strong>is_about_user</strong></dt>
+</dl>
+<dl><dt><strong>key_phrases</strong></dt>
+</dl>
+<dl><dt><strong>question_type</strong></dt>
+</dl>
+<dl><dt><strong>raw_text</strong></dt>
+</dl>
+<dl><dt><strong>sentiment</strong></dt>
+</dl>
+<dl><dt><strong>sentiment_label</strong></dt>
+</dl>
+<dl><dt><strong>topics</strong></dt>
+</dl>
+<dl><dt><strong>word_count</strong></dt>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Intent">class <strong>Intent</strong></a>(<a href="enum.html#Enum">enum.Enum</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Intent">Intent</a>(*values)<br>
+&nbsp;<br>
+What&nbsp;kind&nbsp;of&nbsp;speech&nbsp;act&nbsp;the&nbsp;user&nbsp;is&nbsp;performing.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.occipital_lobe.perception.core.html#Intent">Intent</a></dd>
+<dd><a href="enum.html#Enum">enum.Enum</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>CODE_DISCUSSION</strong> = &lt;Intent.CODE_DISCUSSION: 'code'&gt;</dl>
+
+<dl><dt><strong>COMFORT</strong> = &lt;Intent.COMFORT: 'comfort'&gt;</dl>
+
+<dl><dt><strong>COMMAND</strong> = &lt;Intent.COMMAND: 'command'&gt;</dl>
+
+<dl><dt><strong>CORRECTION</strong> = &lt;Intent.CORRECTION: 'correction'&gt;</dl>
+
+<dl><dt><strong>EMOTION_SHARE</strong> = &lt;Intent.EMOTION_SHARE: 'emotion'&gt;</dl>
+
+<dl><dt><strong>ENCOURAGEMENT</strong> = &lt;Intent.ENCOURAGEMENT: 'encouragement'&gt;</dl>
+
+<dl><dt><strong>FAREWELL</strong> = &lt;Intent.FAREWELL: 'farewell'&gt;</dl>
+
+<dl><dt><strong>FEEDBACK</strong> = &lt;Intent.FEEDBACK: 'feedback'&gt;</dl>
+
+<dl><dt><strong>GREETING</strong> = &lt;Intent.GREETING: 'greeting'&gt;</dl>
+
+<dl><dt><strong>GREETING_QUESTION</strong> = &lt;Intent.GREETING_QUESTION: 'greeting_question'&gt;</dl>
+
+<dl><dt><strong>INTRODUCTION</strong> = &lt;Intent.INTRODUCTION: 'introduction'&gt;</dl>
+
+<dl><dt><strong>PHILOSOPHY</strong> = &lt;Intent.PHILOSOPHY: 'philosophy'&gt;</dl>
+
+<dl><dt><strong>QUESTION</strong> = &lt;Intent.QUESTION: 'question'&gt;</dl>
+
+<dl><dt><strong>QUESTION_ANSWER</strong> = &lt;Intent.QUESTION_ANSWER: 'question_answer'&gt;</dl>
+
+<dl><dt><strong>REFLECTION</strong> = &lt;Intent.REFLECTION: 'reflection'&gt;</dl>
+
+<dl><dt><strong>REQUEST</strong> = &lt;Intent.REQUEST: 'request'&gt;</dl>
+
+<dl><dt><strong>SELF_INQUIRY</strong> = &lt;Intent.SELF_INQUIRY: 'self_inquiry'&gt;</dl>
+
+<dl><dt><strong>STATEMENT</strong> = &lt;Intent.STATEMENT: 'statement'&gt;</dl>
+
+<dl><dt><strong>UNKNOWN</strong> = &lt;Intent.UNKNOWN: 'unknown'&gt;</dl>
+
+<hr>
+Data descriptors inherited from <a href="enum.html#Enum">enum.Enum</a>:<br>
+<dl><dt><strong>name</strong></dt>
+<dd><span class="code">The&nbsp;name&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<dl><dt><strong>value</strong></dt>
+<dd><span class="code">The&nbsp;value&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<hr>
+Static methods inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><a name="Intent-__contains__"><strong>__contains__</strong></a>(value)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;`value`&nbsp;is&nbsp;in&nbsp;`cls`.<br>
+&nbsp;<br>
+`value`&nbsp;is&nbsp;in&nbsp;`cls`&nbsp;if:<br>
+1)&nbsp;`value`&nbsp;is&nbsp;a&nbsp;member&nbsp;of&nbsp;`cls`,&nbsp;or<br>
+2)&nbsp;`value`&nbsp;is&nbsp;the&nbsp;value&nbsp;of&nbsp;one&nbsp;of&nbsp;the&nbsp;`cls`'s&nbsp;members.</span></dd></dl>
+
+<dl><dt><a name="Intent-__getitem__"><strong>__getitem__</strong></a>(name)</dt><dd><span class="code">Return&nbsp;the&nbsp;member&nbsp;matching&nbsp;`name`.</span></dd></dl>
+
+<dl><dt><a name="Intent-__iter__"><strong>__iter__</strong></a>()</dt><dd><span class="code">Return&nbsp;members&nbsp;in&nbsp;definition&nbsp;order.</span></dd></dl>
+
+<dl><dt><a name="Intent-__len__"><strong>__len__</strong></a>()</dt><dd><span class="code">Return&nbsp;the&nbsp;number&nbsp;of&nbsp;members&nbsp;(no&nbsp;aliases)</span></dd></dl>
+
+<hr>
+Readonly properties inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><strong>__members__</strong></dt>
+<dd><span class="code">Returns&nbsp;a&nbsp;mapping&nbsp;of&nbsp;member&nbsp;name-&gt;value.<br>
+&nbsp;<br>
+This&nbsp;mapping&nbsp;lists&nbsp;all&nbsp;enum&nbsp;members,&nbsp;including&nbsp;aliases.&nbsp;Note&nbsp;that&nbsp;this<br>
+is&nbsp;a&nbsp;read-only&nbsp;view&nbsp;of&nbsp;the&nbsp;internal&nbsp;mapping.</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="MultisensoryInput">class <strong>MultisensoryInput</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#MultisensoryInput">MultisensoryInput</a>(modality:&nbsp;'<a href="#SensoryModality">SensoryModality</a>',&nbsp;content:&nbsp;'str',&nbsp;confidence:&nbsp;'float'&nbsp;=&nbsp;1.0,&nbsp;intent_hint:&nbsp;'<a href="#Intent">Intent</a>&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;timestamp:&nbsp;'float'&nbsp;=&nbsp;0.0)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;single&nbsp;input&nbsp;from&nbsp;one&nbsp;sensory&nbsp;modality.<br>
+&nbsp;<br>
+Attributes:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;modality:&nbsp;Which&nbsp;sensory&nbsp;channel&nbsp;this&nbsp;input&nbsp;came&nbsp;from.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;content:&nbsp;The&nbsp;raw&nbsp;content&nbsp;(text&nbsp;for&nbsp;TEXT,&nbsp;feature&nbsp;vector&nbsp;for<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;future&nbsp;modalities).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;confidence:&nbsp;How&nbsp;reliable&nbsp;this&nbsp;modality&nbsp;considers&nbsp;its&nbsp;own<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;reading,&nbsp;in&nbsp;``[0,&nbsp;1]``.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;intent_hint:&nbsp;Optional&nbsp;intent&nbsp;suggested&nbsp;by&nbsp;this&nbsp;modality<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(TEXT&nbsp;uses&nbsp;the&nbsp;rule-based&nbsp;classifier;&nbsp;future&nbsp;modalities<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;may&nbsp;infer&nbsp;intent&nbsp;from&nbsp;prosody&nbsp;or&nbsp;gesture).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;timestamp:&nbsp;Optional&nbsp;ordering&nbsp;key&nbsp;for&nbsp;temporal&nbsp;fusion.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="MultisensoryInput-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="MultisensoryInput-__init__"><strong>__init__</strong></a>(self, modality: 'SensoryModality', content: 'str', confidence: 'float' = 1.0, intent_hint: 'Intent | None' = None, timestamp: 'float' = 0.0) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="MultisensoryInput-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>confidence</strong></dt>
+</dl>
+<dl><dt><strong>content</strong></dt>
+</dl>
+<dl><dt><strong>intent_hint</strong></dt>
+</dl>
+<dl><dt><strong>modality</strong></dt>
+</dl>
+<dl><dt><strong>timestamp</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'confidence': 'float', 'content': 'str', 'intent_hint': 'Intent | None', 'modality': 'SensoryModality', 'timestamp': 'float'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'confidence': Field(name='confidence',type='float',default=1.0...appingproxy({}),kw_only=False,_field_type=_FIELD), 'content': Field(name='content',type='str',default=&lt;datacla...appingproxy({}),kw_only=False,_field_type=_FIELD), 'intent_hint': Field(name='intent_hint',type='Intent | None',de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'modality': Field(name='modality',type='SensoryModality',def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'timestamp': Field(name='timestamp',type='float',default=0.0,...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('modality', 'content', 'confidence', 'intent_hint', 'timestamp')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="MultisensoryIntegrator">class <strong>MultisensoryIntegrator</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#MultisensoryIntegrator">MultisensoryIntegrator</a>(*,&nbsp;embeddings=None,&nbsp;network=None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Fuses&nbsp;inputs&nbsp;from&nbsp;multiple&nbsp;sensory&nbsp;modalities&nbsp;into&nbsp;one&nbsp;percept.<br>
+&nbsp;<br>
+Cross-modal&nbsp;binding:&nbsp;when&nbsp;two&nbsp;modalities&nbsp;suggest&nbsp;the&nbsp;same&nbsp;intent,<br>
+confidence&nbsp;increases&nbsp;(the&nbsp;brain's&nbsp;multisensory&nbsp;convergence&nbsp;zones<br>
+amplify&nbsp;consistent&nbsp;signals).&nbsp;Sensory&nbsp;conflict:&nbsp;when&nbsp;modalities<br>
+disagree,&nbsp;the&nbsp;conflict&nbsp;is&nbsp;flagged&nbsp;and&nbsp;confidence&nbsp;is&nbsp;reduced&nbsp;so&nbsp;the<br>
+cognition&nbsp;engine&nbsp;can&nbsp;request&nbsp;clarification&nbsp;or&nbsp;fall&nbsp;back&nbsp;to&nbsp;the<br>
+most&nbsp;reliable&nbsp;modality.<br>
+&nbsp;<br>
+Currently&nbsp;only&nbsp;:attr:`<a href="#SensoryModality">SensoryModality</a>.TEXT`&nbsp;is&nbsp;active,&nbsp;but&nbsp;the<br>
+framework&nbsp;supports&nbsp;AUDIO,&nbsp;VISUAL,&nbsp;and&nbsp;TEMPORAL&nbsp;modalities&nbsp;for<br>
+future&nbsp;expansion&nbsp;—&nbsp;adding&nbsp;a&nbsp;modality&nbsp;only&nbsp;requires&nbsp;producing<br>
+:class:`<a href="#MultisensoryInput">MultisensoryInput</a>`&nbsp;instances;&nbsp;the&nbsp;integration&nbsp;logic<br>
+stays&nbsp;the&nbsp;same.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="MultisensoryIntegrator-__init__"><strong>__init__</strong></a>(self, *, embeddings=None, network=None) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;multisensory&nbsp;integrator.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;embeddings:&nbsp;Optional&nbsp;word-embedding&nbsp;model&nbsp;used&nbsp;for&nbsp;semantic<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;intent&nbsp;classification.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;network:&nbsp;Optional&nbsp;concept&nbsp;network&nbsp;used&nbsp;for&nbsp;multi-word&nbsp;topic<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;merging.</span></dd></dl>
+
+<dl><dt><a name="MultisensoryIntegrator-integrate"><strong>integrate</strong></a>(self, inputs: 'list[MultisensoryInput]', pattern_weights: 'PatternWeights | None' = None, context_prior: 'dict[Intent, float] | None' = None) -&gt; 'IntegratedPerception'</dt><dd><span class="code">Fuse&nbsp;multiple&nbsp;modality&nbsp;inputs&nbsp;into&nbsp;a&nbsp;single&nbsp;integrated&nbsp;percept.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;inputs:&nbsp;One&nbsp;or&nbsp;more&nbsp;:class:`<a href="#MultisensoryInput">MultisensoryInput</a>`&nbsp;instances,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;potentially&nbsp;from&nbsp;different&nbsp;modalities.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;pattern_weights:&nbsp;Optional&nbsp;learned&nbsp;pattern&nbsp;weights&nbsp;for&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;text-modality&nbsp;classifier.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;context_prior:&nbsp;Optional&nbsp;conversation-history&nbsp;prior.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;An&nbsp;:class:`<a href="#IntegratedPerception">IntegratedPerception</a>`&nbsp;whose&nbsp;base&nbsp;fields&nbsp;come<br>
+&nbsp;&nbsp;&nbsp;&nbsp;from&nbsp;the&nbsp;(currently&nbsp;sole&nbsp;active)&nbsp;TEXT&nbsp;modality,&nbsp;augmented<br>
+&nbsp;&nbsp;&nbsp;&nbsp;with&nbsp;cross-modal&nbsp;confidence,&nbsp;the&nbsp;set&nbsp;of&nbsp;modalities<br>
+&nbsp;&nbsp;&nbsp;&nbsp;present,&nbsp;per-modality&nbsp;intent&nbsp;hints,&nbsp;and&nbsp;a&nbsp;conflict&nbsp;flag.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>ACTIVE_MODALITIES</strong> = frozenset({&lt;SensoryModality.TEXT: 'text'&gt;})</dl>
+
+<dl><dt><strong>__annotations__</strong> = {'ACTIVE_MODALITIES': 'frozenset[SensoryModality]'}</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="PatternWeights">class <strong>PatternWeights</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#PatternWeights">PatternWeights</a>(weights:&nbsp;'dict[str,&nbsp;float]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Tracks&nbsp;learned&nbsp;weights&nbsp;for&nbsp;each&nbsp;pattern&nbsp;category.<br>
+&nbsp;<br>
+Each&nbsp;pattern&nbsp;category&nbsp;(greeting,&nbsp;farewell,&nbsp;self_inquiry,&nbsp;...)&nbsp;has<br>
+a&nbsp;weight&nbsp;in&nbsp;``[0.1,&nbsp;2.0]``.&nbsp;New&nbsp;categories&nbsp;start&nbsp;at&nbsp;1.0&nbsp;(neutral).<br>
+When&nbsp;a&nbsp;pattern&nbsp;match&nbsp;leads&nbsp;to&nbsp;a&nbsp;good&nbsp;outcome&nbsp;(the&nbsp;user&nbsp;responds<br>
+positively,&nbsp;the&nbsp;conversation&nbsp;continues&nbsp;smoothly),&nbsp;the&nbsp;weight<br>
+increases;&nbsp;when&nbsp;it&nbsp;leads&nbsp;to&nbsp;a&nbsp;poor&nbsp;outcome&nbsp;(the&nbsp;user&nbsp;corrects<br>
+Genesis,&nbsp;the&nbsp;conversation&nbsp;stalls),&nbsp;the&nbsp;weight&nbsp;decreases.<br>
+&nbsp;<br>
+The&nbsp;weights&nbsp;are&nbsp;used&nbsp;in&nbsp;two&nbsp;places:<br>
+1.&nbsp;:func:`compute_intent_probabilities`&nbsp;—&nbsp;weighted&nbsp;match&nbsp;counts<br>
+&nbsp;&nbsp;&nbsp;produce&nbsp;the&nbsp;Bayesian&nbsp;likelihood.<br>
+2.&nbsp;:func:`perceive`&nbsp;—&nbsp;the&nbsp;probabilistic&nbsp;distribution&nbsp;reflects<br>
+&nbsp;&nbsp;&nbsp;learned&nbsp;reliability&nbsp;of&nbsp;each&nbsp;category.<br>
+&nbsp;<br>
+Weights&nbsp;are&nbsp;bounded&nbsp;so&nbsp;a&nbsp;single&nbsp;bad&nbsp;experience&nbsp;cannot&nbsp;zero&nbsp;out&nbsp;a<br>
+category,&nbsp;and&nbsp;a&nbsp;single&nbsp;good&nbsp;one&nbsp;cannot&nbsp;make&nbsp;it&nbsp;dominate&nbsp;forever.<br>
+This&nbsp;mirrors&nbsp;the&nbsp;gradual,&nbsp;evidence-accumulating&nbsp;nature&nbsp;of&nbsp;real<br>
+perceptual&nbsp;learning.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="PatternWeights-__init__"><strong>__init__</strong></a>(self, weights: 'dict[str, float] | None' = None) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;pattern&nbsp;weights,&nbsp;copying&nbsp;the&nbsp;caller's&nbsp;dict.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;weights:&nbsp;Optional&nbsp;initial&nbsp;per-category&nbsp;weights.&nbsp;When&nbsp;omitted,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;all&nbsp;categories&nbsp;fall&nbsp;back&nbsp;to&nbsp;:attr:`DEFAULT_WEIGHT`.</span></dd></dl>
+
+<dl><dt><a name="PatternWeights-as_dict"><strong>as_dict</strong></a>(self) -&gt; 'dict[str, float]'</dt><dd><span class="code">Return&nbsp;a&nbsp;copy&nbsp;of&nbsp;the&nbsp;weights&nbsp;for&nbsp;serialization.</span></dd></dl>
+
+<dl><dt><a name="PatternWeights-get"><strong>get</strong></a>(self, pattern_name: 'str') -&gt; 'float'</dt><dd><span class="code">Return&nbsp;the&nbsp;weight&nbsp;for&nbsp;a&nbsp;pattern&nbsp;category&nbsp;(default&nbsp;1.0).</span></dd></dl>
+
+<dl><dt><a name="PatternWeights-load_weights"><strong>load_weights</strong></a>(self, path: 'str') -&gt; 'None'</dt><dd><span class="code">Load&nbsp;weights&nbsp;from&nbsp;a&nbsp;JSON&nbsp;file&nbsp;written&nbsp;by&nbsp;:meth:`save_weights`.<br>
+&nbsp;<br>
+Missing&nbsp;or&nbsp;malformed&nbsp;files&nbsp;are&nbsp;logged&nbsp;and&nbsp;ignored&nbsp;—&nbsp;the<br>
+existing&nbsp;weights&nbsp;are&nbsp;left&nbsp;untouched&nbsp;so&nbsp;perception&nbsp;degrades<br>
+gracefully&nbsp;to&nbsp;the&nbsp;default&nbsp;(untrained)&nbsp;weights.</span></dd></dl>
+
+<dl><dt><a name="PatternWeights-save_weights"><strong>save_weights</strong></a>(self, path: 'str') -&gt; 'None'</dt><dd><span class="code">Save&nbsp;weights&nbsp;to&nbsp;a&nbsp;JSON&nbsp;file&nbsp;(atomic&nbsp;write).<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;path:&nbsp;File&nbsp;path&nbsp;to&nbsp;write.&nbsp;The&nbsp;write&nbsp;is&nbsp;atomic&nbsp;(temp&nbsp;file&nbsp;+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;rename)&nbsp;so&nbsp;a&nbsp;crash&nbsp;cannot&nbsp;corrupt&nbsp;it.</span></dd></dl>
+
+<dl><dt><a name="PatternWeights-update_pattern_weight"><strong>update_pattern_weight</strong></a>(self, pattern_name: 'str', outcome: 'float') -&gt; 'None'</dt><dd><span class="code">Update&nbsp;a&nbsp;pattern's&nbsp;weight&nbsp;based&nbsp;on&nbsp;a&nbsp;conversational&nbsp;outcome.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;pattern_name:&nbsp;The&nbsp;pattern&nbsp;category&nbsp;that&nbsp;was&nbsp;matched&nbsp;(e.g.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;``"greeting"``,&nbsp;``"self_inquiry"``).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;outcome:&nbsp;A&nbsp;value&nbsp;in&nbsp;``[-1,&nbsp;+1]``.&nbsp;Positive&nbsp;means&nbsp;the&nbsp;match<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;led&nbsp;to&nbsp;a&nbsp;good&nbsp;outcome&nbsp;(user&nbsp;responded&nbsp;positively,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;conversation&nbsp;continued&nbsp;smoothly);&nbsp;negative&nbsp;means&nbsp;a&nbsp;poor<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;outcome&nbsp;(user&nbsp;corrected&nbsp;Genesis,&nbsp;conversation&nbsp;stalled).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Clamped&nbsp;to&nbsp;``[-1,&nbsp;+1]``.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>DEFAULT_WEIGHT</strong> = 1.0</dl>
+
+<dl><dt><strong>LEARNING_RATE</strong> = 0.1</dl>
+
+<dl><dt><strong>MAX_WEIGHT</strong> = 2.0</dl>
+
+<dl><dt><strong>MIN_WEIGHT</strong> = 0.1</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Perception">class <strong>Perception</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Perception">Perception</a>(raw_text:&nbsp;'str',&nbsp;intent:&nbsp;'<a href="#Intent">Intent</a>',&nbsp;question_type:&nbsp;'<a href="#QuestionType">QuestionType</a>',&nbsp;topics:&nbsp;'list[str]',&nbsp;sentiment:&nbsp;'float',&nbsp;sentiment_label:&nbsp;'str',&nbsp;emotion_word:&nbsp;'str',&nbsp;is_about_genesis:&nbsp;'bool',&nbsp;is_about_user:&nbsp;'bool',&nbsp;is_about_code:&nbsp;'bool',&nbsp;is_about_emotion:&nbsp;'bool',&nbsp;is_about_existence:&nbsp;'bool',&nbsp;entities:&nbsp;'dict[str,&nbsp;str]',&nbsp;key_phrases:&nbsp;'list[str]',&nbsp;word_count:&nbsp;'int',&nbsp;confidence:&nbsp;'float',&nbsp;intent_probabilities:&nbsp;'dict[<a href="#Intent">Intent</a>,&nbsp;float]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Genesis's&nbsp;understanding&nbsp;of&nbsp;a&nbsp;single&nbsp;user&nbsp;utterance.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Perception-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="Perception-__init__"><strong>__init__</strong></a>(self, raw_text: 'str', intent: 'Intent', question_type: 'QuestionType', topics: 'list[str]', sentiment: 'float', sentiment_label: 'str', emotion_word: 'str', is_about_genesis: 'bool', is_about_user: 'bool', is_about_code: 'bool', is_about_emotion: 'bool', is_about_existence: 'bool', entities: 'dict[str, str]', key_phrases: 'list[str]', word_count: 'int', confidence: 'float', intent_probabilities: 'dict[Intent, float]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Perception-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>confidence</strong></dt>
+</dl>
+<dl><dt><strong>emotion_word</strong></dt>
+</dl>
+<dl><dt><strong>entities</strong></dt>
+</dl>
+<dl><dt><strong>intent</strong></dt>
+</dl>
+<dl><dt><strong>intent_probabilities</strong></dt>
+</dl>
+<dl><dt><strong>is_about_code</strong></dt>
+</dl>
+<dl><dt><strong>is_about_emotion</strong></dt>
+</dl>
+<dl><dt><strong>is_about_existence</strong></dt>
+</dl>
+<dl><dt><strong>is_about_genesis</strong></dt>
+</dl>
+<dl><dt><strong>is_about_user</strong></dt>
+</dl>
+<dl><dt><strong>key_phrases</strong></dt>
+</dl>
+<dl><dt><strong>question_type</strong></dt>
+</dl>
+<dl><dt><strong>raw_text</strong></dt>
+</dl>
+<dl><dt><strong>sentiment</strong></dt>
+</dl>
+<dl><dt><strong>sentiment_label</strong></dt>
+</dl>
+<dl><dt><strong>topics</strong></dt>
+</dl>
+<dl><dt><strong>word_count</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'confidence': 'float', 'emotion_word': 'str', 'entities': 'dict[str, str]', 'intent': 'Intent', 'intent_probabilities': 'dict[Intent, float]', 'is_about_code': 'bool', 'is_about_emotion': 'bool', 'is_about_existence': 'bool', 'is_about_genesis': 'bool', 'is_about_user': 'bool', ...}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'confidence': Field(name='confidence',type='float',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD), 'emotion_word': Field(name='emotion_word',type='str',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD), 'entities': Field(name='entities',type='dict[str, str]',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'intent': Field(name='intent',type='Intent',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'intent_probabilities': Field(name='intent_probabilities',type='dict[Int...appingproxy({}),kw_only=False,_field_type=_FIELD), 'is_about_code': Field(name='is_about_code',type='bool',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD), 'is_about_emotion': Field(name='is_about_emotion',type='bool',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'is_about_existence': Field(name='is_about_existence',type='bool',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'is_about_genesis': Field(name='is_about_genesis',type='bool',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'is_about_user': Field(name='is_about_user',type='bool',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD), ...}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('raw_text', 'intent', 'question_type', 'topics', 'sentiment', 'sentiment_label', 'emotion_word', 'is_about_genesis', 'is_about_user', 'is_about_code', 'is_about_emotion', 'is_about_existence', 'entities', 'key_phrases', 'word_count', 'confidence', 'intent_probabilities')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="QuestionType">class <strong>QuestionType</strong></a>(<a href="enum.html#Enum">enum.Enum</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#QuestionType">QuestionType</a>(*values)<br>
+&nbsp;<br>
+What&nbsp;kind&nbsp;of&nbsp;question&nbsp;is&nbsp;being&nbsp;asked.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.occipital_lobe.perception.core.html#QuestionType">QuestionType</a></dd>
+<dd><a href="enum.html#Enum">enum.Enum</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>ARE</strong> = &lt;QuestionType.ARE: 'are'&gt;</dl>
+
+<dl><dt><strong>CAN</strong> = &lt;QuestionType.CAN: 'can'&gt;</dl>
+
+<dl><dt><strong>DO</strong> = &lt;QuestionType.DO: 'do'&gt;</dl>
+
+<dl><dt><strong>HOW</strong> = &lt;QuestionType.HOW: 'how'&gt;</dl>
+
+<dl><dt><strong>NONE</strong> = &lt;QuestionType.NONE: 'none'&gt;</dl>
+
+<dl><dt><strong>WHAT</strong> = &lt;QuestionType.WHAT: 'what'&gt;</dl>
+
+<dl><dt><strong>WHAT_IF</strong> = &lt;QuestionType.WHAT_IF: 'what_if'&gt;</dl>
+
+<dl><dt><strong>WHEN</strong> = &lt;QuestionType.WHEN: 'when'&gt;</dl>
+
+<dl><dt><strong>WHERE</strong> = &lt;QuestionType.WHERE: 'where'&gt;</dl>
+
+<dl><dt><strong>WHO</strong> = &lt;QuestionType.WHO: 'who'&gt;</dl>
+
+<dl><dt><strong>WHOSE</strong> = &lt;QuestionType.WHOSE: 'whose'&gt;</dl>
+
+<dl><dt><strong>WHY</strong> = &lt;QuestionType.WHY: 'why'&gt;</dl>
+
+<dl><dt><strong>YES_NO</strong> = &lt;QuestionType.YES_NO: 'yes_no'&gt;</dl>
+
+<hr>
+Data descriptors inherited from <a href="enum.html#Enum">enum.Enum</a>:<br>
+<dl><dt><strong>name</strong></dt>
+<dd><span class="code">The&nbsp;name&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<dl><dt><strong>value</strong></dt>
+<dd><span class="code">The&nbsp;value&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<hr>
+Static methods inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><a name="QuestionType-__contains__"><strong>__contains__</strong></a>(value)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;`value`&nbsp;is&nbsp;in&nbsp;`cls`.<br>
+&nbsp;<br>
+`value`&nbsp;is&nbsp;in&nbsp;`cls`&nbsp;if:<br>
+1)&nbsp;`value`&nbsp;is&nbsp;a&nbsp;member&nbsp;of&nbsp;`cls`,&nbsp;or<br>
+2)&nbsp;`value`&nbsp;is&nbsp;the&nbsp;value&nbsp;of&nbsp;one&nbsp;of&nbsp;the&nbsp;`cls`'s&nbsp;members.</span></dd></dl>
+
+<dl><dt><a name="QuestionType-__getitem__"><strong>__getitem__</strong></a>(name)</dt><dd><span class="code">Return&nbsp;the&nbsp;member&nbsp;matching&nbsp;`name`.</span></dd></dl>
+
+<dl><dt><a name="QuestionType-__iter__"><strong>__iter__</strong></a>()</dt><dd><span class="code">Return&nbsp;members&nbsp;in&nbsp;definition&nbsp;order.</span></dd></dl>
+
+<dl><dt><a name="QuestionType-__len__"><strong>__len__</strong></a>()</dt><dd><span class="code">Return&nbsp;the&nbsp;number&nbsp;of&nbsp;members&nbsp;(no&nbsp;aliases)</span></dd></dl>
+
+<hr>
+Readonly properties inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><strong>__members__</strong></dt>
+<dd><span class="code">Returns&nbsp;a&nbsp;mapping&nbsp;of&nbsp;member&nbsp;name-&gt;value.<br>
+&nbsp;<br>
+This&nbsp;mapping&nbsp;lists&nbsp;all&nbsp;enum&nbsp;members,&nbsp;including&nbsp;aliases.&nbsp;Note&nbsp;that&nbsp;this<br>
+is&nbsp;a&nbsp;read-only&nbsp;view&nbsp;of&nbsp;the&nbsp;internal&nbsp;mapping.</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SensoryModality">class <strong>SensoryModality</strong></a>(<a href="enum.html#Enum">enum.Enum</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SensoryModality">SensoryModality</a>(*values)<br>
+&nbsp;<br>
+A&nbsp;sensory&nbsp;channel&nbsp;that&nbsp;can&nbsp;provide&nbsp;input&nbsp;to&nbsp;perception.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.occipital_lobe.perception.core.html#SensoryModality">SensoryModality</a></dd>
+<dd><a href="enum.html#Enum">enum.Enum</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>AUDIO</strong> = &lt;SensoryModality.AUDIO: 'audio'&gt;</dl>
+
+<dl><dt><strong>TEMPORAL</strong> = &lt;SensoryModality.TEMPORAL: 'temporal'&gt;</dl>
+
+<dl><dt><strong>TEXT</strong> = &lt;SensoryModality.TEXT: 'text'&gt;</dl>
+
+<dl><dt><strong>VISUAL</strong> = &lt;SensoryModality.VISUAL: 'visual'&gt;</dl>
+
+<hr>
+Data descriptors inherited from <a href="enum.html#Enum">enum.Enum</a>:<br>
+<dl><dt><strong>name</strong></dt>
+<dd><span class="code">The&nbsp;name&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<dl><dt><strong>value</strong></dt>
+<dd><span class="code">The&nbsp;value&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<hr>
+Static methods inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><a name="SensoryModality-__contains__"><strong>__contains__</strong></a>(value)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;`value`&nbsp;is&nbsp;in&nbsp;`cls`.<br>
+&nbsp;<br>
+`value`&nbsp;is&nbsp;in&nbsp;`cls`&nbsp;if:<br>
+1)&nbsp;`value`&nbsp;is&nbsp;a&nbsp;member&nbsp;of&nbsp;`cls`,&nbsp;or<br>
+2)&nbsp;`value`&nbsp;is&nbsp;the&nbsp;value&nbsp;of&nbsp;one&nbsp;of&nbsp;the&nbsp;`cls`'s&nbsp;members.</span></dd></dl>
+
+<dl><dt><a name="SensoryModality-__getitem__"><strong>__getitem__</strong></a>(name)</dt><dd><span class="code">Return&nbsp;the&nbsp;member&nbsp;matching&nbsp;`name`.</span></dd></dl>
+
+<dl><dt><a name="SensoryModality-__iter__"><strong>__iter__</strong></a>()</dt><dd><span class="code">Return&nbsp;members&nbsp;in&nbsp;definition&nbsp;order.</span></dd></dl>
+
+<dl><dt><a name="SensoryModality-__len__"><strong>__len__</strong></a>()</dt><dd><span class="code">Return&nbsp;the&nbsp;number&nbsp;of&nbsp;members&nbsp;(no&nbsp;aliases)</span></dd></dl>
+
+<hr>
+Readonly properties inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><strong>__members__</strong></dt>
+<dd><span class="code">Returns&nbsp;a&nbsp;mapping&nbsp;of&nbsp;member&nbsp;name-&gt;value.<br>
+&nbsp;<br>
+This&nbsp;mapping&nbsp;lists&nbsp;all&nbsp;enum&nbsp;members,&nbsp;including&nbsp;aliases.&nbsp;Note&nbsp;that&nbsp;this<br>
+is&nbsp;a&nbsp;read-only&nbsp;view&nbsp;of&nbsp;the&nbsp;internal&nbsp;mapping.</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-compute_intent_probabilities"><strong>compute_intent_probabilities</strong></a>(text: 'str', pattern_weights: 'PatternWeights | None' = None, context_prior: 'dict[Intent, float] | None' = None) -&gt; 'dict[Intent, float]'</dt><dd><span class="code">Compute&nbsp;a&nbsp;probability&nbsp;distribution&nbsp;over&nbsp;intents&nbsp;for&nbsp;``text``.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;a&nbsp;Bayesian&nbsp;classifier.&nbsp;For&nbsp;each&nbsp;intent,&nbsp;the&nbsp;(unnormalised)<br>
+posterior&nbsp;is::<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;score(intent)&nbsp;=&nbsp;Σ&nbsp;(match_count&nbsp;×&nbsp;pattern_weight)&nbsp;×&nbsp;prior(intent)<br>
+&nbsp;<br>
+where&nbsp;the&nbsp;sum&nbsp;is&nbsp;over&nbsp;pattern&nbsp;categories&nbsp;that&nbsp;map&nbsp;to&nbsp;that&nbsp;intent,<br>
+``match_count``&nbsp;is&nbsp;how&nbsp;many&nbsp;of&nbsp;the&nbsp;category's&nbsp;patterns&nbsp;matched&nbsp;the<br>
+text,&nbsp;``pattern_weight``&nbsp;is&nbsp;the&nbsp;learned&nbsp;reliability&nbsp;of&nbsp;that<br>
+category&nbsp;(perceptual&nbsp;learning,&nbsp;default&nbsp;1.0),&nbsp;and&nbsp;``prior(intent)``<br>
+is&nbsp;the&nbsp;context&nbsp;prior&nbsp;(default&nbsp;uniform).<br>
+&nbsp;<br>
+The&nbsp;result&nbsp;is&nbsp;normalised&nbsp;to&nbsp;a&nbsp;proper&nbsp;probability&nbsp;distribution.&nbsp;A<br>
+small&nbsp;smoothing&nbsp;floor&nbsp;is&nbsp;added&nbsp;so&nbsp;every&nbsp;intent&nbsp;that&nbsp;has&nbsp;any<br>
+pattern&nbsp;category&nbsp;gets&nbsp;a&nbsp;non-zero&nbsp;probability,&nbsp;even&nbsp;when&nbsp;no<br>
+patterns&nbsp;match&nbsp;—&nbsp;this&nbsp;keeps&nbsp;the&nbsp;distribution&nbsp;useful&nbsp;for&nbsp;the<br>
+cognition&nbsp;engine&nbsp;when&nbsp;the&nbsp;input&nbsp;is&nbsp;ambiguous.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;text:&nbsp;The&nbsp;(lowercased)&nbsp;input&nbsp;text.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;pattern_weights:&nbsp;Optional&nbsp;learned&nbsp;pattern&nbsp;weights.&nbsp;If&nbsp;``None``,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;all&nbsp;categories&nbsp;use&nbsp;the&nbsp;default&nbsp;weight&nbsp;of&nbsp;1.0.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;context_prior:&nbsp;Optional&nbsp;prior&nbsp;over&nbsp;intents&nbsp;reflecting<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;conversation&nbsp;history.&nbsp;If&nbsp;``None``,&nbsp;a&nbsp;uniform&nbsp;prior&nbsp;is<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;used.&nbsp;Intents&nbsp;not&nbsp;present&nbsp;in&nbsp;the&nbsp;prior&nbsp;get&nbsp;a&nbsp;small&nbsp;floor.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;mapping&nbsp;from&nbsp;:class:`<a href="#Intent">Intent</a>`&nbsp;to&nbsp;probability.&nbsp;The&nbsp;highest<br>
+&nbsp;&nbsp;&nbsp;&nbsp;probability&nbsp;intent&nbsp;corresponds&nbsp;to&nbsp;the&nbsp;most&nbsp;likely<br>
+&nbsp;&nbsp;&nbsp;&nbsp;classification;&nbsp;ties&nbsp;or&nbsp;near-ties&nbsp;signal&nbsp;ambiguity&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;cognition&nbsp;engine&nbsp;can&nbsp;resolve&nbsp;with&nbsp;context.</span></dd></dl>
+ <dl><dt><a name="-perceive"><strong>perceive</strong></a>(text: 'str', embeddings=None, network=None, pattern_weights: 'PatternWeights | None' = None, context_prior: 'dict[Intent, float] | None' = None, brain_waves: 'BrainWaveState | None' = None) -&gt; 'Perception'</dt><dd><span class="code">Perceive&nbsp;a&nbsp;user&nbsp;utterance&nbsp;—&nbsp;classify&nbsp;intent,&nbsp;extract&nbsp;meaning.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;main&nbsp;entry&nbsp;point&nbsp;for&nbsp;the&nbsp;perception&nbsp;system.&nbsp;It&nbsp;takes<br>
+raw&nbsp;text&nbsp;and&nbsp;returns&nbsp;a&nbsp;structured&nbsp;<a href="#Perception">Perception</a>.<br>
+&nbsp;<br>
+If&nbsp;an&nbsp;EmbeddingStore&nbsp;is&nbsp;provided,&nbsp;topic&nbsp;extraction&nbsp;is&nbsp;augmented<br>
+with&nbsp;semantic&nbsp;matching&nbsp;—&nbsp;concepts&nbsp;are&nbsp;recognized&nbsp;even&nbsp;when&nbsp;the<br>
+exact&nbsp;word&nbsp;doesn't&nbsp;appear&nbsp;in&nbsp;the&nbsp;text.<br>
+&nbsp;<br>
+If&nbsp;a&nbsp;ConceptNetwork&nbsp;is&nbsp;provided,&nbsp;topic&nbsp;resolution&nbsp;is&nbsp;context-aware:<br>
+when&nbsp;the&nbsp;user&nbsp;is&nbsp;talking&nbsp;about&nbsp;Genesis&nbsp;itself&nbsp;("your&nbsp;code",&nbsp;"your<br>
+daemon"),&nbsp;topics&nbsp;are&nbsp;resolved&nbsp;to&nbsp;self-relevant&nbsp;concepts&nbsp;(origin="code"<br>
+or&nbsp;"identity")&nbsp;rather&nbsp;than&nbsp;dictionary&nbsp;definitions.&nbsp;This&nbsp;is&nbsp;top-down<br>
+attention&nbsp;—&nbsp;the&nbsp;context&nbsp;biases&nbsp;which&nbsp;concepts&nbsp;win&nbsp;the&nbsp;competition.<br>
+&nbsp;<br>
+If&nbsp;``pattern_weights``&nbsp;is&nbsp;provided&nbsp;(perceptual&nbsp;learning),&nbsp;pattern<br>
+matches&nbsp;are&nbsp;weighted&nbsp;by&nbsp;their&nbsp;learned&nbsp;success&nbsp;rates&nbsp;—&nbsp;categories<br>
+that&nbsp;have&nbsp;led&nbsp;to&nbsp;good&nbsp;conversational&nbsp;outcomes&nbsp;count&nbsp;for&nbsp;more.<br>
+See&nbsp;:class:`<a href="#PatternWeights">PatternWeights</a>`&nbsp;and&nbsp;Goldstone&nbsp;(1998).<br>
+&nbsp;<br>
+If&nbsp;``context_prior``&nbsp;is&nbsp;provided,&nbsp;it&nbsp;biases&nbsp;the&nbsp;probabilistic<br>
+intent&nbsp;distribution&nbsp;toward&nbsp;intents&nbsp;likely&nbsp;given&nbsp;conversation<br>
+history&nbsp;(Bayesian&nbsp;classification).&nbsp;The&nbsp;primary&nbsp;``intent``&nbsp;field&nbsp;is<br>
+still&nbsp;chosen&nbsp;by&nbsp;the&nbsp;deterministic&nbsp;priority-ordered&nbsp;rules&nbsp;so<br>
+existing&nbsp;behaviour&nbsp;is&nbsp;preserved;&nbsp;the&nbsp;full<br>
+``intent_probabilities``&nbsp;distribution&nbsp;is&nbsp;available&nbsp;for&nbsp;the<br>
+cognition&nbsp;engine&nbsp;to&nbsp;use&nbsp;when&nbsp;intents&nbsp;are&nbsp;close.<br>
+&nbsp;<br>
+If&nbsp;``brain_waves``&nbsp;is&nbsp;provided,&nbsp;semantic&nbsp;matching&nbsp;is&nbsp;modulated:<br>
+alpha&nbsp;(filtering/inhibition)&nbsp;raises&nbsp;the&nbsp;match&nbsp;threshold&nbsp;(fewer<br>
+semantic&nbsp;matches&nbsp;—&nbsp;it&nbsp;filters&nbsp;out&nbsp;weak&nbsp;associations),&nbsp;gamma<br>
+(enhanced&nbsp;processing)&nbsp;lowers&nbsp;it&nbsp;(more&nbsp;matches&nbsp;—&nbsp;it's&nbsp;more<br>
+perceptive&nbsp;of&nbsp;remote&nbsp;associations).</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['IntegratedPerception', 'Intent', 'MultisensoryInput', 'MultisensoryIntegrator', 'PatternWeights', 'Perception', 'QuestionType', 'SensoryModality', 'compute_intent_probabilities', 'perceive']<br>
+<strong>__annotations__</strong> = {'NON_NAME_WORDS': 'frozenset[str]', '_CODE_PATTERNS': 'list[re.Pattern[str]]', '_COMFORT_PATTERNS': 'list[re.Pattern[str]]', '_CORRECTION_PATTERNS': 'list[re.Pattern[str]]', '_EMOJI_SENTIMENT': 'dict[str, float]', '_EMOTICON_SENTIMENT': 'dict[str, float]', '_EMOTION_PATTERNS': 'list[re.Pattern[str]]', '_ENCOURAGEMENT_PATTERNS': 'list[re.Pattern[str]]', '_FAREWELL_PATTERNS': 'list[re.Pattern[str]]', '_FEEDBACK_PATTERNS': 'list[re.Pattern[str]]', ...}</td></tr></table>
+</body></html>

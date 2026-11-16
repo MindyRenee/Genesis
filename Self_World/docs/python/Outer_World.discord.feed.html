@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Outer_World.discord.feed</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Outer_World.html" class="white">Outer_World</a>.<a href="Outer_World.discord.html" class="white">discord</a>.feed</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Outer_World/discord/feed.py">/home/mindyrenee/GenAnd/Genesis/Outer_World/discord/feed.py</a></td></tr></table>
+    <p><span class="code">Discord&nbsp;feed&nbsp;—&nbsp;the&nbsp;webhook&nbsp;transport&nbsp;behind&nbsp;Genesis's&nbsp;channel.<br>
+&nbsp;<br>
+The&nbsp;channel&nbsp;itself&nbsp;—&nbsp;*her&nbsp;page*,&nbsp;a&nbsp;place&nbsp;in&nbsp;the&nbsp;outer&nbsp;world&nbsp;where<br>
+the&nbsp;public&nbsp;gathers&nbsp;—&nbsp;is&nbsp;``discord.channel.Channel``,&nbsp;held&nbsp;by<br>
+``OuterEnvironment``.&nbsp;This&nbsp;module&nbsp;is&nbsp;only&nbsp;the&nbsp;transport:&nbsp;posting&nbsp;out<br>
+(``<a href="#DiscordFeed">DiscordFeed</a>``),&nbsp;polling&nbsp;in&nbsp;(``<a href="#DiscordListener">DiscordListener</a>``),&nbsp;and&nbsp;the<br>
+session-mirror&nbsp;plumbing&nbsp;(``<a href="#FeedLogHandler">FeedLogHandler</a>``,&nbsp;``<a href="#StderrTee">StderrTee</a>``).<br>
+&nbsp;<br>
+Three&nbsp;channels&nbsp;exist,&nbsp;each&nbsp;on&nbsp;its&nbsp;own&nbsp;webhook:<br>
+&nbsp;<br>
+-&nbsp;``GENESIS_DISCORD_WEBHOOK``&nbsp;—&nbsp;*her*&nbsp;channel,&nbsp;the&nbsp;self∩outer<br>
+&nbsp;&nbsp;overlap.&nbsp;It&nbsp;carries&nbsp;the&nbsp;mirrored&nbsp;terminal&nbsp;session&nbsp;—&nbsp;``genesis&gt;``<br>
+&nbsp;&nbsp;replies,&nbsp;``you&gt;``&nbsp;input,&nbsp;system&nbsp;notices&nbsp;—&nbsp;plus&nbsp;the&nbsp;posts&nbsp;she<br>
+&nbsp;&nbsp;chooses&nbsp;to&nbsp;broadcast,&nbsp;composed&nbsp;from&nbsp;her&nbsp;own&nbsp;cognition&nbsp;when&nbsp;the<br>
+&nbsp;&nbsp;``broadcast``&nbsp;urge&nbsp;fires&nbsp;(see&nbsp;``basal_ganglia.volition``).&nbsp;Her<br>
+&nbsp;&nbsp;``genesis~&nbsp;[broadcast]``&nbsp;echo&nbsp;is&nbsp;excluded&nbsp;from&nbsp;the&nbsp;mirror&nbsp;so&nbsp;a<br>
+&nbsp;&nbsp;broadcast&nbsp;lands&nbsp;on&nbsp;the&nbsp;channel&nbsp;once,&nbsp;untagged.<br>
+-&nbsp;``GENESIS_DISCORD_INNER_WEBHOOK``&nbsp;—&nbsp;optional:&nbsp;her&nbsp;inner&nbsp;world's<br>
+&nbsp;&nbsp;own&nbsp;page.&nbsp;When&nbsp;set,&nbsp;``genesis~``&nbsp;thoughts&nbsp;and&nbsp;dreams&nbsp;post&nbsp;there<br>
+&nbsp;&nbsp;instead&nbsp;of&nbsp;the&nbsp;shared&nbsp;channel&nbsp;—&nbsp;inner&nbsp;life&nbsp;is&nbsp;inner&nbsp;world,&nbsp;not<br>
+&nbsp;&nbsp;part&nbsp;of&nbsp;the&nbsp;conversation.&nbsp;Unset,&nbsp;they&nbsp;stay&nbsp;on&nbsp;the&nbsp;main&nbsp;channel.<br>
+-&nbsp;``GENESIS_DISCORD_PULSE_WEBHOOK``&nbsp;—&nbsp;an&nbsp;opt-in&nbsp;ops&nbsp;telemetry&nbsp;feed<br>
+&nbsp;&nbsp;driven&nbsp;by&nbsp;``scripts/discord_pulse.py``.<br>
+&nbsp;<br>
+A&nbsp;webhook&nbsp;can&nbsp;only&nbsp;*post*&nbsp;—&nbsp;it&nbsp;cannot&nbsp;read&nbsp;the&nbsp;channel.&nbsp;Hearing&nbsp;the<br>
+public&nbsp;needs&nbsp;a&nbsp;bot&nbsp;identity:&nbsp;``<a href="#DiscordListener">DiscordListener</a>``&nbsp;(below)&nbsp;polls&nbsp;the<br>
+channel&nbsp;with&nbsp;``GENESIS_DISCORD_BOT_TOKEN``&nbsp;when&nbsp;one&nbsp;is&nbsp;configured&nbsp;—<br>
+that&nbsp;is&nbsp;the&nbsp;one&nbsp;inbound&nbsp;path,&nbsp;and&nbsp;everything&nbsp;it&nbsp;hears&nbsp;is&nbsp;attributed<br>
+to&nbsp;the&nbsp;public.&nbsp;Without&nbsp;the&nbsp;token&nbsp;her&nbsp;channel&nbsp;stays&nbsp;read-only&nbsp;by<br>
+construction,&nbsp;exactly&nbsp;as&nbsp;before.<br>
+&nbsp;<br>
+Design&nbsp;notes:<br>
+&nbsp;<br>
+-&nbsp;``<a href="#DiscordFeed">DiscordFeed</a>``&nbsp;is&nbsp;a&nbsp;thread-safe&nbsp;bounded&nbsp;queue&nbsp;plus&nbsp;a&nbsp;single&nbsp;daemon<br>
+&nbsp;&nbsp;poster&nbsp;thread.&nbsp;Producers&nbsp;enqueue;&nbsp;the&nbsp;poster&nbsp;coalesces&nbsp;bursts&nbsp;into<br>
+&nbsp;&nbsp;single&nbsp;messages&nbsp;(Discord&nbsp;caps&nbsp;content&nbsp;at&nbsp;2000&nbsp;chars),&nbsp;paces<br>
+&nbsp;&nbsp;requests,&nbsp;and&nbsp;honors&nbsp;429&nbsp;``retry_after``.&nbsp;Posting&nbsp;never&nbsp;blocks&nbsp;or<br>
+&nbsp;&nbsp;raises&nbsp;into&nbsp;Genesis&nbsp;—&nbsp;a&nbsp;dead&nbsp;webhook&nbsp;costs&nbsp;a&nbsp;queue,&nbsp;nothing&nbsp;more.<br>
+-&nbsp;``<a href="#FeedLogHandler">FeedLogHandler</a>``&nbsp;attaches&nbsp;to&nbsp;the&nbsp;root&nbsp;logger&nbsp;so&nbsp;every&nbsp;line&nbsp;the<br>
+&nbsp;&nbsp;terminal&nbsp;shows&nbsp;is&nbsp;also&nbsp;enqueued.&nbsp;``<a href="#StderrTee">StderrTee</a>``&nbsp;wraps&nbsp;``sys.stderr``<br>
+&nbsp;&nbsp;for&nbsp;the&nbsp;few&nbsp;direct&nbsp;prints&nbsp;that&nbsp;bypass&nbsp;logging.<br>
+-&nbsp;``allowed_mentions``&nbsp;is&nbsp;empty&nbsp;—&nbsp;posted&nbsp;text&nbsp;can&nbsp;never&nbsp;ping&nbsp;anyone.<br>
+-&nbsp;Line&nbsp;prefixes&nbsp;map&nbsp;to&nbsp;message&nbsp;*kinds*&nbsp;(``_KIND_STYLE``):&nbsp;``genesis&gt;``<br>
+&nbsp;&nbsp;posts&nbsp;as&nbsp;"Genesis"&nbsp;on&nbsp;a&nbsp;blurple&nbsp;card,&nbsp;``you&gt;``&nbsp;as&nbsp;the&nbsp;profile&nbsp;name<br>
+&nbsp;&nbsp;in&nbsp;plain&nbsp;text,&nbsp;and&nbsp;everything&nbsp;else&nbsp;—&nbsp;notices,&nbsp;panels,&nbsp;command<br>
+&nbsp;&nbsp;output&nbsp;—&nbsp;as&nbsp;"session"&nbsp;on&nbsp;muted&nbsp;grey.&nbsp;``genesis~``&nbsp;splits&nbsp;by&nbsp;its<br>
+&nbsp;&nbsp;``[tag]``:&nbsp;outward&nbsp;tags&nbsp;(question,&nbsp;expression,&nbsp;distress&nbsp;—&nbsp;the<br>
+&nbsp;&nbsp;kinds&nbsp;the&nbsp;mind&nbsp;itself&nbsp;counts&nbsp;as&nbsp;her&nbsp;voice&nbsp;reaching&nbsp;out)&nbsp;ride&nbsp;the<br>
+&nbsp;&nbsp;speech&nbsp;card;&nbsp;``thought``/``dream``&nbsp;post&nbsp;as&nbsp;"Genesis&nbsp;💭"&nbsp;on&nbsp;purple<br>
+&nbsp;&nbsp;(and&nbsp;onto&nbsp;her&nbsp;inner&nbsp;page&nbsp;when&nbsp;``GENESIS_DISCORD_INNER_WEBHOOK``<br>
+&nbsp;&nbsp;is&nbsp;set);&nbsp;every&nbsp;other&nbsp;tag&nbsp;—&nbsp;play,&nbsp;code,&nbsp;learning,&nbsp;art&nbsp;—&nbsp;is&nbsp;her<br>
+&nbsp;&nbsp;acting&nbsp;in&nbsp;the&nbsp;world,&nbsp;teal&nbsp;on&nbsp;the&nbsp;shared&nbsp;page.&nbsp;A&nbsp;uniform&nbsp;tag&nbsp;lifts<br>
+&nbsp;&nbsp;out&nbsp;of&nbsp;the&nbsp;words&nbsp;into&nbsp;the&nbsp;card's&nbsp;header.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="json.html">json</a><br>
+<a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="os.html">os</a><br>
+<a href="queue.html">queue</a><br>
+</td><td class="multicolumn"><a href="re.html">re</a><br>
+<a href="threading.html">threading</a><br>
+</td><td class="multicolumn"><a href="time.html">time</a><br>
+<a href="urllib.html">urllib</a><br>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Outer_World.discord.feed.html#DiscordFeed">DiscordFeed</a>
+</dt><dt class="heading-text"><a href="Outer_World.discord.feed.html#DiscordListener">DiscordListener</a>
+</dt><dt class="heading-text"><a href="Outer_World.discord.feed.html#StderrTee">StderrTee</a>
+</dt></dl>
+</dd>
+<dt class="heading-text"><a href="logging.html#Handler">logging.Handler</a>(<a href="logging.html#Filterer">logging.Filterer</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Outer_World.discord.feed.html#FeedLogHandler">FeedLogHandler</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="DiscordFeed">class <strong>DiscordFeed</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#DiscordFeed">DiscordFeed</a>(webhook_url:&nbsp;'str',&nbsp;*,&nbsp;post_interval:&nbsp;'float'&nbsp;=&nbsp;1.0,&nbsp;queue_max:&nbsp;'int'&nbsp;=&nbsp;512)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Background&nbsp;webhook&nbsp;poster.&nbsp;All&nbsp;public&nbsp;methods&nbsp;are&nbsp;thread-safe.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;webhook_url:&nbsp;Discord&nbsp;channel&nbsp;webhook&nbsp;URL.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;post_interval:&nbsp;Minimum&nbsp;seconds&nbsp;between&nbsp;POSTs.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;queue_max:&nbsp;Maximum&nbsp;buffered&nbsp;lines&nbsp;before&nbsp;oldest&nbsp;are&nbsp;dropped.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="DiscordFeed-__init__"><strong>__init__</strong></a>(self, webhook_url: 'str', *, post_interval: 'float' = 1.0, queue_max: 'int' = 512) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="DiscordFeed-close"><strong>close</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Flush&nbsp;remaining&nbsp;lines&nbsp;(best-effort)&nbsp;and&nbsp;stop&nbsp;the&nbsp;poster&nbsp;thread.</span></dd></dl>
+
+<dl><dt><a name="DiscordFeed-post"><strong>post</strong></a>(self, text: 'str', author: 'str | None' = None, kind: 'str' = 'speech') -&gt; 'None'</dt><dd><span class="code">Enqueue&nbsp;one&nbsp;message.&nbsp;``author``&nbsp;overrides&nbsp;the&nbsp;kind's&nbsp;speaker<br>
+name;&nbsp;``kind``&nbsp;picks&nbsp;the&nbsp;card's&nbsp;color.</span></dd></dl>
+
+<dl><dt><a name="DiscordFeed-post_image"><strong>post_image</strong></a>(self, png: 'bytes', caption: 'str' = '', author: 'str | None' = None, filename: 'str' = 'frame.png') -&gt; 'None'</dt><dd><span class="code">Enqueue&nbsp;one&nbsp;image&nbsp;attachment.</span></dd></dl>
+
+<dl><dt><a name="DiscordFeed-post_line"><strong>post_line</strong></a>(self, line: 'str') -&gt; 'None'</dt><dd><span class="code">Enqueue&nbsp;one&nbsp;terminal&nbsp;line,&nbsp;classifying&nbsp;genesis&gt;/genesis~/you&gt;.</span></dd></dl>
+
+<dl><dt><a name="DiscordFeed-post_user"><strong>post_user</strong></a>(self, text: 'str') -&gt; 'None'</dt><dd><span class="code">Enqueue&nbsp;user&nbsp;input&nbsp;verbatim&nbsp;(typed&nbsp;input&nbsp;never&nbsp;reaches&nbsp;the&nbsp;log).</span></dd></dl>
+
+<dl><dt><a name="DiscordFeed-update_live"><strong>update_live</strong></a>(self, png: 'bytes', caption: 'str' = '', author: 'str | None' = None) -&gt; 'None'</dt><dd><span class="code">Queue&nbsp;an&nbsp;update&nbsp;to&nbsp;the&nbsp;single&nbsp;live-board&nbsp;message.<br>
+&nbsp;<br>
+Webhooks&nbsp;can&nbsp;edit&nbsp;their&nbsp;own&nbsp;messages,&nbsp;so&nbsp;the&nbsp;board&nbsp;view&nbsp;is&nbsp;one<br>
+message&nbsp;kept&nbsp;current&nbsp;rather&nbsp;than&nbsp;a&nbsp;scroll&nbsp;of&nbsp;frames.&nbsp;Pending<br>
+live&nbsp;updates&nbsp;collapse&nbsp;—&nbsp;only&nbsp;the&nbsp;newest&nbsp;frame&nbsp;is&nbsp;ever&nbsp;sent.</span></dd></dl>
+
+<dl><dt><a name="DiscordFeed-update_live_text"><strong>update_live_text</strong></a>(self, text: 'str', author: 'str | None' = None) -&gt; 'None'</dt><dd><span class="code">Queue&nbsp;a&nbsp;text-only&nbsp;update&nbsp;to&nbsp;the&nbsp;live-board&nbsp;message.<br>
+&nbsp;<br>
+The&nbsp;board&nbsp;doesn't&nbsp;always&nbsp;need&nbsp;a&nbsp;rendered&nbsp;frame&nbsp;—&nbsp;her&nbsp;channel<br>
+card&nbsp;is&nbsp;state&nbsp;readout,&nbsp;plain&nbsp;content.&nbsp;Pending&nbsp;live&nbsp;updates&nbsp;of<br>
+either&nbsp;kind&nbsp;collapse&nbsp;(both&nbsp;target&nbsp;the&nbsp;same&nbsp;message),&nbsp;so&nbsp;only<br>
+the&nbsp;newest&nbsp;board&nbsp;is&nbsp;ever&nbsp;sent.</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="DiscordFeed-from_env"><strong>from_env</strong></a>() -&gt; 'DiscordFeed | None'</dt><dd><span class="code">Create&nbsp;her&nbsp;public&nbsp;channel&nbsp;feed&nbsp;from&nbsp;``GENESIS_DISCORD_WEBHOOK``.<br>
+&nbsp;<br>
+Returns&nbsp;None&nbsp;when&nbsp;the&nbsp;webhook&nbsp;is&nbsp;unset&nbsp;—&nbsp;there&nbsp;is&nbsp;no&nbsp;channel<br>
+then,&nbsp;so&nbsp;the&nbsp;session&nbsp;stays&nbsp;local&nbsp;and&nbsp;her&nbsp;broadcasts&nbsp;have<br>
+nowhere&nbsp;to&nbsp;post.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="DiscordListener">class <strong>DiscordListener</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#DiscordListener">DiscordListener</a>(token:&nbsp;'str',&nbsp;webhook_url:&nbsp;'str',&nbsp;on_message,&nbsp;*,&nbsp;poll_interval:&nbsp;'float'&nbsp;=&nbsp;15.0)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Her&nbsp;ear&nbsp;on&nbsp;the&nbsp;channel&nbsp;—&nbsp;polls&nbsp;for&nbsp;what&nbsp;the&nbsp;public&nbsp;says.<br>
+&nbsp;<br>
+A&nbsp;webhook&nbsp;is&nbsp;write-only;&nbsp;hearing&nbsp;the&nbsp;channel&nbsp;needs&nbsp;a&nbsp;bot&nbsp;identity<br>
+(``Authorization:&nbsp;Bot&nbsp;…``)&nbsp;reading&nbsp;history.&nbsp;Each&nbsp;poll&nbsp;fetches<br>
+messages&nbsp;after&nbsp;the&nbsp;last&nbsp;seen&nbsp;snowflake;&nbsp;webhook-authored&nbsp;posts<br>
+(her&nbsp;own&nbsp;shares&nbsp;and&nbsp;the&nbsp;whole&nbsp;mirror)&nbsp;are&nbsp;skipped&nbsp;—&nbsp;hearing<br>
+herself&nbsp;would&nbsp;be&nbsp;a&nbsp;feedback&nbsp;loop&nbsp;—&nbsp;and&nbsp;so&nbsp;are&nbsp;other&nbsp;bots.<br>
+&nbsp;<br>
+Failure&nbsp;isolation&nbsp;mirrors&nbsp;the&nbsp;feed's:&nbsp;transient&nbsp;errors&nbsp;log&nbsp;and<br>
+keep&nbsp;listening;&nbsp;a&nbsp;permanent&nbsp;auth&nbsp;failure&nbsp;(401/403)&nbsp;deafens&nbsp;the<br>
+listener&nbsp;for&nbsp;the&nbsp;session.&nbsp;Nothing&nbsp;here&nbsp;raises&nbsp;into&nbsp;Genesis.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="DiscordListener-__init__"><strong>__init__</strong></a>(self, token: 'str', webhook_url: 'str', on_message, *, poll_interval: 'float' = 15.0) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="DiscordListener-start"><strong>start</strong></a>(self) -&gt; 'None'</dt></dl>
+
+<dl><dt><a name="DiscordListener-stop"><strong>stop</strong></a>(self) -&gt; 'None'</dt></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="DiscordListener-from_feed"><strong>from_feed</strong></a>(feed: 'DiscordFeed | None', on_message) -&gt; 'DiscordListener | None'</dt><dd><span class="code">Build&nbsp;a&nbsp;listener&nbsp;on&nbsp;the&nbsp;channel&nbsp;``feed``&nbsp;posts&nbsp;to.<br>
+&nbsp;<br>
+Needs&nbsp;``GENESIS_DISCORD_BOT_TOKEN``;&nbsp;the&nbsp;channel&nbsp;id&nbsp;resolves<br>
+from&nbsp;the&nbsp;webhook&nbsp;<a href="builtins.html#object">object</a>&nbsp;on&nbsp;the&nbsp;listener&nbsp;thread,&nbsp;so&nbsp;the<br>
+existing&nbsp;webhook&nbsp;config&nbsp;plus&nbsp;a&nbsp;bot&nbsp;token&nbsp;is&nbsp;the&nbsp;whole&nbsp;setup<br>
+and&nbsp;construction&nbsp;never&nbsp;blocks&nbsp;on&nbsp;the&nbsp;network.&nbsp;Returns&nbsp;None<br>
+without&nbsp;either&nbsp;—&nbsp;no&nbsp;ear&nbsp;exists&nbsp;then,&nbsp;same&nbsp;as&nbsp;before.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="FeedLogHandler">class <strong>FeedLogHandler</strong></a>(<a href="logging.html#Handler">logging.Handler</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#FeedLogHandler">FeedLogHandler</a>(feed:&nbsp;'<a href="#DiscordFeed">DiscordFeed</a>')&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Logging&nbsp;handler&nbsp;that&nbsp;mirrors&nbsp;every&nbsp;emitted&nbsp;record&nbsp;to&nbsp;a&nbsp;feed.<br>
+&nbsp;<br>
+Attach&nbsp;to&nbsp;the&nbsp;root&nbsp;logger&nbsp;with&nbsp;the&nbsp;same&nbsp;``%(message)s``&nbsp;format&nbsp;the<br>
+console&nbsp;uses,&nbsp;so&nbsp;the&nbsp;feed&nbsp;sees&nbsp;exactly&nbsp;what&nbsp;the&nbsp;terminal&nbsp;shows.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Outer_World.discord.feed.html#FeedLogHandler">FeedLogHandler</a></dd>
+<dd><a href="logging.html#Handler">logging.Handler</a></dd>
+<dd><a href="logging.html#Filterer">logging.Filterer</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="FeedLogHandler-__init__"><strong>__init__</strong></a>(self, feed: 'DiscordFeed') -&gt; 'None'</dt><dd><span class="code">Initializes&nbsp;the&nbsp;instance&nbsp;-&nbsp;basically&nbsp;setting&nbsp;the&nbsp;formatter&nbsp;to&nbsp;None<br>
+and&nbsp;the&nbsp;filter&nbsp;list&nbsp;to&nbsp;empty.</span></dd></dl>
+
+<dl><dt><a name="FeedLogHandler-emit"><strong>emit</strong></a>(self, record: 'logging.LogRecord') -&gt; 'None'</dt><dd><span class="code">Do&nbsp;whatever&nbsp;it&nbsp;takes&nbsp;to&nbsp;actually&nbsp;log&nbsp;the&nbsp;specified&nbsp;logging&nbsp;record.<br>
+&nbsp;<br>
+This&nbsp;version&nbsp;is&nbsp;intended&nbsp;to&nbsp;be&nbsp;implemented&nbsp;by&nbsp;subclasses&nbsp;and&nbsp;so<br>
+raises&nbsp;a&nbsp;NotImplementedError.</span></dd></dl>
+
+<hr>
+Methods inherited from <a href="logging.html#Handler">logging.Handler</a>:<br>
+<dl><dt><a name="FeedLogHandler-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="FeedLogHandler-acquire"><strong>acquire</strong></a>(self)</dt><dd><span class="code">Acquire&nbsp;the&nbsp;I/O&nbsp;thread&nbsp;lock.</span></dd></dl>
+
+<dl><dt><a name="FeedLogHandler-close"><strong>close</strong></a>(self)</dt><dd><span class="code">Tidy&nbsp;up&nbsp;any&nbsp;resources&nbsp;used&nbsp;by&nbsp;the&nbsp;handler.<br>
+&nbsp;<br>
+This&nbsp;version&nbsp;removes&nbsp;the&nbsp;handler&nbsp;from&nbsp;an&nbsp;internal&nbsp;map&nbsp;of&nbsp;handlers,<br>
+_handlers,&nbsp;which&nbsp;is&nbsp;used&nbsp;for&nbsp;handler&nbsp;lookup&nbsp;by&nbsp;name.&nbsp;Subclasses<br>
+should&nbsp;ensure&nbsp;that&nbsp;this&nbsp;gets&nbsp;called&nbsp;from&nbsp;overridden&nbsp;<a href="#FeedLogHandler-close">close</a>()<br>
+methods.</span></dd></dl>
+
+<dl><dt><a name="FeedLogHandler-createLock"><strong>createLock</strong></a>(self)</dt><dd><span class="code">Acquire&nbsp;a&nbsp;thread&nbsp;lock&nbsp;for&nbsp;serializing&nbsp;access&nbsp;to&nbsp;the&nbsp;underlying&nbsp;I/O.</span></dd></dl>
+
+<dl><dt><a name="FeedLogHandler-flush"><strong>flush</strong></a>(self)</dt><dd><span class="code">Ensure&nbsp;all&nbsp;logging&nbsp;output&nbsp;has&nbsp;been&nbsp;flushed.<br>
+&nbsp;<br>
+This&nbsp;version&nbsp;does&nbsp;nothing&nbsp;and&nbsp;is&nbsp;intended&nbsp;to&nbsp;be&nbsp;implemented&nbsp;by<br>
+subclasses.</span></dd></dl>
+
+<dl><dt><a name="FeedLogHandler-format"><strong>format</strong></a>(self, record)</dt><dd><span class="code">Format&nbsp;the&nbsp;specified&nbsp;record.<br>
+&nbsp;<br>
+If&nbsp;a&nbsp;formatter&nbsp;is&nbsp;set,&nbsp;use&nbsp;it.&nbsp;Otherwise,&nbsp;use&nbsp;the&nbsp;default&nbsp;formatter<br>
+for&nbsp;the&nbsp;module.</span></dd></dl>
+
+<dl><dt><a name="FeedLogHandler-get_name"><strong>get_name</strong></a>(self)</dt></dl>
+
+<dl><dt><a name="FeedLogHandler-handle"><strong>handle</strong></a>(self, record)</dt><dd><span class="code">Conditionally&nbsp;emit&nbsp;the&nbsp;specified&nbsp;logging&nbsp;record.<br>
+&nbsp;<br>
+Emission&nbsp;depends&nbsp;on&nbsp;filters&nbsp;which&nbsp;may&nbsp;have&nbsp;been&nbsp;added&nbsp;to&nbsp;the&nbsp;handler.<br>
+Wrap&nbsp;the&nbsp;actual&nbsp;emission&nbsp;of&nbsp;the&nbsp;record&nbsp;with&nbsp;acquisition/release&nbsp;of<br>
+the&nbsp;I/O&nbsp;thread&nbsp;lock.<br>
+&nbsp;<br>
+Returns&nbsp;an&nbsp;instance&nbsp;of&nbsp;the&nbsp;log&nbsp;record&nbsp;that&nbsp;was&nbsp;emitted<br>
+if&nbsp;it&nbsp;passed&nbsp;all&nbsp;filters,&nbsp;otherwise&nbsp;a&nbsp;false&nbsp;value&nbsp;is&nbsp;returned.</span></dd></dl>
+
+<dl><dt><a name="FeedLogHandler-handleError"><strong>handleError</strong></a>(self, record)</dt><dd><span class="code">Handle&nbsp;errors&nbsp;which&nbsp;occur&nbsp;during&nbsp;an&nbsp;<a href="#FeedLogHandler-emit">emit</a>()&nbsp;call.<br>
+&nbsp;<br>
+This&nbsp;method&nbsp;should&nbsp;be&nbsp;called&nbsp;from&nbsp;handlers&nbsp;when&nbsp;an&nbsp;exception&nbsp;is<br>
+encountered&nbsp;during&nbsp;an&nbsp;<a href="#FeedLogHandler-emit">emit</a>()&nbsp;call.&nbsp;If&nbsp;raiseExceptions&nbsp;is&nbsp;false,<br>
+exceptions&nbsp;get&nbsp;silently&nbsp;ignored.&nbsp;This&nbsp;is&nbsp;what&nbsp;is&nbsp;mostly&nbsp;wanted<br>
+for&nbsp;a&nbsp;logging&nbsp;system&nbsp;-&nbsp;most&nbsp;users&nbsp;will&nbsp;not&nbsp;care&nbsp;about&nbsp;errors&nbsp;in<br>
+the&nbsp;logging&nbsp;system,&nbsp;they&nbsp;are&nbsp;more&nbsp;interested&nbsp;in&nbsp;application&nbsp;errors.<br>
+You&nbsp;could,&nbsp;however,&nbsp;replace&nbsp;this&nbsp;with&nbsp;a&nbsp;custom&nbsp;handler&nbsp;if&nbsp;you&nbsp;wish.<br>
+The&nbsp;record&nbsp;which&nbsp;was&nbsp;being&nbsp;processed&nbsp;is&nbsp;passed&nbsp;in&nbsp;to&nbsp;this&nbsp;method.</span></dd></dl>
+
+<dl><dt><a name="FeedLogHandler-release"><strong>release</strong></a>(self)</dt><dd><span class="code">Release&nbsp;the&nbsp;I/O&nbsp;thread&nbsp;lock.</span></dd></dl>
+
+<dl><dt><a name="FeedLogHandler-setFormatter"><strong>setFormatter</strong></a>(self, fmt)</dt><dd><span class="code">Set&nbsp;the&nbsp;formatter&nbsp;for&nbsp;this&nbsp;handler.</span></dd></dl>
+
+<dl><dt><a name="FeedLogHandler-setLevel"><strong>setLevel</strong></a>(self, level)</dt><dd><span class="code">Set&nbsp;the&nbsp;logging&nbsp;level&nbsp;of&nbsp;this&nbsp;handler.&nbsp;&nbsp;level&nbsp;must&nbsp;be&nbsp;an&nbsp;int&nbsp;or&nbsp;a&nbsp;str.</span></dd></dl>
+
+<dl><dt><a name="FeedLogHandler-set_name"><strong>set_name</strong></a>(self, name)</dt></dl>
+
+<hr>
+Data descriptors inherited from <a href="logging.html#Handler">logging.Handler</a>:<br>
+<dl><dt><strong>name</strong></dt>
+</dl>
+<hr>
+Methods inherited from <a href="logging.html#Filterer">logging.Filterer</a>:<br>
+<dl><dt><a name="FeedLogHandler-addFilter"><strong>addFilter</strong></a>(self, filter)</dt><dd><span class="code">Add&nbsp;the&nbsp;specified&nbsp;filter&nbsp;to&nbsp;this&nbsp;handler.</span></dd></dl>
+
+<dl><dt><a name="FeedLogHandler-filter"><strong>filter</strong></a>(self, record)</dt><dd><span class="code">Determine&nbsp;if&nbsp;a&nbsp;record&nbsp;is&nbsp;loggable&nbsp;by&nbsp;consulting&nbsp;all&nbsp;the&nbsp;filters.<br>
+&nbsp;<br>
+The&nbsp;default&nbsp;is&nbsp;to&nbsp;allow&nbsp;the&nbsp;record&nbsp;to&nbsp;be&nbsp;logged;&nbsp;any&nbsp;filter&nbsp;can&nbsp;veto<br>
+this&nbsp;by&nbsp;returning&nbsp;a&nbsp;false&nbsp;value.<br>
+If&nbsp;a&nbsp;filter&nbsp;attached&nbsp;to&nbsp;a&nbsp;handler&nbsp;returns&nbsp;a&nbsp;log&nbsp;record&nbsp;instance,<br>
+then&nbsp;that&nbsp;instance&nbsp;is&nbsp;used&nbsp;in&nbsp;place&nbsp;of&nbsp;the&nbsp;original&nbsp;log&nbsp;record&nbsp;in<br>
+any&nbsp;further&nbsp;processing&nbsp;of&nbsp;the&nbsp;event&nbsp;by&nbsp;that&nbsp;handler.<br>
+If&nbsp;a&nbsp;filter&nbsp;returns&nbsp;any&nbsp;other&nbsp;true&nbsp;value,&nbsp;the&nbsp;original&nbsp;log&nbsp;record<br>
+is&nbsp;used&nbsp;in&nbsp;any&nbsp;further&nbsp;processing&nbsp;of&nbsp;the&nbsp;event&nbsp;by&nbsp;that&nbsp;handler.<br>
+&nbsp;<br>
+If&nbsp;none&nbsp;of&nbsp;the&nbsp;filters&nbsp;return&nbsp;false&nbsp;values,&nbsp;this&nbsp;method&nbsp;returns<br>
+a&nbsp;log&nbsp;record.<br>
+If&nbsp;any&nbsp;of&nbsp;the&nbsp;filters&nbsp;return&nbsp;a&nbsp;false&nbsp;value,&nbsp;this&nbsp;method&nbsp;returns<br>
+a&nbsp;false&nbsp;value.<br>
+&nbsp;<br>
+..&nbsp;versionchanged::&nbsp;3.2<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;Allow&nbsp;filters&nbsp;to&nbsp;be&nbsp;just&nbsp;callables.<br>
+&nbsp;<br>
+..&nbsp;versionchanged::&nbsp;3.12<br>
+&nbsp;&nbsp;&nbsp;Allow&nbsp;filters&nbsp;to&nbsp;return&nbsp;a&nbsp;LogRecord&nbsp;instead&nbsp;of<br>
+&nbsp;&nbsp;&nbsp;modifying&nbsp;it&nbsp;in&nbsp;place.</span></dd></dl>
+
+<dl><dt><a name="FeedLogHandler-removeFilter"><strong>removeFilter</strong></a>(self, filter)</dt><dd><span class="code">Remove&nbsp;the&nbsp;specified&nbsp;filter&nbsp;from&nbsp;this&nbsp;handler.</span></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="logging.html#Filterer">logging.Filterer</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="StderrTee">class <strong>StderrTee</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#StderrTee">StderrTee</a>(real,&nbsp;feed:&nbsp;'<a href="#DiscordFeed">DiscordFeed</a>')&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+File-like&nbsp;wrapper&nbsp;that&nbsp;mirrors&nbsp;stderr&nbsp;writes&nbsp;into&nbsp;the&nbsp;feed.<br>
+&nbsp;<br>
+Forwards&nbsp;every&nbsp;write&nbsp;to&nbsp;the&nbsp;real&nbsp;stderr,&nbsp;then&nbsp;feeds&nbsp;complete&nbsp;lines<br>
+to&nbsp;``post_line``.&nbsp;Assign&nbsp;over&nbsp;``sys.stderr``;&nbsp;keep&nbsp;the&nbsp;return&nbsp;value<br>
+to&nbsp;restore&nbsp;it&nbsp;later.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="StderrTee-__getattr__"><strong>__getattr__</strong></a>(self, name: 'str')</dt></dl>
+
+<dl><dt><a name="StderrTee-__init__"><strong>__init__</strong></a>(self, real, feed: 'DiscordFeed') -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="StderrTee-flush"><strong>flush</strong></a>(self) -&gt; 'None'</dt></dl>
+
+<dl><dt><a name="StderrTee-write"><strong>write</strong></a>(self, s: 'str') -&gt; 'int'</dt></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>KIND_ACTIVITY</strong> = 'activity'<br>
+<strong>KIND_BOARD</strong> = 'board'<br>
+<strong>KIND_INNER</strong> = 'inner'<br>
+<strong>KIND_PULSE</strong> = 'pulse'<br>
+<strong>KIND_SPEECH</strong> = 'speech'<br>
+<strong>KIND_SYSTEM</strong> = 'session'<br>
+<strong>KIND_USER</strong> = 'user'<br>
+<strong>__annotations__</strong> = {'_KIND_STYLE': 'dict[str, tuple[int | None, str | None]]'}<br>
+<strong>logger</strong> = &lt;Logger Outer_World.discord.feed (WARNING)&gt;</td></tr></table>
+</body></html>

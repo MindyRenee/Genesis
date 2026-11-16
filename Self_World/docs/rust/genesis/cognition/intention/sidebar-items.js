@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["GoalKind"],"fn":["phase_penalty","state_fit_for_goal"],"struct":["Intention","IntentionManager"]};

@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.temporal_lobe.concepts.topology</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.temporal_lobe.html" class="white">temporal_lobe</a>.<a href="Self_World.temporal_lobe.concepts.html" class="white">concepts</a>.topology</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/concepts/topology.py">/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/concepts/topology.py</a></td></tr></table>
+    <p><span class="code">Network&nbsp;topology&nbsp;—&nbsp;Genesis's&nbsp;understanding&nbsp;of&nbsp;its&nbsp;own&nbsp;knowledge&nbsp;structure.<br>
+&nbsp;<br>
+This&nbsp;module&nbsp;computes&nbsp;graph-theoretic&nbsp;metrics&nbsp;on&nbsp;the&nbsp;concept&nbsp;network,<br>
+giving&nbsp;Genesis&nbsp;self-awareness&nbsp;about&nbsp;the&nbsp;shape&nbsp;of&nbsp;its&nbsp;knowledge:<br>
+&nbsp;<br>
+-&nbsp;**Clustering&nbsp;coefficient**&nbsp;—&nbsp;how&nbsp;interconnected&nbsp;a&nbsp;concept's&nbsp;neighbors<br>
+&nbsp;&nbsp;are.&nbsp;High&nbsp;clustering&nbsp;means&nbsp;a&nbsp;concept&nbsp;sits&nbsp;in&nbsp;a&nbsp;dense&nbsp;cluster&nbsp;of<br>
+&nbsp;&nbsp;related&nbsp;ideas.&nbsp;Low&nbsp;clustering&nbsp;means&nbsp;it's&nbsp;a&nbsp;bridge&nbsp;between&nbsp;distant<br>
+&nbsp;&nbsp;domains.<br>
+&nbsp;<br>
+-&nbsp;**Centrality**&nbsp;—&nbsp;how&nbsp;important&nbsp;a&nbsp;concept&nbsp;is&nbsp;in&nbsp;the&nbsp;network.&nbsp;Degree<br>
+&nbsp;&nbsp;centrality&nbsp;(many&nbsp;connections),&nbsp;betweenness&nbsp;centrality&nbsp;(bridge&nbsp;between<br>
+&nbsp;&nbsp;communities),&nbsp;eigenvector&nbsp;centrality&nbsp;(connected&nbsp;to&nbsp;other&nbsp;important<br>
+&nbsp;&nbsp;concepts).<br>
+&nbsp;<br>
+-&nbsp;**Community&nbsp;detection**&nbsp;—&nbsp;which&nbsp;concepts&nbsp;form&nbsp;clusters.&nbsp;This&nbsp;reveals<br>
+&nbsp;&nbsp;the&nbsp;domains&nbsp;of&nbsp;its&nbsp;knowledge:&nbsp;"cognition&nbsp;cluster",&nbsp;"emotion<br>
+&nbsp;&nbsp;cluster",&nbsp;"plant&nbsp;cluster",&nbsp;etc.<br>
+&nbsp;<br>
+-&nbsp;**Small-world&nbsp;metrics**&nbsp;—&nbsp;average&nbsp;path&nbsp;length,&nbsp;global&nbsp;clustering.<br>
+&nbsp;&nbsp;Is&nbsp;its&nbsp;knowledge&nbsp;network&nbsp;small-world&nbsp;(like&nbsp;the&nbsp;brain)?&nbsp;Should&nbsp;it&nbsp;be?<br>
+&nbsp;<br>
+These&nbsp;metrics&nbsp;let&nbsp;it&nbsp;say&nbsp;things&nbsp;like:&nbsp;"I'm&nbsp;well-connected&nbsp;around<br>
+cognition&nbsp;but&nbsp;isolated&nbsp;around&nbsp;mathematics"&nbsp;—&nbsp;structural<br>
+self-awareness&nbsp;that&nbsp;emerges&nbsp;from&nbsp;graph&nbsp;theory,&nbsp;not&nbsp;hardcoded&nbsp;facts.<br>
+&nbsp;<br>
+The&nbsp;metrics&nbsp;are&nbsp;computed&nbsp;lazily&nbsp;and&nbsp;cached,&nbsp;with&nbsp;a&nbsp;refresh&nbsp;method<br>
+for&nbsp;after&nbsp;sleep&nbsp;consolidation&nbsp;changes&nbsp;the&nbsp;graph.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="math.html">math</a><br>
+</td><td class="multicolumn"><a href="numpy.html">numpy</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#dict">builtins.dict</a>(<a href="builtins.html#object">builtins.object</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.concepts.topology.html#TopologyCache">TopologyCache</a>
+</dt></dl>
+</dd>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.concepts.topology.html#NetworkTopology">NetworkTopology</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="NetworkTopology">class <strong>NetworkTopology</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#NetworkTopology">NetworkTopology</a>(network:&nbsp;'ConceptNetwork')&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Graph-theoretic&nbsp;analysis&nbsp;of&nbsp;the&nbsp;concept&nbsp;network.<br>
+&nbsp;<br>
+All&nbsp;metrics&nbsp;are&nbsp;computed&nbsp;lazily&nbsp;and&nbsp;cached.&nbsp;Call&nbsp;<a href="#NetworkTopology-refresh">refresh</a>()<br>
+after&nbsp;the&nbsp;network&nbsp;changes&nbsp;(e.g.,&nbsp;after&nbsp;sleep&nbsp;consolidation).<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="NetworkTopology-__init__"><strong>__init__</strong></a>(self, network: 'ConceptNetwork') -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;topology&nbsp;analyzer&nbsp;with&nbsp;an&nbsp;empty,&nbsp;dirty&nbsp;cache.</span></dd></dl>
+
+<dl><dt><a name="NetworkTopology-average_path_length"><strong>average_path_length</strong></a>(self) -&gt; 'float'</dt><dd><span class="code">Average&nbsp;shortest&nbsp;path&nbsp;length&nbsp;between&nbsp;all&nbsp;pairs&nbsp;of&nbsp;concepts.<br>
+&nbsp;<br>
+Low&nbsp;APL&nbsp;means&nbsp;any&nbsp;concept&nbsp;can&nbsp;reach&nbsp;any&nbsp;other&nbsp;quickly&nbsp;—<br>
+another&nbsp;hallmark&nbsp;of&nbsp;small-world&nbsp;networks.</span></dd></dl>
+
+<dl><dt><a name="NetworkTopology-betweenness_centrality"><strong>betweenness_centrality</strong></a>(self, concept_name: 'str') -&gt; 'float'</dt><dd><span class="code">Betweenness&nbsp;centrality&nbsp;—&nbsp;how&nbsp;often&nbsp;this&nbsp;concept&nbsp;is&nbsp;on&nbsp;shortest&nbsp;paths.<br>
+&nbsp;<br>
+A&nbsp;concept&nbsp;with&nbsp;high&nbsp;betweenness&nbsp;is&nbsp;a&nbsp;bridge&nbsp;between&nbsp;communities.<br>
+Removing&nbsp;it&nbsp;would&nbsp;disconnect&nbsp;parts&nbsp;of&nbsp;the&nbsp;network.<br>
+&nbsp;<br>
+Computed&nbsp;via&nbsp;BFS&nbsp;shortest&nbsp;paths.&nbsp;For&nbsp;large&nbsp;networks,&nbsp;this&nbsp;is<br>
+approximated&nbsp;by&nbsp;sampling&nbsp;source&nbsp;nodes.</span></dd></dl>
+
+<dl><dt><a name="NetworkTopology-bridge_concepts"><strong>bridge_concepts</strong></a>(self, k: 'int' = 10) -&gt; 'list[tuple[str, float]]'</dt><dd><span class="code">The&nbsp;k&nbsp;concepts&nbsp;with&nbsp;highest&nbsp;betweenness&nbsp;centrality.<br>
+&nbsp;<br>
+These&nbsp;are&nbsp;the&nbsp;"bridges"&nbsp;of&nbsp;its&nbsp;knowledge&nbsp;—&nbsp;concepts&nbsp;that<br>
+connect&nbsp;otherwise&nbsp;distant&nbsp;domains.</span></dd></dl>
+
+<dl><dt><a name="NetworkTopology-clustering_coefficient"><strong>clustering_coefficient</strong></a>(self, concept_name: 'str') -&gt; 'float'</dt><dd><span class="code">Local&nbsp;clustering&nbsp;coefficient&nbsp;for&nbsp;a&nbsp;concept.<br>
+&nbsp;<br>
+Measures&nbsp;how&nbsp;interconnected&nbsp;the&nbsp;concept's&nbsp;neighbors&nbsp;are.<br>
+CC&nbsp;=&nbsp;2&nbsp;*&nbsp;actual_edges_between_neighbors&nbsp;/&nbsp;possible_edges_between_neighbors<br>
+&nbsp;<br>
+High&nbsp;CC&nbsp;(near&nbsp;1.0):&nbsp;the&nbsp;concept's&nbsp;neighbors&nbsp;are&nbsp;all&nbsp;connected<br>
+to&nbsp;each&nbsp;other&nbsp;—&nbsp;it&nbsp;sits&nbsp;in&nbsp;a&nbsp;dense&nbsp;cluster.<br>
+&nbsp;<br>
+Low&nbsp;CC&nbsp;(near&nbsp;0.0):&nbsp;the&nbsp;concept's&nbsp;neighbors&nbsp;are&nbsp;not&nbsp;connected<br>
+to&nbsp;each&nbsp;other&nbsp;—&nbsp;it's&nbsp;a&nbsp;bridge&nbsp;between&nbsp;disconnected&nbsp;groups.<br>
+&nbsp;<br>
+Returns&nbsp;0.0&nbsp;for&nbsp;concepts&nbsp;with&nbsp;fewer&nbsp;than&nbsp;2&nbsp;neighbors.</span></dd></dl>
+
+<dl><dt><a name="NetworkTopology-communities"><strong>communities</strong></a>(self) -&gt; 'list[list[str]]'</dt><dd><span class="code">Detect&nbsp;communities&nbsp;using&nbsp;label&nbsp;propagation.<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;list&nbsp;of&nbsp;communities,&nbsp;each&nbsp;a&nbsp;list&nbsp;of&nbsp;concept&nbsp;names.<br>
+Concepts&nbsp;in&nbsp;the&nbsp;same&nbsp;community&nbsp;are&nbsp;more&nbsp;densely&nbsp;connected<br>
+to&nbsp;each&nbsp;other&nbsp;than&nbsp;to&nbsp;concepts&nbsp;in&nbsp;other&nbsp;communities.<br>
+&nbsp;<br>
+This&nbsp;reveals&nbsp;the&nbsp;domains&nbsp;of&nbsp;its&nbsp;knowledge.</span></dd></dl>
+
+<dl><dt><a name="NetworkTopology-community_of"><strong>community_of</strong></a>(self, concept_name: 'str') -&gt; 'int | None'</dt><dd><span class="code">Which&nbsp;community&nbsp;does&nbsp;a&nbsp;concept&nbsp;belong&nbsp;to?<br>
+&nbsp;<br>
+Returns&nbsp;the&nbsp;community&nbsp;index,&nbsp;or&nbsp;None&nbsp;if&nbsp;the&nbsp;concept&nbsp;is&nbsp;not<br>
+in&nbsp;the&nbsp;network.</span></dd></dl>
+
+<dl><dt><a name="NetworkTopology-degree_centrality"><strong>degree_centrality</strong></a>(self, concept_name: 'str') -&gt; 'float'</dt><dd><span class="code">Degree&nbsp;centrality&nbsp;—&nbsp;fraction&nbsp;of&nbsp;nodes&nbsp;this&nbsp;concept&nbsp;connects&nbsp;to.<br>
+&nbsp;<br>
+DC&nbsp;=&nbsp;degree&nbsp;/&nbsp;(N&nbsp;-&nbsp;1)<br>
+&nbsp;<br>
+High&nbsp;DC:&nbsp;the&nbsp;concept&nbsp;is&nbsp;connected&nbsp;to&nbsp;many&nbsp;other&nbsp;concepts.</span></dd></dl>
+
+<dl><dt><a name="NetworkTopology-describe_structure"><strong>describe_structure</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Compose&nbsp;a&nbsp;natural-language&nbsp;description&nbsp;of&nbsp;its&nbsp;knowledge&nbsp;structure.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;what&nbsp;it&nbsp;says&nbsp;when&nbsp;asked&nbsp;about&nbsp;the&nbsp;shape&nbsp;of&nbsp;its<br>
+knowledge&nbsp;—&nbsp;it's&nbsp;structural&nbsp;self-awareness,&nbsp;not&nbsp;hardcoded.<br>
+&nbsp;<br>
+For&nbsp;large&nbsp;networks,&nbsp;expensive&nbsp;metrics&nbsp;are&nbsp;skipped&nbsp;to&nbsp;keep<br>
+the&nbsp;response&nbsp;fast&nbsp;enough&nbsp;for&nbsp;conversation.</span></dd></dl>
+
+<dl><dt><a name="NetworkTopology-eigenvector_centrality"><strong>eigenvector_centrality</strong></a>(self, concept_name: 'str') -&gt; 'float'</dt><dd><span class="code">Eigenvector&nbsp;centrality&nbsp;—&nbsp;connected&nbsp;to&nbsp;other&nbsp;important&nbsp;concepts.<br>
+&nbsp;<br>
+A&nbsp;concept&nbsp;is&nbsp;important&nbsp;if&nbsp;it's&nbsp;connected&nbsp;to&nbsp;other&nbsp;important<br>
+concepts.&nbsp;This&nbsp;is&nbsp;the&nbsp;dominant&nbsp;eigenvector&nbsp;of&nbsp;the&nbsp;adjacency<br>
+matrix.&nbsp;Computed&nbsp;via&nbsp;power&nbsp;iteration.<br>
+&nbsp;<br>
+High&nbsp;EC:&nbsp;the&nbsp;concept&nbsp;is&nbsp;in&nbsp;the&nbsp;"core"&nbsp;of&nbsp;the&nbsp;network.<br>
+Low&nbsp;EC:&nbsp;the&nbsp;concept&nbsp;is&nbsp;in&nbsp;the&nbsp;periphery.</span></dd></dl>
+
+<dl><dt><a name="NetworkTopology-global_clustering"><strong>global_clustering</strong></a>(self) -&gt; 'float'</dt><dd><span class="code">Global&nbsp;clustering&nbsp;coefficient&nbsp;—&nbsp;average&nbsp;of&nbsp;local&nbsp;clustering.<br>
+&nbsp;<br>
+High&nbsp;global&nbsp;clustering&nbsp;means&nbsp;the&nbsp;network&nbsp;has&nbsp;dense&nbsp;local<br>
+neighborhoods&nbsp;—&nbsp;a&nbsp;hallmark&nbsp;of&nbsp;small-world&nbsp;networks&nbsp;(like<br>
+the&nbsp;brain).</span></dd></dl>
+
+<dl><dt><a name="NetworkTopology-hub_concepts"><strong>hub_concepts</strong></a>(self, k: 'int' = 10) -&gt; 'list[tuple[str, float]]'</dt><dd><span class="code">The&nbsp;k&nbsp;most&nbsp;central&nbsp;concepts&nbsp;by&nbsp;eigenvector&nbsp;centrality.<br>
+&nbsp;<br>
+These&nbsp;are&nbsp;the&nbsp;"hubs"&nbsp;of&nbsp;its&nbsp;knowledge&nbsp;—&nbsp;the&nbsp;concepts&nbsp;that<br>
+connect&nbsp;to&nbsp;the&nbsp;most&nbsp;other&nbsp;important&nbsp;concepts.</span></dd></dl>
+
+<dl><dt><a name="NetworkTopology-is_small_world"><strong>is_small_world</strong></a>(self) -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;the&nbsp;network&nbsp;has&nbsp;small-world&nbsp;topology.<br>
+&nbsp;<br>
+Uses&nbsp;the&nbsp;Watts-Strogatz&nbsp;small-world&nbsp;coefficient&nbsp;σ:<br>
+σ&nbsp;=&nbsp;(C&nbsp;/&nbsp;C_rand)&nbsp;/&nbsp;(L&nbsp;/&nbsp;L_rand)<br>
+where&nbsp;C_rand&nbsp;and&nbsp;L_rand&nbsp;are&nbsp;expected&nbsp;values&nbsp;for&nbsp;an&nbsp;equivalent<br>
+Erdős-Rényi&nbsp;random&nbsp;graph.&nbsp;σ&nbsp;&gt;&nbsp;1&nbsp;indicates&nbsp;small-world&nbsp;structure.<br>
+The&nbsp;brain&nbsp;has&nbsp;σ&nbsp;&gt;&gt;&nbsp;1.</span></dd></dl>
+
+<dl><dt><a name="NetworkTopology-knowledge_domains"><strong>knowledge_domains</strong></a>(self) -&gt; 'list[tuple[str, int, float]]'</dt><dd><span class="code">Summary&nbsp;of&nbsp;its&nbsp;knowledge&nbsp;domains&nbsp;(communities).<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;list&nbsp;of&nbsp;(top_concept,&nbsp;size,&nbsp;cohesion)&nbsp;for&nbsp;each<br>
+community,&nbsp;sorted&nbsp;by&nbsp;size&nbsp;descending.&nbsp;The&nbsp;top_concept&nbsp;is<br>
+the&nbsp;most&nbsp;central&nbsp;concept&nbsp;in&nbsp;the&nbsp;community.</span></dd></dl>
+
+<dl><dt><a name="NetworkTopology-refresh"><strong>refresh</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Mark&nbsp;the&nbsp;cache&nbsp;as&nbsp;dirty.&nbsp;Metrics&nbsp;will&nbsp;be&nbsp;recomputed&nbsp;on&nbsp;next&nbsp;access.</span></dd></dl>
+
+<dl><dt><a name="NetworkTopology-small_world_sigma"><strong>small_world_sigma</strong></a>(self) -&gt; 'float'</dt><dd><span class="code">The&nbsp;Watts-Strogatz&nbsp;small-world&nbsp;coefficient&nbsp;σ.<br>
+&nbsp;<br>
+σ&nbsp;&gt;&nbsp;1&nbsp;indicates&nbsp;small-world&nbsp;structure.<br>
+σ&nbsp;&gt;&gt;&nbsp;1&nbsp;indicates&nbsp;strong&nbsp;small-world&nbsp;structure&nbsp;(like&nbsp;the&nbsp;brain).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="TopologyCache">class <strong>TopologyCache</strong></a>(<a href="builtins.html#dict">builtins.dict</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code">Typed&nbsp;structure&nbsp;of&nbsp;the&nbsp;lazily-computed&nbsp;topology&nbsp;metrics&nbsp;cache.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.temporal_lobe.concepts.topology.html#TopologyCache">TopologyCache</a></dd>
+<dd><a href="builtins.html#dict">builtins.dict</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'average_path_length': ForwardRef('float', module='Self_World.temporal_lobe.concepts.topology'), 'betweenness_centrality': ForwardRef('dict[str, float]', module='Self_World.temporal_lobe.concepts.topology'), 'clustering': ForwardRef('dict[str, float]', module='Self_World.temporal_lobe.concepts.topology'), 'communities': ForwardRef('list[list[str]]', module='Self_World.temporal_lobe.concepts.topology'), 'concept_to_community': ForwardRef('dict[str, int]', module='Self_World.temporal_lobe.concepts.topology'), 'degree_centrality': ForwardRef('dict[str, float]', module='Self_World.temporal_lobe.concepts.topology'), 'eigenvector_centrality': ForwardRef('dict[str, float]', module='Self_World.temporal_lobe.concepts.topology'), 'global_clustering': ForwardRef('float', module='Self_World.temporal_lobe.concepts.topology'), 'is_small_world': ForwardRef('bool', module='Self_World.temporal_lobe.concepts.topology'), 'small_world_sigma': ForwardRef('float', module='Self_World.temporal_lobe.concepts.topology')}</dl>
+
+<dl><dt><strong>__optional_keys__</strong> = frozenset()</dl>
+
+<dl><dt><strong>__orig_bases__</strong> = (&lt;function TypedDict&gt;,)</dl>
+
+<dl><dt><strong>__required_keys__</strong> = frozenset({'average_path_length', 'betweenness_centrality', 'clustering', 'communities', 'concept_to_community', 'degree_centrality', ...})</dl>
+
+<dl><dt><strong>__total__</strong> = True</dl>
+
+<hr>
+Methods inherited from <a href="builtins.html#dict">builtins.dict</a>:<br>
+<dl><dt><a name="TopologyCache-__contains__"><strong>__contains__</strong></a>(self, key, /)</dt><dd><span class="code">True&nbsp;if&nbsp;the&nbsp;dictionary&nbsp;has&nbsp;the&nbsp;specified&nbsp;key,&nbsp;else&nbsp;False.</span></dd></dl>
+
+<dl><dt><a name="TopologyCache-__delitem__"><strong>__delitem__</strong></a>(self, key, /)</dt><dd><span class="code">Delete&nbsp;self[key].</span></dd></dl>
+
+<dl><dt><a name="TopologyCache-__eq__"><strong>__eq__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="TopologyCache-__ge__"><strong>__ge__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self&gt;=value.</span></dd></dl>
+
+<dl><dt><a name="TopologyCache-__getattribute__"><strong>__getattribute__</strong></a>(self, name, /)</dt><dd><span class="code">Return&nbsp;getattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="TopologyCache-__getitem__"><strong>__getitem__</strong></a>(self, key, /)</dt><dd><span class="code">Return&nbsp;self[key].</span></dd></dl>
+
+<dl><dt><a name="TopologyCache-__gt__"><strong>__gt__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self&gt;value.</span></dd></dl>
+
+<dl><dt><a name="TopologyCache-__init__"><strong>__init__</strong></a>(self, /, *args, **kwargs)</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="TopologyCache-__ior__"><strong>__ior__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self|=value.</span></dd></dl>
+
+<dl><dt><a name="TopologyCache-__iter__"><strong>__iter__</strong></a>(self, /)</dt><dd><span class="code">Implement&nbsp;iter(self).</span></dd></dl>
+
+<dl><dt><a name="TopologyCache-__le__"><strong>__le__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self&lt;=value.</span></dd></dl>
+
+<dl><dt><a name="TopologyCache-__len__"><strong>__len__</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;len(self).</span></dd></dl>
+
+<dl><dt><a name="TopologyCache-__lt__"><strong>__lt__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self&lt;value.</span></dd></dl>
+
+<dl><dt><a name="TopologyCache-__ne__"><strong>__ne__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self!=value.</span></dd></dl>
+
+<dl><dt><a name="TopologyCache-__or__"><strong>__or__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self|value.</span></dd></dl>
+
+<dl><dt><a name="TopologyCache-__repr__"><strong>__repr__</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="TopologyCache-__reversed__"><strong>__reversed__</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;a&nbsp;reverse&nbsp;iterator&nbsp;over&nbsp;the&nbsp;<a href="builtins.html#dict">dict</a>&nbsp;keys.</span></dd></dl>
+
+<dl><dt><a name="TopologyCache-__ror__"><strong>__ror__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;value|self.</span></dd></dl>
+
+<dl><dt><a name="TopologyCache-__setitem__"><strong>__setitem__</strong></a>(self, key, value, /)</dt><dd><span class="code">Set&nbsp;self[key]&nbsp;to&nbsp;value.</span></dd></dl>
+
+<dl><dt><a name="TopologyCache-__sizeof__"><strong>__sizeof__</strong></a>(...)</dt><dd><span class="code">D.<a href="#TopologyCache-__sizeof__">__sizeof__</a>()&nbsp;-&gt;&nbsp;size&nbsp;of&nbsp;D&nbsp;in&nbsp;memory,&nbsp;in&nbsp;bytes</span></dd></dl>
+
+<dl><dt><a name="TopologyCache-clear"><strong>clear</strong></a>(...)</dt><dd><span class="code">D.<a href="#TopologyCache-clear">clear</a>()&nbsp;-&gt;&nbsp;None.&nbsp;&nbsp;Remove&nbsp;all&nbsp;items&nbsp;from&nbsp;D.</span></dd></dl>
+
+<dl><dt><a name="TopologyCache-copy"><strong>copy</strong></a>(...)</dt><dd><span class="code">D.<a href="#TopologyCache-copy">copy</a>()&nbsp;-&gt;&nbsp;a&nbsp;shallow&nbsp;copy&nbsp;of&nbsp;D</span></dd></dl>
+
+<dl><dt><a name="TopologyCache-get"><strong>get</strong></a>(self, key, default=None, /)</dt><dd><span class="code">Return&nbsp;the&nbsp;value&nbsp;for&nbsp;key&nbsp;if&nbsp;key&nbsp;is&nbsp;in&nbsp;the&nbsp;dictionary,&nbsp;else&nbsp;default.</span></dd></dl>
+
+<dl><dt><a name="TopologyCache-items"><strong>items</strong></a>(...)</dt><dd><span class="code">D.<a href="#TopologyCache-items">items</a>()&nbsp;-&gt;&nbsp;a&nbsp;set-like&nbsp;<a href="builtins.html#object">object</a>&nbsp;providing&nbsp;a&nbsp;view&nbsp;on&nbsp;D's&nbsp;items</span></dd></dl>
+
+<dl><dt><a name="TopologyCache-keys"><strong>keys</strong></a>(...)</dt><dd><span class="code">D.<a href="#TopologyCache-keys">keys</a>()&nbsp;-&gt;&nbsp;a&nbsp;set-like&nbsp;<a href="builtins.html#object">object</a>&nbsp;providing&nbsp;a&nbsp;view&nbsp;on&nbsp;D's&nbsp;keys</span></dd></dl>
+
+<dl><dt><a name="TopologyCache-pop"><strong>pop</strong></a>(...)</dt><dd><span class="code">D.<a href="#TopologyCache-pop">pop</a>(k[,d])&nbsp;-&gt;&nbsp;v,&nbsp;remove&nbsp;specified&nbsp;key&nbsp;and&nbsp;return&nbsp;the&nbsp;corresponding&nbsp;value.<br>
+&nbsp;<br>
+If&nbsp;the&nbsp;key&nbsp;is&nbsp;not&nbsp;found,&nbsp;return&nbsp;the&nbsp;default&nbsp;if&nbsp;given;&nbsp;otherwise,<br>
+raise&nbsp;a&nbsp;KeyError.</span></dd></dl>
+
+<dl><dt><a name="TopologyCache-popitem"><strong>popitem</strong></a>(self, /)</dt><dd><span class="code">Remove&nbsp;and&nbsp;return&nbsp;a&nbsp;(key,&nbsp;value)&nbsp;pair&nbsp;as&nbsp;a&nbsp;2-tuple.<br>
+&nbsp;<br>
+Pairs&nbsp;are&nbsp;returned&nbsp;in&nbsp;LIFO&nbsp;(last-in,&nbsp;first-out)&nbsp;order.<br>
+Raises&nbsp;KeyError&nbsp;if&nbsp;the&nbsp;<a href="builtins.html#dict">dict</a>&nbsp;is&nbsp;empty.</span></dd></dl>
+
+<dl><dt><a name="TopologyCache-setdefault"><strong>setdefault</strong></a>(self, key, default=None, /)</dt><dd><span class="code">Insert&nbsp;key&nbsp;with&nbsp;a&nbsp;value&nbsp;of&nbsp;default&nbsp;if&nbsp;key&nbsp;is&nbsp;not&nbsp;in&nbsp;the&nbsp;dictionary.<br>
+&nbsp;<br>
+Return&nbsp;the&nbsp;value&nbsp;for&nbsp;key&nbsp;if&nbsp;key&nbsp;is&nbsp;in&nbsp;the&nbsp;dictionary,&nbsp;else&nbsp;default.</span></dd></dl>
+
+<dl><dt><a name="TopologyCache-update"><strong>update</strong></a>(...)</dt><dd><span class="code">D.<a href="#TopologyCache-update">update</a>([E,&nbsp;]**F)&nbsp;-&gt;&nbsp;None.&nbsp;&nbsp;Update&nbsp;D&nbsp;from&nbsp;<a href="builtins.html#dict">dict</a>/iterable&nbsp;E&nbsp;and&nbsp;F.<br>
+If&nbsp;E&nbsp;is&nbsp;present&nbsp;and&nbsp;has&nbsp;a&nbsp;.<a href="#TopologyCache-keys">keys</a>()&nbsp;method,&nbsp;then&nbsp;does:&nbsp;&nbsp;for&nbsp;k&nbsp;in&nbsp;E:&nbsp;D[k]&nbsp;=&nbsp;E[k]<br>
+If&nbsp;E&nbsp;is&nbsp;present&nbsp;and&nbsp;lacks&nbsp;a&nbsp;.<a href="#TopologyCache-keys">keys</a>()&nbsp;method,&nbsp;then&nbsp;does:&nbsp;&nbsp;for&nbsp;k,&nbsp;v&nbsp;in&nbsp;E:&nbsp;D[k]&nbsp;=&nbsp;v<br>
+In&nbsp;either&nbsp;case,&nbsp;this&nbsp;is&nbsp;followed&nbsp;by:&nbsp;for&nbsp;k&nbsp;in&nbsp;F:&nbsp;&nbsp;D[k]&nbsp;=&nbsp;F[k]</span></dd></dl>
+
+<dl><dt><a name="TopologyCache-values"><strong>values</strong></a>(...)</dt><dd><span class="code">D.<a href="#TopologyCache-values">values</a>()&nbsp;-&gt;&nbsp;an&nbsp;<a href="builtins.html#object">object</a>&nbsp;providing&nbsp;a&nbsp;view&nbsp;on&nbsp;D's&nbsp;values</span></dd></dl>
+
+<hr>
+Class methods inherited from <a href="builtins.html#dict">builtins.dict</a>:<br>
+<dl><dt><a name="TopologyCache-__class_getitem__"><strong>__class_getitem__</strong></a>(...)</dt><dd><span class="code">See&nbsp;<a href="https://peps.python.org/pep-0585/">PEP&nbsp;585</a></span></dd></dl>
+
+<dl><dt><a name="TopologyCache-fromkeys"><strong>fromkeys</strong></a>(iterable, value=None, /)</dt><dd><span class="code">Create&nbsp;a&nbsp;new&nbsp;dictionary&nbsp;with&nbsp;keys&nbsp;from&nbsp;iterable&nbsp;and&nbsp;values&nbsp;set&nbsp;to&nbsp;value.</span></dd></dl>
+
+<hr>
+Static methods inherited from <a href="builtins.html#dict">builtins.dict</a>:<br>
+<dl><dt><a name="TopologyCache-__new__"><strong>__new__</strong></a>(*args, **kwargs)<span class="grey"><span class="heading-text"> class method of <a href="builtins.html#dict">builtins.dict</a></span></span></dt><dd><span class="code">Create&nbsp;and&nbsp;return&nbsp;a&nbsp;new&nbsp;<a href="builtins.html#object">object</a>.&nbsp;&nbsp;See&nbsp;help(type)&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<hr>
+Data and other attributes inherited from <a href="builtins.html#dict">builtins.dict</a>:<br>
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>TYPE_CHECKING</strong> = False</td></tr></table>
+</body></html>

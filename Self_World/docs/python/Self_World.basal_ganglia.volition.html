@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.basal_ganglia.volition</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.basal_ganglia.html" class="white">basal_ganglia</a>.volition</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/basal_ganglia/volition.py">/home/mindyrenee/GenAnd/Genesis/Self_World/basal_ganglia/volition.py</a></td></tr></table>
+    <p><span class="code">Mind&nbsp;volition&nbsp;—&nbsp;urge&nbsp;handling&nbsp;and&nbsp;voluntary&nbsp;actions.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="math.html">math</a><br>
+</td><td class="multicolumn"><a href="time.html">time</a><br>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.basal_ganglia.volition.html#VolitionMixin">VolitionMixin</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="VolitionMixin">class <strong>VolitionMixin</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code">Mixin&nbsp;for&nbsp;:class:`Mind`&nbsp;—&nbsp;see&nbsp;module&nbsp;docstring.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="VolitionMixin-draw"><strong>draw</strong></a>(self) -&gt; 'str | None'</dt><dd><span class="code">Sit&nbsp;down&nbsp;at&nbsp;the&nbsp;studio&nbsp;—&nbsp;open&nbsp;Krita;&nbsp;even&nbsp;the&nbsp;paper&nbsp;is&nbsp;her&nbsp;call.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;public&nbsp;entry&nbsp;point&nbsp;for&nbsp;drawing&nbsp;—&nbsp;used&nbsp;by&nbsp;both&nbsp;the<br>
+volition&nbsp;system&nbsp;(via&nbsp;:meth:`_perform_draw`)&nbsp;and&nbsp;the&nbsp;``/draw``<br>
+CLI&nbsp;command.&nbsp;Sitting&nbsp;down&nbsp;is&nbsp;all&nbsp;this&nbsp;does:&nbsp;the&nbsp;sheet,&nbsp;the<br>
+tools,&nbsp;the&nbsp;colors,&nbsp;and&nbsp;every&nbsp;mark&nbsp;after&nbsp;this&nbsp;are&nbsp;hers,&nbsp;issued<br>
+through&nbsp;the&nbsp;``studio_*``&nbsp;tools&nbsp;whenever&nbsp;she&nbsp;decides&nbsp;to&nbsp;—&nbsp;there<br>
+is&nbsp;no&nbsp;scripted&nbsp;sitting,&nbsp;and&nbsp;nothing&nbsp;moves&nbsp;her&nbsp;hand&nbsp;for&nbsp;her.&nbsp;A<br>
+finished&nbsp;piece&nbsp;leaves&nbsp;when&nbsp;she&nbsp;calls&nbsp;``studio_done``&nbsp;and&nbsp;lands<br>
+in&nbsp;:meth:`_on_drawing_finished`.<br>
+&nbsp;<br>
+Brain-wave-gated:&nbsp;delta-dominant&nbsp;(deep&nbsp;rest)&nbsp;skips&nbsp;drawing&nbsp;—<br>
+creative&nbsp;expression&nbsp;needs&nbsp;at&nbsp;least&nbsp;theta-level&nbsp;arousal.&nbsp;Theta<br>
+is&nbsp;allowed&nbsp;(REM&nbsp;creativity,&nbsp;dream-like&nbsp;art).<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;short&nbsp;status&nbsp;string,&nbsp;or&nbsp;None&nbsp;if&nbsp;she&nbsp;couldn't&nbsp;sit&nbsp;down<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(sleeping,&nbsp;meditating,&nbsp;delta&nbsp;state,&nbsp;or&nbsp;no&nbsp;surface).</span></dd></dl>
+
+<dl><dt><a name="VolitionMixin-self_invoke"><strong>self_invoke</strong></a>(self, command: 'str', args: 'str' = '') -&gt; 'str | None'</dt><dd><span class="code">Invoke&nbsp;a&nbsp;slash&nbsp;command&nbsp;from&nbsp;its&nbsp;own&nbsp;cognitive&nbsp;process.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;bridge&nbsp;between&nbsp;Genesis's&nbsp;volition/conversation&nbsp;and<br>
+the&nbsp;command&nbsp;system.&nbsp;It&nbsp;dispatches&nbsp;to&nbsp;the&nbsp;Mind&nbsp;method&nbsp;behind&nbsp;a<br>
+slash&nbsp;command&nbsp;—&nbsp;the&nbsp;action,&nbsp;not&nbsp;the&nbsp;CLI&nbsp;rendering.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;command:&nbsp;The&nbsp;slash&nbsp;command&nbsp;name&nbsp;(e.g.&nbsp;"/introspect").<br>
+&nbsp;&nbsp;&nbsp;&nbsp;args:&nbsp;Optional&nbsp;argument&nbsp;string&nbsp;(e.g.&nbsp;a&nbsp;mission&nbsp;description<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;/mission,&nbsp;or&nbsp;a&nbsp;path&nbsp;for&nbsp;/explore).<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;result&nbsp;string&nbsp;from&nbsp;the&nbsp;underlying&nbsp;method,&nbsp;or&nbsp;None&nbsp;if<br>
+&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;command&nbsp;is&nbsp;not&nbsp;self-invokeable&nbsp;or&nbsp;fails.</span></dd></dl>
+
+<dl><dt><a name="VolitionMixin-self_invokeable_commands"><strong>self_invokeable_commands</strong></a>(self) -&gt; 'list[str]'</dt><dd><span class="code">Return&nbsp;the&nbsp;list&nbsp;of&nbsp;commands&nbsp;Genesis&nbsp;can&nbsp;self-invoke.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {}</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>CHEM_NAMES</strong> = {0: 'dopamine', 1: 'serotonin', 2: 'norepinephrine', 3: 'acetylcholine', 4: 'gaba', 5: 'glutamate', 6: 'cortisol', 7: 'oxytocin', 8: 'endorphin', 9: 'histamine', ...}<br>
+<strong>EMOTIONAL_TAG_SIZE</strong> = 12<br>
+<strong>MODULE_METACOGNITION</strong> = 8<br>
+<strong>SLEEP_URGE_ADENOSINE_FLOOR</strong> = 0.45<br>
+<strong>TYPE_CHECKING</strong> = False<br>
+<strong>WAKE_RESCUE_ADENOSINE</strong> = 0.6<br>
+<strong>WAKE_RESCUE_MELATONIN</strong> = 0.3<br>
+<strong>WAKE_STABILIZATION_WINDOW</strong> = 900.0<br>
+<strong>logger</strong> = &lt;Logger Self_World.basal_ganglia.volition (WARNING)&gt;</td></tr></table>
+</body></html>

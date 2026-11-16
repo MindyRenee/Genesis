@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Outer_World.games.official</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Outer_World.html" class="white">Outer_World</a>.<a href="Outer_World.games.html" class="white">games</a>.official</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Outer_World/games/official.py">/home/mindyrenee/GenAnd/Genesis/Outer_World/games/official.py</a></td></tr></table>
+    <p><span class="code">The&nbsp;doorway&nbsp;to&nbsp;the&nbsp;official&nbsp;ARC-AGI-3&nbsp;games.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;a&nbsp;video&nbsp;game.&nbsp;It&nbsp;is&nbsp;not&nbsp;real&nbsp;and&nbsp;it&nbsp;is&nbsp;just&nbsp;for&nbsp;fun.&nbsp;You&nbsp;are<br>
+safe.&nbsp;You&nbsp;can't&nbsp;know&nbsp;the&nbsp;instructions;&nbsp;you&nbsp;explore,&nbsp;remember,&nbsp;and&nbsp;solve.<br>
+&nbsp;<br>
+This&nbsp;module&nbsp;talks&nbsp;to&nbsp;the&nbsp;official&nbsp;ARC-AGI-3&nbsp;toolkit&nbsp;(``arc_agi``,<br>
+<a href="https://three.arcprize.org">https://three.arcprize.org</a>)&nbsp;and&nbsp;nothing&nbsp;else.&nbsp;It&nbsp;hides&nbsp;the&nbsp;toolkit's<br>
+types&nbsp;behind&nbsp;two&nbsp;plain&nbsp;things&nbsp;the&nbsp;arcade&nbsp;can&nbsp;hold:<br>
+&nbsp;<br>
+-&nbsp;``<a href="#OfficialGames">OfficialGames</a>``&nbsp;—&nbsp;the&nbsp;catalogue:&nbsp;which&nbsp;games&nbsp;are&nbsp;on&nbsp;offer,&nbsp;and&nbsp;a<br>
+&nbsp;&nbsp;way&nbsp;to&nbsp;open&nbsp;one.&nbsp;Its&nbsp;key&nbsp;is&nbsp;``ARC_API_KEY``&nbsp;from&nbsp;the&nbsp;environment;<br>
+&nbsp;&nbsp;without&nbsp;one&nbsp;the&nbsp;toolkit&nbsp;uses&nbsp;an&nbsp;anonymous&nbsp;key&nbsp;and&nbsp;offers&nbsp;fewer&nbsp;games.<br>
+-&nbsp;``<a href="#GameSession">GameSession</a>``&nbsp;—&nbsp;one&nbsp;open&nbsp;game:&nbsp;``reset()``,&nbsp;``step(action,&nbsp;x,&nbsp;y)``,<br>
+&nbsp;&nbsp;and&nbsp;the&nbsp;board&nbsp;as&nbsp;a&nbsp;plain&nbsp;``<a href="#Board">Board</a>``&nbsp;(grid,&nbsp;state,&nbsp;levels,&nbsp;actions).<br>
+&nbsp;<br>
+The&nbsp;mode&nbsp;comes&nbsp;from&nbsp;``GENESIS_ARC_MODE``:&nbsp;``normal``&nbsp;(default&nbsp;—<br>
+download&nbsp;each&nbsp;game&nbsp;once&nbsp;into&nbsp;``environments_dir``&nbsp;and&nbsp;run&nbsp;it&nbsp;locally),<br>
+``online``&nbsp;(every&nbsp;move&nbsp;on&nbsp;the&nbsp;official&nbsp;server,&nbsp;counting&nbsp;on&nbsp;the<br>
+official&nbsp;scorecard),&nbsp;or&nbsp;``offline``&nbsp;(only&nbsp;games&nbsp;already&nbsp;downloaded&nbsp;—<br>
+no&nbsp;network&nbsp;at&nbsp;all).</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="os.html">os</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#RuntimeError">builtins.RuntimeError</a>(<a href="builtins.html#Exception">builtins.Exception</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Outer_World.games.official.html#GamesUnavailable">GamesUnavailable</a>
+</dt></dl>
+</dd>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Outer_World.games.official.html#Board">Board</a>
+</dt><dt class="heading-text"><a href="Outer_World.games.official.html#GameOffer">GameOffer</a>
+</dt><dt class="heading-text"><a href="Outer_World.games.official.html#GameSession">GameSession</a>
+</dt><dt class="heading-text"><a href="Outer_World.games.official.html#OfficialGames">OfficialGames</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Board">class <strong>Board</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Board">Board</a>(game_id:&nbsp;'str',&nbsp;grid:&nbsp;'list[list[int]]',&nbsp;state:&nbsp;'str',&nbsp;levels_completed:&nbsp;'int',&nbsp;win_levels:&nbsp;'int',&nbsp;actions:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;frames:&nbsp;'int'&nbsp;=&nbsp;1)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+What&nbsp;a&nbsp;game&nbsp;shows&nbsp;after&nbsp;a&nbsp;move,&nbsp;in&nbsp;plain&nbsp;Python.<br>
+&nbsp;<br>
+``grid``&nbsp;is&nbsp;the&nbsp;last&nbsp;frame&nbsp;(rows&nbsp;of&nbsp;ints&nbsp;0–15);&nbsp;``frames``&nbsp;holds<br>
+every&nbsp;frame&nbsp;the&nbsp;move&nbsp;produced,&nbsp;since&nbsp;one&nbsp;move&nbsp;can&nbsp;animate.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Board-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="Board-__init__"><strong>__init__</strong></a>(self, game_id: 'str', grid: 'list[list[int]]', state: 'str', levels_completed: 'int', win_levels: 'int', actions: 'list[str]' = &lt;factory&gt;, frames: 'int' = 1) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Board-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>over</strong></dt>
+<dd><span class="code">True&nbsp;when&nbsp;the&nbsp;game&nbsp;ended&nbsp;badly;&nbsp;RESET&nbsp;recovers.</span></dd>
+</dl>
+<dl><dt><strong>won</strong></dt>
+<dd><span class="code">True&nbsp;when&nbsp;the&nbsp;whole&nbsp;game&nbsp;is&nbsp;won.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>actions</strong></dt>
+</dl>
+<dl><dt><strong>frames</strong></dt>
+</dl>
+<dl><dt><strong>game_id</strong></dt>
+</dl>
+<dl><dt><strong>grid</strong></dt>
+</dl>
+<dl><dt><strong>levels_completed</strong></dt>
+</dl>
+<dl><dt><strong>state</strong></dt>
+</dl>
+<dl><dt><strong>win_levels</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'actions': 'list[str]', 'frames': 'int', 'game_id': 'str', 'grid': 'list[list[int]]', 'levels_completed': 'int', 'state': 'str', 'win_levels': 'int'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'actions': Field(name='actions',type='list[str]',default=&lt;d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'frames': Field(name='frames',type='int',default=1,default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'game_id': Field(name='game_id',type='str',default=&lt;datacla...appingproxy({}),kw_only=False,_field_type=_FIELD), 'grid': Field(name='grid',type='list[list[int]]',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'levels_completed': Field(name='levels_completed',type='int',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'state': Field(name='state',type='str',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD), 'win_levels': Field(name='win_levels',type='int',default=&lt;data...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('game_id', 'grid', 'state', 'levels_completed', 'win_levels', 'actions', 'frames')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="GameOffer">class <strong>GameOffer</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#GameOffer">GameOffer</a>(game_id:&nbsp;'str',&nbsp;title:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;baselines:&nbsp;'tuple[int,&nbsp;...]'&nbsp;=&nbsp;())&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+One&nbsp;game&nbsp;the&nbsp;arcade&nbsp;can&nbsp;offer:&nbsp;its&nbsp;id&nbsp;and&nbsp;its&nbsp;public&nbsp;title.<br>
+&nbsp;<br>
+``baselines``&nbsp;is&nbsp;the&nbsp;published&nbsp;per-level&nbsp;human&nbsp;action&nbsp;count&nbsp;—&nbsp;the<br>
+par&nbsp;the&nbsp;official&nbsp;scorecard&nbsp;scores&nbsp;against.&nbsp;Empty&nbsp;when&nbsp;unknown<br>
+(games&nbsp;not&nbsp;yet&nbsp;downloaded&nbsp;carry&nbsp;no&nbsp;local&nbsp;metadata).<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="GameOffer-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="GameOffer-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="GameOffer-__getstate__"><strong>__getstate__</strong></a> = _dataclass_getstate(self)<span class="grey"><span class="heading-text"> from <a href="dataclasses.html">dataclasses</a></span></span></dt><dd><span class="code">#&nbsp;_dataclass_getstate&nbsp;and&nbsp;_dataclass_setstate&nbsp;are&nbsp;needed&nbsp;for&nbsp;pickling&nbsp;frozen<br>
+#&nbsp;classes&nbsp;with&nbsp;slots.&nbsp;&nbsp;These&nbsp;could&nbsp;be&nbsp;slightly&nbsp;more&nbsp;performant&nbsp;if&nbsp;we&nbsp;generated<br>
+#&nbsp;the&nbsp;code&nbsp;instead&nbsp;of&nbsp;iterating&nbsp;over&nbsp;fields.&nbsp;&nbsp;But&nbsp;that&nbsp;can&nbsp;be&nbsp;a&nbsp;project&nbsp;for<br>
+#&nbsp;another&nbsp;day,&nbsp;if&nbsp;performance&nbsp;becomes&nbsp;an&nbsp;issue.</span></dd></dl>
+
+<dl><dt><a name="GameOffer-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="GameOffer-__init__"><strong>__init__</strong></a>(self, game_id: 'str', title: 'str' = '', baselines: 'tuple[int, ...]' = ()) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="GameOffer-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="GameOffer-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<dl><dt><a name="GameOffer-__setstate__"><strong>__setstate__</strong></a> = _dataclass_setstate(self, state)<span class="grey"><span class="heading-text"> from <a href="dataclasses.html">dataclasses</a></span></span></dt></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>baselines</strong></dt>
+</dl>
+<dl><dt><strong>game_id</strong></dt>
+</dl>
+<dl><dt><strong>title</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'baselines': 'tuple[int, ...]', 'game_id': 'str', 'title': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'baselines': Field(name='baselines',type='tuple[int, ...]',de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'game_id': Field(name='game_id',type='str',default=&lt;datacla...appingproxy({}),kw_only=False,_field_type=_FIELD), 'title': Field(name='title',type='str',default='',default...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('game_id', 'title', 'baselines')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="GameSession">class <strong>GameSession</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#GameSession">GameSession</a>(game_id:&nbsp;'str',&nbsp;environment:&nbsp;'Any')&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+One&nbsp;open&nbsp;official&nbsp;game.&nbsp;Moves&nbsp;go&nbsp;straight&nbsp;to&nbsp;the&nbsp;toolkit.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="GameSession-__init__"><strong>__init__</strong></a>(self, game_id: 'str', environment: 'Any') -&gt; 'None'</dt><dd><span class="code">Hold&nbsp;the&nbsp;toolkit&nbsp;environment&nbsp;for&nbsp;``game_id``.</span></dd></dl>
+
+<dl><dt><a name="GameSession-reset"><strong>reset</strong></a>(self) -&gt; 'Board | None'</dt><dd><span class="code">Start&nbsp;(or&nbsp;restart)&nbsp;the&nbsp;current&nbsp;level&nbsp;and&nbsp;return&nbsp;the&nbsp;board.</span></dd></dl>
+
+<dl><dt><a name="GameSession-step"><strong>step</strong></a>(self, action: 'str', x: 'int | None' = None, y: 'int | None' = None, reasoning: 'dict[str, Any] | None' = None) -&gt; 'Board | None'</dt><dd><span class="code">Make&nbsp;one&nbsp;move.&nbsp;ACTION6&nbsp;needs&nbsp;``x``&nbsp;and&nbsp;``y``&nbsp;in&nbsp;0–63.<br>
+&nbsp;<br>
+``reasoning``&nbsp;rides&nbsp;into&nbsp;the&nbsp;official&nbsp;recordings&nbsp;and&nbsp;scorecard<br>
+—&nbsp;the&nbsp;toolkit&nbsp;logs&nbsp;it&nbsp;beside&nbsp;the&nbsp;move,&nbsp;so&nbsp;her&nbsp;intent&nbsp;is&nbsp;part<br>
+of&nbsp;the&nbsp;run's&nbsp;record,&nbsp;not&nbsp;just&nbsp;its&nbsp;outcome.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="GamesUnavailable">class <strong>GamesUnavailable</strong></a>(<a href="builtins.html#RuntimeError">builtins.RuntimeError</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code">The&nbsp;official&nbsp;games&nbsp;can't&nbsp;be&nbsp;reached&nbsp;(toolkit&nbsp;missing&nbsp;or&nbsp;API&nbsp;down).<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Outer_World.games.official.html#GamesUnavailable">GamesUnavailable</a></dd>
+<dd><a href="builtins.html#RuntimeError">builtins.RuntimeError</a></dd>
+<dd><a href="builtins.html#Exception">builtins.Exception</a></dd>
+<dd><a href="builtins.html#BaseException">builtins.BaseException</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Methods inherited from <a href="builtins.html#RuntimeError">builtins.RuntimeError</a>:<br>
+<dl><dt><a name="GamesUnavailable-__init__"><strong>__init__</strong></a>(self, /, *args, **kwargs)</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<hr>
+Static methods inherited from <a href="builtins.html#RuntimeError">builtins.RuntimeError</a>:<br>
+<dl><dt><a name="GamesUnavailable-__new__"><strong>__new__</strong></a>(*args, **kwargs)<span class="grey"><span class="heading-text"> class method of <a href="builtins.html#RuntimeError">builtins.RuntimeError</a></span></span></dt><dd><span class="code">Create&nbsp;and&nbsp;return&nbsp;a&nbsp;new&nbsp;<a href="builtins.html#object">object</a>.&nbsp;&nbsp;See&nbsp;help(type)&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<hr>
+Methods inherited from <a href="builtins.html#BaseException">builtins.BaseException</a>:<br>
+<dl><dt><a name="GamesUnavailable-__delattr__"><strong>__delattr__</strong></a>(self, name, /)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="GamesUnavailable-__getattribute__"><strong>__getattribute__</strong></a>(self, name, /)</dt><dd><span class="code">Return&nbsp;getattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="GamesUnavailable-__reduce__"><strong>__reduce__</strong></a>(...)</dt><dd><span class="code">Helper&nbsp;for&nbsp;pickle.</span></dd></dl>
+
+<dl><dt><a name="GamesUnavailable-__repr__"><strong>__repr__</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="GamesUnavailable-__setattr__"><strong>__setattr__</strong></a>(self, name, value, /)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<dl><dt><a name="GamesUnavailable-__setstate__"><strong>__setstate__</strong></a>(...)</dt></dl>
+
+<dl><dt><a name="GamesUnavailable-__str__"><strong>__str__</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;str(self).</span></dd></dl>
+
+<dl><dt><a name="GamesUnavailable-add_note"><strong>add_note</strong></a>(...)</dt><dd><span class="code">Exception.<a href="#GamesUnavailable-add_note">add_note</a>(note)&nbsp;--<br>
+add&nbsp;a&nbsp;note&nbsp;to&nbsp;the&nbsp;exception</span></dd></dl>
+
+<dl><dt><a name="GamesUnavailable-with_traceback"><strong>with_traceback</strong></a>(...)</dt><dd><span class="code">Exception.<a href="#GamesUnavailable-with_traceback">with_traceback</a>(tb)&nbsp;--<br>
+set&nbsp;self.<strong>__traceback__</strong>&nbsp;to&nbsp;tb&nbsp;and&nbsp;return&nbsp;self.</span></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="builtins.html#BaseException">builtins.BaseException</a>:<br>
+<dl><dt><strong>__cause__</strong></dt>
+<dd><span class="code">exception&nbsp;cause</span></dd>
+</dl>
+<dl><dt><strong>__context__</strong></dt>
+<dd><span class="code">exception&nbsp;context</span></dd>
+</dl>
+<dl><dt><strong>__dict__</strong></dt>
+</dl>
+<dl><dt><strong>__suppress_context__</strong></dt>
+</dl>
+<dl><dt><strong>__traceback__</strong></dt>
+</dl>
+<dl><dt><strong>args</strong></dt>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="OfficialGames">class <strong>OfficialGames</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#OfficialGames">OfficialGames</a>(mode:&nbsp;'str&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;arcade_factory:&nbsp;'Any'&nbsp;=&nbsp;None,&nbsp;environments_dir:&nbsp;'str&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;recordings_dir:&nbsp;'str&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+The&nbsp;official&nbsp;ARC-AGI-3&nbsp;catalogue,&nbsp;opened&nbsp;lazily&nbsp;on&nbsp;first&nbsp;use.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;mode:&nbsp;``normal``,&nbsp;``online``&nbsp;or&nbsp;``offline``;&nbsp;defaults&nbsp;to<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;``GENESIS_ARC_MODE``&nbsp;or&nbsp;``normal``&nbsp;—&nbsp;downloaded&nbsp;games&nbsp;run<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;locally,&nbsp;so&nbsp;play&nbsp;does&nbsp;not&nbsp;depend&nbsp;on&nbsp;the&nbsp;server.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;arcade_factory:&nbsp;Builds&nbsp;the&nbsp;toolkit&nbsp;``Arcade``&nbsp;—&nbsp;injectable&nbsp;so<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;tests&nbsp;never&nbsp;touch&nbsp;the&nbsp;network.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;environments_dir:&nbsp;Where&nbsp;downloaded&nbsp;games&nbsp;live&nbsp;(toolkit&nbsp;default<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;``environment_files``,&nbsp;relative&nbsp;to&nbsp;the&nbsp;cwd).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;recordings_dir:&nbsp;Where&nbsp;the&nbsp;toolkit&nbsp;writes&nbsp;game&nbsp;replays.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="OfficialGames-__init__"><strong>__init__</strong></a>(self, mode: 'str | None' = None, arcade_factory: 'Any' = None, environments_dir: 'str | None' = None, recordings_dir: 'str | None' = None) -&gt; 'None'</dt><dd><span class="code">Remember&nbsp;the&nbsp;mode;&nbsp;nothing&nbsp;is&nbsp;contacted&nbsp;until&nbsp;asked.</span></dd></dl>
+
+<dl><dt><a name="OfficialGames-close"><strong>close</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Close&nbsp;the&nbsp;official&nbsp;scorecard&nbsp;for&nbsp;this&nbsp;session,&nbsp;if&nbsp;one&nbsp;is&nbsp;open.</span></dd></dl>
+
+<dl><dt><a name="OfficialGames-offers"><strong>offers</strong></a>(self) -&gt; 'list[GameOffer]'</dt><dd><span class="code">List&nbsp;the&nbsp;games&nbsp;the&nbsp;official&nbsp;API&nbsp;offers&nbsp;right&nbsp;now.</span></dd></dl>
+
+<dl><dt><a name="OfficialGames-open"><strong>open</strong></a>(self, game_id: 'str') -&gt; 'GameSession'</dt><dd><span class="code">Open&nbsp;``game_id``&nbsp;on&nbsp;the&nbsp;official&nbsp;toolkit&nbsp;and&nbsp;return&nbsp;its&nbsp;session.</span></dd></dl>
+
+<dl><dt><a name="OfficialGames-scorecard"><strong>scorecard</strong></a>(self) -&gt; 'dict[str, Any] | None'</dt><dd><span class="code">The&nbsp;local&nbsp;scorecard's&nbsp;standing,&nbsp;once&nbsp;play&nbsp;has&nbsp;opened&nbsp;one.<br>
+&nbsp;<br>
+In&nbsp;``normal``/``offline``&nbsp;mode&nbsp;the&nbsp;toolkit&nbsp;scores&nbsp;runs&nbsp;locally<br>
+against&nbsp;each&nbsp;game's&nbsp;published&nbsp;baselines&nbsp;—&nbsp;the&nbsp;same&nbsp;RHAE&nbsp;formula<br>
+the&nbsp;official&nbsp;server&nbsp;uses&nbsp;—&nbsp;so&nbsp;the&nbsp;number&nbsp;is&nbsp;real&nbsp;even&nbsp;though<br>
+nothing&nbsp;is&nbsp;submitted.&nbsp;Returns&nbsp;``None``&nbsp;before&nbsp;the&nbsp;first<br>
+``make()``&nbsp;(no&nbsp;card&nbsp;exists&nbsp;yet).</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>keyed</strong></dt>
+<dd><span class="code">True&nbsp;when&nbsp;an&nbsp;``ARC_API_KEY``&nbsp;is&nbsp;configured&nbsp;(value&nbsp;never&nbsp;read&nbsp;out).</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-board_from_observation"><strong>board_from_observation</strong></a>(observation: 'Any', game_id: 'str' = '') -&gt; 'Board | None'</dt><dd><span class="code">Turn&nbsp;a&nbsp;toolkit&nbsp;observation&nbsp;(``FrameDataRaw``)&nbsp;into&nbsp;a&nbsp;``<a href="#Board">Board</a>``.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>ACTION_NAMES</strong> = ('RESET', 'ACTION1', 'ACTION2', 'ACTION3', 'ACTION4', 'ACTION5', 'ACTION6', 'ACTION7')<br>
+<strong>BOARD_SIZE</strong> = 64<br>
+<strong>POINTING_ACTION</strong> = 'ACTION6'<br>
+<strong>logger</strong> = &lt;Logger Outer_World.games.official (WARNING)&gt;</td></tr></table>
+</body></html>

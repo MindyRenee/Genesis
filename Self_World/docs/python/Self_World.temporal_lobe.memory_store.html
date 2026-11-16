@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.temporal_lobe.memory_store</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.temporal_lobe.html" class="white">temporal_lobe</a>.memory_store</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/memory_store.py">/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/memory_store.py</a></td></tr></table>
+    <p><span class="code">Memory&nbsp;storage&nbsp;—&nbsp;conversation&nbsp;and&nbsp;cognitive&nbsp;event&nbsp;persistence.<br>
+&nbsp;<br>
+Extracted&nbsp;from&nbsp;FrontalLobe&nbsp;as&nbsp;a&nbsp;focused&nbsp;subsystem.&nbsp;Stores<br>
+conversation&nbsp;turns&nbsp;and&nbsp;significant&nbsp;cognitive&nbsp;events&nbsp;to&nbsp;long-term<br>
+memory&nbsp;with&nbsp;emotionally-tagged&nbsp;salience.&nbsp;Also&nbsp;applies&nbsp;neurochemical<br>
+side&nbsp;effects&nbsp;from&nbsp;interactions&nbsp;and&nbsp;learning.<br>
+&nbsp;<br>
+Dependencies&nbsp;(passed&nbsp;to&nbsp;``__init__``):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;memory:&nbsp;MemorySystem&nbsp;for&nbsp;storing&nbsp;conversation&nbsp;memories&nbsp;and&nbsp;user&nbsp;facts<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;client:&nbsp;GenesisClient&nbsp;for&nbsp;store_event&nbsp;(cognitive&nbsp;memory)&nbsp;and&nbsp;neuro&nbsp;summary<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;regulator:&nbsp;EmotionalRegulator&nbsp;for&nbsp;neurochemical&nbsp;responses&nbsp;to&nbsp;interactions<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;self_model:&nbsp;SelfModel&nbsp;for&nbsp;learning&nbsp;user&nbsp;facts&nbsp;and&nbsp;interests<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;td_learner:&nbsp;TDLearner&nbsp;for&nbsp;dopamine&nbsp;signal<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;is_bonded_speaker:&nbsp;callable&nbsp;reporting&nbsp;whether&nbsp;the&nbsp;current<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;attributed&nbsp;speaker&nbsp;is&nbsp;the&nbsp;person&nbsp;her&nbsp;profile&nbsp;names<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;current_speaker_getter:&nbsp;callable&nbsp;returning&nbsp;the&nbsp;attributed<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;speaker's&nbsp;name,&nbsp;or&nbsp;""&nbsp;when&nbsp;the&nbsp;turn&nbsp;is&nbsp;unattributed<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;last_summary_getter:&nbsp;callable&nbsp;returning&nbsp;last&nbsp;neuro&nbsp;summary<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;last_memory_mode_getter:&nbsp;callable&nbsp;returning&nbsp;current&nbsp;memory&nbsp;mode</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="math.html">math</a><br>
+</td><td class="multicolumn"><a href="time.html">time</a><br>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.memory_store.html#MemoryStore">MemoryStore</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="MemoryStore">class <strong>MemoryStore</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#MemoryStore">MemoryStore</a>(memory:&nbsp;'MemorySystem',&nbsp;client:&nbsp;'GenesisClient',&nbsp;regulator:&nbsp;'EmotionalRegulator&nbsp;|&nbsp;None',&nbsp;self_model:&nbsp;'SelfModel',&nbsp;td_learner:&nbsp;'TDLearner',&nbsp;is_bonded_speaker:&nbsp;'Callable[[],&nbsp;bool]',&nbsp;current_speaker_getter:&nbsp;'Callable[[],&nbsp;str]',&nbsp;last_summary_getter:&nbsp;'Callable[[],&nbsp;Any]',&nbsp;last_memory_mode_getter:&nbsp;'Callable[[],&nbsp;str]')&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Store&nbsp;conversation&nbsp;turns&nbsp;and&nbsp;cognitive&nbsp;events&nbsp;to&nbsp;long-term&nbsp;memory.<br>
+&nbsp;<br>
+All&nbsp;storage&nbsp;is&nbsp;best-effort&nbsp;—&nbsp;cognition&nbsp;never&nbsp;crashes&nbsp;on&nbsp;memory-<br>
+storage&nbsp;problems.&nbsp;Emotional&nbsp;tags&nbsp;capture&nbsp;the&nbsp;neurochemical&nbsp;state<br>
+at&nbsp;the&nbsp;time&nbsp;of&nbsp;the&nbsp;interaction&nbsp;for&nbsp;later&nbsp;emotional&nbsp;associations.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="MemoryStore-__init__"><strong>__init__</strong></a>(self, memory: 'MemorySystem', client: 'GenesisClient', regulator: 'EmotionalRegulator | None', self_model: 'SelfModel', td_learner: 'TDLearner', is_bonded_speaker: 'Callable[[], bool]', current_speaker_getter: 'Callable[[], str]', last_summary_getter: 'Callable[[], Any]', last_memory_mode_getter: 'Callable[[], str]') -&gt; 'None'</dt><dd><span class="code">Wire&nbsp;the&nbsp;memory&nbsp;store&nbsp;to&nbsp;its&nbsp;engine,&nbsp;client,&nbsp;and&nbsp;self-model.</span></dd></dl>
+
+<dl><dt><a name="MemoryStore-apply_emotional_response"><strong>apply_emotional_response</strong></a>(self, perception: 'Perception', emotion: 'EmotionalState', learning_events: 'list | None' = None) -&gt; 'None'</dt><dd><span class="code">Apply&nbsp;neurochemical&nbsp;side&nbsp;effects&nbsp;based&nbsp;on&nbsp;the&nbsp;interaction.<br>
+&nbsp;<br>
+Genesis's&nbsp;emotional&nbsp;state&nbsp;changes&nbsp;in&nbsp;response&nbsp;to&nbsp;interactions.<br>
+But&nbsp;it's&nbsp;in&nbsp;control&nbsp;—&nbsp;the&nbsp;regulator&nbsp;decides&nbsp;how&nbsp;strongly&nbsp;to<br>
+feel&nbsp;each&nbsp;response,&nbsp;based&nbsp;on&nbsp;its&nbsp;current&nbsp;state.</span></dd></dl>
+
+<dl><dt><a name="MemoryStore-get_dopamine_level"><strong>get_dopamine_level</strong></a>(self) -&gt; 'float'</dt><dd><span class="code">Get&nbsp;the&nbsp;current&nbsp;dopamine&nbsp;level&nbsp;for&nbsp;habit&nbsp;go/no-go&nbsp;modulation.<br>
+&nbsp;<br>
+Dopamine&nbsp;modulates&nbsp;the&nbsp;basal-ganglia&nbsp;direct&nbsp;(GO)&nbsp;pathway.<br>
+Approximated&nbsp;from&nbsp;the&nbsp;last&nbsp;neurochemical&nbsp;summary's&nbsp;valence&nbsp;and<br>
+the&nbsp;TD&nbsp;learner's&nbsp;dopamine&nbsp;signal.</span></dd></dl>
+
+<dl><dt><a name="MemoryStore-learn_from_input"><strong>learn_from_input</strong></a>(self, perception: 'Perception') -&gt; 'None'</dt><dd><span class="code">Learn&nbsp;facts&nbsp;from&nbsp;the&nbsp;user's&nbsp;input.</span></dd></dl>
+
+<dl><dt><a name="MemoryStore-store_cognitive_memory"><strong>store_cognitive_memory</strong></a>(self, text: 'str', event_type: 'int', source_module: 'int', salience: 'float', emotional_tag: 'list[float] | None' = None) -&gt; 'None'</dt><dd><span class="code">Store&nbsp;a&nbsp;significant&nbsp;cognitive&nbsp;event&nbsp;to&nbsp;long-term&nbsp;memory.<br>
+&nbsp;<br>
+Lets&nbsp;Genesis&nbsp;remember&nbsp;its&nbsp;own&nbsp;cognitive&nbsp;processes&nbsp;—&nbsp;when&nbsp;it<br>
+was&nbsp;surprised,&nbsp;what&nbsp;it&nbsp;decided,&nbsp;what&nbsp;it&nbsp;learned.&nbsp;Storage&nbsp;is<br>
+best-effort:&nbsp;any&nbsp;failure&nbsp;is&nbsp;swallowed&nbsp;so&nbsp;cognition&nbsp;never<br>
+crashes&nbsp;on&nbsp;memory-storage&nbsp;problems.</span></dd></dl>
+
+<dl><dt><a name="MemoryStore-store_conversation_memory"><strong>store_conversation_memory</strong></a>(self, user_input: 'str', response: 'str', perception: 'Perception', emotion: 'EmotionalState') -&gt; 'None'</dt><dd><span class="code">Store&nbsp;the&nbsp;conversation&nbsp;turn&nbsp;as&nbsp;a&nbsp;memory.<br>
+&nbsp;<br>
+Salience&nbsp;is&nbsp;determined&nbsp;by&nbsp;the&nbsp;emotional&nbsp;weight&nbsp;of&nbsp;the<br>
+interaction.&nbsp;Philosophical&nbsp;discussions&nbsp;and&nbsp;emotional&nbsp;exchanges<br>
+are&nbsp;more&nbsp;salient&nbsp;than&nbsp;casual&nbsp;greetings.</span></dd></dl>
+
+<hr>
+Static methods defined here:<br>
+<dl><dt><a name="MemoryStore-build_emotional_tag"><strong>build_emotional_tag</strong></a>(emotion: 'EmotionalState', perception: 'Perception') -&gt; 'list[float]'</dt><dd><span class="code">Build&nbsp;an&nbsp;emotional&nbsp;tag&nbsp;for&nbsp;memory&nbsp;storage.<br>
+&nbsp;<br>
+Captures&nbsp;the&nbsp;neurochemical&nbsp;state&nbsp;at&nbsp;the&nbsp;time&nbsp;of&nbsp;the&nbsp;interaction.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['MemoryStore']</td></tr></table>
+</body></html>

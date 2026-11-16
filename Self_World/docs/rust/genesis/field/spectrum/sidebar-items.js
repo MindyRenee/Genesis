@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["BASELINE_ALPHA","CARRIER_ALPHA","FIELD_BANDS","RATE_ALPHA","RING_LEN","SPECTRUM_STEP_HZ","WARM_SAMPLES"],"fn":["band_phase","band_power"],"struct":["BandChannel","FieldSpectrum","Ring","RingIter","SpectrumReading"]};

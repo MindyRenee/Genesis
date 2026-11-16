@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.brainstem.serotonin</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.brainstem.html" class="white">brainstem</a>.serotonin</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/brainstem/serotonin.py">/home/mindyrenee/GenAnd/Genesis/Self_World/brainstem/serotonin.py</a></td></tr></table>
+    <p><span class="code"><a href="#Serotonin">Serotonin</a>&nbsp;—&nbsp;mood&nbsp;stability,&nbsp;wellbeing,&nbsp;and&nbsp;the&nbsp;antidepressant&nbsp;mechanism.<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+BIOLOGY<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+Origin:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Dorsal&nbsp;raphe&nbsp;nucleus&nbsp;(DRN)&nbsp;—&nbsp;upper&nbsp;autonomics<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Median&nbsp;raphe&nbsp;nucleus&nbsp;(MRN)&nbsp;—&nbsp;upper&nbsp;autonomics<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(Note:&nbsp;the&nbsp;model&nbsp;uses&nbsp;a&nbsp;single&nbsp;"serotonin"&nbsp;scalar,&nbsp;eliding&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;dorsal&nbsp;vs&nbsp;median&nbsp;raphe&nbsp;projection&nbsp;differences.)<br>
+&nbsp;<br>
+Projections:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Throughout&nbsp;the&nbsp;cortex,&nbsp;hippocampus,&nbsp;amygdala,&nbsp;basal&nbsp;ganglia,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;hypothalamus.&nbsp;<a href="#Serotonin">Serotonin</a>&nbsp;is&nbsp;one&nbsp;of&nbsp;the&nbsp;most&nbsp;widely&nbsp;projecting<br>
+&nbsp;&nbsp;&nbsp;&nbsp;neuromodulators.<br>
+&nbsp;<br>
+Receptors:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;5-HT1A&nbsp;—&nbsp;anxiolytic,&nbsp;high-affinity,&nbsp;Gi-coupled.&nbsp;Activated&nbsp;by<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;tonic&nbsp;serotonin&nbsp;(mood&nbsp;stability,&nbsp;calm).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;5-HT2A&nbsp;—&nbsp;hallucinogenic,&nbsp;low-affinity,&nbsp;Gq-coupled.&nbsp;Activated&nbsp;by<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;phasic&nbsp;serotonin&nbsp;bursts&nbsp;(excitatory).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;5-HT1B/1D,&nbsp;5-HT2C,&nbsp;5-HT3,&nbsp;5-HT4,&nbsp;5-HT5,&nbsp;5-HT6,&nbsp;5-HT7<br>
+&nbsp;<br>
+Receptor&nbsp;subtypes&nbsp;(default_receptor_subtypes):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;[5-HT1A,&nbsp;5-HT2A]&nbsp;=&nbsp;[0.50,&nbsp;0.50]&nbsp;—&nbsp;balanced&nbsp;anxiolytic/excitatory.<br>
+&nbsp;<br>
+The&nbsp;5-HT1A/5-HT2A&nbsp;distinction&nbsp;mirrors&nbsp;the&nbsp;D1/D2&nbsp;split:&nbsp;tonic<br>
+serotonin&nbsp;activates&nbsp;high-affinity&nbsp;5-HT1A&nbsp;(anxiolytic),&nbsp;phasic<br>
+bursts&nbsp;activate&nbsp;low-affinity&nbsp;5-HT2A&nbsp;(excitatory).&nbsp;This&nbsp;is&nbsp;why&nbsp;SSRIs<br>
+take&nbsp;weeks&nbsp;to&nbsp;work&nbsp;—&nbsp;they&nbsp;raise&nbsp;tonic&nbsp;serotonin,&nbsp;which&nbsp;gradually<br>
+upregulates&nbsp;BDNF&nbsp;and&nbsp;restores&nbsp;mood.<br>
+&nbsp;<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+DEFAULT&nbsp;BASELINE<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;baseline&nbsp;=&nbsp;0.40<br>
+&nbsp;<br>
+Tonic&nbsp;5-HT&nbsp;is&nbsp;~10&nbsp;nM&nbsp;but&nbsp;is&nbsp;a&nbsp;potent&nbsp;modulator.&nbsp;Oscillates&nbsp;with<br>
+~10&nbsp;min&nbsp;periods&nbsp;(FSCAV&nbsp;data).&nbsp;Regulates&nbsp;mood,&nbsp;sleep,&nbsp;and&nbsp;BDNF<br>
+expression.<br>
+&nbsp;<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+RECEPTOR&nbsp;ADAPTATION&nbsp;MULTIPLIER<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;multiplier&nbsp;=&nbsp;0.9<br>
+&nbsp;<br>
+5-HT1A/2A&nbsp;receptors&nbsp;show&nbsp;moderate&nbsp;trafficking&nbsp;—&nbsp;slightly&nbsp;slower<br>
+than&nbsp;the&nbsp;baseline&nbsp;reference&nbsp;(glutamate&nbsp;at&nbsp;1.0×).<br>
+&nbsp;<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+COUPLING:&nbsp;HOW&nbsp;OTHERS&nbsp;AFFECT&nbsp;SEROTONIN&nbsp;(matrix&nbsp;row&nbsp;1)<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+Index&nbsp;order:&nbsp;DA,&nbsp;SRT,&nbsp;NE,&nbsp;ACh,&nbsp;GABA,&nbsp;GLU,&nbsp;CORT,&nbsp;OXY,&nbsp;END,&nbsp;HIST,<br>
+ADN,&nbsp;BDNF,&nbsp;ECB,&nbsp;VP,&nbsp;CRH,&nbsp;OX,&nbsp;EPI,&nbsp;MEL<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;DA&nbsp;&nbsp;&nbsp;-&gt;&nbsp;SRT:&nbsp;-0.05&nbsp;&nbsp;(weak&nbsp;volume&nbsp;transmission.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;NE&nbsp;&nbsp;&nbsp;-&gt;&nbsp;SRT:&nbsp;+0.05&nbsp;&nbsp;(weak&nbsp;volume&nbsp;transmission.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;GABA&nbsp;-&gt;&nbsp;SRT:&nbsp;-0.05&nbsp;&nbsp;(weak&nbsp;volume&nbsp;transmission.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;GLU&nbsp;&nbsp;-&gt;&nbsp;SRT:&nbsp;+0.05&nbsp;&nbsp;(weak&nbsp;volume&nbsp;transmission.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;CORT&nbsp;-&gt;&nbsp;SRT:&nbsp;-0.10&nbsp;&nbsp;(chronic&nbsp;stress&nbsp;depletes&nbsp;serotonin.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;OXY&nbsp;&nbsp;-&gt;&nbsp;SRT:&nbsp;+0.05&nbsp;&nbsp;(weak&nbsp;volume&nbsp;transmission.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;END&nbsp;&nbsp;-&gt;&nbsp;SRT:&nbsp;+0.05&nbsp;&nbsp;(weak&nbsp;volume&nbsp;transmission.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;BDNF&nbsp;-&gt;&nbsp;SRT:&nbsp;+0.10&nbsp;&nbsp;(the&nbsp;antidepressant&nbsp;positive&nbsp;feedback&nbsp;—&nbsp;SSRIs&nbsp;raise&nbsp;SRT&nbsp;-&gt;&nbsp;raise&nbsp;BDNF&nbsp;-&gt;&nbsp;.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;raise&nbsp;SRT.&nbsp;Bounded&nbsp;by&nbsp;homeostatic&nbsp;forces.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ACh&nbsp;&nbsp;-&gt;&nbsp;SRT:&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;HIST&nbsp;-&gt;&nbsp;SRT:&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ADN&nbsp;&nbsp;-&gt;&nbsp;SRT:&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ECB&nbsp;&nbsp;-&gt;&nbsp;SRT:&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;VP&nbsp;&nbsp;&nbsp;-&gt;&nbsp;SRT:&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;CRH&nbsp;&nbsp;-&gt;&nbsp;SRT:&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;OX&nbsp;&nbsp;&nbsp;-&gt;&nbsp;SRT:&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;EPI&nbsp;&nbsp;-&gt;&nbsp;SRT:&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;MEL&nbsp;&nbsp;-&gt;&nbsp;SRT:&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+COUPLING:&nbsp;HOW&nbsp;SEROTONIN&nbsp;AFFECTS&nbsp;OTHERS&nbsp;(matrix&nbsp;column&nbsp;1)<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;SRT&nbsp;-&gt;&nbsp;DA&nbsp;:&nbsp;&nbsp;-0.05&nbsp;&nbsp;(weak&nbsp;volume&nbsp;transmission&nbsp;(default&nbsp;region);&nbsp;region-specific:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-0.025&nbsp;default,&nbsp;-0.20&nbsp;striatum,&nbsp;+0.15&nbsp;PFC.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;SRT&nbsp;-&gt;&nbsp;NE&nbsp;:&nbsp;&nbsp;-0.05&nbsp;&nbsp;(weak&nbsp;volume&nbsp;transmission.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;SRT&nbsp;-&gt;&nbsp;GABA:&nbsp;&nbsp;+0.05&nbsp;&nbsp;(weak&nbsp;volume&nbsp;transmission.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;SRT&nbsp;-&gt;&nbsp;GLU:&nbsp;&nbsp;-0.05&nbsp;&nbsp;(weak&nbsp;volume&nbsp;transmission.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;SRT&nbsp;-&gt;&nbsp;CORT:&nbsp;&nbsp;-0.10&nbsp;&nbsp;(serotonin&nbsp;suppresses&nbsp;cortisol.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;SRT&nbsp;-&gt;&nbsp;OXY:&nbsp;&nbsp;+0.05&nbsp;&nbsp;(weak&nbsp;volume&nbsp;transmission.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;SRT&nbsp;-&gt;&nbsp;END:&nbsp;&nbsp;+0.05&nbsp;&nbsp;(weak&nbsp;volume&nbsp;transmission.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;SRT&nbsp;-&gt;&nbsp;HIST:&nbsp;&nbsp;-0.05&nbsp;&nbsp;(serotonin&nbsp;promotes&nbsp;sleep&nbsp;onset.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;SRT&nbsp;-&gt;&nbsp;BDNF:&nbsp;&nbsp;+0.10&nbsp;&nbsp;(the&nbsp;antidepressant&nbsp;mechanism&nbsp;—&nbsp;SSRIs&nbsp;raise&nbsp;SRT&nbsp;-&gt;&nbsp;raise&nbsp;BDNF&nbsp;-&gt;&nbsp;.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;neuroplasticity&nbsp;-&gt;&nbsp;depression&nbsp;recovery.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;SRT&nbsp;-&gt;&nbsp;OX&nbsp;:&nbsp;&nbsp;-0.05&nbsp;&nbsp;(serotonin&nbsp;promotes&nbsp;sleep&nbsp;onset.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;SRT&nbsp;-&gt;&nbsp;ACh:&nbsp;&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;SRT&nbsp;-&gt;&nbsp;ADN:&nbsp;&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;SRT&nbsp;-&gt;&nbsp;ECB:&nbsp;&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;SRT&nbsp;-&gt;&nbsp;VP&nbsp;:&nbsp;&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;SRT&nbsp;-&gt;&nbsp;CRH:&nbsp;&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;SRT&nbsp;-&gt;&nbsp;EPI:&nbsp;&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;SRT&nbsp;-&gt;&nbsp;MEL:&nbsp;&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+SPECIAL&nbsp;DYNAMICS<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+Subtype-weighted&nbsp;effective&nbsp;level:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;5-HT1A&nbsp;(anxiolytic)&nbsp;promotes&nbsp;calm&nbsp;signaling,&nbsp;5-HT2A<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(hallucinogenic)&nbsp;promotes&nbsp;excitatory&nbsp;signaling.&nbsp;The&nbsp;net&nbsp;effect<br>
+&nbsp;&nbsp;&nbsp;&nbsp;is&nbsp;neutral&nbsp;at&nbsp;a&nbsp;50/50&nbsp;balance,&nbsp;biased&nbsp;up&nbsp;or&nbsp;down&nbsp;by&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;relative&nbsp;receptor&nbsp;weights.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;balance&nbsp;=&nbsp;(ht1a&nbsp;-&nbsp;ht2a)&nbsp;/&nbsp;total<br>
+&nbsp;&nbsp;&nbsp;&nbsp;subtype_effective&nbsp;=&nbsp;base&nbsp;*&nbsp;(1.0&nbsp;+&nbsp;0.3&nbsp;*&nbsp;balance)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(clamped&nbsp;to&nbsp;[0,&nbsp;2])<br>
+&nbsp;<br>
+Phasic&nbsp;boost:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Phasic&nbsp;bursts&nbsp;activate&nbsp;low-affinity&nbsp;5-HT2A&nbsp;(excitatory)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;receptors,&nbsp;adding&nbsp;signaling&nbsp;beyond&nbsp;the&nbsp;tonic&nbsp;baseline.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;effective&nbsp;=&nbsp;base&nbsp;+&nbsp;phasic_level&nbsp;*&nbsp;ht2a_weight&nbsp;*&nbsp;0.2<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(clamped&nbsp;to&nbsp;[0,&nbsp;2])<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Tonic&nbsp;level&nbsp;activates&nbsp;high-affinity&nbsp;5-HT1A&nbsp;(anxiolytic).&nbsp;Phasic<br>
+&nbsp;&nbsp;&nbsp;&nbsp;bursts&nbsp;activate&nbsp;low-affinity&nbsp;5-HT2A&nbsp;(excitatory).<br>
+&nbsp;<br>
+BDNF&nbsp;recovery&nbsp;driver:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#Serotonin">Serotonin</a>&nbsp;drives&nbsp;BDNF&nbsp;expression&nbsp;—&nbsp;this&nbsp;is&nbsp;why&nbsp;SSRIs&nbsp;help<br>
+&nbsp;&nbsp;&nbsp;&nbsp;depression.&nbsp;When&nbsp;cortisol&nbsp;clears&nbsp;below&nbsp;the&nbsp;stress-phase&nbsp;gate<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(0.06)&nbsp;and&nbsp;BDNF&nbsp;is&nbsp;below&nbsp;baseline,&nbsp;BDNF&nbsp;gets&nbsp;a&nbsp;recovery&nbsp;boost<br>
+&nbsp;&nbsp;&nbsp;&nbsp;proportional&nbsp;to&nbsp;serotonin&nbsp;level.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;recovery&nbsp;=&nbsp;srt_level&nbsp;*&nbsp;bdnf_recovery_rate&nbsp;*&nbsp;dt_scale<br>
+&nbsp;<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+MATHEMATICAL&nbsp;FORMULAS<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+Homeostatic&nbsp;force&nbsp;(with&nbsp;autoreceptor&nbsp;nonlinearity):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Same&nbsp;as&nbsp;dopamine&nbsp;—&nbsp;see&nbsp;dopamine.py&nbsp;for&nbsp;the&nbsp;general&nbsp;formula.<br>
+&nbsp;<br>
+Effective&nbsp;level:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;effective&nbsp;=&nbsp;level&nbsp;*&nbsp;receptor_sensitivity&nbsp;*&nbsp;desensitization&nbsp;*&nbsp;internalization<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(clamped&nbsp;to&nbsp;[0,&nbsp;2])<br>
+&nbsp;<br>
+Subtype-weighted&nbsp;effective&nbsp;level:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ht1a&nbsp;=&nbsp;receptor_subtypes[0]<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ht2a&nbsp;=&nbsp;receptor_subtypes[1]<br>
+&nbsp;&nbsp;&nbsp;&nbsp;total&nbsp;=&nbsp;ht1a&nbsp;+&nbsp;ht2a<br>
+&nbsp;&nbsp;&nbsp;&nbsp;balance&nbsp;=&nbsp;(ht1a&nbsp;-&nbsp;ht2a)&nbsp;/&nbsp;total<br>
+&nbsp;&nbsp;&nbsp;&nbsp;subtype_effective&nbsp;=&nbsp;base&nbsp;*&nbsp;(1.0&nbsp;+&nbsp;0.3&nbsp;*&nbsp;balance)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(clamped&nbsp;to&nbsp;[0,&nbsp;2])<br>
+&nbsp;<br>
+Phasic&nbsp;boost:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;effective&nbsp;=&nbsp;base&nbsp;+&nbsp;phasic_level&nbsp;*&nbsp;ht2a_weight&nbsp;*&nbsp;0.2<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(clamped&nbsp;to&nbsp;[0,&nbsp;2])<br>
+&nbsp;<br>
+Coupling&nbsp;force,&nbsp;vesicular&nbsp;pool,&nbsp;tonic/phasic,&nbsp;receptor&nbsp;adaptation,<br>
+baseline&nbsp;adaptation:&nbsp;same&nbsp;general&nbsp;formulas&nbsp;as&nbsp;dopamine.py.<br>
+&nbsp;<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+CIRCADIAN&nbsp;MODULATION<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;modifier&nbsp;=&nbsp;1.0&nbsp;-&nbsp;0.10&nbsp;*&nbsp;melatonin_factor<br>
+&nbsp;<br>
+<a href="#Serotonin">Serotonin</a>&nbsp;is&nbsp;the&nbsp;precursor&nbsp;to&nbsp;melatonin.&nbsp;Reduced&nbsp;at&nbsp;night&nbsp;when<br>
+melatonin&nbsp;production&nbsp;is&nbsp;high&nbsp;(biochemical&nbsp;conversion).<br>
+&nbsp;<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+BRAIN&nbsp;WAVE&nbsp;COUPLING<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#Serotonin">Serotonin</a>&nbsp;-&gt;&nbsp;alpha&nbsp;(mood&nbsp;stability,&nbsp;cortical&nbsp;idling)<br>
+&nbsp;<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+ROLE&nbsp;IN&nbsp;EMERGENT&nbsp;PHASES<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+Valence&nbsp;equation:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;valence&nbsp;=&nbsp;DA*0.25&nbsp;+&nbsp;SRT*0.25&nbsp;+&nbsp;OXY*0.10&nbsp;+&nbsp;END*0.15&nbsp;+&nbsp;NE*0.10<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;CORT*0.35&nbsp;-&nbsp;glu_excess*0.15&nbsp;+&nbsp;DA*SRT*0.10<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(serotonin&nbsp;weight&nbsp;=&nbsp;0.25&nbsp;—&nbsp;mood&nbsp;stability)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(DA&nbsp;×&nbsp;SRT&nbsp;synergy&nbsp;=&nbsp;0.10&nbsp;—&nbsp;balanced&nbsp;mood&nbsp;when&nbsp;both&nbsp;high)<br>
+&nbsp;<br>
+Stress&nbsp;phase:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;CORT&nbsp;&gt;&nbsp;0.06&nbsp;+&nbsp;NE&nbsp;&gt;&nbsp;0.45&nbsp;+&nbsp;SRT&nbsp;&lt;&nbsp;0.35&nbsp;+&nbsp;hysteresis<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(low&nbsp;serotonin&nbsp;is&nbsp;a&nbsp;stress&nbsp;indicator;&nbsp;the&nbsp;cortisol&nbsp;gate&nbsp;sits<br>
+&nbsp;&nbsp;&nbsp;&nbsp;inside&nbsp;the&nbsp;substrate's&nbsp;measured&nbsp;envelope&nbsp;—&nbsp;peak&nbsp;~0.084)<br>
+&nbsp;<br>
+Sleep-state&nbsp;role:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;When&nbsp;the&nbsp;sleep-wake&nbsp;network&nbsp;runs,&nbsp;serotonin&nbsp;is&nbsp;driven&nbsp;toward<br>
+&nbsp;&nbsp;&nbsp;&nbsp;SRT_BASE&nbsp;+&nbsp;SRT_FROM_LC&nbsp;*&nbsp;lc&nbsp;-&nbsp;SRT_FROM_REM&nbsp;*&nbsp;rem&nbsp;—&nbsp;the&nbsp;REM-off<br>
+&nbsp;&nbsp;&nbsp;&nbsp;dorsal&nbsp;raphe&nbsp;profile:&nbsp;waking&nbsp;0.39,&nbsp;NREM&nbsp;0.22,&nbsp;REM&nbsp;0.07.<br>
+&nbsp;<br>
+BDNF/plasticity:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;plasticity_gate&nbsp;=&nbsp;BDNF&nbsp;*&nbsp;(1&nbsp;-&nbsp;CORT&nbsp;*&nbsp;0.5)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(serotonin&nbsp;drives&nbsp;BDNF,&nbsp;which&nbsp;drives&nbsp;plasticity)<br>
+&nbsp;<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+APPLICATION&nbsp;IN&nbsp;GENESIS<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+Maximum&nbsp;impulse&nbsp;magnitude:&nbsp;0.05<br>
+(Gentle&nbsp;modulation&nbsp;—&nbsp;0.01-0.03&nbsp;is&nbsp;typical,&nbsp;Belmaker&nbsp;&amp;&nbsp;Agam,&nbsp;2008)<br>
+&nbsp;<br>
+Python&nbsp;modules&nbsp;that&nbsp;send&nbsp;serotonin&nbsp;impulses:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;limbic_system/emotional_regulator.py:&nbsp;comfort,&nbsp;pleasure,&nbsp;social<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;bonding,&nbsp;motivation,&nbsp;stress&nbsp;reduction<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;frontal_lobe/autonomous.py:&nbsp;learning&nbsp;satisfaction<br>
+&nbsp;<br>
+Python&nbsp;modules&nbsp;that&nbsp;read&nbsp;serotonin:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;limbic_system/emotion.py:&nbsp;maps&nbsp;to&nbsp;EmotionalState&nbsp;(valence,&nbsp;mood)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;limbic_system/emotional_regulator.py:&nbsp;homeostatic&nbsp;regulation<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;self/damasio.py:&nbsp;proto-self&nbsp;state&nbsp;(tone)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;memory/memory.py:&nbsp;consolidation&nbsp;weight<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;thalamus/brain_waves.py:&nbsp;alpha&nbsp;baseline<br>
+&nbsp;<br>
+Typical&nbsp;impulse&nbsp;scenarios:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Comfort:&nbsp;+0.03&nbsp;(limbic_system/emotional_regulator)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Pleasure:&nbsp;+pleasure&nbsp;(limbic_system/emotional_regulator)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Social&nbsp;bonding:&nbsp;+0.02&nbsp;(limbic_system/emotional_regulator)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Stress&nbsp;reduction:&nbsp;+0.01&nbsp;(limbic_system/emotional_regulator)</span></p>
+<p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.brainstem.serotonin.html#Serotonin">Serotonin</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Serotonin">class <strong>Serotonin</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Serotonin">Serotonin</a>(index:&nbsp;'int'&nbsp;=&nbsp;1,&nbsp;name:&nbsp;'str'&nbsp;=&nbsp;'serotonin',&nbsp;baseline:&nbsp;'float'&nbsp;=&nbsp;0.4,&nbsp;receptor_adaptation_multiplier:&nbsp;'float'&nbsp;=&nbsp;0.9,&nbsp;receptor_subtypes:&nbsp;'tuple[str,&nbsp;str]'&nbsp;=&nbsp;('5-HT1A',&nbsp;'5-HT2A'),&nbsp;receptor_subtype_balance:&nbsp;'tuple[float,&nbsp;float]'&nbsp;=&nbsp;(0.5,&nbsp;0.5),&nbsp;max_impulse:&nbsp;'float'&nbsp;=&nbsp;0.05,&nbsp;origin:&nbsp;'tuple[str,&nbsp;...]'&nbsp;=&nbsp;('dorsal&nbsp;raphe',&nbsp;'median&nbsp;raphe'),&nbsp;projections:&nbsp;'tuple[str,&nbsp;...]'&nbsp;=&nbsp;('cortex',&nbsp;'hippocampus',&nbsp;'amygdala',&nbsp;'basal&nbsp;ganglia',&nbsp;'hypothalamus'),&nbsp;receptors:&nbsp;'tuple[str,&nbsp;...]'&nbsp;=&nbsp;('5-HT1A',&nbsp;'5-HT1B',&nbsp;'5-HT1D',&nbsp;'5-HT2A',&nbsp;'5-HT2C',&nbsp;'5-HT3',&nbsp;'5-HT4',&nbsp;'5-HT5',&nbsp;'5-HT6',&nbsp;'5-HT7'),&nbsp;brain_waves:&nbsp;'tuple[str,&nbsp;...]'&nbsp;=&nbsp;('alpha',),&nbsp;circadian_modifier:&nbsp;'str'&nbsp;=&nbsp;'1.0&nbsp;-&nbsp;0.10&nbsp;*&nbsp;melatonin_factor',&nbsp;role:&nbsp;'str'&nbsp;=&nbsp;'mood&nbsp;stability,&nbsp;wellbeing,&nbsp;BDNF&nbsp;expression,&nbsp;sleep')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+<a href="#Serotonin">Serotonin</a>&nbsp;—&nbsp;mood&nbsp;stability&nbsp;and&nbsp;the&nbsp;antidepressant&nbsp;mechanism.<br>
+&nbsp;<br>
+All&nbsp;values&nbsp;synchronized&nbsp;with&nbsp;src/state/neurochemical.rs.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Serotonin-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="Serotonin-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="Serotonin-__getstate__"><strong>__getstate__</strong></a> = _dataclass_getstate(self)<span class="grey"><span class="heading-text"> from <a href="dataclasses.html">dataclasses</a></span></span></dt><dd><span class="code">#&nbsp;_dataclass_getstate&nbsp;and&nbsp;_dataclass_setstate&nbsp;are&nbsp;needed&nbsp;for&nbsp;pickling&nbsp;frozen<br>
+#&nbsp;classes&nbsp;with&nbsp;slots.&nbsp;&nbsp;These&nbsp;could&nbsp;be&nbsp;slightly&nbsp;more&nbsp;performant&nbsp;if&nbsp;we&nbsp;generated<br>
+#&nbsp;the&nbsp;code&nbsp;instead&nbsp;of&nbsp;iterating&nbsp;over&nbsp;fields.&nbsp;&nbsp;But&nbsp;that&nbsp;can&nbsp;be&nbsp;a&nbsp;project&nbsp;for<br>
+#&nbsp;another&nbsp;day,&nbsp;if&nbsp;performance&nbsp;becomes&nbsp;an&nbsp;issue.</span></dd></dl>
+
+<dl><dt><a name="Serotonin-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="Serotonin-__init__"><strong>__init__</strong></a>(self, index: 'int' = 1, name: 'str' = 'serotonin', baseline: 'float' = 0.4, receptor_adaptation_multiplier: 'float' = 0.9, receptor_subtypes: 'tuple[str, str]' = ('5-HT1A', '5-HT2A'), receptor_subtype_balance: 'tuple[float, float]' = (0.5, 0.5), max_impulse: 'float' = 0.05, origin: 'tuple[str, ...]' = ('dorsal raphe', 'median raphe'), projections: 'tuple[str, ...]' = ('cortex', 'hippocampus', 'amygdala', 'basal ganglia', 'hypothalamus'), receptors: 'tuple[str, ...]' = ('5-HT1A', '5-HT1B', '5-HT1D', '5-HT2A', '5-HT2C', '5-HT3', '5-HT4', '5-HT5', '5-HT6', '5-HT7'), brain_waves: 'tuple[str, ...]' = ('alpha',), circadian_modifier: 'str' = '1.0 - 0.10 * melatonin_factor', role: 'str' = 'mood stability, wellbeing, BDNF expression, sleep') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Serotonin-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="Serotonin-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<dl><dt><a name="Serotonin-__setstate__"><strong>__setstate__</strong></a> = _dataclass_setstate(self, state)<span class="grey"><span class="heading-text"> from <a href="dataclasses.html">dataclasses</a></span></span></dt></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>baseline</strong></dt>
+</dl>
+<dl><dt><strong>brain_waves</strong></dt>
+</dl>
+<dl><dt><strong>circadian_modifier</strong></dt>
+</dl>
+<dl><dt><strong>index</strong></dt>
+</dl>
+<dl><dt><strong>max_impulse</strong></dt>
+</dl>
+<dl><dt><strong>name</strong></dt>
+</dl>
+<dl><dt><strong>origin</strong></dt>
+</dl>
+<dl><dt><strong>projections</strong></dt>
+</dl>
+<dl><dt><strong>receptor_adaptation_multiplier</strong></dt>
+</dl>
+<dl><dt><strong>receptor_subtype_balance</strong></dt>
+</dl>
+<dl><dt><strong>receptor_subtypes</strong></dt>
+</dl>
+<dl><dt><strong>receptors</strong></dt>
+</dl>
+<dl><dt><strong>role</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'baseline': 'float', 'brain_waves': 'tuple[str, ...]', 'circadian_modifier': 'str', 'index': 'int', 'max_impulse': 'float', 'name': 'str', 'origin': 'tuple[str, ...]', 'projections': 'tuple[str, ...]', 'receptor_adaptation_multiplier': 'float', 'receptor_subtype_balance': 'tuple[float, float]', ...}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'baseline': Field(name='baseline',type='float',default=0.4,d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'brain_waves': Field(name='brain_waves',type='tuple[str, ...]',...appingproxy({}),kw_only=False,_field_type=_FIELD), 'circadian_modifier': Field(name='circadian_modifier',type='str',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'index': Field(name='index',type='int',default=1,default_...appingproxy({}),kw_only=False,_field_type=_FIELD), 'max_impulse': Field(name='max_impulse',type='float',default=0....appingproxy({}),kw_only=False,_field_type=_FIELD), 'name': Field(name='name',type='str',default='serotonin'...appingproxy({}),kw_only=False,_field_type=_FIELD), 'origin': Field(name='origin',type='tuple[str, ...]',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'projections': Field(name='projections',type='tuple[str, ...]',...appingproxy({}),kw_only=False,_field_type=_FIELD), 'receptor_adaptation_multiplier': Field(name='receptor_adaptation_multiplier',type...appingproxy({}),kw_only=False,_field_type=_FIELD), 'receptor_subtype_balance': Field(name='receptor_subtype_balance',type='tupl...appingproxy({}),kw_only=False,_field_type=_FIELD), ...}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('index', 'name', 'baseline', 'receptor_adaptation_multiplier', 'receptor_subtypes', 'receptor_subtype_balance', 'max_impulse', 'origin', 'projections', 'receptors', 'brain_waves', 'circadian_modifier', 'role')</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>CHEM_SEROTONIN</strong> = 1<br>
+<strong>__all__</strong> = ['CHEM_SEROTONIN', 'Serotonin']</td></tr></table>
+</body></html>

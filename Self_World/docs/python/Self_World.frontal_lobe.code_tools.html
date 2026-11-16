@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.frontal_lobe.code_tools</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.frontal_lobe.html" class="white">frontal_lobe</a>.code_tools</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/code_tools.py">/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/code_tools.py</a></td></tr></table>
+    <p><span class="code">Code&nbsp;tool&nbsp;handling&nbsp;—&nbsp;dispatch&nbsp;code&nbsp;tools&nbsp;and&nbsp;compose&nbsp;code&nbsp;discussions.<br>
+&nbsp;<br>
+Extracted&nbsp;from&nbsp;FrontalLobe&nbsp;as&nbsp;a&nbsp;focused&nbsp;subsystem.&nbsp;When&nbsp;the&nbsp;user<br>
+mentions&nbsp;a&nbsp;.py&nbsp;file&nbsp;with&nbsp;an&nbsp;action&nbsp;word&nbsp;(compile,&nbsp;test,&nbsp;read,&nbsp;check),<br>
+the&nbsp;handler&nbsp;dispatches&nbsp;the&nbsp;appropriate&nbsp;tool&nbsp;and&nbsp;composes&nbsp;a&nbsp;response<br>
+from&nbsp;the&nbsp;tool&nbsp;output.&nbsp;For&nbsp;general&nbsp;code&nbsp;discussions,&nbsp;it&nbsp;composes&nbsp;from<br>
+concept-network&nbsp;knowledge&nbsp;about&nbsp;code-related&nbsp;topics.<br>
+&nbsp;<br>
+Dependencies&nbsp;(passed&nbsp;to&nbsp;``__init__``):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;network:&nbsp;ConceptNetwork&nbsp;for&nbsp;code&nbsp;concept&nbsp;lookup&nbsp;and&nbsp;neighbors<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;language:&nbsp;Language&nbsp;for&nbsp;rendering&nbsp;file-not-found&nbsp;thoughts<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;composer:&nbsp;ThoughtComposer&nbsp;for&nbsp;concept-network&nbsp;composition&nbsp;fallbacks<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;tools:&nbsp;ToolRegistry&nbsp;for&nbsp;run_pytest,&nbsp;compile_python,&nbsp;read_file&nbsp;tools<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;resolve_topics:&nbsp;callable&nbsp;from&nbsp;TopicResolver<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;build_meta_emotion:&nbsp;callable&nbsp;for&nbsp;emotional&nbsp;state&nbsp;in&nbsp;error&nbsp;reports</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="os.html">os</a><br>
+</td><td class="multicolumn"><a href="re.html">re</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.frontal_lobe.code_tools.html#CodeToolHandler">CodeToolHandler</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="CodeToolHandler">class <strong>CodeToolHandler</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#CodeToolHandler">CodeToolHandler</a>(network:&nbsp;'ConceptNetwork',&nbsp;language:&nbsp;'Language',&nbsp;composer:&nbsp;'ThoughtComposer',&nbsp;tools:&nbsp;'ToolRegistry',&nbsp;resolve_topics:&nbsp;'Callable[[list[str],&nbsp;str],&nbsp;list[str]]',&nbsp;build_meta_emotion:&nbsp;'Callable[[],&nbsp;EmotionalState]')&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Dispatch&nbsp;code&nbsp;tools&nbsp;and&nbsp;compose&nbsp;code-discussion&nbsp;responses.<br>
+&nbsp;<br>
+Tool&nbsp;output&nbsp;is&nbsp;reported&nbsp;directly&nbsp;(it's&nbsp;factual&nbsp;tool&nbsp;output,&nbsp;not<br>
+Genesis's&nbsp;self-expression).&nbsp;Code&nbsp;discussion&nbsp;fallbacks&nbsp;compose&nbsp;from<br>
+concept-network&nbsp;knowledge,&nbsp;never&nbsp;from&nbsp;hardcoded&nbsp;template&nbsp;strings.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="CodeToolHandler-__init__"><strong>__init__</strong></a>(self, network: 'ConceptNetwork', language: 'Language', composer: 'ThoughtComposer', tools: 'ToolRegistry', resolve_topics: 'Callable[[list[str], str], list[str]]', build_meta_emotion: 'Callable[[], EmotionalState]') -&gt; 'None'</dt><dd><span class="code">Wire&nbsp;the&nbsp;tool&nbsp;dispatcher&nbsp;to&nbsp;its&nbsp;dependencies.</span></dd></dl>
+
+<dl><dt><a name="CodeToolHandler-deliberate_code_tools"><strong>deliberate_code_tools</strong></a>(self, perception: 'Perception', emotion: 'EmotionalState') -&gt; 'Thought | None'</dt><dd><span class="code">Top-priority&nbsp;code-tool&nbsp;dispatch:&nbsp;if&nbsp;the&nbsp;user&nbsp;asks&nbsp;about&nbsp;a&nbsp;.py&nbsp;file,&nbsp;act.</span></dd></dl>
+
+<dl><dt><a name="CodeToolHandler-handle_code_discussion"><strong>handle_code_discussion</strong></a>(self, perception: 'Perception', emotion: 'EmotionalState') -&gt; 'Thought'</dt><dd><span class="code">Handle&nbsp;code-related&nbsp;discussion.<br>
+&nbsp;<br>
+Uses&nbsp;the&nbsp;thought&nbsp;composer&nbsp;to&nbsp;generate&nbsp;responses&nbsp;from&nbsp;its<br>
+actual&nbsp;knowledge&nbsp;about&nbsp;code,&nbsp;not&nbsp;hardcoded&nbsp;strings.</span></dd></dl>
+
+<dl><dt><a name="CodeToolHandler-run_code_tools"><strong>run_code_tools</strong></a>(self, path: 'str', action: 'str') -&gt; 'str'</dt><dd><span class="code">Run&nbsp;the&nbsp;requested&nbsp;code&nbsp;tools&nbsp;and&nbsp;compose&nbsp;a&nbsp;response.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'_ACTION_WORDS': 'tuple[str, ...]'}</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['CodeToolHandler']</td></tr></table>
+</body></html>

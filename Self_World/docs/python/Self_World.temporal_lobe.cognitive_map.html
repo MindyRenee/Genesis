@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.temporal_lobe.cognitive_map</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.temporal_lobe.html" class="white">temporal_lobe</a>.cognitive_map</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/cognitive_map.py">/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/cognitive_map.py</a></td></tr></table>
+    <p><span class="code">Cognitive&nbsp;map&nbsp;—&nbsp;the&nbsp;hippocampal-entorhinal&nbsp;allocentric&nbsp;world&nbsp;model.<br>
+&nbsp;<br>
+Medial&nbsp;temporal&nbsp;spatial&nbsp;memory:&nbsp;the&nbsp;world-centered&nbsp;complement&nbsp;to&nbsp;the<br>
+parietal&nbsp;lobe's&nbsp;egocentric&nbsp;stream.&nbsp;The&nbsp;parietal&nbsp;model&nbsp;answers&nbsp;"where<br>
+are&nbsp;things&nbsp;relative&nbsp;to&nbsp;me&nbsp;right&nbsp;now";&nbsp;this&nbsp;map&nbsp;answers&nbsp;"how&nbsp;is&nbsp;this<br>
+place&nbsp;laid&nbsp;out"&nbsp;—&nbsp;structure&nbsp;that&nbsp;persists&nbsp;across&nbsp;episodes,&nbsp;is&nbsp;anchored<br>
+to&nbsp;landmarks&nbsp;rather&nbsp;than&nbsp;to&nbsp;her&nbsp;body,&nbsp;and&nbsp;is&nbsp;reinstated&nbsp;by&nbsp;pattern<br>
+completion&nbsp;when&nbsp;a&nbsp;familiar&nbsp;environment&nbsp;is&nbsp;re-entered.<br>
+&nbsp;<br>
+The&nbsp;representation&nbsp;follows&nbsp;the&nbsp;neuroscience&nbsp;rather&nbsp;than&nbsp;any&nbsp;domain:<br>
+&nbsp;<br>
+-&nbsp;**Grid&nbsp;code**&nbsp;(medial&nbsp;entorhinal&nbsp;cortex)&nbsp;—&nbsp;position&nbsp;is&nbsp;encoded&nbsp;as<br>
+&nbsp;&nbsp;phases&nbsp;on&nbsp;hexagonal&nbsp;lattices&nbsp;at&nbsp;geometrically&nbsp;spaced&nbsp;scales&nbsp;and<br>
+&nbsp;&nbsp;rotated&nbsp;orientations&nbsp;(Moser&nbsp;et&nbsp;al.&nbsp;2008;&nbsp;Stensola&nbsp;et&nbsp;al.&nbsp;2012).<br>
+&nbsp;&nbsp;Each&nbsp;module&nbsp;m&nbsp;has&nbsp;scale&nbsp;λ_m&nbsp;and&nbsp;orientation&nbsp;θ_m;&nbsp;a&nbsp;position&nbsp;p&nbsp;has<br>
+&nbsp;&nbsp;lattice-phase&nbsp;coordinates&nbsp;u_m&nbsp;=&nbsp;(B_m&nbsp;p)&nbsp;mod&nbsp;1&nbsp;where&nbsp;B_m&nbsp;is&nbsp;the<br>
+&nbsp;&nbsp;reciprocal&nbsp;of&nbsp;the&nbsp;module's&nbsp;two&nbsp;60°-separated&nbsp;basis&nbsp;vectors.&nbsp;Path<br>
+&nbsp;&nbsp;integration&nbsp;is&nbsp;exact&nbsp;phase&nbsp;advance:&nbsp;u_m&nbsp;+=&nbsp;B_m&nbsp;Δ.&nbsp;The&nbsp;phase&nbsp;code&nbsp;is<br>
+&nbsp;&nbsp;the&nbsp;position&nbsp;signal;&nbsp;a&nbsp;grid&nbsp;cell&nbsp;with&nbsp;preferred&nbsp;phase&nbsp;φ&nbsp;reads&nbsp;it<br>
+&nbsp;&nbsp;out&nbsp;as&nbsp;a&nbsp;sum-of-cosines&nbsp;hexagonal&nbsp;firing&nbsp;field.<br>
+-&nbsp;**<a href="#Place">Place</a>&nbsp;cells**&nbsp;(hippocampus)&nbsp;—&nbsp;Gaussian&nbsp;fields&nbsp;over&nbsp;allocentric<br>
+&nbsp;&nbsp;space;&nbsp;each&nbsp;visited&nbsp;location&nbsp;consolidates&nbsp;into&nbsp;a&nbsp;place&nbsp;node&nbsp;that<br>
+&nbsp;&nbsp;re-activates&nbsp;when&nbsp;re-occupied&nbsp;within&nbsp;σ.<br>
+-&nbsp;**Boundary-vector&nbsp;cells**&nbsp;(subiculum&nbsp;/&nbsp;medial&nbsp;entorhinal)&nbsp;—&nbsp;a<br>
+&nbsp;&nbsp;population&nbsp;tuned&nbsp;to&nbsp;(distance,&nbsp;direction)&nbsp;pairs,&nbsp;driven&nbsp;by&nbsp;the<br>
+&nbsp;&nbsp;distance&nbsp;to&nbsp;the&nbsp;nearest&nbsp;known&nbsp;barrier&nbsp;along&nbsp;each&nbsp;ray&nbsp;(Barry&nbsp;et&nbsp;al.<br>
+&nbsp;&nbsp;2006).&nbsp;They&nbsp;anchor&nbsp;place&nbsp;structure&nbsp;to&nbsp;the&nbsp;arena's&nbsp;geometry.<br>
+-&nbsp;**Transition&nbsp;graph**&nbsp;(Tolman&nbsp;1948;&nbsp;Whittington&nbsp;et&nbsp;al.&nbsp;2020,&nbsp;the<br>
+&nbsp;&nbsp;Tolman-Eichenbaum&nbsp;machine)&nbsp;—&nbsp;places&nbsp;are&nbsp;nodes;&nbsp;observed&nbsp;traversals<br>
+&nbsp;&nbsp;are&nbsp;directed&nbsp;edges&nbsp;labelled&nbsp;by&nbsp;the&nbsp;action&nbsp;taken.&nbsp;Structure&nbsp;(the<br>
+&nbsp;&nbsp;graph)&nbsp;is&nbsp;factorized&nbsp;from&nbsp;content&nbsp;(what&nbsp;occupies&nbsp;each&nbsp;place),&nbsp;so<br>
+&nbsp;&nbsp;layouts&nbsp;learned&nbsp;under&nbsp;one&nbsp;arrangement&nbsp;constrain&nbsp;new&nbsp;ones.<br>
+-&nbsp;**Successor&nbsp;representation**&nbsp;(Stachenfeld,&nbsp;Botvinick&nbsp;&amp;&nbsp;Gershman<br>
+&nbsp;&nbsp;2017)&nbsp;—&nbsp;the&nbsp;predictive&nbsp;map&nbsp;M&nbsp;=&nbsp;(I&nbsp;−&nbsp;γP)⁻¹&nbsp;over&nbsp;the&nbsp;transition<br>
+&nbsp;&nbsp;graph,&nbsp;where&nbsp;P&nbsp;is&nbsp;the&nbsp;row-normalized&nbsp;transition&nbsp;matrix&nbsp;under&nbsp;the<br>
+&nbsp;&nbsp;observed&nbsp;action&nbsp;distribution.&nbsp;M[s,&nbsp;·]&nbsp;is&nbsp;place&nbsp;s's&nbsp;expected<br>
+&nbsp;&nbsp;discounted&nbsp;future&nbsp;occupancy&nbsp;—&nbsp;"from&nbsp;here,&nbsp;where&nbsp;am&nbsp;I&nbsp;headed."<br>
+-&nbsp;**Anchors**&nbsp;(retrosplenial&nbsp;/&nbsp;parahippocampal&nbsp;input)&nbsp;—&nbsp;entities<br>
+&nbsp;&nbsp;that&nbsp;reappear&nbsp;at&nbsp;the&nbsp;same&nbsp;cell&nbsp;across&nbsp;episodes&nbsp;are&nbsp;promoted&nbsp;to<br>
+&nbsp;&nbsp;landmarks;&nbsp;the&nbsp;map&nbsp;re-grounds&nbsp;to&nbsp;them&nbsp;rather&nbsp;than&nbsp;to&nbsp;drifted<br>
+&nbsp;&nbsp;path&nbsp;integration.<br>
+-&nbsp;**Global&nbsp;remapping**&nbsp;—&nbsp;each&nbsp;distinct&nbsp;environment&nbsp;gets&nbsp;its&nbsp;own<br>
+&nbsp;&nbsp;context&nbsp;graph.&nbsp;The&nbsp;opening&nbsp;observation's&nbsp;spatial&nbsp;signature&nbsp;is&nbsp;the<br>
+&nbsp;&nbsp;retrieval&nbsp;cue:&nbsp;a&nbsp;matching&nbsp;stored&nbsp;context&nbsp;is&nbsp;reinstated&nbsp;(CA3-style<br>
+&nbsp;&nbsp;pattern&nbsp;completion);&nbsp;an&nbsp;unfamiliar&nbsp;signature&nbsp;starts&nbsp;a&nbsp;new&nbsp;map.<br>
+&nbsp;<br>
+Nothing&nbsp;here&nbsp;knows&nbsp;what&nbsp;environment&nbsp;it&nbsp;is&nbsp;mapping.&nbsp;Positions&nbsp;arrive<br>
+as&nbsp;coordinates,&nbsp;entities&nbsp;as&nbsp;(color,&nbsp;footprint)&nbsp;observations,&nbsp;actions<br>
+as&nbsp;opaque&nbsp;ids&nbsp;—&nbsp;the&nbsp;same&nbsp;substrate&nbsp;serves&nbsp;a&nbsp;maze,&nbsp;a&nbsp;grid&nbsp;world,&nbsp;or&nbsp;a<br>
+robot&nbsp;floor&nbsp;plan.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="math.html">math</a><br>
+</td><td class="multicolumn"><a href="numpy.html">numpy</a><br>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.cognitive_map.html#Anchor">Anchor</a>
+</dt><dt class="heading-text"><a href="Self_World.temporal_lobe.cognitive_map.html#CognitiveMap">CognitiveMap</a>
+</dt><dt class="heading-text"><a href="Self_World.temporal_lobe.cognitive_map.html#ContextMap">ContextMap</a>
+</dt><dt class="heading-text"><a href="Self_World.temporal_lobe.cognitive_map.html#GridCode">GridCode</a>
+</dt><dt class="heading-text"><a href="Self_World.temporal_lobe.cognitive_map.html#MapEvent">MapEvent</a>
+</dt><dt class="heading-text"><a href="Self_World.temporal_lobe.cognitive_map.html#Place">Place</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Anchor">class <strong>Anchor</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Anchor">Anchor</a>(color:&nbsp;'int',&nbsp;cell:&nbsp;'Cell',&nbsp;episodes:&nbsp;'set[int]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;landmark:&nbsp;an&nbsp;entity&nbsp;kind&nbsp;re-observed&nbsp;at&nbsp;the&nbsp;same&nbsp;cell.<br>
+&nbsp;<br>
+Confirmed&nbsp;once&nbsp;it&nbsp;has&nbsp;appeared&nbsp;in&nbsp;more&nbsp;than&nbsp;one&nbsp;episode&nbsp;—&nbsp;a&nbsp;thing<br>
+that&nbsp;keeps&nbsp;being&nbsp;where&nbsp;it&nbsp;was&nbsp;is&nbsp;a&nbsp;thing&nbsp;you&nbsp;can&nbsp;navigate&nbsp;by.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Anchor-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="Anchor-__init__"><strong>__init__</strong></a>(self, color: 'int', cell: 'Cell', episodes: 'set[int]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Anchor-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>confirmed</strong></dt>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'cell': 'Cell', 'color': 'int', 'episodes': 'set[int]'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'cell': Field(name='cell',type='Cell',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD), 'color': Field(name='color',type='int',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD), 'episodes': Field(name='episodes',type='set[int]',default=&lt;d...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('color', 'cell', 'episodes')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="CognitiveMap">class <strong>CognitiveMap</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#CognitiveMap">CognitiveMap</a>()&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+The&nbsp;allocentric&nbsp;map&nbsp;—&nbsp;hippocampal&nbsp;formation&nbsp;of&nbsp;the&nbsp;organism.<br>
+&nbsp;<br>
+Consumed&nbsp;per&nbsp;observation:&nbsp;her&nbsp;allocentric&nbsp;position&nbsp;(or&nbsp;a<br>
+dead-reckoning&nbsp;displacement&nbsp;when&nbsp;position&nbsp;is&nbsp;unknown),&nbsp;the<br>
+currently&nbsp;visible&nbsp;entities,&nbsp;the&nbsp;action&nbsp;that&nbsp;produced&nbsp;this<br>
+observation,&nbsp;and&nbsp;the&nbsp;egocentric&nbsp;model's&nbsp;known-blocked&nbsp;cells&nbsp;as<br>
+boundary&nbsp;evidence.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="CognitiveMap-__init__"><strong>__init__</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="CognitiveMap-boundary_vector"><strong>boundary_vector</strong></a>(self, pos: 'tuple[float, float] | None' = None) -&gt; 'np.ndarray'</dt><dd><span class="code">Subicular&nbsp;boundary-vector&nbsp;activity&nbsp;at&nbsp;a&nbsp;position.<br>
+&nbsp;<br>
+For&nbsp;each&nbsp;preferred&nbsp;(distance,&nbsp;direction)&nbsp;pair:&nbsp;distance&nbsp;to&nbsp;the<br>
+nearest&nbsp;boundary&nbsp;cell&nbsp;along&nbsp;that&nbsp;ray,&nbsp;Gaussian-tuned&nbsp;to&nbsp;the<br>
+preferred&nbsp;distance&nbsp;—&nbsp;the&nbsp;BVC&nbsp;model&nbsp;of&nbsp;Barry&nbsp;et&nbsp;al.&nbsp;2006.</span></dd></dl>
+
+<dl><dt><a name="CognitiveMap-load_state"><strong>load_state</strong></a>(self, data: 'dict[str, Any]') -&gt; 'None'</dt><dd><span class="code">Restore&nbsp;a&nbsp;saved&nbsp;map.&nbsp;Unknown/missing&nbsp;keys&nbsp;reset&nbsp;to&nbsp;a&nbsp;fresh<br>
+map&nbsp;—&nbsp;a&nbsp;corrupt&nbsp;payload&nbsp;must&nbsp;not&nbsp;leave&nbsp;a&nbsp;half-built&nbsp;context.</span></dd></dl>
+
+<dl><dt><a name="CognitiveMap-observe"><strong>observe</strong></a>(self, position: 'tuple[float, float] | None', entities: 'list[tuple[int, frozenset[Cell]]]', action: 'str | None' = None, blocked_cells: 'set[Cell] | None' = None, bounds: 'tuple[int, int] | None' = None, delta: 'tuple[float, float] | None' = None) -&gt; 'list[MapEvent]'</dt><dd><span class="code">Integrate&nbsp;one&nbsp;allocentric&nbsp;observation.<br>
+&nbsp;<br>
+``position``&nbsp;is&nbsp;her&nbsp;centroid&nbsp;in&nbsp;world&nbsp;coordinates&nbsp;when&nbsp;the<br>
+egocentric&nbsp;model&nbsp;knows&nbsp;where&nbsp;she&nbsp;is;&nbsp;``action``&nbsp;is&nbsp;the&nbsp;action<br>
+that&nbsp;produced&nbsp;this&nbsp;observation&nbsp;(recorded&nbsp;on&nbsp;the&nbsp;transition<br>
+edge);&nbsp;``entities``&nbsp;are&nbsp;the&nbsp;visible&nbsp;non-self&nbsp;things&nbsp;as<br>
+(color,&nbsp;cells)&nbsp;pairs.&nbsp;``bounds``&nbsp;is&nbsp;the&nbsp;field&nbsp;size.<br>
+``delta``&nbsp;is&nbsp;self-reported&nbsp;motion&nbsp;(e.g.&nbsp;velocity)&nbsp;used&nbsp;for<br>
+dead&nbsp;reckoning&nbsp;when&nbsp;no&nbsp;allocentric&nbsp;fix&nbsp;is&nbsp;available.</span></dd></dl>
+
+<dl><dt><a name="CognitiveMap-path_integrate"><strong>path_integrate</strong></a>(self, delta: 'tuple[float, float]') -&gt; 'None'</dt><dd><span class="code">Dead&nbsp;reckoning&nbsp;when&nbsp;no&nbsp;allocentric&nbsp;fix&nbsp;is&nbsp;available.</span></dd></dl>
+
+<dl><dt><a name="CognitiveMap-reset_episode"><strong>reset_episode</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Episode&nbsp;boundary&nbsp;—&nbsp;end&nbsp;the&nbsp;fix,&nbsp;keep&nbsp;the&nbsp;map.<br>
+&nbsp;<br>
+Everything&nbsp;learned&nbsp;persists:&nbsp;places,&nbsp;transitions,&nbsp;anchors,<br>
+boundaries.&nbsp;Only&nbsp;the&nbsp;egocentric&nbsp;estimate&nbsp;clears&nbsp;—&nbsp;the&nbsp;next<br>
+observation&nbsp;re-anchors&nbsp;it,&nbsp;and&nbsp;if&nbsp;the&nbsp;opening&nbsp;signature<br>
+matches&nbsp;a&nbsp;stored&nbsp;context&nbsp;the&nbsp;map&nbsp;is&nbsp;reinstated&nbsp;as&nbsp;a&nbsp;whole.</span></dd></dl>
+
+<dl><dt><a name="CognitiveMap-route"><strong>route</strong></a>(self, from_place: 'int', to_place: 'int') -&gt; 'list[tuple[int, str]] | None'</dt><dd><span class="code">Shortest&nbsp;world-centered&nbsp;route&nbsp;between&nbsp;two&nbsp;places.<br>
+&nbsp;<br>
+BFS&nbsp;over&nbsp;the&nbsp;transition&nbsp;graph&nbsp;—&nbsp;what&nbsp;frontal&nbsp;planning&nbsp;over<br>
+the&nbsp;map&nbsp;consumes.&nbsp;Returns&nbsp;(place,&nbsp;action-taken)&nbsp;steps.</span></dd></dl>
+
+<dl><dt><a name="CognitiveMap-save_state"><strong>save_state</strong></a>(self) -&gt; 'dict[str, Any]'</dt><dd><span class="code">Serialize&nbsp;every&nbsp;context's&nbsp;structure&nbsp;—&nbsp;the&nbsp;learned&nbsp;maps.<br>
+&nbsp;<br>
+Places,&nbsp;transitions,&nbsp;anchors,&nbsp;and&nbsp;boundaries&nbsp;are&nbsp;the<br>
+accumulations;&nbsp;the&nbsp;egocentric&nbsp;fix&nbsp;(_pos/_code/_place)&nbsp;is&nbsp;saved<br>
+so&nbsp;a&nbsp;mid-episode&nbsp;save&nbsp;resumes&nbsp;where&nbsp;it&nbsp;stood&nbsp;rather&nbsp;than<br>
+re-anchoring&nbsp;cold.&nbsp;The&nbsp;grid&nbsp;itself&nbsp;is&nbsp;deterministic&nbsp;(fixed<br>
+scales/orientations)&nbsp;and&nbsp;is&nbsp;not&nbsp;stored.</span></dd></dl>
+
+<dl><dt><a name="CognitiveMap-successor_map"><strong>successor_map</strong></a>(self, gamma: 'float' = 0.9) -&gt; 'tuple[list[int], np.ndarray]'</dt><dd><span class="code">M&nbsp;=&nbsp;(I&nbsp;−&nbsp;γP)⁻¹&nbsp;—&nbsp;the&nbsp;predictive&nbsp;occupancy&nbsp;map.<br>
+&nbsp;<br>
+Row&nbsp;s&nbsp;is&nbsp;place&nbsp;s's&nbsp;expected&nbsp;discounted&nbsp;future&nbsp;occupancy:&nbsp;the<br>
+hippocampal&nbsp;"predictive&nbsp;map"&nbsp;of&nbsp;Stachenfeld&nbsp;et&nbsp;al.&nbsp;2017.</span></dd></dl>
+
+<dl><dt><a name="CognitiveMap-summary"><strong>summary</strong></a>(self) -&gt; 'str'</dt></dl>
+
+<dl><dt><a name="CognitiveMap-transition_matrix"><strong>transition_matrix</strong></a>(self, ctx: 'ContextMap | None' = None) -&gt; 'tuple[list[int], np.ndarray]'</dt><dd><span class="code">P&nbsp;—&nbsp;row-normalized&nbsp;transition&nbsp;probabilities&nbsp;over&nbsp;places.<br>
+&nbsp;<br>
+Marginalizes&nbsp;the&nbsp;observed&nbsp;action&nbsp;distribution:&nbsp;P(s'|s)&nbsp;=<br>
+Σ_a&nbsp;P(a|s)·T(s,a,s'),&nbsp;with&nbsp;P(a|s)&nbsp;the&nbsp;empirical&nbsp;frequency&nbsp;of<br>
+each&nbsp;action&nbsp;at&nbsp;s.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>context</strong></dt>
+</dl>
+<dl><dt><strong>current_place</strong></dt>
+</dl>
+<dl><dt><strong>position_code</strong></dt>
+<dd><span class="code">The&nbsp;grid-cell&nbsp;phase&nbsp;code&nbsp;of&nbsp;the&nbsp;current&nbsp;estimate.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ContextMap">class <strong>ContextMap</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ContextMap">ContextMap</a>(signature:&nbsp;'frozenset[tuple[int,&nbsp;int,&nbsp;int,&nbsp;int]]',&nbsp;bounds:&nbsp;'tuple[int,&nbsp;int]',&nbsp;places:&nbsp;'dict[int,&nbsp;<a href="#Place">Place</a>]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;next_place_id:&nbsp;'int'&nbsp;=&nbsp;1,&nbsp;transitions:&nbsp;'dict[tuple[int,&nbsp;str],&nbsp;Counter[int]]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;contents:&nbsp;'dict[int,&nbsp;Counter[int]]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;anchors:&nbsp;'dict[tuple[int,&nbsp;Cell],&nbsp;<a href="#Anchor">Anchor</a>]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;boundary:&nbsp;'set[Cell]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;n_episodes:&nbsp;'int'&nbsp;=&nbsp;1)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+One&nbsp;environment's&nbsp;allocentric&nbsp;structure&nbsp;(a&nbsp;"rate&nbsp;map").<br>
+&nbsp;<br>
+Hippocampal&nbsp;place&nbsp;populations&nbsp;remap&nbsp;globally&nbsp;between&nbsp;environments;<br>
+each&nbsp;context&nbsp;keeps&nbsp;its&nbsp;own&nbsp;places,&nbsp;transitions,&nbsp;anchors,&nbsp;and<br>
+boundary&nbsp;set,&nbsp;and&nbsp;accumulates&nbsp;them&nbsp;across&nbsp;every&nbsp;episode&nbsp;spent&nbsp;in<br>
+that&nbsp;same&nbsp;environment.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ContextMap-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="ContextMap-__init__"><strong>__init__</strong></a>(self, signature: 'frozenset[tuple[int, int, int, int]]', bounds: 'tuple[int, int]', places: 'dict[int, Place]' = &lt;factory&gt;, next_place_id: 'int' = 1, transitions: 'dict[tuple[int, str], Counter[int]]' = &lt;factory&gt;, contents: 'dict[int, Counter[int]]' = &lt;factory&gt;, anchors: 'dict[tuple[int, Cell], Anchor]' = &lt;factory&gt;, boundary: 'set[Cell]' = &lt;factory&gt;, n_episodes: 'int' = 1) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="ContextMap-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'anchors': 'dict[tuple[int, Cell], Anchor]', 'boundary': 'set[Cell]', 'bounds': 'tuple[int, int]', 'contents': 'dict[int, Counter[int]]', 'n_episodes': 'int', 'next_place_id': 'int', 'places': 'dict[int, Place]', 'signature': 'frozenset[tuple[int, int, int, int]]', 'transitions': 'dict[tuple[int, str], Counter[int]]'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'anchors': Field(name='anchors',type='dict[tuple[int, Cell]...appingproxy({}),kw_only=False,_field_type=_FIELD), 'boundary': Field(name='boundary',type='set[Cell]',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD), 'bounds': Field(name='bounds',type='tuple[int, int]',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'contents': Field(name='contents',type='dict[int, Counter[in...appingproxy({}),kw_only=False,_field_type=_FIELD), 'n_episodes': Field(name='n_episodes',type='int',default=1,def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'next_place_id': Field(name='next_place_id',type='int',default=1,...appingproxy({}),kw_only=False,_field_type=_FIELD), 'places': Field(name='places',type='dict[int, Place]',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'signature': Field(name='signature',type='frozenset[tuple[int...appingproxy({}),kw_only=False,_field_type=_FIELD), 'transitions': Field(name='transitions',type='dict[tuple[int, s...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('signature', 'bounds', 'places', 'next_place_id', 'transitions', 'contents', 'anchors', 'boundary', 'n_episodes')</dl>
+
+<dl><dt><strong>n_episodes</strong> = 1</dl>
+
+<dl><dt><strong>next_place_id</strong> = 1</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="GridCode">class <strong>GridCode</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#GridCode">GridCode</a>(scales:&nbsp;'tuple[float,&nbsp;...]'&nbsp;=&nbsp;(3.0,&nbsp;4.8,&nbsp;7.7,&nbsp;12.3),&nbsp;orientations:&nbsp;'tuple[float,&nbsp;...]'&nbsp;=&nbsp;(0.0,&nbsp;0.35,&nbsp;-0.2,&nbsp;0.55))&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Entorhinal&nbsp;position&nbsp;code:&nbsp;hexagonal-lattice&nbsp;phases&nbsp;per&nbsp;module.<br>
+&nbsp;<br>
+A&nbsp;position&nbsp;is&nbsp;represented&nbsp;by&nbsp;its&nbsp;fractional&nbsp;coordinates&nbsp;on&nbsp;each<br>
+module's&nbsp;lattice&nbsp;—&nbsp;the&nbsp;"grid&nbsp;phase."&nbsp;Translation&nbsp;advances&nbsp;phases<br>
+linearly&nbsp;(path&nbsp;integration),&nbsp;and&nbsp;the&nbsp;joint&nbsp;code&nbsp;across&nbsp;scales&nbsp;is<br>
+locally&nbsp;unique&nbsp;(distinct&nbsp;positions&nbsp;in&nbsp;the&nbsp;arena&nbsp;map&nbsp;to&nbsp;distinct<br>
+phase&nbsp;vectors),&nbsp;which&nbsp;is&nbsp;what&nbsp;lets&nbsp;the&nbsp;system&nbsp;represent&nbsp;position<br>
+without&nbsp;any&nbsp;external&nbsp;coordinate&nbsp;frame.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="GridCode-__init__"><strong>__init__</strong></a>(self, scales: 'tuple[float, ...]' = (3.0, 4.8, 7.7, 12.3), orientations: 'tuple[float, ...]' = (0.0, 0.35, -0.2, 0.55)) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="GridCode-advance"><strong>advance</strong></a>(self, code: 'np.ndarray', delta: 'tuple[float, float]') -&gt; 'np.ndarray'</dt><dd><span class="code">Path&nbsp;integration:&nbsp;advance&nbsp;every&nbsp;module's&nbsp;phase&nbsp;by&nbsp;B·Δ.</span></dd></dl>
+
+<dl><dt><a name="GridCode-encode"><strong>encode</strong></a>(self, pos: 'tuple[float, float]') -&gt; 'np.ndarray'</dt><dd><span class="code">Position&nbsp;→&nbsp;concatenated&nbsp;lattice&nbsp;phases,&nbsp;one&nbsp;pair&nbsp;per&nbsp;module.</span></dd></dl>
+
+<dl><dt><a name="GridCode-field"><strong>field</strong></a>(self, module: 'int', pos: 'tuple[float, float]', offset: 'np.ndarray') -&gt; 'float'</dt><dd><span class="code">One&nbsp;grid&nbsp;cell's&nbsp;activity:&nbsp;hex&nbsp;field&nbsp;at&nbsp;preferred&nbsp;phase.<br>
+&nbsp;<br>
+The&nbsp;firing&nbsp;field&nbsp;is&nbsp;a&nbsp;sum&nbsp;of&nbsp;three&nbsp;plane&nbsp;waves&nbsp;at&nbsp;120°&nbsp;—&nbsp;in<br>
+lattice-phase&nbsp;coordinates&nbsp;that&nbsp;is&nbsp;the&nbsp;three&nbsp;wave&nbsp;components<br>
+du₀,&nbsp;du₁,&nbsp;du₀+du₁&nbsp;—&nbsp;which&nbsp;produces&nbsp;the&nbsp;hexagonal&nbsp;array&nbsp;of<br>
+firing&nbsp;peaks&nbsp;grid&nbsp;cells&nbsp;exhibit.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="MapEvent">class <strong>MapEvent</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#MapEvent">MapEvent</a>(kind:&nbsp;'str',&nbsp;text:&nbsp;'str',&nbsp;salience:&nbsp;'float'&nbsp;=&nbsp;0.3)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+One&nbsp;change&nbsp;in&nbsp;the&nbsp;allocentric&nbsp;map&nbsp;worth&nbsp;noticing.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="MapEvent-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="MapEvent-__init__"><strong>__init__</strong></a>(self, kind: 'str', text: 'str', salience: 'float' = 0.3) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="MapEvent-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'kind': 'str', 'salience': 'float', 'text': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'kind': Field(name='kind',type='str',default=&lt;dataclasse...appingproxy({}),kw_only=False,_field_type=_FIELD), 'salience': Field(name='salience',type='float',default=0.3,d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'text': Field(name='text',type='str',default=&lt;dataclasse...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('kind', 'text', 'salience')</dl>
+
+<dl><dt><strong>salience</strong> = 0.3</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Place">class <strong>Place</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Place">Place</a>(id:&nbsp;'int',&nbsp;pos:&nbsp;'tuple[float,&nbsp;float]',&nbsp;visits:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;code:&nbsp;'np.ndarray'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;hippocampal&nbsp;place&nbsp;node&nbsp;—&nbsp;a&nbsp;stable&nbsp;allocentric&nbsp;location.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Place-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="Place-__init__"><strong>__init__</strong></a>(self, id: 'int', pos: 'tuple[float, float]', visits: 'int' = 0, code: 'np.ndarray' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Place-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'code': 'np.ndarray', 'id': 'int', 'pos': 'tuple[float, float]', 'visits': 'int'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'code': Field(name='code',type='np.ndarray',default=&lt;dat...appingproxy({}),kw_only=False,_field_type=_FIELD), 'id': Field(name='id',type='int',default=&lt;dataclasses....appingproxy({}),kw_only=False,_field_type=_FIELD), 'pos': Field(name='pos',type='tuple[float, float]',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'visits': Field(name='visits',type='int',default=0,default...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('id', 'pos', 'visits', 'code')</dl>
+
+<dl><dt><strong>visits</strong> = 0</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>Cell</strong> = tuple[int, int]<br>
+<strong>logger</strong> = &lt;Logger Self_World.temporal_lobe.cognitive_map (WARNING)&gt;</td></tr></table>
+</body></html>

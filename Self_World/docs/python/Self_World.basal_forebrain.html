@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: package Self_World.basal_forebrain</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.basal_forebrain</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/basal_forebrain/__init__.py">/home/mindyrenee/GenAnd/Genesis/Self_World/basal_forebrain/__init__.py</a></td></tr></table>
+    <p><span class="code">Basal&nbsp;forebrain&nbsp;—&nbsp;cortical&nbsp;acetylcholine,&nbsp;attention,&nbsp;and&nbsp;encoding.<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+ANATOMY&nbsp;AND&nbsp;FUNCTION<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+The&nbsp;basal&nbsp;forebrain&nbsp;lies&nbsp;ventral&nbsp;to&nbsp;the&nbsp;striatum&nbsp;and&nbsp;anterior&nbsp;to&nbsp;the<br>
+hypothalamus.&nbsp;It&nbsp;holds&nbsp;the&nbsp;major&nbsp;cholinergic&nbsp;projection&nbsp;to&nbsp;the&nbsp;cortex<br>
+and&nbsp;the&nbsp;hippocampus.&nbsp;In&nbsp;the&nbsp;nomenclature&nbsp;of&nbsp;Mesulam&nbsp;and&nbsp;colleagues,<br>
+Ch1&nbsp;and&nbsp;Ch2&nbsp;(medial&nbsp;septum&nbsp;and&nbsp;vertical&nbsp;diagonal&nbsp;band)&nbsp;supply&nbsp;the<br>
+hippocampal&nbsp;complex,&nbsp;Ch3&nbsp;(horizontal&nbsp;diagonal&nbsp;band)&nbsp;supplies&nbsp;the<br>
+olfactory&nbsp;bulb,&nbsp;and&nbsp;Ch4&nbsp;(nucleus&nbsp;basalis&nbsp;of&nbsp;Meynert)&nbsp;supplies&nbsp;the<br>
+neocortex&nbsp;and&nbsp;amygdala.&nbsp;The&nbsp;brainstem's&nbsp;pedunculopontine&nbsp;and<br>
+laterodorsal&nbsp;nuclei&nbsp;(Ch5,&nbsp;Ch6)&nbsp;project&nbsp;mainly&nbsp;to&nbsp;the&nbsp;thalamus,&nbsp;not&nbsp;the<br>
+cortex,&nbsp;so&nbsp;they&nbsp;belong&nbsp;to&nbsp;``brainstem``,&nbsp;not&nbsp;here.<br>
+&nbsp;<br>
+Acetylcholine&nbsp;from&nbsp;this&nbsp;region&nbsp;controls&nbsp;cortical&nbsp;arousal,&nbsp;attention,<br>
+and&nbsp;the&nbsp;encoding&nbsp;of&nbsp;new&nbsp;memories.<br>
+&nbsp;<br>
+The&nbsp;region&nbsp;is&nbsp;also&nbsp;a&nbsp;sleep-wake&nbsp;structure,&nbsp;not&nbsp;only&nbsp;a&nbsp;cholinergic<br>
+one.&nbsp;The&nbsp;basal&nbsp;forebrain&nbsp;holds&nbsp;three&nbsp;intermingled&nbsp;populations&nbsp;—<br>
+wake-promoting&nbsp;cholinergic&nbsp;and&nbsp;parvalbumin&nbsp;GABAergic&nbsp;neurons,<br>
+glutamatergic&nbsp;arousal&nbsp;neurons,&nbsp;and&nbsp;sleep-promoting&nbsp;GABAergic<br>
+(somatostatin+)&nbsp;neurons&nbsp;—&nbsp;and&nbsp;it&nbsp;is&nbsp;the&nbsp;best-characterized&nbsp;site<br>
+where&nbsp;the&nbsp;homeostatic&nbsp;sleep-pressure&nbsp;signal&nbsp;acts.<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+MATHEMATICAL&nbsp;FOUNDATION:&nbsp;ADENOSINE&nbsp;AS&nbsp;PROCESS&nbsp;S<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+In&nbsp;the&nbsp;two-process&nbsp;model&nbsp;(Borbély,&nbsp;1982;&nbsp;documented&nbsp;under<br>
+``hypothalamus/``&nbsp;where&nbsp;the&nbsp;circadian&nbsp;half&nbsp;lives),&nbsp;homeostatic<br>
+pressure&nbsp;S&nbsp;accumulates&nbsp;during&nbsp;wake&nbsp;and&nbsp;dissipates&nbsp;during&nbsp;sleep:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;dS/dt&nbsp;=&nbsp;+r_wake&nbsp;&nbsp;&nbsp;(awake)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;dS/dt&nbsp;=&nbsp;-S&nbsp;/&nbsp;τ_sleep&nbsp;&nbsp;(asleep)<br>
+&nbsp;<br>
+The&nbsp;molecular&nbsp;correlate&nbsp;of&nbsp;the&nbsp;wake&nbsp;side&nbsp;is&nbsp;adenosine,&nbsp;the&nbsp;ATP<br>
+byproduct.&nbsp;Extracellular&nbsp;adenosine&nbsp;in&nbsp;the&nbsp;basal&nbsp;forebrain&nbsp;rises&nbsp;with<br>
+time&nbsp;spent&nbsp;awake&nbsp;and&nbsp;falls&nbsp;during&nbsp;sleep&nbsp;(Porkka-Heiskanen&nbsp;et&nbsp;al.,<br>
+Science&nbsp;1997);&nbsp;blocking&nbsp;its&nbsp;reuptake&nbsp;mimics&nbsp;sleep&nbsp;deprivation,&nbsp;and<br>
+blocking&nbsp;A1&nbsp;receptors&nbsp;in&nbsp;the&nbsp;cholinergic&nbsp;basal&nbsp;forebrain&nbsp;blunts&nbsp;the<br>
+recovery-sleep&nbsp;response&nbsp;(Strecker&nbsp;et&nbsp;al.,&nbsp;J.&nbsp;Neurosci.&nbsp;2000;<br>
+Basheer&nbsp;et&nbsp;al.,&nbsp;2004).&nbsp;The&nbsp;mechanism&nbsp;is&nbsp;A1-mediated&nbsp;inhibition&nbsp;of<br>
+the&nbsp;region's&nbsp;wake-active&nbsp;neurons&nbsp;—&nbsp;the&nbsp;sleep&nbsp;signal&nbsp;literally<br>
+silences&nbsp;the&nbsp;arousal&nbsp;output&nbsp;that&nbsp;this&nbsp;same&nbsp;region&nbsp;produces.<br>
+&nbsp;<br>
+The&nbsp;honest&nbsp;caveat,&nbsp;kept&nbsp;current&nbsp;as&nbsp;of&nbsp;October&nbsp;2026:&nbsp;lesioning&nbsp;the<br>
+basal-forebrain&nbsp;cholinergic&nbsp;neurons&nbsp;abolishes&nbsp;the&nbsp;local&nbsp;adenosine<br>
+rise&nbsp;but&nbsp;does&nbsp;NOT&nbsp;abolish&nbsp;sleep&nbsp;drive&nbsp;(Blanco-Centurion&nbsp;et&nbsp;al.,<br>
+J.&nbsp;Neurosci.&nbsp;2006),&nbsp;and&nbsp;conditional&nbsp;A1R&nbsp;knockouts&nbsp;retain&nbsp;much&nbsp;of<br>
+the&nbsp;rebound&nbsp;response&nbsp;(Bjorness&nbsp;et&nbsp;al.,&nbsp;2009).&nbsp;Adenosine&nbsp;is&nbsp;now<br>
+understood&nbsp;to&nbsp;accumulate&nbsp;across&nbsp;cortex&nbsp;and&nbsp;basal&nbsp;forebrain&nbsp;as&nbsp;a<br>
+distributed,&nbsp;largely&nbsp;astrocytic&nbsp;signal&nbsp;—&nbsp;the&nbsp;basal&nbsp;forebrain&nbsp;is&nbsp;the<br>
+canonical&nbsp;measurement&nbsp;site,&nbsp;not&nbsp;the&nbsp;sole&nbsp;locus.&nbsp;What&nbsp;this&nbsp;region<br>
+owns&nbsp;is&nbsp;the&nbsp;site-of-action&nbsp;role,&nbsp;not&nbsp;an&nbsp;exclusivity&nbsp;claim.<br>
+&nbsp;<br>
+In&nbsp;Genesis:&nbsp;``neurochemical/adenosine.py``&nbsp;is&nbsp;the&nbsp;chemical&nbsp;model;<br>
+the&nbsp;daemon&nbsp;integrates&nbsp;its&nbsp;level&nbsp;with&nbsp;wake&nbsp;time&nbsp;and&nbsp;the&nbsp;sleep-wake<br>
+network's&nbsp;homeostat&nbsp;reads&nbsp;it&nbsp;for&nbsp;onset&nbsp;—&nbsp;the&nbsp;signal&nbsp;is&nbsp;homed&nbsp;here;<br>
+the&nbsp;mind's&nbsp;voluntary&nbsp;half&nbsp;is&nbsp;the&nbsp;self-sleep&nbsp;urge&nbsp;floor<br>
+(``SLEEP_URGE_ADENOSINE_FLOOR``&nbsp;in&nbsp;``brainstem/thresholds.py``).<br>
+&nbsp;<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+MATHEMATICAL&nbsp;FOUNDATION:&nbsp;ACETYLCHOLINE&nbsp;AS&nbsp;UNCERTAINTY&nbsp;SIGNAL<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+Yu&nbsp;&amp;&nbsp;Dayan&nbsp;(2005,&nbsp;Neuron,&nbsp;"Uncertainty,&nbsp;neuromodulation,&nbsp;and<br>
+attention")&nbsp;separate&nbsp;two&nbsp;kinds&nbsp;of&nbsp;uncertainty.&nbsp;Expected&nbsp;uncertainty&nbsp;is<br>
+the&nbsp;known&nbsp;unreliability&nbsp;of&nbsp;prior&nbsp;knowledge&nbsp;in&nbsp;a&nbsp;stable&nbsp;environment,&nbsp;and<br>
+they&nbsp;propose&nbsp;acetylcholine&nbsp;as&nbsp;its&nbsp;signal.&nbsp;Unexpected&nbsp;uncertainty&nbsp;is&nbsp;a<br>
+change&nbsp;in&nbsp;the&nbsp;environment,&nbsp;and&nbsp;they&nbsp;propose&nbsp;norepinephrine&nbsp;as&nbsp;its<br>
+signal.&nbsp;Acetylcholine&nbsp;therefore&nbsp;sets&nbsp;how&nbsp;strongly&nbsp;a&nbsp;learner&nbsp;relies&nbsp;on<br>
+its&nbsp;prior&nbsp;against&nbsp;new&nbsp;evidence.&nbsp;The&nbsp;implemented&nbsp;model&nbsp;in<br>
+``neurochemical.acetylcholine``&nbsp;covers&nbsp;the&nbsp;attention&nbsp;and&nbsp;encoding&nbsp;roles<br>
+described&nbsp;in&nbsp;its&nbsp;own&nbsp;module&nbsp;docstring;&nbsp;its&nbsp;equations&nbsp;live&nbsp;there.<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+HOMES<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+Cortical&nbsp;and&nbsp;hippocampal&nbsp;acetylcholine&nbsp;(shared&nbsp;with&nbsp;``neurochemical/``<br>
+and&nbsp;``brainstem``,&nbsp;whose&nbsp;PPT/LDT&nbsp;nuclei&nbsp;feed&nbsp;the&nbsp;thalamic&nbsp;branch):<br>
+the&nbsp;acetylcholine&nbsp;system.<br>
+&nbsp;<br>
+The&nbsp;homeostatic&nbsp;sleep&nbsp;signal&nbsp;(homed&nbsp;here&nbsp;alone):&nbsp;adenosine,&nbsp;the<br>
+process-S&nbsp;correlate&nbsp;whose&nbsp;best-characterized&nbsp;site&nbsp;of&nbsp;action&nbsp;is&nbsp;this<br>
+region's&nbsp;wake-active&nbsp;neurons.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Package Contents</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="Self_World.basal_forebrain.acetylcholine.html">acetylcholine</a><br>
+</td><td class="multicolumn"><a href="Self_World.basal_forebrain.adenosine.html">adenosine</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table>
+</body></html>

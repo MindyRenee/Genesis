@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.thalamus.relay</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.thalamus.html" class="white">thalamus</a>.relay</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/thalamus/relay.py">/home/mindyrenee/GenAnd/Genesis/Self_World/thalamus/relay.py</a></td></tr></table>
+    <p><span class="code">Region-to-region&nbsp;messages,&nbsp;carried&nbsp;on&nbsp;the&nbsp;module&nbsp;telemetry.<br>
+&nbsp;<br>
+This&nbsp;software&nbsp;bus&nbsp;abstracts&nbsp;both&nbsp;direct&nbsp;cortical&nbsp;and&nbsp;transthalamic<br>
+communication;&nbsp;it&nbsp;is&nbsp;not&nbsp;a&nbsp;model&nbsp;of&nbsp;mandatory&nbsp;thalamic&nbsp;routing&nbsp;for<br>
+all&nbsp;neural&nbsp;signals.&nbsp;A&nbsp;region&nbsp;posts&nbsp;a&nbsp;message&nbsp;onto&nbsp;its<br>
+own&nbsp;module&nbsp;entry&nbsp;in&nbsp;the&nbsp;runtime&nbsp;manifest&nbsp;—&nbsp;the&nbsp;``task_id``&nbsp;field&nbsp;the&nbsp;metronome&nbsp;already<br>
+writes&nbsp;and&nbsp;``GET_SUBSYSTEM_TELEMETRY``&nbsp;already<br>
+returns&nbsp;—&nbsp;and&nbsp;the&nbsp;channel&nbsp;delivers&nbsp;the&nbsp;payload&nbsp;to&nbsp;whichever&nbsp;regions<br>
+projected&nbsp;onto&nbsp;that&nbsp;module.<br>
+&nbsp;<br>
+The&nbsp;manifest&nbsp;carries&nbsp;the&nbsp;*fact*&nbsp;of&nbsp;the&nbsp;message&nbsp;(which&nbsp;module&nbsp;spoke,<br>
+what&nbsp;kind)&nbsp;—&nbsp;the&nbsp;same&nbsp;record&nbsp;an&nbsp;EEG-visible&nbsp;trace&nbsp;would&nbsp;leave.&nbsp;The<br>
+payload&nbsp;travels&nbsp;the&nbsp;axon:&nbsp;``post``&nbsp;dispatches&nbsp;it&nbsp;synchronously&nbsp;to<br>
+in-process&nbsp;subscribers,&nbsp;because&nbsp;a&nbsp;conversational&nbsp;reply&nbsp;cannot&nbsp;wait<br>
+for&nbsp;the&nbsp;next&nbsp;telemetry&nbsp;sample.&nbsp;If&nbsp;a&nbsp;region&nbsp;ever&nbsp;lives&nbsp;in&nbsp;another<br>
+process,&nbsp;the&nbsp;same&nbsp;task_id&nbsp;arrives&nbsp;through&nbsp;``deliver``&nbsp;instead&nbsp;—<br>
+the&nbsp;wire&nbsp;format&nbsp;does&nbsp;not&nbsp;change.<br>
+&nbsp;<br>
+``post(source_module,&nbsp;kind,&nbsp;payload)``&nbsp;publishes&nbsp;from&nbsp;the&nbsp;source.<br>
+Receivers&nbsp;``register``&nbsp;against&nbsp;the&nbsp;module&nbsp;they&nbsp;listen&nbsp;to&nbsp;—&nbsp;a<br>
+projection,&nbsp;not&nbsp;a&nbsp;broadcast:&nbsp;only&nbsp;subscribers&nbsp;of&nbsp;that&nbsp;source&nbsp;hear&nbsp;it.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="math.html">math</a><br>
+</td><td class="multicolumn"><a href="time.html">time</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.thalamus.relay.html#Thalamus">Thalamus</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Thalamus">class <strong>Thalamus</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Thalamus">Thalamus</a>()&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Posts&nbsp;messages&nbsp;through&nbsp;module&nbsp;telemetry&nbsp;and&nbsp;delivers&nbsp;them&nbsp;back.<br>
+&nbsp;<br>
+``post``&nbsp;records&nbsp;the&nbsp;message&nbsp;a&nbsp;module&nbsp;publishes,&nbsp;fires&nbsp;the&nbsp;local<br>
+axons&nbsp;(subscribers&nbsp;run&nbsp;synchronously&nbsp;on&nbsp;the&nbsp;caller's&nbsp;thread),&nbsp;and<br>
+leaves&nbsp;the&nbsp;task_id&nbsp;for&nbsp;the&nbsp;next&nbsp;metronome&nbsp;pass&nbsp;to&nbsp;write&nbsp;into&nbsp;the<br>
+manifest.&nbsp;``deliver``&nbsp;is&nbsp;the&nbsp;other&nbsp;direction:&nbsp;it&nbsp;is&nbsp;called&nbsp;with<br>
+the&nbsp;module&nbsp;section&nbsp;of&nbsp;a&nbsp;telemetry&nbsp;report&nbsp;and&nbsp;hands&nbsp;any&nbsp;message<br>
+this&nbsp;process&nbsp;did&nbsp;*not*&nbsp;post&nbsp;itself&nbsp;—&nbsp;one&nbsp;that&nbsp;arrived&nbsp;over&nbsp;the<br>
+wire&nbsp;—&nbsp;to&nbsp;the&nbsp;subscribers&nbsp;of&nbsp;that&nbsp;module.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Thalamus-__init__"><strong>__init__</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Thalamus-deliver"><strong>deliver</strong></a>(self, modules) -&gt; 'None'</dt><dd><span class="code">Hand&nbsp;messages&nbsp;that&nbsp;arrived&nbsp;over&nbsp;the&nbsp;wire&nbsp;to&nbsp;subscribers.<br>
+&nbsp;<br>
+``modules``&nbsp;is&nbsp;the&nbsp;module&nbsp;section&nbsp;of&nbsp;a&nbsp;subsystem&nbsp;telemetry<br>
+report.&nbsp;A&nbsp;task_id&nbsp;is&nbsp;delivered&nbsp;at&nbsp;most&nbsp;once,&nbsp;and&nbsp;only&nbsp;if&nbsp;this<br>
+process&nbsp;did&nbsp;not&nbsp;post&nbsp;it&nbsp;—&nbsp;local&nbsp;posts&nbsp;already&nbsp;fired&nbsp;their<br>
+axons&nbsp;in&nbsp;``post``.</span></dd></dl>
+
+<dl><dt><a name="Thalamus-once"><strong>once</strong></a>(self, module_id: 'int', handler: 'OnceHandler') -&gt; 'Handler'</dt><dd><span class="code">Hear&nbsp;the&nbsp;first&nbsp;matching&nbsp;message,&nbsp;then&nbsp;drop&nbsp;the&nbsp;projection.<br>
+&nbsp;<br>
+``handler``&nbsp;returns&nbsp;True&nbsp;when&nbsp;it&nbsp;has&nbsp;what&nbsp;it&nbsp;came&nbsp;for;&nbsp;the<br>
+projection&nbsp;is&nbsp;removed&nbsp;only&nbsp;then,&nbsp;so&nbsp;non-matching&nbsp;messages&nbsp;pass<br>
+it&nbsp;by&nbsp;without&nbsp;consuming&nbsp;it.</span></dd></dl>
+
+<dl><dt><a name="Thalamus-post"><strong>post</strong></a>(self, module_id: 'int', kind: 'int', payload: 'object', drive: 'float' = 1.0) -&gt; 'int'</dt><dd><span class="code">Publish&nbsp;a&nbsp;message&nbsp;from&nbsp;``module_id``;&nbsp;returns&nbsp;its&nbsp;task_id.<br>
+&nbsp;<br>
+The&nbsp;volley&nbsp;first&nbsp;crosses&nbsp;the&nbsp;TRN&nbsp;gate:&nbsp;its&nbsp;divisive<br>
+normalization&nbsp;gain&nbsp;must&nbsp;clear&nbsp;the&nbsp;transmission&nbsp;floor,&nbsp;or&nbsp;the<br>
+message&nbsp;is&nbsp;vetoed&nbsp;and&nbsp;0&nbsp;is&nbsp;returned&nbsp;(kind-0&nbsp;silence&nbsp;—&nbsp;the<br>
+module&nbsp;has&nbsp;nothing&nbsp;to&nbsp;say).&nbsp;``drive``&nbsp;is&nbsp;the&nbsp;afferent<br>
+strength&nbsp;of&nbsp;this&nbsp;message&nbsp;—&nbsp;unattended&nbsp;chatter&nbsp;posts&nbsp;weak<br>
+drives&nbsp;and&nbsp;loses&nbsp;to&nbsp;competing&nbsp;traffic.<br>
+&nbsp;<br>
+Subscribers&nbsp;fire&nbsp;synchronously,&nbsp;in&nbsp;registration&nbsp;order.&nbsp;The<br>
+task_id&nbsp;stays&nbsp;in&nbsp;the&nbsp;mailbox&nbsp;until&nbsp;the&nbsp;metronome&nbsp;writes&nbsp;it&nbsp;—<br>
+that&nbsp;is&nbsp;how&nbsp;the&nbsp;manifest&nbsp;comes&nbsp;to&nbsp;show&nbsp;which&nbsp;module&nbsp;spoke.</span></dd></dl>
+
+<dl><dt><a name="Thalamus-register"><strong>register</strong></a>(self, module_id: 'int', handler: 'Handler') -&gt; 'Handler'</dt><dd><span class="code">Project&nbsp;onto&nbsp;``module_id``&nbsp;—&nbsp;hear&nbsp;every&nbsp;message&nbsp;it&nbsp;publishes.</span></dd></dl>
+
+<dl><dt><a name="Thalamus-take"><strong>take</strong></a>(self, module_id: 'int') -&gt; 'int | None'</dt><dd><span class="code">Return&nbsp;the&nbsp;task_id&nbsp;a&nbsp;metronome&nbsp;pass&nbsp;should&nbsp;publish,&nbsp;if&nbsp;any.<br>
+&nbsp;<br>
+The&nbsp;payload&nbsp;stays&nbsp;until&nbsp;a&nbsp;newer&nbsp;post&nbsp;replaces&nbsp;it:&nbsp;a&nbsp;reader<br>
+sampling&nbsp;the&nbsp;manifest&nbsp;between&nbsp;metronome&nbsp;passes&nbsp;and&nbsp;telemetry&nbsp;still<br>
+resolves&nbsp;the&nbsp;message.<br>
+&nbsp;<br>
+There&nbsp;is&nbsp;deliberately&nbsp;no&nbsp;expiry&nbsp;—&nbsp;``task_id``&nbsp;records&nbsp;what&nbsp;the<br>
+module&nbsp;*last&nbsp;said*,&nbsp;and&nbsp;a&nbsp;message&nbsp;stays&nbsp;the&nbsp;last&nbsp;said&nbsp;thing<br>
+until&nbsp;the&nbsp;module&nbsp;says&nbsp;something&nbsp;else.&nbsp;A&nbsp;consumer&nbsp;that&nbsp;needs<br>
+recency&nbsp;reads&nbsp;``SubsystemReport.published_at_ms``&nbsp;—&nbsp;the<br>
+sample's&nbsp;own&nbsp;freshness&nbsp;—&nbsp;rather&nbsp;than&nbsp;a&nbsp;message&nbsp;TTL.</span></dd></dl>
+
+<dl><dt><a name="Thalamus-unregister"><strong>unregister</strong></a>(self, module_id: 'int', handler: 'Handler') -&gt; 'None'</dt><dd><span class="code">Stop&nbsp;hearing&nbsp;``module_id``&nbsp;—&nbsp;drop&nbsp;the&nbsp;projection.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-pack"><strong>pack</strong></a>(kind: 'int', salt: 'int') -&gt; 'int'</dt><dd><span class="code">Pack&nbsp;a&nbsp;message&nbsp;kind&nbsp;into&nbsp;the&nbsp;task_id&nbsp;field.</span></dd></dl>
+ <dl><dt><a name="-unpack"><strong>unpack</strong></a>(task_id: 'int') -&gt; 'int'</dt><dd><span class="code">Return&nbsp;the&nbsp;message&nbsp;kind&nbsp;carried&nbsp;by&nbsp;a&nbsp;task_id,&nbsp;or&nbsp;0&nbsp;if&nbsp;none.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>Handler</strong> = collections.abc.Callable[[int, object], None]<br>
+<strong>KIND_FELT</strong> = 4<br>
+<strong>KIND_HEARD</strong> = 1<br>
+<strong>KIND_RECALLED</strong> = 3<br>
+<strong>KIND_SPOKE</strong> = 2<br>
+<strong>OnceHandler</strong> = collections.abc.Callable[[int, object], bool]</td></tr></table>
+</body></html>

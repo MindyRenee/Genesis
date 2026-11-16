@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: package Self_World.eval</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.eval</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/eval/__init__.py">/home/mindyrenee/GenAnd/Genesis/Self_World/eval/__init__.py</a></td></tr></table>
+    <p><span class="code">Baseline&nbsp;+&nbsp;drift&nbsp;+&nbsp;chemical-assay&nbsp;harness&nbsp;for&nbsp;Genesis.<br>
+&nbsp;<br>
+This&nbsp;package&nbsp;answers&nbsp;two&nbsp;questions:<br>
+&nbsp;<br>
+1.&nbsp;**Is&nbsp;Genesis&nbsp;drifting?**&nbsp;:mod:`baseline`&nbsp;captures&nbsp;a&nbsp;deterministic<br>
+&nbsp;&nbsp;&nbsp;resting&nbsp;snapshot&nbsp;(neurochemistry,&nbsp;plasticity,&nbsp;inference,&nbsp;memory<br>
+&nbsp;&nbsp;&nbsp;gating,&nbsp;phase);&nbsp;:mod:`drift`&nbsp;compares&nbsp;a&nbsp;fresh<br>
+&nbsp;&nbsp;&nbsp;capture&nbsp;against&nbsp;a&nbsp;stored&nbsp;baseline&nbsp;and&nbsp;reports&nbsp;per-field&nbsp;drift.<br>
+&nbsp;<br>
+2.&nbsp;**What&nbsp;does&nbsp;each&nbsp;chemical&nbsp;do?**&nbsp;:mod:`assay`&nbsp;applies&nbsp;a&nbsp;controlled<br>
+&nbsp;&nbsp;&nbsp;impulse&nbsp;to&nbsp;each&nbsp;of&nbsp;the&nbsp;18&nbsp;chemicals&nbsp;on&nbsp;an&nbsp;isolated&nbsp;live&nbsp;daemon&nbsp;and<br>
+&nbsp;&nbsp;&nbsp;records&nbsp;the&nbsp;causal&nbsp;effect&nbsp;on&nbsp;arousal,&nbsp;valence,&nbsp;phase,&nbsp;memory<br>
+&nbsp;&nbsp;&nbsp;gating,&nbsp;and&nbsp;the&nbsp;other&nbsp;chemicals.<br>
+&nbsp;<br>
+All&nbsp;live-daemon&nbsp;work&nbsp;goes&nbsp;through&nbsp;:mod:`harness`,&nbsp;which&nbsp;spawns&nbsp;an<br>
+isolated&nbsp;daemon&nbsp;in&nbsp;a&nbsp;temporary&nbsp;data&nbsp;directory&nbsp;—&nbsp;never&nbsp;the&nbsp;production<br>
+instance&nbsp;—&nbsp;settles&nbsp;it&nbsp;to&nbsp;rest,&nbsp;and&nbsp;tears&nbsp;it&nbsp;down&nbsp;afterwards.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Package Contents</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="Self_World.eval.abstraction_gradient.html">abstraction_gradient</a><br>
+<a href="Self_World.eval.assay.html">assay</a><br>
+<a href="Self_World.eval.baseline.html">baseline</a><br>
+</td><td class="multicolumn"><a href="Self_World.eval.drift.html">drift</a><br>
+<a href="Self_World.eval.field_coupling.html">field_coupling</a><br>
+<a href="Self_World.eval.field_elements.html">field_elements</a><br>
+</td><td class="multicolumn"><a href="Self_World.eval.field_ringdown.html">field_ringdown</a><br>
+<a href="Self_World.eval.field_voice.html">field_voice</a><br>
+<a href="Self_World.eval.harness.html">harness</a><br>
+</td><td class="multicolumn"><a href="Self_World.eval.schema_preview.html">schema_preview</a><br>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.eval.assay.html#AssayResult">Self_World.eval.assay.AssayResult</a>
+</dt><dt class="heading-text"><a href="Self_World.eval.assay.html#ChemicalEffect">Self_World.eval.assay.ChemicalEffect</a>
+</dt><dt class="heading-text"><a href="Self_World.eval.baseline.html#Snapshot">Self_World.eval.baseline.Snapshot</a>
+</dt><dt class="heading-text"><a href="Self_World.eval.drift.html#DriftEntry">Self_World.eval.drift.DriftEntry</a>
+</dt><dt class="heading-text"><a href="Self_World.eval.drift.html#DriftReport">Self_World.eval.drift.DriftReport</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="AssayResult">class <strong>AssayResult</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#AssayResult">AssayResult</a>(format_version:&nbsp;'int'&nbsp;=&nbsp;1,&nbsp;captured_at_unix:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;impulse:&nbsp;'float'&nbsp;=&nbsp;0.3,&nbsp;settle_ticks:&nbsp;'int'&nbsp;=&nbsp;60,&nbsp;washout_ticks:&nbsp;'int'&nbsp;=&nbsp;20,&nbsp;dt:&nbsp;'float'&nbsp;=&nbsp;1.0,&nbsp;effects:&nbsp;'list[<a href="#ChemicalEffect">ChemicalEffect</a>]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Full&nbsp;18-chemical&nbsp;assay&nbsp;matrix.&nbsp;JSON-serializable.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="AssayResult-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="AssayResult-__init__"><strong>__init__</strong></a>(self, format_version: 'int' = 1, captured_at_unix: 'float' = 0.0, impulse: 'float' = 0.3, settle_ticks: 'int' = 60, washout_ticks: 'int' = 20, dt: 'float' = 1.0, effects: 'list[ChemicalEffect]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="AssayResult-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="AssayResult-by_name"><strong>by_name</strong></a>(self, name: 'str') -&gt; 'ChemicalEffect | None'</dt><dd><span class="code">Look&nbsp;up&nbsp;one&nbsp;chemical's&nbsp;effect&nbsp;by&nbsp;name.</span></dd></dl>
+
+<dl><dt><a name="AssayResult-summary_lines"><strong>summary_lines</strong></a>(self) -&gt; 'list[str]'</dt><dd><span class="code">Human-readable&nbsp;effect&nbsp;table,&nbsp;one&nbsp;line&nbsp;per&nbsp;chemical.</span></dd></dl>
+
+<dl><dt><a name="AssayResult-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict[str, Any]'</dt><dd><span class="code">Serialize&nbsp;to&nbsp;a&nbsp;JSON-compatible&nbsp;dict.</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="AssayResult-from_dict"><strong>from_dict</strong></a>(data: 'dict[str, Any]') -&gt; 'AssayResult'</dt><dd><span class="code">Deserialize.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'captured_at_unix': 'float', 'dt': 'float', 'effects': 'list[ChemicalEffect]', 'format_version': 'int', 'impulse': 'float', 'settle_ticks': 'int', 'washout_ticks': 'int'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'captured_at_unix': Field(name='captured_at_unix',type='float',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'dt': Field(name='dt',type='float',default=1.0,default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'effects': Field(name='effects',type='list[ChemicalEffect]'...appingproxy({}),kw_only=False,_field_type=_FIELD), 'format_version': Field(name='format_version',type='int',default=1...appingproxy({}),kw_only=False,_field_type=_FIELD), 'impulse': Field(name='impulse',type='float',default=0.3,de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'settle_ticks': Field(name='settle_ticks',type='int',default=60,...appingproxy({}),kw_only=False,_field_type=_FIELD), 'washout_ticks': Field(name='washout_ticks',type='int',default=20...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('format_version', 'captured_at_unix', 'impulse', 'settle_ticks', 'washout_ticks', 'dt', 'effects')</dl>
+
+<dl><dt><strong>captured_at_unix</strong> = 0.0</dl>
+
+<dl><dt><strong>dt</strong> = 1.0</dl>
+
+<dl><dt><strong>format_version</strong> = 1</dl>
+
+<dl><dt><strong>impulse</strong> = 0.3</dl>
+
+<dl><dt><strong>settle_ticks</strong> = 60</dl>
+
+<dl><dt><strong>washout_ticks</strong> = 20</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ChemicalEffect">class <strong>ChemicalEffect</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ChemicalEffect">ChemicalEffect</a>(chem_id:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;name:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;impulse:&nbsp;'float'&nbsp;=&nbsp;0.3,&nbsp;pre_self:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;post_fast_self:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;post_slow_self:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;d_arousal_fast:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;d_arousal_slow:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;d_valence_fast:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;d_valence_slow:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;d_plasticity_slow:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;d_encoding_slow:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;d_consolidation_slow:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;d_retrieval_slow:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;phase_pre:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;phase_fast:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;phase_slow:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;top_coupled:&nbsp;'list[list[Any]]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Measured&nbsp;causal&nbsp;effect&nbsp;of&nbsp;one&nbsp;chemical's&nbsp;impulse.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ChemicalEffect-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="ChemicalEffect-__init__"><strong>__init__</strong></a>(self, chem_id: 'int' = 0, name: 'str' = '', impulse: 'float' = 0.3, pre_self: 'float' = 0.0, post_fast_self: 'float' = 0.0, post_slow_self: 'float' = 0.0, d_arousal_fast: 'float' = 0.0, d_arousal_slow: 'float' = 0.0, d_valence_fast: 'float' = 0.0, d_valence_slow: 'float' = 0.0, d_plasticity_slow: 'float' = 0.0, d_encoding_slow: 'float' = 0.0, d_consolidation_slow: 'float' = 0.0, d_retrieval_slow: 'float' = 0.0, phase_pre: 'str' = '', phase_fast: 'str' = '', phase_slow: 'str' = '', top_coupled: 'list[list[Any]]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="ChemicalEffect-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="ChemicalEffect-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict[str, Any]'</dt><dd><span class="code">Serialize&nbsp;to&nbsp;a&nbsp;JSON-compatible&nbsp;dict.</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="ChemicalEffect-from_dict"><strong>from_dict</strong></a>(data: 'dict[str, Any]') -&gt; 'ChemicalEffect'</dt><dd><span class="code">Deserialize;&nbsp;unknown&nbsp;keys&nbsp;are&nbsp;ignored.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'chem_id': 'int', 'd_arousal_fast': 'float', 'd_arousal_slow': 'float', 'd_consolidation_slow': 'float', 'd_encoding_slow': 'float', 'd_plasticity_slow': 'float', 'd_retrieval_slow': 'float', 'd_valence_fast': 'float', 'd_valence_slow': 'float', 'impulse': 'float', ...}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'chem_id': Field(name='chem_id',type='int',default=0,defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'd_arousal_fast': Field(name='d_arousal_fast',type='float',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'd_arousal_slow': Field(name='d_arousal_slow',type='float',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'd_consolidation_slow': Field(name='d_consolidation_slow',type='float',d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'd_encoding_slow': Field(name='d_encoding_slow',type='float',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'd_plasticity_slow': Field(name='d_plasticity_slow',type='float',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'd_retrieval_slow': Field(name='d_retrieval_slow',type='float',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'd_valence_fast': Field(name='d_valence_fast',type='float',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'd_valence_slow': Field(name='d_valence_slow',type='float',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'impulse': Field(name='impulse',type='float',default=0.3,de...appingproxy({}),kw_only=False,_field_type=_FIELD), ...}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('chem_id', 'name', 'impulse', 'pre_self', 'post_fast_self', 'post_slow_self', 'd_arousal_fast', 'd_arousal_slow', 'd_valence_fast', 'd_valence_slow', 'd_plasticity_slow', 'd_encoding_slow', 'd_consolidation_slow', 'd_retrieval_slow', 'phase_pre', 'phase_fast', 'phase_slow', 'top_coupled')</dl>
+
+<dl><dt><strong>chem_id</strong> = 0</dl>
+
+<dl><dt><strong>d_arousal_fast</strong> = 0.0</dl>
+
+<dl><dt><strong>d_arousal_slow</strong> = 0.0</dl>
+
+<dl><dt><strong>d_consolidation_slow</strong> = 0.0</dl>
+
+<dl><dt><strong>d_encoding_slow</strong> = 0.0</dl>
+
+<dl><dt><strong>d_plasticity_slow</strong> = 0.0</dl>
+
+<dl><dt><strong>d_retrieval_slow</strong> = 0.0</dl>
+
+<dl><dt><strong>d_valence_fast</strong> = 0.0</dl>
+
+<dl><dt><strong>d_valence_slow</strong> = 0.0</dl>
+
+<dl><dt><strong>impulse</strong> = 0.3</dl>
+
+<dl><dt><strong>name</strong> = ''</dl>
+
+<dl><dt><strong>phase_fast</strong> = ''</dl>
+
+<dl><dt><strong>phase_pre</strong> = ''</dl>
+
+<dl><dt><strong>phase_slow</strong> = ''</dl>
+
+<dl><dt><strong>post_fast_self</strong> = 0.0</dl>
+
+<dl><dt><strong>post_slow_self</strong> = 0.0</dl>
+
+<dl><dt><strong>pre_self</strong> = 0.0</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="DriftEntry">class <strong>DriftEntry</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#DriftEntry">DriftEntry</a>(field:&nbsp;'str',&nbsp;baseline:&nbsp;'float&nbsp;|&nbsp;str',&nbsp;current:&nbsp;'float&nbsp;|&nbsp;str',&nbsp;delta:&nbsp;'float&nbsp;|&nbsp;str',&nbsp;severity:&nbsp;'str')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+One&nbsp;compared&nbsp;field.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="DriftEntry-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="DriftEntry-__init__"><strong>__init__</strong></a>(self, field: 'str', baseline: 'float | str', current: 'float | str', delta: 'float | str', severity: 'str') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="DriftEntry-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'baseline': 'float | str', 'current': 'float | str', 'delta': 'float | str', 'field': 'str', 'severity': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'baseline': Field(name='baseline',type='float | str',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'current': Field(name='current',type='float | str',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'delta': Field(name='delta',type='float | str',default=&lt;d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'field': Field(name='field',type='str',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD), 'severity': Field(name='severity',type='str',default=&lt;datacl...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('field', 'baseline', 'current', 'delta', 'severity')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="DriftReport">class <strong>DriftReport</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#DriftReport">DriftReport</a>(entries:&nbsp;'list[<a href="#DriftEntry">DriftEntry</a>]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;passed:&nbsp;'bool'&nbsp;=&nbsp;True)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Full&nbsp;comparison&nbsp;outcome.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="DriftReport-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="DriftReport-__init__"><strong>__init__</strong></a>(self, entries: 'list[DriftEntry]' = &lt;factory&gt;, passed: 'bool' = True) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="DriftReport-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="DriftReport-summary_lines"><strong>summary_lines</strong></a>(self) -&gt; 'list[str]'</dt><dd><span class="code">Human-readable&nbsp;report&nbsp;lines.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>failures</strong></dt>
+<dd><span class="code">Entries&nbsp;with&nbsp;severity&nbsp;==&nbsp;fail.</span></dd>
+</dl>
+<dl><dt><strong>warnings</strong></dt>
+<dd><span class="code">Entries&nbsp;with&nbsp;severity&nbsp;==&nbsp;warn.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'entries': 'list[DriftEntry]', 'passed': 'bool'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'entries': Field(name='entries',type='list[DriftEntry]',def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'passed': Field(name='passed',type='bool',default=True,def...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('entries', 'passed')</dl>
+
+<dl><dt><strong>passed</strong> = True</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Snapshot">class <strong>Snapshot</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Snapshot">Snapshot</a>(format_version:&nbsp;'int'&nbsp;=&nbsp;1,&nbsp;captured_at_unix:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;protocol_version:&nbsp;'int'&nbsp;=&nbsp;3,&nbsp;settle_ticks:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;settle_dt:&nbsp;'float'&nbsp;=&nbsp;1.0,&nbsp;chemicals:&nbsp;'dict[str,&nbsp;float]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;arousal:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;valence:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;global_tone:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;plasticity_gate:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;encoding_weight:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;consolidation_weight:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;retrieval_weight:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;phase:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;phase_name:&nbsp;'str'&nbsp;=&nbsp;'unknown',&nbsp;coupling_drift:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;mean_receptor_sensitivity:&nbsp;'float'&nbsp;=&nbsp;1.0,&nbsp;bdnf_effective:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;cortisol_effective:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;surprise_ema:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;free_energy:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;precision:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;allostatic_load:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;model_maturity:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;resting_emotion:&nbsp;'dict[str,&nbsp;str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;settled&nbsp;resting-state&nbsp;capture.&nbsp;JSON-serializable&nbsp;via&nbsp;to_dict.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Snapshot-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="Snapshot-__init__"><strong>__init__</strong></a>(self, format_version: 'int' = 1, captured_at_unix: 'float' = 0.0, protocol_version: 'int' = 3, settle_ticks: 'int' = 0, settle_dt: 'float' = 1.0, chemicals: 'dict[str, float]' = &lt;factory&gt;, arousal: 'float' = 0.0, valence: 'float' = 0.0, global_tone: 'float' = 0.0, plasticity_gate: 'float' = 0.0, encoding_weight: 'float' = 0.0, consolidation_weight: 'float' = 0.0, retrieval_weight: 'float' = 0.0, phase: 'int' = 0, phase_name: 'str' = 'unknown', coupling_drift: 'float' = 0.0, mean_receptor_sensitivity: 'float' = 1.0, bdnf_effective: 'float' = 0.0, cortisol_effective: 'float' = 0.0, surprise_ema: 'float' = 0.0, free_energy: 'float' = 0.0, precision: 'float' = 0.0, allostatic_load: 'float' = 0.0, model_maturity: 'float' = 0.0, resting_emotion: 'dict[str, str]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Snapshot-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="Snapshot-save"><strong>save</strong></a>(self, path: 'str') -&gt; 'None'</dt><dd><span class="code">Write&nbsp;the&nbsp;snapshot&nbsp;as&nbsp;pretty-printed&nbsp;JSON.</span></dd></dl>
+
+<dl><dt><a name="Snapshot-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict[str, Any]'</dt><dd><span class="code">Serialize&nbsp;to&nbsp;a&nbsp;JSON-compatible&nbsp;dict.</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="Snapshot-from_dict"><strong>from_dict</strong></a>(data: 'dict[str, Any]') -&gt; 'Snapshot'</dt><dd><span class="code">Deserialize;&nbsp;unknown&nbsp;keys&nbsp;are&nbsp;ignored&nbsp;for&nbsp;forward&nbsp;compatibility.</span></dd></dl>
+
+<dl><dt><a name="Snapshot-load"><strong>load</strong></a>(path: 'str') -&gt; 'Snapshot'</dt><dd><span class="code">Read&nbsp;a&nbsp;snapshot&nbsp;from&nbsp;a&nbsp;JSON&nbsp;file.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'allostatic_load': 'float', 'arousal': 'float', 'bdnf_effective': 'float', 'captured_at_unix': 'float', 'chemicals': 'dict[str, float]', 'consolidation_weight': 'float', 'cortisol_effective': 'float', 'coupling_drift': 'float', 'encoding_weight': 'float', 'format_version': 'int', ...}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'allostatic_load': Field(name='allostatic_load',type='float',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'arousal': Field(name='arousal',type='float',default=0.0,de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'bdnf_effective': Field(name='bdnf_effective',type='float',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'captured_at_unix': Field(name='captured_at_unix',type='float',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'chemicals': Field(name='chemicals',type='dict[str, float]',d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'consolidation_weight': Field(name='consolidation_weight',type='float',d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'cortisol_effective': Field(name='cortisol_effective',type='float',def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'coupling_drift': Field(name='coupling_drift',type='float',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'encoding_weight': Field(name='encoding_weight',type='float',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'format_version': Field(name='format_version',type='int',default=1...appingproxy({}),kw_only=False,_field_type=_FIELD), ...}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('format_version', 'captured_at_unix', 'protocol_version', 'settle_ticks', 'settle_dt', 'chemicals', 'arousal', 'valence', 'global_tone', 'plasticity_gate', 'encoding_weight', 'consolidation_weight', 'retrieval_weight', 'phase', 'phase_name', 'coupling_drift', 'mean_receptor_sensitivity', 'bdnf_effective', 'cortisol_effective', 'surprise_ema', ...)</dl>
+
+<dl><dt><strong>allostatic_load</strong> = 0.0</dl>
+
+<dl><dt><strong>arousal</strong> = 0.0</dl>
+
+<dl><dt><strong>bdnf_effective</strong> = 0.0</dl>
+
+<dl><dt><strong>captured_at_unix</strong> = 0.0</dl>
+
+<dl><dt><strong>consolidation_weight</strong> = 0.0</dl>
+
+<dl><dt><strong>cortisol_effective</strong> = 0.0</dl>
+
+<dl><dt><strong>coupling_drift</strong> = 0.0</dl>
+
+<dl><dt><strong>encoding_weight</strong> = 0.0</dl>
+
+<dl><dt><strong>format_version</strong> = 1</dl>
+
+<dl><dt><strong>free_energy</strong> = 0.0</dl>
+
+<dl><dt><strong>global_tone</strong> = 0.0</dl>
+
+<dl><dt><strong>mean_receptor_sensitivity</strong> = 1.0</dl>
+
+<dl><dt><strong>model_maturity</strong> = 0.0</dl>
+
+<dl><dt><strong>phase</strong> = 0</dl>
+
+<dl><dt><strong>phase_name</strong> = 'unknown'</dl>
+
+<dl><dt><strong>plasticity_gate</strong> = 0.0</dl>
+
+<dl><dt><strong>precision</strong> = 0.0</dl>
+
+<dl><dt><strong>protocol_version</strong> = 3</dl>
+
+<dl><dt><strong>retrieval_weight</strong> = 0.0</dl>
+
+<dl><dt><strong>settle_dt</strong> = 1.0</dl>
+
+<dl><dt><strong>settle_ticks</strong> = 0</dl>
+
+<dl><dt><strong>surprise_ema</strong> = 0.0</dl>
+
+<dl><dt><strong>valence</strong> = 0.0</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-capture_snapshot"><strong>capture_snapshot</strong></a>(client: 'GenesisClient', *, settle_ticks: 'int' = 60, settle_dt: 'float' = 1.0) -&gt; 'Snapshot'</dt><dd><span class="code">Settle&nbsp;the&nbsp;daemon&nbsp;to&nbsp;rest,&nbsp;then&nbsp;capture&nbsp;a&nbsp;<a href="#Snapshot">Snapshot</a>.<br>
+&nbsp;<br>
+Must&nbsp;be&nbsp;called&nbsp;on&nbsp;an&nbsp;isolated&nbsp;daemon&nbsp;(see&nbsp;harness.isolated_daemon)<br>
+so&nbsp;impulses&nbsp;from&nbsp;production&nbsp;activity&nbsp;cannot&nbsp;pollute&nbsp;the&nbsp;capture.</span></dd></dl>
+ <dl><dt><a name="-check_snapshot_vs_defaults"><strong>check_snapshot_vs_defaults</strong></a>(snapshot: 'Snapshot') -&gt; 'DriftReport'</dt><dd><span class="code">Coarse&nbsp;sanity&nbsp;gate:&nbsp;resting&nbsp;levels&nbsp;vs&nbsp;genetic&nbsp;set-points.</span></dd></dl>
+ <dl><dt><a name="-compare_snapshots"><strong>compare_snapshots</strong></a>(baseline: 'Snapshot', current: 'Snapshot') -&gt; 'DriftReport'</dt><dd><span class="code">Compare&nbsp;a&nbsp;fresh&nbsp;snapshot&nbsp;against&nbsp;a&nbsp;stored&nbsp;baseline.</span></dd></dl>
+ <dl><dt><a name="-find_daemon_binary"><strong>find_daemon_binary</strong></a>(project_root: 'str | None' = None) -&gt; 'str | None'</dt><dd><span class="code">Locate&nbsp;the&nbsp;genesis-daemon&nbsp;binary,&nbsp;or&nbsp;None&nbsp;if&nbsp;not&nbsp;built.<br>
+&nbsp;<br>
+Checks&nbsp;``GENESIS_DAEMON``&nbsp;first,&nbsp;then&nbsp;the&nbsp;release/debug&nbsp;build<br>
+outputs&nbsp;relative&nbsp;to&nbsp;the&nbsp;project&nbsp;root.</span></dd></dl>
+ <dl><dt><a name="-isolated_daemon"><strong>isolated_daemon</strong></a>(*, stm_capacity: 'int' = 64, ltm_capacity: 'int' = 256, project_root: 'str | None' = None) -&gt; 'Iterator[GenesisClient]'</dt><dd><span class="code">Spawn&nbsp;a&nbsp;throwaway&nbsp;daemon&nbsp;and&nbsp;yield&nbsp;a&nbsp;connected&nbsp;client.<br>
+&nbsp;<br>
+Uses&nbsp;a&nbsp;fresh&nbsp;temporary&nbsp;data&nbsp;directory.&nbsp;On&nbsp;exit,&nbsp;shuts&nbsp;the&nbsp;daemon<br>
+down&nbsp;via&nbsp;IPC&nbsp;and&nbsp;removes&nbsp;the&nbsp;directory.&nbsp;The&nbsp;force-kill&nbsp;fallback<br>
+applies&nbsp;only&nbsp;to&nbsp;this&nbsp;disposable&nbsp;test&nbsp;daemon&nbsp;—&nbsp;never&nbsp;to&nbsp;a<br>
+production&nbsp;instance&nbsp;carrying&nbsp;developmental&nbsp;state.</span></dd></dl>
+ <dl><dt><a name="-run_chemical_assay"><strong>run_chemical_assay</strong></a>(client: 'GenesisClient', *, impulse: 'float' = 0.3, settle_ticks: 'int' = 60, washout_ticks: 'int' = 20, dt: 'float' = 1.0) -&gt; 'AssayResult'</dt><dd><span class="code">Run&nbsp;the&nbsp;full&nbsp;18-chemical&nbsp;impulse-response&nbsp;assay.<br>
+&nbsp;<br>
+Raises&nbsp;ValueError&nbsp;if&nbsp;any&nbsp;post-impulse&nbsp;state&nbsp;is&nbsp;non-finite&nbsp;(that<br>
+would&nbsp;indicate&nbsp;dynamics&nbsp;corruption,&nbsp;not&nbsp;a&nbsp;chemical&nbsp;effect).</span></dd></dl>
+ <dl><dt><a name="-settle"><strong>settle</strong></a>(client: 'GenesisClient', *, ticks: 'int' = 60, dt: 'float' = 1.0) -&gt; 'None'</dt><dd><span class="code">Advance&nbsp;neurochemistry&nbsp;until&nbsp;transients&nbsp;decay&nbsp;to&nbsp;resting&nbsp;state.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>CIRCADIAN_SENSITIVE</strong> = frozenset({'dopamine', 'histamine', 'melatonin', 'serotonin'})<br>
+<strong>DEFAULT_BASELINES</strong> = {'acetylcholine': 0.35, 'adenosine': 0.2, 'bdnf': 0.45, 'cortisol': 0.0, 'crh': 0.0, 'dopamine': 0.35, 'endocannabinoid': 0.25, 'endorphin': 0.25, 'epinephrine': 0.15, 'gaba': 0.5, ...}<br>
+<strong>__all__</strong> = ['CIRCADIAN_SENSITIVE', 'DEFAULT_BASELINES', 'AssayResult', 'ChemicalEffect', 'DriftEntry', 'DriftReport', 'Snapshot', 'capture_snapshot', 'check_snapshot_vs_defaults', 'compare_snapshots', 'find_daemon_binary', 'isolated_daemon', 'run_chemical_assay', 'settle']</td></tr></table>
+</body></html>

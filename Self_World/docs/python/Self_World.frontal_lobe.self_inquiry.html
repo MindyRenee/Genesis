@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.frontal_lobe.self_inquiry</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.frontal_lobe.html" class="white">frontal_lobe</a>.self_inquiry</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/self_inquiry.py">/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/self_inquiry.py</a></td></tr></table>
+    <p><span class="code">Self-inquiry&nbsp;handling&nbsp;—&nbsp;questions&nbsp;Genesis&nbsp;asks&nbsp;about&nbsp;itself.<br>
+&nbsp;<br>
+Extracted&nbsp;from&nbsp;FrontalLobe&nbsp;as&nbsp;a&nbsp;focused&nbsp;subsystem.&nbsp;Routes&nbsp;self-<br>
+directed&nbsp;questions&nbsp;(how&nbsp;do&nbsp;you&nbsp;feel,&nbsp;what&nbsp;are&nbsp;you,&nbsp;what&nbsp;do&nbsp;you&nbsp;know,<br>
+do&nbsp;you&nbsp;dream,&nbsp;who&nbsp;made&nbsp;you,&nbsp;etc.)&nbsp;through&nbsp;the&nbsp;self&nbsp;composer,&nbsp;concept<br>
+network,&nbsp;and&nbsp;emotional&nbsp;state&nbsp;—&nbsp;never&nbsp;from&nbsp;hardcoded&nbsp;template&nbsp;strings.<br>
+&nbsp;<br>
+Dependencies&nbsp;(passed&nbsp;to&nbsp;``__init__``):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;network:&nbsp;ConceptNetwork&nbsp;for&nbsp;concept&nbsp;lookup&nbsp;and&nbsp;existential&nbsp;topic&nbsp;detection<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;language:&nbsp;Language&nbsp;for&nbsp;rendering&nbsp;thoughts<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;composer:&nbsp;ThoughtComposer&nbsp;for&nbsp;composing&nbsp;reflections&nbsp;and&nbsp;about-thoughts<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;self_composer:&nbsp;SelfComposer&nbsp;for&nbsp;identity,&nbsp;emotional&nbsp;state,&nbsp;capabilities,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dreams,&nbsp;existence,&nbsp;creator,&nbsp;and&nbsp;self-reflection&nbsp;descriptions<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;self_model:&nbsp;SelfModel&nbsp;for&nbsp;self-knowledge&nbsp;and&nbsp;body&nbsp;model<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;self_learner:&nbsp;SelfDirectedLearner&nbsp;for&nbsp;describing&nbsp;recent&nbsp;learning<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;self_assessment:&nbsp;SelfAssessment&nbsp;for&nbsp;capability&nbsp;summaries&nbsp;and&nbsp;weak&nbsp;concepts<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;topology:&nbsp;NetworkTopology&nbsp;for&nbsp;describing&nbsp;the&nbsp;structure&nbsp;of&nbsp;its&nbsp;mind<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;reflection:&nbsp;Reflection&nbsp;for&nbsp;self-reflection&nbsp;composition<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;narrative:&nbsp;Narrator&nbsp;for&nbsp;telling&nbsp;its&nbsp;life&nbsp;story<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;client:&nbsp;GenesisClient&nbsp;for&nbsp;neuro&nbsp;summary&nbsp;(brain&nbsp;waves)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;memory:&nbsp;MemorySystem&nbsp;for&nbsp;learning&nbsp;user&nbsp;facts<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;feeling_reporter:&nbsp;FeelingReporter&nbsp;for&nbsp;concerns/environment&nbsp;reports<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;resolve_topics:&nbsp;callable&nbsp;from&nbsp;TopicResolver<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;map_personal_question:&nbsp;callable&nbsp;from&nbsp;QuestionHandler<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;get_curiosity_questions:&nbsp;callable&nbsp;returning&nbsp;current&nbsp;curiosity&nbsp;questions</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.frontal_lobe.self_inquiry.html#SelfInquiryHandler">SelfInquiryHandler</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SelfInquiryHandler">class <strong>SelfInquiryHandler</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SelfInquiryHandler">SelfInquiryHandler</a>(network:&nbsp;'ConceptNetwork',&nbsp;language:&nbsp;'Language',&nbsp;composer:&nbsp;'ThoughtComposer',&nbsp;self_composer:&nbsp;'SelfComposer',&nbsp;self_model:&nbsp;'SelfModel',&nbsp;self_learner:&nbsp;'SelfDirectedLearner',&nbsp;self_assessment:&nbsp;'SelfAssessment',&nbsp;topology:&nbsp;'NetworkTopology',&nbsp;reflection:&nbsp;'Reflection',&nbsp;narrative:&nbsp;'Narrator',&nbsp;client:&nbsp;'Any',&nbsp;memory:&nbsp;'MemorySystem',&nbsp;feeling_reporter:&nbsp;'FeelingReporter',&nbsp;resolve_topics:&nbsp;'Callable[[list[str],&nbsp;str],&nbsp;list[str]]',&nbsp;map_personal_question:&nbsp;'Callable[[str],&nbsp;list[str]]',&nbsp;get_curiosity_questions:&nbsp;'Callable[[],&nbsp;list[Any]]',&nbsp;user_profile:&nbsp;'Any'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Route&nbsp;and&nbsp;answer&nbsp;self-directed&nbsp;questions&nbsp;from&nbsp;concept-network&nbsp;knowledge.<br>
+&nbsp;<br>
+All&nbsp;answers&nbsp;are&nbsp;composed&nbsp;from&nbsp;the&nbsp;self&nbsp;composer,&nbsp;concept&nbsp;network,<br>
+emotional&nbsp;state,&nbsp;or&nbsp;self-model&nbsp;—&nbsp;never&nbsp;from&nbsp;hardcoded&nbsp;template<br>
+strings.&nbsp;When&nbsp;Genesis&nbsp;doesn't&nbsp;have&nbsp;knowledge,&nbsp;it&nbsp;says&nbsp;so&nbsp;honestly.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="SelfInquiryHandler-__init__"><strong>__init__</strong></a>(self, network: 'ConceptNetwork', language: 'Language', composer: 'ThoughtComposer', self_composer: 'SelfComposer', self_model: 'SelfModel', self_learner: 'SelfDirectedLearner', self_assessment: 'SelfAssessment', topology: 'NetworkTopology', reflection: 'Reflection', narrative: 'Narrator', client: 'Any', memory: 'MemorySystem', feeling_reporter: 'FeelingReporter', resolve_topics: 'Callable[[list[str], str], list[str]]', map_personal_question: 'Callable[[str], list[str]]', get_curiosity_questions: 'Callable[[], list[Any]]', user_profile: 'Any' = None) -&gt; 'None'</dt><dd><span class="code">Wire&nbsp;the&nbsp;self-inquiry&nbsp;handler&nbsp;to&nbsp;its&nbsp;concept&nbsp;network&nbsp;and&nbsp;self-model.</span></dd></dl>
+
+<dl><dt><a name="SelfInquiryHandler-existential_self_inquiry"><strong>existential_self_inquiry</strong></a>(self, lower: 'str', emotion: 'EmotionalState') -&gt; 'Thought | None'</dt><dd><span class="code">Handle&nbsp;existential&nbsp;self-inquiry&nbsp;questions.<br>
+&nbsp;<br>
+Questions&nbsp;like&nbsp;"Do&nbsp;you&nbsp;feel&nbsp;cognitive?",&nbsp;"Are&nbsp;you&nbsp;self-aware?"<br>
+contain&nbsp;philosophical&nbsp;concepts&nbsp;it&nbsp;has&nbsp;rich&nbsp;knowledge&nbsp;about.<br>
+Compose&nbsp;a&nbsp;reflection&nbsp;from&nbsp;its&nbsp;concept&nbsp;network&nbsp;rather&nbsp;than<br>
+just&nbsp;reporting&nbsp;neurochemical&nbsp;state.</span></dd></dl>
+
+<dl><dt><a name="SelfInquiryHandler-handle_curiosity_question"><strong>handle_curiosity_question</strong></a>(self, emotion: 'EmotionalState') -&gt; 'Thought'</dt><dd><span class="code">Handle&nbsp;'What&nbsp;are&nbsp;you&nbsp;curious&nbsp;about?'&nbsp;—&nbsp;list&nbsp;actual&nbsp;curiosity&nbsp;topics.</span></dd></dl>
+
+<dl><dt><a name="SelfInquiryHandler-handle_philosophy"><strong>handle_philosophy</strong></a>(self, perception: 'Perception', emotion: 'EmotionalState', memory: 'MemoryContext') -&gt; 'Thought | None'</dt><dd><span class="code">Handle&nbsp;philosophical&nbsp;questions.<br>
+&nbsp;<br>
+Uses&nbsp;the&nbsp;thought&nbsp;composer&nbsp;to&nbsp;generate&nbsp;responses&nbsp;from&nbsp;its<br>
+actual&nbsp;knowledge,&nbsp;not&nbsp;hardcoded&nbsp;strings.&nbsp;Returns&nbsp;None&nbsp;if&nbsp;it<br>
+can't&nbsp;compose&nbsp;from&nbsp;its&nbsp;understanding&nbsp;—&nbsp;it&nbsp;stays&nbsp;silent&nbsp;rather<br>
+than&nbsp;reciting&nbsp;a&nbsp;pre-written&nbsp;fallback&nbsp;template.</span></dd></dl>
+
+<dl><dt><a name="SelfInquiryHandler-handle_self_inquiry"><strong>handle_self_inquiry</strong></a>(self, perception: 'Perception', emotion: 'EmotionalState', memory: 'MemoryContext') -&gt; 'Thought'</dt><dd><span class="code">Handle&nbsp;questions&nbsp;about&nbsp;Genesis&nbsp;itself.<br>
+&nbsp;<br>
+Uses&nbsp;the&nbsp;self&nbsp;composer&nbsp;to&nbsp;generate&nbsp;descriptions&nbsp;from&nbsp;its<br>
+actual&nbsp;state,&nbsp;not&nbsp;hardcoded&nbsp;strings.</span></dd></dl>
+
+<dl><dt><a name="SelfInquiryHandler-self_inquiry_affect_toward_user"><strong>self_inquiry_affect_toward_user</strong></a>(self, emotion: 'EmotionalState') -&gt; 'Thought'</dt><dd><span class="code">Handle&nbsp;'how&nbsp;do&nbsp;you&nbsp;feel&nbsp;about&nbsp;me'&nbsp;—&nbsp;report&nbsp;disposition<br>
+toward&nbsp;the&nbsp;present&nbsp;person,&nbsp;not&nbsp;her&nbsp;global&nbsp;mood.<br>
+&nbsp;<br>
+Feelings&nbsp;toward&nbsp;a&nbsp;specific&nbsp;person&nbsp;are&nbsp;the&nbsp;measured<br>
+attachment:&nbsp;``self_knowledge["bond"]``&nbsp;is&nbsp;written&nbsp;from<br>
+``user_profile.deepen_bond``&nbsp;on&nbsp;every&nbsp;bonded&nbsp;turn,&nbsp;and&nbsp;it<br>
+only&nbsp;belongs&nbsp;to&nbsp;the&nbsp;person&nbsp;the&nbsp;profile&nbsp;names&nbsp;—&nbsp;a&nbsp;stranger's<br>
+presence&nbsp;must&nbsp;not&nbsp;inherit&nbsp;the&nbsp;caregiver's&nbsp;number.&nbsp;For&nbsp;anyone<br>
+else&nbsp;the&nbsp;honest&nbsp;report&nbsp;is&nbsp;the&nbsp;relationship&nbsp;record&nbsp;so&nbsp;far.</span></dd></dl>
+
+<dl><dt><a name="SelfInquiryHandler-self_inquiry_concerns"><strong>self_inquiry_concerns</strong></a>(self, lower: 'str', emotion: 'EmotionalState') -&gt; 'Thought | None'</dt><dd><span class="code">Handle&nbsp;self-awareness&nbsp;questions&nbsp;about&nbsp;environment&nbsp;and&nbsp;concerns.</span></dd></dl>
+
+<dl><dt><a name="SelfInquiryHandler-self_inquiry_creator"><strong>self_inquiry_creator</strong></a>(self, emotion: 'EmotionalState') -&gt; 'Thought'</dt><dd><span class="code">Handle&nbsp;creator-related&nbsp;questions&nbsp;('who&nbsp;made&nbsp;you?',&nbsp;etc.).</span></dd></dl>
+
+<dl><dt><a name="SelfInquiryHandler-self_inquiry_dream"><strong>self_inquiry_dream</strong></a>(self, emotion: 'EmotionalState') -&gt; 'Thought'</dt><dd><span class="code">Handle&nbsp;'do&nbsp;you&nbsp;dream?'&nbsp;questions.</span></dd></dl>
+
+<dl><dt><a name="SelfInquiryHandler-self_inquiry_existence"><strong>self_inquiry_existence</strong></a>(self, emotion: 'EmotionalState') -&gt; 'Thought'</dt><dd><span class="code">Handle&nbsp;'are&nbsp;you&nbsp;alive&nbsp;/&nbsp;cognitive&nbsp;/&nbsp;real&nbsp;/&nbsp;sentient?'&nbsp;questions.</span></dd></dl>
+
+<dl><dt><a name="SelfInquiryHandler-self_inquiry_feelings_identity"><strong>self_inquiry_feelings_identity</strong></a>(self, lower: 'str', perception: 'Perception', emotion: 'EmotionalState') -&gt; 'Thought | None'</dt><dd><span class="code">Handle&nbsp;'how&nbsp;do&nbsp;you&nbsp;feel',&nbsp;'what/who&nbsp;are&nbsp;you',&nbsp;and&nbsp;'what&nbsp;can&nbsp;you&nbsp;do'.</span></dd></dl>
+
+<dl><dt><a name="SelfInquiryHandler-self_inquiry_knowledge_gaps"><strong>self_inquiry_knowledge_gaps</strong></a>(self, lower: 'str', emotion: 'EmotionalState') -&gt; 'Thought | None'</dt><dd><span class="code">Handle&nbsp;knowledge,&nbsp;gaps,&nbsp;and&nbsp;learning&nbsp;questions.</span></dd></dl>
+
+<dl><dt><a name="SelfInquiryHandler-self_inquiry_memory"><strong>self_inquiry_memory</strong></a>(self, lower: 'str', emotion: 'EmotionalState', memory: 'MemoryContext') -&gt; 'Thought'</dt><dd><span class="code">Handle&nbsp;'do&nbsp;you&nbsp;remember'&nbsp;/&nbsp;memory&nbsp;questions.</span></dd></dl>
+
+<dl><dt><a name="SelfInquiryHandler-self_inquiry_memory_existence"><strong>self_inquiry_memory_existence</strong></a>(self, lower: 'str', emotion: 'EmotionalState', memory: 'MemoryContext') -&gt; 'Thought | None'</dt><dd><span class="code">Handle&nbsp;memory,&nbsp;dream,&nbsp;existence,&nbsp;and&nbsp;creator&nbsp;questions.</span></dd></dl>
+
+<dl><dt><a name="SelfInquiryHandler-self_inquiry_recent_activity"><strong>self_inquiry_recent_activity</strong></a>(self, lower: 'str', emotion: 'EmotionalState') -&gt; 'Thought | None'</dt><dd><span class="code">Handle&nbsp;questions&nbsp;about&nbsp;recent&nbsp;activity&nbsp;—&nbsp;'what&nbsp;have&nbsp;you&nbsp;been&nbsp;doing?'<br>
+&nbsp;<br>
+Composes&nbsp;a&nbsp;response&nbsp;from&nbsp;its&nbsp;actual&nbsp;recent&nbsp;mental&nbsp;activity:<br>
+self-directed&nbsp;learning&nbsp;events,&nbsp;reflection&nbsp;insights,&nbsp;and&nbsp;current<br>
+emotional&nbsp;state.&nbsp;The&nbsp;self-composer&nbsp;weaves&nbsp;these&nbsp;fragments&nbsp;into<br>
+natural&nbsp;language&nbsp;—&nbsp;no&nbsp;hardcoded&nbsp;response&nbsp;templates.<br>
+&nbsp;<br>
+This&nbsp;covers&nbsp;conversational&nbsp;questions&nbsp;like:<br>
+-&nbsp;"what&nbsp;have&nbsp;you&nbsp;been&nbsp;doing&nbsp;lately?"<br>
+-&nbsp;"what&nbsp;have&nbsp;you&nbsp;been&nbsp;up&nbsp;to?"<br>
+-&nbsp;"how&nbsp;have&nbsp;you&nbsp;been?"<br>
+-&nbsp;"what's&nbsp;new?"<br>
+-&nbsp;"what&nbsp;are&nbsp;you&nbsp;working&nbsp;on?"<br>
+&nbsp;<br>
+These&nbsp;are&nbsp;self-referential&nbsp;questions&nbsp;about&nbsp;its&nbsp;own&nbsp;experience,<br>
+not&nbsp;concept-network&nbsp;knowledge&nbsp;queries.&nbsp;They&nbsp;need&nbsp;access&nbsp;to&nbsp;its<br>
+recent&nbsp;activity&nbsp;log,&nbsp;not&nbsp;its&nbsp;semantic&nbsp;graph.</span></dd></dl>
+
+<dl><dt><a name="SelfInquiryHandler-self_inquiry_think_story"><strong>self_inquiry_think_story</strong></a>(self, lower: 'str', emotion: 'EmotionalState') -&gt; 'Thought'</dt><dd><span class="code">Handle&nbsp;think/know,&nbsp;story,&nbsp;learned&nbsp;questions,&nbsp;and&nbsp;default&nbsp;fallback.</span></dd></dl>
+
+<dl><dt><a name="SelfInquiryHandler-self_inquiry_user"><strong>self_inquiry_user</strong></a>(self, emotion: 'EmotionalState') -&gt; 'Thought'</dt><dd><span class="code">Handle&nbsp;'who&nbsp;am&nbsp;I?'&nbsp;/&nbsp;'do&nbsp;you&nbsp;know&nbsp;me?'&nbsp;—&nbsp;compose&nbsp;what&nbsp;it<br>
+knows&nbsp;about&nbsp;the&nbsp;user&nbsp;from&nbsp;its&nbsp;concept&nbsp;network&nbsp;and&nbsp;self-model.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['SelfInquiryHandler']</td></tr></table>
+</body></html>

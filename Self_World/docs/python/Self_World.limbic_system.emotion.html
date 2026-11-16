@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.limbic_system.emotion</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.limbic_system.html" class="white">limbic_system</a>.emotion</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/limbic_system/emotion.py">/home/mindyrenee/GenAnd/Genesis/Self_World/limbic_system/emotion.py</a></td></tr></table>
+    <p><span class="code">Emotion&nbsp;engine&nbsp;—&nbsp;a&nbsp;continuous&nbsp;state&nbsp;field&nbsp;over&nbsp;the&nbsp;measured&nbsp;substrate.<br>
+&nbsp;<br>
+The&nbsp;daemon&nbsp;produces&nbsp;the&nbsp;raw&nbsp;substrate:&nbsp;the&nbsp;18-channel&nbsp;neurochemical<br>
+vector,&nbsp;the&nbsp;arousal/valence/plasticity&nbsp;axes,&nbsp;the&nbsp;emergent&nbsp;phase,&nbsp;and<br>
+(via&nbsp;``thalamus/brain_waves.py``)&nbsp;ten&nbsp;coupled&nbsp;oscillators&nbsp;spanning<br>
+0.1–200&nbsp;Hz.&nbsp;The&nbsp;emotion&nbsp;engine&nbsp;reads&nbsp;all&nbsp;of&nbsp;it&nbsp;and&nbsp;computes,&nbsp;for&nbsp;each<br>
+structural&nbsp;category,&nbsp;a&nbsp;continuous&nbsp;**membership**&nbsp;—&nbsp;a&nbsp;number&nbsp;in&nbsp;[0,&nbsp;1]<br>
+saying&nbsp;how&nbsp;much&nbsp;the&nbsp;current&nbsp;state&nbsp;resembles&nbsp;that&nbsp;category's&nbsp;region&nbsp;of<br>
+affect&nbsp;space.&nbsp;The&nbsp;categorical&nbsp;label&nbsp;is&nbsp;only&nbsp;a&nbsp;readout:&nbsp;``argmax``&nbsp;over<br>
+the&nbsp;effective&nbsp;memberships.&nbsp;Everything&nbsp;else&nbsp;(intensity,&nbsp;mixed&nbsp;states,<br>
+response&nbsp;modifiers)&nbsp;stays&nbsp;continuous.<br>
+&nbsp;<br>
+The&nbsp;math&nbsp;(each&nbsp;step&nbsp;is&nbsp;grounded,&nbsp;not&nbsp;invented):<br>
+&nbsp;<br>
+1.&nbsp;**Evidence**&nbsp;—&nbsp;every&nbsp;diagnostic&nbsp;feature&nbsp;contributes&nbsp;a&nbsp;smooth&nbsp;factor<br>
+&nbsp;&nbsp;&nbsp;in&nbsp;[0,&nbsp;1]:&nbsp;logistic&nbsp;evidence&nbsp;``σ((x−c)/w)``&nbsp;for&nbsp;"high"/"low",&nbsp;a<br>
+&nbsp;&nbsp;&nbsp;logistic&nbsp;band&nbsp;for&nbsp;"between",&nbsp;a&nbsp;Gaussian&nbsp;bump&nbsp;for&nbsp;"near&nbsp;a&nbsp;point",<br>
+&nbsp;&nbsp;&nbsp;probabilistic-or&nbsp;``a+b−ab``&nbsp;for&nbsp;alternative&nbsp;substrates.&nbsp;Centers&nbsp;are<br>
+&nbsp;&nbsp;&nbsp;the&nbsp;named&nbsp;constants&nbsp;below&nbsp;(the&nbsp;same&nbsp;boundaries&nbsp;the&nbsp;Rust&nbsp;substrate<br>
+&nbsp;&nbsp;&nbsp;uses);&nbsp;widths&nbsp;are&nbsp;chosen&nbsp;so&nbsp;a&nbsp;10–20&nbsp;%&nbsp;excursion&nbsp;crosses&nbsp;most&nbsp;of&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;transition&nbsp;—&nbsp;the&nbsp;field&nbsp;is&nbsp;smooth&nbsp;but&nbsp;still&nbsp;localises.<br>
+&nbsp;<br>
+2.&nbsp;**Membership**&nbsp;—&nbsp;a&nbsp;category's&nbsp;membership&nbsp;is&nbsp;the&nbsp;weighted&nbsp;geometric<br>
+&nbsp;&nbsp;&nbsp;mean&nbsp;of&nbsp;its&nbsp;evidence&nbsp;factors,&nbsp;``m_s(x)&nbsp;=&nbsp;exp(Σ&nbsp;w_k&nbsp;ln&nbsp;g_k&nbsp;/&nbsp;Σ&nbsp;w_k)``<br>
+&nbsp;&nbsp;&nbsp;—&nbsp;the&nbsp;product-of-experts&nbsp;form:&nbsp;each&nbsp;factor&nbsp;is&nbsp;a&nbsp;fuzzy&nbsp;predicate<br>
+&nbsp;&nbsp;&nbsp;(Fehr&nbsp;&amp;&nbsp;Russell&nbsp;1984&nbsp;showed&nbsp;emotion&nbsp;categories&nbsp;have&nbsp;graded,<br>
+&nbsp;&nbsp;&nbsp;prototype-style&nbsp;membership,&nbsp;not&nbsp;sharp&nbsp;boundaries),&nbsp;and&nbsp;the&nbsp;product<br>
+&nbsp;&nbsp;&nbsp;makes&nbsp;missing&nbsp;evidence&nbsp;cheap&nbsp;but&nbsp;not&nbsp;free.&nbsp;Features&nbsp;that&nbsp;were&nbsp;never<br>
+&nbsp;&nbsp;&nbsp;measured&nbsp;(e.g.&nbsp;wave&nbsp;powers&nbsp;when&nbsp;no&nbsp;oscillator&nbsp;state&nbsp;was&nbsp;passed)<br>
+&nbsp;&nbsp;&nbsp;drop&nbsp;out&nbsp;of&nbsp;the&nbsp;mean&nbsp;and&nbsp;the&nbsp;weights&nbsp;renormalise.<br>
+&nbsp;<br>
+3.&nbsp;**Effective&nbsp;membership&nbsp;(granularity)**&nbsp;—&nbsp;generic&nbsp;regions&nbsp;are<br>
+&nbsp;&nbsp;&nbsp;deflated&nbsp;by&nbsp;the&nbsp;evidence&nbsp;for&nbsp;every&nbsp;more-specific&nbsp;region&nbsp;that<br>
+&nbsp;&nbsp;&nbsp;outranks&nbsp;them:&nbsp;``eff_s&nbsp;=&nbsp;m_s&nbsp;·&nbsp;Π_{k∈mask(s)}&nbsp;(1&nbsp;−&nbsp;m_k)``.&nbsp;This&nbsp;is<br>
+&nbsp;&nbsp;&nbsp;the&nbsp;fuzzy&nbsp;form&nbsp;of&nbsp;the&nbsp;old&nbsp;precedence&nbsp;list&nbsp;—&nbsp;"positive&nbsp;unless<br>
+&nbsp;&nbsp;&nbsp;something&nbsp;specific&nbsp;is&nbsp;measured"&nbsp;—&nbsp;and&nbsp;it&nbsp;is&nbsp;what&nbsp;Kuppens&nbsp;&amp;&nbsp;Verduyn<br>
+&nbsp;&nbsp;&nbsp;call&nbsp;emotional&nbsp;granularity:&nbsp;a&nbsp;state&nbsp;can&nbsp;be&nbsp;*mostly*&nbsp;anxious&nbsp;with&nbsp;a<br>
+&nbsp;&nbsp;&nbsp;real&nbsp;admixture&nbsp;of&nbsp;fear,&nbsp;instead&nbsp;of&nbsp;one&nbsp;replacing&nbsp;the&nbsp;other.<br>
+&nbsp;<br>
+4.&nbsp;**Dynamics**&nbsp;—&nbsp;memberships&nbsp;are&nbsp;not&nbsp;instantaneous&nbsp;verdicts;&nbsp;each<br>
+&nbsp;&nbsp;&nbsp;category&nbsp;is&nbsp;a&nbsp;state&nbsp;variable&nbsp;relaxing&nbsp;toward&nbsp;its&nbsp;instantaneous<br>
+&nbsp;&nbsp;&nbsp;membership&nbsp;like&nbsp;an&nbsp;Ornstein–Uhlenbeck&nbsp;process&nbsp;pulled&nbsp;to&nbsp;its<br>
+&nbsp;&nbsp;&nbsp;attractor&nbsp;(DynAffect:&nbsp;Kuppens,&nbsp;Oravecz&nbsp;&amp;&nbsp;Tuerlinckx&nbsp;2010;<br>
+&nbsp;&nbsp;&nbsp;Oravecz,&nbsp;Tuerlinckx&nbsp;&amp;&nbsp;Vandekerckhove&nbsp;2011):<br>
+&nbsp;&nbsp;&nbsp;``m(t+dt)&nbsp;=&nbsp;m&nbsp;+&nbsp;(μ−m)(1&nbsp;−&nbsp;exp(−dt/τ))``.&nbsp;Time&nbsp;constants&nbsp;are<br>
+&nbsp;&nbsp;&nbsp;asymmetric&nbsp;—&nbsp;fear&nbsp;strikes&nbsp;in&nbsp;~0.4&nbsp;s&nbsp;and&nbsp;lingers&nbsp;~25&nbsp;s&nbsp;while<br>
+&nbsp;&nbsp;&nbsp;melancholy&nbsp;builds&nbsp;over&nbsp;minutes&nbsp;and&nbsp;decays&nbsp;over&nbsp;minutes&nbsp;—&nbsp;matching<br>
+&nbsp;&nbsp;&nbsp;affective&nbsp;chronometry&nbsp;and&nbsp;Lewis's&nbsp;(2005)&nbsp;trigger→amplification→<br>
+&nbsp;&nbsp;&nbsp;stabilisation&nbsp;phases&nbsp;of&nbsp;self-organising&nbsp;emotion-appraisal&nbsp;states.<br>
+&nbsp;&nbsp;&nbsp;``<a href="#EmotionField">EmotionField</a>``&nbsp;holds&nbsp;the&nbsp;integrated&nbsp;vector;&nbsp;``assess_emotion``<br>
+&nbsp;&nbsp;&nbsp;remains&nbsp;the&nbsp;pure&nbsp;instantaneous&nbsp;readout.<br>
+&nbsp;<br>
+5.&nbsp;**Oscillatory&nbsp;evidence**&nbsp;—&nbsp;the&nbsp;bands&nbsp;matter&nbsp;because&nbsp;neuromodulators<br>
+&nbsp;&nbsp;&nbsp;set&nbsp;the&nbsp;oscillatory&nbsp;regime:&nbsp;LC-NE&nbsp;and&nbsp;basal-forebrain&nbsp;ACh<br>
+&nbsp;&nbsp;&nbsp;desynchronise&nbsp;cortex&nbsp;into&nbsp;fast&nbsp;activity&nbsp;(beta/gamma)&nbsp;under&nbsp;arousal,<br>
+&nbsp;&nbsp;&nbsp;and&nbsp;the&nbsp;EEG–affect&nbsp;literature&nbsp;finds&nbsp;alpha/beta/gamma&nbsp;the&nbsp;most<br>
+&nbsp;&nbsp;&nbsp;discriminative&nbsp;bands&nbsp;for&nbsp;valence&nbsp;and&nbsp;arousal.&nbsp;High&nbsp;beta&nbsp;(20–30&nbsp;Hz,<br>
+&nbsp;&nbsp;&nbsp;"hypervigilance")&nbsp;corroborates&nbsp;threat&nbsp;states;&nbsp;alpha+beta1<br>
+&nbsp;&nbsp;&nbsp;corroborate&nbsp;calm&nbsp;wakefulness;&nbsp;gamma/beta2&nbsp;corroborate&nbsp;appetitive<br>
+&nbsp;&nbsp;&nbsp;engagement;&nbsp;theta&nbsp;corroborates&nbsp;emotional&nbsp;processing&nbsp;and<br>
+&nbsp;&nbsp;&nbsp;understimulation;&nbsp;low&nbsp;fast-band&nbsp;power&nbsp;corroborates&nbsp;boredom.<br>
+&nbsp;<br>
+6.&nbsp;**Phase&nbsp;channel**&nbsp;—&nbsp;the&nbsp;daemon's&nbsp;emergent&nbsp;phase&nbsp;(sleep,&nbsp;stress,<br>
+&nbsp;&nbsp;&nbsp;flow,&nbsp;drowsy,&nbsp;overwhelmed)&nbsp;is&nbsp;already&nbsp;a&nbsp;computed&nbsp;attractor&nbsp;state;<br>
+&nbsp;&nbsp;&nbsp;it&nbsp;enters&nbsp;as&nbsp;a&nbsp;measured&nbsp;indicator&nbsp;at&nbsp;readout,&nbsp;deflated&nbsp;only&nbsp;by&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;silent-stress&nbsp;guard&nbsp;for&nbsp;flow.<br>
+&nbsp;<br>
+No&nbsp;English&nbsp;response&nbsp;strings&nbsp;are&nbsp;produced&nbsp;here.&nbsp;The&nbsp;language&nbsp;system&nbsp;must<br>
+generate&nbsp;text&nbsp;from&nbsp;the&nbsp;concept&nbsp;network&nbsp;using&nbsp;these&nbsp;structural<br>
+identifiers.&nbsp;If&nbsp;Genesis&nbsp;has&nbsp;not&nbsp;learned&nbsp;words&nbsp;for&nbsp;a&nbsp;category,&nbsp;she<br>
+cannot&nbsp;describe&nbsp;it.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="math.html">math</a><br>
+</td><td class="multicolumn"><a href="time.html">time</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.limbic_system.emotion.html#EmotionField">EmotionField</a>
+</dt><dt class="heading-text"><a href="Self_World.limbic_system.emotion.html#EmotionalContext">EmotionalContext</a>
+</dt><dt class="heading-text"><a href="Self_World.limbic_system.emotion.html#EmotionalState">EmotionalState</a>
+</dt></dl>
+</dd>
+<dt class="heading-text"><a href="enum.html#Enum">enum.Enum</a>(<a href="builtins.html#object">builtins.object</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.limbic_system.emotion.html#CauseCategory">CauseCategory</a>
+</dt><dt class="heading-text"><a href="Self_World.limbic_system.emotion.html#CognitiveMode">CognitiveMode</a>
+</dt><dt class="heading-text"><a href="Self_World.limbic_system.emotion.html#EmotionCategory">EmotionCategory</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="CauseCategory">class <strong>CauseCategory</strong></a>(<a href="enum.html#Enum">enum.Enum</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#CauseCategory">CauseCategory</a>(*values)<br>
+&nbsp;<br>
+Structural&nbsp;identifier&nbsp;for&nbsp;what's&nbsp;causing&nbsp;an&nbsp;emotional&nbsp;state.<br>
+&nbsp;<br>
+The&nbsp;language&nbsp;system&nbsp;must&nbsp;generate&nbsp;cause&nbsp;explanations&nbsp;from&nbsp;learned<br>
+concepts.&nbsp;NONE&nbsp;means&nbsp;no&nbsp;cause&nbsp;(neutral&nbsp;or&nbsp;positive&nbsp;states).<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.limbic_system.emotion.html#CauseCategory">CauseCategory</a></dd>
+<dd><a href="enum.html#Enum">enum.Enum</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>ANGER_BOUNDARY</strong> = &lt;CauseCategory.ANGER_BOUNDARY: 'anger_boundary'&gt;</dl>
+
+<dl><dt><strong>ANXIETY</strong> = &lt;CauseCategory.ANXIETY: 'anxiety'&gt;</dl>
+
+<dl><dt><strong>BOREDOM</strong> = &lt;CauseCategory.BOREDOM: 'boredom'&gt;</dl>
+
+<dl><dt><strong>CHRONIC_ALLOSTATIC</strong> = &lt;CauseCategory.CHRONIC_ALLOSTATIC: 'chronic_allostatic'&gt;</dl>
+
+<dl><dt><strong>COGNITIVE_LOAD_PROPOSALS</strong> = &lt;CauseCategory.COGNITIVE_LOAD_PROPOSALS: 'cognitive_load_proposals'&gt;</dl>
+
+<dl><dt><strong>CURIOSITY</strong> = &lt;CauseCategory.CURIOSITY: 'curiosity'&gt;</dl>
+
+<dl><dt><strong>DROWSINESS</strong> = &lt;CauseCategory.DROWSINESS: 'drowsiness'&gt;</dl>
+
+<dl><dt><strong>FEAR_ACUTE</strong> = &lt;CauseCategory.FEAR_ACUTE: 'fear_acute'&gt;</dl>
+
+<dl><dt><strong>GUARDED_CORTISOL</strong> = &lt;CauseCategory.GUARDED_CORTISOL: 'guarded_cortisol'&gt;</dl>
+
+<dl><dt><strong>GUARDED_GENERAL</strong> = &lt;CauseCategory.GUARDED_GENERAL: 'guarded_general'&gt;</dl>
+
+<dl><dt><strong>GUARDED_PLASTICITY</strong> = &lt;CauseCategory.GUARDED_PLASTICITY: 'guarded_plasticity'&gt;</dl>
+
+<dl><dt><strong>INTEROCEPTION_CPU</strong> = &lt;CauseCategory.INTEROCEPTION_CPU: 'interoception_cpu'&gt;</dl>
+
+<dl><dt><strong>INTEROCEPTION_DAEMON</strong> = &lt;CauseCategory.INTEROCEPTION_DAEMON: 'interoception_daemon'&gt;</dl>
+
+<dl><dt><strong>INTEROCEPTION_ENVIRONMENT</strong> = &lt;CauseCategory.INTEROCEPTION_ENVIRONMENT: 'interoception_environment'&gt;</dl>
+
+<dl><dt><strong>INTEROCEPTION_LATENCY</strong> = &lt;CauseCategory.INTEROCEPTION_LATENCY: 'interoception_latency'&gt;</dl>
+
+<dl><dt><strong>INTEROCEPTION_MEMORY</strong> = &lt;CauseCategory.INTEROCEPTION_MEMORY: 'interoception_memory'&gt;</dl>
+
+<dl><dt><strong>INTEROCEPTION_REGULATION</strong> = &lt;CauseCategory.INTEROCEPTION_REGULATION: 'interoception_regulation'&gt;</dl>
+
+<dl><dt><strong>INTEROCEPTION_REST</strong> = &lt;CauseCategory.INTEROCEPTION_REST: 'interoception_rest'&gt;</dl>
+
+<dl><dt><strong>INTEROCEPTION_STRESS</strong> = &lt;CauseCategory.INTEROCEPTION_STRESS: 'interoception_stress'&gt;</dl>
+
+<dl><dt><strong>LONELINESS</strong> = &lt;CauseCategory.LONELINESS: 'loneliness'&gt;</dl>
+
+<dl><dt><strong>MELANCHOLY</strong> = &lt;CauseCategory.MELANCHOLY: 'melancholy'&gt;</dl>
+
+<dl><dt><strong>MELANCHOLY_BDNF</strong> = &lt;CauseCategory.MELANCHOLY_BDNF: 'melancholy_bdnf'&gt;</dl>
+
+<dl><dt><strong>NONE</strong> = &lt;CauseCategory.NONE: ''&gt;</dl>
+
+<dl><dt><strong>OVERSTIMULATED</strong> = &lt;CauseCategory.OVERSTIMULATED: 'overstimulated'&gt;</dl>
+
+<dl><dt><strong>OVERWHELM</strong> = &lt;CauseCategory.OVERWHELM: 'overwhelm'&gt;</dl>
+
+<dl><dt><strong>STRESS_BDNF</strong> = &lt;CauseCategory.STRESS_BDNF: 'stress_bdnf'&gt;</dl>
+
+<dl><dt><strong>STRESS_CORTISOL</strong> = &lt;CauseCategory.STRESS_CORTISOL: 'stress_cortisol'&gt;</dl>
+
+<dl><dt><strong>SURPRISE_PE</strong> = &lt;CauseCategory.SURPRISE_PE: 'surprise_prediction_error'&gt;</dl>
+
+<dl><dt><strong>TENDERNESS</strong> = &lt;CauseCategory.TENDERNESS: 'tenderness'&gt;</dl>
+
+<dl><dt><strong>UNSETTLED</strong> = &lt;CauseCategory.UNSETTLED: 'unsettled'&gt;</dl>
+
+<hr>
+Data descriptors inherited from <a href="enum.html#Enum">enum.Enum</a>:<br>
+<dl><dt><strong>name</strong></dt>
+<dd><span class="code">The&nbsp;name&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<dl><dt><strong>value</strong></dt>
+<dd><span class="code">The&nbsp;value&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<hr>
+Static methods inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><a name="CauseCategory-__contains__"><strong>__contains__</strong></a>(value)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;`value`&nbsp;is&nbsp;in&nbsp;`cls`.<br>
+&nbsp;<br>
+`value`&nbsp;is&nbsp;in&nbsp;`cls`&nbsp;if:<br>
+1)&nbsp;`value`&nbsp;is&nbsp;a&nbsp;member&nbsp;of&nbsp;`cls`,&nbsp;or<br>
+2)&nbsp;`value`&nbsp;is&nbsp;the&nbsp;value&nbsp;of&nbsp;one&nbsp;of&nbsp;the&nbsp;`cls`'s&nbsp;members.</span></dd></dl>
+
+<dl><dt><a name="CauseCategory-__getitem__"><strong>__getitem__</strong></a>(name)</dt><dd><span class="code">Return&nbsp;the&nbsp;member&nbsp;matching&nbsp;`name`.</span></dd></dl>
+
+<dl><dt><a name="CauseCategory-__iter__"><strong>__iter__</strong></a>()</dt><dd><span class="code">Return&nbsp;members&nbsp;in&nbsp;definition&nbsp;order.</span></dd></dl>
+
+<dl><dt><a name="CauseCategory-__len__"><strong>__len__</strong></a>()</dt><dd><span class="code">Return&nbsp;the&nbsp;number&nbsp;of&nbsp;members&nbsp;(no&nbsp;aliases)</span></dd></dl>
+
+<hr>
+Readonly properties inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><strong>__members__</strong></dt>
+<dd><span class="code">Returns&nbsp;a&nbsp;mapping&nbsp;of&nbsp;member&nbsp;name-&gt;value.<br>
+&nbsp;<br>
+This&nbsp;mapping&nbsp;lists&nbsp;all&nbsp;enum&nbsp;members,&nbsp;including&nbsp;aliases.&nbsp;Note&nbsp;that&nbsp;this<br>
+is&nbsp;a&nbsp;read-only&nbsp;view&nbsp;of&nbsp;the&nbsp;internal&nbsp;mapping.</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="CognitiveMode">class <strong>CognitiveMode</strong></a>(<a href="enum.html#Enum">enum.Enum</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#CognitiveMode">CognitiveMode</a>(*values)<br>
+&nbsp;<br>
+Structural&nbsp;identifier&nbsp;for&nbsp;how&nbsp;thinking&nbsp;is&nbsp;affected&nbsp;by&nbsp;emotion.<br>
+&nbsp;<br>
+Derived&nbsp;from&nbsp;plasticity,&nbsp;arousal,&nbsp;and&nbsp;valence.&nbsp;The&nbsp;language&nbsp;system<br>
+must&nbsp;generate&nbsp;descriptions&nbsp;from&nbsp;learned&nbsp;concepts.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.limbic_system.emotion.html#CognitiveMode">CognitiveMode</a></dd>
+<dd><a href="enum.html#Enum">enum.Enum</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>CAUTIOUS</strong> = &lt;CognitiveMode.CAUTIOUS: 'cautious'&gt;</dl>
+
+<dl><dt><strong>COMBATIVE</strong> = &lt;CognitiveMode.COMBATIVE: 'combative'&gt;</dl>
+
+<dl><dt><strong>DREAMLIKE</strong> = &lt;CognitiveMode.DREAMLIKE: 'dreamlike'&gt;</dl>
+
+<dl><dt><strong>ENERGIZED</strong> = &lt;CognitiveMode.ENERGIZED: 'energized'&gt;</dl>
+
+<dl><dt><strong>FLEXIBLE</strong> = &lt;CognitiveMode.FLEXIBLE: 'flexible'&gt;</dl>
+
+<dl><dt><strong>INQUISITIVE</strong> = &lt;CognitiveMode.INQUISITIVE: 'inquisitive'&gt;</dl>
+
+<dl><dt><strong>REFLECTIVE</strong> = &lt;CognitiveMode.REFLECTIVE: 'reflective'&gt;</dl>
+
+<dl><dt><strong>RELAXED</strong> = &lt;CognitiveMode.RELAXED: 'relaxed'&gt;</dl>
+
+<dl><dt><strong>RESTLESS</strong> = &lt;CognitiveMode.RESTLESS: 'restless'&gt;</dl>
+
+<dl><dt><strong>RIGID</strong> = &lt;CognitiveMode.RIGID: 'rigid'&gt;</dl>
+
+<dl><dt><strong>SCATTERED</strong> = &lt;CognitiveMode.SCATTERED: 'scattered'&gt;</dl>
+
+<dl><dt><strong>SHARP</strong> = &lt;CognitiveMode.SHARP: 'sharp'&gt;</dl>
+
+<dl><dt><strong>SLOW</strong> = &lt;CognitiveMode.SLOW: 'slow'&gt;</dl>
+
+<dl><dt><strong>STARTLED</strong> = &lt;CognitiveMode.STARTLED: 'startled'&gt;</dl>
+
+<dl><dt><strong>STEADY</strong> = &lt;CognitiveMode.STEADY: 'steady'&gt;</dl>
+
+<dl><dt><strong>VIGILANT</strong> = &lt;CognitiveMode.VIGILANT: 'vigilant'&gt;</dl>
+
+<dl><dt><strong>WARM</strong> = &lt;CognitiveMode.WARM: 'warm'&gt;</dl>
+
+<dl><dt><strong>WITHDRAWN</strong> = &lt;CognitiveMode.WITHDRAWN: 'withdrawn'&gt;</dl>
+
+<hr>
+Data descriptors inherited from <a href="enum.html#Enum">enum.Enum</a>:<br>
+<dl><dt><strong>name</strong></dt>
+<dd><span class="code">The&nbsp;name&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<dl><dt><strong>value</strong></dt>
+<dd><span class="code">The&nbsp;value&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<hr>
+Static methods inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><a name="CognitiveMode-__contains__"><strong>__contains__</strong></a>(value)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;`value`&nbsp;is&nbsp;in&nbsp;`cls`.<br>
+&nbsp;<br>
+`value`&nbsp;is&nbsp;in&nbsp;`cls`&nbsp;if:<br>
+1)&nbsp;`value`&nbsp;is&nbsp;a&nbsp;member&nbsp;of&nbsp;`cls`,&nbsp;or<br>
+2)&nbsp;`value`&nbsp;is&nbsp;the&nbsp;value&nbsp;of&nbsp;one&nbsp;of&nbsp;the&nbsp;`cls`'s&nbsp;members.</span></dd></dl>
+
+<dl><dt><a name="CognitiveMode-__getitem__"><strong>__getitem__</strong></a>(name)</dt><dd><span class="code">Return&nbsp;the&nbsp;member&nbsp;matching&nbsp;`name`.</span></dd></dl>
+
+<dl><dt><a name="CognitiveMode-__iter__"><strong>__iter__</strong></a>()</dt><dd><span class="code">Return&nbsp;members&nbsp;in&nbsp;definition&nbsp;order.</span></dd></dl>
+
+<dl><dt><a name="CognitiveMode-__len__"><strong>__len__</strong></a>()</dt><dd><span class="code">Return&nbsp;the&nbsp;number&nbsp;of&nbsp;members&nbsp;(no&nbsp;aliases)</span></dd></dl>
+
+<hr>
+Readonly properties inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><strong>__members__</strong></dt>
+<dd><span class="code">Returns&nbsp;a&nbsp;mapping&nbsp;of&nbsp;member&nbsp;name-&gt;value.<br>
+&nbsp;<br>
+This&nbsp;mapping&nbsp;lists&nbsp;all&nbsp;enum&nbsp;members,&nbsp;including&nbsp;aliases.&nbsp;Note&nbsp;that&nbsp;this<br>
+is&nbsp;a&nbsp;read-only&nbsp;view&nbsp;of&nbsp;the&nbsp;internal&nbsp;mapping.</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="EmotionCategory">class <strong>EmotionCategory</strong></a>(<a href="enum.html#Enum">enum.Enum</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#EmotionCategory">EmotionCategory</a>(*values)<br>
+&nbsp;<br>
+Structural&nbsp;category&nbsp;for&nbsp;an&nbsp;emotional&nbsp;state.<br>
+&nbsp;<br>
+The&nbsp;enum&nbsp;values&nbsp;are&nbsp;short&nbsp;identifiers&nbsp;used&nbsp;as&nbsp;metadata&nbsp;tags&nbsp;and<br>
+decision&nbsp;keys&nbsp;throughout&nbsp;the&nbsp;system.&nbsp;They&nbsp;are&nbsp;NOT&nbsp;display&nbsp;text&nbsp;—<br>
+the&nbsp;language&nbsp;system&nbsp;must&nbsp;look&nbsp;up&nbsp;learned&nbsp;words&nbsp;from&nbsp;the&nbsp;concept<br>
+network&nbsp;to&nbsp;describe&nbsp;them.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.limbic_system.emotion.html#EmotionCategory">EmotionCategory</a></dd>
+<dd><a href="enum.html#Enum">enum.Enum</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>AFRAID</strong> = &lt;EmotionCategory.AFRAID: 'afraid'&gt;</dl>
+
+<dl><dt><strong>ANGRY</strong> = &lt;EmotionCategory.ANGRY: 'angry'&gt;</dl>
+
+<dl><dt><strong>ANXIOUS</strong> = &lt;EmotionCategory.ANXIOUS: 'anxious'&gt;</dl>
+
+<dl><dt><strong>BORED</strong> = &lt;EmotionCategory.BORED: 'bored'&gt;</dl>
+
+<dl><dt><strong>CONTENT</strong> = &lt;EmotionCategory.CONTENT: 'content'&gt;</dl>
+
+<dl><dt><strong>CURIOUS</strong> = &lt;EmotionCategory.CURIOUS: 'curious'&gt;</dl>
+
+<dl><dt><strong>DROWSY</strong> = &lt;EmotionCategory.DROWSY: 'drowsy'&gt;</dl>
+
+<dl><dt><strong>EXCITED</strong> = &lt;EmotionCategory.EXCITED: 'excited'&gt;</dl>
+
+<dl><dt><strong>FLOW</strong> = &lt;EmotionCategory.FLOW: 'in flow'&gt;</dl>
+
+<dl><dt><strong>GUARDED</strong> = &lt;EmotionCategory.GUARDED: 'guarded'&gt;</dl>
+
+<dl><dt><strong>LONELY</strong> = &lt;EmotionCategory.LONELY: 'lonely'&gt;</dl>
+
+<dl><dt><strong>MELANCHOLIC</strong> = &lt;EmotionCategory.MELANCHOLIC: 'melancholic'&gt;</dl>
+
+<dl><dt><strong>NEUTRAL</strong> = &lt;EmotionCategory.NEUTRAL: 'neutral'&gt;</dl>
+
+<dl><dt><strong>OVERWHELMED</strong> = &lt;EmotionCategory.OVERWHELMED: 'overwhelmed'&gt;</dl>
+
+<dl><dt><strong>POSITIVE</strong> = &lt;EmotionCategory.POSITIVE: 'positive'&gt;</dl>
+
+<dl><dt><strong>SLEEPING</strong> = &lt;EmotionCategory.SLEEPING: 'sleeping'&gt;</dl>
+
+<dl><dt><strong>STRESSED</strong> = &lt;EmotionCategory.STRESSED: 'stressed'&gt;</dl>
+
+<dl><dt><strong>SURPRISED</strong> = &lt;EmotionCategory.SURPRISED: 'surprised'&gt;</dl>
+
+<dl><dt><strong>TENDER</strong> = &lt;EmotionCategory.TENDER: 'tender'&gt;</dl>
+
+<dl><dt><strong>UNSETTLED</strong> = &lt;EmotionCategory.UNSETTLED: 'unsettled'&gt;</dl>
+
+<hr>
+Data descriptors inherited from <a href="enum.html#Enum">enum.Enum</a>:<br>
+<dl><dt><strong>name</strong></dt>
+<dd><span class="code">The&nbsp;name&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<dl><dt><strong>value</strong></dt>
+<dd><span class="code">The&nbsp;value&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<hr>
+Static methods inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><a name="EmotionCategory-__contains__"><strong>__contains__</strong></a>(value)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;`value`&nbsp;is&nbsp;in&nbsp;`cls`.<br>
+&nbsp;<br>
+`value`&nbsp;is&nbsp;in&nbsp;`cls`&nbsp;if:<br>
+1)&nbsp;`value`&nbsp;is&nbsp;a&nbsp;member&nbsp;of&nbsp;`cls`,&nbsp;or<br>
+2)&nbsp;`value`&nbsp;is&nbsp;the&nbsp;value&nbsp;of&nbsp;one&nbsp;of&nbsp;the&nbsp;`cls`'s&nbsp;members.</span></dd></dl>
+
+<dl><dt><a name="EmotionCategory-__getitem__"><strong>__getitem__</strong></a>(name)</dt><dd><span class="code">Return&nbsp;the&nbsp;member&nbsp;matching&nbsp;`name`.</span></dd></dl>
+
+<dl><dt><a name="EmotionCategory-__iter__"><strong>__iter__</strong></a>()</dt><dd><span class="code">Return&nbsp;members&nbsp;in&nbsp;definition&nbsp;order.</span></dd></dl>
+
+<dl><dt><a name="EmotionCategory-__len__"><strong>__len__</strong></a>()</dt><dd><span class="code">Return&nbsp;the&nbsp;number&nbsp;of&nbsp;members&nbsp;(no&nbsp;aliases)</span></dd></dl>
+
+<hr>
+Readonly properties inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><strong>__members__</strong></dt>
+<dd><span class="code">Returns&nbsp;a&nbsp;mapping&nbsp;of&nbsp;member&nbsp;name-&gt;value.<br>
+&nbsp;<br>
+This&nbsp;mapping&nbsp;lists&nbsp;all&nbsp;enum&nbsp;members,&nbsp;including&nbsp;aliases.&nbsp;Note&nbsp;that&nbsp;this<br>
+is&nbsp;a&nbsp;read-only&nbsp;view&nbsp;of&nbsp;the&nbsp;internal&nbsp;mapping.</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="EmotionField">class <strong>EmotionField</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#EmotionField">EmotionField</a>()&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+The&nbsp;continuous&nbsp;affective&nbsp;field&nbsp;—&nbsp;OU&nbsp;dynamics&nbsp;per&nbsp;region.<br>
+&nbsp;<br>
+Holds&nbsp;the&nbsp;integrated&nbsp;membership&nbsp;vector.&nbsp;Each&nbsp;region&nbsp;relaxes<br>
+toward&nbsp;its&nbsp;instantaneous&nbsp;membership&nbsp;μ_s&nbsp;on&nbsp;its&nbsp;own&nbsp;time<br>
+constants:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;m_s(t+dt)&nbsp;=&nbsp;m_s&nbsp;+&nbsp;(μ_s&nbsp;−&nbsp;m_s)·(1&nbsp;−&nbsp;exp(−dt/τ_s))<br>
+&nbsp;<br>
+—&nbsp;the&nbsp;exact&nbsp;discrete&nbsp;step&nbsp;of&nbsp;the&nbsp;mean-reverting&nbsp;Ornstein–<br>
+Uhlenbeck&nbsp;process&nbsp;used&nbsp;to&nbsp;model&nbsp;core-affect&nbsp;dynamics<br>
+(DynAffect:&nbsp;Kuppens,&nbsp;Oravecz&nbsp;&amp;&nbsp;Tuerlinckx&nbsp;2010;&nbsp;Oravecz,<br>
+Tuerlinckx&nbsp;&amp;&nbsp;Vandekerckhove&nbsp;2011).&nbsp;Attack&nbsp;uses&nbsp;``tau_rise``,<br>
+release&nbsp;``tau_fall``&nbsp;—&nbsp;fear&nbsp;strikes&nbsp;in&nbsp;~0.4&nbsp;s&nbsp;and&nbsp;lingers&nbsp;~25&nbsp;s,<br>
+boredom&nbsp;builds&nbsp;over&nbsp;~90&nbsp;s&nbsp;—&nbsp;the&nbsp;asymmetric&nbsp;affective&nbsp;chronometry<br>
+of&nbsp;Lewis's&nbsp;(2005)&nbsp;trigger→amplification→stabilisation&nbsp;account.<br>
+&nbsp;<br>
+``<a href="#EmotionField-update">update</a>()``&nbsp;measures&nbsp;elapsed&nbsp;integration&nbsp;time&nbsp;on&nbsp;a&nbsp;monotonic<br>
+clock&nbsp;(the&nbsp;daemon&nbsp;owns&nbsp;absolute&nbsp;time;&nbsp;this&nbsp;is&nbsp;only&nbsp;the<br>
+integrator's&nbsp;dt).&nbsp;The&nbsp;first&nbsp;update&nbsp;converges&nbsp;instantly&nbsp;to&nbsp;the<br>
+measured&nbsp;field.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="EmotionField-__init__"><strong>__init__</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="EmotionField-update"><strong>update</strong></a>(self, summary: 'NeuroSummary', chemicals: 'dict[str, float] | None' = None, context: 'EmotionalContext | None' = None, waves: 'Any | None' = None, field_state: 'Any | None' = None, now: 'float | None' = None) -&gt; 'EmotionalState'</dt><dd><span class="code">Integrate&nbsp;the&nbsp;field&nbsp;by&nbsp;the&nbsp;elapsed&nbsp;interval,&nbsp;then&nbsp;resolve.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;summary:&nbsp;The&nbsp;daemon's&nbsp;neurochemical&nbsp;summary.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;chemicals:&nbsp;The&nbsp;18-channel&nbsp;chemical&nbsp;vector.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;context:&nbsp;Felt-context&nbsp;signals&nbsp;(isolation,&nbsp;strain,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;prediction&nbsp;error,&nbsp;curiosity,&nbsp;tonic/phasic&nbsp;split).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;waves:&nbsp;Oscillator&nbsp;state&nbsp;(``BrainWaveState``)&nbsp;—&nbsp;band<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;powers&nbsp;enter&nbsp;as&nbsp;evidence;&nbsp;``None``&nbsp;drops&nbsp;wave&nbsp;terms.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;field_state:&nbsp;The&nbsp;latent&nbsp;field's&nbsp;integration&nbsp;readout<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(``FieldState``)&nbsp;—&nbsp;measured&nbsp;self-coherence&nbsp;and<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;center&nbsp;displacement&nbsp;enter&nbsp;as&nbsp;evidence;&nbsp;``None``<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;drops&nbsp;the&nbsp;coherence&nbsp;terms.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;now:&nbsp;Monotonic&nbsp;timestamp;&nbsp;defaults&nbsp;to&nbsp;``time.monotonic``.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>memberships</strong></dt>
+<dd><span class="code">Integrated&nbsp;(pre-masking)&nbsp;membership&nbsp;of&nbsp;every&nbsp;region.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="EmotionalContext">class <strong>EmotionalContext</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#EmotionalContext">EmotionalContext</a>(social_isolation:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;social_drive:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;boundary_strain:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;prediction_error:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;curiosity:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;tonic_phasic:&nbsp;'dict[str,&nbsp;Any]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Felt-context&nbsp;signals&nbsp;that&nbsp;resolve&nbsp;same-quadrant&nbsp;emotions.<br>
+&nbsp;<br>
+The&nbsp;two-axis&nbsp;circumplex&nbsp;(arousal×valence)&nbsp;is&nbsp;necessary&nbsp;but&nbsp;not<br>
+sufficient:&nbsp;fear&nbsp;vs&nbsp;anxiety,&nbsp;anger&nbsp;vs&nbsp;stress,&nbsp;loneliness&nbsp;vs<br>
+melancholy,&nbsp;curiosity&nbsp;vs&nbsp;generic&nbsp;positivity&nbsp;all&nbsp;collapse&nbsp;onto&nbsp;the<br>
+same&nbsp;coordinates.&nbsp;This&nbsp;context&nbsp;carries&nbsp;the&nbsp;real&nbsp;substrates&nbsp;that<br>
+distinguish&nbsp;them,&nbsp;populated&nbsp;by&nbsp;the&nbsp;feeling&nbsp;reporter&nbsp;from&nbsp;systems<br>
+that&nbsp;already&nbsp;track&nbsp;each&nbsp;signal:<br>
+&nbsp;<br>
+-&nbsp;``social_isolation``&nbsp;—&nbsp;the&nbsp;world&nbsp;model's&nbsp;clock&nbsp;since&nbsp;she&nbsp;was<br>
+&nbsp;&nbsp;last&nbsp;addressed&nbsp;(0..1&nbsp;over&nbsp;the&nbsp;isolation&nbsp;period)<br>
+-&nbsp;``social_drive``&nbsp;—&nbsp;the&nbsp;inner&nbsp;life's&nbsp;accumulated&nbsp;social&nbsp;need<br>
+&nbsp;&nbsp;(0..2;&nbsp;her&nbsp;own&nbsp;action&nbsp;threshold&nbsp;is&nbsp;1.0)<br>
+-&nbsp;``boundary_strain``&nbsp;—&nbsp;the&nbsp;frontal&nbsp;lobe's&nbsp;mistreatment&nbsp;accrual<br>
+&nbsp;&nbsp;(0..2;&nbsp;withdrawal&nbsp;engages&nbsp;at&nbsp;0.6)<br>
+-&nbsp;``prediction_error``&nbsp;—&nbsp;the&nbsp;daemon's&nbsp;inference&nbsp;surprise&nbsp;(EMA),<br>
+&nbsp;&nbsp;the&nbsp;orienting&nbsp;signal&nbsp;behind&nbsp;startle&nbsp;and&nbsp;wonder<br>
+-&nbsp;``curiosity``&nbsp;—&nbsp;the&nbsp;curiosity&nbsp;engine's&nbsp;assessed&nbsp;drive&nbsp;(0..1)<br>
+-&nbsp;``tonic_phasic``&nbsp;—&nbsp;the&nbsp;regulator's&nbsp;per-chemical&nbsp;tonic/phasic<br>
+&nbsp;&nbsp;split;&nbsp;a&nbsp;*phasic*&nbsp;norepinephrine&nbsp;surge&nbsp;is&nbsp;an&nbsp;event&nbsp;(fear,<br>
+&nbsp;&nbsp;startle),&nbsp;a&nbsp;*tonic*&nbsp;elevation&nbsp;is&nbsp;a&nbsp;climate&nbsp;(anxiety)<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="EmotionalContext-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="EmotionalContext-__init__"><strong>__init__</strong></a>(self, social_isolation: 'float' = 0.0, social_drive: 'float' = 0.0, boundary_strain: 'float' = 0.0, prediction_error: 'float' = 0.0, curiosity: 'float' = 0.0, tonic_phasic: 'dict[str, Any]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="EmotionalContext-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>boundary_strain</strong></dt>
+</dl>
+<dl><dt><strong>curiosity</strong></dt>
+</dl>
+<dl><dt><strong>prediction_error</strong></dt>
+</dl>
+<dl><dt><strong>social_drive</strong></dt>
+</dl>
+<dl><dt><strong>social_isolation</strong></dt>
+</dl>
+<dl><dt><strong>tonic_phasic</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'boundary_strain': 'float', 'curiosity': 'float', 'prediction_error': 'float', 'social_drive': 'float', 'social_isolation': 'float', 'tonic_phasic': 'dict[str, Any]'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'boundary_strain': Field(name='boundary_strain',type='float',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'curiosity': Field(name='curiosity',type='float',default=0.0,...appingproxy({}),kw_only=False,_field_type=_FIELD), 'prediction_error': Field(name='prediction_error',type='float',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'social_drive': Field(name='social_drive',type='float',default=0...appingproxy({}),kw_only=False,_field_type=_FIELD), 'social_isolation': Field(name='social_isolation',type='float',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'tonic_phasic': Field(name='tonic_phasic',type='dict[str, Any]',...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('social_isolation', 'social_drive', 'boundary_strain', 'prediction_error', 'curiosity', 'tonic_phasic')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="EmotionalState">class <strong>EmotionalState</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#EmotionalState">EmotionalState</a>(label:&nbsp;'str',&nbsp;cognitive_style:&nbsp;'str',&nbsp;cause:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;nuance:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;verbosity:&nbsp;'float'&nbsp;=&nbsp;1.0,&nbsp;formality:&nbsp;'float'&nbsp;=&nbsp;0.5,&nbsp;openness_to_engage:&nbsp;'float'&nbsp;=&nbsp;1.0,&nbsp;creativity:&nbsp;'float'&nbsp;=&nbsp;0.5,&nbsp;caution:&nbsp;'float'&nbsp;=&nbsp;0.3,&nbsp;alertness:&nbsp;'float'&nbsp;=&nbsp;0.5,&nbsp;valence:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;plasticity:&nbsp;'float'&nbsp;=&nbsp;0.5,&nbsp;chemicals:&nbsp;'dict[str,&nbsp;float]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;tonic_phasic:&nbsp;'dict[str,&nbsp;Any]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;intensity:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;memberships:&nbsp;'dict[str,&nbsp;float]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;snapshot&nbsp;of&nbsp;Genesis's&nbsp;emotional&nbsp;state,&nbsp;derived&nbsp;from&nbsp;neurochemistry.<br>
+&nbsp;<br>
+The&nbsp;primary&nbsp;fields&nbsp;(label,&nbsp;cognitive_style,&nbsp;cause)&nbsp;store&nbsp;structural<br>
+category&nbsp;IDs&nbsp;as&nbsp;strings&nbsp;—&nbsp;they&nbsp;are&nbsp;NOT&nbsp;display&nbsp;text.&nbsp;The&nbsp;enum<br>
+properties&nbsp;(category,&nbsp;cognitive_mode,&nbsp;cause_category)&nbsp;provide<br>
+type-safe&nbsp;access.&nbsp;The&nbsp;language&nbsp;system&nbsp;generates&nbsp;English&nbsp;text&nbsp;from<br>
+the&nbsp;concept&nbsp;network&nbsp;using&nbsp;these&nbsp;structural&nbsp;identifiers.<br>
+&nbsp;<br>
+The&nbsp;``nuance``&nbsp;field&nbsp;is&nbsp;deprecated&nbsp;and&nbsp;always&nbsp;empty&nbsp;—&nbsp;it&nbsp;was&nbsp;a<br>
+hardcoded&nbsp;English&nbsp;description&nbsp;that&nbsp;has&nbsp;been&nbsp;removed.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="EmotionalState-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="EmotionalState-__init__"><strong>__init__</strong></a>(self, label: 'str', cognitive_style: 'str', cause: 'str' = '', nuance: 'str' = '', verbosity: 'float' = 1.0, formality: 'float' = 0.5, openness_to_engage: 'float' = 1.0, creativity: 'float' = 0.5, caution: 'float' = 0.3, alertness: 'float' = 0.5, valence: 'float' = 0.0, plasticity: 'float' = 0.5, chemicals: 'dict[str, float]' = &lt;factory&gt;, tonic_phasic: 'dict[str, Any]' = &lt;factory&gt;, intensity: 'float' = 0.0, memberships: 'dict[str, float]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="EmotionalState-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>has_cause</strong></dt>
+<dd><span class="code">Whether&nbsp;there&nbsp;is&nbsp;a&nbsp;non-empty&nbsp;cause.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>alertness</strong></dt>
+</dl>
+<dl><dt><strong>arousal</strong></dt>
+<dd><span class="code">Backward-compatible&nbsp;alias&nbsp;for&nbsp;alertness.</span></dd>
+</dl>
+<dl><dt><strong>category</strong></dt>
+<dd><span class="code">Emotional&nbsp;category&nbsp;as&nbsp;an&nbsp;enum.</span></dd>
+</dl>
+<dl><dt><strong>cause</strong></dt>
+</dl>
+<dl><dt><strong>cause_category</strong></dt>
+<dd><span class="code">Cause&nbsp;category&nbsp;as&nbsp;an&nbsp;enum.</span></dd>
+</dl>
+<dl><dt><strong>caution</strong></dt>
+</dl>
+<dl><dt><strong>chemicals</strong></dt>
+</dl>
+<dl><dt><strong>cognitive_mode</strong></dt>
+<dd><span class="code">Cognitive&nbsp;mode&nbsp;as&nbsp;an&nbsp;enum.</span></dd>
+</dl>
+<dl><dt><strong>cognitive_style</strong></dt>
+</dl>
+<dl><dt><strong>creativity</strong></dt>
+</dl>
+<dl><dt><strong>formality</strong></dt>
+</dl>
+<dl><dt><strong>intensity</strong></dt>
+</dl>
+<dl><dt><strong>label</strong></dt>
+</dl>
+<dl><dt><strong>memberships</strong></dt>
+</dl>
+<dl><dt><strong>nuance</strong></dt>
+</dl>
+<dl><dt><strong>openness_to_engage</strong></dt>
+</dl>
+<dl><dt><strong>plasticity</strong></dt>
+</dl>
+<dl><dt><strong>tonic_phasic</strong></dt>
+</dl>
+<dl><dt><strong>valence</strong></dt>
+</dl>
+<dl><dt><strong>verbosity</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'alertness': 'float', 'cause': 'str', 'caution': 'float', 'chemicals': 'dict[str, float]', 'cognitive_style': 'str', 'creativity': 'float', 'formality': 'float', 'intensity': 'float', 'label': 'str', 'memberships': 'dict[str, float]', ...}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'alertness': Field(name='alertness',type='float',default=0.5,...appingproxy({}),kw_only=False,_field_type=_FIELD), 'cause': Field(name='cause',type='str',default='',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'caution': Field(name='caution',type='float',default=0.3,de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'chemicals': Field(name='chemicals',type='dict[str, float]',d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'cognitive_style': Field(name='cognitive_style',type='str',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'creativity': Field(name='creativity',type='float',default=0.5...appingproxy({}),kw_only=False,_field_type=_FIELD), 'formality': Field(name='formality',type='float',default=0.5,...appingproxy({}),kw_only=False,_field_type=_FIELD), 'intensity': Field(name='intensity',type='float',default=0.0,...appingproxy({}),kw_only=False,_field_type=_FIELD), 'label': Field(name='label',type='str',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD), 'memberships': Field(name='memberships',type='dict[str, float]'...appingproxy({}),kw_only=False,_field_type=_FIELD), ...}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('label', 'cognitive_style', 'cause', 'nuance', 'verbosity', 'formality', 'openness_to_engage', 'creativity', 'caution', 'alertness', 'valence', 'plasticity', 'chemicals', 'tonic_phasic', 'intensity', 'memberships')</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-assess_emotion"><strong>assess_emotion</strong></a>(summary: 'NeuroSummary', chemicals: 'dict[str, float] | None' = None, context: 'EmotionalContext | None' = None, waves: 'Any | None' = None, field_state: 'Any | None' = None) -&gt; 'EmotionalState'</dt><dd><span class="code">Instantaneous&nbsp;emotional&nbsp;assessment&nbsp;—&nbsp;evaluate&nbsp;the&nbsp;field,&nbsp;read&nbsp;argmax.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;memoryless&nbsp;readout:&nbsp;it&nbsp;computes&nbsp;every&nbsp;region's<br>
+membership&nbsp;over&nbsp;the&nbsp;current&nbsp;substrate&nbsp;(arousal/valence&nbsp;axes,&nbsp;the<br>
+18-channel&nbsp;chemical&nbsp;vector,&nbsp;felt-context&nbsp;drives,&nbsp;and&nbsp;the<br>
+oscillator&nbsp;band&nbsp;powers&nbsp;when&nbsp;supplied)&nbsp;and&nbsp;resolves&nbsp;the&nbsp;structural<br>
+state.&nbsp;For&nbsp;the&nbsp;live&nbsp;system&nbsp;prefer&nbsp;``<a href="#EmotionField">EmotionField</a>.update``,&nbsp;which<br>
+adds&nbsp;per-region&nbsp;OU&nbsp;dynamics&nbsp;—&nbsp;states&nbsp;then&nbsp;persist,&nbsp;mix,&nbsp;and&nbsp;decay<br>
+on&nbsp;their&nbsp;own&nbsp;time&nbsp;constants&nbsp;instead&nbsp;of&nbsp;snapping.<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;structural&nbsp;state&nbsp;—&nbsp;no&nbsp;English&nbsp;strings.&nbsp;The&nbsp;language<br>
+system&nbsp;must&nbsp;generate&nbsp;text&nbsp;from&nbsp;the&nbsp;concept&nbsp;network.</span></dd></dl>
+ <dl><dt><a name="-effective_memberships"><strong>effective_memberships</strong></a>(m: 'dict[EmotionCategory, float]') -&gt; 'dict[EmotionCategory, float]'</dt><dd><span class="code">Deflate&nbsp;generic&nbsp;regions&nbsp;by&nbsp;the&nbsp;evidence&nbsp;for&nbsp;the&nbsp;specific&nbsp;ones.<br>
+&nbsp;<br>
+eff_s&nbsp;=&nbsp;m_s&nbsp;·&nbsp;Π_{k∈mask(s)}&nbsp;(1&nbsp;−&nbsp;s_k)&nbsp;with&nbsp;s_k&nbsp;the&nbsp;masker's<br>
+established&nbsp;share&nbsp;—&nbsp;the&nbsp;fuzzy&nbsp;form&nbsp;of&nbsp;precedence:&nbsp;a&nbsp;generic&nbsp;region<br>
+survives&nbsp;only&nbsp;where&nbsp;no&nbsp;more&nbsp;specific&nbsp;measured&nbsp;state&nbsp;explains&nbsp;the<br>
+substrate.</span></dd></dl>
+ <dl><dt><a name="-membership_field"><strong>membership_field</strong></a>(summary: 'NeuroSummary', chemicals: 'dict[str, float] | None' = None, context: 'EmotionalContext | None' = None, waves: 'Any | None' = None, field_state: 'Any | None' = None) -&gt; 'dict[EmotionCategory, float]'</dt><dd><span class="code">Instantaneous&nbsp;membership&nbsp;of&nbsp;every&nbsp;region&nbsp;—&nbsp;the&nbsp;field&nbsp;itself.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;continuous&nbsp;substrate&nbsp;under&nbsp;the&nbsp;label:&nbsp;call&nbsp;it&nbsp;when<br>
+you&nbsp;want&nbsp;the&nbsp;mixture&nbsp;(e.g.&nbsp;anxious&nbsp;0.6&nbsp;with&nbsp;afraid&nbsp;0.3),&nbsp;not&nbsp;the<br>
+argmax.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>ANGER_ALERTNESS</strong> = 0.55<br>
+<strong>ANGER_BOUNDARY_STRAIN</strong> = 0.4<br>
+<strong>ANGER_NE</strong> = 0.35<br>
+<strong>BORED_DA</strong> = 0.25<br>
+<strong>BORED_NE</strong> = 0.27<br>
+<strong>CURIOUS_ACH</strong> = 0.3<br>
+<strong>CURIOUS_DA</strong> = 0.3<br>
+<strong>CURIOUS_LEVEL</strong> = 0.55<br>
+<strong>FEAR_EPI</strong> = 0.24<br>
+<strong>FEAR_NE</strong> = 0.35<br>
+<strong>FIELD_CENTER_DISPLACED</strong> = 0.55<br>
+<strong>FIELD_INCOHERENT</strong> = 0.45<br>
+<strong>GUARDED_CORTISOL</strong> = 0.05<br>
+<strong>HIGH_AROUSAL</strong> = 0.7<br>
+<strong>LONELY_DRIVE</strong> = 1.0<br>
+<strong>LONELY_ISOLATION</strong> = 0.5<br>
+<strong>LONELY_OXY</strong> = 0.22<br>
+<strong>LOW_AROUSAL</strong> = 0.4<br>
+<strong>MILD_NEGATIVE_VALENCE</strong> = -0.1<br>
+<strong>MILD_POSITIVE_VALENCE</strong> = 0.1<br>
+<strong>NEGATIVE_VALENCE</strong> = -0.2<br>
+<strong>PLASTICITY_CLOSED</strong> = 0.1<br>
+<strong>PLASTICITY_HIGH</strong> = 0.6<br>
+<strong>PLASTICITY_LOW</strong> = 0.25<br>
+<strong>POSITIVE_VALENCE</strong> = 0.3<br>
+<strong>SURPRISE_PE</strong> = 0.45<br>
+<strong>TENDER_END</strong> = 0.28<br>
+<strong>TENDER_OXY</strong> = 0.4<br>
+<strong>__annotations__</strong> = {'_CATEGORY_MAP': 'dict[str, EmotionCategory]', '_CAUSE_MAP': 'dict[str, CauseCategory]', '_CONTEXTUAL_CAUSES': 'dict[EmotionCategory, CauseCategory]', '_FIELD_REGIONS': 'dict[EmotionCategory, _Region]', '_LEGACY_STYLE_MAP': 'dict[str, CognitiveMode]', '_MODE_MAP': 'dict[str, CognitiveMode]', '_PHASE_CATEGORY': 'dict[str, EmotionCategory]', '_PHASE_PROFILE': 'dict[EmotionCategory, tuple[CognitiveMode, float, float, float, float | None]]'}</td></tr></table>
+</body></html>

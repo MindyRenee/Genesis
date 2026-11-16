@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.parietal_lobe.spatial_imagery</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.parietal_lobe.html" class="white">parietal_lobe</a>.spatial_imagery</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/parietal_lobe/spatial_imagery.py">/home/mindyrenee/GenAnd/Genesis/Self_World/parietal_lobe/spatial_imagery.py</a></td></tr></table>
+    <p><span class="code">Parietal&nbsp;spatial&nbsp;imagery&nbsp;—&nbsp;the&nbsp;depictive&nbsp;workspace.<br>
+&nbsp;<br>
+This&nbsp;module&nbsp;is&nbsp;the&nbsp;mental-imagery&nbsp;faculty&nbsp;for&nbsp;spatial&nbsp;structure:<br>
+known&nbsp;transforms&nbsp;are&nbsp;*skills*&nbsp;she&nbsp;can&nbsp;apply&nbsp;to&nbsp;an&nbsp;internal&nbsp;copy&nbsp;of&nbsp;a<br>
+grid&nbsp;and&nbsp;re-perceive,&nbsp;exactly&nbsp;the&nbsp;way&nbsp;Soar's&nbsp;Spatial/Visual&nbsp;System<br>
+exposes&nbsp;imagery&nbsp;operations&nbsp;to&nbsp;an&nbsp;agent's&nbsp;general&nbsp;decision&nbsp;procedure<br>
+(Lathrop,&nbsp;Wintermute&nbsp;&amp;&nbsp;Laird&nbsp;2011;&nbsp;Wintermute&nbsp;2012).&nbsp;Three&nbsp;design<br>
+commitments,&nbsp;each&nbsp;grounded&nbsp;in&nbsp;the&nbsp;literature:<br>
+&nbsp;<br>
+-&nbsp;**Imagery&nbsp;reuses&nbsp;perceptual-motor&nbsp;machinery&nbsp;offline.**&nbsp;Imagined<br>
+&nbsp;&nbsp;transforms&nbsp;are&nbsp;actions&nbsp;simulated&nbsp;on&nbsp;the&nbsp;depictive&nbsp;buffer&nbsp;—<br>
+&nbsp;&nbsp;motor-imagery&nbsp;analog&nbsp;(Jeannerod&nbsp;2001;&nbsp;Caligiore&nbsp;et&nbsp;al.&nbsp;2013)&nbsp;—&nbsp;and<br>
+&nbsp;&nbsp;the&nbsp;generative&nbsp;direction&nbsp;of&nbsp;predictive&nbsp;coding:&nbsp;higher&nbsp;levels<br>
+&nbsp;&nbsp;synthesize&nbsp;the&nbsp;low-level&nbsp;representation&nbsp;a&nbsp;transform&nbsp;would&nbsp;produce<br>
+&nbsp;&nbsp;(Breedlove&nbsp;et&nbsp;al.&nbsp;2020;&nbsp;Dijkstra&nbsp;et&nbsp;al.&nbsp;2018).<br>
+-&nbsp;**Recognition&nbsp;is&nbsp;not&nbsp;search.**&nbsp;``recognize_change``&nbsp;asks&nbsp;which<br>
+&nbsp;&nbsp;single&nbsp;known&nbsp;skill&nbsp;explains&nbsp;an&nbsp;observed&nbsp;input→output&nbsp;change&nbsp;—<br>
+&nbsp;&nbsp;one&nbsp;step&nbsp;per&nbsp;candidate,&nbsp;parallel&nbsp;in&nbsp;spirit&nbsp;(Copycat's&nbsp;codelet<br>
+&nbsp;&nbsp;style,&nbsp;Hofstadter&nbsp;&amp;&nbsp;Mitchell&nbsp;1994).&nbsp;Composition&nbsp;and&nbsp;sequencing<br>
+&nbsp;&nbsp;belong&nbsp;to&nbsp;the&nbsp;general&nbsp;planner,&nbsp;not&nbsp;to&nbsp;this&nbsp;module;&nbsp;humans&nbsp;likewise<br>
+&nbsp;&nbsp;imagine&nbsp;one&nbsp;step&nbsp;and&nbsp;re-perceive&nbsp;rather&nbsp;than&nbsp;enumerating&nbsp;programs.<br>
+-&nbsp;**Skills&nbsp;are&nbsp;knowledge.**&nbsp;The&nbsp;vocabulary&nbsp;lives&nbsp;in<br>
+&nbsp;&nbsp;``spatial/transforms.py``;&nbsp;each&nbsp;name&nbsp;grounds&nbsp;as&nbsp;a<br>
+&nbsp;&nbsp;``spatial_skill:*``&nbsp;concept&nbsp;so&nbsp;spreading&nbsp;activation&nbsp;can&nbsp;make<br>
+&nbsp;&nbsp;relevant&nbsp;skills&nbsp;salient&nbsp;(the&nbsp;Slipnet&nbsp;hook).&nbsp;Skills&nbsp;learned&nbsp;later<br>
+&nbsp;&nbsp;register&nbsp;through&nbsp;``register_skill``&nbsp;—&nbsp;the&nbsp;repertoire&nbsp;grows&nbsp;with<br>
+&nbsp;&nbsp;experience&nbsp;instead&nbsp;of&nbsp;being&nbsp;fixed&nbsp;at&nbsp;birth.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.parietal_lobe.spatial_imagery.html#SpatialImagery">SpatialImagery</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SpatialImagery">class <strong>SpatialImagery</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SpatialImagery">SpatialImagery</a>(network:&nbsp;'ConceptNetwork&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Depictive&nbsp;workspace:&nbsp;apply&nbsp;and&nbsp;recognize&nbsp;spatial&nbsp;skills.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="SpatialImagery-__init__"><strong>__init__</strong></a>(self, network: 'ConceptNetwork | None' = None) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="SpatialImagery-applicable_skills"><strong>applicable_skills</strong></a>(self, grid: 'Grid') -&gt; 'list[str]'</dt><dd><span class="code">Skills&nbsp;whose&nbsp;preconditions&nbsp;hold&nbsp;on&nbsp;this&nbsp;grid&nbsp;—&nbsp;affordances<br>
+of&nbsp;the&nbsp;imagery&nbsp;workspace.</span></dd></dl>
+
+<dl><dt><a name="SpatialImagery-imagine"><strong>imagine</strong></a>(self, grid: 'Grid', skill: 'str') -&gt; 'Grid | None'</dt><dd><span class="code">Apply&nbsp;one&nbsp;skill&nbsp;to&nbsp;an&nbsp;internal&nbsp;copy&nbsp;of&nbsp;``grid``.<br>
+&nbsp;<br>
+The&nbsp;forward-model&nbsp;half&nbsp;of&nbsp;imagery:&nbsp;predict&nbsp;what&nbsp;this&nbsp;transform<br>
+would&nbsp;produce,&nbsp;one&nbsp;step,&nbsp;without&nbsp;touching&nbsp;perception.&nbsp;Returns<br>
+``None``&nbsp;for&nbsp;unknown&nbsp;skills&nbsp;and&nbsp;inapplicable&nbsp;ones&nbsp;alike&nbsp;—<br>
+inapplicability&nbsp;is&nbsp;data,&nbsp;not&nbsp;an&nbsp;error.</span></dd></dl>
+
+<dl><dt><a name="SpatialImagery-recognize_change"><strong>recognize_change</strong></a>(self, before: 'Grid', after: 'Grid') -&gt; 'list[str]'</dt><dd><span class="code">Which&nbsp;known&nbsp;skills&nbsp;explain&nbsp;``before``&nbsp;→&nbsp;``after``.<br>
+&nbsp;<br>
+Single-step&nbsp;recognition:&nbsp;each&nbsp;candidate&nbsp;is&nbsp;imagined&nbsp;and&nbsp;its<br>
+result&nbsp;compared&nbsp;to&nbsp;what&nbsp;was&nbsp;actually&nbsp;observed&nbsp;—&nbsp;the&nbsp;generative<br>
+model&nbsp;run&nbsp;backward.&nbsp;Returns&nbsp;every&nbsp;single-skill&nbsp;explanation,<br>
+empty&nbsp;when&nbsp;the&nbsp;change&nbsp;is&nbsp;complex&nbsp;or&nbsp;unfamiliar.&nbsp;Unfamiliar<br>
+change&nbsp;is&nbsp;an&nbsp;epistemic&nbsp;gap&nbsp;for&nbsp;the&nbsp;caller&nbsp;to&nbsp;route&nbsp;(curiosity,<br>
+learning),&nbsp;not&nbsp;a&nbsp;failure&nbsp;this&nbsp;module&nbsp;papers&nbsp;over.</span></dd></dl>
+
+<dl><dt><a name="SpatialImagery-register_skill"><strong>register_skill</strong></a>(self, name: 'str', op: 'Op') -&gt; 'None'</dt><dd><span class="code">Add&nbsp;a&nbsp;learned&nbsp;transform&nbsp;to&nbsp;the&nbsp;repertoire.</span></dd></dl>
+
+<dl><dt><a name="SpatialImagery-summary"><strong>summary</strong></a>(self) -&gt; 'str'</dt></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>known_skills</strong></dt>
+<dd><span class="code">Skill&nbsp;names&nbsp;she&nbsp;can&nbsp;currently&nbsp;imagine,&nbsp;in&nbsp;fixed&nbsp;order.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>INFER_OPS</strong> = [&lt;function infer_gravity_direction&gt;, &lt;function infer_erase_color&gt;, &lt;function infer_keep_color&gt;, &lt;function infer_fill_enclosed&gt;, &lt;function infer_recolor_largest&gt;, &lt;function infer_recolor_smallest&gt;, &lt;function infer_recolor_map&gt;, &lt;function infer_shift&gt;]<br>
+<strong>INFER_OP_NAMES</strong> = {&lt;function infer_gravity_direction&gt;: 'infer_gravity_direction', &lt;function infer_erase_color&gt;: 'infer_erase_color', &lt;function infer_keep_color&gt;: 'infer_keep_color', &lt;function infer_fill_enclosed&gt;: 'infer_fill_enclosed', &lt;function infer_recolor_largest&gt;: 'infer_recolor_largest', &lt;function infer_recolor_smallest&gt;: 'infer_recolor_smallest', &lt;function infer_recolor_map&gt;: 'infer_recolor_map', &lt;function infer_shift&gt;: 'infer_shift'}<br>
+<strong>Op</strong> = collections.abc.Callable[[parietal_lobe.grid.Grid], 'Grid | None']<br>
+<strong>TYPE_CHECKING</strong> = False<br>
+<strong>logger</strong> = &lt;Logger Self_World.parietal_lobe.spatial_imagery (WARNING)&gt;</td></tr></table>
+</body></html>

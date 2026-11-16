@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.eval.drift</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.eval.html" class="white">eval</a>.drift</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/eval/drift.py">/home/mindyrenee/GenAnd/Genesis/Self_World/eval/drift.py</a></td></tr></table>
+    <p><span class="code">Drift&nbsp;detection:&nbsp;compare&nbsp;a&nbsp;fresh&nbsp;capture&nbsp;against&nbsp;a&nbsp;stored&nbsp;baseline.<br>
+&nbsp;<br>
+Two&nbsp;comparisons&nbsp;are&nbsp;supported:<br>
+&nbsp;<br>
+1.&nbsp;:func:`compare_snapshots`&nbsp;—&nbsp;fresh&nbsp;:class:`Snapshot`&nbsp;vs&nbsp;stored<br>
+&nbsp;&nbsp;&nbsp;baseline&nbsp;:class:`Snapshot`.&nbsp;Deterministic&nbsp;rest&nbsp;state&nbsp;means&nbsp;tight<br>
+&nbsp;&nbsp;&nbsp;tolerances&nbsp;are&nbsp;viable;&nbsp;circadian-sensitive&nbsp;chemicals&nbsp;(see<br>
+&nbsp;&nbsp;&nbsp;``CIRCADIAN_SENSITIVE``)&nbsp;get&nbsp;wider&nbsp;bands&nbsp;for&nbsp;time-of-day&nbsp;effects.<br>
+2.&nbsp;:func:`check_snapshot_vs_defaults`&nbsp;—&nbsp;:class:`Snapshot`&nbsp;vs&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;genetic&nbsp;``DEFAULT_BASELINES``.&nbsp;A&nbsp;coarse&nbsp;sanity&nbsp;gate:&nbsp;catches&nbsp;a<br>
+&nbsp;&nbsp;&nbsp;fundamentally&nbsp;broken&nbsp;substrate&nbsp;even&nbsp;when&nbsp;no&nbsp;baseline&nbsp;file&nbsp;exists.</span></p>
+<p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.eval.drift.html#DriftEntry">DriftEntry</a>
+</dt><dt class="heading-text"><a href="Self_World.eval.drift.html#DriftReport">DriftReport</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="DriftEntry">class <strong>DriftEntry</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#DriftEntry">DriftEntry</a>(field:&nbsp;'str',&nbsp;baseline:&nbsp;'float&nbsp;|&nbsp;str',&nbsp;current:&nbsp;'float&nbsp;|&nbsp;str',&nbsp;delta:&nbsp;'float&nbsp;|&nbsp;str',&nbsp;severity:&nbsp;'str')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+One&nbsp;compared&nbsp;field.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="DriftEntry-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="DriftEntry-__init__"><strong>__init__</strong></a>(self, field: 'str', baseline: 'float | str', current: 'float | str', delta: 'float | str', severity: 'str') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="DriftEntry-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'baseline': 'float | str', 'current': 'float | str', 'delta': 'float | str', 'field': 'str', 'severity': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'baseline': Field(name='baseline',type='float | str',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'current': Field(name='current',type='float | str',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'delta': Field(name='delta',type='float | str',default=&lt;d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'field': Field(name='field',type='str',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD), 'severity': Field(name='severity',type='str',default=&lt;datacl...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('field', 'baseline', 'current', 'delta', 'severity')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="DriftReport">class <strong>DriftReport</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#DriftReport">DriftReport</a>(entries:&nbsp;'list[<a href="#DriftEntry">DriftEntry</a>]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;passed:&nbsp;'bool'&nbsp;=&nbsp;True)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Full&nbsp;comparison&nbsp;outcome.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="DriftReport-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="DriftReport-__init__"><strong>__init__</strong></a>(self, entries: 'list[DriftEntry]' = &lt;factory&gt;, passed: 'bool' = True) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="DriftReport-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="DriftReport-summary_lines"><strong>summary_lines</strong></a>(self) -&gt; 'list[str]'</dt><dd><span class="code">Human-readable&nbsp;report&nbsp;lines.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>failures</strong></dt>
+<dd><span class="code">Entries&nbsp;with&nbsp;severity&nbsp;==&nbsp;fail.</span></dd>
+</dl>
+<dl><dt><strong>warnings</strong></dt>
+<dd><span class="code">Entries&nbsp;with&nbsp;severity&nbsp;==&nbsp;warn.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'entries': 'list[DriftEntry]', 'passed': 'bool'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'entries': Field(name='entries',type='list[DriftEntry]',def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'passed': Field(name='passed',type='bool',default=True,def...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('entries', 'passed')</dl>
+
+<dl><dt><strong>passed</strong> = True</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-check_snapshot_vs_defaults"><strong>check_snapshot_vs_defaults</strong></a>(snapshot: 'Snapshot') -&gt; 'DriftReport'</dt><dd><span class="code">Coarse&nbsp;sanity&nbsp;gate:&nbsp;resting&nbsp;levels&nbsp;vs&nbsp;genetic&nbsp;set-points.</span></dd></dl>
+ <dl><dt><a name="-compare_snapshots"><strong>compare_snapshots</strong></a>(baseline: 'Snapshot', current: 'Snapshot') -&gt; 'DriftReport'</dt><dd><span class="code">Compare&nbsp;a&nbsp;fresh&nbsp;snapshot&nbsp;against&nbsp;a&nbsp;stored&nbsp;baseline.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>CIRCADIAN_SENSITIVE</strong> = frozenset({'dopamine', 'histamine', 'melatonin', 'serotonin'})<br>
+<strong>DEFAULT_BASELINES</strong> = {'acetylcholine': 0.35, 'adenosine': 0.2, 'bdnf': 0.45, 'cortisol': 0.0, 'crh': 0.0, 'dopamine': 0.35, 'endocannabinoid': 0.25, 'endorphin': 0.25, 'epinephrine': 0.15, 'gaba': 0.5, ...}<br>
+<strong>PHASE_NAMES</strong> = {0: 'active', 1: 'alert', 2: 'flow', 3: 'stress', 4: 'drowsy', 5: 'nrem', 6: 'rem', 7: 'overwhelmed'}<br>
+<strong>__annotations__</strong> = {'_SCALAR_BANDS': 'dict[str, tuple[float, float]]'}</td></tr></table>
+</body></html>

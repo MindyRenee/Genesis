@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.temporal_lobe.statistical_learner</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.temporal_lobe.html" class="white">temporal_lobe</a>.statistical_learner</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/statistical_learner.py">/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/statistical_learner.py</a></td></tr></table>
+    <p><span class="code">Statistical&nbsp;language&nbsp;learning&nbsp;from&nbsp;user&nbsp;input.<br>
+&nbsp;<br>
+This&nbsp;module&nbsp;implements&nbsp;statistical&nbsp;learning&nbsp;of&nbsp;language&nbsp;patterns&nbsp;from<br>
+the&nbsp;user's&nbsp;input.&nbsp;Genesis&nbsp;tracks&nbsp;word&nbsp;frequencies,&nbsp;n-gram&nbsp;patterns<br>
+(bigrams&nbsp;and&nbsp;trigrams),&nbsp;and&nbsp;builds&nbsp;a&nbsp;simple&nbsp;probabilistic&nbsp;grammar&nbsp;from<br>
+observed&nbsp;patterns.&nbsp;It&nbsp;also&nbsp;adapts&nbsp;to&nbsp;the&nbsp;user's&nbsp;communication&nbsp;style<br>
+(formal,&nbsp;casual,&nbsp;technical).<br>
+&nbsp;<br>
+The&nbsp;generative&nbsp;engine&nbsp;can&nbsp;use&nbsp;the&nbsp;learned&nbsp;statistics&nbsp;to&nbsp;match&nbsp;the<br>
+user's&nbsp;style&nbsp;—&nbsp;producing&nbsp;language&nbsp;that&nbsp;mirrors&nbsp;their&nbsp;vocabulary,<br>
+sentence&nbsp;length,&nbsp;and&nbsp;register.<br>
+&nbsp;<br>
+#&nbsp;Background<br>
+&nbsp;<br>
+Statistical&nbsp;learning&nbsp;is&nbsp;a&nbsp;foundational&nbsp;mechanism&nbsp;in&nbsp;human&nbsp;language<br>
+acquisition.&nbsp;Children&nbsp;are&nbsp;sensitive&nbsp;to&nbsp;the&nbsp;statistical&nbsp;structure&nbsp;of<br>
+their&nbsp;input&nbsp;—&nbsp;transitional&nbsp;probabilities&nbsp;between&nbsp;syllables&nbsp;(Saffran,<br>
+Aslin&nbsp;&amp;&nbsp;Newport,&nbsp;1996),&nbsp;word&nbsp;frequencies,&nbsp;and&nbsp;distributional&nbsp;patterns.<br>
+This&nbsp;module&nbsp;applies&nbsp;the&nbsp;same&nbsp;principle:&nbsp;Genesis&nbsp;learns&nbsp;the&nbsp;statistical<br>
+regularities&nbsp;of&nbsp;the&nbsp;user's&nbsp;language&nbsp;and&nbsp;uses&nbsp;them&nbsp;to&nbsp;adapt&nbsp;its&nbsp;own.<br>
+&nbsp;<br>
+References:<br>
+-&nbsp;Saffran,&nbsp;J.&nbsp;R.,&nbsp;Aslin,&nbsp;R.&nbsp;N.,&nbsp;&amp;&nbsp;Newport,&nbsp;E.&nbsp;L.&nbsp;(1996).&nbsp;Statistical<br>
+&nbsp;&nbsp;learning&nbsp;by&nbsp;8-month-old&nbsp;infants.&nbsp;*Science*,&nbsp;274(5294),&nbsp;1926–1928.<br>
+-&nbsp;Jurafsky,&nbsp;D.,&nbsp;&amp;&nbsp;Martin,&nbsp;J.&nbsp;H.&nbsp;(2024).&nbsp;*Speech&nbsp;and&nbsp;Language<br>
+&nbsp;&nbsp;Processing*&nbsp;(3rd&nbsp;ed.).&nbsp;Chapter&nbsp;3:&nbsp;N-gram&nbsp;Language&nbsp;Models.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="re.html">re</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.statistical_learner.html#NGramModel">NGramModel</a>
+</dt><dt class="heading-text"><a href="Self_World.temporal_lobe.statistical_learner.html#StatisticalLanguageLearner">StatisticalLanguageLearner</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="NGramModel">class <strong>NGramModel</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#NGramModel">NGramModel</a>(n:&nbsp;'int',&nbsp;counts:&nbsp;'dict[tuple[str,&nbsp;...],&nbsp;int]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;context_counts:&nbsp;'dict[tuple[str,&nbsp;...],&nbsp;int]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;prefix_index:&nbsp;'dict[tuple[str,&nbsp;...],&nbsp;dict[str,&nbsp;int]]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;simple&nbsp;n-gram&nbsp;model&nbsp;with&nbsp;frequency&nbsp;counts.<br>
+&nbsp;<br>
+Attributes:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;n:&nbsp;The&nbsp;n&nbsp;in&nbsp;n-gram&nbsp;(2&nbsp;for&nbsp;bigrams,&nbsp;3&nbsp;for&nbsp;trigrams).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;counts:&nbsp;Mapping&nbsp;from&nbsp;n-gram&nbsp;tuple&nbsp;to&nbsp;observed&nbsp;count.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;context_counts:&nbsp;Mapping&nbsp;from&nbsp;the&nbsp;(n-1)-gram&nbsp;prefix&nbsp;to<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;total&nbsp;count&nbsp;of&nbsp;all&nbsp;n-grams&nbsp;sharing&nbsp;that&nbsp;prefix.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Used&nbsp;for&nbsp;computing&nbsp;conditional&nbsp;probabilities.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;prefix_index:&nbsp;Mapping&nbsp;from&nbsp;prefix&nbsp;tuple&nbsp;to<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{completion_word:&nbsp;count}&nbsp;for&nbsp;every&nbsp;n-gram&nbsp;with&nbsp;that<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;prefix.&nbsp;Maintained&nbsp;alongside&nbsp;``counts``&nbsp;so&nbsp;prefix-based<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;queries&nbsp;(e.g.&nbsp;next-word&nbsp;prediction)&nbsp;are&nbsp;O(K)&nbsp;in&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;number&nbsp;of&nbsp;completions&nbsp;for&nbsp;the&nbsp;prefix&nbsp;rather&nbsp;than&nbsp;O(N)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;in&nbsp;the&nbsp;total&nbsp;number&nbsp;of&nbsp;observed&nbsp;n-grams.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="NGramModel-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="NGramModel-__init__"><strong>__init__</strong></a>(self, n: 'int', counts: 'dict[tuple[str, ...], int]' = &lt;factory&gt;, context_counts: 'dict[tuple[str, ...], int]' = &lt;factory&gt;, prefix_index: 'dict[tuple[str, ...], dict[str, int]]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="NGramModel-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="NGramModel-completions_for"><strong>completions_for</strong></a>(self, prefix: 'tuple[str, ...]') -&gt; 'dict[str, int]'</dt><dd><span class="code">Return&nbsp;``{completion_word:&nbsp;count}``&nbsp;for&nbsp;all&nbsp;n-grams&nbsp;with&nbsp;``prefix``.<br>
+&nbsp;<br>
+Lookup&nbsp;is&nbsp;O(1)&nbsp;average;&nbsp;iterating&nbsp;the&nbsp;result&nbsp;is&nbsp;O(K)&nbsp;where&nbsp;K<br>
+is&nbsp;the&nbsp;number&nbsp;of&nbsp;distinct&nbsp;completions&nbsp;observed&nbsp;for&nbsp;the&nbsp;prefix.</span></dd></dl>
+
+<dl><dt><a name="NGramModel-most_common"><strong>most_common</strong></a>(self, k: 'int' = 10) -&gt; 'list[tuple[tuple[str, ...], int]]'</dt><dd><span class="code">Return&nbsp;the&nbsp;k&nbsp;most&nbsp;frequent&nbsp;n-grams.</span></dd></dl>
+
+<dl><dt><a name="NGramModel-observe"><strong>observe</strong></a>(self, tokens: 'list[str]') -&gt; 'None'</dt><dd><span class="code">Record&nbsp;n-grams&nbsp;from&nbsp;a&nbsp;token&nbsp;list.</span></dd></dl>
+
+<dl><dt><a name="NGramModel-probability"><strong>probability</strong></a>(self, ngram: 'tuple[str, ...]') -&gt; 'float'</dt><dd><span class="code">Conditional&nbsp;probability&nbsp;P(word_n&nbsp;|&nbsp;prefix).<br>
+&nbsp;<br>
+Uses&nbsp;simple&nbsp;maximum-likelihood&nbsp;estimation&nbsp;with&nbsp;add-one<br>
+(Laplace)&nbsp;smoothing&nbsp;to&nbsp;avoid&nbsp;zero&nbsp;probabilities&nbsp;for&nbsp;unseen<br>
+n-grams.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>context_counts</strong></dt>
+</dl>
+<dl><dt><strong>counts</strong></dt>
+</dl>
+<dl><dt><strong>n</strong></dt>
+</dl>
+<dl><dt><strong>prefix_index</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'context_counts': 'dict[tuple[str, ...], int]', 'counts': 'dict[tuple[str, ...], int]', 'n': 'int', 'prefix_index': 'dict[tuple[str, ...], dict[str, int]]'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'context_counts': Field(name='context_counts',type='dict[tuple[str...appingproxy({}),kw_only=False,_field_type=_FIELD), 'counts': Field(name='counts',type='dict[tuple[str, ...], ...appingproxy({}),kw_only=False,_field_type=_FIELD), 'n': Field(name='n',type='int',default=&lt;dataclasses._...appingproxy({}),kw_only=False,_field_type=_FIELD), 'prefix_index': Field(name='prefix_index',type='dict[tuple[str, ...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('n', 'counts', 'context_counts', 'prefix_index')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="StatisticalLanguageLearner">class <strong>StatisticalLanguageLearner</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#StatisticalLanguageLearner">StatisticalLanguageLearner</a>()&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Learn&nbsp;the&nbsp;user's&nbsp;language&nbsp;patterns&nbsp;from&nbsp;input&nbsp;text.<br>
+&nbsp;<br>
+Tracks&nbsp;word&nbsp;frequencies,&nbsp;bigram/trigram&nbsp;patterns,&nbsp;and&nbsp;adapts&nbsp;to<br>
+the&nbsp;user's&nbsp;communication&nbsp;style.&nbsp;The&nbsp;generative&nbsp;engine&nbsp;can&nbsp;query<br>
+this&nbsp;learner&nbsp;to&nbsp;match&nbsp;the&nbsp;user's&nbsp;vocabulary&nbsp;and&nbsp;register.<br>
+&nbsp;<br>
+Usage::<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;learner&nbsp;=&nbsp;<a href="#StatisticalLanguageLearner">StatisticalLanguageLearner</a>()<br>
+&nbsp;&nbsp;&nbsp;&nbsp;learner.<a href="#StatisticalLanguageLearner-learn_from_input">learn_from_input</a>("Hello,&nbsp;could&nbsp;you&nbsp;help&nbsp;me&nbsp;with&nbsp;this?")<br>
+&nbsp;&nbsp;&nbsp;&nbsp;learner.<a href="#StatisticalLanguageLearner-learn_from_input">learn_from_input</a>("Sure,&nbsp;I&nbsp;can&nbsp;assist&nbsp;with&nbsp;that.")<br>
+&nbsp;&nbsp;&nbsp;&nbsp;profile&nbsp;=&nbsp;learner.<a href="#StatisticalLanguageLearner-user_style_profile">user_style_profile</a>()<br>
+&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;profile&nbsp;=&nbsp;{"style":&nbsp;"formal",&nbsp;"avg_sentence_length":&nbsp;7.5,&nbsp;...}<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="StatisticalLanguageLearner-__init__"><strong>__init__</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;empty&nbsp;word&nbsp;frequency&nbsp;and&nbsp;n-gram&nbsp;models.</span></dd></dl>
+
+<dl><dt><a name="StatisticalLanguageLearner-bigram_probability"><strong>bigram_probability</strong></a>(self, word_a: 'str', word_b: 'str') -&gt; 'float'</dt><dd><span class="code">Get&nbsp;P(word_b&nbsp;|&nbsp;word_a)&nbsp;from&nbsp;the&nbsp;bigram&nbsp;model.</span></dd></dl>
+
+<dl><dt><a name="StatisticalLanguageLearner-learn_from_input"><strong>learn_from_input</strong></a>(self, text: 'str') -&gt; 'None'</dt><dd><span class="code">Learn&nbsp;language&nbsp;patterns&nbsp;from&nbsp;a&nbsp;user's&nbsp;input&nbsp;text.<br>
+&nbsp;<br>
+Updates&nbsp;word&nbsp;frequencies,&nbsp;n-gram&nbsp;models,&nbsp;sentence&nbsp;length<br>
+statistics,&nbsp;and&nbsp;style&nbsp;marker&nbsp;counts.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;text:&nbsp;The&nbsp;user's&nbsp;input&nbsp;text&nbsp;to&nbsp;learn&nbsp;from.</span></dd></dl>
+
+<dl><dt><a name="StatisticalLanguageLearner-sequence_fluency"><strong>sequence_fluency</strong></a>(self, text: 'str') -&gt; 'float'</dt><dd><span class="code">Score&nbsp;local&nbsp;transitions&nbsp;against&nbsp;learned&nbsp;language&nbsp;experience.<br>
+&nbsp;<br>
+The&nbsp;score&nbsp;remains&nbsp;neutral&nbsp;for&nbsp;contexts&nbsp;the&nbsp;learner&nbsp;has&nbsp;never&nbsp;seen,<br>
+so&nbsp;sparse&nbsp;experience&nbsp;cannot&nbsp;reject&nbsp;novel&nbsp;wording.&nbsp;Evidence&nbsp;only<br>
+moves&nbsp;the&nbsp;score&nbsp;where&nbsp;an&nbsp;observed&nbsp;prefix&nbsp;supports&nbsp;or&nbsp;disfavors&nbsp;the<br>
+candidate's&nbsp;continuation.</span></dd></dl>
+
+<dl><dt><a name="StatisticalLanguageLearner-suggest_next_word"><strong>suggest_next_word</strong></a>(self, context: 'list[str]') -&gt; 'str | None'</dt><dd><span class="code">Suggest&nbsp;the&nbsp;most&nbsp;likely&nbsp;next&nbsp;word&nbsp;given&nbsp;context.<br>
+&nbsp;<br>
+Uses&nbsp;the&nbsp;trigram&nbsp;model&nbsp;if&nbsp;the&nbsp;context&nbsp;is&nbsp;long&nbsp;enough,<br>
+otherwise&nbsp;falls&nbsp;back&nbsp;to&nbsp;the&nbsp;bigram&nbsp;model.<br>
+&nbsp;<br>
+Lookup&nbsp;is&nbsp;O(K)&nbsp;in&nbsp;the&nbsp;number&nbsp;of&nbsp;completions&nbsp;observed&nbsp;for&nbsp;the<br>
+prefix,&nbsp;via&nbsp;the&nbsp;prefix&nbsp;index&nbsp;—&nbsp;it&nbsp;does&nbsp;not&nbsp;scan&nbsp;the&nbsp;full<br>
+n-gram&nbsp;table.&nbsp;Ranking&nbsp;by&nbsp;raw&nbsp;count&nbsp;is&nbsp;equivalent&nbsp;to&nbsp;ranking<br>
+by&nbsp;Laplace-smoothed&nbsp;probability&nbsp;for&nbsp;a&nbsp;fixed&nbsp;prefix,&nbsp;since<br>
+the&nbsp;smoothing&nbsp;denominator&nbsp;(context_count&nbsp;+&nbsp;V)&nbsp;is&nbsp;constant<br>
+across&nbsp;completions&nbsp;sharing&nbsp;that&nbsp;prefix.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;context:&nbsp;The&nbsp;preceding&nbsp;words&nbsp;(most&nbsp;recent&nbsp;last).<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;most&nbsp;likely&nbsp;next&nbsp;word,&nbsp;or&nbsp;None&nbsp;if&nbsp;no&nbsp;data.</span></dd></dl>
+
+<dl><dt><a name="StatisticalLanguageLearner-trigram_probability"><strong>trigram_probability</strong></a>(self, w1: 'str', w2: 'str', w3: 'str') -&gt; 'float'</dt><dd><span class="code">Get&nbsp;P(w3&nbsp;|&nbsp;w1,&nbsp;w2)&nbsp;from&nbsp;the&nbsp;trigram&nbsp;model.</span></dd></dl>
+
+<dl><dt><a name="StatisticalLanguageLearner-user_style_profile"><strong>user_style_profile</strong></a>(self) -&gt; 'dict'</dt><dd><span class="code">Return&nbsp;a&nbsp;profile&nbsp;of&nbsp;the&nbsp;user's&nbsp;communication&nbsp;style.<br>
+&nbsp;<br>
+The&nbsp;profile&nbsp;includes:<br>
+-&nbsp;``style``:&nbsp;the&nbsp;dominant&nbsp;register&nbsp;("formal",&nbsp;"casual",<br>
+&nbsp;&nbsp;"technical",&nbsp;or&nbsp;"neutral")<br>
+-&nbsp;``avg_sentence_length``:&nbsp;average&nbsp;words&nbsp;per&nbsp;sentence<br>
+-&nbsp;``vocabulary_size``:&nbsp;number&nbsp;of&nbsp;distinct&nbsp;words&nbsp;observed<br>
+-&nbsp;``top_words``:&nbsp;the&nbsp;10&nbsp;most&nbsp;frequent&nbsp;words<br>
+-&nbsp;``top_bigrams``:&nbsp;the&nbsp;5&nbsp;most&nbsp;frequent&nbsp;bigrams<br>
+-&nbsp;``top_trigrams``:&nbsp;the&nbsp;5&nbsp;most&nbsp;frequent&nbsp;trigrams<br>
+-&nbsp;``formal_score``:&nbsp;proportion&nbsp;of&nbsp;formal&nbsp;markers&nbsp;(0–1)<br>
+-&nbsp;``casual_score``:&nbsp;proportion&nbsp;of&nbsp;casual&nbsp;markers&nbsp;(0–1)<br>
+-&nbsp;``technical_score``:&nbsp;proportion&nbsp;of&nbsp;technical&nbsp;markers&nbsp;(0–1)<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;dictionary&nbsp;describing&nbsp;the&nbsp;user's&nbsp;style&nbsp;profile.</span></dd></dl>
+
+<dl><dt><a name="StatisticalLanguageLearner-word_frequency"><strong>word_frequency</strong></a>(self, word: 'str') -&gt; 'int'</dt><dd><span class="code">Get&nbsp;the&nbsp;observed&nbsp;frequency&nbsp;of&nbsp;a&nbsp;word.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>total_inputs</strong></dt>
+<dd><span class="code">Total&nbsp;number&nbsp;of&nbsp;sentences&nbsp;observed.</span></dd>
+</dl>
+<dl><dt><strong>total_tokens</strong></dt>
+<dd><span class="code">Total&nbsp;number&nbsp;of&nbsp;word&nbsp;tokens&nbsp;observed&nbsp;across&nbsp;all&nbsp;input.</span></dd>
+</dl>
+<dl><dt><strong>vocabulary_size</strong></dt>
+<dd><span class="code">Number&nbsp;of&nbsp;distinct&nbsp;words&nbsp;observed.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['NGramModel', 'StatisticalLanguageLearner']</td></tr></table>
+</body></html>

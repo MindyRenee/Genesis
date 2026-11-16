@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.parietal_lobe.situation_model</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.parietal_lobe.html" class="white">parietal_lobe</a>.situation_model</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/parietal_lobe/situation_model.py">/home/mindyrenee/GenAnd/Genesis/Self_World/parietal_lobe/situation_model.py</a></td></tr></table>
+    <p><span class="code">Situation&nbsp;model&nbsp;—&nbsp;the&nbsp;state&nbsp;of&nbsp;the&nbsp;world&nbsp;the&nbsp;current&nbsp;discourse&nbsp;describes.<br>
+&nbsp;<br>
+Distinct&nbsp;from&nbsp;the&nbsp;concept&nbsp;network:&nbsp;the&nbsp;network&nbsp;holds&nbsp;semantic&nbsp;knowledge<br>
+("a&nbsp;tardigrade&nbsp;is&nbsp;a&nbsp;microscopic&nbsp;animal")&nbsp;while&nbsp;this&nbsp;holds&nbsp;the&nbsp;episodic<br>
+situation&nbsp;being&nbsp;talked&nbsp;about&nbsp;right&nbsp;now&nbsp;("Mary&nbsp;is&nbsp;in&nbsp;the&nbsp;bathroom",<br>
+"Sandra&nbsp;is&nbsp;carrying&nbsp;the&nbsp;milk").&nbsp;Propositions&nbsp;from&nbsp;the&nbsp;comprehension<br>
+engine&nbsp;update&nbsp;it&nbsp;every&nbsp;turn;&nbsp;question&nbsp;answering&nbsp;consults&nbsp;it&nbsp;before<br>
+falling&nbsp;back&nbsp;to&nbsp;semantic&nbsp;memory&nbsp;or&nbsp;external&nbsp;lookup&nbsp;—&nbsp;so&nbsp;a&nbsp;"Where&nbsp;is<br>
+Mary?"&nbsp;asked&nbsp;mid-story&nbsp;is&nbsp;answered&nbsp;from&nbsp;what&nbsp;she&nbsp;just&nbsp;heard,&nbsp;not&nbsp;from<br>
+the&nbsp;web.<br>
+&nbsp;<br>
+Modeled&nbsp;on&nbsp;the&nbsp;discourse&nbsp;situation&nbsp;model&nbsp;of&nbsp;van&nbsp;Dijk&nbsp;&amp;&nbsp;Kintsch&nbsp;(1983):<br>
+comprehension&nbsp;does&nbsp;not&nbsp;end&nbsp;at&nbsp;the&nbsp;sentence&nbsp;—&nbsp;it&nbsp;maintains&nbsp;a&nbsp;running<br>
+model&nbsp;of&nbsp;who&nbsp;is&nbsp;where,&nbsp;holding&nbsp;what,&nbsp;in&nbsp;what&nbsp;relation&nbsp;to&nbsp;whom.<br>
+&nbsp;<br>
+What&nbsp;it&nbsp;tracks&nbsp;per&nbsp;entity:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;location&nbsp;(latest&nbsp;wins)&nbsp;plus&nbsp;a&nbsp;history&nbsp;for&nbsp;"where&nbsp;was&nbsp;X&nbsp;before&nbsp;Y"<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;negated&nbsp;locations&nbsp;("John&nbsp;is&nbsp;not&nbsp;in&nbsp;the&nbsp;hallway")<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;uncertain&nbsp;locations&nbsp;("either&nbsp;in&nbsp;the&nbsp;garden&nbsp;or&nbsp;the&nbsp;bathroom",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"might&nbsp;be&nbsp;in&nbsp;the&nbsp;office")<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;possessions&nbsp;(take/drop/give)&nbsp;—&nbsp;carried&nbsp;objects&nbsp;co-locate&nbsp;with<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;their&nbsp;holder,&nbsp;including&nbsp;through&nbsp;the&nbsp;holder's&nbsp;moves<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;attributes&nbsp;and&nbsp;class&nbsp;membership&nbsp;("a&nbsp;mouse",&nbsp;"hungry",&nbsp;"afraid<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;of&nbsp;cats")&nbsp;—&nbsp;for&nbsp;deduction/induction&nbsp;and&nbsp;motivation&nbsp;questions<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;place&nbsp;relations&nbsp;("the&nbsp;kitchen&nbsp;is&nbsp;north&nbsp;of&nbsp;the&nbsp;hallway")&nbsp;for<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;relational&nbsp;and&nbsp;path-finding&nbsp;questions<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;size/order&nbsp;relations&nbsp;("fits&nbsp;in",&nbsp;"bigger&nbsp;than")&nbsp;for&nbsp;size<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;reasoning<br>
+&nbsp;<br>
+Event-indexed&nbsp;structure&nbsp;(Zwaan&nbsp;&amp;&nbsp;Radvansky,&nbsp;1998):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Every&nbsp;proposition&nbsp;also&nbsp;becomes&nbsp;a&nbsp;:class:`<a href="#SituationEvent">SituationEvent</a>`&nbsp;—&nbsp;a&nbsp;bound<br>
+&nbsp;&nbsp;&nbsp;&nbsp;relational&nbsp;unit&nbsp;indexed&nbsp;on&nbsp;the&nbsp;five&nbsp;dimensions&nbsp;readers&nbsp;use&nbsp;to<br>
+&nbsp;&nbsp;&nbsp;&nbsp;track&nbsp;a&nbsp;situation:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;protagonist:&nbsp;every&nbsp;participant&nbsp;in&nbsp;the&nbsp;event&nbsp;(``by_participant``)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;space:&nbsp;where&nbsp;the&nbsp;event&nbsp;happens&nbsp;(``by_location``)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;time:&nbsp;sequence,&nbsp;tense,&nbsp;and&nbsp;explicit&nbsp;temporal&nbsp;phrases<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;causation:&nbsp;stated&nbsp;reasons&nbsp;("because&nbsp;...")&nbsp;and&nbsp;consequence<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;markers&nbsp;("so",&nbsp;"therefore")&nbsp;link&nbsp;cause&nbsp;→&nbsp;effect&nbsp;events<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;intention:&nbsp;purpose&nbsp;clauses&nbsp;("to&nbsp;buy&nbsp;milk")&nbsp;and,&nbsp;separately,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;interlocutor's&nbsp;questions/commands&nbsp;(``requests``)<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Events&nbsp;bind&nbsp;to&nbsp;each&nbsp;other&nbsp;by&nbsp;shared&nbsp;participants&nbsp;and&nbsp;location<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(construction–integration;&nbsp;Kintsch,&nbsp;1988).&nbsp;An&nbsp;event&nbsp;that&nbsp;binds&nbsp;to<br>
+&nbsp;&nbsp;&nbsp;&nbsp;nothing&nbsp;in&nbsp;the&nbsp;active&nbsp;window&nbsp;marks&nbsp;an&nbsp;episode&nbsp;boundary&nbsp;—&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;discourse&nbsp;has&nbsp;shifted&nbsp;to&nbsp;a&nbsp;new&nbsp;situation.<br>
+&nbsp;<br>
+Attribution&nbsp;and&nbsp;scope:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Embedded&nbsp;propositions&nbsp;(comprehension's&nbsp;``Proposition.embedded``)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;are&nbsp;*attributed*&nbsp;content,&nbsp;never&nbsp;asserted.&nbsp;"John&nbsp;believes&nbsp;that<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Mary&nbsp;is&nbsp;in&nbsp;the&nbsp;kitchen"&nbsp;logs&nbsp;a&nbsp;belief&nbsp;event&nbsp;about&nbsp;John&nbsp;and&nbsp;stores<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"mary&nbsp;is&nbsp;in&nbsp;the&nbsp;kitchen"&nbsp;under&nbsp;John's&nbsp;``beliefs``&nbsp;—&nbsp;it&nbsp;does&nbsp;not<br>
+&nbsp;&nbsp;&nbsp;&nbsp;move&nbsp;Mary.&nbsp;Mental-state&nbsp;verbs&nbsp;(think,&nbsp;believe,&nbsp;hope,&nbsp;...)&nbsp;write&nbsp;to<br>
+&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;belief&nbsp;index&nbsp;(``beliefs_of``);&nbsp;report&nbsp;verbs&nbsp;(say,&nbsp;tell,&nbsp;...)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;stay&nbsp;on&nbsp;the&nbsp;event&nbsp;log&nbsp;as&nbsp;public&nbsp;speech&nbsp;acts&nbsp;(``reports_of``).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Embedded&nbsp;entities&nbsp;join&nbsp;the&nbsp;event's&nbsp;participant&nbsp;index&nbsp;so&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;attribution&nbsp;binds&nbsp;into&nbsp;the&nbsp;discourse&nbsp;without&nbsp;becoming&nbsp;world&nbsp;state.<br>
+&nbsp;<br>
+Only&nbsp;statements&nbsp;update&nbsp;entity&nbsp;state&nbsp;and&nbsp;the&nbsp;event&nbsp;log.&nbsp;Questions&nbsp;and<br>
+commands&nbsp;are&nbsp;recorded&nbsp;as&nbsp;dialogue&nbsp;acts&nbsp;(the&nbsp;interlocutor's&nbsp;expressed<br>
+intentions)&nbsp;but&nbsp;never&nbsp;mutate&nbsp;the&nbsp;state&nbsp;being&nbsp;talked&nbsp;about.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="re.html">re</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.parietal_lobe.situation_model.html#DialogueAct">DialogueAct</a>
+</dt><dt class="heading-text"><a href="Self_World.parietal_lobe.situation_model.html#EntityState">EntityState</a>
+</dt><dt class="heading-text"><a href="Self_World.parietal_lobe.situation_model.html#SituationEvent">SituationEvent</a>
+</dt><dt class="heading-text"><a href="Self_World.parietal_lobe.situation_model.html#SituationModel">SituationModel</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="DialogueAct">class <strong>DialogueAct</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#DialogueAct">DialogueAct</a>(seq:&nbsp;'int',&nbsp;kind:&nbsp;'str',&nbsp;subject:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;predicate:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;<a href="builtins.html#object">object</a>:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;focus:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;theme:&nbsp;'str'&nbsp;=&nbsp;'')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;interlocutor's&nbsp;expressed&nbsp;intention&nbsp;—&nbsp;a&nbsp;question&nbsp;or&nbsp;command.<br>
+&nbsp;<br>
+Statements&nbsp;describe&nbsp;the&nbsp;world;&nbsp;questions&nbsp;and&nbsp;commands&nbsp;express&nbsp;what<br>
+the&nbsp;speaker&nbsp;wants.&nbsp;They&nbsp;are&nbsp;indexed&nbsp;as&nbsp;intentions&nbsp;of&nbsp;the<br>
+interlocutor&nbsp;(Zwaan's&nbsp;motivation&nbsp;dimension,&nbsp;applied&nbsp;to&nbsp;the<br>
+discourse&nbsp;itself)&nbsp;rather&nbsp;than&nbsp;as&nbsp;events&nbsp;in&nbsp;the&nbsp;described&nbsp;world&nbsp;—<br>
+asking&nbsp;"Where&nbsp;is&nbsp;Mary?"&nbsp;must&nbsp;not&nbsp;move&nbsp;Mary&nbsp;anywhere.<br>
+&nbsp;<br>
+Attributes:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;seq:&nbsp;Request&nbsp;index.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;kind:&nbsp;"question"&nbsp;or&nbsp;"command".<br>
+&nbsp;&nbsp;&nbsp;&nbsp;subject:&nbsp;What&nbsp;the&nbsp;act&nbsp;is&nbsp;about&nbsp;(normalized).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;predicate:&nbsp;The&nbsp;verb&nbsp;of&nbsp;the&nbsp;request&nbsp;("tell",&nbsp;"is").<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="builtins.html#object">object</a>:&nbsp;Its&nbsp;<a href="builtins.html#object">object</a>&nbsp;argument.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;focus:&nbsp;For&nbsp;questions,&nbsp;the&nbsp;questioned&nbsp;constituent&nbsp;("where").<br>
+&nbsp;&nbsp;&nbsp;&nbsp;theme:&nbsp;THEME&nbsp;role&nbsp;content&nbsp;("tell&nbsp;me&nbsp;about&nbsp;X"&nbsp;→&nbsp;"x").<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="DialogueAct-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="DialogueAct-__init__"><strong>__init__</strong></a>(self, seq: 'int', kind: 'str', subject: 'str' = '', predicate: 'str' = '', object: 'str' = '', focus: 'str' = '', theme: 'str' = '') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="DialogueAct-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'focus': 'str', 'kind': 'str', 'object': 'str', 'predicate': 'str', 'seq': 'int', 'subject': 'str', 'theme': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'focus': Field(name='focus',type='str',default='',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'kind': Field(name='kind',type='str',default=&lt;dataclasse...appingproxy({}),kw_only=False,_field_type=_FIELD), 'object': Field(name='object',type='str',default='',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'predicate': Field(name='predicate',type='str',default='',def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'seq': Field(name='seq',type='int',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD), 'subject': Field(name='subject',type='str',default='',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'theme': Field(name='theme',type='str',default='',default...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('seq', 'kind', 'subject', 'predicate', 'object', 'focus', 'theme')</dl>
+
+<dl><dt><strong>focus</strong> = ''</dl>
+
+<dl><dt><strong>object</strong> = ''</dl>
+
+<dl><dt><strong>predicate</strong> = ''</dl>
+
+<dl><dt><strong>subject</strong> = ''</dl>
+
+<dl><dt><strong>theme</strong> = ''</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="EntityState">class <strong>EntityState</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#EntityState">EntityState</a>(location:&nbsp;'str&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;location_seq:&nbsp;'int'&nbsp;=&nbsp;-1,&nbsp;location_history:&nbsp;'list[tuple[int,&nbsp;str]]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;not_at:&nbsp;'set[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;candidates:&nbsp;'set[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;carrying:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;holder:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;classes:&nbsp;'set[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;attributes:&nbsp;'set[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;fears:&nbsp;'set[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;beliefs:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;discourse&nbsp;state&nbsp;of&nbsp;one&nbsp;entity.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="EntityState-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="EntityState-__init__"><strong>__init__</strong></a>(self, location: 'str | None' = None, location_seq: 'int' = -1, location_history: 'list[tuple[int, str]]' = &lt;factory&gt;, not_at: 'set[str]' = &lt;factory&gt;, candidates: 'set[str]' = &lt;factory&gt;, carrying: 'list[str]' = &lt;factory&gt;, holder: 'str' = '', classes: 'set[str]' = &lt;factory&gt;, attributes: 'set[str]' = &lt;factory&gt;, fears: 'set[str]' = &lt;factory&gt;, beliefs: 'list[str]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="EntityState-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'attributes': 'set[str]', 'beliefs': 'list[str]', 'candidates': 'set[str]', 'carrying': 'list[str]', 'classes': 'set[str]', 'fears': 'set[str]', 'holder': 'str', 'location': 'str | None', 'location_history': 'list[tuple[int, str]]', 'location_seq': 'int', ...}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'attributes': Field(name='attributes',type='set[str]',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'beliefs': Field(name='beliefs',type='list[str]',default=&lt;d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'candidates': Field(name='candidates',type='set[str]',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'carrying': Field(name='carrying',type='list[str]',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD), 'classes': Field(name='classes',type='set[str]',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD), 'fears': Field(name='fears',type='set[str]',default=&lt;data...appingproxy({}),kw_only=False,_field_type=_FIELD), 'holder': Field(name='holder',type='str',default='',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'location': Field(name='location',type='str | None',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'location_history': Field(name='location_history',type='list[tuple[i...appingproxy({}),kw_only=False,_field_type=_FIELD), 'location_seq': Field(name='location_seq',type='int',default=-1,...appingproxy({}),kw_only=False,_field_type=_FIELD), ...}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('location', 'location_seq', 'location_history', 'not_at', 'candidates', 'carrying', 'holder', 'classes', 'attributes', 'fears', 'beliefs')</dl>
+
+<dl><dt><strong>holder</strong> = ''</dl>
+
+<dl><dt><strong>location</strong> = None</dl>
+
+<dl><dt><strong>location_seq</strong> = -1</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SituationEvent">class <strong>SituationEvent</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SituationEvent">SituationEvent</a>(seq:&nbsp;'int',&nbsp;episode:&nbsp;'int',&nbsp;subject:&nbsp;'str',&nbsp;predicate:&nbsp;'str',&nbsp;<a href="builtins.html#object">object</a>:&nbsp;'str',&nbsp;participants:&nbsp;'tuple[str,&nbsp;...]'&nbsp;=&nbsp;(),&nbsp;location:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;time_marker:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;tense:&nbsp;'str'&nbsp;=&nbsp;'unknown',&nbsp;negated:&nbsp;'bool'&nbsp;=&nbsp;False,&nbsp;uncertain:&nbsp;'bool'&nbsp;=&nbsp;False,&nbsp;bound_to:&nbsp;'tuple[int,&nbsp;...]'&nbsp;=&nbsp;(),&nbsp;cause_text:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;causes:&nbsp;'tuple[int,&nbsp;...]'&nbsp;=&nbsp;(),&nbsp;caused_by:&nbsp;'tuple[int,&nbsp;...]'&nbsp;=&nbsp;(),&nbsp;intention:&nbsp;'str'&nbsp;=&nbsp;'')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+One&nbsp;bound&nbsp;event&nbsp;—&nbsp;a&nbsp;clause's&nbsp;contribution&nbsp;to&nbsp;the&nbsp;situation.<br>
+&nbsp;<br>
+The&nbsp;unit&nbsp;of&nbsp;the&nbsp;event-indexed&nbsp;model&nbsp;(Zwaan&nbsp;&amp;&nbsp;Radvansky,&nbsp;1998):<br>
+each&nbsp;event&nbsp;is&nbsp;indexed&nbsp;on&nbsp;the&nbsp;five&nbsp;dimensions&nbsp;a&nbsp;comprehender&nbsp;uses<br>
+to&nbsp;keep&nbsp;track&nbsp;of&nbsp;what&nbsp;is&nbsp;happening.<br>
+&nbsp;<br>
+Attributes:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;seq:&nbsp;Temporal&nbsp;position&nbsp;—&nbsp;the&nbsp;event's&nbsp;index&nbsp;in&nbsp;the&nbsp;log.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;episode:&nbsp;Which&nbsp;episode&nbsp;this&nbsp;belongs&nbsp;to.&nbsp;A&nbsp;new&nbsp;episode&nbsp;starts<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;when&nbsp;an&nbsp;event&nbsp;binds&nbsp;to&nbsp;nothing&nbsp;in&nbsp;the&nbsp;active&nbsp;window.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;subject:&nbsp;The&nbsp;protagonist/agent&nbsp;of&nbsp;the&nbsp;event&nbsp;(normalized).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;predicate:&nbsp;The&nbsp;relation&nbsp;or&nbsp;action.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="builtins.html#object">object</a>:&nbsp;The&nbsp;patient/theme/place&nbsp;argument&nbsp;(""&nbsp;when&nbsp;absent).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;participants:&nbsp;Every&nbsp;entity&nbsp;the&nbsp;event&nbsp;binds&nbsp;—&nbsp;subject,&nbsp;<a href="builtins.html#object">object</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;parts,&nbsp;and&nbsp;clause&nbsp;co-subjects&nbsp;—&nbsp;ordered&nbsp;by&nbsp;mention.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;location:&nbsp;Spatial&nbsp;index&nbsp;—&nbsp;where&nbsp;the&nbsp;event&nbsp;situates.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;time_marker:&nbsp;Explicit&nbsp;temporal&nbsp;phrase&nbsp;("during&nbsp;the&nbsp;storm").<br>
+&nbsp;&nbsp;&nbsp;&nbsp;tense:&nbsp;"past"/"present"/"future"/"unknown"&nbsp;from&nbsp;the&nbsp;parse.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;negated:&nbsp;Whether&nbsp;the&nbsp;proposition&nbsp;was&nbsp;negated.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;uncertain:&nbsp;Whether&nbsp;it&nbsp;was&nbsp;hedged&nbsp;("might",&nbsp;"either&nbsp;...&nbsp;or").<br>
+&nbsp;&nbsp;&nbsp;&nbsp;bound_to:&nbsp;Seq&nbsp;of&nbsp;prior&nbsp;events&nbsp;sharing&nbsp;a&nbsp;participant&nbsp;or&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;location&nbsp;—&nbsp;the&nbsp;construction–integration&nbsp;binding&nbsp;that&nbsp;makes<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;log&nbsp;a&nbsp;graph&nbsp;rather&nbsp;than&nbsp;a&nbsp;list&nbsp;(Kintsch,&nbsp;1988).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;cause_text:&nbsp;Stated&nbsp;reason&nbsp;from&nbsp;a&nbsp;"because"&nbsp;clause,&nbsp;verbatim.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;causes:&nbsp;Seq&nbsp;of&nbsp;events&nbsp;this&nbsp;one&nbsp;is&nbsp;stated&nbsp;to&nbsp;cause/enable<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;("X&nbsp;so&nbsp;Y",&nbsp;"X.&nbsp;Therefore&nbsp;Y").<br>
+&nbsp;&nbsp;&nbsp;&nbsp;caused_by:&nbsp;Seq&nbsp;of&nbsp;events&nbsp;stated&nbsp;to&nbsp;cause&nbsp;this&nbsp;one.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;intention:&nbsp;Stated&nbsp;purpose&nbsp;("to&nbsp;buy&nbsp;milk",&nbsp;"in&nbsp;order&nbsp;to&nbsp;sleep").<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="SituationEvent-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="SituationEvent-__init__"><strong>__init__</strong></a>(self, seq: 'int', episode: 'int', subject: 'str', predicate: 'str', object: 'str', participants: 'tuple[str, ...]' = (), location: 'str' = '', time_marker: 'str' = '', tense: 'str' = 'unknown', negated: 'bool' = False, uncertain: 'bool' = False, bound_to: 'tuple[int, ...]' = (), cause_text: 'str' = '', causes: 'tuple[int, ...]' = (), caused_by: 'tuple[int, ...]' = (), intention: 'str' = '') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="SituationEvent-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="SituationEvent-describe"><strong>describe</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Compact&nbsp;"subject&nbsp;predicate&nbsp;<a href="builtins.html#object">object</a>"&nbsp;rendering.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'bound_to': 'tuple[int, ...]', 'cause_text': 'str', 'caused_by': 'tuple[int, ...]', 'causes': 'tuple[int, ...]', 'episode': 'int', 'intention': 'str', 'location': 'str', 'negated': 'bool', 'object': 'str', 'participants': 'tuple[str, ...]', ...}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'bound_to': Field(name='bound_to',type='tuple[int, ...]',def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'cause_text': Field(name='cause_text',type='str',default='',de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'caused_by': Field(name='caused_by',type='tuple[int, ...]',de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'causes': Field(name='causes',type='tuple[int, ...]',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'episode': Field(name='episode',type='int',default=&lt;datacla...appingproxy({}),kw_only=False,_field_type=_FIELD), 'intention': Field(name='intention',type='str',default='',def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'location': Field(name='location',type='str',default='',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'negated': Field(name='negated',type='bool',default=False,d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'object': Field(name='object',type='str',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD), 'participants': Field(name='participants',type='tuple[str, ...]'...appingproxy({}),kw_only=False,_field_type=_FIELD), ...}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('seq', 'episode', 'subject', 'predicate', 'object', 'participants', 'location', 'time_marker', 'tense', 'negated', 'uncertain', 'bound_to', 'cause_text', 'causes', 'caused_by', 'intention')</dl>
+
+<dl><dt><strong>bound_to</strong> = ()</dl>
+
+<dl><dt><strong>cause_text</strong> = ''</dl>
+
+<dl><dt><strong>caused_by</strong> = ()</dl>
+
+<dl><dt><strong>causes</strong> = ()</dl>
+
+<dl><dt><strong>intention</strong> = ''</dl>
+
+<dl><dt><strong>location</strong> = ''</dl>
+
+<dl><dt><strong>negated</strong> = False</dl>
+
+<dl><dt><strong>participants</strong> = ()</dl>
+
+<dl><dt><strong>tense</strong> = 'unknown'</dl>
+
+<dl><dt><strong>time_marker</strong> = ''</dl>
+
+<dl><dt><strong>uncertain</strong> = False</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SituationModel">class <strong>SituationModel</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SituationModel">SituationModel</a>()&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Running&nbsp;model&nbsp;of&nbsp;the&nbsp;situation&nbsp;under&nbsp;discussion.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="SituationModel-__init__"><strong>__init__</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="SituationModel-active_participants"><strong>active_participants</strong></a>(self, limit: 'int' = 6) -&gt; 'list[str]'</dt><dd><span class="code">Entities&nbsp;bound&nbsp;in&nbsp;the&nbsp;current&nbsp;episode,&nbsp;most&nbsp;recent&nbsp;first.<br>
+&nbsp;<br>
+These&nbsp;are&nbsp;the&nbsp;referents&nbsp;held&nbsp;"in&nbsp;mind"&nbsp;—&nbsp;what&nbsp;working&nbsp;memory<br>
+should&nbsp;keep&nbsp;active&nbsp;for&nbsp;pronoun&nbsp;resolution&nbsp;and&nbsp;topic&nbsp;continuity<br>
+(Baddeley's&nbsp;episodic&nbsp;buffer&nbsp;function:&nbsp;the&nbsp;current&nbsp;bound<br>
+structure,&nbsp;not&nbsp;loose&nbsp;items).</span></dd></dl>
+
+<dl><dt><a name="SituationModel-beliefs_of"><strong>beliefs_of</strong></a>(self, entity: 'str') -&gt; 'list[str]'</dt><dd><span class="code">Content&nbsp;attributed&nbsp;to&nbsp;an&nbsp;entity's&nbsp;mind&nbsp;—&nbsp;"what&nbsp;does&nbsp;X<br>
+believe/think/hope?"&nbsp;answered&nbsp;from&nbsp;attribution,&nbsp;not&nbsp;fact.<br>
+&nbsp;<br>
+These&nbsp;are&nbsp;propositions&nbsp;the&nbsp;discourse&nbsp;*ascribed*&nbsp;to&nbsp;the&nbsp;entity<br>
+("John&nbsp;believes&nbsp;that&nbsp;Mary&nbsp;is&nbsp;in&nbsp;the&nbsp;kitchen"),&nbsp;stored&nbsp;under<br>
+John's&nbsp;state&nbsp;without&nbsp;asserting&nbsp;them.&nbsp;Most&nbsp;recent&nbsp;last,&nbsp;capped<br>
+at&nbsp;``_MAX_BELIEFS``.</span></dd></dl>
+
+<dl><dt><a name="SituationModel-carrying"><strong>carrying</strong></a>(self, entity: 'str') -&gt; 'list[str]'</dt></dl>
+
+<dl><dt><a name="SituationModel-color_of"><strong>color_of</strong></a>(self, entity: 'str') -&gt; 'str | None'</dt><dd><span class="code">Entity's&nbsp;color&nbsp;—&nbsp;own&nbsp;attribute,&nbsp;else&nbsp;induced&nbsp;from&nbsp;a&nbsp;class<br>
+member's&nbsp;color&nbsp;(induction:&nbsp;'Lily&nbsp;is&nbsp;a&nbsp;swan&nbsp;and&nbsp;white;&nbsp;Greg&nbsp;is&nbsp;a<br>
+swan'&nbsp;→&nbsp;Greg&nbsp;is&nbsp;white).</span></dd></dl>
+
+<dl><dt><a name="SituationModel-consume_episode_shift"><strong>consume_episode_shift</strong></a>(self) -&gt; 'bool'</dt><dd><span class="code">Read-and-clear&nbsp;the&nbsp;episode-boundary&nbsp;flag.</span></dd></dl>
+
+<dl><dt><a name="SituationModel-count_carried"><strong>count_carried</strong></a>(self, entity: 'str') -&gt; 'int | None'</dt></dl>
+
+<dl><dt><a name="SituationModel-describe"><strong>describe</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">A&nbsp;one-line&nbsp;structural&nbsp;summary&nbsp;for&nbsp;introspection.</span></dd></dl>
+
+<dl><dt><a name="SituationModel-direction_of"><strong>direction_of</strong></a>(self, place: 'str', rel: 'str') -&gt; 'str | None'</dt><dd><span class="code">What&nbsp;is&nbsp;&lt;rel&gt;&nbsp;of&nbsp;&lt;place&gt;:&nbsp;'north&nbsp;of&nbsp;the&nbsp;hallway'&nbsp;→&nbsp;kitchen.</span></dd></dl>
+
+<dl><dt><a name="SituationModel-events_involving"><strong>events_involving</strong></a>(self, entity: 'str', limit: 'int' = 10) -&gt; 'list[SituationEvent]'</dt><dd><span class="code">Events&nbsp;an&nbsp;entity&nbsp;participates&nbsp;in,&nbsp;most&nbsp;recent&nbsp;first&nbsp;—<br>
+the&nbsp;protagonist&nbsp;index.</span></dd></dl>
+
+<dl><dt><a name="SituationModel-fears_of"><strong>fears_of</strong></a>(self, entity: 'str') -&gt; 'list[str]'</dt><dd><span class="code">What&nbsp;the&nbsp;entity&nbsp;is&nbsp;afraid&nbsp;of&nbsp;—&nbsp;own&nbsp;fears&nbsp;plus&nbsp;fears&nbsp;of&nbsp;its<br>
+classes&nbsp;(deduction:&nbsp;'mice&nbsp;are&nbsp;afraid&nbsp;of&nbsp;cats',&nbsp;'Jessica&nbsp;is&nbsp;a<br>
+mouse'&nbsp;→&nbsp;Jessica&nbsp;is&nbsp;afraid&nbsp;of&nbsp;cats).</span></dd></dl>
+
+<dl><dt><a name="SituationModel-fits_in"><strong>fits_in</strong></a>(self, a: 'str', b: 'str') -&gt; 'str | None'</dt><dd><span class="code">Does&nbsp;a&nbsp;fit&nbsp;in&nbsp;b?&nbsp;&nbsp;a&nbsp;fits&nbsp;in&nbsp;b&nbsp;iff&nbsp;a&nbsp;is&nbsp;smaller&nbsp;than&nbsp;b.</span></dd></dl>
+
+<dl><dt><a name="SituationModel-intentions_of"><strong>intentions_of</strong></a>(self, entity: 'str') -&gt; 'list[str]'</dt><dd><span class="code">An&nbsp;entity's&nbsp;stated&nbsp;purposes&nbsp;—&nbsp;the&nbsp;intention&nbsp;index.<br>
+&nbsp;<br>
+"John&nbsp;went&nbsp;to&nbsp;the&nbsp;store&nbsp;to&nbsp;buy&nbsp;milk"&nbsp;stores&nbsp;"buy&nbsp;milk"&nbsp;as<br>
+John's&nbsp;intention.&nbsp;Only&nbsp;purposes&nbsp;stated&nbsp;in&nbsp;the&nbsp;discourse&nbsp;are<br>
+returned;&nbsp;the&nbsp;model&nbsp;does&nbsp;not&nbsp;infer&nbsp;goals.</span></dd></dl>
+
+<dl><dt><a name="SituationModel-is_at"><strong>is_at</strong></a>(self, entity: 'str', place: 'str') -&gt; 'str | None'</dt><dd><span class="code">"yes"&nbsp;/&nbsp;"no"&nbsp;/&nbsp;"maybe"&nbsp;—&nbsp;or&nbsp;None&nbsp;when&nbsp;nothing&nbsp;is&nbsp;known.</span></dd></dl>
+
+<dl><dt><a name="SituationModel-is_bigger"><strong>is_bigger</strong></a>(self, a: 'str', b: 'str') -&gt; 'str | None'</dt><dd><span class="code">Transitive&nbsp;size&nbsp;query:&nbsp;is&nbsp;a&nbsp;bigger&nbsp;than&nbsp;b?</span></dd></dl>
+
+<dl><dt><a name="SituationModel-last_action_object"><strong>last_action_object</strong></a>(self, entity: 'str') -&gt; 'tuple[str, str] | None'</dt><dd><span class="code">Most&nbsp;recent&nbsp;(predicate,&nbsp;<a href="builtins.html#object">object</a>)&nbsp;event&nbsp;for&nbsp;an&nbsp;entity.</span></dd></dl>
+
+<dl><dt><a name="SituationModel-open_requests"><strong>open_requests</strong></a>(self) -&gt; 'list[DialogueAct]'</dt><dd><span class="code">The&nbsp;interlocutor's&nbsp;pending&nbsp;questions&nbsp;and&nbsp;commands.</span></dd></dl>
+
+<dl><dt><a name="SituationModel-path"><strong>path</strong></a>(self, src: 'str', dst: 'str') -&gt; 'str | None'</dt><dd><span class="code">Direction&nbsp;path&nbsp;src→dst&nbsp;over&nbsp;place_dir&nbsp;('n,s'),&nbsp;or&nbsp;None.</span></dd></dl>
+
+<dl><dt><a name="SituationModel-place_relation"><strong>place_relation</strong></a>(self, a: 'str', rel: 'str', b: 'str') -&gt; 'str | None'</dt><dd><span class="code">Is&nbsp;a&nbsp;&lt;rel&gt;&nbsp;of&nbsp;b?&nbsp;&nbsp;(positional:&nbsp;left/right/above/below).</span></dd></dl>
+
+<dl><dt><a name="SituationModel-recent_events"><strong>recent_events</strong></a>(self, n: 'int' = 4) -&gt; 'list[SituationEvent]'</dt><dd><span class="code">The&nbsp;n&nbsp;most&nbsp;recent&nbsp;events&nbsp;—&nbsp;the&nbsp;recency&nbsp;edge&nbsp;of&nbsp;the&nbsp;model.</span></dd></dl>
+
+<dl><dt><a name="SituationModel-recent_relations"><strong>recent_relations</strong></a>(self, n: 'int' = 4) -&gt; 'list[tuple[str, str, str]]'</dt><dd><span class="code">Recent&nbsp;events&nbsp;as&nbsp;(subject,&nbsp;predicate,&nbsp;<a href="builtins.html#object">object</a>)&nbsp;triples&nbsp;—<br>
+the&nbsp;relational&nbsp;structure&nbsp;working&nbsp;memory&nbsp;binds.</span></dd></dl>
+
+<dl><dt><a name="SituationModel-reports_of"><strong>reports_of</strong></a>(self, entity: 'str') -&gt; 'list[str]'</dt><dd><span class="code">Content&nbsp;an&nbsp;entity&nbsp;publicly&nbsp;said/reported&nbsp;—&nbsp;speech&nbsp;acts,&nbsp;not<br>
+mental&nbsp;states.&nbsp;Searched&nbsp;on&nbsp;the&nbsp;event&nbsp;log:&nbsp;any&nbsp;event&nbsp;whose<br>
+subject&nbsp;is&nbsp;the&nbsp;entity&nbsp;and&nbsp;whose&nbsp;predicate&nbsp;is&nbsp;a&nbsp;report&nbsp;verb<br>
+carries&nbsp;its&nbsp;content&nbsp;in&nbsp;``<a href="builtins.html#object">object</a>``.</span></dd></dl>
+
+<dl><dt><a name="SituationModel-state_of"><strong>state_of</strong></a>(self, entity: 'str') -&gt; 'str | None'</dt><dd><span class="code">Most&nbsp;recent&nbsp;state&nbsp;attribute&nbsp;(hungry,&nbsp;tired,&nbsp;...)&nbsp;—&nbsp;for<br>
+'why&nbsp;did&nbsp;X&nbsp;go'&nbsp;motivation&nbsp;questions.</span></dd></dl>
+
+<dl><dt><a name="SituationModel-update"><strong>update</strong></a>(self, result: 'ComprehensionResult') -&gt; 'None'</dt><dd><span class="code">Apply&nbsp;a&nbsp;comprehended&nbsp;turn&nbsp;to&nbsp;the&nbsp;model.<br>
+&nbsp;<br>
+Statements&nbsp;mutate&nbsp;entity&nbsp;state&nbsp;and&nbsp;append&nbsp;bound&nbsp;events.<br>
+Questions&nbsp;and&nbsp;commands&nbsp;are&nbsp;recorded&nbsp;as&nbsp;the&nbsp;interlocutor's<br>
+intentions&nbsp;(``requests``)&nbsp;but&nbsp;never&nbsp;mutate&nbsp;described&nbsp;state.</span></dd></dl>
+
+<dl><dt><a name="SituationModel-where_is"><strong>where_is</strong></a>(self, entity: 'str') -&gt; 'tuple[str | None, set[str]]'</dt><dd><span class="code">(definite&nbsp;location,&nbsp;uncertain&nbsp;candidates)&nbsp;for&nbsp;an&nbsp;entity.</span></dd></dl>
+
+<dl><dt><a name="SituationModel-where_was_before"><strong>where_was_before</strong></a>(self, entity: 'str', place: 'str') -&gt; 'str | None'</dt><dd><span class="code">The&nbsp;entity's&nbsp;location&nbsp;immediately&nbsp;before&nbsp;arriving&nbsp;at&nbsp;place.</span></dd></dl>
+
+<dl><dt><a name="SituationModel-who_gave"><strong>who_gave</strong></a>(self, item: 'str', recipient: 'str') -&gt; 'str | None'</dt><dd><span class="code">Who&nbsp;gave&nbsp;&lt;item&gt;&nbsp;to&nbsp;&lt;recipient&gt;&nbsp;—&nbsp;scans&nbsp;the&nbsp;event&nbsp;log.</span></dd></dl>
+
+<dl><dt><a name="SituationModel-who_is_at"><strong>who_is_at</strong></a>(self, place: 'str') -&gt; 'list[str]'</dt></dl>
+
+<dl><dt><a name="SituationModel-why_did"><strong>why_did</strong></a>(self, entity: 'str', predicate: 'str' = '') -&gt; 'str | None'</dt><dd><span class="code">The&nbsp;stated&nbsp;cause&nbsp;of&nbsp;an&nbsp;entity's&nbsp;most&nbsp;recent&nbsp;matching&nbsp;event.<br>
+&nbsp;<br>
+Answers&nbsp;"why&nbsp;did&nbsp;X&nbsp;&lt;predicate&gt;?"&nbsp;from&nbsp;the&nbsp;causation&nbsp;index:<br>
+an&nbsp;explicit&nbsp;"because"&nbsp;clause&nbsp;wins,&nbsp;then&nbsp;a&nbsp;linked&nbsp;cause&nbsp;event<br>
+("A&nbsp;so&nbsp;B"),&nbsp;else&nbsp;None&nbsp;—&nbsp;the&nbsp;model&nbsp;does&nbsp;not&nbsp;invent&nbsp;reasons.<br>
+Predicate&nbsp;matching&nbsp;is&nbsp;morphological&nbsp;("go"&nbsp;matches&nbsp;"went")&nbsp;and<br>
+family-aware&nbsp;("go"&nbsp;matches&nbsp;the&nbsp;logged&nbsp;transition&nbsp;"moved&nbsp;to").</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>current_episode</strong></dt>
+<dd><span class="code">The&nbsp;episode&nbsp;the&nbsp;most&nbsp;recent&nbsp;event&nbsp;belongs&nbsp;to.</span></dd>
+</dl>
+<dl><dt><strong>episode_count</strong></dt>
+<dd><span class="code">How&nbsp;many&nbsp;episodes&nbsp;the&nbsp;discourse&nbsp;has&nbsp;segmented&nbsp;into.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>BIND_WINDOW</strong> = 8</dl>
+
+<dl><dt><strong>MAX_REQUESTS</strong> = 8</dl>
+
+<dl><dt><strong>__annotations__</strong> = {'BIND_WINDOW': 'int', 'MAX_REQUESTS': 'int'}</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>TYPE_CHECKING</strong> = False</td></tr></table>
+</body></html>

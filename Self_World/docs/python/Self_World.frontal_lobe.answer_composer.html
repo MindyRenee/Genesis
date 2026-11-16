@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.frontal_lobe.answer_composer</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.frontal_lobe.html" class="white">frontal_lobe</a>.answer_composer</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/answer_composer.py">/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/answer_composer.py</a></td></tr></table>
+    <p><span class="code">Answer&nbsp;composition&nbsp;—&nbsp;compose&nbsp;factual&nbsp;answers&nbsp;from&nbsp;concept-network&nbsp;knowledge.<br>
+&nbsp;<br>
+Extracted&nbsp;from&nbsp;FrontalLobe&nbsp;as&nbsp;a&nbsp;focused&nbsp;subsystem.&nbsp;The&nbsp;composer<br>
+builds&nbsp;answers&nbsp;to&nbsp;factual,&nbsp;comparison,&nbsp;parts,&nbsp;consumption,&nbsp;counterfactual,<br>
+explanatory,&nbsp;and&nbsp;planning&nbsp;questions&nbsp;from&nbsp;concept-network&nbsp;relationships&nbsp;—<br>
+never&nbsp;from&nbsp;hardcoded&nbsp;template&nbsp;strings.&nbsp;All&nbsp;answers&nbsp;are&nbsp;returned&nbsp;as<br>
+Thought&nbsp;objects&nbsp;with&nbsp;semantic&nbsp;metadata&nbsp;for&nbsp;the&nbsp;language&nbsp;engine&nbsp;to&nbsp;render.<br>
+&nbsp;<br>
+Dependencies&nbsp;(passed&nbsp;to&nbsp;``__init__``):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;network:&nbsp;ConceptNetwork&nbsp;for&nbsp;concept&nbsp;lookup,&nbsp;edges,&nbsp;and&nbsp;relationships<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;language:&nbsp;Language&nbsp;for&nbsp;rendering&nbsp;gap&nbsp;thoughts<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;meta_emotion_builder:&nbsp;callable&nbsp;returning&nbsp;the&nbsp;current&nbsp;EmotionalState<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;goals_getter:&nbsp;callable&nbsp;returning&nbsp;the&nbsp;live&nbsp;list&nbsp;of&nbsp;Goal&nbsp;objects<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;mission_getter:&nbsp;callable&nbsp;returning&nbsp;the&nbsp;current&nbsp;mission&nbsp;string</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="re.html">re</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.frontal_lobe.answer_composer.html#AnswerComposer">AnswerComposer</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="AnswerComposer">class <strong>AnswerComposer</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#AnswerComposer">AnswerComposer</a>(network:&nbsp;'ConceptNetwork',&nbsp;language:&nbsp;'Language',&nbsp;meta_emotion_builder:&nbsp;'Callable[[],&nbsp;EmotionalState]',&nbsp;goals_getter:&nbsp;'Callable[[],&nbsp;list]',&nbsp;mission_getter:&nbsp;'Callable[[],&nbsp;str]')&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Compose&nbsp;factual&nbsp;answers&nbsp;from&nbsp;concept-network&nbsp;knowledge.<br>
+&nbsp;<br>
+All&nbsp;methods&nbsp;return&nbsp;Thought&nbsp;objects&nbsp;with&nbsp;semantic&nbsp;metadata<br>
+(knowledge&nbsp;triples,&nbsp;definitions,&nbsp;reasoning)&nbsp;so&nbsp;the&nbsp;language&nbsp;engine<br>
+composes&nbsp;the&nbsp;actual&nbsp;prose&nbsp;—&nbsp;no&nbsp;hardcoded&nbsp;template&nbsp;strings.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="AnswerComposer-__init__"><strong>__init__</strong></a>(self, network: 'ConceptNetwork', language: 'Language', meta_emotion_builder: 'Callable[[], EmotionalState]', goals_getter: 'Callable[[], list]', mission_getter: 'Callable[[], str]') -&gt; 'None'</dt><dd><span class="code">Wire&nbsp;the&nbsp;composer&nbsp;to&nbsp;its&nbsp;concept&nbsp;network&nbsp;and&nbsp;language&nbsp;engine.</span></dd></dl>
+
+<dl><dt><a name="AnswerComposer-compose_comparison_answer"><strong>compose_comparison_answer</strong></a>(self, sub_kind: 'str', emotion: 'EmotionalState') -&gt; 'Thought'</dt><dd><span class="code">Compose&nbsp;a&nbsp;comparison&nbsp;of&nbsp;two&nbsp;concepts.<br>
+&nbsp;<br>
+sub_kind&nbsp;is&nbsp;"X|||Y".&nbsp;Retrieves&nbsp;both&nbsp;concepts,&nbsp;shows&nbsp;their<br>
+definitions&nbsp;and&nbsp;distinguishing&nbsp;relationships,&nbsp;and&nbsp;highlights<br>
+differences&nbsp;(opposite_of,&nbsp;different&nbsp;is_a&nbsp;parents,&nbsp;etc.).<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;Thought&nbsp;with&nbsp;metadata["knowledge"]&nbsp;so&nbsp;the&nbsp;language<br>
+engine&nbsp;composes&nbsp;the&nbsp;actual&nbsp;words&nbsp;—&nbsp;no&nbsp;hardcoded&nbsp;phrasings.<br>
+The&nbsp;content&nbsp;is&nbsp;a&nbsp;semantic&nbsp;label&nbsp;("comparison"),&nbsp;not&nbsp;a&nbsp;finished<br>
+sentence.&nbsp;The&nbsp;engine's&nbsp;_is_raw_content()&nbsp;check&nbsp;sees<br>
+metadata["knowledge"]&nbsp;is&nbsp;present&nbsp;and&nbsp;calls&nbsp;_compose().</span></dd></dl>
+
+<dl><dt><a name="AnswerComposer-compose_consumes_answer"><strong>compose_consumes_answer</strong></a>(self, target: 'str', emotion: 'EmotionalState') -&gt; 'Thought'</dt><dd><span class="code">Compose&nbsp;an&nbsp;answer&nbsp;about&nbsp;what&nbsp;a&nbsp;concept&nbsp;consumes/needs/wants.<br>
+&nbsp;<br>
+Finds&nbsp;all&nbsp;concepts&nbsp;connected&nbsp;via&nbsp;depends_on,&nbsp;needs,&nbsp;enables,<br>
+or&nbsp;related&nbsp;consumption&nbsp;edges.<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;Thought&nbsp;with&nbsp;metadata["knowledge"]&nbsp;so&nbsp;the&nbsp;language<br>
+engine&nbsp;composes&nbsp;the&nbsp;actual&nbsp;words&nbsp;—&nbsp;no&nbsp;hardcoded&nbsp;phrasings.</span></dd></dl>
+
+<dl><dt><a name="AnswerComposer-compose_counterfactual_answer"><strong>compose_counterfactual_answer</strong></a>(self, query: 'str', emotion: 'EmotionalState') -&gt; 'Thought'</dt><dd><span class="code">Compose&nbsp;a&nbsp;speculative&nbsp;answer&nbsp;to&nbsp;a&nbsp;'what&nbsp;if'&nbsp;question.<br>
+&nbsp;<br>
+Parses&nbsp;the&nbsp;target&nbsp;concept&nbsp;and&nbsp;the&nbsp;direction&nbsp;of&nbsp;change&nbsp;from&nbsp;the&nbsp;query,<br>
+then&nbsp;walks&nbsp;the&nbsp;concept&nbsp;network&nbsp;for&nbsp;one-hop&nbsp;causal/dependent<br>
+consequences.<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;Thought&nbsp;with&nbsp;semantic&nbsp;metadata&nbsp;(knowledge&nbsp;triples,<br>
+condition,&nbsp;effects)&nbsp;so&nbsp;the&nbsp;language&nbsp;engine&nbsp;composes&nbsp;the&nbsp;actual<br>
+words&nbsp;—&nbsp;no&nbsp;hardcoded&nbsp;template&nbsp;strings.</span></dd></dl>
+
+<dl><dt><a name="AnswerComposer-compose_explanatory_answer"><strong>compose_explanatory_answer</strong></a>(self, user_input: 'str', emotion: 'EmotionalState') -&gt; 'Thought'</dt><dd><span class="code">Compose&nbsp;an&nbsp;answer&nbsp;to&nbsp;a&nbsp;'why'&nbsp;or&nbsp;'how&nbsp;come'&nbsp;question.<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;Thought&nbsp;with&nbsp;semantic&nbsp;metadata&nbsp;(causal&nbsp;path,&nbsp;cause<br>
+relation,&nbsp;condition)&nbsp;so&nbsp;the&nbsp;language&nbsp;engine&nbsp;composes&nbsp;the&nbsp;actual<br>
+words&nbsp;—&nbsp;no&nbsp;hardcoded&nbsp;template&nbsp;strings.</span></dd></dl>
+
+<dl><dt><a name="AnswerComposer-compose_factual_answer"><strong>compose_factual_answer</strong></a>(self, target: 'str', emotion: 'EmotionalState') -&gt; 'Thought'</dt><dd><span class="code">Compose&nbsp;a&nbsp;factual&nbsp;answer&nbsp;about&nbsp;a&nbsp;concept&nbsp;from&nbsp;the&nbsp;network.<br>
+&nbsp;<br>
+No&nbsp;hardcoded&nbsp;concept&nbsp;knowledge:&nbsp;this&nbsp;looks&nbsp;up&nbsp;the&nbsp;target&nbsp;in&nbsp;the<br>
+concept&nbsp;network&nbsp;and&nbsp;builds&nbsp;a&nbsp;short&nbsp;answer&nbsp;from&nbsp;its&nbsp;definition<br>
+and&nbsp;relationships&nbsp;(is_a,&nbsp;causes,&nbsp;enables,&nbsp;related_to,&nbsp;etc.).<br>
+&nbsp;<br>
+The&nbsp;answer&nbsp;is&nbsp;composed&nbsp;by&nbsp;the&nbsp;language&nbsp;engine&nbsp;from&nbsp;semantic<br>
+metadata&nbsp;(knowledge&nbsp;triples&nbsp;+&nbsp;definition),&nbsp;NOT&nbsp;from&nbsp;pre-written<br>
+template&nbsp;strings.&nbsp;This&nbsp;satisfies&nbsp;the&nbsp;CRITICAL&nbsp;RULE:&nbsp;Genesis's<br>
+words&nbsp;emerge&nbsp;from&nbsp;its&nbsp;language&nbsp;engine,&nbsp;not&nbsp;from&nbsp;hardcoded<br>
+phrasings.<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;Thought&nbsp;with&nbsp;metadata["knowledge"]&nbsp;so&nbsp;the&nbsp;language<br>
+engine&nbsp;composes&nbsp;the&nbsp;actual&nbsp;words.&nbsp;The&nbsp;caller&nbsp;should&nbsp;pass&nbsp;this<br>
+Thought&nbsp;to&nbsp;language.render()&nbsp;—&nbsp;do&nbsp;NOT&nbsp;use&nbsp;thought.content&nbsp;as<br>
+final&nbsp;text.</span></dd></dl>
+
+<dl><dt><a name="AnswerComposer-compose_goal_answer"><strong>compose_goal_answer</strong></a>(self, emotion: 'EmotionalState') -&gt; 'Thought'</dt><dd><span class="code">Answer&nbsp;"what&nbsp;are&nbsp;you&nbsp;trying&nbsp;to&nbsp;learn?"&nbsp;from&nbsp;the&nbsp;goal&nbsp;stack.<br>
+&nbsp;<br>
+Passes&nbsp;the&nbsp;active&nbsp;goal&nbsp;reasons&nbsp;as&nbsp;metadata&nbsp;so&nbsp;the&nbsp;generative<br>
+language&nbsp;engine&nbsp;composes&nbsp;the&nbsp;actual&nbsp;words&nbsp;—&nbsp;no&nbsp;fixed&nbsp;templates.</span></dd></dl>
+
+<dl><dt><a name="AnswerComposer-compose_mission_answer"><strong>compose_mission_answer</strong></a>(self, emotion: 'EmotionalState') -&gt; 'Thought'</dt><dd><span class="code">Answer&nbsp;"what&nbsp;is&nbsp;your&nbsp;mission?"&nbsp;from&nbsp;the&nbsp;stored&nbsp;mission.<br>
+&nbsp;<br>
+Passes&nbsp;the&nbsp;mission&nbsp;as&nbsp;metadata&nbsp;so&nbsp;the&nbsp;language&nbsp;engine&nbsp;composes<br>
+the&nbsp;actual&nbsp;words&nbsp;—&nbsp;no&nbsp;fixed&nbsp;template&nbsp;strings.</span></dd></dl>
+
+<dl><dt><a name="AnswerComposer-compose_parts_answer"><strong>compose_parts_answer</strong></a>(self, container: 'str', emotion: 'EmotionalState') -&gt; 'Thought'</dt><dd><span class="code">Compose&nbsp;an&nbsp;answer&nbsp;listing&nbsp;the&nbsp;parts/types/instances&nbsp;of&nbsp;a&nbsp;concept.<br>
+&nbsp;<br>
+Finds&nbsp;all&nbsp;concepts&nbsp;connected&nbsp;to&nbsp;the&nbsp;container&nbsp;via&nbsp;part_of,<br>
+includes,&nbsp;has,&nbsp;contains,&nbsp;is_a&nbsp;(children),&nbsp;or&nbsp;related&nbsp;structural<br>
+edges,&nbsp;and&nbsp;lists&nbsp;them.<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;Thought&nbsp;with&nbsp;metadata["knowledge"]&nbsp;so&nbsp;the&nbsp;language<br>
+engine&nbsp;composes&nbsp;the&nbsp;actual&nbsp;words&nbsp;—&nbsp;no&nbsp;hardcoded&nbsp;phrasings.</span></dd></dl>
+
+<dl><dt><a name="AnswerComposer-compose_planning_answer"><strong>compose_planning_answer</strong></a>(self, query: 'str', perception: 'Perception | None', emotion: 'EmotionalState') -&gt; 'Thought'</dt><dd><span class="code">Compose&nbsp;an&nbsp;answer&nbsp;to&nbsp;a&nbsp;planning&nbsp;/&nbsp;'how&nbsp;do&nbsp;I'&nbsp;question.<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;Thought&nbsp;with&nbsp;semantic&nbsp;metadata&nbsp;(plan&nbsp;steps&nbsp;as<br>
+knowledge&nbsp;triples,&nbsp;goal&nbsp;direction)&nbsp;so&nbsp;the&nbsp;language&nbsp;engine<br>
+composes&nbsp;the&nbsp;actual&nbsp;words&nbsp;—&nbsp;no&nbsp;hardcoded&nbsp;template&nbsp;strings.</span></dd></dl>
+
+<dl><dt><a name="AnswerComposer-goal_for_question"><strong>goal_for_question</strong></a>(self, q: 'Question') -&gt; 'str'</dt><dd><span class="code">Compose&nbsp;a&nbsp;cognitive&nbsp;reason&nbsp;for&nbsp;a&nbsp;curiosity&nbsp;question&nbsp;through&nbsp;the&nbsp;language&nbsp;engine.<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;rendered&nbsp;string&nbsp;composed&nbsp;from&nbsp;semantic&nbsp;metadata&nbsp;—<br>
+not&nbsp;a&nbsp;hardcoded&nbsp;template.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['AnswerComposer']</td></tr></table>
+</body></html>

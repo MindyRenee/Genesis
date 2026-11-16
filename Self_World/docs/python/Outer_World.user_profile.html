@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Outer_World.user_profile</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Outer_World.html" class="white">Outer_World</a>.user_profile</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Outer_World/user_profile.py">/home/mindyrenee/GenAnd/Genesis/Outer_World/user_profile.py</a></td></tr></table>
+    <p><span class="code">User&nbsp;profile&nbsp;—&nbsp;what&nbsp;Genesis&nbsp;knows&nbsp;about&nbsp;Mindy.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;a&nbsp;dedicated,&nbsp;persistent&nbsp;model&nbsp;of&nbsp;the&nbsp;user,&nbsp;distinct&nbsp;from&nbsp;the<br>
+concept&nbsp;network.&nbsp;It&nbsp;tracks&nbsp;identity,&nbsp;preferences,&nbsp;goals,&nbsp;emotional<br>
+history,&nbsp;and&nbsp;recent&nbsp;topics&nbsp;so&nbsp;Genesis&nbsp;can&nbsp;respond&nbsp;in&nbsp;a&nbsp;personal,<br>
+context-aware&nbsp;way&nbsp;without&nbsp;having&nbsp;to&nbsp;reconstruct&nbsp;everything&nbsp;from<br>
+scattered&nbsp;beliefs.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="json.html">json</a><br>
+<a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="math.html">math</a><br>
+<a href="os.html">os</a><br>
+</td><td class="multicolumn"><a href="time.html">time</a><br>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Outer_World.user_profile.html#UserProfile">UserProfile</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="UserProfile">class <strong>UserProfile</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#UserProfile">UserProfile</a>(name:&nbsp;'str'&nbsp;=&nbsp;'Mindy',&nbsp;aliases:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;preferences:&nbsp;'dict[str,&nbsp;list[str]]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;facts:&nbsp;'dict[str,&nbsp;str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;goals:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;recent_topics:&nbsp;'deque[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;emotional_history:&nbsp;'list[tuple[float,&nbsp;str,&nbsp;float]]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;interaction_count:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;bond:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;data_path:&nbsp;'Path&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;structured,&nbsp;persistent&nbsp;model&nbsp;of&nbsp;the&nbsp;human&nbsp;user.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="UserProfile-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="UserProfile-__init__"><strong>__init__</strong></a>(self, name: 'str' = 'Mindy', aliases: 'list[str]' = &lt;factory&gt;, preferences: 'dict[str, list[str]]' = &lt;factory&gt;, facts: 'dict[str, str]' = &lt;factory&gt;, goals: 'list[str]' = &lt;factory&gt;, recent_topics: 'deque[str]' = &lt;factory&gt;, emotional_history: 'list[tuple[float, str, float]]' = &lt;factory&gt;, interaction_count: 'int' = 0, bond: 'float' = 0.0, data_path: 'Path | None' = None) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="UserProfile-__post_init__"><strong>__post_init__</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Convert&nbsp;a&nbsp;list-based&nbsp;recent_topics&nbsp;field&nbsp;into&nbsp;a&nbsp;bounded&nbsp;deque.</span></dd></dl>
+
+<dl><dt><a name="UserProfile-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="UserProfile-add_alias"><strong>add_alias</strong></a>(self, alias: 'str') -&gt; 'None'</dt><dd><span class="code">Record&nbsp;another&nbsp;handle&nbsp;that&nbsp;means&nbsp;her&nbsp;—&nbsp;e.g.&nbsp;her&nbsp;Discord&nbsp;name.</span></dd></dl>
+
+<dl><dt><a name="UserProfile-add_fact"><strong>add_fact</strong></a>(self, key: 'str', value: 'str') -&gt; 'None'</dt><dd><span class="code">Record&nbsp;an&nbsp;arbitrary&nbsp;fact&nbsp;and&nbsp;persist&nbsp;immediately.</span></dd></dl>
+
+<dl><dt><a name="UserProfile-add_goal"><strong>add_goal</strong></a>(self, goal: 'str') -&gt; 'None'</dt><dd><span class="code">Record&nbsp;a&nbsp;goal&nbsp;and&nbsp;persist&nbsp;immediately.</span></dd></dl>
+
+<dl><dt><a name="UserProfile-add_preference"><strong>add_preference</strong></a>(self, category: 'str', value: 'str') -&gt; 'None'</dt><dd><span class="code">Record&nbsp;a&nbsp;preference&nbsp;and&nbsp;persist&nbsp;immediately.</span></dd></dl>
+
+<dl><dt><a name="UserProfile-deepen_bond"><strong>deepen_bond</strong></a>(self, rate: 'float') -&gt; 'float'</dt><dd><span class="code">Move&nbsp;the&nbsp;bond&nbsp;one&nbsp;interaction's&nbsp;worth&nbsp;toward&nbsp;its&nbsp;setpoint.<br>
+&nbsp;<br>
+Attachment&nbsp;is&nbsp;asymptotic&nbsp;and&nbsp;bounded&nbsp;—&nbsp;each&nbsp;turn&nbsp;closes&nbsp;a<br>
+fraction&nbsp;of&nbsp;the&nbsp;remaining&nbsp;distance&nbsp;to&nbsp;``_BOND_ASYMPTOTE``,<br>
+so&nbsp;the&nbsp;bond&nbsp;forms&nbsp;quickly&nbsp;at&nbsp;first&nbsp;and&nbsp;matures&nbsp;slowly,&nbsp;the<br>
+way&nbsp;familiarity&nbsp;does,&nbsp;and&nbsp;it&nbsp;can&nbsp;never&nbsp;fuse:&nbsp;a&nbsp;bond&nbsp;above<br>
+the&nbsp;setpoint&nbsp;relaxes&nbsp;back&nbsp;down&nbsp;toward&nbsp;it.&nbsp;`rate`&nbsp;is&nbsp;the<br>
+fraction&nbsp;of&nbsp;the&nbsp;distance&nbsp;closed&nbsp;this&nbsp;turn;&nbsp;warm&nbsp;turns&nbsp;pass<br>
+a&nbsp;larger&nbsp;rate&nbsp;than&nbsp;flat&nbsp;ones.</span></dd></dl>
+
+<dl><dt><a name="UserProfile-get_fact"><strong>get_fact</strong></a>(self, key: 'str') -&gt; 'str | None'</dt><dd><span class="code">Return&nbsp;a&nbsp;fact,&nbsp;if&nbsp;known.</span></dd></dl>
+
+<dl><dt><a name="UserProfile-get_name"><strong>get_name</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Return&nbsp;the&nbsp;user's&nbsp;name.</span></dd></dl>
+
+<dl><dt><a name="UserProfile-get_preference"><strong>get_preference</strong></a>(self, category: 'str') -&gt; 'list[str]'</dt><dd><span class="code">Return&nbsp;all&nbsp;recorded&nbsp;values&nbsp;for&nbsp;a&nbsp;preference&nbsp;category.</span></dd></dl>
+
+<dl><dt><a name="UserProfile-increment_interactions"><strong>increment_interactions</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Bump&nbsp;the&nbsp;conversation&nbsp;turn&nbsp;counter.</span></dd></dl>
+
+<dl><dt><a name="UserProfile-is_user"><strong>is_user</strong></a>(self, handle: 'str') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;*handle*&nbsp;names&nbsp;her&nbsp;person&nbsp;—&nbsp;name&nbsp;or&nbsp;any&nbsp;alias.<br>
+&nbsp;<br>
+The&nbsp;identity&nbsp;question&nbsp;every&nbsp;channel&nbsp;asks:&nbsp;"is&nbsp;this&nbsp;her?"&nbsp;A<br>
+Discord&nbsp;message&nbsp;from&nbsp;``MindyRenee``&nbsp;and&nbsp;a&nbsp;terminal&nbsp;line&nbsp;are<br>
+the&nbsp;same&nbsp;person&nbsp;when&nbsp;the&nbsp;handle&nbsp;matches&nbsp;name&nbsp;or&nbsp;an&nbsp;alias.</span></dd></dl>
+
+<dl><dt><a name="UserProfile-load"><strong>load</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Load&nbsp;from&nbsp;disk,&nbsp;if&nbsp;a&nbsp;data&nbsp;path&nbsp;was&nbsp;set&nbsp;and&nbsp;the&nbsp;file&nbsp;exists.</span></dd></dl>
+
+<dl><dt><a name="UserProfile-record_emotion"><strong>record_emotion</strong></a>(self, label: 'str', valence: 'float') -&gt; 'None'</dt><dd><span class="code">Append&nbsp;a&nbsp;snapshot&nbsp;of&nbsp;the&nbsp;user's&nbsp;emotional&nbsp;state.</span></dd></dl>
+
+<dl><dt><a name="UserProfile-record_topic"><strong>record_topic</strong></a>(self, topic: 'str') -&gt; 'None'</dt><dd><span class="code">Track&nbsp;a&nbsp;recently&nbsp;discussed&nbsp;topic.</span></dd></dl>
+
+<dl><dt><a name="UserProfile-save"><strong>save</strong></a>(self) -&gt; 'bool'</dt><dd><span class="code">Persist&nbsp;to&nbsp;disk&nbsp;atomically,&nbsp;if&nbsp;a&nbsp;data&nbsp;path&nbsp;was&nbsp;set.<br>
+&nbsp;<br>
+Returns&nbsp;True&nbsp;on&nbsp;success&nbsp;(or&nbsp;when&nbsp;no&nbsp;path&nbsp;is&nbsp;set),&nbsp;False&nbsp;on<br>
+failure&nbsp;so&nbsp;callers&nbsp;can&nbsp;report&nbsp;a&nbsp;failed&nbsp;shutdown&nbsp;save&nbsp;instead<br>
+of&nbsp;silently&nbsp;recording&nbsp;success.</span></dd></dl>
+
+<dl><dt><a name="UserProfile-set_name"><strong>set_name</strong></a>(self, name: 'str') -&gt; 'None'</dt><dd><span class="code">Record&nbsp;the&nbsp;user's&nbsp;name&nbsp;and&nbsp;persist&nbsp;immediately.</span></dd></dl>
+
+<dl><dt><a name="UserProfile-summarize"><strong>summarize</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Return&nbsp;a&nbsp;short,&nbsp;human-readable&nbsp;summary&nbsp;of&nbsp;what&nbsp;it&nbsp;knows.<br>
+&nbsp;<br>
+Declarative&nbsp;knowledge&nbsp;only&nbsp;—&nbsp;name,&nbsp;preferences,&nbsp;goals&nbsp;—&nbsp;the<br>
+facts&nbsp;she&nbsp;can&nbsp;relay&nbsp;when&nbsp;asked&nbsp;"what&nbsp;do&nbsp;you&nbsp;know&nbsp;about&nbsp;me".<br>
+The&nbsp;bond&nbsp;is&nbsp;deliberately&nbsp;absent:&nbsp;attachment&nbsp;is&nbsp;a&nbsp;felt&nbsp;state,<br>
+not&nbsp;a&nbsp;fact&nbsp;about&nbsp;the&nbsp;user,&nbsp;and&nbsp;its&nbsp;report&nbsp;belongs&nbsp;to&nbsp;the<br>
+self-inquiry&nbsp;path&nbsp;that&nbsp;reads&nbsp;``bond``&nbsp;and&nbsp;lets&nbsp;her&nbsp;own<br>
+language&nbsp;express&nbsp;it&nbsp;—&nbsp;never&nbsp;a&nbsp;quoted&nbsp;number.<br>
+&nbsp;<br>
+Capped&nbsp;at&nbsp;a&nbsp;few&nbsp;items&nbsp;per&nbsp;category&nbsp;to&nbsp;avoid&nbsp;dumping&nbsp;the&nbsp;entire<br>
+profile&nbsp;as&nbsp;a&nbsp;single&nbsp;unbounded&nbsp;string.</span></dd></dl>
+
+<dl><dt><a name="UserProfile-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict[str, Any]'</dt><dd><span class="code">Serialize&nbsp;the&nbsp;profile&nbsp;to&nbsp;a&nbsp;plain&nbsp;dictionary.</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="UserProfile-from_dict"><strong>from_dict</strong></a>(data: 'dict[str, Any]') -&gt; 'UserProfile'</dt><dd><span class="code">Restore&nbsp;a&nbsp;profile&nbsp;from&nbsp;a&nbsp;plain&nbsp;dictionary.<br>
+&nbsp;<br>
+Every&nbsp;field&nbsp;is&nbsp;coerced&nbsp;to&nbsp;its&nbsp;declared&nbsp;type&nbsp;—&nbsp;a&nbsp;hand-edited<br>
+or&nbsp;foreign&nbsp;JSON&nbsp;that&nbsp;stores&nbsp;a&nbsp;list&nbsp;where&nbsp;a&nbsp;dict&nbsp;belongs&nbsp;must<br>
+not&nbsp;load&nbsp;"successfully"&nbsp;and&nbsp;then&nbsp;crash&nbsp;the&nbsp;next&nbsp;add_*&nbsp;call.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>aliases</strong></dt>
+</dl>
+<dl><dt><strong>bond</strong></dt>
+</dl>
+<dl><dt><strong>data_path</strong></dt>
+</dl>
+<dl><dt><strong>emotional_history</strong></dt>
+</dl>
+<dl><dt><strong>facts</strong></dt>
+</dl>
+<dl><dt><strong>goals</strong></dt>
+</dl>
+<dl><dt><strong>interaction_count</strong></dt>
+</dl>
+<dl><dt><strong>name</strong></dt>
+</dl>
+<dl><dt><strong>preferences</strong></dt>
+</dl>
+<dl><dt><strong>recent_topics</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'_MAX_ALIASES': 'ClassVar[int]', '_MAX_EMOTIONAL_HISTORY': 'ClassVar[int]', '_MAX_FACTS': 'ClassVar[int]', '_MAX_GOALS': 'ClassVar[int]', '_MAX_PREF_CATEGORIES': 'ClassVar[int]', '_MAX_PREF_VALUES': 'ClassVar[int]', 'aliases': 'list[str]', 'bond': 'float', 'data_path': 'Path | None', 'emotional_history': 'list[tuple[float, str, float]]', ...}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'_MAX_ALIASES': Field(name='_MAX_ALIASES',type='ClassVar[int]',d...t at 0x7e8a4e036cf0&gt;,_field_type=_FIELD_CLASSVAR), '_MAX_EMOTIONAL_HISTORY': Field(name='_MAX_EMOTIONAL_HISTORY',type='ClassV...t at 0x7e8a4e036cf0&gt;,_field_type=_FIELD_CLASSVAR), '_MAX_FACTS': Field(name='_MAX_FACTS',type='ClassVar[int]',def...t at 0x7e8a4e036cf0&gt;,_field_type=_FIELD_CLASSVAR), '_MAX_GOALS': Field(name='_MAX_GOALS',type='ClassVar[int]',def...t at 0x7e8a4e036cf0&gt;,_field_type=_FIELD_CLASSVAR), '_MAX_PREF_CATEGORIES': Field(name='_MAX_PREF_CATEGORIES',type='ClassVar...t at 0x7e8a4e036cf0&gt;,_field_type=_FIELD_CLASSVAR), '_MAX_PREF_VALUES': Field(name='_MAX_PREF_VALUES',type='ClassVar[int...t at 0x7e8a4e036cf0&gt;,_field_type=_FIELD_CLASSVAR), 'aliases': Field(name='aliases',type='list[str]',default=&lt;d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'bond': Field(name='bond',type='float',default=0.0,defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'data_path': Field(name='data_path',type='Path | None',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'emotional_history': Field(name='emotional_history',type='list[tuple[...appingproxy({}),kw_only=False,_field_type=_FIELD), ...}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('name', 'aliases', 'preferences', 'facts', 'goals', 'recent_topics', 'emotional_history', 'interaction_count', 'bond', 'data_path')</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>ClassVar</strong> = typing.ClassVar<br>
+<strong>logger</strong> = &lt;Logger Outer_World.user_profile (WARNING)&gt;</td></tr></table>
+</body></html>

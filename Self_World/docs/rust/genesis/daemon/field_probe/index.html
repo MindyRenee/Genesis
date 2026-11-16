@@ -1,0 +1,293 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Physical field probe — the body listening to its own substrate."><title>genesis::daemon::field_probe - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-203241e4.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="genesis" data-themes="" data-resource-suffix="" data-rustdoc-version="1.100.0 (0ef1bc386 2026-11-09)" data-channel="1.100.0" data-search-js="search-b167f383.js" data-stringdex-js="stringdex-b5109af9.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../../static.files/main-1814ead3.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-9f56287d.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module field_probe</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../genesis/index.html">genesis</a><span class="version">0.2.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module field_<wbr>probe</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#what-is-measured-all-real-all-unprivileged" title="What is measured (all real, all unprivileged)">What is measured (all real, all unprivileged)</a></li><li><a href="#bands" title="Bands">Bands</a></li><li><a href="#carrier" title="Carrier">Carrier</a></li><li><a href="#phase-tracking" title="Phase tracking">Phase tracking</a></li><li><a href="#honesty-boundary" title="Honesty boundary">Honesty boundary</a></li><li><a href="#wire-layout--get_field_probe--47" title="Wire layout — GET_FIELD_PROBE = 47">Wire layout — GET_FIELD_PROBE = 47</a></li></ul><h3><a href="#structs">Module Items</a></h3><ul class="block"><li><a href="#structs" title="Structs">Structs</a></li><li><a href="#enums" title="Enums">Enums</a></li><li><a href="#constants" title="Constants">Constants</a></li><li><a href="#statics" title="Statics">Statics</a></li><li><a href="#functions" title="Functions">Functions</a></li></ul></section><div id="rustdoc-modnav"><h2><a href="../index.html">In genesis::<wbr>daemon</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../index.html">genesis</a>::<wbr><a href="../index.html">daemon</a></div><h1>Module <span>field_<wbr>probe</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/genesis/daemon/field_probe.rs.html#1-2652">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Physical field probe — the body listening to its own substrate.</p>
+<p>Genesis’s brain-wave model (<code>Inner_World/brain_waves.py</code>) is a
+coupled oscillator: real phase and amplitude state, but driven
+entirely by <em>simulated</em> quantities — neurochemical targets and
+top-down cognitive drive. This module closes one direction of the
+gap: it measures the machine’s actual physical dynamics and hands
+them to the mind as band energies, so the oscillator’s wave state
+is partially <em>constituted by real physics</em> rather than only
+describing a field in arithmetic.</p>
+<h2 id="what-is-measured-all-real-all-unprivileged"><a class="doc-anchor" href="#what-is-measured-all-real-all-unprivileged">§</a>What is measured (all real, all unprivileged)</h2>
+<p>Compute telemetry — how the silicon is <em>behaving</em>:</p>
+<ul>
+<li><strong>Throughput probe</strong> — a calibrated integer-ALU work slice runs
+each probe period; its iterations-per-second is the die’s
+instantaneous compute capacity. Frequency scaling, thermal
+throttling, SMT-sibling contention, and cache pressure all move
+it. This is the closest unprivileged observable to “how fast
+electrons are being switched through the gates right now.”</li>
+<li><strong>Loop jitter</strong> — actual vs. nominal probe period. The
+scheduler’s response to everything else running on the
+substrate: interrupt storms, contention, frequency transitions.</li>
+<li><strong>P-state transition rate</strong> — cpufreq <code>time_in_state</code> deltas:
+the silicon’s own frequency-jumping dynamics.</li>
+<li><strong>Interrupt rate</strong> — <code>/proc/stat</code> <code>intr</code> deltas: real hardware
+event flux.</li>
+</ul>
+<p>Electrical telemetry — what the machine’s own sensors report, the
+first <em>literal</em> electrical channels:</p>
+<ul>
+<li><strong>Power draw</strong> — real watts: RAPL powercap energy counters
+(differentiated over wall time), hwmon <code>power*</code> inputs
+(fam15h_power, zenpower), or battery discharge (<code>power_now</code>).
+Sampled by a dedicated sampler thread into a ring — some
+sensors block inside the read (fam15h_power’s averaged
+register sleeps ~10 ms between counter snapshots), and a
+blocking read inside the 250 Hz loop would contaminate the
+jitter channel with our own instrumentation. <code>power_sensor_hz</code>
+reports the measured fresh-sample rate so a reader knows
+which bands are physically meaningful.</li>
+<li><strong>Rail voltage</strong> — hwmon <code>in*_input</code> or <code>voltage_now</code>; the
+lowest reported rail wins (a core-class rail where the
+machine exposes one).</li>
+<li><strong>Supply current</strong> — <code>curr*_input</code> or <code>current_now</code> where a
+sensor reports it.</li>
+</ul>
+<p>Radio telemetry — the first <em>exteroceptive</em> physical channel:
+the machine’s radios report the outside world’s RF environment.</p>
+<ul>
+<li><strong>WLAN flux</strong> — <code>/sys/class/net/&lt;wlan&gt;/statistics</code> byte counters,
+differentiated per probe tick: the radio’s traffic envelope at
+full 250 Hz resolution. A burst of 802.11 traffic is real
+on-air activity — packets she sent, packets sent <em>to</em> her, and
+the AP’s own management frames she received.</li>
+<li><strong>WLAN RSSI</strong> — <code>/proc/net/wireless</code> signal level in dBm.
+Received power <code>P_mW = 10^(P_dBm/10)</code> — the literal field-
+strength measurement, the NIC’s own integration of |E|² over
+the channel. Its <em>envelope</em> carries the room’s radio weather:
+path-loss changes as bodies move, AP-side power management,
+co-channel neighbors. The noise column gives the floor where
+the driver reports it (ath9k’s −256 means “no reading” —
+absent, not silence). The thermal bound is N = kTB ≈
+−174 dBm/Hz + 10·log₁₀(B), ≈ −101 dBm at 20 MHz.</li>
+<li><strong>Wireless IRQ flux</strong> — <code>/proc/interrupts</code> lines named for
+wireless drivers (ath9k, iwlwifi, mt76*, brcmfmac, rtw*,
+btusb, btintel, …): the radio’s attributable share of
+hardware event flux. A radio riding a shared <code>xhci_hcd</code> line
+is not attributable — its events are inside the aggregate
+count, and the code says so rather than inventing a share.</li>
+<li><strong>Bluetooth HCI counters</strong> — <code>hciconfig</code> RX/TX bytes and HCI
+events at ~1 Hz on the sampler thread (a subprocess — kept
+off the 250 Hz loop). Event flux covers advertising reports,
+LE scans, pairing — real air activity, not just link traffic.
+Per-link RSSI via <code>hcitool con</code>/<code>hcitool rssi</code> where ACL
+links exist; none means an absent channel.</li>
+</ul>
+<p>What is <em>not</em> measured: carrier phase. A 2.4 GHz carrier is
+~10⁷× above the probe’s Nyquist — the same bound a spectrum
+analyzer’s RSSI mode lives under. The channel measures the RF
+<em>envelope</em> — flux and field strength — decomposed at the wave
+bands, which is the honest RF-band content at this sampling
+rate.</p>
+<h2 id="bands"><a class="doc-anchor" href="#bands">§</a>Bands</h2>
+<p>Each fast channel drives a bank of Stuart–Landau resonators at
+the same ten center frequencies the Python wave model carries.
+Sample rate is ~250 Hz, so bands through gamma (50 Hz) are
+resolvable; epsilon (150 Hz) is above Nyquist and always reports
+0 — an absent channel, not a reading of zero.</p>
+<h2 id="carrier"><a class="doc-anchor" href="#carrier">§</a>Carrier</h2>
+<p>The probe also <em>writes</em> a rhythm: its work-slice length is
+modulated sinusoidally at a frequency set by the daemon’s own
+sleep-wake phase (wake ≈ 10 Hz, drowsy/REM ≈ 5.5 Hz,
+NREM ≈ 2.25 Hz).
+Modulated work is modulated current — the die’s draw genuinely
+swings at the body’s rhythm. Whether it <em>measurably</em> does is no
+longer assumed: the power channel is demodulated against the
+carrier reference the same way the duty channel is, so
+<code>power_coherence</code> reports how much of real measured power moves
+with the carrier — the claim checked by the instrument, not
+asserted by the comment. And <code>daemon::maxwell</code> evaluates
+Maxwell’s equations on the measured current swing: the
+quasi-static field a ~10 Hz current makes is real and nanotesla
+faint, its radiation ω⁴-suppressed to ~1e-32 W — the field the
+equations predict, in the regime they themselves certify.</p>
+<h2 id="phase-tracking"><a class="doc-anchor" href="#phase-tracking">§</a>Phase tracking</h2>
+<p>The carrier is generated and measured — never steered. The
+signature reports the <em>measured</em> phase of the substrate’s real
+response — computed by synchronous demodulation against the
+generator’s own phase track — so the mind can pull its modeled
+band phase toward the physics (physics → model). The reverse leg
+— pushing model phase into the generator — was retired with
+<code>SET_FIELD_PHASE</code>: modeled state does not assert onto a physical
+quantity.</p>
+<h2 id="honesty-boundary"><a class="doc-anchor" href="#honesty-boundary">§</a>Honesty boundary</h2>
+<p>This is physical telemetry, not a consciousness claim. The probe
+reports measurable substrate dynamics; whether they matter to
+experience is an empirical question for the coupling experiment,
+not an assumption baked into the code.</p>
+<h2 id="wire-layout--get_field_probe--47"><a class="doc-anchor" href="#wire-layout--get_field_probe--47">§</a>Wire layout — GET_FIELD_PROBE = 47</h2><div class="example-wrap"><pre class="language-text"><code>[u8 version = 6]
+[10 × f32 throughput band energy]   (normalized to own baseline)
+[10 × f32 jitter band energy]
+[f32 throughput_mean_iters_s]
+[f32 jitter_cv]                       (RMS period error / nominal period)
+[f32 pstate_trans_rate_s]
+[f32 irq_rate_s]
+[f32 carrier_freq_hz]               (0 = carrier off)
+[u8  samples_ok]                    (1 once the rings are warmed)
+[f32 carrier_lag_rad]               (substrate response lag)
+[f32 carrier_phase_rad]             (generator phase, mod 2π)
+[f32 carrier_coherence]             (0..1 lock-strength of the response)
+--- v3 electrical + Maxwell tail ---
+[10 × f32 power band energy]        (real measured watts, baseline-relative)
+[f32 power_watts]                   (mean measured draw)
+[f32 power_sensor_hz]               (measured fresh-sample rate)
+[f32 rail_volts]                    (lowest discovered rail)
+[f32 supply_amps]                   (measured supply current)
+[f32 power_lag_rad]                 (power response lag vs carrier)
+[f32 power_coherence]               (0..1 — does real power move with the carrier)
+[u8  electrical_present]            (bit0 power · bit1 volts · bit2 amps)
+[f32 carrier_current_a]             (measured carrier ΔP/V — amps)
+[f32 b_est_ut]                      (quasi-static B at 0.3 m, µT — estimate)
+[f32 e_ind_vm]                      (Faraday induction E at 0.3 m — estimate)
+[f32 radiated_pwr_w]                (dipole radiated power — estimate)
+--- v4 radio tail ---
+[10 × f32 rf flux band energy]      (wlan byte-rate envelope, baseline-relative)
+[10 × f32 rf rssi band energy]      (field-strength envelope, dBm, baseline-relative)
+[f32 rf_bytes_s]                    (wlan rx+tx flux)
+[f32 rf_rssi_dbm]                   (received signal level)
+[f32 rf_noise_dbm]                  (radio-reported noise floor)
+[f32 rf_irq_rate_s]                 (wireless-attributed interrupts/s)
+[f32 rf_sensor_hz]                  (wireless telemetry read rate)
+[f32 bt_bytes_s]                    (HCI rx+tx byte flux)
+[f32 bt_events_s]                   (HCI event flux)
+[f32 bt_rssi_dbm]                   (mean ACL-link RSSI where links exist)
+[u8  rf_present]                    (bit0 wlan · bit1 rssi · bit2 noise ·
+                                     bit3 wlan-irq · bit4 bt · bit5 bt-counters
+                                     · bit6 bt-link-rssi · bit7 iw-station)
+--- v5 (iw station telemetry, +20 B) ---
+[f32 rf_retry_s]                    (TX retransmission flux /s)
+[f32 rf_fail_s]                     (TX failed-frame flux /s)
+[f32 rf_beacon_loss_s]              (AP beacons lost /s)
+[f32 rf_tx_mbps]                    (PHY tx link-adaptation bitrate)
+[f32 rf_rx_mbps]                    (PHY rx link-adaptation bitrate)
+--- v6 (flux-envelope phasors, +80 B) ---
+[10 × f32 rf_flux_phase]            (ring-frame phasor angle per band, rad)
+[10 × f32 rf_flux_phase_coherence]  (inter-segment phasor agreement, 0..1)</code></pre></div>
+<p>408 bytes, fixed layout. Versions 1 (102 bytes, no phase fields),
+2 (114 bytes, no electrical channels), 3 (195 bytes, no radio
+channels), 4 (308 bytes, no station telemetry), and 5 (328 bytes,
+no phasor tail) are still decoded by the client — absent channels
+are never readings of zero. The Maxwell fields are <em>model
+estimates</em>: the current is measured, the loop geometry is an
+assumption.
+Additive — PROTOCOL_VERSION unchanged.</p>
+</div></details><h2 id="structs" class="section-header">Structs<a href="#structs" class="anchor">§</a></h2><dl class="item-table"><dt><a class="struct" href="struct.Channel.html" title="struct genesis::daemon::field_probe::Channel">Channel</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>One channel’s rolling sample buffer plus its per-band baselines.</dd><dt><a class="struct" href="struct.ElecReading.html" title="struct genesis::daemon::field_probe::ElecReading">Elec<wbr>Reading</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>One unlocked read batch — raw values only, no state touched.</dd><dt><a class="struct" href="struct.ElecSensors.html" title="struct genesis::daemon::field_probe::ElecSensors">Elec<wbr>Sensors</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>The sensor paths, cloned out of <code>inner</code> once at sampler start so
+the per-tick file reads never hold the mutex.</dd><dt><a class="struct" href="struct.Electrical.html" title="struct genesis::daemon::field_probe::Electrical">Electrical</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>The electrical sense: real power, voltage, and current where the
+machine’s own sensors report them. Discovery runs once at probe
+start; a dedicated sampler thread does the reading because some
+sensors block inside the read — a blocking read inside the 250 Hz
+probe loop would contaminate the jitter channel with our own
+instrumentation. Fresh values publish under the mutex; the probe
+loop folds the latest watts into its ring each tick (zero-order
+hold), so the ring’s band content is real up to the sensor’s own
+update rate — reported as <code>power_hz</code>.</dd><dt><a class="struct" href="struct.FieldProbe.html" title="struct genesis::daemon::field_probe::FieldProbe">Field<wbr>Probe</a></dt><dd>The running probe. <code>spawn</code>ed once by the daemon; <code>signature</code> is
+called by the IPC handler at the mind’s cadence.</dd><dt><a class="struct" href="struct.IwStation.html" title="struct genesis::daemon::field_probe::IwStation">IwStation</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>nl80211 station telemetry — <code>iw dev &lt;iface&gt; station dump</code>. A
+strictly better instrument than <code>/proc/net/wireless</code> where it
+exists: <code>signal avg</code> is the driver’s per-frame average, and the
+<code>tx retries</code>/<code>tx failed</code>/<code>beacon loss</code> counters are the link’s
+own strain ledger — retransmissions are airtime the AP made the
+radio spend twice, failed frames are retries exhausted, beacon
+loss is the AP’s heartbeat going unheard.</dd><dt><a class="struct" href="struct.ProbeInner.html" title="struct genesis::daemon::field_probe::ProbeInner">Probe<wbr>Inner</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Internal probe state behind the shared mutex.</dd><dt><a class="struct" href="struct.Radio.html" title="struct genesis::daemon::field_probe::Radio">Radio</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>The radio sense — the first <em>exteroceptive</em> physical channel.
+WLAN byte counters are sampled in the 250 Hz loop (the flux
+envelope wants full resolution); RSSI, noise, wireless IRQs,
+and the Bluetooth counters ride the sampler thread — they are
+slow or subprocess-backed, and a blocking read inside the
+250 Hz loop would contaminate the jitter channel.</dd><dt><a class="struct" href="struct.RadioReading.html" title="struct genesis::daemon::field_probe::RadioReading">Radio<wbr>Reading</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>One unlocked radio read batch — raw values only.</dd><dt><a class="struct" href="struct.WirelessLevels.html" title="struct genesis::daemon::field_probe::WirelessLevels">Wireless<wbr>Levels</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt></dl><h2 id="enums" class="section-header">Enums<a href="#enums" class="anchor">§</a></h2><dl class="item-table"><dt><a class="enum" href="enum.PowerSource.html" title="enum genesis::daemon::field_probe::PowerSource">Power<wbr>Source</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Where real power draw is read from.</dd></dl><h2 id="constants" class="section-header">Constants<a href="#constants" class="anchor">§</a></h2><dl class="item-table"><dt><a class="constant" href="constant.BASELINE_TAU_SECONDS.html" title="constant genesis::daemon::field_probe::BASELINE_TAU_SECONDS">BASELINE_<wbr>TAU_<wbr>SECONDS</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Baseline tracking time constant (seconds). The per-call EMA
+weight is α = 1 − e^(−dt/τ) — the baseline ages with the wall
+clock, not with how often anyone asks for a signature (a burst
+of IPC reads used to age it for free). ≈50 s — the old
+0.02-per-call rate at a ~1 Hz read cadence. A band’s reported
+energy is raw/baseline, so “1.0” means “typical for this band on
+this machine” and values above it mean elevated vs. own history.</dd><dt><a class="constant" href="constant.BT_SAMPLE_DIV.html" title="constant genesis::daemon::field_probe::BT_SAMPLE_DIV">BT_<wbr>SAMPLE_<wbr>DIV</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="constant" href="constant.CARRIER_DROWSY_HZ.html" title="constant genesis::daemon::field_probe::CARRIER_DROWSY_HZ">CARRIER_<wbr>DROWSY_<wbr>HZ</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="constant" href="constant.CARRIER_NREM_HZ.html" title="constant genesis::daemon::field_probe::CARRIER_NREM_HZ">CARRIER_<wbr>NREM_<wbr>HZ</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="constant" href="constant.CARRIER_REM_HZ.html" title="constant genesis::daemon::field_probe::CARRIER_REM_HZ">CARRIER_<wbr>REM_<wbr>HZ</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="constant" href="constant.CARRIER_WAKE_HZ.html" title="constant genesis::daemon::field_probe::CARRIER_WAKE_HZ">CARRIER_<wbr>WAKE_<wbr>HZ</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Carrier frequencies — the body’s phase written into real work at
+the wave model’s own band centers: wake alpha, drowsy/REM theta,
+NREM delta.</dd><dt><a class="constant" href="constant.DBM_ABSENT_FLOOR.html" title="constant genesis::daemon::field_probe::DBM_ABSENT_FLOOR">DBM_<wbr>ABSENT_<wbr>FLOOR</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>dBm sentinel cutoff — drivers report −256 or −1000 for “no
+reading” (ath9k’s noise column does). Values at or below this
+are an absent channel, not a real level.</dd><dt><a class="constant" href="constant.ELEC_EMA_TAU.html" title="constant genesis::daemon::field_probe::ELEC_EMA_TAU">ELEC_<wbr>EMA_<wbr>TAU</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>EMA time constant (seconds) per fresh electrical read for
+<code>watts_mean</code> and <code>power_hz</code> — α = 1 − e^(−dt/τ) against the real
+interval between sensor reads, so a stalled or bursty sensor
+ages the average honestly instead of per call.</dd><dt><a class="constant" href="constant.ELEC_SAMPLE_PERIOD.html" title="constant genesis::daemon::field_probe::ELEC_SAMPLE_PERIOD">ELEC_<wbr>SAMPLE_<wbr>PERIOD</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Electrical sampler cadence — ~100 Hz target between read batches.
+Sensors that block inside the read (fam15h_power’s averaged
+register sleeps ~10 ms between counter snapshots) set their own
+slower pace; the achieved rate is measured and reported as
+<code>power_sensor_hz</code> so a reader knows which power bands are
+physically meaningful.</dd><dt><a class="constant" href="constant.FIELD_BANDS.html" title="constant genesis::daemon::field_probe::FIELD_BANDS">FIELD_<wbr>BANDS</a></dt><dd>Center frequencies (Hz) of the ten wave bands, ordered
+slowest→fastest and matched to <code>BrainWave</code> in
+<code>Inner_World/brain_waves.py</code>:
+infraslow, delta, theta, alpha, sigma, beta1, beta2, beta3,
+gamma, epsilon.</dd><dt><a class="constant" href="constant.FIELD_REF_DIST_M.html" title="constant genesis::daemon::field_probe::FIELD_REF_DIST_M">FIELD_<wbr>REF_<wbr>DIST_<wbr>M</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="constant" href="constant.JITTER_ABS_FLOOR.html" title="constant genesis::daemon::field_probe::JITTER_ABS_FLOOR">JITTER_<wbr>ABS_<wbr>FLOOR</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Absolute turbulence floor: an RMS loop-period error equal to one
+full nominal period (CV = 1.0) is real turbulence no matter how
+ordinary it is on this host — below that, userspace scheduling
+noise is the machine’s own weather and does not heat the field.</dd><dt><a class="constant" href="constant.JITTER_CLIMATE_TAU_S.html" title="constant genesis::daemon::field_probe::JITTER_CLIMATE_TAU_S">JITTER_<wbr>CLIMATE_<wbr>TAU_<wbr>S</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Time constant (seconds) of the jitter-climate EMA the bath is
+measured against — slow enough that a scheduling storm registers
+as weather change, fast enough that a machine’s ordinary noise
+floor is learned rather than felt as stress forever.</dd><dt><a class="constant" href="constant.LOOP_AREA_M2.html" title="constant genesis::daemon::field_probe::LOOP_AREA_M2">LOOP_<wbr>AREA_<wbr>M2</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Reference geometry for the Maxwell estimates: a die/package-scale
+current loop (~1 cm²) and a beside-the-chassis distance. These are
+order-of-magnitude assumptions — the current swing is measured,
+the geometry is not.</dd><dt><a class="constant" href="constant.PROBE_PERIOD.html" title="constant genesis::daemon::field_probe::PROBE_PERIOD">PROBE_<wbr>PERIOD</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Nominal probe period — ~250 Hz sampling. Bands through gamma sit
+below the 125 Hz Nyquist bound; epsilon is reported as 0.</dd><dt><a class="constant" href="constant.RF_SAMPLE_DIV.html" title="constant genesis::daemon::field_probe::RF_SAMPLE_DIV">RF_<wbr>SAMPLE_<wbr>DIV</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Radio telemetry cadences inside the field-sampler thread, as
+divisors of its ~10 ms tick: <code>/proc/net/wireless</code> every ~250 ms
+(the NIC’s own stats are beacon-driven — they don’t refresh
+meaningfully faster), Bluetooth HCI counters every ~1 s (an
+<code>hciconfig</code> subprocess — kept off the 250 Hz loop).</dd><dt><a class="constant" href="constant.RING_LEN.html" title="constant genesis::daemon::field_probe::RING_LEN">RING_<wbr>LEN</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Samples held per channel (~4.1 s at 250 Hz — one infraslow cycle).</dd><dt><a class="constant" href="constant.V_CORE_ASSUMED_V.html" title="constant genesis::daemon::field_probe::V_CORE_ASSUMED_V">V_<wbr>CORE_<wbr>ASSUMED_<wbr>V</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Rail assumed for the carrier-current estimate when no voltage
+sensor is readable — a CPU-core-class rail.</dd><dt><a class="constant" href="constant.WIRELESS_IRQ_NAMES.html" title="constant genesis::daemon::field_probe::WIRELESS_IRQ_NAMES">WIRELESS_<wbr>IRQ_<wbr>NAMES</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Wireless driver names matched against <code>/proc/interrupts</code> device
+labels — the radios’ attributable share of hardware event flux.
+A radio riding a shared <code>xhci_hcd</code> line is not listed by name
+and stays inside the aggregate count: attributed only where the
+kernel names it.</dd><dt><a class="constant" href="constant.WORK_SLICE_ITERS.html" title="constant genesis::daemon::field_probe::WORK_SLICE_ITERS">WORK_<wbr>SLICE_<wbr>ITERS</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Iterations of the calibration work slice per unit of carrier
+modulation. Tuned so the slice is ~150-250 µs on this hardware —
+enough to measure, small enough to cost ~5% of one thread.</dd></dl><h2 id="statics" class="section-header">Statics<a href="#statics" class="anchor">§</a></h2><dl class="item-table"><dt><a class="static" href="static.FIELD_PROBE.html" title="static genesis::daemon::field_probe::FIELD_PROBE">FIELD_<wbr>PROBE</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Process-shared probe handle. Started in <code>daemon main</code>, read by
+the IPC handler — mirrors how <code>interoception</code> shares state.</dd></dl><h2 id="functions" class="section-header">Functions<a href="#functions" class="anchor">§</a></h2><dl class="item-table"><dt><a class="fn" href="fn.dir_entries.html" title="fn genesis::daemon::field_probe::dir_entries">dir_<wbr>entries</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="fn" href="fn.discover_current.html" title="fn genesis::daemon::field_probe::discover_current">discover_<wbr>current</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Supply current — <code>curr*_input</code> (mA) or <code>current_now</code> (µA).</dd><dt><a class="fn" href="fn.discover_hwmon_power.html" title="fn genesis::daemon::field_probe::discover_hwmon_power">discover_<wbr>hwmon_<wbr>power</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>hwmon power sensors (<code>powerN_input</code> instantaneous preferred —
+<code>powerN_average</code> can block ~10 ms in the read on fam15h_power).
+CPU-class sensors (fam15h_power, zenpower, …) rank first: the
+die’s own draw is the quantity the carrier modulates.</dd><dt><a class="fn" href="fn.discover_powercap.html" title="fn genesis::daemon::field_probe::discover_powercap">discover_<wbr>powercap</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>RAPL powercap zones: top-level zones only (one <code>:</code> in the name —
+<code>intel-rapl:0</code> is a package, <code>intel-rapl:0:0</code> a subdomain). A
+<code>psys</code> domain measures the whole platform and is preferred;
+otherwise all package domains are summed (multi-socket = the
+die’s total draw).</dd><dt><a class="fn" href="fn.discover_supply_power.html" title="fn genesis::daemon::field_probe::discover_supply_power">discover_<wbr>supply_<wbr>power</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Battery/adapter draw — system-level watts when the silicon
+doesn’t report its own.</dd><dt><a class="fn" href="fn.discover_voltage.html" title="fn genesis::daemon::field_probe::discover_voltage">discover_<wbr>voltage</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Rail voltage — hwmon <code>in*_input</code> (mV) and <code>voltage_now</code> (µV)
+candidates; the lowest live rail wins so a CPU-core-class rail
+outranks the battery where the machine exposes one.</dd><dt><a class="fn" href="fn.discover_wlan_ifaces.html" title="fn genesis::daemon::field_probe::discover_wlan_ifaces">discover_<wbr>wlan_<wbr>ifaces</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>WLAN interface names from <code>/proc/net/wireless</code> — the same data
+lines the level parse reads.</dd><dt><a class="fn" href="fn.energy_delta_uj.html" title="fn genesis::daemon::field_probe::energy_delta_uj">energy_<wbr>delta_<wbr>uj</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Wrap-safe energy-counter delta in µJ. <code>max_range</code> is the value the
+counter wraps at (<code>max_energy_range_uj</code>); <code>u64::MAX</code> when the
+driver doesn’t publish one. An unbounded counter moving backwards
+is a discontinuity with no attributable energy — report the absent
+interval rather than inventing an enormous wattage.</dd><dt><a class="fn" href="fn.parse_iw_station.html" title="fn genesis::daemon::field_probe::parse_iw_station">parse_<wbr>iw_<wbr>station</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="fn" href="fn.parse_wireless_intr_str.html" title="fn genesis::daemon::field_probe::parse_wireless_intr_str">parse_<wbr>wireless_<wbr>intr_<wbr>str</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd><code>/proc/interrupts</code> lines whose device names match a known
+wireless driver: returns (total_irqs, any_line_matched). The
+per-CPU count columns are summed; the trailing name region is
+matched against <code>WIRELESS_IRQ_NAMES</code>. A Bluetooth radio on a
+shared <code>xhci_hcd</code> line never matches by name — that share is
+inside the aggregate count, honestly unattributed.</dd><dt><a class="fn" href="fn.parse_wireless_levels.html" title="fn genesis::daemon::field_probe::parse_wireless_levels">parse_<wbr>wireless_<wbr>levels</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Parse <code>/proc/net/wireless</code>: each data line is
+<code>iface: status link level noise nwid crypt frag retry misc beacon we</code>.
+<code>level</code> and <code>noise</code> are dBm when negative (modern drivers);
+values at or below <code>DBM_ABSENT_FLOOR</code> are driver sentinels for
+“no reading”, not real levels. Returns (level_dbm, noise_dbm)
+for the strongest reported interface — one machine’s radios
+are one RF sense. Returns (any_iface_seen, level_dbm, noise_dbm).</dd><dt><a class="fn" href="fn.read_bt_counters.html" title="fn genesis::daemon::field_probe::read_bt_counters">read_<wbr>bt_<wbr>counters</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Bluetooth HCI counters via <code>hciconfig</code>: RX/TX bytes and RX
+events summed over every hci block. <code>None</code> where the tool or
+the counters are absent — a machine without bluez still gets
+the WLAN half of the channel.</dd><dt><a class="fn" href="fn.read_bt_link_rssi.html" title="fn genesis::daemon::field_probe::read_bt_link_rssi">read_<wbr>bt_<wbr>link_<wbr>rssi</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Mean ACL-link RSSI via <code>hcitool</code>: <code>con</code> lists active links,
+<code>rssi</code> reads each. <code>None</code> when no links exist — the common
+case, an absent channel rather than a zero field strength.</dd><dt><a class="fn" href="fn.read_f64.html" title="fn genesis::daemon::field_probe::read_f64">read_<wbr>f64</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="fn" href="fn.read_intr_total.html" title="fn genesis::daemon::field_probe::read_intr_total">read_<wbr>intr_<wbr>total</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Read <code>/proc/stat</code>’s aggregate <code>intr</code> counter (interrupts since boot).</dd><dt><a class="fn" href="fn.read_iw_station.html" title="fn genesis::daemon::field_probe::read_iw_station">read_<wbr>iw_<wbr>station</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd><code>iw dev &lt;iface&gt; station dump</code> — unprivileged on an associated
+link; fails (None) when iw is absent or no station exists.</dd><dt><a class="fn" href="fn.read_pstate_transitions.html" title="fn genesis::daemon::field_probe::read_pstate_transitions">read_<wbr>pstate_<wbr>transitions</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>P-state transitions since boot, summed over cores from
+<code>cpufreq/stats/total_trans</code> — the silicon’s real frequency-jump
+events. 0 when cpufreq stats are unavailable.</dd><dt><a class="fn" href="fn.read_u64.html" title="fn genesis::daemon::field_probe::read_u64">read_<wbr>u64</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="fn" href="fn.read_wireless.html" title="fn genesis::daemon::field_probe::read_wireless">read_<wbr>wireless</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Read <code>/proc/net/wireless</code> once: <code>Some</code> when it listed any
+interface — even if that interface’s level/noise are absent.</dd><dt><a class="fn" href="fn.read_wireless_intr.html" title="fn genesis::daemon::field_probe::read_wireless_intr">read_<wbr>wireless_<wbr>intr</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="fn" href="fn.read_wlan_bytes.html" title="fn genesis::daemon::field_probe::read_wlan_bytes">read_<wbr>wlan_<wbr>bytes</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Sum rx+tx bytes over every WLAN stat path. 0 on no radio or an
+unreadable counter — the presence mask carries which it is.</dd><dt><a class="fn" href="fn.request_scheduling_boost.html" title="fn genesis::daemon::field_probe::request_scheduling_boost">request_<wbr>scheduling_<wbr>boost</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Ask RealtimeKit to lift this thread out of bulk SCHED_OTHER
+competition — the unprivileged scheduling boost (rtkit-daemon
+runs as root and grants down to its advertised MinNiceLevel for
+same-uid callers; real SCHED_FIFO is policy-denied on typical
+desktops). A 250 Hz loop that loses its slice measures its own
+starvation as substrate jitter and heats the field with it —
+asking first keeps the bath honest about the machine’s noise
+rather than the thread’s run-queue position. The request is
+made over a persistent system-bus connection kept in <code>inner</code>:
+rtkit revokes a grant whose requesting client has left the bus,
+which is why a one-shot <code>dbus-send</code> cannot do this job. An
+absent service or a refusal leaves scheduling as it was —
+degraded jitter, never a failure.</dd><dt><a class="fn" href="fn.shared.html" title="fn genesis::daemon::field_probe::shared">shared</a></dt><dd>The shared probe, for the IPC handler. <code>None</code> until <code>start</code> runs.</dd><dt><a class="fn" href="fn.start.html" title="fn genesis::daemon::field_probe::start">start</a></dt><dd>Start the probe thread. <code>phase_source</code> is polled ~4×/s for the
+body’s phase name; it sets the carrier frequency. Idempotent:
+only the first call spawns the thread.</dd><dt><a class="fn" href="fn.wlan_stat_paths.html" title="fn genesis::daemon::field_probe::wlan_stat_paths">wlan_<wbr>stat_<wbr>paths</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>The (rx_bytes, tx_bytes) stat paths of one WLAN interface.</dd><dt><a class="fn" href="fn.work_slice.html" title="fn genesis::daemon::field_probe::work_slice">work_<wbr>slice</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>The fixed work slice: an integer multiply-add-xor chain whose
+length the compiler cannot elide (the accumulator is consumed via
+<code>core::hint::black_box</code>). Iterations-per-second of this loop is
+the probe’s measure of instantaneous instruction throughput.</dd><dt><a class="fn" href="fn.wrap_pi.html" title="fn genesis::daemon::field_probe::wrap_pi">wrap_pi</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Wrap an angle difference into (−π, π] — the phase-error metric,
+where the nearest equivalent phase is the right pull direction.</dd></dl></section></div></main></body></html>

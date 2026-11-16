@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.frontal_lobe.reasoning.math_reasoning</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.frontal_lobe.html" class="white">frontal_lobe</a>.<a href="Self_World.frontal_lobe.reasoning.html" class="white">reasoning</a>.math_reasoning</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/reasoning/math_reasoning.py">/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/reasoning/math_reasoning.py</a></td></tr></table>
+    <p><span class="code">Mathematical&nbsp;reasoning&nbsp;engine&nbsp;for&nbsp;Genesis.<br>
+&nbsp;<br>
+This&nbsp;module&nbsp;gives&nbsp;Genesis&nbsp;the&nbsp;ability&nbsp;to&nbsp;DO&nbsp;mathematics,&nbsp;not&nbsp;just&nbsp;know<br>
+about&nbsp;it.&nbsp;It&nbsp;provides&nbsp;four&nbsp;capabilities:<br>
+&nbsp;<br>
+1.&nbsp;**Computation**&nbsp;—&nbsp;parse&nbsp;and&nbsp;evaluate&nbsp;arithmetic&nbsp;expressions<br>
+2.&nbsp;**Symbolic&nbsp;manipulation**&nbsp;—&nbsp;solve&nbsp;equations&nbsp;by&nbsp;applying<br>
+&nbsp;&nbsp;&nbsp;transformation&nbsp;rules<br>
+3.&nbsp;**Proof&nbsp;construction**&nbsp;—&nbsp;verify&nbsp;statements&nbsp;by&nbsp;computation,<br>
+&nbsp;&nbsp;&nbsp;expansion,&nbsp;and&nbsp;templated&nbsp;proofs<br>
+4.&nbsp;**Discovery**&nbsp;—&nbsp;generate&nbsp;examples,&nbsp;detect&nbsp;patterns,&nbsp;form&nbsp;and&nbsp;test<br>
+&nbsp;&nbsp;&nbsp;conjectures<br>
+&nbsp;<br>
+##&nbsp;Architecture:&nbsp;computational&nbsp;substrate&nbsp;with&nbsp;configurable&nbsp;rules<br>
+&nbsp;<br>
+The&nbsp;engines&nbsp;(parser,&nbsp;evaluator,&nbsp;solver,&nbsp;discovery)&nbsp;are&nbsp;code&nbsp;—&nbsp;they<br>
+are&nbsp;the&nbsp;"hardware"&nbsp;of&nbsp;mathematical&nbsp;reasoning.&nbsp;The&nbsp;RULES&nbsp;they&nbsp;apply<br>
+(commutativity,&nbsp;identity,&nbsp;balance,&nbsp;quadratic&nbsp;formula)&nbsp;can&nbsp;be&nbsp;either<br>
+hardcoded&nbsp;(default,&nbsp;backward&nbsp;compatible)&nbsp;or&nbsp;gated&nbsp;by&nbsp;the&nbsp;concept<br>
+network&nbsp;via&nbsp;``<a href="#MathRuleRegistry">MathRuleRegistry</a>``.<br>
+&nbsp;<br>
+When&nbsp;``<a href="#-try_math">try_math</a>()``&nbsp;is&nbsp;called&nbsp;with&nbsp;a&nbsp;concept&nbsp;network,&nbsp;it&nbsp;builds&nbsp;a<br>
+``<a href="#MathRuleRegistry">MathRuleRegistry</a>``&nbsp;that&nbsp;checks&nbsp;which&nbsp;math&nbsp;concepts&nbsp;Genesis&nbsp;has<br>
+learned.&nbsp;Only&nbsp;rules&nbsp;whose&nbsp;corresponding&nbsp;concepts&nbsp;exist&nbsp;in&nbsp;the&nbsp;network<br>
+(with&nbsp;sufficient&nbsp;confidence)&nbsp;are&nbsp;applied.&nbsp;This&nbsp;means&nbsp;training&nbsp;Genesis<br>
+on&nbsp;"the&nbsp;additive&nbsp;identity&nbsp;says&nbsp;that&nbsp;a&nbsp;+&nbsp;0&nbsp;=&nbsp;a"&nbsp;enables&nbsp;that&nbsp;rule&nbsp;in<br>
+the&nbsp;simplifier.<br>
+&nbsp;<br>
+Without&nbsp;a&nbsp;concept&nbsp;network,&nbsp;all&nbsp;rules&nbsp;are&nbsp;enabled&nbsp;(backward&nbsp;compatible).<br>
+&nbsp;<br>
+##&nbsp;What's&nbsp;genuine&nbsp;vs&nbsp;templated<br>
+&nbsp;<br>
+-&nbsp;**Computation**&nbsp;(parser&nbsp;+&nbsp;evaluator):&nbsp;genuine&nbsp;—&nbsp;parses&nbsp;and&nbsp;evaluates<br>
+&nbsp;&nbsp;real&nbsp;expressions&nbsp;with&nbsp;operator&nbsp;precedence,&nbsp;functions,&nbsp;variables.<br>
+-&nbsp;**<a href="#Equation">Equation</a>&nbsp;solving**:&nbsp;genuine&nbsp;—&nbsp;extracts&nbsp;polynomial&nbsp;coefficients,<br>
+&nbsp;&nbsp;applies&nbsp;the&nbsp;quadratic&nbsp;formula,&nbsp;handles&nbsp;complex&nbsp;roots.<br>
+-&nbsp;**Discovery**:&nbsp;genuine&nbsp;—&nbsp;generates&nbsp;primes&nbsp;(Sieve&nbsp;of&nbsp;Eratosthenes),<br>
+&nbsp;&nbsp;verifies&nbsp;parity/Goldbach/twin-prime&nbsp;patterns&nbsp;by&nbsp;actual&nbsp;computation.<br>
+-&nbsp;**Proof&nbsp;by&nbsp;computation**:&nbsp;genuine&nbsp;—&nbsp;evaluates&nbsp;both&nbsp;sides&nbsp;of&nbsp;an<br>
+&nbsp;&nbsp;equation&nbsp;and&nbsp;checks&nbsp;equality.<br>
+-&nbsp;**Proof&nbsp;by&nbsp;expansion**:&nbsp;genuine&nbsp;—&nbsp;expands&nbsp;and&nbsp;collects&nbsp;terms&nbsp;on<br>
+&nbsp;&nbsp;both&nbsp;sides,&nbsp;checks&nbsp;structural&nbsp;equality.<br>
+-&nbsp;**Even/odd&nbsp;proofs**:&nbsp;templated&nbsp;—&nbsp;hardcoded&nbsp;proof&nbsp;steps,&nbsp;not<br>
+&nbsp;&nbsp;generated&nbsp;by&nbsp;a&nbsp;proof&nbsp;search&nbsp;algorithm.<br>
+-&nbsp;**Induction&nbsp;proof**:&nbsp;templated&nbsp;—&nbsp;hardcoded&nbsp;for&nbsp;the&nbsp;specific&nbsp;case<br>
+&nbsp;&nbsp;``1&nbsp;+&nbsp;2&nbsp;+&nbsp;...&nbsp;+&nbsp;n&nbsp;=&nbsp;n(n+1)/2``.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="math.html">math</a><br>
+</td><td class="multicolumn"><a href="re.html">re</a><br>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#Exception">builtins.Exception</a>(<a href="builtins.html#BaseException">builtins.BaseException</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.math_reasoning.html#EvalError">EvalError</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.math_reasoning.html#ParseError">ParseError</a>
+</dt></dl>
+</dd>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.math_reasoning.html#BinOp">BinOp</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.math_reasoning.html#Conjecture">Conjecture</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.math_reasoning.html#DiscoveryResult">DiscoveryResult</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.math_reasoning.html#Equation">Equation</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.math_reasoning.html#FuncCall">FuncCall</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.math_reasoning.html#MathResult">MathResult</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.math_reasoning.html#MathRuleRegistry">MathRuleRegistry</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.math_reasoning.html#Num">Num</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.math_reasoning.html#Parser">Parser</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.math_reasoning.html#ProofResult">ProofResult</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.math_reasoning.html#ProofStep">ProofStep</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.math_reasoning.html#SolveResult">SolveResult</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.math_reasoning.html#SolveStep">SolveStep</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.math_reasoning.html#Token">Token</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.math_reasoning.html#UnaryOp">UnaryOp</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.math_reasoning.html#Var">Var</a>
+</dt></dl>
+</dd>
+<dt class="heading-text"><a href="enum.html#Enum">enum.Enum</a>(<a href="builtins.html#object">builtins.object</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.math_reasoning.html#TokenType">TokenType</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="BinOp">class <strong>BinOp</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#BinOp">BinOp</a>(op:&nbsp;'str',&nbsp;left:&nbsp;'Any',&nbsp;right:&nbsp;'Any')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+AST&nbsp;node&nbsp;for&nbsp;a&nbsp;binary&nbsp;operation.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="BinOp-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="BinOp-__init__"><strong>__init__</strong></a>(self, op: 'str', left: 'Any', right: 'Any') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="BinOp-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="BinOp-__str__"><strong>__str__</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Render&nbsp;the&nbsp;binary&nbsp;operation&nbsp;as&nbsp;``left&nbsp;op&nbsp;right``.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'left': 'Any', 'op': 'str', 'right': 'Any'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'left': Field(name='left',type='Any',default=&lt;dataclasse...appingproxy({}),kw_only=False,_field_type=_FIELD), 'op': Field(name='op',type='str',default=&lt;dataclasses....appingproxy({}),kw_only=False,_field_type=_FIELD), 'right': Field(name='right',type='Any',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('op', 'left', 'right')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Conjecture">class <strong>Conjecture</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Conjecture">Conjecture</a>(statement:&nbsp;'str',&nbsp;evidence:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;confidence:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;counterexample:&nbsp;'str&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;mathematical&nbsp;conjecture&nbsp;discovered&nbsp;by&nbsp;pattern&nbsp;analysis.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Conjecture-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="Conjecture-__init__"><strong>__init__</strong></a>(self, statement: 'str', evidence: 'list[str]' = &lt;factory&gt;, confidence: 'float' = 0.0, counterexample: 'str | None' = None) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Conjecture-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'confidence': 'float', 'counterexample': 'str | None', 'evidence': 'list[str]', 'statement': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'confidence': Field(name='confidence',type='float',default=0.0...appingproxy({}),kw_only=False,_field_type=_FIELD), 'counterexample': Field(name='counterexample',type='str | None',de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'evidence': Field(name='evidence',type='list[str]',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD), 'statement': Field(name='statement',type='str',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('statement', 'evidence', 'confidence', 'counterexample')</dl>
+
+<dl><dt><strong>confidence</strong> = 0.0</dl>
+
+<dl><dt><strong>counterexample</strong> = None</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="DiscoveryResult">class <strong>DiscoveryResult</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#DiscoveryResult">DiscoveryResult</a>(conjectures:&nbsp;'list[<a href="#Conjecture">Conjecture</a>]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;summary:&nbsp;'str'&nbsp;=&nbsp;'')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Result&nbsp;of&nbsp;a&nbsp;mathematical&nbsp;discovery&nbsp;process.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="DiscoveryResult-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="DiscoveryResult-__init__"><strong>__init__</strong></a>(self, conjectures: 'list[Conjecture]' = &lt;factory&gt;, summary: 'str' = '') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="DiscoveryResult-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'conjectures': 'list[Conjecture]', 'summary': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'conjectures': Field(name='conjectures',type='list[Conjecture]'...appingproxy({}),kw_only=False,_field_type=_FIELD), 'summary': Field(name='summary',type='str',default='',defau...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('conjectures', 'summary')</dl>
+
+<dl><dt><strong>summary</strong> = ''</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Equation">class <strong>Equation</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Equation">Equation</a>(left:&nbsp;'Any',&nbsp;right:&nbsp;'Any',&nbsp;comparator:&nbsp;'str')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+AST&nbsp;node&nbsp;for&nbsp;an&nbsp;equation&nbsp;or&nbsp;comparison.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Equation-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="Equation-__init__"><strong>__init__</strong></a>(self, left: 'Any', right: 'Any', comparator: 'str') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Equation-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="Equation-__str__"><strong>__str__</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Render&nbsp;the&nbsp;equation&nbsp;as&nbsp;``left&nbsp;comparator&nbsp;right``.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'comparator': 'str', 'left': 'Any', 'right': 'Any'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'comparator': Field(name='comparator',type='str',default=&lt;data...appingproxy({}),kw_only=False,_field_type=_FIELD), 'left': Field(name='left',type='Any',default=&lt;dataclasse...appingproxy({}),kw_only=False,_field_type=_FIELD), 'right': Field(name='right',type='Any',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('left', 'right', 'comparator')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="EvalError">class <strong>EvalError</strong></a>(<a href="builtins.html#Exception">builtins.Exception</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code">Raised&nbsp;when&nbsp;an&nbsp;expression&nbsp;cannot&nbsp;be&nbsp;evaluated.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.frontal_lobe.reasoning.math_reasoning.html#EvalError">EvalError</a></dd>
+<dd><a href="builtins.html#Exception">builtins.Exception</a></dd>
+<dd><a href="builtins.html#BaseException">builtins.BaseException</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Methods inherited from <a href="builtins.html#Exception">builtins.Exception</a>:<br>
+<dl><dt><a name="EvalError-__init__"><strong>__init__</strong></a>(self, /, *args, **kwargs)</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<hr>
+Static methods inherited from <a href="builtins.html#Exception">builtins.Exception</a>:<br>
+<dl><dt><a name="EvalError-__new__"><strong>__new__</strong></a>(*args, **kwargs)<span class="grey"><span class="heading-text"> class method of <a href="builtins.html#Exception">builtins.Exception</a></span></span></dt><dd><span class="code">Create&nbsp;and&nbsp;return&nbsp;a&nbsp;new&nbsp;<a href="builtins.html#object">object</a>.&nbsp;&nbsp;See&nbsp;help(type)&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<hr>
+Methods inherited from <a href="builtins.html#BaseException">builtins.BaseException</a>:<br>
+<dl><dt><a name="EvalError-__delattr__"><strong>__delattr__</strong></a>(self, name, /)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="EvalError-__getattribute__"><strong>__getattribute__</strong></a>(self, name, /)</dt><dd><span class="code">Return&nbsp;getattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="EvalError-__reduce__"><strong>__reduce__</strong></a>(...)</dt><dd><span class="code">Helper&nbsp;for&nbsp;pickle.</span></dd></dl>
+
+<dl><dt><a name="EvalError-__repr__"><strong>__repr__</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="EvalError-__setattr__"><strong>__setattr__</strong></a>(self, name, value, /)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<dl><dt><a name="EvalError-__setstate__"><strong>__setstate__</strong></a>(...)</dt></dl>
+
+<dl><dt><a name="EvalError-__str__"><strong>__str__</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;str(self).</span></dd></dl>
+
+<dl><dt><a name="EvalError-add_note"><strong>add_note</strong></a>(...)</dt><dd><span class="code"><a href="builtins.html#Exception">Exception</a>.<a href="#EvalError-add_note">add_note</a>(note)&nbsp;--<br>
+add&nbsp;a&nbsp;note&nbsp;to&nbsp;the&nbsp;exception</span></dd></dl>
+
+<dl><dt><a name="EvalError-with_traceback"><strong>with_traceback</strong></a>(...)</dt><dd><span class="code"><a href="builtins.html#Exception">Exception</a>.<a href="#EvalError-with_traceback">with_traceback</a>(tb)&nbsp;--<br>
+set&nbsp;self.<strong>__traceback__</strong>&nbsp;to&nbsp;tb&nbsp;and&nbsp;return&nbsp;self.</span></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="builtins.html#BaseException">builtins.BaseException</a>:<br>
+<dl><dt><strong>__cause__</strong></dt>
+<dd><span class="code">exception&nbsp;cause</span></dd>
+</dl>
+<dl><dt><strong>__context__</strong></dt>
+<dd><span class="code">exception&nbsp;context</span></dd>
+</dl>
+<dl><dt><strong>__dict__</strong></dt>
+</dl>
+<dl><dt><strong>__suppress_context__</strong></dt>
+</dl>
+<dl><dt><strong>__traceback__</strong></dt>
+</dl>
+<dl><dt><strong>args</strong></dt>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="FuncCall">class <strong>FuncCall</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#FuncCall">FuncCall</a>(name:&nbsp;'str',&nbsp;args:&nbsp;'list[Any]')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+AST&nbsp;node&nbsp;for&nbsp;a&nbsp;function&nbsp;call.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="FuncCall-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="FuncCall-__init__"><strong>__init__</strong></a>(self, name: 'str', args: 'list[Any]') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="FuncCall-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="FuncCall-__str__"><strong>__str__</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Render&nbsp;the&nbsp;function&nbsp;call&nbsp;as&nbsp;``name(arg,&nbsp;...)``.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'args': 'list[Any]', 'name': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'args': Field(name='args',type='list[Any]',default=&lt;data...appingproxy({}),kw_only=False,_field_type=_FIELD), 'name': Field(name='name',type='str',default=&lt;dataclasse...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('name', 'args')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="MathResult">class <strong>MathResult</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#MathResult">MathResult</a>(answer:&nbsp;'str',&nbsp;result_type:&nbsp;'str',&nbsp;steps:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;success:&nbsp;'bool'&nbsp;=&nbsp;True)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Result&nbsp;of&nbsp;a&nbsp;math&nbsp;reasoning&nbsp;operation.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="MathResult-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="MathResult-__init__"><strong>__init__</strong></a>(self, answer: 'str', result_type: 'str', steps: 'list[str]' = &lt;factory&gt;, success: 'bool' = True) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="MathResult-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'answer': 'str', 'result_type': 'str', 'steps': 'list[str]', 'success': 'bool'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'answer': Field(name='answer',type='str',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD), 'result_type': Field(name='result_type',type='str',default=&lt;dat...appingproxy({}),kw_only=False,_field_type=_FIELD), 'steps': Field(name='steps',type='list[str]',default=&lt;dat...appingproxy({}),kw_only=False,_field_type=_FIELD), 'success': Field(name='success',type='bool',default=True,de...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('answer', 'result_type', 'steps', 'success')</dl>
+
+<dl><dt><strong>success</strong> = True</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="MathRuleRegistry">class <strong>MathRuleRegistry</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#MathRuleRegistry">MathRuleRegistry</a>(enabled_rules:&nbsp;'set[str]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Registry&nbsp;of&nbsp;math&nbsp;rules&nbsp;enabled&nbsp;based&nbsp;on&nbsp;the&nbsp;concept&nbsp;network.<br>
+&nbsp;<br>
+This&nbsp;bridges&nbsp;the&nbsp;concept&nbsp;network&nbsp;(Genesis's&nbsp;learned&nbsp;knowledge)&nbsp;and<br>
+the&nbsp;math&nbsp;engine&nbsp;(the&nbsp;computational&nbsp;substrate).&nbsp;Rules&nbsp;are&nbsp;enabled<br>
+when&nbsp;Genesis&nbsp;has&nbsp;learned&nbsp;the&nbsp;corresponding&nbsp;concept.<br>
+&nbsp;<br>
+Usage:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;registry&nbsp;=&nbsp;<a href="#MathRuleRegistry">MathRuleRegistry</a>.<a href="#MathRuleRegistry-from_concept_network">from_concept_network</a>(network)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;result&nbsp;=&nbsp;<a href="#-simplify">simplify</a>(expr,&nbsp;registry.enabled_rules)<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="MathRuleRegistry-__init__"><strong>__init__</strong></a>(self, enabled_rules: 'set[str] | None' = None) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;registry,&nbsp;enabling&nbsp;all&nbsp;rules&nbsp;by&nbsp;default&nbsp;or&nbsp;a&nbsp;custom&nbsp;subset.</span></dd></dl>
+
+<dl><dt><a name="MathRuleRegistry-has_rule"><strong>has_rule</strong></a>(self, name: 'str') -&gt; 'bool'</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;*name*&nbsp;is&nbsp;in&nbsp;the&nbsp;enabled&nbsp;rule&nbsp;set.</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="MathRuleRegistry-from_concept_network"><strong>from_concept_network</strong></a>(network: 'Any') -&gt; 'MathRuleRegistry'</dt><dd><span class="code">Build&nbsp;a&nbsp;rule&nbsp;registry&nbsp;from&nbsp;concepts&nbsp;in&nbsp;the&nbsp;network.<br>
+&nbsp;<br>
+A&nbsp;rule&nbsp;is&nbsp;enabled&nbsp;if:<br>
+1.&nbsp;It's&nbsp;a&nbsp;base&nbsp;rule&nbsp;(always&nbsp;enabled),&nbsp;OR<br>
+2.&nbsp;A&nbsp;concept&nbsp;with&nbsp;the&nbsp;corresponding&nbsp;name&nbsp;exists&nbsp;in&nbsp;the&nbsp;network<br>
+&nbsp;&nbsp;&nbsp;with&nbsp;confidence&nbsp;&gt;=&nbsp;0.3<br>
+&nbsp;<br>
+If&nbsp;no&nbsp;math&nbsp;concepts&nbsp;are&nbsp;found&nbsp;in&nbsp;the&nbsp;network&nbsp;at&nbsp;all,&nbsp;all&nbsp;rules<br>
+are&nbsp;enabled&nbsp;(backward&nbsp;compatible&nbsp;—&nbsp;the&nbsp;engine&nbsp;assumes&nbsp;a<br>
+pre-trained&nbsp;network&nbsp;or&nbsp;standalone&nbsp;usage).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Num">class <strong>Num</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Num">Num</a>(value:&nbsp;'float&nbsp;|&nbsp;int')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+AST&nbsp;node&nbsp;for&nbsp;a&nbsp;numeric&nbsp;literal.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Num-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="Num-__init__"><strong>__init__</strong></a>(self, value: 'float | int') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Num-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="Num-__str__"><strong>__str__</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Render&nbsp;the&nbsp;numeric&nbsp;literal,&nbsp;dropping&nbsp;a&nbsp;trailing&nbsp;``.0``&nbsp;for&nbsp;floats.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'value': 'float | int'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'value': Field(name='value',type='float | int',default=&lt;d...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('value',)</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ParseError">class <strong>ParseError</strong></a>(<a href="builtins.html#Exception">builtins.Exception</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code">Raised&nbsp;when&nbsp;the&nbsp;parser&nbsp;encounters&nbsp;invalid&nbsp;syntax.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.frontal_lobe.reasoning.math_reasoning.html#ParseError">ParseError</a></dd>
+<dd><a href="builtins.html#Exception">builtins.Exception</a></dd>
+<dd><a href="builtins.html#BaseException">builtins.BaseException</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Methods inherited from <a href="builtins.html#Exception">builtins.Exception</a>:<br>
+<dl><dt><a name="ParseError-__init__"><strong>__init__</strong></a>(self, /, *args, **kwargs)</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<hr>
+Static methods inherited from <a href="builtins.html#Exception">builtins.Exception</a>:<br>
+<dl><dt><a name="ParseError-__new__"><strong>__new__</strong></a>(*args, **kwargs)<span class="grey"><span class="heading-text"> class method of <a href="builtins.html#Exception">builtins.Exception</a></span></span></dt><dd><span class="code">Create&nbsp;and&nbsp;return&nbsp;a&nbsp;new&nbsp;<a href="builtins.html#object">object</a>.&nbsp;&nbsp;See&nbsp;help(type)&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<hr>
+Methods inherited from <a href="builtins.html#BaseException">builtins.BaseException</a>:<br>
+<dl><dt><a name="ParseError-__delattr__"><strong>__delattr__</strong></a>(self, name, /)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="ParseError-__getattribute__"><strong>__getattribute__</strong></a>(self, name, /)</dt><dd><span class="code">Return&nbsp;getattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="ParseError-__reduce__"><strong>__reduce__</strong></a>(...)</dt><dd><span class="code">Helper&nbsp;for&nbsp;pickle.</span></dd></dl>
+
+<dl><dt><a name="ParseError-__repr__"><strong>__repr__</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="ParseError-__setattr__"><strong>__setattr__</strong></a>(self, name, value, /)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<dl><dt><a name="ParseError-__setstate__"><strong>__setstate__</strong></a>(...)</dt></dl>
+
+<dl><dt><a name="ParseError-__str__"><strong>__str__</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;str(self).</span></dd></dl>
+
+<dl><dt><a name="ParseError-add_note"><strong>add_note</strong></a>(...)</dt><dd><span class="code"><a href="builtins.html#Exception">Exception</a>.<a href="#ParseError-add_note">add_note</a>(note)&nbsp;--<br>
+add&nbsp;a&nbsp;note&nbsp;to&nbsp;the&nbsp;exception</span></dd></dl>
+
+<dl><dt><a name="ParseError-with_traceback"><strong>with_traceback</strong></a>(...)</dt><dd><span class="code"><a href="builtins.html#Exception">Exception</a>.<a href="#ParseError-with_traceback">with_traceback</a>(tb)&nbsp;--<br>
+set&nbsp;self.<strong>__traceback__</strong>&nbsp;to&nbsp;tb&nbsp;and&nbsp;return&nbsp;self.</span></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="builtins.html#BaseException">builtins.BaseException</a>:<br>
+<dl><dt><strong>__cause__</strong></dt>
+<dd><span class="code">exception&nbsp;cause</span></dd>
+</dl>
+<dl><dt><strong>__context__</strong></dt>
+<dd><span class="code">exception&nbsp;context</span></dd>
+</dl>
+<dl><dt><strong>__dict__</strong></dt>
+</dl>
+<dl><dt><strong>__suppress_context__</strong></dt>
+</dl>
+<dl><dt><strong>__traceback__</strong></dt>
+</dl>
+<dl><dt><strong>args</strong></dt>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Parser">class <strong>Parser</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Parser">Parser</a>(tokens:&nbsp;'list[<a href="#Token">Token</a>]')&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Recursive&nbsp;descent&nbsp;parser&nbsp;for&nbsp;mathematical&nbsp;expressions&nbsp;and&nbsp;equations.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Parser-__init__"><strong>__init__</strong></a>(self, tokens: 'list[Token]') -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;math&nbsp;expression&nbsp;parser.</span></dd></dl>
+
+<dl><dt><a name="Parser-advance"><strong>advance</strong></a>(self) -&gt; 'Token'</dt><dd><span class="code">Consume&nbsp;and&nbsp;return&nbsp;the&nbsp;current&nbsp;token,&nbsp;advancing&nbsp;to&nbsp;the&nbsp;next.</span></dd></dl>
+
+<dl><dt><a name="Parser-expect"><strong>expect</strong></a>(self, tt: 'TokenType') -&gt; 'Token'</dt><dd><span class="code">Consume&nbsp;the&nbsp;current&nbsp;token&nbsp;if&nbsp;it&nbsp;matches&nbsp;*tt*,&nbsp;else&nbsp;raise&nbsp;<a href="#ParseError">ParseError</a>.</span></dd></dl>
+
+<dl><dt><a name="Parser-parse"><strong>parse</strong></a>(self) -&gt; 'Equation | Any'</dt><dd><span class="code">Parse&nbsp;a&nbsp;full&nbsp;expression&nbsp;or&nbsp;equation.</span></dd></dl>
+
+<dl><dt><a name="Parser-peek"><strong>peek</strong></a>(self) -&gt; 'Token'</dt><dd><span class="code">Return&nbsp;the&nbsp;current&nbsp;token&nbsp;without&nbsp;consuming&nbsp;it.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'_PRECEDENCE': 'ClassVar[dict]'}</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ProofResult">class <strong>ProofResult</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ProofResult">ProofResult</a>(conclusion:&nbsp;'str',&nbsp;steps:&nbsp;'list[<a href="#ProofStep">ProofStep</a>]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;success:&nbsp;'bool'&nbsp;=&nbsp;True,&nbsp;proof_type:&nbsp;'str'&nbsp;=&nbsp;'')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Result&nbsp;of&nbsp;a&nbsp;proof&nbsp;attempt.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ProofResult-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="ProofResult-__init__"><strong>__init__</strong></a>(self, conclusion: 'str', steps: 'list[ProofStep]' = &lt;factory&gt;, success: 'bool' = True, proof_type: 'str' = '') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="ProofResult-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'conclusion': 'str', 'proof_type': 'str', 'steps': 'list[ProofStep]', 'success': 'bool'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'conclusion': Field(name='conclusion',type='str',default=&lt;data...appingproxy({}),kw_only=False,_field_type=_FIELD), 'proof_type': Field(name='proof_type',type='str',default='',de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'steps': Field(name='steps',type='list[ProofStep]',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'success': Field(name='success',type='bool',default=True,de...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('conclusion', 'steps', 'success', 'proof_type')</dl>
+
+<dl><dt><strong>proof_type</strong> = ''</dl>
+
+<dl><dt><strong>success</strong> = True</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ProofStep">class <strong>ProofStep</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ProofStep">ProofStep</a>(statement:&nbsp;'str',&nbsp;justification:&nbsp;'str')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;single&nbsp;step&nbsp;in&nbsp;a&nbsp;proof.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ProofStep-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="ProofStep-__init__"><strong>__init__</strong></a>(self, statement: 'str', justification: 'str') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="ProofStep-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'justification': 'str', 'statement': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'justification': Field(name='justification',type='str',default=&lt;d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'statement': Field(name='statement',type='str',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('statement', 'justification')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SolveResult">class <strong>SolveResult</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SolveResult">SolveResult</a>(solution:&nbsp;'str',&nbsp;steps:&nbsp;'list[<a href="#SolveStep">SolveStep</a>]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;variable:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;success:&nbsp;'bool'&nbsp;=&nbsp;True)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Result&nbsp;of&nbsp;solving&nbsp;an&nbsp;equation.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="SolveResult-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="SolveResult-__init__"><strong>__init__</strong></a>(self, solution: 'str', steps: 'list[SolveStep]' = &lt;factory&gt;, variable: 'str' = '', success: 'bool' = True) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="SolveResult-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'solution': 'str', 'steps': 'list[SolveStep]', 'success': 'bool', 'variable': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'solution': Field(name='solution',type='str',default=&lt;datacl...appingproxy({}),kw_only=False,_field_type=_FIELD), 'steps': Field(name='steps',type='list[SolveStep]',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'success': Field(name='success',type='bool',default=True,de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'variable': Field(name='variable',type='str',default='',defa...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('solution', 'steps', 'variable', 'success')</dl>
+
+<dl><dt><strong>success</strong> = True</dl>
+
+<dl><dt><strong>variable</strong> = ''</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SolveStep">class <strong>SolveStep</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SolveStep">SolveStep</a>(description:&nbsp;'str',&nbsp;expression:&nbsp;'str')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;single&nbsp;step&nbsp;in&nbsp;a&nbsp;solution.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="SolveStep-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="SolveStep-__init__"><strong>__init__</strong></a>(self, description: 'str', expression: 'str') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="SolveStep-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'description': 'str', 'expression': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'description': Field(name='description',type='str',default=&lt;dat...appingproxy({}),kw_only=False,_field_type=_FIELD), 'expression': Field(name='expression',type='str',default=&lt;data...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('description', 'expression')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Token">class <strong>Token</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Token">Token</a>(type:&nbsp;'<a href="#TokenType">TokenType</a>',&nbsp;value:&nbsp;'str',&nbsp;pos:&nbsp;'int')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;single&nbsp;token&nbsp;from&nbsp;the&nbsp;math&nbsp;expression&nbsp;tokenizer.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Token-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="Token-__init__"><strong>__init__</strong></a>(self, type: 'TokenType', value: 'str', pos: 'int') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(<a href="#Token-type">type</a>(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Token-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>pos</strong></dt>
+</dl>
+<dl><dt><strong>type</strong></dt>
+</dl>
+<dl><dt><strong>value</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'pos': 'int', 'type': 'TokenType', 'value': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'pos': Field(name='pos',type='int',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD), 'type': Field(name='type',type='TokenType',default=&lt;data...appingproxy({}),kw_only=False,_field_type=_FIELD), 'value': Field(name='value',type='str',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('type', 'value', 'pos')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="TokenType">class <strong>TokenType</strong></a>(<a href="enum.html#Enum">enum.Enum</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#TokenType">TokenType</a>(*values)<br>
+&nbsp;<br>
+Types&nbsp;of&nbsp;tokens&nbsp;produced&nbsp;by&nbsp;the&nbsp;math&nbsp;expression&nbsp;tokenizer.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.frontal_lobe.reasoning.math_reasoning.html#TokenType">TokenType</a></dd>
+<dd><a href="enum.html#Enum">enum.Enum</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>CARET</strong> = &lt;TokenType.CARET: '^'&gt;</dl>
+
+<dl><dt><strong>COMMA</strong> = &lt;TokenType.COMMA: ','&gt;</dl>
+
+<dl><dt><strong>EOF</strong> = &lt;TokenType.EOF: 'eof'&gt;</dl>
+
+<dl><dt><strong>EQ</strong> = &lt;TokenType.EQ: '='&gt;</dl>
+
+<dl><dt><strong>GE</strong> = &lt;TokenType.GE: '&gt;='&gt;</dl>
+
+<dl><dt><strong>GT</strong> = &lt;TokenType.GT: '&gt;'&gt;</dl>
+
+<dl><dt><strong>IDENT</strong> = &lt;TokenType.IDENT: 'ident'&gt;</dl>
+
+<dl><dt><strong>LE</strong> = &lt;TokenType.LE: '&lt;='&gt;</dl>
+
+<dl><dt><strong>LPAREN</strong> = &lt;TokenType.LPAREN: '('&gt;</dl>
+
+<dl><dt><strong>LT</strong> = &lt;TokenType.LT: '&lt;'&gt;</dl>
+
+<dl><dt><strong>MINUS</strong> = &lt;TokenType.MINUS: '-'&gt;</dl>
+
+<dl><dt><strong>NE</strong> = &lt;TokenType.NE: '!='&gt;</dl>
+
+<dl><dt><strong>NUMBER</strong> = &lt;TokenType.NUMBER: 'number'&gt;</dl>
+
+<dl><dt><strong>PLUS</strong> = &lt;TokenType.PLUS: '+'&gt;</dl>
+
+<dl><dt><strong>RPAREN</strong> = &lt;TokenType.RPAREN: ')'&gt;</dl>
+
+<dl><dt><strong>SLASH</strong> = &lt;TokenType.SLASH: '/'&gt;</dl>
+
+<dl><dt><strong>STAR</strong> = &lt;TokenType.STAR: '*'&gt;</dl>
+
+<hr>
+Data descriptors inherited from <a href="enum.html#Enum">enum.Enum</a>:<br>
+<dl><dt><strong>name</strong></dt>
+<dd><span class="code">The&nbsp;name&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<dl><dt><strong>value</strong></dt>
+<dd><span class="code">The&nbsp;value&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<hr>
+Static methods inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><a name="TokenType-__contains__"><strong>__contains__</strong></a>(value)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;`value`&nbsp;is&nbsp;in&nbsp;`cls`.<br>
+&nbsp;<br>
+`value`&nbsp;is&nbsp;in&nbsp;`cls`&nbsp;if:<br>
+1)&nbsp;`value`&nbsp;is&nbsp;a&nbsp;member&nbsp;of&nbsp;`cls`,&nbsp;or<br>
+2)&nbsp;`value`&nbsp;is&nbsp;the&nbsp;value&nbsp;of&nbsp;one&nbsp;of&nbsp;the&nbsp;`cls`'s&nbsp;members.</span></dd></dl>
+
+<dl><dt><a name="TokenType-__getitem__"><strong>__getitem__</strong></a>(name)</dt><dd><span class="code">Return&nbsp;the&nbsp;member&nbsp;matching&nbsp;`name`.</span></dd></dl>
+
+<dl><dt><a name="TokenType-__iter__"><strong>__iter__</strong></a>()</dt><dd><span class="code">Return&nbsp;members&nbsp;in&nbsp;definition&nbsp;order.</span></dd></dl>
+
+<dl><dt><a name="TokenType-__len__"><strong>__len__</strong></a>()</dt><dd><span class="code">Return&nbsp;the&nbsp;number&nbsp;of&nbsp;members&nbsp;(no&nbsp;aliases)</span></dd></dl>
+
+<hr>
+Readonly properties inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><strong>__members__</strong></dt>
+<dd><span class="code">Returns&nbsp;a&nbsp;mapping&nbsp;of&nbsp;member&nbsp;name-&gt;value.<br>
+&nbsp;<br>
+This&nbsp;mapping&nbsp;lists&nbsp;all&nbsp;enum&nbsp;members,&nbsp;including&nbsp;aliases.&nbsp;Note&nbsp;that&nbsp;this<br>
+is&nbsp;a&nbsp;read-only&nbsp;view&nbsp;of&nbsp;the&nbsp;internal&nbsp;mapping.</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="UnaryOp">class <strong>UnaryOp</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#UnaryOp">UnaryOp</a>(op:&nbsp;'str',&nbsp;operand:&nbsp;'Any')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+AST&nbsp;node&nbsp;for&nbsp;a&nbsp;unary&nbsp;operation.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="UnaryOp-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="UnaryOp-__init__"><strong>__init__</strong></a>(self, op: 'str', operand: 'Any') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="UnaryOp-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="UnaryOp-__str__"><strong>__str__</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Render&nbsp;the&nbsp;unary&nbsp;operation&nbsp;as&nbsp;``op&nbsp;operand``.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'op': 'str', 'operand': 'Any'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'op': Field(name='op',type='str',default=&lt;dataclasses....appingproxy({}),kw_only=False,_field_type=_FIELD), 'operand': Field(name='operand',type='Any',default=&lt;datacla...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('op', 'operand')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Var">class <strong>Var</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Var">Var</a>(name:&nbsp;'str')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+AST&nbsp;node&nbsp;for&nbsp;a&nbsp;variable&nbsp;reference.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Var-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="Var-__init__"><strong>__init__</strong></a>(self, name: 'str') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Var-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="Var-__str__"><strong>__str__</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Render&nbsp;the&nbsp;variable&nbsp;name.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'name': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'name': Field(name='name',type='str',default=&lt;dataclasse...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('name',)</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-collect_variables"><strong>collect_variables</strong></a>(node: 'Any') -&gt; 'set[str]'</dt><dd><span class="code">Find&nbsp;all&nbsp;variable&nbsp;names&nbsp;in&nbsp;an&nbsp;expression&nbsp;tree.</span></dd></dl>
+ <dl><dt><a name="-discover"><strong>discover</strong></a>(pattern_type: 'str', n_examples: 'int' = 20) -&gt; 'DiscoveryResult'</dt><dd><span class="code">Generate&nbsp;examples&nbsp;and&nbsp;look&nbsp;for&nbsp;mathematical&nbsp;patterns.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;how&nbsp;mathematicians&nbsp;discover&nbsp;new&nbsp;results:&nbsp;compute&nbsp;many<br>
+examples,&nbsp;look&nbsp;for&nbsp;regularities,&nbsp;form&nbsp;conjectures,&nbsp;and&nbsp;test&nbsp;them.<br>
+The&nbsp;discovery&nbsp;is&nbsp;genuinely&nbsp;computational&nbsp;—&nbsp;patterns&nbsp;are&nbsp;verified<br>
+by&nbsp;actual&nbsp;computation,&nbsp;not&nbsp;hardcoded.&nbsp;The&nbsp;heuristics&nbsp;for&nbsp;which<br>
+patterns&nbsp;to&nbsp;look&nbsp;for&nbsp;are&nbsp;hardcoded&nbsp;by&nbsp;topic&nbsp;keyword.</span></dd></dl>
+ <dl><dt><a name="-evaluate"><strong>evaluate</strong></a>(node: 'Any', env: 'dict[str, float] | None' = None) -&gt; 'float | int'</dt><dd><span class="code">Evaluate&nbsp;an&nbsp;expression&nbsp;tree&nbsp;to&nbsp;a&nbsp;numeric&nbsp;value.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;node:&nbsp;AST&nbsp;node&nbsp;(<a href="#Num">Num</a>,&nbsp;<a href="#Var">Var</a>,&nbsp;<a href="#BinOp">BinOp</a>,&nbsp;<a href="#UnaryOp">UnaryOp</a>,&nbsp;<a href="#FuncCall">FuncCall</a>)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;env:&nbsp;variable&nbsp;bindings&nbsp;(name&nbsp;→&nbsp;value)<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Numeric&nbsp;result<br>
+&nbsp;<br>
+Raises:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#EvalError">EvalError</a>:&nbsp;if&nbsp;the&nbsp;expression&nbsp;can't&nbsp;be&nbsp;evaluated&nbsp;(unbound&nbsp;variable,&nbsp;etc.)</span></dd></dl>
+ <dl><dt><a name="-format_number"><strong>format_number</strong></a>(n: 'float | int') -&gt; 'str'</dt><dd><span class="code">Format&nbsp;a&nbsp;number&nbsp;nicely&nbsp;for&nbsp;display.</span></dd></dl>
+ <dl><dt><a name="-parse_expression"><strong>parse_expression</strong></a>(text: 'str') -&gt; 'Equation | Any'</dt><dd><span class="code">Parse&nbsp;a&nbsp;math&nbsp;expression&nbsp;or&nbsp;equation&nbsp;from&nbsp;text.</span></dd></dl>
+ <dl><dt><a name="-prove"><strong>prove</strong></a>(statement: 'str') -&gt; 'ProofResult'</dt><dd><span class="code">Attempt&nbsp;to&nbsp;prove&nbsp;a&nbsp;mathematical&nbsp;statement.<br>
+&nbsp;<br>
+The&nbsp;proof&nbsp;strategies&nbsp;are&nbsp;a&nbsp;mix&nbsp;of&nbsp;genuine&nbsp;computation&nbsp;and<br>
+hardcoded&nbsp;templates:<br>
+-&nbsp;Arithmetic&nbsp;identities:&nbsp;verified&nbsp;by&nbsp;computation&nbsp;(genuine)<br>
+-&nbsp;Even/odd&nbsp;properties:&nbsp;hardcoded&nbsp;proof&nbsp;templates&nbsp;(not&nbsp;generated)<br>
+-&nbsp;Algebraic&nbsp;identities:&nbsp;verified&nbsp;by&nbsp;expansion&nbsp;(genuine)<br>
+-&nbsp;Induction&nbsp;for&nbsp;sum&nbsp;formulas:&nbsp;hardcoded&nbsp;template&nbsp;(not&nbsp;generated)</span></dd></dl>
+ <dl><dt><a name="-simplify"><strong>simplify</strong></a>(node: 'Any', enabled_rules: 'set[str] | None' = None) -&gt; 'Any'</dt><dd><span class="code">Simplify&nbsp;an&nbsp;expression&nbsp;tree&nbsp;by&nbsp;applying&nbsp;algebraic&nbsp;identities.<br>
+&nbsp;<br>
+Parameters:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;node:&nbsp;The&nbsp;AST&nbsp;node&nbsp;to&nbsp;simplify.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;enabled_rules:&nbsp;Optional&nbsp;set&nbsp;of&nbsp;rule&nbsp;names&nbsp;to&nbsp;apply.&nbsp;If&nbsp;None,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;all&nbsp;rules&nbsp;are&nbsp;enabled&nbsp;(backward&nbsp;compatible).&nbsp;If&nbsp;provided,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;only&nbsp;rules&nbsp;whose&nbsp;names&nbsp;are&nbsp;in&nbsp;the&nbsp;set&nbsp;are&nbsp;applied.<br>
+&nbsp;<br>
+Rule&nbsp;names:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;"additive_identity":&nbsp;a&nbsp;+&nbsp;0&nbsp;=&nbsp;a,&nbsp;0&nbsp;+&nbsp;a&nbsp;=&nbsp;a<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;"additive_inverse":&nbsp;a&nbsp;+&nbsp;(-a)&nbsp;=&nbsp;0,&nbsp;(-a)&nbsp;+&nbsp;a&nbsp;=&nbsp;0<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;"subtract_zero":&nbsp;a&nbsp;-&nbsp;0&nbsp;=&nbsp;a<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;"subtract_self":&nbsp;a&nbsp;-&nbsp;a&nbsp;=&nbsp;0<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;"multiplicative_zero":&nbsp;a&nbsp;*&nbsp;0&nbsp;=&nbsp;0,&nbsp;0&nbsp;*&nbsp;a&nbsp;=&nbsp;0<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;"multiplicative_identity":&nbsp;a&nbsp;*&nbsp;1&nbsp;=&nbsp;a,&nbsp;1&nbsp;*&nbsp;a&nbsp;=&nbsp;a<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;"multiplicative_inverse":&nbsp;a&nbsp;*&nbsp;(-1)&nbsp;=&nbsp;-a,&nbsp;(-1)&nbsp;*&nbsp;a&nbsp;=&nbsp;-a<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;"divide_identity":&nbsp;a&nbsp;/&nbsp;1&nbsp;=&nbsp;a<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;"divide_zero":&nbsp;0&nbsp;/&nbsp;a&nbsp;=&nbsp;0<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;"divide_self":&nbsp;a&nbsp;/&nbsp;a&nbsp;=&nbsp;1<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;"power_zero":&nbsp;a&nbsp;^&nbsp;0&nbsp;=&nbsp;1<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;"power_one":&nbsp;a&nbsp;^&nbsp;1&nbsp;=&nbsp;a<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;"zero_power":&nbsp;0&nbsp;^&nbsp;a&nbsp;=&nbsp;0&nbsp;(a&nbsp;&gt;&nbsp;0)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;"one_power":&nbsp;1&nbsp;^&nbsp;a&nbsp;=&nbsp;1<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;"constant_fold":&nbsp;evaluate&nbsp;numeric&nbsp;subexpressions<br>
+&nbsp;<br>
+This&nbsp;makes&nbsp;the&nbsp;simplifier's&nbsp;rule&nbsp;set&nbsp;configurable.&nbsp;The<br>
+``<a href="#MathRuleRegistry">MathRuleRegistry</a>.from_concept_network``&nbsp;method&nbsp;builds&nbsp;the<br>
+enabled_rules&nbsp;set&nbsp;from&nbsp;concepts&nbsp;in&nbsp;the&nbsp;concept&nbsp;network,&nbsp;so<br>
+that&nbsp;rules&nbsp;Genesis&nbsp;has&nbsp;learned&nbsp;are&nbsp;applied&nbsp;and&nbsp;rules&nbsp;it<br>
+hasn't&nbsp;learned&nbsp;are&nbsp;skipped.</span></dd></dl>
+ <dl><dt><a name="-solve_equation"><strong>solve_equation</strong></a>(eq: 'Equation', enabled_rules: 'set[str] | None' = None) -&gt; 'SolveResult'</dt><dd><span class="code">Solve&nbsp;a&nbsp;linear&nbsp;or&nbsp;quadratic&nbsp;equation&nbsp;for&nbsp;its&nbsp;variable.<br>
+&nbsp;<br>
+Uses&nbsp;transformation&nbsp;rules&nbsp;(balance,&nbsp;isolate,&nbsp;simplify)&nbsp;applied<br>
+mechanically&nbsp;by&nbsp;the&nbsp;engine.&nbsp;The&nbsp;simplification&nbsp;rules&nbsp;are&nbsp;gated&nbsp;by<br>
+``enabled_rules``&nbsp;(see&nbsp;``<a href="#-simplify">simplify</a>()``&nbsp;for&nbsp;the&nbsp;rule&nbsp;names).&nbsp;The<br>
+steps&nbsp;are&nbsp;recorded&nbsp;so&nbsp;Genesis&nbsp;can&nbsp;explain&nbsp;its&nbsp;reasoning.</span></dd></dl>
+ <dl><dt><a name="-substitute"><strong>substitute</strong></a>(node: 'Any', env: 'dict[str, Any]') -&gt; 'Any'</dt><dd><span class="code">Substitute&nbsp;variables&nbsp;in&nbsp;an&nbsp;expression&nbsp;tree&nbsp;with&nbsp;values/expressions.</span></dd></dl>
+ <dl><dt><a name="-tokenize"><strong>tokenize</strong></a>(text: 'str') -&gt; 'list[Token]'</dt><dd><span class="code">Convert&nbsp;a&nbsp;complete&nbsp;math&nbsp;expression&nbsp;string&nbsp;into&nbsp;tokens.<br>
+&nbsp;<br>
+The&nbsp;tokenizer&nbsp;is&nbsp;deliberately&nbsp;strict.&nbsp;&nbsp;Silently&nbsp;omitting&nbsp;an&nbsp;unknown<br>
+character&nbsp;changes&nbsp;the&nbsp;expression&nbsp;the&nbsp;evaluator&nbsp;sees,&nbsp;which&nbsp;can&nbsp;turn&nbsp;a<br>
+malformed&nbsp;request&nbsp;into&nbsp;a&nbsp;confident&nbsp;but&nbsp;unrelated&nbsp;answer.</span></dd></dl>
+ <dl><dt><a name="-try_math"><strong>try_math</strong></a>(question: 'str', network: 'Any' = None, task_competence: 'Any' = None, salience: 'float | None' = None) -&gt; 'MathResult | None'</dt><dd><span class="code">Try&nbsp;to&nbsp;answer&nbsp;a&nbsp;question&nbsp;using&nbsp;mathematical&nbsp;reasoning.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;entry&nbsp;point&nbsp;for&nbsp;the&nbsp;cognition&nbsp;engine.&nbsp;It&nbsp;detects<br>
+what&nbsp;kind&nbsp;of&nbsp;math&nbsp;question&nbsp;is&nbsp;being&nbsp;asked&nbsp;and&nbsp;routes&nbsp;it&nbsp;to<br>
+the&nbsp;appropriate&nbsp;engine&nbsp;(computation,&nbsp;solving,&nbsp;proof,&nbsp;discovery).<br>
+&nbsp;<br>
+If&nbsp;a&nbsp;concept&nbsp;network&nbsp;is&nbsp;provided,&nbsp;the&nbsp;simplification&nbsp;rules&nbsp;are<br>
+gated&nbsp;by&nbsp;what&nbsp;Genesis&nbsp;has&nbsp;learned&nbsp;(see&nbsp;``<a href="#MathRuleRegistry">MathRuleRegistry</a>``).<br>
+Without&nbsp;a&nbsp;concept&nbsp;network,&nbsp;all&nbsp;rules&nbsp;are&nbsp;enabled&nbsp;(backward<br>
+compatible).<br>
+&nbsp;<br>
+When&nbsp;``task_competence``&nbsp;is&nbsp;provided,&nbsp;each&nbsp;answered&nbsp;question&nbsp;is<br>
+recorded&nbsp;as&nbsp;an&nbsp;episode:&nbsp;schemas&nbsp;accumulate&nbsp;which&nbsp;math&nbsp;families<br>
+succeed&nbsp;or&nbsp;fail,&nbsp;and&nbsp;verified&nbsp;results&nbsp;consolidate&nbsp;as&nbsp;skills&nbsp;the<br>
+concept&nbsp;network&nbsp;can&nbsp;reason&nbsp;about.<br>
+&nbsp;<br>
+Returns&nbsp;None&nbsp;if&nbsp;the&nbsp;question&nbsp;is&nbsp;not&nbsp;a&nbsp;math&nbsp;question.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>ClassVar</strong> = typing.ClassVar<br>
+<strong>__annotations__</strong> = {'_ALL_RULES': 'frozenset[str]', '_BASE_RULES': 'frozenset[str]', '_BUILTIN_FUNCTIONS': 'dict[str, Callable[..., Any]]', '_CONCEPT_TO_RULE': 'dict[str, str]'}<br>
+<strong>logger</strong> = &lt;Logger Self_World.frontal_lobe.reasoning.math_reasoning (WARNING)&gt;</td></tr></table>
+</body></html>

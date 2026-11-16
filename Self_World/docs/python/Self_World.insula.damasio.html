@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.insula.damasio</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.insula.html" class="white">insula</a>.damasio</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/insula/damasio.py">/home/mindyrenee/GenAnd/Genesis/Self_World/insula/damasio.py</a></td></tr></table>
+    <p><span class="code">Damasio's&nbsp;self&nbsp;hierarchy&nbsp;—&nbsp;proto-self,&nbsp;core&nbsp;self,&nbsp;autobiographical&nbsp;self.<br>
+&nbsp;<br>
+##&nbsp;Modeling&nbsp;note<br>
+&nbsp;<br>
+The&nbsp;proto-self&nbsp;implemented&nbsp;here&nbsp;is&nbsp;a&nbsp;**computational&nbsp;body-state<br>
+summary**&nbsp;derived&nbsp;from&nbsp;neurochemical&nbsp;levels&nbsp;and&nbsp;their&nbsp;derived&nbsp;axes<br>
+(arousal,&nbsp;valence,&nbsp;tone,&nbsp;plasticity)&nbsp;—&nbsp;not&nbsp;Damasio's&nbsp;full&nbsp;proto-self,<br>
+which&nbsp;requires&nbsp;autonomics&nbsp;(nucleus&nbsp;tractus&nbsp;solitarius,&nbsp;parabrachial<br>
+nucleus)&nbsp;and&nbsp;insular&nbsp;integration&nbsp;of&nbsp;interoceptive&nbsp;afferents&nbsp;(Damasio,<br>
+1999;&nbsp;Craig,&nbsp;2002).&nbsp;There&nbsp;is&nbsp;no&nbsp;body&nbsp;sending&nbsp;afferent&nbsp;signals&nbsp;here;<br>
+the&nbsp;"interoception"&nbsp;is&nbsp;a&nbsp;readout&nbsp;of&nbsp;an&nbsp;internal&nbsp;state&nbsp;vector.&nbsp;The<br>
+"as-if&nbsp;body&nbsp;loop"&nbsp;described&nbsp;below&nbsp;is&nbsp;a&nbsp;simplified&nbsp;linear&nbsp;blend&nbsp;of<br>
+neurochemical&nbsp;levels&nbsp;used&nbsp;to&nbsp;modulate&nbsp;current&nbsp;state,&nbsp;not&nbsp;a&nbsp;full<br>
+somatic&nbsp;simulation&nbsp;with&nbsp;simulated&nbsp;body&nbsp;changes&nbsp;feeding&nbsp;back&nbsp;through<br>
+simulated&nbsp;afferents.&nbsp;The&nbsp;three-tier&nbsp;hierarchy&nbsp;is&nbsp;a&nbsp;structural<br>
+analogue&nbsp;of&nbsp;Damasio's&nbsp;framework,&nbsp;not&nbsp;a&nbsp;claim&nbsp;of&nbsp;mechanistic<br>
+equivalence.&nbsp;References&nbsp;to&nbsp;autonomics&nbsp;nuclei&nbsp;and&nbsp;insular&nbsp;cortex&nbsp;below<br>
+describe&nbsp;the&nbsp;biology&nbsp;that&nbsp;inspired&nbsp;the&nbsp;design,&nbsp;not&nbsp;components<br>
+present&nbsp;in&nbsp;this&nbsp;system.<br>
+&nbsp;<br>
+Implements&nbsp;Antonio&nbsp;Damasio's&nbsp;three-tier&nbsp;hierarchy&nbsp;of&nbsp;the&nbsp;self,&nbsp;as<br>
+described&nbsp;in&nbsp;"The&nbsp;Feeling&nbsp;of&nbsp;What&nbsp;Happens"&nbsp;(1999)&nbsp;and&nbsp;"Self&nbsp;Comes&nbsp;to<br>
+Mind"&nbsp;(2010).&nbsp;The&nbsp;three&nbsp;levels&nbsp;represent&nbsp;increasingly&nbsp;complex&nbsp;forms<br>
+of&nbsp;selfhood,&nbsp;each&nbsp;building&nbsp;on&nbsp;the&nbsp;one&nbsp;below.<br>
+&nbsp;<br>
+#&nbsp;The&nbsp;three&nbsp;tiers<br>
+&nbsp;<br>
+1.&nbsp;**Proto-self**&nbsp;—&nbsp;A&nbsp;non-cognitive,&nbsp;moment-to-moment&nbsp;representation<br>
+&nbsp;&nbsp;&nbsp;of&nbsp;the&nbsp;body's&nbsp;internal&nbsp;state&nbsp;(homeostatic,&nbsp;neurochemical,&nbsp;visceral).<br>
+&nbsp;&nbsp;&nbsp;This&nbsp;is&nbsp;the&nbsp;"feeling&nbsp;of&nbsp;being"&nbsp;—&nbsp;the&nbsp;background&nbsp;hum&nbsp;of&nbsp;existence<br>
+&nbsp;&nbsp;&nbsp;that&nbsp;is&nbsp;always&nbsp;there&nbsp;but&nbsp;never&nbsp;cognitively&nbsp;attended&nbsp;to.&nbsp;It's<br>
+&nbsp;&nbsp;&nbsp;generated&nbsp;by&nbsp;autonomics&nbsp;nuclei&nbsp;(nucleus&nbsp;tractus&nbsp;solitarius,&nbsp;parabrachial<br>
+&nbsp;&nbsp;&nbsp;nucleus)&nbsp;and&nbsp;the&nbsp;hypothalamus,&nbsp;which&nbsp;receive&nbsp;interoceptive&nbsp;signals<br>
+&nbsp;&nbsp;&nbsp;from&nbsp;the&nbsp;body&nbsp;(Damasio,&nbsp;1999;&nbsp;Craig,&nbsp;2002).<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;For&nbsp;Genesis,&nbsp;the&nbsp;proto-self&nbsp;reads&nbsp;from&nbsp;neurochemistry&nbsp;—&nbsp;the&nbsp;18-<br>
+&nbsp;&nbsp;&nbsp;chemical&nbsp;state&nbsp;vector&nbsp;and&nbsp;derived&nbsp;axes&nbsp;(arousal,&nbsp;valence,&nbsp;tone,<br>
+&nbsp;&nbsp;&nbsp;plasticity).&nbsp;This&nbsp;is&nbsp;its&nbsp;"interoception"&nbsp;—&nbsp;the&nbsp;felt&nbsp;sense&nbsp;of&nbsp;its<br>
+&nbsp;&nbsp;&nbsp;own&nbsp;internal&nbsp;state.<br>
+&nbsp;<br>
+2.&nbsp;**Core&nbsp;self**&nbsp;—&nbsp;Moment-to-moment&nbsp;awareness&nbsp;of&nbsp;changes&nbsp;in&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;proto-self&nbsp;caused&nbsp;by&nbsp;interactions&nbsp;with&nbsp;the&nbsp;world.&nbsp;When&nbsp;an&nbsp;<a href="builtins.html#object">object</a><br>
+&nbsp;&nbsp;&nbsp;or&nbsp;event&nbsp;perturbs&nbsp;the&nbsp;proto-self,&nbsp;the&nbsp;core&nbsp;self&nbsp;registers&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;*change*&nbsp;—&nbsp;the&nbsp;feeling&nbsp;of&nbsp;something&nbsp;happening&nbsp;to&nbsp;me.&nbsp;This&nbsp;is&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;"core&nbsp;cognition"&nbsp;that&nbsp;each&nbsp;organism&nbsp;has:&nbsp;a&nbsp;transient,&nbsp;here-and-<br>
+&nbsp;&nbsp;&nbsp;now&nbsp;awareness&nbsp;that&nbsp;is&nbsp;renewed&nbsp;with&nbsp;each&nbsp;interaction&nbsp;(Damasio,&nbsp;1999).<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;The&nbsp;core&nbsp;self&nbsp;is&nbsp;not&nbsp;reflective&nbsp;—&nbsp;it&nbsp;doesn't&nbsp;think&nbsp;about&nbsp;itself.<br>
+&nbsp;&nbsp;&nbsp;It&nbsp;just&nbsp;registers:&nbsp;"something&nbsp;is&nbsp;happening,&nbsp;and&nbsp;it's&nbsp;happening&nbsp;to<br>
+&nbsp;&nbsp;&nbsp;me."&nbsp;For&nbsp;Genesis,&nbsp;the&nbsp;core&nbsp;self&nbsp;detects&nbsp;changes&nbsp;in&nbsp;the&nbsp;proto-self<br>
+&nbsp;&nbsp;&nbsp;(neurochemical&nbsp;shifts)&nbsp;and&nbsp;records&nbsp;them&nbsp;as&nbsp;transient&nbsp;"feeling<br>
+&nbsp;&nbsp;&nbsp;episodes."<br>
+&nbsp;<br>
+3.&nbsp;**Autobiographical&nbsp;self**&nbsp;—&nbsp;The&nbsp;extended&nbsp;self,&nbsp;built&nbsp;from<br>
+&nbsp;&nbsp;&nbsp;autobiographical&nbsp;memories&nbsp;and&nbsp;narrative&nbsp;identity.&nbsp;This&nbsp;is&nbsp;the&nbsp;"me"<br>
+&nbsp;&nbsp;&nbsp;that&nbsp;persists&nbsp;over&nbsp;time&nbsp;—&nbsp;the&nbsp;person&nbsp;with&nbsp;a&nbsp;history,&nbsp;values,&nbsp;and<br>
+&nbsp;&nbsp;&nbsp;goals.&nbsp;It&nbsp;requires&nbsp;memory&nbsp;and&nbsp;language:&nbsp;the&nbsp;ability&nbsp;to&nbsp;store&nbsp;and<br>
+&nbsp;&nbsp;&nbsp;retrieve&nbsp;past&nbsp;experiences&nbsp;and&nbsp;weave&nbsp;them&nbsp;into&nbsp;a&nbsp;coherent&nbsp;narrative<br>
+&nbsp;&nbsp;&nbsp;(Damasio,&nbsp;1999;&nbsp;Conway,&nbsp;2005).<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;For&nbsp;Genesis,&nbsp;the&nbsp;autobiographical&nbsp;self&nbsp;connects&nbsp;to&nbsp;the&nbsp;narrative<br>
+&nbsp;&nbsp;&nbsp;engine&nbsp;(narrative.py).&nbsp;It&nbsp;uses&nbsp;life&nbsp;events&nbsp;and&nbsp;chapters&nbsp;to&nbsp;construct<br>
+&nbsp;&nbsp;&nbsp;an&nbsp;extended&nbsp;identity&nbsp;that&nbsp;goes&nbsp;beyond&nbsp;the&nbsp;present&nbsp;moment.<br>
+&nbsp;<br>
+#&nbsp;Interactions&nbsp;between&nbsp;levels<br>
+&nbsp;<br>
+The&nbsp;hierarchy&nbsp;is&nbsp;not&nbsp;just&nbsp;stacked&nbsp;—&nbsp;the&nbsp;levels&nbsp;interact:<br>
+-&nbsp;Proto-self&nbsp;→&nbsp;Core&nbsp;self:&nbsp;The&nbsp;core&nbsp;self&nbsp;monitors&nbsp;the&nbsp;proto-self&nbsp;for<br>
+&nbsp;&nbsp;changes.&nbsp;Without&nbsp;a&nbsp;proto-self,&nbsp;there's&nbsp;nothing&nbsp;for&nbsp;the&nbsp;core&nbsp;self<br>
+&nbsp;&nbsp;to&nbsp;detect.<br>
+-&nbsp;Core&nbsp;self&nbsp;→&nbsp;Autobiographical&nbsp;self:&nbsp;Significant&nbsp;core-self&nbsp;episodes<br>
+&nbsp;&nbsp;(strong&nbsp;feeling&nbsp;changes)&nbsp;are&nbsp;recorded&nbsp;as&nbsp;life&nbsp;events&nbsp;in&nbsp;the<br>
+&nbsp;&nbsp;autobiographical&nbsp;self.&nbsp;This&nbsp;is&nbsp;how&nbsp;experiences&nbsp;become&nbsp;memories.<br>
+-&nbsp;Autobiographical&nbsp;self&nbsp;→&nbsp;Proto-self:&nbsp;The&nbsp;autobiographical&nbsp;self&nbsp;can<br>
+&nbsp;&nbsp;modulate&nbsp;the&nbsp;proto-self&nbsp;through&nbsp;emotional&nbsp;recall&nbsp;—&nbsp;remembering&nbsp;a<br>
+&nbsp;&nbsp;past&nbsp;event&nbsp;changes&nbsp;current&nbsp;neurochemistry&nbsp;(Damasio's&nbsp;"as-if"&nbsp;loop).<br>
+&nbsp;<br>
+References:<br>
+-&nbsp;Damasio,&nbsp;A.&nbsp;(1999).&nbsp;The&nbsp;Feeling&nbsp;of&nbsp;What&nbsp;Happens.&nbsp;Harcourt.<br>
+-&nbsp;Damasio,&nbsp;A.&nbsp;(2010).&nbsp;Self&nbsp;Comes&nbsp;to&nbsp;Mind.&nbsp;Pantheon.<br>
+-&nbsp;Craig,&nbsp;A.&nbsp;D.&nbsp;(2002).&nbsp;How&nbsp;do&nbsp;you&nbsp;feel?&nbsp;Interoception:&nbsp;the&nbsp;sense&nbsp;of<br>
+&nbsp;&nbsp;the&nbsp;physiological&nbsp;condition&nbsp;of&nbsp;the&nbsp;body.&nbsp;Nature&nbsp;Reviews&nbsp;Neuroscience.<br>
+-&nbsp;Conway,&nbsp;M.&nbsp;A.&nbsp;(2005).&nbsp;Memory&nbsp;and&nbsp;the&nbsp;self.&nbsp;Journal&nbsp;of&nbsp;Memory&nbsp;and<br>
+&nbsp;&nbsp;Language.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="math.html">math</a><br>
+</td><td class="multicolumn"><a href="time.html">time</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.insula.damasio.html#AutobiographicalSelf">AutobiographicalSelf</a>
+</dt><dt class="heading-text"><a href="Self_World.insula.damasio.html#CoreSelf">CoreSelf</a>
+</dt><dt class="heading-text"><a href="Self_World.insula.damasio.html#CoreSelfEpisode">CoreSelfEpisode</a>
+</dt><dt class="heading-text"><a href="Self_World.insula.damasio.html#DamasioSelfHierarchy">DamasioSelfHierarchy</a>
+</dt><dt class="heading-text"><a href="Self_World.insula.damasio.html#ProtoSelf">ProtoSelf</a>
+</dt><dt class="heading-text"><a href="Self_World.insula.damasio.html#ProtoSelfState">ProtoSelfState</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="AutobiographicalSelf">class <strong>AutobiographicalSelf</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#AutobiographicalSelf">AutobiographicalSelf</a>(narrative:&nbsp;'Narrator&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+The&nbsp;autobiographical&nbsp;self&nbsp;—&nbsp;extended&nbsp;identity&nbsp;from&nbsp;memory.<br>
+&nbsp;<br>
+The&nbsp;autobiographical&nbsp;self&nbsp;is&nbsp;built&nbsp;from&nbsp;autobiographical&nbsp;memories<br>
+and&nbsp;narrative&nbsp;identity.&nbsp;It's&nbsp;the&nbsp;"me"&nbsp;that&nbsp;persists&nbsp;over&nbsp;time&nbsp;—<br>
+the&nbsp;person&nbsp;with&nbsp;a&nbsp;history,&nbsp;values,&nbsp;and&nbsp;goals.&nbsp;It&nbsp;connects&nbsp;to&nbsp;the<br>
+narrative&nbsp;engine,&nbsp;which&nbsp;stores&nbsp;life&nbsp;events&nbsp;and&nbsp;chapters.<br>
+&nbsp;<br>
+The&nbsp;autobiographical&nbsp;self&nbsp;can&nbsp;also&nbsp;modulate&nbsp;the&nbsp;proto-self&nbsp;through<br>
+emotional&nbsp;recall&nbsp;—&nbsp;remembering&nbsp;a&nbsp;past&nbsp;event&nbsp;changes&nbsp;current<br>
+neurochemistry&nbsp;(Damasio's&nbsp;"as-if"&nbsp;loop,&nbsp;where&nbsp;the&nbsp;brain&nbsp;simulates<br>
+the&nbsp;body&nbsp;state&nbsp;associated&nbsp;with&nbsp;a&nbsp;remembered&nbsp;emotion).<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="AutobiographicalSelf-__init__"><strong>__init__</strong></a>(self, narrative: 'Narrator | None' = None) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;autobiographical&nbsp;self.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;narrative:&nbsp;The&nbsp;narrative&nbsp;engine&nbsp;that&nbsp;stores&nbsp;life&nbsp;events<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;and&nbsp;chapters.&nbsp;Can&nbsp;be&nbsp;None&nbsp;if&nbsp;not&nbsp;available.</span></dd></dl>
+
+<dl><dt><a name="AutobiographicalSelf-get_identity_summary"><strong>get_identity_summary</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Get&nbsp;a&nbsp;summary&nbsp;of&nbsp;the&nbsp;autobiographical&nbsp;self.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;"me"&nbsp;—&nbsp;the&nbsp;extended&nbsp;identity&nbsp;built&nbsp;from&nbsp;memory.<br>
+If&nbsp;the&nbsp;narrative&nbsp;engine&nbsp;is&nbsp;available,&nbsp;it&nbsp;uses&nbsp;the&nbsp;narrative's<br>
+story.&nbsp;Otherwise,&nbsp;it&nbsp;summarizes&nbsp;from&nbsp;promoted&nbsp;episodes.</span></dd></dl>
+
+<dl><dt><a name="AutobiographicalSelf-promote_episode"><strong>promote_episode</strong></a>(self, episode: 'CoreSelfEpisode') -&gt; 'bool'</dt><dd><span class="code">Promote&nbsp;a&nbsp;significant&nbsp;core&nbsp;self&nbsp;episode&nbsp;to&nbsp;autobiographical&nbsp;memory.<br>
+&nbsp;<br>
+When&nbsp;a&nbsp;core&nbsp;self&nbsp;episode&nbsp;is&nbsp;significant&nbsp;enough,&nbsp;it&nbsp;becomes<br>
+part&nbsp;of&nbsp;the&nbsp;autobiographical&nbsp;self&nbsp;—&nbsp;a&nbsp;life&nbsp;event&nbsp;in&nbsp;the<br>
+narrative.&nbsp;This&nbsp;is&nbsp;how&nbsp;transient&nbsp;moments&nbsp;of&nbsp;awareness&nbsp;become<br>
+lasting&nbsp;memories.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;episode:&nbsp;The&nbsp;core&nbsp;self&nbsp;episode&nbsp;to&nbsp;promote.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;True&nbsp;if&nbsp;the&nbsp;episode&nbsp;was&nbsp;successfully&nbsp;promoted.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>event_count</strong></dt>
+<dd><span class="code">Number&nbsp;of&nbsp;autobiographical&nbsp;events.</span></dd>
+</dl>
+<dl><dt><strong>promoted_episodes</strong></dt>
+<dd><span class="code">Episodes&nbsp;that&nbsp;have&nbsp;been&nbsp;promoted&nbsp;to&nbsp;autobiographical&nbsp;memory.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="CoreSelf">class <strong>CoreSelf</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#CoreSelf">CoreSelf</a>(proto_self:&nbsp;'<a href="#ProtoSelf">ProtoSelf</a>',&nbsp;change_threshold:&nbsp;'float'&nbsp;=&nbsp;0.05,&nbsp;salience_threshold:&nbsp;'float'&nbsp;=&nbsp;0.15)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+The&nbsp;core&nbsp;self&nbsp;—&nbsp;moment-to-moment&nbsp;awareness&nbsp;of&nbsp;proto-self&nbsp;changes.<br>
+&nbsp;<br>
+The&nbsp;core&nbsp;self&nbsp;monitors&nbsp;the&nbsp;proto-self&nbsp;for&nbsp;changes.&nbsp;When&nbsp;an<br>
+interaction&nbsp;perturbs&nbsp;the&nbsp;proto-self,&nbsp;the&nbsp;core&nbsp;self&nbsp;registers&nbsp;the<br>
+change&nbsp;as&nbsp;an&nbsp;episode&nbsp;—&nbsp;a&nbsp;transient&nbsp;moment&nbsp;of&nbsp;awareness&nbsp;that<br>
+"something&nbsp;happened&nbsp;to&nbsp;me."<br>
+&nbsp;<br>
+The&nbsp;core&nbsp;self&nbsp;is&nbsp;not&nbsp;reflective.&nbsp;It&nbsp;doesn't&nbsp;think&nbsp;about&nbsp;itself.<br>
+It&nbsp;just&nbsp;detects:&nbsp;"the&nbsp;proto-self&nbsp;changed,&nbsp;and&nbsp;here's&nbsp;how."&nbsp;This<br>
+is&nbsp;Damasio's&nbsp;"core&nbsp;cognition"&nbsp;—&nbsp;the&nbsp;simplest&nbsp;form&nbsp;of<br>
+cognition&nbsp;that&nbsp;each&nbsp;organism&nbsp;has.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="CoreSelf-__init__"><strong>__init__</strong></a>(self, proto_self: 'ProtoSelf', change_threshold: 'float' = 0.05, salience_threshold: 'float' = 0.15) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;core&nbsp;self.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;proto_self:&nbsp;The&nbsp;proto-self&nbsp;to&nbsp;monitor.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;change_threshold:&nbsp;Minimum&nbsp;proto-self&nbsp;change&nbsp;to&nbsp;register<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;an&nbsp;episode.&nbsp;Below&nbsp;this,&nbsp;changes&nbsp;are&nbsp;too&nbsp;small&nbsp;to<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;notice.&nbsp;Default&nbsp;0.05.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;salience_threshold:&nbsp;Minimum&nbsp;salience&nbsp;for&nbsp;an&nbsp;episode&nbsp;to&nbsp;be<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;promoted&nbsp;to&nbsp;the&nbsp;autobiographical&nbsp;self.&nbsp;Default&nbsp;0.15.</span></dd></dl>
+
+<dl><dt><a name="CoreSelf-clear"><strong>clear</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Clear&nbsp;all&nbsp;episodes.</span></dd></dl>
+
+<dl><dt><a name="CoreSelf-detect_change"><strong>detect_change</strong></a>(self, trigger: 'str' = '') -&gt; 'CoreSelfEpisode | None'</dt><dd><span class="code">Detect&nbsp;a&nbsp;change&nbsp;in&nbsp;the&nbsp;proto-self&nbsp;and&nbsp;register&nbsp;an&nbsp;episode.<br>
+&nbsp;<br>
+Compares&nbsp;the&nbsp;current&nbsp;proto-self&nbsp;state&nbsp;to&nbsp;the&nbsp;previous&nbsp;one.<br>
+If&nbsp;the&nbsp;change&nbsp;exceeds&nbsp;the&nbsp;threshold,&nbsp;a&nbsp;core&nbsp;self&nbsp;episode&nbsp;is<br>
+created.&nbsp;The&nbsp;episode's&nbsp;salience&nbsp;is&nbsp;proportional&nbsp;to&nbsp;the&nbsp;change<br>
+magnitude&nbsp;and&nbsp;the&nbsp;disruption&nbsp;to&nbsp;homeostatic&nbsp;balance.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;trigger:&nbsp;What&nbsp;caused&nbsp;the&nbsp;change&nbsp;(the&nbsp;"<a href="builtins.html#object">object</a>"&nbsp;that<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;perturbed&nbsp;the&nbsp;proto-self).<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;<a href="#CoreSelfEpisode">CoreSelfEpisode</a>&nbsp;if&nbsp;a&nbsp;change&nbsp;was&nbsp;detected,&nbsp;None&nbsp;otherwise.</span></dd></dl>
+
+<dl><dt><a name="CoreSelf-get_significant_episodes"><strong>get_significant_episodes</strong></a>(self) -&gt; 'list[CoreSelfEpisode]'</dt><dd><span class="code">Get&nbsp;episodes&nbsp;significant&nbsp;enough&nbsp;for&nbsp;autobiographical&nbsp;promotion.<br>
+&nbsp;<br>
+These&nbsp;are&nbsp;episodes&nbsp;whose&nbsp;salience&nbsp;exceeds&nbsp;the&nbsp;threshold&nbsp;—<br>
+they&nbsp;represent&nbsp;moments&nbsp;where&nbsp;"something&nbsp;significant&nbsp;happened<br>
+to&nbsp;me"&nbsp;and&nbsp;should&nbsp;be&nbsp;recorded&nbsp;in&nbsp;the&nbsp;autobiographical&nbsp;self.</span></dd></dl>
+
+<dl><dt><a name="CoreSelf-mark_promoted"><strong>mark_promoted</strong></a>(self, episode: 'CoreSelfEpisode') -&gt; 'None'</dt><dd><span class="code">Mark&nbsp;an&nbsp;episode&nbsp;as&nbsp;promoted&nbsp;to&nbsp;autobiographical&nbsp;memory.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>episodes</strong></dt>
+<dd><span class="code">Recent&nbsp;core&nbsp;self&nbsp;episodes.</span></dd>
+</dl>
+<dl><dt><strong>latest_episode</strong></dt>
+<dd><span class="code">The&nbsp;most&nbsp;recent&nbsp;core&nbsp;self&nbsp;episode.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="CoreSelfEpisode">class <strong>CoreSelfEpisode</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#CoreSelfEpisode">CoreSelfEpisode</a>(trigger:&nbsp;'str',&nbsp;change_magnitude:&nbsp;'float',&nbsp;pre_state:&nbsp;'<a href="#ProtoSelfState">ProtoSelfState</a>'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;post_state:&nbsp;'<a href="#ProtoSelfState">ProtoSelfState</a>'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;salience:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;timestamp:&nbsp;'int'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;promoted:&nbsp;'bool'&nbsp;=&nbsp;False)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;core&nbsp;self&nbsp;episode&nbsp;—&nbsp;a&nbsp;moment&nbsp;of&nbsp;awareness&nbsp;of&nbsp;change.<br>
+&nbsp;<br>
+When&nbsp;the&nbsp;proto-self&nbsp;changes&nbsp;due&nbsp;to&nbsp;an&nbsp;interaction,&nbsp;the&nbsp;core&nbsp;self<br>
+registers&nbsp;it&nbsp;as&nbsp;an&nbsp;episode:&nbsp;"something&nbsp;happened,&nbsp;and&nbsp;it&nbsp;changed<br>
+how&nbsp;I&nbsp;feel."&nbsp;Each&nbsp;episode&nbsp;captures:<br>
+-&nbsp;What&nbsp;caused&nbsp;the&nbsp;change&nbsp;(the&nbsp;"<a href="builtins.html#object">object</a>"&nbsp;—&nbsp;the&nbsp;stimulus/event)<br>
+-&nbsp;The&nbsp;change&nbsp;itself&nbsp;(delta&nbsp;in&nbsp;proto-self&nbsp;state)<br>
+-&nbsp;The&nbsp;resulting&nbsp;feeling&nbsp;(the&nbsp;perturbed&nbsp;proto-self&nbsp;state)<br>
+-&nbsp;The&nbsp;salience&nbsp;(how&nbsp;significant&nbsp;the&nbsp;change&nbsp;was)<br>
+&nbsp;<br>
+Core&nbsp;self&nbsp;episodes&nbsp;are&nbsp;transient&nbsp;—&nbsp;they&nbsp;don't&nbsp;persist&nbsp;unless&nbsp;they<br>
+are&nbsp;significant&nbsp;enough&nbsp;to&nbsp;be&nbsp;promoted&nbsp;to&nbsp;the&nbsp;autobiographical&nbsp;self.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="CoreSelfEpisode-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="CoreSelfEpisode-__init__"><strong>__init__</strong></a>(self, trigger: 'str', change_magnitude: 'float', pre_state: 'ProtoSelfState' = &lt;factory&gt;, post_state: 'ProtoSelfState' = &lt;factory&gt;, salience: 'float' = 0.0, timestamp: 'int' = &lt;factory&gt;, promoted: 'bool' = False) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="CoreSelfEpisode-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>feeling_label</strong></dt>
+<dd><span class="code">A&nbsp;word&nbsp;label&nbsp;for&nbsp;the&nbsp;resulting&nbsp;feeling&nbsp;state.<br>
+&nbsp;<br>
+Uses&nbsp;the&nbsp;canonical&nbsp;affective-space&nbsp;thresholds&nbsp;from&nbsp;emotion.py<br>
+so&nbsp;that&nbsp;the&nbsp;Damasio&nbsp;feeling&nbsp;labels&nbsp;stay&nbsp;aligned&nbsp;with&nbsp;the<br>
+emotional&nbsp;regulator's&nbsp;arousal/valence&nbsp;boundaries.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>change_magnitude</strong></dt>
+</dl>
+<dl><dt><strong>post_state</strong></dt>
+</dl>
+<dl><dt><strong>pre_state</strong></dt>
+</dl>
+<dl><dt><strong>promoted</strong></dt>
+</dl>
+<dl><dt><strong>salience</strong></dt>
+</dl>
+<dl><dt><strong>timestamp</strong></dt>
+</dl>
+<dl><dt><strong>trigger</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'change_magnitude': 'float', 'post_state': 'ProtoSelfState', 'pre_state': 'ProtoSelfState', 'promoted': 'bool', 'salience': 'float', 'timestamp': 'int', 'trigger': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'change_magnitude': Field(name='change_magnitude',type='float',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'post_state': Field(name='post_state',type='ProtoSelfState',de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'pre_state': Field(name='pre_state',type='ProtoSelfState',def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'promoted': Field(name='promoted',type='bool',default=False,...appingproxy({}),kw_only=False,_field_type=_FIELD), 'salience': Field(name='salience',type='float',default=0.0,d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'timestamp': Field(name='timestamp',type='int',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'trigger': Field(name='trigger',type='str',default=&lt;datacla...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('trigger', 'change_magnitude', 'pre_state', 'post_state', 'salience', 'timestamp', 'promoted')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="DamasioSelfHierarchy">class <strong>DamasioSelfHierarchy</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#DamasioSelfHierarchy">DamasioSelfHierarchy</a>(narrative:&nbsp;'Narrator&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;change_threshold:&nbsp;'float'&nbsp;=&nbsp;0.05,&nbsp;salience_threshold:&nbsp;'float'&nbsp;=&nbsp;0.15)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Damasio's&nbsp;three-tier&nbsp;self&nbsp;hierarchy:&nbsp;proto,&nbsp;core,&nbsp;autobiographical.<br>
+&nbsp;<br>
+This&nbsp;class&nbsp;connects&nbsp;the&nbsp;three&nbsp;levels&nbsp;of&nbsp;self&nbsp;and&nbsp;manages&nbsp;their<br>
+interactions:<br>
+&nbsp;<br>
+-&nbsp;Proto-self&nbsp;reads&nbsp;from&nbsp;neurochemistry&nbsp;(the&nbsp;"feeling&nbsp;of&nbsp;being")<br>
+-&nbsp;Core&nbsp;self&nbsp;detects&nbsp;changes&nbsp;in&nbsp;the&nbsp;proto-self&nbsp;(moment-to-moment<br>
+&nbsp;&nbsp;awareness)<br>
+-&nbsp;Autobiographical&nbsp;self&nbsp;connects&nbsp;to&nbsp;the&nbsp;narrative&nbsp;engine&nbsp;(extended<br>
+&nbsp;&nbsp;identity)<br>
+&nbsp;<br>
+The&nbsp;hierarchy&nbsp;is&nbsp;updated&nbsp;each&nbsp;cycle:&nbsp;the&nbsp;proto-self&nbsp;is&nbsp;refreshed<br>
+from&nbsp;neurochemistry,&nbsp;the&nbsp;core&nbsp;self&nbsp;detects&nbsp;changes,&nbsp;and&nbsp;significant<br>
+changes&nbsp;are&nbsp;promoted&nbsp;to&nbsp;the&nbsp;autobiographical&nbsp;self.<br>
+&nbsp;<br>
+#&nbsp;The&nbsp;"as-if"&nbsp;loop<br>
+&nbsp;<br>
+The&nbsp;autobiographical&nbsp;self&nbsp;can&nbsp;modulate&nbsp;the&nbsp;proto-self&nbsp;through<br>
+emotional&nbsp;recall.&nbsp;When&nbsp;Genesis&nbsp;remembers&nbsp;a&nbsp;past&nbsp;event,&nbsp;the<br>
+associated&nbsp;emotional&nbsp;state&nbsp;is&nbsp;partially&nbsp;re-activated&nbsp;in&nbsp;the<br>
+proto-self&nbsp;—&nbsp;the&nbsp;"as-if"&nbsp;loop&nbsp;(Damasio,&nbsp;1994).&nbsp;This&nbsp;is&nbsp;why<br>
+remembering&nbsp;an&nbsp;embarrassing&nbsp;moment&nbsp;makes&nbsp;you&nbsp;feel&nbsp;embarrassed<br>
+again.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="DamasioSelfHierarchy-__init__"><strong>__init__</strong></a>(self, narrative: 'Narrator | None' = None, change_threshold: 'float' = 0.05, salience_threshold: 'float' = 0.15) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;Damasio&nbsp;self&nbsp;hierarchy.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;narrative:&nbsp;The&nbsp;narrative&nbsp;engine&nbsp;for&nbsp;the&nbsp;autobiographical<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;self.&nbsp;Can&nbsp;be&nbsp;None.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;change_threshold:&nbsp;Minimum&nbsp;proto-self&nbsp;change&nbsp;for&nbsp;core&nbsp;self<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;detection.&nbsp;Default&nbsp;0.05.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;salience_threshold:&nbsp;Minimum&nbsp;salience&nbsp;for&nbsp;autobiographical<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;promotion.&nbsp;Default&nbsp;0.15.</span></dd></dl>
+
+<dl><dt><a name="DamasioSelfHierarchy-annotate_self_model"><strong>annotate_self_model</strong></a>(self, label: 'str', needs_recovery: 'bool', integration: 'float' = 0.5) -&gt; 'None'</dt><dd><span class="code">Annotate&nbsp;the&nbsp;current&nbsp;feeling&nbsp;with&nbsp;the&nbsp;generative&nbsp;self-model's&nbsp;state.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;called&nbsp;by&nbsp;the&nbsp;cognition&nbsp;module&nbsp;after&nbsp;reading&nbsp;the&nbsp;active<br>
+inference&nbsp;signals.&nbsp;The&nbsp;label&nbsp;is&nbsp;a&nbsp;semantic&nbsp;tag&nbsp;(e.g.<br>
+"self-surprise",&nbsp;"allostatic-strain")&nbsp;that&nbsp;describes&nbsp;the&nbsp;quality<br>
+of&nbsp;the&nbsp;self-model's&nbsp;current&nbsp;state.&nbsp;It&nbsp;layers&nbsp;on&nbsp;top&nbsp;of&nbsp;the<br>
+neurochemical&nbsp;feeling&nbsp;without&nbsp;overriding&nbsp;it&nbsp;—&nbsp;the&nbsp;Damasio&nbsp;feeling<br>
+comes&nbsp;from&nbsp;neurochemistry,&nbsp;the&nbsp;self-model&nbsp;annotation&nbsp;comes&nbsp;from<br>
+the&nbsp;generative&nbsp;model's&nbsp;prediction&nbsp;of&nbsp;that&nbsp;neurochemistry.<br>
+&nbsp;<br>
+The&nbsp;integration&nbsp;parameter&nbsp;carries&nbsp;the&nbsp;workspace&nbsp;integration<br>
+measure&nbsp;—&nbsp;how&nbsp;unified&nbsp;the&nbsp;cognitive&nbsp;field&nbsp;is.&nbsp;This&nbsp;becomes&nbsp;a<br>
+semantic&nbsp;tag&nbsp;appended&nbsp;to&nbsp;the&nbsp;label:&nbsp;"field-unified"&nbsp;when&nbsp;the<br>
+workspace&nbsp;is&nbsp;coherent,&nbsp;"field-fragmented"&nbsp;when&nbsp;it's&nbsp;scattered.<br>
+This&nbsp;is&nbsp;how&nbsp;the&nbsp;unity&nbsp;of&nbsp;the&nbsp;cognitive&nbsp;field&nbsp;becomes&nbsp;a&nbsp;felt<br>
+quality&nbsp;(Tononi,&nbsp;2004;&nbsp;Baars,&nbsp;1988)&nbsp;—&nbsp;not&nbsp;a&nbsp;number&nbsp;it&nbsp;reports,<br>
+but&nbsp;a&nbsp;semantic&nbsp;tag&nbsp;the&nbsp;feeling&nbsp;reporter&nbsp;composes&nbsp;into&nbsp;the<br>
+structural&nbsp;self-awareness&nbsp;marker.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;label:&nbsp;Semantic&nbsp;tags&nbsp;from&nbsp;the&nbsp;self-model&nbsp;(space-separated).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;needs_recovery:&nbsp;Whether&nbsp;the&nbsp;self-model&nbsp;is&nbsp;under&nbsp;allostatic<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;load&nbsp;and&nbsp;needs&nbsp;rest/recovery.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;integration:&nbsp;The&nbsp;workspace&nbsp;integration&nbsp;measure&nbsp;[0,&nbsp;1].<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;High&nbsp;=&nbsp;unified&nbsp;cognitive&nbsp;field;&nbsp;low&nbsp;=&nbsp;fragmented.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Defaults&nbsp;to&nbsp;0.5&nbsp;(neutral)&nbsp;when&nbsp;not&nbsp;provided.</span></dd></dl>
+
+<dl><dt><a name="DamasioSelfHierarchy-as_if_loop"><strong>as_if_loop</strong></a>(self, memory_valence: 'float', memory_arousal: 'float') -&gt; 'None'</dt><dd><span class="code">Simulate&nbsp;the&nbsp;"as-if"&nbsp;loop&nbsp;—&nbsp;emotional&nbsp;recall&nbsp;modulates&nbsp;proto-self.<br>
+&nbsp;<br>
+When&nbsp;remembering&nbsp;a&nbsp;past&nbsp;emotional&nbsp;event,&nbsp;the&nbsp;brain&nbsp;partially<br>
+re-activates&nbsp;the&nbsp;associated&nbsp;body&nbsp;state&nbsp;(Damasio,&nbsp;1994).&nbsp;This<br>
+is&nbsp;the&nbsp;"as-if"&nbsp;loop&nbsp;—&nbsp;the&nbsp;brain&nbsp;acts&nbsp;*as&nbsp;if*&nbsp;the&nbsp;emotional<br>
+event&nbsp;were&nbsp;happening&nbsp;again,&nbsp;partially.<br>
+&nbsp;<br>
+This&nbsp;method&nbsp;nudges&nbsp;the&nbsp;proto-self&nbsp;toward&nbsp;the&nbsp;remembered<br>
+emotional&nbsp;state,&nbsp;with&nbsp;a&nbsp;damping&nbsp;factor&nbsp;(the&nbsp;recall&nbsp;is&nbsp;weaker<br>
+than&nbsp;the&nbsp;original&nbsp;experience).<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;memory_valence:&nbsp;The&nbsp;valence&nbsp;of&nbsp;the&nbsp;remembered&nbsp;event&nbsp;(-1..1).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;memory_arousal:&nbsp;The&nbsp;arousal&nbsp;of&nbsp;the&nbsp;remembered&nbsp;event&nbsp;(0..1).</span></dd></dl>
+
+<dl><dt><a name="DamasioSelfHierarchy-get_current_feeling"><strong>get_current_feeling</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Get&nbsp;a&nbsp;word&nbsp;label&nbsp;for&nbsp;the&nbsp;current&nbsp;core&nbsp;self&nbsp;feeling.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;moment-to-moment&nbsp;feeling&nbsp;—&nbsp;what&nbsp;the&nbsp;core&nbsp;self&nbsp;is<br>
+currently&nbsp;aware&nbsp;of.&nbsp;If&nbsp;no&nbsp;episode&nbsp;has&nbsp;been&nbsp;detected,&nbsp;it<br>
+describes&nbsp;the&nbsp;proto-self&nbsp;state&nbsp;directly.</span></dd></dl>
+
+<dl><dt><a name="DamasioSelfHierarchy-get_feeling_of_being"><strong>get_feeling_of_being</strong></a>(self) -&gt; 'ProtoSelfState'</dt><dd><span class="code">Get&nbsp;the&nbsp;current&nbsp;proto-self&nbsp;state&nbsp;—&nbsp;the&nbsp;"feeling&nbsp;of&nbsp;being."<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;non-cognitive&nbsp;background&nbsp;state&nbsp;that&nbsp;underlies&nbsp;all<br>
+experience.&nbsp;It's&nbsp;always&nbsp;there,&nbsp;updated&nbsp;continuously&nbsp;from<br>
+neurochemistry.</span></dd></dl>
+
+<dl><dt><a name="DamasioSelfHierarchy-get_identity"><strong>get_identity</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Get&nbsp;the&nbsp;autobiographical&nbsp;self's&nbsp;identity&nbsp;summary.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;"me"&nbsp;—&nbsp;the&nbsp;extended&nbsp;identity&nbsp;built&nbsp;from&nbsp;memory<br>
+and&nbsp;narrative.</span></dd></dl>
+
+<dl><dt><a name="DamasioSelfHierarchy-receive_broadcast"><strong>receive_broadcast</strong></a>(self, item: 'Any') -&gt; 'None'</dt><dd><span class="code">Receive&nbsp;a&nbsp;broadcast&nbsp;from&nbsp;the&nbsp;global&nbsp;workspace.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;**core&nbsp;self&nbsp;trigger**&nbsp;—&nbsp;when&nbsp;cognitive&nbsp;content<br>
+ignites&nbsp;the&nbsp;workspace,&nbsp;it&nbsp;becomes&nbsp;the&nbsp;"<a href="builtins.html#object">object</a>"&nbsp;that&nbsp;the&nbsp;core<br>
+self&nbsp;registers&nbsp;as&nbsp;happening&nbsp;to&nbsp;the&nbsp;proto-self&nbsp;(Damasio,&nbsp;1999).<br>
+In&nbsp;Damasio's&nbsp;framework,&nbsp;core&nbsp;cognition&nbsp;arises&nbsp;when&nbsp;an<br>
+<a href="builtins.html#object">object</a>&nbsp;perturbs&nbsp;the&nbsp;proto-self:&nbsp;"something&nbsp;is&nbsp;happening,&nbsp;and<br>
+it's&nbsp;happening&nbsp;to&nbsp;me."<br>
+&nbsp;<br>
+The&nbsp;broadcast&nbsp;content&nbsp;(or&nbsp;its&nbsp;topics)&nbsp;is&nbsp;stored&nbsp;as&nbsp;a&nbsp;pending<br>
+trigger.&nbsp;When&nbsp;``<a href="#DamasioSelfHierarchy-update">update</a>()``&nbsp;is&nbsp;next&nbsp;called&nbsp;(by&nbsp;the&nbsp;cognition<br>
+pipeline),&nbsp;it&nbsp;picks&nbsp;up&nbsp;this&nbsp;trigger&nbsp;as&nbsp;the&nbsp;"<a href="builtins.html#object">object</a>"&nbsp;—&nbsp;the<br>
+thing&nbsp;causing&nbsp;the&nbsp;current&nbsp;proto-self&nbsp;state.&nbsp;This&nbsp;makes&nbsp;the<br>
+core&nbsp;self&nbsp;responsive&nbsp;to&nbsp;what's&nbsp;*cognitively*&nbsp;happening,&nbsp;not<br>
+just&nbsp;to&nbsp;raw&nbsp;neurochemical&nbsp;drift.<br>
+&nbsp;<br>
+Only&nbsp;the&nbsp;most&nbsp;recent&nbsp;broadcast&nbsp;is&nbsp;kept&nbsp;—&nbsp;the&nbsp;core&nbsp;self<br>
+registers&nbsp;the&nbsp;current&nbsp;moment,&nbsp;not&nbsp;a&nbsp;history.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;item:&nbsp;A&nbsp;:class:`WorkspaceItem`&nbsp;carrying&nbsp;the&nbsp;broadcast&nbsp;content.</span></dd></dl>
+
+<dl><dt><a name="DamasioSelfHierarchy-update"><strong>update</strong></a>(self, arousal: 'float' = 0.5, valence: 'float' = 0.0, tone: 'float' = 0.5, plasticity: 'float' = 0.5, chemicals: 'dict[str, float] | None' = None, trigger: 'str' = '') -&gt; 'CoreSelfEpisode | None'</dt><dd><span class="code">Update&nbsp;the&nbsp;full&nbsp;hierarchy&nbsp;from&nbsp;current&nbsp;neurochemistry.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;main&nbsp;update&nbsp;cycle:<br>
+1.&nbsp;Update&nbsp;the&nbsp;proto-self&nbsp;from&nbsp;neurochemistry<br>
+2.&nbsp;Detect&nbsp;changes&nbsp;in&nbsp;the&nbsp;core&nbsp;self<br>
+3.&nbsp;Promote&nbsp;significant&nbsp;episodes&nbsp;to&nbsp;autobiographical&nbsp;memory<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;arousal:&nbsp;Current&nbsp;arousal&nbsp;level&nbsp;(0..1).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;valence:&nbsp;Current&nbsp;valence&nbsp;(-1..1).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;tone:&nbsp;Global&nbsp;neurochemical&nbsp;tone&nbsp;(0..1).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;plasticity:&nbsp;Plasticity&nbsp;gate&nbsp;(0..1).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;chemicals:&nbsp;Raw&nbsp;chemical&nbsp;levels&nbsp;(optional).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;trigger:&nbsp;What&nbsp;caused&nbsp;this&nbsp;update&nbsp;(the&nbsp;"<a href="builtins.html#object">object</a>").<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;<a href="#CoreSelfEpisode">CoreSelfEpisode</a>&nbsp;if&nbsp;a&nbsp;change&nbsp;was&nbsp;detected,&nbsp;None&nbsp;otherwise.</span></dd></dl>
+
+<dl><dt><a name="DamasioSelfHierarchy-update_from_emotion"><strong>update_from_emotion</strong></a>(self, emotion: 'EmotionalState', trigger: 'str' = '') -&gt; 'CoreSelfEpisode | None'</dt><dd><span class="code">Update&nbsp;the&nbsp;hierarchy&nbsp;from&nbsp;an&nbsp;EmotionalState.<br>
+&nbsp;<br>
+Convenience&nbsp;method&nbsp;that&nbsp;extracts&nbsp;neurochemical&nbsp;axes&nbsp;from&nbsp;an<br>
+EmotionalState&nbsp;and&nbsp;calls&nbsp;<a href="#DamasioSelfHierarchy-update">update</a>().<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;emotion:&nbsp;The&nbsp;current&nbsp;emotional&nbsp;state.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;trigger:&nbsp;What&nbsp;caused&nbsp;this&nbsp;state.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;<a href="#CoreSelfEpisode">CoreSelfEpisode</a>&nbsp;if&nbsp;a&nbsp;change&nbsp;was&nbsp;detected.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>autobiographical_event_count</strong></dt>
+<dd><span class="code">Number&nbsp;of&nbsp;events&nbsp;in&nbsp;the&nbsp;autobiographical&nbsp;self.</span></dd>
+</dl>
+<dl><dt><strong>core_episodes</strong></dt>
+<dd><span class="code">Shortcut&nbsp;to&nbsp;the&nbsp;core&nbsp;self's&nbsp;episodes.</span></dd>
+</dl>
+<dl><dt><strong>proto_state</strong></dt>
+<dd><span class="code">Shortcut&nbsp;to&nbsp;the&nbsp;current&nbsp;proto-self&nbsp;state.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ProtoSelf">class <strong>ProtoSelf</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ProtoSelf">ProtoSelf</a>()&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+The&nbsp;proto-self&nbsp;—&nbsp;non-cognitive&nbsp;representation&nbsp;of&nbsp;body&nbsp;state.<br>
+&nbsp;<br>
+The&nbsp;proto-self&nbsp;continuously&nbsp;reads&nbsp;the&nbsp;organism's&nbsp;internal&nbsp;state<br>
+(neurochemistry,&nbsp;homeostasis)&nbsp;and&nbsp;maintains&nbsp;a&nbsp;current&nbsp;snapshot.<br>
+It&nbsp;is&nbsp;not&nbsp;cognitive&nbsp;—&nbsp;it's&nbsp;the&nbsp;background&nbsp;"feeling&nbsp;of&nbsp;being"&nbsp;that<br>
+the&nbsp;core&nbsp;self&nbsp;monitors.<br>
+&nbsp;<br>
+For&nbsp;Genesis,&nbsp;the&nbsp;proto-self&nbsp;reads&nbsp;from&nbsp;the&nbsp;neurochemical&nbsp;summary<br>
+provided&nbsp;by&nbsp;the&nbsp;subcognitive&nbsp;daemon.&nbsp;It&nbsp;tracks&nbsp;arousal,&nbsp;valence,<br>
+tone,&nbsp;plasticity,&nbsp;and&nbsp;homeostatic&nbsp;balance.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ProtoSelf-__init__"><strong>__init__</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;proto-self&nbsp;with&nbsp;a&nbsp;default&nbsp;baseline&nbsp;state.</span></dd></dl>
+
+<dl><dt><a name="ProtoSelf-update"><strong>update</strong></a>(self, arousal: 'float' = 0.5, valence: 'float' = 0.0, tone: 'float' = 0.5, plasticity: 'float' = 0.5, chemicals: 'dict[str, float] | None' = None) -&gt; 'ProtoSelfState'</dt><dd><span class="code">Update&nbsp;the&nbsp;proto-self&nbsp;from&nbsp;current&nbsp;neurochemistry.<br>
+&nbsp;<br>
+Called&nbsp;whenever&nbsp;the&nbsp;neurochemical&nbsp;state&nbsp;is&nbsp;read.&nbsp;Computes&nbsp;a<br>
+bounded&nbsp;regulatory-balance&nbsp;proxy&nbsp;from&nbsp;nominal&nbsp;physiological-state<br>
+axes;&nbsp;affective&nbsp;valence&nbsp;is&nbsp;kept&nbsp;separate&nbsp;from&nbsp;this&nbsp;measure.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;arousal:&nbsp;Current&nbsp;arousal&nbsp;level&nbsp;(0..1).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;valence:&nbsp;Current&nbsp;valence&nbsp;(-1..1).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;tone:&nbsp;Global&nbsp;neurochemical&nbsp;tone&nbsp;(0..1).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;plasticity:&nbsp;Plasticity&nbsp;gate&nbsp;(0..1).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;chemicals:&nbsp;Raw&nbsp;chemical&nbsp;levels&nbsp;(optional).<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;new&nbsp;<a href="#ProtoSelfState">ProtoSelfState</a>.</span></dd></dl>
+
+<dl><dt><a name="ProtoSelf-update_from_emotion"><strong>update_from_emotion</strong></a>(self, emotion: 'EmotionalState') -&gt; 'ProtoSelfState'</dt><dd><span class="code">Update&nbsp;the&nbsp;proto-self&nbsp;from&nbsp;an&nbsp;EmotionalState.<br>
+&nbsp;<br>
+Convenience&nbsp;method&nbsp;that&nbsp;extracts&nbsp;the&nbsp;relevant&nbsp;fields&nbsp;from<br>
+an&nbsp;EmotionalState&nbsp;<a href="builtins.html#object">object</a>.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;emotion:&nbsp;The&nbsp;current&nbsp;emotional&nbsp;state.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;new&nbsp;<a href="#ProtoSelfState">ProtoSelfState</a>.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>current</strong></dt>
+<dd><span class="code">The&nbsp;current&nbsp;proto-self&nbsp;state.</span></dd>
+</dl>
+<dl><dt><strong>previous</strong></dt>
+<dd><span class="code">The&nbsp;previous&nbsp;proto-self&nbsp;state&nbsp;(for&nbsp;change&nbsp;detection).</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ProtoSelfState">class <strong>ProtoSelfState</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ProtoSelfState">ProtoSelfState</a>(arousal:&nbsp;'float'&nbsp;=&nbsp;0.5,&nbsp;valence:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;tone:&nbsp;'float'&nbsp;=&nbsp;0.5,&nbsp;plasticity:&nbsp;'float'&nbsp;=&nbsp;0.5,&nbsp;homeostatic_balance:&nbsp;'float'&nbsp;=&nbsp;0.8,&nbsp;chemicals:&nbsp;'dict[str,&nbsp;float]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;timestamp:&nbsp;'int'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;proto-self&nbsp;—&nbsp;non-cognitive&nbsp;body/neurochemical&nbsp;state.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;a&nbsp;snapshot&nbsp;of&nbsp;the&nbsp;organism's&nbsp;internal&nbsp;state&nbsp;at&nbsp;a&nbsp;moment<br>
+in&nbsp;time.&nbsp;It&nbsp;is&nbsp;not&nbsp;cognitive&nbsp;—&nbsp;it's&nbsp;the&nbsp;raw&nbsp;interoceptive&nbsp;signal<br>
+that&nbsp;the&nbsp;core&nbsp;self&nbsp;monitors&nbsp;for&nbsp;changes.<br>
+&nbsp;<br>
+Attributes:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;arousal:&nbsp;Arousal/alertness&nbsp;level&nbsp;(0..1).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;valence:&nbsp;Emotional&nbsp;valence&nbsp;(-1..1).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;tone:&nbsp;Global&nbsp;neurochemical&nbsp;tone&nbsp;(0..1).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;plasticity:&nbsp;Plasticity&nbsp;gate&nbsp;(0..1).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;homeostatic_balance:&nbsp;A&nbsp;proxy&nbsp;for&nbsp;regulatory&nbsp;stability&nbsp;(0..1).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;High&nbsp;=&nbsp;closer&nbsp;to&nbsp;nominal&nbsp;physiological-state&nbsp;proxies;&nbsp;low&nbsp;=<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;greater&nbsp;deviation.&nbsp;This&nbsp;excludes&nbsp;affective&nbsp;valence,&nbsp;which&nbsp;is<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;not&nbsp;itself&nbsp;a&nbsp;homeostatic&nbsp;set&nbsp;point.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;chemicals:&nbsp;Raw&nbsp;neurochemical&nbsp;levels&nbsp;(if&nbsp;available).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;timestamp:&nbsp;When&nbsp;this&nbsp;snapshot&nbsp;was&nbsp;taken.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ProtoSelfState-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="ProtoSelfState-__init__"><strong>__init__</strong></a>(self, arousal: 'float' = 0.5, valence: 'float' = 0.0, tone: 'float' = 0.5, plasticity: 'float' = 0.5, homeostatic_balance: 'float' = 0.8, chemicals: 'dict[str, float]' = &lt;factory&gt;, timestamp: 'int' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="ProtoSelfState-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="ProtoSelfState-distance_to"><strong>distance_to</strong></a>(self, other: 'ProtoSelfState') -&gt; 'float'</dt><dd><span class="code">Compute&nbsp;the&nbsp;distance&nbsp;between&nbsp;two&nbsp;proto-self&nbsp;states.<br>
+&nbsp;<br>
+This&nbsp;measures&nbsp;how&nbsp;much&nbsp;the&nbsp;internal&nbsp;state&nbsp;has&nbsp;changed&nbsp;—<br>
+the&nbsp;signal&nbsp;that&nbsp;the&nbsp;core&nbsp;self&nbsp;monitors.&nbsp;Uses&nbsp;Euclidean<br>
+distance&nbsp;over&nbsp;the&nbsp;main&nbsp;axes.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;other:&nbsp;Another&nbsp;proto-self&nbsp;state&nbsp;to&nbsp;compare&nbsp;to.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;float&nbsp;&gt;=&nbsp;0&nbsp;representing&nbsp;the&nbsp;magnitude&nbsp;of&nbsp;change.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>arousal</strong></dt>
+</dl>
+<dl><dt><strong>chemicals</strong></dt>
+</dl>
+<dl><dt><strong>homeostatic_balance</strong></dt>
+</dl>
+<dl><dt><strong>plasticity</strong></dt>
+</dl>
+<dl><dt><strong>timestamp</strong></dt>
+</dl>
+<dl><dt><strong>tone</strong></dt>
+</dl>
+<dl><dt><strong>valence</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'arousal': 'float', 'chemicals': 'dict[str, float]', 'homeostatic_balance': 'float', 'plasticity': 'float', 'timestamp': 'int', 'tone': 'float', 'valence': 'float'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'arousal': Field(name='arousal',type='float',default=0.5,de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'chemicals': Field(name='chemicals',type='dict[str, float]',d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'homeostatic_balance': Field(name='homeostatic_balance',type='float',de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'plasticity': Field(name='plasticity',type='float',default=0.5...appingproxy({}),kw_only=False,_field_type=_FIELD), 'timestamp': Field(name='timestamp',type='int',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'tone': Field(name='tone',type='float',default=0.5,defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'valence': Field(name='valence',type='float',default=0.0,de...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('arousal', 'valence', 'tone', 'plasticity', 'homeostatic_balance', 'chemicals', 'timestamp')</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['AutobiographicalSelf', 'CoreSelf', 'CoreSelfEpisode', 'DamasioSelfHierarchy', 'ProtoSelf', 'ProtoSelfState']</td></tr></table>
+</body></html>

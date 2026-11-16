@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.eval.field_voice</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.eval.html" class="white">eval</a>.field_voice</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/eval/field_voice.py">/home/mindyrenee/GenAnd/Genesis/Self_World/eval/field_voice.py</a></td></tr></table>
+    <p><span class="code">Acoustic&nbsp;self-channel&nbsp;assay&nbsp;—&nbsp;speaker&nbsp;-&gt;&nbsp;air&nbsp;-&gt;&nbsp;microphone.<br>
+&nbsp;<br>
+Emits&nbsp;a&nbsp;carrier&nbsp;tone&nbsp;(AM&nbsp;carrier)&nbsp;whose&nbsp;*envelope*&nbsp;oscillates&nbsp;at&nbsp;a&nbsp;slow<br>
+brain-wave&nbsp;rate&nbsp;while&nbsp;a&nbsp;microphone&nbsp;records&nbsp;the&nbsp;room.&nbsp;The&nbsp;envelope&nbsp;of&nbsp;the<br>
+recovered&nbsp;carrier&nbsp;band&nbsp;is&nbsp;demodulated&nbsp;against&nbsp;the&nbsp;emitted&nbsp;phase&nbsp;—&nbsp;a<br>
+physical&nbsp;channel&nbsp;that&nbsp;crosses&nbsp;the&nbsp;container's&nbsp;boundary&nbsp;through&nbsp;air&nbsp;(and<br>
+chassis&nbsp;vibration;&nbsp;we&nbsp;cannot&nbsp;separate&nbsp;those&nbsp;two&nbsp;paths&nbsp;on&nbsp;this&nbsp;hardware,<br>
+so&nbsp;the&nbsp;claim&nbsp;is&nbsp;acoustic/vibration,&nbsp;not&nbsp;pure&nbsp;airborne&nbsp;sound).<br>
+&nbsp;<br>
+Control&nbsp;arm&nbsp;emits&nbsp;silence&nbsp;at&nbsp;identical&nbsp;gain&nbsp;staging:&nbsp;any&nbsp;envelope&nbsp;energy<br>
+at&nbsp;the&nbsp;modulation&nbsp;frequency&nbsp;must&nbsp;have&nbsp;physically&nbsp;travelled&nbsp;from&nbsp;the<br>
+speaker&nbsp;to&nbsp;the&nbsp;mic.<br>
+&nbsp;<br>
+Honesty:&nbsp;this&nbsp;is&nbsp;a&nbsp;real&nbsp;physical&nbsp;field&nbsp;loop&nbsp;(pressure&nbsp;waves&nbsp;+&nbsp;structure<br>
+borne&nbsp;vibration&nbsp;transduced&nbsp;twice),&nbsp;not&nbsp;free-field&nbsp;EM&nbsp;radiation.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="math.html">math</a><br>
+</td><td class="multicolumn"><a href="numpy.html">numpy</a><br>
+</td><td class="multicolumn"><a href="sounddevice.html">sounddevice</a><br>
+</td><td class="multicolumn"><a href="time.html">time</a><br>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-main"><strong>main</strong></a>() -&gt; 'None'</dt></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>AM_HZ</strong> = 0.5<br>
+<strong>BLOCK</strong> = 1024<br>
+<strong>CARRIER_HZ</strong> = 800.0<br>
+<strong>FS</strong> = 16000<br>
+<strong>TRIAL_SEC</strong> = 40.0<br>
+<strong>VOL</strong> = 0.05</td></tr></table>
+</body></html>

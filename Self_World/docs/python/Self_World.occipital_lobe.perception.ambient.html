@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.occipital_lobe.perception.ambient</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.occipital_lobe.html" class="white">occipital_lobe</a>.<a href="Self_World.occipital_lobe.perception.html" class="white">perception</a>.ambient</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/occipital_lobe/perception/ambient.py">/home/mindyrenee/GenAnd/Genesis/Self_World/occipital_lobe/perception/ambient.py</a></td></tr></table>
+    <p><span class="code">Ambient&nbsp;listener&nbsp;—&nbsp;Genesis's&nbsp;ears.<br>
+&nbsp;<br>
+Continuously&nbsp;captures&nbsp;audio&nbsp;from&nbsp;the&nbsp;microphone,&nbsp;transcribes&nbsp;it&nbsp;with<br>
+Vosk&nbsp;(offline),&nbsp;and&nbsp;emits&nbsp;complete&nbsp;utterances.&nbsp;The&nbsp;caller&nbsp;decides<br>
+whether&nbsp;to&nbsp;act&nbsp;on&nbsp;each&nbsp;utterance.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;a&nbsp;streaming,&nbsp;always-on&nbsp;listener&nbsp;—&nbsp;unlike&nbsp;``VoiceInput.listen``<br>
+which&nbsp;blocks&nbsp;for&nbsp;a&nbsp;single&nbsp;utterance,&nbsp;``<a href="#AmbientListener">AmbientListener</a>``&nbsp;runs&nbsp;in&nbsp;a<br>
+background&nbsp;thread&nbsp;and&nbsp;calls&nbsp;a&nbsp;callback&nbsp;for&nbsp;every&nbsp;utterance&nbsp;detected<br>
+in&nbsp;the&nbsp;room.<br>
+&nbsp;<br>
+#&nbsp;Wake&nbsp;word<br>
+&nbsp;<br>
+The&nbsp;listener&nbsp;does&nbsp;**not**&nbsp;decide&nbsp;whether&nbsp;to&nbsp;respond&nbsp;—&nbsp;it&nbsp;just<br>
+transcribes.&nbsp;Wake-word&nbsp;detection&nbsp;is&nbsp;handled&nbsp;by&nbsp;the&nbsp;caller&nbsp;via<br>
+``<a href="#-contains_wake_word">contains_wake_word</a>()``,&nbsp;which&nbsp;does&nbsp;fuzzy&nbsp;matching&nbsp;against&nbsp;"genesis"<br>
+and&nbsp;common&nbsp;Vosk&nbsp;mis-transcriptions.<br>
+&nbsp;<br>
+#&nbsp;Resource&nbsp;use<br>
+&nbsp;<br>
+Vosk&nbsp;small&nbsp;model:&nbsp;~50&nbsp;MB&nbsp;RAM,&nbsp;low&nbsp;CPU.&nbsp;The&nbsp;audio&nbsp;capture&nbsp;uses<br>
+sounddevice's&nbsp;callback&nbsp;API&nbsp;(no&nbsp;busy-waiting).&nbsp;On&nbsp;the&nbsp;A8-6410&nbsp;this<br>
+adds&nbsp;negligible&nbsp;load&nbsp;to&nbsp;the&nbsp;conscious&nbsp;mind's&nbsp;1&nbsp;GB&nbsp;/&nbsp;2-core&nbsp;budget.<br>
+&nbsp;<br>
+#&nbsp;Privacy<br>
+&nbsp;<br>
+This&nbsp;module&nbsp;listens&nbsp;to&nbsp;all&nbsp;speech&nbsp;in&nbsp;microphone&nbsp;range.&nbsp;It&nbsp;logs<br>
+transcribed&nbsp;utterances&nbsp;at&nbsp;INFO&nbsp;level.&nbsp;The&nbsp;caller&nbsp;is&nbsp;responsible&nbsp;for<br>
+deciding&nbsp;what&nbsp;to&nbsp;do&nbsp;with&nbsp;them.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="json.html">json</a><br>
+<a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="queue.html">queue</a><br>
+<a href="re.html">re</a><br>
+</td><td class="multicolumn"><a href="threading.html">threading</a><br>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.occipital_lobe.perception.ambient.html#AmbientListener">AmbientListener</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="AmbientListener">class <strong>AmbientListener</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#AmbientListener">AmbientListener</a>(callback:&nbsp;'Callable[[str],&nbsp;None]',&nbsp;sample_rate:&nbsp;'int'&nbsp;=&nbsp;16000,&nbsp;silence_threshold:&nbsp;'int'&nbsp;=&nbsp;30,&nbsp;min_utterance_len:&nbsp;'int'&nbsp;=&nbsp;2,&nbsp;is_speaking:&nbsp;'Callable[[],&nbsp;bool]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Continuously&nbsp;listens&nbsp;to&nbsp;the&nbsp;microphone&nbsp;and&nbsp;emits&nbsp;utterances.<br>
+&nbsp;<br>
+Runs&nbsp;a&nbsp;background&nbsp;thread&nbsp;that&nbsp;captures&nbsp;audio,&nbsp;runs&nbsp;it&nbsp;through<br>
+Vosk,&nbsp;and&nbsp;calls&nbsp;the&nbsp;callback&nbsp;for&nbsp;each&nbsp;complete&nbsp;utterance.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;callback:&nbsp;Called&nbsp;as&nbsp;``callback(text:&nbsp;str)``&nbsp;for&nbsp;each&nbsp;detected<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;utterance.&nbsp;The&nbsp;text&nbsp;is&nbsp;the&nbsp;final&nbsp;Vosk&nbsp;transcription,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;stripped&nbsp;and&nbsp;lowercased.&nbsp;Empty/garbage&nbsp;utterances&nbsp;are<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;filtered&nbsp;out.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;sample_rate:&nbsp;Audio&nbsp;sample&nbsp;rate.&nbsp;Vosk&nbsp;expects&nbsp;16000.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;silence_threshold:&nbsp;Number&nbsp;of&nbsp;silence&nbsp;chunks&nbsp;(each&nbsp;~50ms)&nbsp;after<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;speech&nbsp;to&nbsp;consider&nbsp;the&nbsp;utterance&nbsp;complete.&nbsp;30&nbsp;≈&nbsp;1.5s.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;min_utterance_len:&nbsp;Minimum&nbsp;word&nbsp;count&nbsp;to&nbsp;emit&nbsp;(filters&nbsp;out<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"uh",&nbsp;"hmm",&nbsp;false&nbsp;triggers).<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="AmbientListener-__init__"><strong>__init__</strong></a>(self, callback: 'Callable[[str], None]', sample_rate: 'int' = 16000, silence_threshold: 'int' = 30, min_utterance_len: 'int' = 2, is_speaking: 'Callable[[], bool] | None' = None) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;ambient&nbsp;listener&nbsp;with&nbsp;the&nbsp;given&nbsp;callback&nbsp;and&nbsp;parameters.</span></dd></dl>
+
+<dl><dt><a name="AmbientListener-recent_utterances"><strong>recent_utterances</strong></a>(self) -&gt; 'list[str]'</dt><dd><span class="code">Return&nbsp;recent&nbsp;transcribed&nbsp;utterances&nbsp;(for&nbsp;debugging).</span></dd></dl>
+
+<dl><dt><a name="AmbientListener-start"><strong>start</strong></a>(self) -&gt; 'bool'</dt><dd><span class="code">Start&nbsp;the&nbsp;ambient&nbsp;listener&nbsp;thread.&nbsp;Returns&nbsp;True&nbsp;on&nbsp;success.</span></dd></dl>
+
+<dl><dt><a name="AmbientListener-stop"><strong>stop</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Stop&nbsp;the&nbsp;listener.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>available</strong></dt>
+<dd><span class="code">True&nbsp;if&nbsp;the&nbsp;listener&nbsp;can&nbsp;start&nbsp;(Vosk&nbsp;model&nbsp;loaded).</span></dd>
+</dl>
+<dl><dt><strong>init_error</strong></dt>
+<dd><span class="code">Error&nbsp;message&nbsp;from&nbsp;the&nbsp;last&nbsp;Vosk&nbsp;initialization&nbsp;attempt,&nbsp;or&nbsp;None&nbsp;if&nbsp;no&nbsp;error.</span></dd>
+</dl>
+<dl><dt><strong>running</strong></dt>
+<dd><span class="code">Whether&nbsp;the&nbsp;listener&nbsp;thread&nbsp;is&nbsp;currently&nbsp;active.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-contains_wake_word"><strong>contains_wake_word</strong></a>(text: 'str') -&gt; 'bool'</dt><dd><span class="code">True&nbsp;if&nbsp;the&nbsp;text&nbsp;contains&nbsp;a&nbsp;wake&nbsp;word&nbsp;for&nbsp;Genesis.<br>
+&nbsp;<br>
+Does&nbsp;fuzzy&nbsp;matching&nbsp;against&nbsp;"genesis"&nbsp;and&nbsp;common&nbsp;Vosk<br>
+mis-transcriptions.</span></dd></dl>
+ <dl><dt><a name="-strip_wake_word"><strong>strip_wake_word</strong></a>(text: 'str') -&gt; 'str'</dt><dd><span class="code">Remove&nbsp;the&nbsp;wake&nbsp;word&nbsp;from&nbsp;the&nbsp;text,&nbsp;returning&nbsp;the&nbsp;query.<br>
+&nbsp;<br>
+"genesis,&nbsp;how&nbsp;are&nbsp;you?"&nbsp;→&nbsp;"how&nbsp;are&nbsp;you?"<br>
+"hey&nbsp;genesis&nbsp;what's&nbsp;up"&nbsp;→&nbsp;"hey&nbsp;what's&nbsp;up"</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['AmbientListener', 'contains_wake_word', 'strip_wake_word']<br>
+<strong>__annotations__</strong> = {'_MIN_TRANSCRIPTION_CONFIDENCE': 'float', '_SILENCE_RMS_THRESHOLD': 'float'}</td></tr></table>
+</body></html>

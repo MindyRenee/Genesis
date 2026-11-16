@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.temporal_lobe.dual</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.temporal_lobe.html" class="white">temporal_lobe</a>.dual</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/dual.py">/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/dual.py</a></td></tr></table>
+    <p><span class="code">Dual-system&nbsp;learning&nbsp;architecture&nbsp;—&nbsp;hippocampus&nbsp;and&nbsp;neocortex.<br>
+&nbsp;<br>
+The&nbsp;brain&nbsp;has&nbsp;two&nbsp;complementary&nbsp;learning&nbsp;systems&nbsp;(McClelland&nbsp;et&nbsp;al.,<br>
+1995;&nbsp;O'Reilly&nbsp;&amp;&nbsp;Norman,&nbsp;2002):<br>
+&nbsp;<br>
+1.&nbsp;**Hippocampus**&nbsp;—&nbsp;a&nbsp;*fast*&nbsp;learner.&nbsp;It&nbsp;rapidly&nbsp;encodes&nbsp;individual<br>
+&nbsp;&nbsp;&nbsp;episodes&nbsp;with&nbsp;high&nbsp;plasticity,&nbsp;using&nbsp;*pattern&nbsp;separation*&nbsp;to<br>
+&nbsp;&nbsp;&nbsp;orthogonalize&nbsp;similar&nbsp;inputs&nbsp;into&nbsp;distinct,&nbsp;non-overlapping<br>
+&nbsp;&nbsp;&nbsp;representations.&nbsp;This&nbsp;prevents&nbsp;new&nbsp;memories&nbsp;from&nbsp;overwriting&nbsp;old<br>
+&nbsp;&nbsp;&nbsp;ones&nbsp;(catastrophic&nbsp;interference).&nbsp;But&nbsp;hippocampal&nbsp;storage&nbsp;is<br>
+&nbsp;&nbsp;&nbsp;capacity-limited&nbsp;and&nbsp;temporary.<br>
+&nbsp;<br>
+2.&nbsp;**Neocortex**&nbsp;—&nbsp;a&nbsp;*slow*&nbsp;learner.&nbsp;It&nbsp;gradually&nbsp;extracts&nbsp;general<br>
+&nbsp;&nbsp;&nbsp;structure&nbsp;across&nbsp;many&nbsp;experiences,&nbsp;using&nbsp;overlapping<br>
+&nbsp;&nbsp;&nbsp;representations&nbsp;that&nbsp;capture&nbsp;shared&nbsp;regularities.&nbsp;Neocortical<br>
+&nbsp;&nbsp;&nbsp;learning&nbsp;is&nbsp;robust&nbsp;and&nbsp;long-lasting&nbsp;but&nbsp;too&nbsp;slow&nbsp;to&nbsp;encode&nbsp;a<br>
+&nbsp;&nbsp;&nbsp;single&nbsp;episode&nbsp;in&nbsp;one&nbsp;shot.<br>
+&nbsp;<br>
+**Systems&nbsp;consolidation**:&nbsp;during&nbsp;sleep&nbsp;(especially&nbsp;slow-wave&nbsp;and<br>
+REM&nbsp;sleep),&nbsp;hippocampal&nbsp;memories&nbsp;are&nbsp;*replayed*&nbsp;and&nbsp;gradually<br>
+transferred&nbsp;to&nbsp;neocortical&nbsp;storage.&nbsp;The&nbsp;hippocampus&nbsp;teaches&nbsp;the<br>
+neocortex,&nbsp;episode&nbsp;by&nbsp;episode,&nbsp;until&nbsp;the&nbsp;neocortex&nbsp;has&nbsp;extracted<br>
+the&nbsp;general&nbsp;knowledge&nbsp;and&nbsp;the&nbsp;hippocampal&nbsp;trace&nbsp;can&nbsp;fade<br>
+(Diekelmann&nbsp;&amp;&nbsp;Born,&nbsp;2010;&nbsp;Frankland&nbsp;&amp;&nbsp;Bontempi,&nbsp;2005).<br>
+&nbsp;<br>
+This&nbsp;complementary&nbsp;systems&nbsp;architecture&nbsp;solves&nbsp;the&nbsp;*stability-<br>
+plasticity&nbsp;dilemma*:&nbsp;the&nbsp;hippocampus&nbsp;can&nbsp;learn&nbsp;fast&nbsp;without<br>
+disrupting&nbsp;neocortical&nbsp;knowledge,&nbsp;and&nbsp;the&nbsp;neocortex&nbsp;can&nbsp;learn<br>
+slowly&nbsp;without&nbsp;forgetting&nbsp;the&nbsp;details&nbsp;that&nbsp;the&nbsp;hippocampus&nbsp;holds.<br>
+&nbsp;<br>
+#&nbsp;Implementation<br>
+&nbsp;<br>
+This&nbsp;module&nbsp;models&nbsp;the&nbsp;two&nbsp;systems&nbsp;as&nbsp;separate&nbsp;stores:<br>
+&nbsp;<br>
+-&nbsp;The&nbsp;**fast&nbsp;(hippocampal)&nbsp;store**&nbsp;keeps&nbsp;recent&nbsp;episodes&nbsp;as<br>
+&nbsp;&nbsp;pattern-separated&nbsp;sparse&nbsp;vectors.&nbsp;Pattern&nbsp;separation&nbsp;is&nbsp;achieved<br>
+&nbsp;&nbsp;by&nbsp;adding&nbsp;orthogonalizing&nbsp;noise&nbsp;proportional&nbsp;to&nbsp;input&nbsp;similarity:<br>
+&nbsp;&nbsp;similar&nbsp;inputs&nbsp;get&nbsp;pushed&nbsp;apart&nbsp;so&nbsp;they&nbsp;don't&nbsp;interfere.<br>
+&nbsp;<br>
+-&nbsp;The&nbsp;**slow&nbsp;(neocortical)&nbsp;store**&nbsp;keeps&nbsp;general&nbsp;knowledge&nbsp;as<br>
+&nbsp;&nbsp;overlapping&nbsp;dense&nbsp;vectors,&nbsp;updated&nbsp;gradually&nbsp;by&nbsp;averaging&nbsp;over<br>
+&nbsp;&nbsp;consolidated&nbsp;hippocampal&nbsp;episodes.<br>
+&nbsp;<br>
+Retrieval&nbsp;checks&nbsp;both&nbsp;systems&nbsp;and&nbsp;blends&nbsp;their&nbsp;outputs&nbsp;—&nbsp;the<br>
+hippocampus&nbsp;provides&nbsp;fast,&nbsp;specific&nbsp;recall;&nbsp;the&nbsp;neocortex&nbsp;provides<br>
+slow,&nbsp;generalized&nbsp;knowledge.<br>
+&nbsp;<br>
+References:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;McClelland&nbsp;et&nbsp;al.&nbsp;(1995):&nbsp;Why&nbsp;there&nbsp;are&nbsp;complementary&nbsp;learning<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;systems&nbsp;in&nbsp;the&nbsp;hippocampus&nbsp;and&nbsp;neocortex.&nbsp;Neural&nbsp;Computation,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;7(2),&nbsp;249-267.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;O'Reilly&nbsp;&amp;&nbsp;Norman&nbsp;(2002):&nbsp;Hippocampal&nbsp;conjunctive&nbsp;encoding,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;representation,&nbsp;and&nbsp;consolidation.&nbsp;Hippocampus,&nbsp;12,&nbsp;175-188.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Frankland&nbsp;&amp;&nbsp;Bontempi&nbsp;(2005):&nbsp;The&nbsp;organization&nbsp;of&nbsp;recent&nbsp;and<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;remote&nbsp;memories.&nbsp;Nature&nbsp;Reviews&nbsp;Neuroscience,&nbsp;6,&nbsp;119-130.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Diekelmann&nbsp;&amp;&nbsp;Born&nbsp;(2010):&nbsp;The&nbsp;memory&nbsp;function&nbsp;of&nbsp;sleep.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Nature&nbsp;Reviews&nbsp;Neuroscience,&nbsp;11,&nbsp;114-126.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="numpy.html">numpy</a><br>
+</td><td class="multicolumn"><a href="time.html">time</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.dual.html#DualSystemLearner">DualSystemLearner</a>
+</dt><dt class="heading-text"><a href="Self_World.temporal_lobe.dual.html#HippocampalEpisode">HippocampalEpisode</a>
+</dt><dt class="heading-text"><a href="Self_World.temporal_lobe.dual.html#NeocorticalMemory">NeocorticalMemory</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="DualSystemLearner">class <strong>DualSystemLearner</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#DualSystemLearner">DualSystemLearner</a>(network:&nbsp;'ConceptNetwork',&nbsp;embeddings:&nbsp;'EmbeddingStore&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;*,&nbsp;fast_lr:&nbsp;'float'&nbsp;=&nbsp;0.5,&nbsp;slow_lr:&nbsp;'float'&nbsp;=&nbsp;0.02,&nbsp;consolidation_rate:&nbsp;'float'&nbsp;=&nbsp;0.1,&nbsp;separation_gain:&nbsp;'float'&nbsp;=&nbsp;0.3,&nbsp;fast_capacity:&nbsp;'int'&nbsp;=&nbsp;200,&nbsp;pattern_dim:&nbsp;'int'&nbsp;=&nbsp;64)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Dual-system&nbsp;learning:&nbsp;fast&nbsp;hippocampal&nbsp;+&nbsp;slow&nbsp;neocortical.<br>
+&nbsp;<br>
+Models&nbsp;the&nbsp;complementary&nbsp;learning&nbsp;systems&nbsp;of&nbsp;the&nbsp;brain.&nbsp;The<br>
+hippocampus&nbsp;rapidly&nbsp;encodes&nbsp;episodes&nbsp;with&nbsp;pattern&nbsp;separation;<br>
+the&nbsp;neocortex&nbsp;gradually&nbsp;extracts&nbsp;general&nbsp;knowledge&nbsp;through<br>
+systems&nbsp;consolidation.<br>
+&nbsp;<br>
+Attributes:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;fast_lr:&nbsp;Hippocampal&nbsp;(fast)&nbsp;learning&nbsp;rate&nbsp;—&nbsp;high.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;slow_lr:&nbsp;Neocortical&nbsp;(slow)&nbsp;learning&nbsp;rate&nbsp;—&nbsp;low.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;consolidation_rate:&nbsp;How&nbsp;much&nbsp;each&nbsp;replay&nbsp;shifts&nbsp;a&nbsp;hippocampal<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;episode&nbsp;toward&nbsp;neocortical&nbsp;storage.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;separation_gain:&nbsp;Strength&nbsp;of&nbsp;pattern&nbsp;separation&nbsp;(how&nbsp;much<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;similar&nbsp;inputs&nbsp;are&nbsp;orthogonalized).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;fast_capacity:&nbsp;Maximum&nbsp;number&nbsp;of&nbsp;hippocampal&nbsp;episodes&nbsp;retained.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="DualSystemLearner-__init__"><strong>__init__</strong></a>(self, network: 'ConceptNetwork', embeddings: 'EmbeddingStore | None' = None, *, fast_lr: 'float' = 0.5, slow_lr: 'float' = 0.02, consolidation_rate: 'float' = 0.1, separation_gain: 'float' = 0.3, fast_capacity: 'int' = 200, pattern_dim: 'int' = 64) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;both&nbsp;learning&nbsp;stores&nbsp;with&nbsp;configurable&nbsp;rates&nbsp;and&nbsp;capacity.</span></dd></dl>
+
+<dl><dt><a name="DualSystemLearner-consolidate_to_slow"><strong>consolidate_to_slow</strong></a>(self, max_episodes: 'int' = 10) -&gt; 'dict[str, int]'</dt><dd><span class="code">Transfer&nbsp;hippocampal&nbsp;memories&nbsp;to&nbsp;neocortical&nbsp;storage.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;systems&nbsp;consolidation.&nbsp;Unconsolidated&nbsp;hippocampal<br>
+episodes&nbsp;are&nbsp;replayed&nbsp;and&nbsp;gradually&nbsp;merged&nbsp;into&nbsp;the&nbsp;slow<br>
+(neocortical)&nbsp;store.&nbsp;Each&nbsp;replay&nbsp;moves&nbsp;the&nbsp;neocortical<br>
+representation&nbsp;toward&nbsp;the&nbsp;hippocampal&nbsp;pattern&nbsp;by&nbsp;a&nbsp;small<br>
+amount&nbsp;(slow_lr),&nbsp;and&nbsp;increments&nbsp;the&nbsp;episode's&nbsp;replay&nbsp;count.<br>
+Once&nbsp;an&nbsp;episode's&nbsp;accumulated&nbsp;transfer&nbsp;exceeds&nbsp;a&nbsp;threshold,<br>
+it&nbsp;is&nbsp;marked&nbsp;consolidated.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;max_episodes:&nbsp;Maximum&nbsp;number&nbsp;of&nbsp;episodes&nbsp;to&nbsp;replay&nbsp;per&nbsp;call.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;dict&nbsp;with&nbsp;'replayed',&nbsp;'consolidated',&nbsp;'neocortical_updated'.</span></dd></dl>
+
+<dl><dt><a name="DualSystemLearner-encode_fast"><strong>encode_fast</strong></a>(self, experience: 'str | list[str]') -&gt; 'HippocampalEpisode'</dt><dd><span class="code">Encode&nbsp;an&nbsp;experience&nbsp;into&nbsp;the&nbsp;fast&nbsp;(hippocampal)&nbsp;store.<br>
+&nbsp;<br>
+Pattern&nbsp;separation&nbsp;ensures&nbsp;that&nbsp;similar&nbsp;experiences&nbsp;get<br>
+distinct&nbsp;hippocampal&nbsp;representations,&nbsp;preventing&nbsp;interference.<br>
+The&nbsp;input&nbsp;is&nbsp;converted&nbsp;to&nbsp;a&nbsp;feature&nbsp;vector&nbsp;(from&nbsp;embeddings&nbsp;if<br>
+available,&nbsp;otherwise&nbsp;a&nbsp;hash-based&nbsp;vector),&nbsp;then&nbsp;orthogonalizing<br>
+noise&nbsp;is&nbsp;added&nbsp;proportional&nbsp;to&nbsp;similarity&nbsp;with&nbsp;existing<br>
+episodes.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;experience:&nbsp;A&nbsp;text&nbsp;description&nbsp;or&nbsp;list&nbsp;of&nbsp;concept&nbsp;names.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;encoded&nbsp;<a href="#HippocampalEpisode">HippocampalEpisode</a>.</span></dd></dl>
+
+<dl><dt><a name="DualSystemLearner-get_statistics"><strong>get_statistics</strong></a>(self) -&gt; 'dict[str, int | float]'</dt><dd><span class="code">Return&nbsp;statistics&nbsp;about&nbsp;both&nbsp;learning&nbsp;systems.</span></dd></dl>
+
+<dl><dt><a name="DualSystemLearner-restore_state"><strong>restore_state</strong></a>(self, data: 'dict') -&gt; 'None'</dt><dd><span class="code">Restore&nbsp;dual-system&nbsp;memory&nbsp;from&nbsp;a&nbsp;persisted&nbsp;state&nbsp;dictionary.<br>
+&nbsp;<br>
+Invalid&nbsp;or&nbsp;dimension-mismatched&nbsp;patterns&nbsp;are&nbsp;rejected&nbsp;rather&nbsp;than<br>
+silently&nbsp;creating&nbsp;a&nbsp;corrupted&nbsp;memory&nbsp;substrate.&nbsp;Runtime&nbsp;capacity<br>
+limits&nbsp;still&nbsp;apply&nbsp;when&nbsp;restoring&nbsp;the&nbsp;fast&nbsp;store.</span></dd></dl>
+
+<dl><dt><a name="DualSystemLearner-retrieve"><strong>retrieve</strong></a>(self, query: 'str | list[str]') -&gt; 'list[tuple[str, float, str]]'</dt><dd><span class="code">Retrieve&nbsp;memories&nbsp;matching&nbsp;a&nbsp;query&nbsp;from&nbsp;both&nbsp;systems.<br>
+&nbsp;<br>
+Checks&nbsp;both&nbsp;the&nbsp;fast&nbsp;(hippocampal)&nbsp;and&nbsp;slow&nbsp;(neocortical)<br>
+stores.&nbsp;The&nbsp;hippocampus&nbsp;provides&nbsp;specific,&nbsp;recent&nbsp;recall;<br>
+the&nbsp;neocortex&nbsp;provides&nbsp;generalized&nbsp;knowledge.&nbsp;Results&nbsp;are<br>
+blended&nbsp;and&nbsp;sorted&nbsp;by&nbsp;similarity.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;query:&nbsp;A&nbsp;text&nbsp;query&nbsp;or&nbsp;list&nbsp;of&nbsp;concept&nbsp;names.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;list&nbsp;of&nbsp;(key,&nbsp;similarity,&nbsp;system)&nbsp;tuples&nbsp;sorted&nbsp;by<br>
+&nbsp;&nbsp;&nbsp;&nbsp;similarity&nbsp;descending.&nbsp;`system`&nbsp;is&nbsp;'hippocampal'&nbsp;or<br>
+&nbsp;&nbsp;&nbsp;&nbsp;'neocortical'.</span></dd></dl>
+
+<dl><dt><a name="DualSystemLearner-serialize_state"><strong>serialize_state</strong></a>(self) -&gt; 'dict'</dt><dd><span class="code">Serialize&nbsp;dual-system&nbsp;memory&nbsp;for&nbsp;persistence&nbsp;across&nbsp;restarts.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>CONSOLIDATION_RATE</strong> = 0.1</dl>
+
+<dl><dt><strong>FAST_CAPACITY</strong> = 200</dl>
+
+<dl><dt><strong>FAST_LR</strong> = 0.5</dl>
+
+<dl><dt><strong>PATTERN_DIM</strong> = 64</dl>
+
+<dl><dt><strong>SEPARATION_GAIN</strong> = 0.3</dl>
+
+<dl><dt><strong>SLOW_LR</strong> = 0.02</dl>
+
+<dl><dt><strong>__annotations__</strong> = {'CONSOLIDATION_RATE': 'float', 'FAST_CAPACITY': 'int', 'FAST_LR': 'float', 'PATTERN_DIM': 'int', 'SEPARATION_GAIN': 'float', 'SLOW_LR': 'float'}</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="HippocampalEpisode">class <strong>HippocampalEpisode</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#HippocampalEpisode">HippocampalEpisode</a>(key:&nbsp;'str',&nbsp;pattern:&nbsp;'np.ndarray',&nbsp;content:&nbsp;'str',&nbsp;timestamp:&nbsp;'int',&nbsp;replay_count:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;consolidated:&nbsp;'bool'&nbsp;=&nbsp;False)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;single&nbsp;episode&nbsp;in&nbsp;the&nbsp;fast&nbsp;(hippocampal)&nbsp;store.<br>
+&nbsp;<br>
+Attributes:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;key:&nbsp;A&nbsp;human-readable&nbsp;key&nbsp;(e.g.,&nbsp;the&nbsp;topic&nbsp;or&nbsp;concept&nbsp;set).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;pattern:&nbsp;The&nbsp;pattern-separated&nbsp;sparse&nbsp;vector&nbsp;representation.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;content:&nbsp;The&nbsp;raw&nbsp;experience&nbsp;content&nbsp;(text&nbsp;or&nbsp;concept&nbsp;list).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;timestamp:&nbsp;When&nbsp;the&nbsp;episode&nbsp;was&nbsp;encoded&nbsp;(ms).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;replay_count:&nbsp;How&nbsp;many&nbsp;times&nbsp;this&nbsp;episode&nbsp;has&nbsp;been&nbsp;replayed<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;during&nbsp;consolidation.&nbsp;Episodes&nbsp;with&nbsp;high&nbsp;replay&nbsp;counts<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;are&nbsp;closer&nbsp;to&nbsp;being&nbsp;fully&nbsp;transferred&nbsp;to&nbsp;neocortex.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;consolidated:&nbsp;Whether&nbsp;this&nbsp;episode&nbsp;has&nbsp;been&nbsp;transferred&nbsp;to<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;slow&nbsp;(neocortical)&nbsp;store.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="HippocampalEpisode-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="HippocampalEpisode-__init__"><strong>__init__</strong></a>(self, key: 'str', pattern: 'np.ndarray', content: 'str', timestamp: 'int', replay_count: 'int' = 0, consolidated: 'bool' = False) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="HippocampalEpisode-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>consolidated</strong></dt>
+</dl>
+<dl><dt><strong>content</strong></dt>
+</dl>
+<dl><dt><strong>key</strong></dt>
+</dl>
+<dl><dt><strong>pattern</strong></dt>
+</dl>
+<dl><dt><strong>replay_count</strong></dt>
+</dl>
+<dl><dt><strong>timestamp</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'consolidated': 'bool', 'content': 'str', 'key': 'str', 'pattern': 'np.ndarray', 'replay_count': 'int', 'timestamp': 'int'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'consolidated': Field(name='consolidated',type='bool',default=Fa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'content': Field(name='content',type='str',default=&lt;datacla...appingproxy({}),kw_only=False,_field_type=_FIELD), 'key': Field(name='key',type='str',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD), 'pattern': Field(name='pattern',type='np.ndarray',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD), 'replay_count': Field(name='replay_count',type='int',default=0,d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'timestamp': Field(name='timestamp',type='int',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('key', 'pattern', 'content', 'timestamp', 'replay_count', 'consolidated')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="NeocorticalMemory">class <strong>NeocorticalMemory</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#NeocorticalMemory">NeocorticalMemory</a>(key:&nbsp;'str',&nbsp;pattern:&nbsp;'np.ndarray',&nbsp;strength:&nbsp;'float',&nbsp;episode_count:&nbsp;'int',&nbsp;last_updated:&nbsp;'int')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;generalized&nbsp;memory&nbsp;in&nbsp;the&nbsp;slow&nbsp;(neocortical)&nbsp;store.<br>
+&nbsp;<br>
+Attributes:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;key:&nbsp;The&nbsp;generalized&nbsp;key&nbsp;(often&nbsp;shared&nbsp;across&nbsp;episodes).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;pattern:&nbsp;The&nbsp;overlapping&nbsp;dense&nbsp;vector&nbsp;representation.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;strength:&nbsp;How&nbsp;strongly&nbsp;this&nbsp;memory&nbsp;is&nbsp;established&nbsp;(grows<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;with&nbsp;consolidation).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;episode_count:&nbsp;How&nbsp;many&nbsp;hippocampal&nbsp;episodes&nbsp;contributed.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;last_updated:&nbsp;Timestamp&nbsp;of&nbsp;the&nbsp;last&nbsp;consolidation&nbsp;update.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="NeocorticalMemory-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="NeocorticalMemory-__init__"><strong>__init__</strong></a>(self, key: 'str', pattern: 'np.ndarray', strength: 'float', episode_count: 'int', last_updated: 'int') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="NeocorticalMemory-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>episode_count</strong></dt>
+</dl>
+<dl><dt><strong>key</strong></dt>
+</dl>
+<dl><dt><strong>last_updated</strong></dt>
+</dl>
+<dl><dt><strong>pattern</strong></dt>
+</dl>
+<dl><dt><strong>strength</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'episode_count': 'int', 'key': 'str', 'last_updated': 'int', 'pattern': 'np.ndarray', 'strength': 'float'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'episode_count': Field(name='episode_count',type='int',default=&lt;d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'key': Field(name='key',type='str',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD), 'last_updated': Field(name='last_updated',type='int',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD), 'pattern': Field(name='pattern',type='np.ndarray',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD), 'strength': Field(name='strength',type='float',default=&lt;data...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('key', 'pattern', 'strength', 'episode_count', 'last_updated')</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['DualSystemLearner', 'HippocampalEpisode', 'NeocorticalMemory']</td></tr></table>
+</body></html>

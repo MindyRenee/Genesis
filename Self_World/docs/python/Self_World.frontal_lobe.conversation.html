@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.frontal_lobe.conversation</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.frontal_lobe.html" class="white">frontal_lobe</a>.conversation</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/conversation.py">/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/conversation.py</a></td></tr></table>
+    <p><span class="code">Mind&nbsp;conversation&nbsp;—&nbsp;respond&nbsp;pipeline&nbsp;and&nbsp;user-facing&nbsp;I/O.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="os.html">os</a><br>
+</td><td class="multicolumn"><a href="threading.html">threading</a><br>
+</td><td class="multicolumn"><a href="time.html">time</a><br>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.frontal_lobe.conversation.html#ConversationMixin">ConversationMixin</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ConversationMixin">class <strong>ConversationMixin</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code">Mixin&nbsp;for&nbsp;:class:`Mind`&nbsp;—&nbsp;see&nbsp;module&nbsp;docstring.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ConversationMixin-add_live_thought_listener"><strong>add_live_thought_listener</strong></a>(self, listener) -&gt; 'None'</dt><dd><span class="code">Register&nbsp;a&nbsp;listener&nbsp;for&nbsp;Genesis's&nbsp;spontaneous&nbsp;thoughts.<br>
+&nbsp;<br>
+The&nbsp;listener&nbsp;is&nbsp;called&nbsp;as&nbsp;``listener(kind:&nbsp;str,&nbsp;content:&nbsp;str)``,<br>
+where&nbsp;``kind``&nbsp;is&nbsp;``"thought"``&nbsp;(a&nbsp;spontaneous&nbsp;inner-life<br>
+thought)&nbsp;or&nbsp;``"learning"``&nbsp;(something&nbsp;it&nbsp;learned&nbsp;autonomously).<br>
+It&nbsp;may&nbsp;arrive&nbsp;from&nbsp;the&nbsp;metronome&nbsp;or&nbsp;an&nbsp;infrastructure&nbsp;callback;<br>
+listeners&nbsp;must&nbsp;be&nbsp;thread-safe.</span></dd></dl>
+
+<dl><dt><a name="ConversationMixin-clear_queued_questions"><strong>clear_queued_questions</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Clear&nbsp;all&nbsp;queued&nbsp;questions.</span></dd></dl>
+
+<dl><dt><a name="ConversationMixin-end_question_session_if_done"><strong>end_question_session_if_done</strong></a>(self) -&gt; 'bool'</dt><dd><span class="code">End&nbsp;the&nbsp;question&nbsp;session&nbsp;once&nbsp;nothing&nbsp;remains&nbsp;to&nbsp;answer.<br>
+&nbsp;<br>
+The&nbsp;session's&nbsp;work&nbsp;is&nbsp;done&nbsp;when&nbsp;no&nbsp;popped&nbsp;question&nbsp;still<br>
+awaits&nbsp;its&nbsp;answer&nbsp;and&nbsp;the&nbsp;queue&nbsp;holds&nbsp;nothing&nbsp;more&nbsp;—&nbsp;focus<br>
+returns&nbsp;to&nbsp;the&nbsp;normal&nbsp;background.&nbsp;Called&nbsp;after&nbsp;every<br>
+conversation&nbsp;turn&nbsp;so&nbsp;the&nbsp;drain&nbsp;is&nbsp;recognized&nbsp;wherever&nbsp;the<br>
+answer&nbsp;arrived&nbsp;from.</span></dd></dl>
+
+<dl><dt><a name="ConversationMixin-enter_question_mode"><strong>enter_question_mode</strong></a>(self, topic: 'str' = '') -&gt; 'None'</dt><dd><span class="code">Enter&nbsp;a&nbsp;focused&nbsp;question-answer&nbsp;session&nbsp;(/teach-questions).<br>
+&nbsp;<br>
+She&nbsp;asked;&nbsp;the&nbsp;user&nbsp;is&nbsp;answering.&nbsp;Takes&nbsp;the&nbsp;same&nbsp;posture<br>
+teaching&nbsp;mode&nbsp;does&nbsp;—&nbsp;the&nbsp;autonomous&nbsp;learner&nbsp;and&nbsp;inner&nbsp;life<br>
+pause&nbsp;so&nbsp;the&nbsp;exchange&nbsp;is&nbsp;the&nbsp;only&nbsp;thing&nbsp;she&nbsp;is&nbsp;doing,&nbsp;and<br>
+volition&nbsp;stays&nbsp;held&nbsp;while&nbsp;questions&nbsp;are&nbsp;out.&nbsp;The&nbsp;question's<br>
+target&nbsp;concept&nbsp;borrows&nbsp;the&nbsp;lesson-scope&nbsp;filter:&nbsp;her&nbsp;inline<br>
+curiosity&nbsp;stays&nbsp;on&nbsp;what&nbsp;the&nbsp;exchange&nbsp;is&nbsp;about&nbsp;(follow-up<br>
+questions&nbsp;that&nbsp;pertain&nbsp;still&nbsp;reach&nbsp;her;&nbsp;unrelated&nbsp;ones&nbsp;queue<br>
+for&nbsp;later),&nbsp;and&nbsp;the&nbsp;executive's&nbsp;task&nbsp;set&nbsp;names&nbsp;what&nbsp;she's<br>
+doing&nbsp;—&nbsp;the&nbsp;mechanics&nbsp;of&nbsp;focus,&nbsp;not&nbsp;just&nbsp;its&nbsp;name.<br>
+&nbsp;<br>
+The&nbsp;session&nbsp;ends&nbsp;when&nbsp;the&nbsp;queue&nbsp;drains<br>
+(:meth:`end_question_session_if_done`),&nbsp;on&nbsp;/teach-questions<br>
+stop&nbsp;or&nbsp;clear,&nbsp;or&nbsp;when&nbsp;the&nbsp;user&nbsp;goes&nbsp;quiet&nbsp;for&nbsp;the<br>
+conversation&nbsp;focus&nbsp;window&nbsp;—&nbsp;whichever&nbsp;comes&nbsp;first.</span></dd></dl>
+
+<dl><dt><a name="ConversationMixin-enter_teaching_mode"><strong>enter_teaching_mode</strong></a>(self, topic: 'str' = '') -&gt; 'None'</dt><dd><span class="code">Put&nbsp;Genesis&nbsp;into&nbsp;teaching/training&nbsp;mode.<br>
+&nbsp;<br>
+Pauses&nbsp;code&nbsp;scanning,&nbsp;autonomous&nbsp;learning,&nbsp;art,&nbsp;and&nbsp;unrelated<br>
+curiosity&nbsp;questions.&nbsp;Self-directed&nbsp;learning&nbsp;from&nbsp;the<br>
+conversation&nbsp;stays&nbsp;active&nbsp;so&nbsp;it&nbsp;remembers&nbsp;what&nbsp;it's&nbsp;taught.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;topic:&nbsp;Optional&nbsp;topic&nbsp;hint&nbsp;for&nbsp;curiosity&nbsp;filtering.</span></dd></dl>
+
+<dl><dt><a name="ConversationMixin-exit_question_mode"><strong>exit_question_mode</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Leave&nbsp;the&nbsp;question-answer&nbsp;session&nbsp;and&nbsp;release&nbsp;its&nbsp;posture.</span></dd></dl>
+
+<dl><dt><a name="ConversationMixin-exit_teaching_mode"><strong>exit_teaching_mode</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Exit&nbsp;teaching/training&nbsp;mode&nbsp;and&nbsp;resume&nbsp;normal&nbsp;operation.</span></dd></dl>
+
+<dl><dt><a name="ConversationMixin-mark_user_activity"><strong>mark_user_activity</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Mark&nbsp;that&nbsp;the&nbsp;user&nbsp;is&nbsp;active&nbsp;(typing&nbsp;or&nbsp;interacting).<br>
+&nbsp;<br>
+This&nbsp;updates&nbsp;``_last_interaction_time``&nbsp;from&nbsp;the&nbsp;CLI's&nbsp;input<br>
+loop,&nbsp;BEFORE&nbsp;responding.&nbsp;The&nbsp;heartbeat's&nbsp;waking-side&nbsp;signals<br>
+run&nbsp;in&nbsp;a&nbsp;separate&nbsp;thread&nbsp;and&nbsp;must&nbsp;see&nbsp;the&nbsp;user&nbsp;as&nbsp;active&nbsp;—<br>
+announcing&nbsp;sleepiness&nbsp;or&nbsp;renewing&nbsp;a&nbsp;wake&nbsp;drive&nbsp;mid-turn&nbsp;is<br>
+noise.</span></dd></dl>
+
+<dl><dt><a name="ConversationMixin-offer_utterance"><strong>offer_utterance</strong></a>(self, text: 'str') -&gt; 'None'</dt><dd><span class="code">Offer&nbsp;a&nbsp;candidate&nbsp;utterance&nbsp;for&nbsp;the&nbsp;speech-volition&nbsp;to&nbsp;consider.<br>
+&nbsp;<br>
+The&nbsp;CLI&nbsp;feeds&nbsp;live-thought&nbsp;text&nbsp;here.&nbsp;The&nbsp;Mind's&nbsp;volition&nbsp;engine<br>
+decides&nbsp;whether&nbsp;it&nbsp;actually&nbsp;feels&nbsp;like&nbsp;saying&nbsp;it.<br>
+&nbsp;<br>
+During&nbsp;sleep,&nbsp;utterances&nbsp;are&nbsp;not&nbsp;queued&nbsp;—&nbsp;it&nbsp;shouldn't<br>
+accumulate&nbsp;speech&nbsp;while&nbsp;resting.&nbsp;The&nbsp;queue&nbsp;would&nbsp;drain&nbsp;when<br>
+it&nbsp;wakes,&nbsp;producing&nbsp;a&nbsp;burst&nbsp;of&nbsp;stale&nbsp;thoughts.</span></dd></dl>
+
+<dl><dt><a name="ConversationMixin-pop_queued_question"><strong>pop_queued_question</strong></a>(self) -&gt; 'dict[str, str] | None'</dt><dd><span class="code">Pop&nbsp;the&nbsp;next&nbsp;queued&nbsp;question.<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;dict&nbsp;with&nbsp;keys&nbsp;'text',&nbsp;'reason',&nbsp;'target_concept',<br>
+'question_type',&nbsp;'gap_detail',&nbsp;or&nbsp;None&nbsp;if&nbsp;the&nbsp;queue&nbsp;is&nbsp;empty.<br>
+Also&nbsp;sets&nbsp;the&nbsp;question&nbsp;as&nbsp;pending&nbsp;so&nbsp;the&nbsp;cognition&nbsp;engine<br>
+treats&nbsp;the&nbsp;user's&nbsp;next&nbsp;input&nbsp;as&nbsp;an&nbsp;answer.</span></dd></dl>
+
+<dl><dt><a name="ConversationMixin-respond"><strong>respond</strong></a>(self, user_input: 'str', timeout: 'float' = 60.0) -&gt; 'str'</dt><dd><span class="code">Process&nbsp;one&nbsp;user&nbsp;turn&nbsp;and&nbsp;record&nbsp;its&nbsp;observed&nbsp;response&nbsp;latency.<br>
+&nbsp;<br>
+Timing&nbsp;starts&nbsp;when&nbsp;the&nbsp;interaction&nbsp;enters&nbsp;the&nbsp;public&nbsp;response<br>
+boundary&nbsp;and&nbsp;ends&nbsp;when&nbsp;that&nbsp;boundary&nbsp;returns.&nbsp;This&nbsp;includes&nbsp;normal<br>
+cognition,&nbsp;errors,&nbsp;and&nbsp;bounded&nbsp;timeout&nbsp;fallbacks.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>awaiting_question_answer</strong></dt>
+<dd><span class="code">True&nbsp;while&nbsp;a&nbsp;popped&nbsp;question&nbsp;is&nbsp;still&nbsp;awaiting&nbsp;its&nbsp;answer.<br>
+&nbsp;<br>
+The&nbsp;pending&nbsp;marker&nbsp;is&nbsp;cleared&nbsp;when&nbsp;the&nbsp;user's&nbsp;next&nbsp;input&nbsp;is<br>
+consumed&nbsp;as&nbsp;the&nbsp;answer&nbsp;—&nbsp;until&nbsp;then&nbsp;the&nbsp;exchange&nbsp;counts&nbsp;as&nbsp;an<br>
+open&nbsp;turn&nbsp;and&nbsp;volition&nbsp;stays&nbsp;held.</span></dd>
+</dl>
+<dl><dt><strong>has_queued_questions</strong></dt>
+<dd><span class="code">Whether&nbsp;it&nbsp;has&nbsp;queued&nbsp;questions&nbsp;to&nbsp;ask.</span></dd>
+</dl>
+<dl><dt><strong>in_question_session</strong></dt>
+<dd><span class="code">Whether&nbsp;a&nbsp;/teach-questions&nbsp;answer&nbsp;session&nbsp;is&nbsp;holding&nbsp;focus.</span></dd>
+</dl>
+<dl><dt><strong>is_teaching</strong></dt>
+<dd><span class="code">Whether&nbsp;it&nbsp;is&nbsp;currently&nbsp;in&nbsp;teaching/training&nbsp;mode.</span></dd>
+</dl>
+<dl><dt><strong>is_user_sleeping</strong></dt>
+<dd><span class="code">Whether&nbsp;its&nbsp;sleep&nbsp;was&nbsp;user-initiated&nbsp;(not&nbsp;auto-wakeable).</span></dd>
+</dl>
+<dl><dt><strong>queued_question_count</strong></dt>
+<dd><span class="code">Number&nbsp;of&nbsp;queued&nbsp;questions.</span></dd>
+</dl>
+<dl><dt><strong>teaching_topic</strong></dt>
+<dd><span class="code">The&nbsp;topic&nbsp;the&nbsp;user&nbsp;is&nbsp;currently&nbsp;teaching&nbsp;it&nbsp;about.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<dl><dt><strong>on_speak</strong></dt>
+<dd><span class="code">Callback&nbsp;used&nbsp;when&nbsp;the&nbsp;speech&nbsp;urge&nbsp;fires.</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {}</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-stream_kind"><strong>stream_kind</strong></a>(thought) -&gt; 'str'</dt><dd><span class="code">Which&nbsp;live&nbsp;stream&nbsp;this&nbsp;event&nbsp;belongs&nbsp;on.<br>
+&nbsp;<br>
+Dream&nbsp;content&nbsp;gets&nbsp;its&nbsp;own&nbsp;kind&nbsp;so&nbsp;the&nbsp;live&nbsp;stream&nbsp;and&nbsp;the&nbsp;cognitive<br>
+journal&nbsp;can&nbsp;tell&nbsp;it&nbsp;apart&nbsp;from&nbsp;waking&nbsp;thought&nbsp;—&nbsp;it&nbsp;used&nbsp;to&nbsp;be&nbsp;labeled<br>
+"thought"&nbsp;and&nbsp;was&nbsp;indistinguishable,&nbsp;so&nbsp;a&nbsp;night&nbsp;of&nbsp;dreaming&nbsp;printed<br>
+`genesis~&nbsp;[thought]`&nbsp;lines&nbsp;all&nbsp;night.<br>
+&nbsp;<br>
+Extracted&nbsp;from&nbsp;`_on_spontaneous_thought`&nbsp;because&nbsp;it&nbsp;is&nbsp;a&nbsp;pure&nbsp;rule&nbsp;and<br>
+it&nbsp;was&nbsp;the&nbsp;thing&nbsp;being&nbsp;got&nbsp;wrong.&nbsp;Left&nbsp;inline,&nbsp;a&nbsp;caller&nbsp;that&nbsp;set&nbsp;the<br>
+kind&nbsp;correctly&nbsp;on&nbsp;`_emit`&nbsp;still&nbsp;had&nbsp;it&nbsp;silently&nbsp;overwritten&nbsp;here,<br>
+because&nbsp;this&nbsp;recomputes&nbsp;from&nbsp;the&nbsp;event's&nbsp;attributes&nbsp;rather&nbsp;than<br>
+trusting&nbsp;what&nbsp;the&nbsp;caller&nbsp;passed.&nbsp;That&nbsp;is&nbsp;invisible&nbsp;from&nbsp;any&nbsp;test&nbsp;that<br>
+stubs&nbsp;the&nbsp;emit&nbsp;side,&nbsp;and&nbsp;it&nbsp;shipped&nbsp;once&nbsp;already.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>CHEM_NOREPINEPHRINE</strong> = 2<br>
+<strong>KIND_HEARD</strong> = 1<br>
+<strong>MODULE_LANGUAGE</strong> = 4<br>
+<strong>MODULE_SENSORY</strong> = 6<br>
+<strong>TYPE_CHECKING</strong> = False<br>
+<strong>logger</strong> = &lt;Logger Self_World.frontal_lobe.conversation (WARNING)&gt;</td></tr></table>
+</body></html>

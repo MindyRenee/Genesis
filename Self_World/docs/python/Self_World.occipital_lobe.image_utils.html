@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.occipital_lobe.image_utils</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.occipital_lobe.html" class="white">occipital_lobe</a>.image_utils</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/occipital_lobe/image_utils.py">/home/mindyrenee/GenAnd/Genesis/Self_World/occipital_lobe/image_utils.py</a></td></tr></table>
+    <p><span class="code">Image&nbsp;loading&nbsp;and&nbsp;resizing&nbsp;utilities&nbsp;for&nbsp;the&nbsp;occipital&nbsp;subsystem.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="numpy.html">numpy</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-decode_image_bytes"><strong>decode_image_bytes</strong></a>(data: 'bytes') -&gt; 'np.ndarray | None'</dt><dd><span class="code">Decode&nbsp;raw&nbsp;image&nbsp;bytes&nbsp;(e.g.&nbsp;from&nbsp;a&nbsp;URL)&nbsp;into&nbsp;an&nbsp;RGB&nbsp;uint8&nbsp;array.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;data:&nbsp;raw&nbsp;image&nbsp;bytes&nbsp;(JPEG,&nbsp;PNG,&nbsp;etc.).<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;H×W×3&nbsp;uint8&nbsp;RGB&nbsp;array,&nbsp;or&nbsp;None.</span></dd></dl>
+ <dl><dt><a name="-load_image"><strong>load_image</strong></a>(path: 'str | Path') -&gt; 'np.ndarray | None'</dt><dd><span class="code">Load&nbsp;an&nbsp;image&nbsp;file&nbsp;as&nbsp;an&nbsp;RGB&nbsp;uint8&nbsp;numpy&nbsp;array.<br>
+&nbsp;<br>
+Supports&nbsp;any&nbsp;format&nbsp;PIL&nbsp;can&nbsp;read&nbsp;(PNG,&nbsp;JPEG,&nbsp;BMP,&nbsp;GIF,&nbsp;etc.).<br>
+Converts&nbsp;grayscale&nbsp;to&nbsp;RGB.&nbsp;Returns&nbsp;None&nbsp;on&nbsp;failure.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;path:&nbsp;path&nbsp;to&nbsp;the&nbsp;image&nbsp;file.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;H×W×3&nbsp;uint8&nbsp;RGB&nbsp;array,&nbsp;or&nbsp;None.</span></dd></dl>
+ <dl><dt><a name="-resize_for_vision"><strong>resize_for_vision</strong></a>(frame: 'np.ndarray', max_dim: 'int' = 320) -&gt; 'np.ndarray'</dt><dd><span class="code">Resize&nbsp;an&nbsp;image&nbsp;to&nbsp;be&nbsp;no&nbsp;larger&nbsp;than&nbsp;max_dim&nbsp;on&nbsp;any&nbsp;side.<br>
+&nbsp;<br>
+This&nbsp;keeps&nbsp;processing&nbsp;fast&nbsp;while&nbsp;preserving&nbsp;aspect&nbsp;ratio.<br>
+V1's&nbsp;8×8&nbsp;patches&nbsp;work&nbsp;best&nbsp;on&nbsp;images&nbsp;in&nbsp;the&nbsp;120-320&nbsp;pixel&nbsp;range.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;frame:&nbsp;H×W×3&nbsp;uint8&nbsp;image.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;max_dim:&nbsp;maximum&nbsp;dimension&nbsp;in&nbsp;pixels.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Resized&nbsp;H×W×3&nbsp;uint8&nbsp;image.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>logger</strong> = &lt;Logger Self_World.occipital_lobe.image_utils (WARNING)&gt;</td></tr></table>
+</body></html>

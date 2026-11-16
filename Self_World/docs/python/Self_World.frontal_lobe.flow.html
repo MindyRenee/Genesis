@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.frontal_lobe.flow</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.frontal_lobe.html" class="white">frontal_lobe</a>.flow</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/flow.py">/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/flow.py</a></td></tr></table>
+    <p><span class="code">Hamiltonian&nbsp;flow&nbsp;language&nbsp;generator.<br>
+&nbsp;<br>
+Language&nbsp;as&nbsp;a&nbsp;trajectory&nbsp;through&nbsp;a&nbsp;potential&nbsp;landscape&nbsp;on&nbsp;a&nbsp;torus.<br>
+&nbsp;<br>
+Instead&nbsp;of&nbsp;searching&nbsp;a&nbsp;flat&nbsp;vector&nbsp;space&nbsp;and&nbsp;assembling&nbsp;results&nbsp;into<br>
+templates,&nbsp;this&nbsp;module&nbsp;builds&nbsp;a&nbsp;potential&nbsp;field&nbsp;from&nbsp;the&nbsp;concept<br>
+network's&nbsp;edge&nbsp;weights,&nbsp;then&nbsp;integrates&nbsp;a&nbsp;geodesic&nbsp;from&nbsp;the&nbsp;query<br>
+concept.&nbsp;The&nbsp;trajectory&nbsp;passes&nbsp;through&nbsp;concept&nbsp;cells,&nbsp;and&nbsp;the<br>
+sequence&nbsp;of&nbsp;cells&nbsp;traversed&nbsp;IS&nbsp;the&nbsp;sentence&nbsp;—&nbsp;word&nbsp;order&nbsp;is&nbsp;the&nbsp;order<br>
+of&nbsp;traversal,&nbsp;sentence&nbsp;structure&nbsp;is&nbsp;the&nbsp;shape&nbsp;of&nbsp;the&nbsp;trajectory.<br>
+&nbsp;<br>
+#&nbsp;The&nbsp;math<br>
+&nbsp;<br>
+The&nbsp;concept&nbsp;network&nbsp;defines&nbsp;a&nbsp;potential&nbsp;landscape&nbsp;on&nbsp;the&nbsp;torus&nbsp;T^d:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;U(θ)&nbsp;=&nbsp;-Σᵢ&nbsp;wᵢ&nbsp;·&nbsp;K(θ,&nbsp;θᵢ)<br>
+&nbsp;<br>
+where&nbsp;θᵢ&nbsp;is&nbsp;concept&nbsp;i's&nbsp;angular&nbsp;position&nbsp;(from&nbsp;spectral&nbsp;embedding),<br>
+wᵢ&nbsp;is&nbsp;its&nbsp;edge&nbsp;weight&nbsp;sum&nbsp;(hubs&nbsp;become&nbsp;deep&nbsp;valleys),&nbsp;and&nbsp;K&nbsp;is&nbsp;a<br>
+von&nbsp;Mises&nbsp;kernel&nbsp;measuring&nbsp;angular&nbsp;proximity&nbsp;with&nbsp;wrap-around.<br>
+&nbsp;<br>
+The&nbsp;Hamiltonian&nbsp;is:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;H(θ,&nbsp;p)&nbsp;=&nbsp;½|p|²&nbsp;+&nbsp;U(θ)<br>
+&nbsp;<br>
+The&nbsp;equations&nbsp;of&nbsp;motion&nbsp;are:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;dθ/dt&nbsp;=&nbsp;&nbsp;∂H/∂p&nbsp;=&nbsp;p<br>
+&nbsp;&nbsp;&nbsp;&nbsp;dp/dt&nbsp;=&nbsp;-∂H/∂θ&nbsp;=&nbsp;-∇U(θ)<br>
+&nbsp;<br>
+The&nbsp;emotional&nbsp;state&nbsp;sets&nbsp;the&nbsp;momentum:&nbsp;high&nbsp;arousal&nbsp;→&nbsp;high&nbsp;momentum&nbsp;→<br>
+fast&nbsp;transitions&nbsp;→&nbsp;shorter&nbsp;sentences;&nbsp;low&nbsp;arousal&nbsp;→&nbsp;low&nbsp;momentum&nbsp;→<br>
+slow&nbsp;transitions&nbsp;→&nbsp;longer,&nbsp;contemplative&nbsp;sentences.<br>
+&nbsp;<br>
+#&nbsp;Hub&nbsp;neighborhood&nbsp;bias<br>
+&nbsp;<br>
+A&nbsp;local&nbsp;swirl&nbsp;perturbation&nbsp;biases&nbsp;trajectories&nbsp;near&nbsp;hub&nbsp;concepts:<br>
+when&nbsp;the&nbsp;walk&nbsp;passes&nbsp;within&nbsp;a&nbsp;fixed&nbsp;angular&nbsp;radius&nbsp;of&nbsp;a&nbsp;hub,&nbsp;its<br>
+first&nbsp;two&nbsp;coordinates&nbsp;are&nbsp;rotated&nbsp;by&nbsp;up&nbsp;to&nbsp;60°&nbsp;(π/3),&nbsp;steering&nbsp;it<br>
+through&nbsp;the&nbsp;hub's&nbsp;neighborhood&nbsp;ring.&nbsp;Typed&nbsp;relations&nbsp;act&nbsp;as<br>
+directional&nbsp;channels&nbsp;—&nbsp;where&nbsp;two&nbsp;concepts'&nbsp;potential&nbsp;wells&nbsp;overlap,<br>
+the&nbsp;relation's&nbsp;channel&nbsp;tilts&nbsp;the&nbsp;gradient&nbsp;so&nbsp;the&nbsp;trajectory&nbsp;tends<br>
+to&nbsp;cross&nbsp;between&nbsp;them,&nbsp;expressing&nbsp;the&nbsp;relation&nbsp;between&nbsp;concepts.<br>
+&nbsp;<br>
+#&nbsp;Why&nbsp;this&nbsp;produces&nbsp;flow<br>
+&nbsp;<br>
+The&nbsp;trajectory&nbsp;is&nbsp;continuous&nbsp;and&nbsp;determined&nbsp;by&nbsp;dynamics,&nbsp;not&nbsp;assembled<br>
+from&nbsp;pieces.&nbsp;The&nbsp;sentence&nbsp;shape&nbsp;emerges&nbsp;from&nbsp;the&nbsp;potential&nbsp;landscape,<br>
+which&nbsp;is&nbsp;built&nbsp;from&nbsp;the&nbsp;concept&nbsp;network.&nbsp;No&nbsp;templates,&nbsp;no&nbsp;fallbacks,<br>
+no&nbsp;hardcoded&nbsp;phrases&nbsp;—&nbsp;the&nbsp;sentence&nbsp;IS&nbsp;the&nbsp;trajectory.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="math.html">math</a><br>
+</td><td class="multicolumn"><a href="numpy.html">numpy</a><br>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.frontal_lobe.flow.html#FlowGenerator">FlowGenerator</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="FlowGenerator">class <strong>FlowGenerator</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#FlowGenerator">FlowGenerator</a>(network:&nbsp;'ConceptNetwork',&nbsp;seed:&nbsp;'int'&nbsp;=&nbsp;42)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Generate&nbsp;language&nbsp;from&nbsp;Hamiltonian&nbsp;flow&nbsp;on&nbsp;a&nbsp;toroidal&nbsp;manifold.<br>
+&nbsp;<br>
+The&nbsp;flow&nbsp;is&nbsp;built&nbsp;from&nbsp;the&nbsp;concept&nbsp;network's&nbsp;edge&nbsp;structure:<br>
+-&nbsp;Each&nbsp;concept's&nbsp;angular&nbsp;position&nbsp;comes&nbsp;from&nbsp;the&nbsp;spectral&nbsp;embedding<br>
+-&nbsp;Edge&nbsp;weights&nbsp;define&nbsp;the&nbsp;potential&nbsp;landscape&nbsp;(hubs&nbsp;=&nbsp;valleys)<br>
+-&nbsp;Typed&nbsp;relations&nbsp;create&nbsp;channels&nbsp;between&nbsp;concept&nbsp;cells<br>
+-&nbsp;The&nbsp;emotional&nbsp;state&nbsp;sets&nbsp;the&nbsp;momentum<br>
+&nbsp;<br>
+The&nbsp;trajectory&nbsp;through&nbsp;the&nbsp;potential&nbsp;landscape&nbsp;IS&nbsp;the&nbsp;sentence.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="FlowGenerator-__init__"><strong>__init__</strong></a>(self, network: 'ConceptNetwork', seed: 'int' = 42) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="FlowGenerator-build"><strong>build</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Build&nbsp;the&nbsp;potential&nbsp;field&nbsp;from&nbsp;the&nbsp;concept&nbsp;network.<br>
+&nbsp;<br>
+Maps&nbsp;each&nbsp;concept&nbsp;to&nbsp;an&nbsp;angular&nbsp;position&nbsp;on&nbsp;the&nbsp;torus&nbsp;using<br>
+the&nbsp;network's&nbsp;spectral&nbsp;structure,&nbsp;computes&nbsp;edge&nbsp;weight&nbsp;sums<br>
+for&nbsp;potential&nbsp;depth,&nbsp;and&nbsp;identifies&nbsp;relation&nbsp;channels.</span></dd></dl>
+
+<dl><dt><a name="FlowGenerator-generate"><strong>generate</strong></a>(self, thought: 'Thought', emotion: 'EmotionalState') -&gt; 'str | None'</dt><dd><span class="code">Generate&nbsp;text&nbsp;by&nbsp;integrating&nbsp;the&nbsp;Hamiltonian&nbsp;flow.<br>
+&nbsp;<br>
+The&nbsp;query&nbsp;concept&nbsp;sets&nbsp;the&nbsp;starting&nbsp;position.&nbsp;The&nbsp;emotional<br>
+state&nbsp;sets&nbsp;the&nbsp;momentum.&nbsp;The&nbsp;trajectory&nbsp;through&nbsp;the&nbsp;potential<br>
+landscape&nbsp;produces&nbsp;the&nbsp;sentence.<br>
+&nbsp;<br>
+Returns&nbsp;None&nbsp;if&nbsp;the&nbsp;flow&nbsp;can't&nbsp;produce&nbsp;text&nbsp;(no&nbsp;seed&nbsp;concept,<br>
+no&nbsp;edges,&nbsp;or&nbsp;the&nbsp;trajectory&nbsp;is&nbsp;too&nbsp;short).</span></dd></dl>
+
+<dl><dt><a name="FlowGenerator-set_angles_from_embedding"><strong>set_angles_from_embedding</strong></a>(self, concept_ids: 'list[str]', angle_matrix: 'np.ndarray') -&gt; 'None'</dt><dd><span class="code">Set&nbsp;angular&nbsp;positions&nbsp;from&nbsp;the&nbsp;EmbeddingStore's&nbsp;toroidal&nbsp;mapping.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;preferred&nbsp;way&nbsp;to&nbsp;set&nbsp;angles&nbsp;—&nbsp;the&nbsp;EmbeddingStore's<br>
+spectral&nbsp;+&nbsp;experiential&nbsp;embedding&nbsp;is&nbsp;higher&nbsp;quality&nbsp;than&nbsp;the<br>
+lightweight&nbsp;power-iteration&nbsp;fallback&nbsp;in&nbsp;<a href="#FlowGenerator-build">build</a>().</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['FlowGenerator']</td></tr></table>
+</body></html>

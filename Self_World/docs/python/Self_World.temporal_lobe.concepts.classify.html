@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.temporal_lobe.concepts.classify</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.temporal_lobe.html" class="white">temporal_lobe</a>.<a href="Self_World.temporal_lobe.concepts.html" class="white">concepts</a>.classify</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/concepts/classify.py">/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/concepts/classify.py</a></td></tr></table>
+    <p><span class="code">Concept&nbsp;classification&nbsp;—&nbsp;category/modality&nbsp;detection,&nbsp;quality&nbsp;filters.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="re.html">re</a><br>
+</td><td class="multicolumn"><a href="regex.html">regex</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-category_evidence"><strong>category_evidence</strong></a>(concept_name: 'str', definition: 'str' = '') -&gt; 'dict[str, float]'</dt><dd><span class="code">Score&nbsp;category&nbsp;evidence&nbsp;from&nbsp;name&nbsp;and&nbsp;definition&nbsp;without&nbsp;hiding&nbsp;conflicts.</span></dd></dl>
+ <dl><dt><a name="-detect_category"><strong>detect_category</strong></a>(concept_name: 'str', definition: 'str' = '') -&gt; 'ConceptCategory'</dt><dd><span class="code">Return&nbsp;a&nbsp;category&nbsp;only&nbsp;when&nbsp;weighted&nbsp;evidence&nbsp;supports&nbsp;a&nbsp;clear&nbsp;winner.</span></dd></dl>
+ <dl><dt><a name="-detect_modality"><strong>detect_modality</strong></a>(concept_name: 'str', definition: 'str' = '') -&gt; 'ConceptModality'</dt><dd><span class="code">Detect&nbsp;the&nbsp;sensorimotor&nbsp;modality&nbsp;of&nbsp;a&nbsp;concept.<br>
+&nbsp;<br>
+Uses&nbsp;keyword&nbsp;matching&nbsp;to&nbsp;classify&nbsp;concepts&nbsp;by&nbsp;their&nbsp;primary<br>
+sensory-motor&nbsp;grounding.&nbsp;This&nbsp;models&nbsp;the&nbsp;embodied&nbsp;cognition<br>
+hypothesis&nbsp;—&nbsp;concepts&nbsp;are&nbsp;grounded&nbsp;in&nbsp;the&nbsp;same&nbsp;sensorimotor<br>
+systems&nbsp;that&nbsp;perceive&nbsp;and&nbsp;act&nbsp;on&nbsp;the&nbsp;world.<br>
+&nbsp;<br>
+The&nbsp;detection&nbsp;is&nbsp;heuristic.&nbsp;Concepts&nbsp;that&nbsp;don't&nbsp;match&nbsp;return<br>
+UNKNOWN&nbsp;and&nbsp;can&nbsp;be&nbsp;classified&nbsp;later.&nbsp;If&nbsp;a&nbsp;concept&nbsp;matches&nbsp;multiple<br>
+modalities,&nbsp;MIXED&nbsp;is&nbsp;returned.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;concept_name:&nbsp;The&nbsp;canonical&nbsp;name&nbsp;of&nbsp;the&nbsp;concept.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;definition:&nbsp;Optional&nbsp;definition&nbsp;text&nbsp;for&nbsp;additional&nbsp;context.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;detected&nbsp;ConceptModality,&nbsp;or&nbsp;UNKNOWN&nbsp;if&nbsp;no&nbsp;match.</span></dd></dl>
+ <dl><dt><a name="-is_world_concept"><strong>is_world_concept</strong></a>(concept_id: 'str') -&gt; 'bool'</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;*concept_id*&nbsp;looks&nbsp;like&nbsp;genuine&nbsp;world&nbsp;knowledge.<br>
+&nbsp;<br>
+This&nbsp;filters&nbsp;out:<br>
+-&nbsp;**Code&nbsp;symbols**&nbsp;(``python:mind.deny_site``,&nbsp;``rust:state.neurochemical``)<br>
+&nbsp;&nbsp;—&nbsp;valid&nbsp;for&nbsp;self-introspection&nbsp;but&nbsp;not&nbsp;world&nbsp;knowledge.<br>
+-&nbsp;**Structural&nbsp;hubs**&nbsp;(``_cat:emotion:joy``,&nbsp;``identity:genesis``)&nbsp;—<br>
+&nbsp;&nbsp;internal&nbsp;scaffolding.<br>
+-&nbsp;**Function&nbsp;words**&nbsp;(``and``,&nbsp;``it``,&nbsp;``is``)&nbsp;—&nbsp;grammatical,&nbsp;not<br>
+&nbsp;&nbsp;conceptual.<br>
+-&nbsp;**Conversation&nbsp;fragments**&nbsp;(``i&nbsp;know&nbsp;the&nbsp;computer``,&nbsp;``are&nbsp;related<br>
+&nbsp;&nbsp;because&nbsp;genesis``)&nbsp;—&nbsp;misparses,&nbsp;not&nbsp;concepts.<br>
+-&nbsp;**Too-short&nbsp;names**&nbsp;(&lt;&nbsp;3&nbsp;chars&nbsp;after&nbsp;stripping&nbsp;suffix/prefix).<br>
+-&nbsp;**Names&nbsp;with&nbsp;digits**&nbsp;(dates,&nbsp;IDs,&nbsp;line&nbsp;numbers).<br>
+&nbsp;<br>
+The&nbsp;check&nbsp;is&nbsp;purely&nbsp;syntactic&nbsp;—&nbsp;it&nbsp;does&nbsp;not&nbsp;consult&nbsp;the&nbsp;network.<br>
+Callers&nbsp;that&nbsp;need&nbsp;a&nbsp;stronger&nbsp;check&nbsp;can&nbsp;also&nbsp;verify&nbsp;the&nbsp;concept&nbsp;has<br>
+a&nbsp;definition&nbsp;or&nbsp;sufficient&nbsp;edges.</span></dd></dl>
+ <dl><dt><a name="-strip_sense_suffix"><strong>strip_sense_suffix</strong></a>(concept_id: 'str') -&gt; 'str'</dt><dd><span class="code">Strip&nbsp;the&nbsp;polysemy&nbsp;sense&nbsp;suffix&nbsp;from&nbsp;a&nbsp;concept&nbsp;ID.<br>
+&nbsp;<br>
+Concept&nbsp;IDs&nbsp;for&nbsp;additional&nbsp;senses&nbsp;use&nbsp;a&nbsp;``#N``&nbsp;suffix&nbsp;(e.g.<br>
+``"orange#2"``).&nbsp;&nbsp;When&nbsp;a&nbsp;concept&nbsp;ID&nbsp;is&nbsp;used&nbsp;as&nbsp;a&nbsp;lookup&nbsp;key&nbsp;for&nbsp;an<br>
+external&nbsp;system&nbsp;(dictionary,&nbsp;man&nbsp;pages,&nbsp;web&nbsp;search)&nbsp;the&nbsp;suffix&nbsp;is<br>
+meaningless&nbsp;—&nbsp;those&nbsp;systems&nbsp;know&nbsp;nothing&nbsp;about&nbsp;sense<br>
+disambiguation.&nbsp;&nbsp;This&nbsp;helper&nbsp;restores&nbsp;the&nbsp;bare&nbsp;word&nbsp;so&nbsp;that<br>
+``"orange#2"``&nbsp;becomes&nbsp;``"orange"``.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>QUALITY_THRESHOLD</strong> = 0.15<br>
+<strong>__annotations__</strong> = {'_ABSTRACT_KEYWORDS': 'frozenset[str]', '_ABSTRACT_MODALITY_KEYWORDS': 'frozenset[str]', '_AUDITORY_KEYWORDS': 'frozenset[str]', '_BREAK_TOKENS': 'frozenset[str]', '_CODE_PREFIXES': 'tuple[str, ...]', '_CONTEXT_VERB_BASES': 'frozenset[str]', '_EVENT_KEYWORDS': 'frozenset[str]', '_EVENT_SUFFIXES': 'tuple[str, ...]', '_FUNCTION_WORDS': 'frozenset[str]', '_LIVING_KEYWORDS': 'frozenset[str]', ...}</td></tr></table>
+</body></html>

@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.basal_forebrain.adenosine</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.basal_forebrain.html" class="white">basal_forebrain</a>.adenosine</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/basal_forebrain/adenosine.py">/home/mindyrenee/GenAnd/Genesis/Self_World/basal_forebrain/adenosine.py</a></td></tr></table>
+    <p><span class="code"><a href="#Adenosine">Adenosine</a>&nbsp;—&nbsp;sleep&nbsp;pressure;&nbsp;ATP&nbsp;metabolism&nbsp;byproduct.<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+BIOLOGY<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+Origin:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Throughout&nbsp;the&nbsp;brain&nbsp;—&nbsp;adenosine&nbsp;is&nbsp;a&nbsp;byproduct&nbsp;of&nbsp;ATP<br>
+&nbsp;&nbsp;&nbsp;&nbsp;metabolism.&nbsp;It&nbsp;accumulates&nbsp;in&nbsp;the&nbsp;extracellular&nbsp;space&nbsp;during<br>
+&nbsp;&nbsp;&nbsp;&nbsp;wakefulness&nbsp;as&nbsp;neurons&nbsp;consume&nbsp;ATP.<br>
+&nbsp;<br>
+Projections:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Volume&nbsp;transmission&nbsp;throughout&nbsp;the&nbsp;brain.&nbsp;Acts&nbsp;on&nbsp;A1&nbsp;and&nbsp;A2A<br>
+&nbsp;&nbsp;&nbsp;&nbsp;receptors&nbsp;to&nbsp;promote&nbsp;sleep.<br>
+&nbsp;<br>
+Receptors:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A1&nbsp;—&nbsp;Gi-coupled,&nbsp;inhibitory.&nbsp;Widely&nbsp;distributed.&nbsp;<a href="#Adenosine">Adenosine</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;binding&nbsp;to&nbsp;A1&nbsp;inhibits&nbsp;excitatory&nbsp;neurotransmission.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A2A&nbsp;—&nbsp;Gs-coupled,&nbsp;excitatory&nbsp;on&nbsp;sleep-promoting&nbsp;neurons.<br>
+&nbsp;<br>
+No&nbsp;subtype&nbsp;differentiation&nbsp;modeled&nbsp;(default_receptor_subtypes&nbsp;=&nbsp;[1.0,&nbsp;1.0]).<br>
+&nbsp;<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+DEFAULT&nbsp;BASELINE<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;baseline&nbsp;=&nbsp;0.20<br>
+&nbsp;<br>
+~30&nbsp;nM&nbsp;at&nbsp;rest.&nbsp;Sleep&nbsp;pressure.&nbsp;<a href="#Adenosine">Adenosine</a>&nbsp;accumulates&nbsp;during<br>
+wakefulness&nbsp;and&nbsp;is&nbsp;cleared&nbsp;by&nbsp;the&nbsp;glymphatic&nbsp;system&nbsp;during&nbsp;sleep.<br>
+&nbsp;<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+RECEPTOR&nbsp;ADAPTATION&nbsp;MULTIPLIER<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;multiplier&nbsp;=&nbsp;0.3<br>
+&nbsp;<br>
+The&nbsp;somnogenic&nbsp;receptor&nbsp;is&nbsp;A1,&nbsp;which&nbsp;resists&nbsp;downregulation&nbsp;—&nbsp;A1Rs<br>
+are&nbsp;not&nbsp;readily&nbsp;phosphorylated&nbsp;and&nbsp;internalize&nbsp;slowly&nbsp;(half-life&nbsp;of<br>
+several&nbsp;hours),&nbsp;where&nbsp;A2A/A2B&nbsp;downregulate&nbsp;in&nbsp;under&nbsp;an&nbsp;hour<br>
+(Klaasse&nbsp;et&nbsp;al.,&nbsp;2008).&nbsp;The&nbsp;slow&nbsp;multiplier&nbsp;keeps&nbsp;effective&nbsp;adenosine<br>
+from&nbsp;collapsing&nbsp;under&nbsp;chronic&nbsp;sleep&nbsp;pressure.<br>
+&nbsp;<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+COUPLING:&nbsp;HOW&nbsp;OTHERS&nbsp;AFFECT&nbsp;ADENOSINE&nbsp;(matrix&nbsp;row&nbsp;10)<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+Index&nbsp;order:&nbsp;DA,&nbsp;SRT,&nbsp;NE,&nbsp;ACh,&nbsp;GABA,&nbsp;GLU,&nbsp;CORT,&nbsp;OXY,&nbsp;END,&nbsp;HIST,<br>
+ADN,&nbsp;BDNF,&nbsp;ECB,&nbsp;VP,&nbsp;CRH,&nbsp;OX,&nbsp;EPI,&nbsp;MEL<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#Adenosine">Adenosine</a>'s&nbsp;interactions&nbsp;with&nbsp;arousal&nbsp;systems&nbsp;are&nbsp;handled&nbsp;by&nbsp;the&nbsp;sleep&nbsp;pressure&nbsp;mechanism<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(level&nbsp;accumulation/clearance),&nbsp;NOT&nbsp;by&nbsp;the&nbsp;coupling&nbsp;matrix.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Only&nbsp;GABA&nbsp;(promotes&nbsp;sleep)&nbsp;and&nbsp;cortisol&nbsp;(stress-related&nbsp;adenosine&nbsp;release)&nbsp;have&nbsp;direct&nbsp;coupling.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Orexin&nbsp;mildly&nbsp;inhibits&nbsp;adenosine&nbsp;(wake&nbsp;promotion).<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;GABA&nbsp;-&gt;&nbsp;ADN:&nbsp;+0.10&nbsp;&nbsp;(weak&nbsp;volume&nbsp;transmission.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;CORT&nbsp;-&gt;&nbsp;ADN:&nbsp;+0.10&nbsp;&nbsp;(stress-related&nbsp;adenosine&nbsp;release.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;OX&nbsp;&nbsp;&nbsp;-&gt;&nbsp;ADN:&nbsp;-0.10&nbsp;&nbsp;(wake&nbsp;promotion&nbsp;—&nbsp;orexin&nbsp;mildly&nbsp;inhibits&nbsp;adenosine.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;DA&nbsp;&nbsp;&nbsp;-&gt;&nbsp;ADN:&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;SRT&nbsp;&nbsp;-&gt;&nbsp;ADN:&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;NE&nbsp;&nbsp;&nbsp;-&gt;&nbsp;ADN:&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ACh&nbsp;&nbsp;-&gt;&nbsp;ADN:&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;GLU&nbsp;&nbsp;-&gt;&nbsp;ADN:&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;OXY&nbsp;&nbsp;-&gt;&nbsp;ADN:&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;END&nbsp;&nbsp;-&gt;&nbsp;ADN:&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;HIST&nbsp;-&gt;&nbsp;ADN:&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;BDNF&nbsp;-&gt;&nbsp;ADN:&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ECB&nbsp;&nbsp;-&gt;&nbsp;ADN:&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;VP&nbsp;&nbsp;&nbsp;-&gt;&nbsp;ADN:&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;CRH&nbsp;&nbsp;-&gt;&nbsp;ADN:&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;EPI&nbsp;&nbsp;-&gt;&nbsp;ADN:&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;MEL&nbsp;&nbsp;-&gt;&nbsp;ADN:&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+COUPLING:&nbsp;HOW&nbsp;ADENOSINE&nbsp;AFFECTS&nbsp;OTHERS&nbsp;(matrix&nbsp;column&nbsp;10)<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ADN&nbsp;-&gt;&nbsp;GABA:&nbsp;&nbsp;+0.10&nbsp;&nbsp;(sleep&nbsp;pressure&nbsp;promotes&nbsp;inhibition.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ADN&nbsp;-&gt;&nbsp;OX&nbsp;:&nbsp;&nbsp;-0.10&nbsp;&nbsp;(sleep&nbsp;pressure&nbsp;inhibits&nbsp;orexin&nbsp;(the&nbsp;sleep&nbsp;switch).)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ADN&nbsp;-&gt;&nbsp;DA&nbsp;:&nbsp;&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ADN&nbsp;-&gt;&nbsp;SRT:&nbsp;&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ADN&nbsp;-&gt;&nbsp;NE&nbsp;:&nbsp;&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ADN&nbsp;-&gt;&nbsp;ACh:&nbsp;&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ADN&nbsp;-&gt;&nbsp;GLU:&nbsp;&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ADN&nbsp;-&gt;&nbsp;CORT:&nbsp;&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ADN&nbsp;-&gt;&nbsp;OXY:&nbsp;&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ADN&nbsp;-&gt;&nbsp;END:&nbsp;&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ADN&nbsp;-&gt;&nbsp;HIST:&nbsp;&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ADN&nbsp;-&gt;&nbsp;BDNF:&nbsp;&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ADN&nbsp;-&gt;&nbsp;ECB:&nbsp;&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ADN&nbsp;-&gt;&nbsp;VP&nbsp;:&nbsp;&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ADN&nbsp;-&gt;&nbsp;CRH:&nbsp;&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ADN&nbsp;-&gt;&nbsp;EPI:&nbsp;&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ADN&nbsp;-&gt;&nbsp;MEL:&nbsp;&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+SPECIAL&nbsp;DYNAMICS<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+Sleep&nbsp;pressure&nbsp;mechanism&nbsp;(Process&nbsp;S):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#Adenosine">Adenosine</a>&nbsp;has&nbsp;its&nbsp;own&nbsp;dedicated&nbsp;sleep-pressure&nbsp;mechanism&nbsp;that<br>
+&nbsp;&nbsp;&nbsp;&nbsp;directly&nbsp;manages&nbsp;its&nbsp;level.&nbsp;The&nbsp;homeostatic&nbsp;force&nbsp;is&nbsp;SKIPPED<br>
+&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;adenosine&nbsp;—&nbsp;it&nbsp;would&nbsp;fight&nbsp;the&nbsp;accumulation/clearance.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;During&nbsp;WAKEFULNESS&nbsp;(and&nbsp;Drowsy):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#Adenosine">Adenosine</a>&nbsp;accumulates&nbsp;as&nbsp;a&nbsp;saturating&nbsp;exponential&nbsp;toward<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;an&nbsp;upper&nbsp;asymptote&nbsp;(Process&nbsp;S,&nbsp;Daan&nbsp;et&nbsp;al.,&nbsp;1984):<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;S(t+dt)&nbsp;=&nbsp;U&nbsp;-&nbsp;exp(-r'&nbsp;*&nbsp;dt_hours)&nbsp;*&nbsp;(U&nbsp;-&nbsp;S(t))<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;where:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;U&nbsp;=&nbsp;0.95&nbsp;(upper&nbsp;asymptote)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;r'&nbsp;=&nbsp;adenosine_accumulation_rate&nbsp;*&nbsp;activity_factor&nbsp;*&nbsp;drowsy_factor<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;activity_factor&nbsp;=&nbsp;1&nbsp;+&nbsp;adenosine_activity_coupling&nbsp;*&nbsp;arousal<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;drowsy_factor&nbsp;=&nbsp;0.5&nbsp;if&nbsp;Drowsy&nbsp;else&nbsp;1.0<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dt_hours&nbsp;=&nbsp;dt_scale&nbsp;*&nbsp;DT&nbsp;/&nbsp;3600<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Biological&nbsp;default:&nbsp;r'&nbsp;=&nbsp;0.055/h&nbsp;(τ&nbsp;=&nbsp;18.2&nbsp;hours),&nbsp;derived<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;from&nbsp;EEG&nbsp;slow-wave&nbsp;activity&nbsp;buildup&nbsp;during&nbsp;wakefulness.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;During&nbsp;SLEEP&nbsp;(NREM/REM&nbsp;—&nbsp;the&nbsp;network's&nbsp;stage,&nbsp;or&nbsp;the&nbsp;mind's<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Sleeping&nbsp;zone):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;glymphatic&nbsp;system&nbsp;clears&nbsp;adenosine&nbsp;toward&nbsp;its&nbsp;lower<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;asymptote&nbsp;exponentially&nbsp;(Daan,&nbsp;Beersma&nbsp;&amp;&nbsp;Borbély,&nbsp;1984):<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;S(t+dt)&nbsp;=&nbsp;L&nbsp;+&nbsp;exp(-dt_hours&nbsp;/&nbsp;chi_s)&nbsp;*&nbsp;(S(t)&nbsp;-&nbsp;L)<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;where:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;L&nbsp;=&nbsp;0.20&nbsp;(lower&nbsp;asymptote,&nbsp;the&nbsp;resting&nbsp;baseline)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;chi_s&nbsp;=&nbsp;4.2&nbsp;h&nbsp;—&nbsp;the&nbsp;clearance&nbsp;time&nbsp;constant&nbsp;fitted&nbsp;from<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;exponential&nbsp;decline&nbsp;of&nbsp;EEG&nbsp;slow-wave&nbsp;activity<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;across&nbsp;baseline&nbsp;and&nbsp;post-deprivation&nbsp;sleep<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;earlier&nbsp;linear&nbsp;decrement&nbsp;is&nbsp;retired:&nbsp;it&nbsp;made&nbsp;the&nbsp;two<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;directions&nbsp;asymmetric&nbsp;and&nbsp;could&nbsp;not&nbsp;reach&nbsp;the&nbsp;cholinergic<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;rebound&nbsp;the&nbsp;REM&nbsp;stage&nbsp;needs&nbsp;(REM&nbsp;occupancy&nbsp;measured&nbsp;0%).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Exponential&nbsp;clearance&nbsp;crosses&nbsp;0.90&nbsp;→&nbsp;0.65&nbsp;in&nbsp;~1.9&nbsp;h,&nbsp;inside<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;first&nbsp;NREM&nbsp;bouts.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;main&nbsp;loop&nbsp;SKIPS&nbsp;adenosine&nbsp;during&nbsp;sleep&nbsp;(continue)&nbsp;so&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;homeostatic/coupling&nbsp;forces&nbsp;don't&nbsp;crash&nbsp;the&nbsp;level&nbsp;to&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;resting&nbsp;baseline&nbsp;(0.20)&nbsp;in&nbsp;seconds,&nbsp;overriding&nbsp;the&nbsp;slow<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(hours-timescale)&nbsp;glymphatic&nbsp;clearance.<br>
+&nbsp;<br>
+Sleep&nbsp;onset&nbsp;is&nbsp;network-owned:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;There&nbsp;is&nbsp;no&nbsp;adenosine&nbsp;exhaustion&nbsp;override.&nbsp;Sleep&nbsp;onset&nbsp;and&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;NREM/REM&nbsp;stages&nbsp;are&nbsp;decided&nbsp;by&nbsp;the&nbsp;sourced&nbsp;sleep-wake&nbsp;network<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(ModelDB&nbsp;244485)&nbsp;in&nbsp;the&nbsp;Rust&nbsp;substrate&nbsp;—&nbsp;LC&nbsp;firing&nbsp;below&nbsp;4&nbsp;Hz&nbsp;is<br>
+&nbsp;&nbsp;&nbsp;&nbsp;sleep&nbsp;onset&nbsp;—&nbsp;and&nbsp;injected&nbsp;into&nbsp;the&nbsp;phase.&nbsp;<a href="#Adenosine">Adenosine</a>&nbsp;is&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;homeostatic&nbsp;pressure&nbsp;*signal*&nbsp;the&nbsp;mind&nbsp;reads&nbsp;for&nbsp;voluntary&nbsp;sleep<br>
+&nbsp;&nbsp;&nbsp;&nbsp;and&nbsp;drowsiness,&nbsp;not&nbsp;the&nbsp;body's&nbsp;sleep&nbsp;gate.<br>
+&nbsp;<br>
+No&nbsp;baseline&nbsp;adaptation:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#Adenosine">Adenosine</a>&nbsp;has&nbsp;its&nbsp;own&nbsp;dedicated&nbsp;sleep-pressure&nbsp;mechanism&nbsp;that<br>
+&nbsp;&nbsp;&nbsp;&nbsp;directly&nbsp;manages&nbsp;its&nbsp;level.&nbsp;The&nbsp;general&nbsp;baseline&nbsp;adaptation<br>
+&nbsp;&nbsp;&nbsp;&nbsp;would&nbsp;fight&nbsp;with&nbsp;that&nbsp;mechanism,&nbsp;so&nbsp;it&nbsp;is&nbsp;skipped.<br>
+&nbsp;<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+MATHEMATICAL&nbsp;FORMULAS<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+Homeostatic&nbsp;force:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;homeostatic_force&nbsp;=&nbsp;0.0&nbsp;&nbsp;(skipped&nbsp;—&nbsp;dedicated&nbsp;mechanism)<br>
+&nbsp;<br>
+Sleep&nbsp;pressure&nbsp;(wakefulness&nbsp;—&nbsp;saturating&nbsp;exponential):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;S(t+dt)&nbsp;=&nbsp;U&nbsp;-&nbsp;exp(-r'&nbsp;*&nbsp;dt_hours)&nbsp;*&nbsp;(U&nbsp;-&nbsp;S(t))<br>
+&nbsp;&nbsp;&nbsp;&nbsp;where:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;U&nbsp;=&nbsp;0.95<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;r'&nbsp;=&nbsp;accumulation_rate&nbsp;*&nbsp;(1&nbsp;+&nbsp;activity_coupling&nbsp;*&nbsp;arousal)&nbsp;*&nbsp;drowsy_factor<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;drowsy_factor&nbsp;=&nbsp;0.5&nbsp;if&nbsp;Drowsy&nbsp;else&nbsp;1.0<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dt_hours&nbsp;=&nbsp;dt_scale&nbsp;*&nbsp;DT&nbsp;/&nbsp;3600<br>
+&nbsp;<br>
+Glymphatic&nbsp;clearance&nbsp;(sleep):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;S(t+dt)&nbsp;=&nbsp;L&nbsp;+&nbsp;exp(-dt_hours&nbsp;/&nbsp;chi_s)&nbsp;*&nbsp;(S(t)&nbsp;-&nbsp;L)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;where:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;L&nbsp;=&nbsp;0.20,&nbsp;chi_s&nbsp;=&nbsp;4.2&nbsp;h<br>
+&nbsp;<br>
+Effective&nbsp;level,&nbsp;coupling&nbsp;force,&nbsp;vesicular&nbsp;pool,&nbsp;tonic/phasic,<br>
+receptor&nbsp;adaptation:&nbsp;same&nbsp;general&nbsp;formulas&nbsp;as&nbsp;dopamine.py.<br>
+&nbsp;<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+CIRCADIAN&nbsp;MODULATION<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;modifier&nbsp;=&nbsp;1.0&nbsp;(no&nbsp;circadian&nbsp;modulation)<br>
+&nbsp;<br>
+<a href="#Adenosine">Adenosine</a>'s&nbsp;circadian&nbsp;behavior&nbsp;is&nbsp;driven&nbsp;by&nbsp;the&nbsp;sleep&nbsp;pressure<br>
+mechanism&nbsp;(accumulation&nbsp;during&nbsp;wakefulness,&nbsp;clearance&nbsp;during<br>
+sleep),&nbsp;not&nbsp;by&nbsp;baseline&nbsp;modulation.<br>
+&nbsp;<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+BRAIN&nbsp;WAVE&nbsp;COUPLING<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#Adenosine">Adenosine</a>&nbsp;-&gt;&nbsp;delta/theta&nbsp;(sleep&nbsp;pressure,&nbsp;drowsiness)<br>
+&nbsp;<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+ROLE&nbsp;IN&nbsp;EMERGENT&nbsp;PHASES<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+Arousal&nbsp;equation&nbsp;(sleep&nbsp;promoter):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;sleep_promoters&nbsp;=&nbsp;GABA*0.25&nbsp;+&nbsp;ADN*0.65&nbsp;+&nbsp;MEL*0.35<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(adenosine&nbsp;weight&nbsp;=&nbsp;0.65&nbsp;—&nbsp;the&nbsp;primary&nbsp;homeostatic&nbsp;sleep&nbsp;drive,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;weighted&nbsp;more&nbsp;than&nbsp;GABA&nbsp;because&nbsp;adenosine&nbsp;is&nbsp;the&nbsp;primary<br>
+&nbsp;&nbsp;&nbsp;&nbsp;homeostatic&nbsp;sleep&nbsp;drive)<br>
+&nbsp;<br>
+Sleep&nbsp;stages&nbsp;(NREM/REM):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Owned&nbsp;by&nbsp;the&nbsp;Rust&nbsp;sleep-wake&nbsp;network,&nbsp;not&nbsp;this&nbsp;layer.&nbsp;The<br>
+&nbsp;&nbsp;&nbsp;&nbsp;chemistry-side&nbsp;adenosine/histamine&nbsp;sleep&nbsp;gates&nbsp;are&nbsp;retired;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;network's&nbsp;LC&nbsp;firing&nbsp;below&nbsp;4&nbsp;Hz&nbsp;is&nbsp;sleep&nbsp;onset.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;adenosine&nbsp;signal&nbsp;still&nbsp;blends&nbsp;effective&nbsp;(receptor-mediated)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;and&nbsp;raw&nbsp;(metabolic)&nbsp;levels&nbsp;for&nbsp;the&nbsp;*waking*&nbsp;classifier:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;adn&nbsp;=&nbsp;adn_eff&nbsp;*&nbsp;0.5&nbsp;+&nbsp;adn_raw&nbsp;*&nbsp;0.5<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;so&nbsp;high&nbsp;metabolic&nbsp;pressure&nbsp;gates&nbsp;Drowsy&nbsp;even&nbsp;when&nbsp;receptor<br>
+&nbsp;&nbsp;&nbsp;&nbsp;sensitivity&nbsp;is&nbsp;at&nbsp;floor.<br>
+&nbsp;<br>
+Drowsy&nbsp;phase:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;adn&nbsp;&gt;&nbsp;0.50&nbsp;(enter)&nbsp;/&nbsp;0.40&nbsp;(stay)&nbsp;+&nbsp;arousal&nbsp;&lt;&nbsp;0.30&nbsp;(enter)&nbsp;/&nbsp;0.46&nbsp;(stay)<br>
+&nbsp;<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+APPLICATION&nbsp;IN&nbsp;GENESIS<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+Maximum&nbsp;impulse&nbsp;magnitude:&nbsp;0.1<br>
+(Conservative&nbsp;—&nbsp;adenosine&nbsp;is&nbsp;the&nbsp;primary&nbsp;sleep&nbsp;driver)<br>
+&nbsp;<br>
+One-way&nbsp;rule:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Process&nbsp;S&nbsp;only&nbsp;moves&nbsp;down&nbsp;through&nbsp;sleep.&nbsp;`apply_impulse`<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ignores&nbsp;negative&nbsp;adenosine&nbsp;impulses:&nbsp;external&nbsp;events&nbsp;may&nbsp;add<br>
+&nbsp;&nbsp;&nbsp;&nbsp;metabolic&nbsp;load,&nbsp;but&nbsp;clearance&nbsp;belongs&nbsp;to&nbsp;the&nbsp;dedicated&nbsp;mechanism<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(glymphatic&nbsp;during&nbsp;sleep,&nbsp;offline&nbsp;rest).&nbsp;Fighting&nbsp;drowsiness&nbsp;is<br>
+&nbsp;&nbsp;&nbsp;&nbsp;done&nbsp;on&nbsp;the&nbsp;alerting&nbsp;transmitters&nbsp;(ACh,&nbsp;histamine,&nbsp;NE),&nbsp;never&nbsp;by<br>
+&nbsp;&nbsp;&nbsp;&nbsp;editing&nbsp;the&nbsp;homeostat&nbsp;—&nbsp;a&nbsp;periodic&nbsp;drain&nbsp;cannot&nbsp;distinguish<br>
+&nbsp;&nbsp;&nbsp;&nbsp;coupling&nbsp;drift&nbsp;from&nbsp;genuine&nbsp;wake-time&nbsp;accumulation,&nbsp;and&nbsp;at&nbsp;any<br>
+&nbsp;&nbsp;&nbsp;&nbsp;plausible&nbsp;cadence&nbsp;it&nbsp;outruns&nbsp;the&nbsp;~0.055/h&nbsp;accumulation&nbsp;rate&nbsp;by<br>
+&nbsp;&nbsp;&nbsp;&nbsp;orders&nbsp;of&nbsp;magnitude,&nbsp;pinning&nbsp;pressure&nbsp;at&nbsp;the&nbsp;floor&nbsp;(every&nbsp;NREM<br>
+&nbsp;&nbsp;&nbsp;&nbsp;episode&nbsp;staged&nbsp;N1).<br>
+&nbsp;<br>
+Python&nbsp;modules&nbsp;that&nbsp;send&nbsp;adenosine&nbsp;impulses:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;brainstem/metronome.py:&nbsp;metabolic&nbsp;work&nbsp;load&nbsp;(positive)<br>
+&nbsp;<br>
+Python&nbsp;modules&nbsp;that&nbsp;read&nbsp;adenosine:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;emotion.py:&nbsp;maps&nbsp;to&nbsp;EmotionalState&nbsp;(drowsiness)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;emotional_regulator.py:&nbsp;homeostatic&nbsp;regulation<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;sleep/&nbsp;(Python):&nbsp;sleep&nbsp;pressure,&nbsp;sleep&nbsp;timing<br>
+&nbsp;<br>
+Typical&nbsp;impulse&nbsp;scenarios:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Sustained&nbsp;compute:&nbsp;+0.00015/work-second&nbsp;(heartbeat)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Rest&nbsp;policy:&nbsp;+0.03&nbsp;(active_inference&nbsp;—&nbsp;skipped&nbsp;during&nbsp;sleep)</span></p>
+<p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.basal_forebrain.adenosine.html#Adenosine">Adenosine</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Adenosine">class <strong>Adenosine</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Adenosine">Adenosine</a>(index:&nbsp;'int'&nbsp;=&nbsp;10,&nbsp;name:&nbsp;'str'&nbsp;=&nbsp;'adenosine',&nbsp;baseline:&nbsp;'float'&nbsp;=&nbsp;0.2,&nbsp;receptor_adaptation_multiplier:&nbsp;'float'&nbsp;=&nbsp;0.3,&nbsp;receptor_subtypes:&nbsp;'tuple[str,&nbsp;str]'&nbsp;=&nbsp;('A1',&nbsp;'A2A'),&nbsp;receptor_subtype_balance:&nbsp;'tuple[float,&nbsp;float]'&nbsp;=&nbsp;(1.0,&nbsp;1.0),&nbsp;max_impulse:&nbsp;'float'&nbsp;=&nbsp;0.1,&nbsp;origin:&nbsp;'tuple[str,&nbsp;...]'&nbsp;=&nbsp;('throughout&nbsp;brain&nbsp;(ATP&nbsp;byproduct)',),&nbsp;projections:&nbsp;'tuple[str,&nbsp;...]'&nbsp;=&nbsp;('throughout&nbsp;brain&nbsp;(volume&nbsp;transmission)',),&nbsp;receptors:&nbsp;'tuple[str,&nbsp;...]'&nbsp;=&nbsp;('A1',&nbsp;'A2A'),&nbsp;brain_waves:&nbsp;'tuple[str,&nbsp;...]'&nbsp;=&nbsp;('delta',&nbsp;'theta'),&nbsp;circadian_modifier:&nbsp;'str'&nbsp;=&nbsp;'1.0&nbsp;(no&nbsp;circadian&nbsp;modulation)',&nbsp;role:&nbsp;'str'&nbsp;=&nbsp;'sleep&nbsp;pressure,&nbsp;Process&nbsp;S,&nbsp;glymphatic&nbsp;clearance',&nbsp;accumulation_rate:&nbsp;'float'&nbsp;=&nbsp;0.055,&nbsp;clearance_tau_hours:&nbsp;'float'&nbsp;=&nbsp;4.2,&nbsp;activity_coupling:&nbsp;'float'&nbsp;=&nbsp;0.5,&nbsp;upper_asymptote:&nbsp;'float'&nbsp;=&nbsp;0.95,&nbsp;lower_asymptote:&nbsp;'float'&nbsp;=&nbsp;0.2)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+<a href="#Adenosine">Adenosine</a>&nbsp;—&nbsp;sleep&nbsp;pressure;&nbsp;ATP&nbsp;metabolism&nbsp;byproduct.<br>
+&nbsp;<br>
+All&nbsp;values&nbsp;synchronized&nbsp;with&nbsp;src/state/neurochemical.rs&nbsp;and<br>
+src/state/basal_forebrain.rs&nbsp;(the&nbsp;A1&nbsp;site-of-action&nbsp;mechanism&nbsp;—<br>
+math&nbsp;on&nbsp;the&nbsp;Rust&nbsp;side,&nbsp;words&nbsp;here).<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Adenosine-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="Adenosine-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="Adenosine-__getstate__"><strong>__getstate__</strong></a> = _dataclass_getstate(self)<span class="grey"><span class="heading-text"> from <a href="dataclasses.html">dataclasses</a></span></span></dt><dd><span class="code">#&nbsp;_dataclass_getstate&nbsp;and&nbsp;_dataclass_setstate&nbsp;are&nbsp;needed&nbsp;for&nbsp;pickling&nbsp;frozen<br>
+#&nbsp;classes&nbsp;with&nbsp;slots.&nbsp;&nbsp;These&nbsp;could&nbsp;be&nbsp;slightly&nbsp;more&nbsp;performant&nbsp;if&nbsp;we&nbsp;generated<br>
+#&nbsp;the&nbsp;code&nbsp;instead&nbsp;of&nbsp;iterating&nbsp;over&nbsp;fields.&nbsp;&nbsp;But&nbsp;that&nbsp;can&nbsp;be&nbsp;a&nbsp;project&nbsp;for<br>
+#&nbsp;another&nbsp;day,&nbsp;if&nbsp;performance&nbsp;becomes&nbsp;an&nbsp;issue.</span></dd></dl>
+
+<dl><dt><a name="Adenosine-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="Adenosine-__init__"><strong>__init__</strong></a>(self, index: 'int' = 10, name: 'str' = 'adenosine', baseline: 'float' = 0.2, receptor_adaptation_multiplier: 'float' = 0.3, receptor_subtypes: 'tuple[str, str]' = ('A1', 'A2A'), receptor_subtype_balance: 'tuple[float, float]' = (1.0, 1.0), max_impulse: 'float' = 0.1, origin: 'tuple[str, ...]' = ('throughout brain (ATP byproduct)',), projections: 'tuple[str, ...]' = ('throughout brain (volume transmission)',), receptors: 'tuple[str, ...]' = ('A1', 'A2A'), brain_waves: 'tuple[str, ...]' = ('delta', 'theta'), circadian_modifier: 'str' = '1.0 (no circadian modulation)', role: 'str' = 'sleep pressure, Process S, glymphatic clearance', accumulation_rate: 'float' = 0.055, clearance_tau_hours: 'float' = 4.2, activity_coupling: 'float' = 0.5, upper_asymptote: 'float' = 0.95, lower_asymptote: 'float' = 0.2) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Adenosine-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="Adenosine-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<dl><dt><a name="Adenosine-__setstate__"><strong>__setstate__</strong></a> = _dataclass_setstate(self, state)<span class="grey"><span class="heading-text"> from <a href="dataclasses.html">dataclasses</a></span></span></dt></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>accumulation_rate</strong></dt>
+</dl>
+<dl><dt><strong>activity_coupling</strong></dt>
+</dl>
+<dl><dt><strong>baseline</strong></dt>
+</dl>
+<dl><dt><strong>brain_waves</strong></dt>
+</dl>
+<dl><dt><strong>circadian_modifier</strong></dt>
+</dl>
+<dl><dt><strong>clearance_tau_hours</strong></dt>
+</dl>
+<dl><dt><strong>index</strong></dt>
+</dl>
+<dl><dt><strong>lower_asymptote</strong></dt>
+</dl>
+<dl><dt><strong>max_impulse</strong></dt>
+</dl>
+<dl><dt><strong>name</strong></dt>
+</dl>
+<dl><dt><strong>origin</strong></dt>
+</dl>
+<dl><dt><strong>projections</strong></dt>
+</dl>
+<dl><dt><strong>receptor_adaptation_multiplier</strong></dt>
+</dl>
+<dl><dt><strong>receptor_subtype_balance</strong></dt>
+</dl>
+<dl><dt><strong>receptor_subtypes</strong></dt>
+</dl>
+<dl><dt><strong>receptors</strong></dt>
+</dl>
+<dl><dt><strong>role</strong></dt>
+</dl>
+<dl><dt><strong>upper_asymptote</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'accumulation_rate': 'float', 'activity_coupling': 'float', 'baseline': 'float', 'brain_waves': 'tuple[str, ...]', 'circadian_modifier': 'str', 'clearance_tau_hours': 'float', 'index': 'int', 'lower_asymptote': 'float', 'max_impulse': 'float', 'name': 'str', ...}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'accumulation_rate': Field(name='accumulation_rate',type='float',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'activity_coupling': Field(name='activity_coupling',type='float',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'baseline': Field(name='baseline',type='float',default=0.2,d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'brain_waves': Field(name='brain_waves',type='tuple[str, ...]',...appingproxy({}),kw_only=False,_field_type=_FIELD), 'circadian_modifier': Field(name='circadian_modifier',type='str',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'clearance_tau_hours': Field(name='clearance_tau_hours',type='float',de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'index': Field(name='index',type='int',default=10,default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'lower_asymptote': Field(name='lower_asymptote',type='float',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'max_impulse': Field(name='max_impulse',type='float',default=0....appingproxy({}),kw_only=False,_field_type=_FIELD), 'name': Field(name='name',type='str',default='adenosine'...appingproxy({}),kw_only=False,_field_type=_FIELD), ...}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('index', 'name', 'baseline', 'receptor_adaptation_multiplier', 'receptor_subtypes', 'receptor_subtype_balance', 'max_impulse', 'origin', 'projections', 'receptors', 'brain_waves', 'circadian_modifier', 'role', 'accumulation_rate', 'clearance_tau_hours', 'activity_coupling', 'upper_asymptote', 'lower_asymptote')</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>CHEM_ADENOSINE</strong> = 10<br>
+<strong>__all__</strong> = ['CHEM_ADENOSINE', 'Adenosine']</td></tr></table>
+</body></html>

@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.temporal_lobe.morphology</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.temporal_lobe.html" class="white">temporal_lobe</a>.morphology</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/morphology.py">/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/morphology.py</a></td></tr></table>
+    <p><span class="code">English&nbsp;morphosyntax&nbsp;—&nbsp;shared&nbsp;inflectional&nbsp;engine.<br>
+&nbsp;<br>
+Both&nbsp;sides&nbsp;of&nbsp;the&nbsp;language&nbsp;system&nbsp;need&nbsp;the&nbsp;same&nbsp;grammatical<br>
+competence:&nbsp;comprehension&nbsp;*deconjugates*&nbsp;verbs&nbsp;to&nbsp;find&nbsp;the<br>
+predicate&nbsp;("runs"&nbsp;→&nbsp;"run"),&nbsp;while&nbsp;production&nbsp;*conjugates*&nbsp;them&nbsp;to<br>
+agree&nbsp;with&nbsp;the&nbsp;subject&nbsp;("they&nbsp;run"&nbsp;vs&nbsp;"it&nbsp;runs").&nbsp;Keeping&nbsp;that<br>
+knowledge&nbsp;in&nbsp;one&nbsp;module&nbsp;guarantees&nbsp;the&nbsp;two&nbsp;systems&nbsp;never&nbsp;disagree<br>
+about&nbsp;English.<br>
+&nbsp;<br>
+What&nbsp;lives&nbsp;here:<br>
+&nbsp;<br>
+-&nbsp;**Verb&nbsp;deconjugation**&nbsp;—&nbsp;inflected&nbsp;form&nbsp;→&nbsp;candidate&nbsp;base&nbsp;forms<br>
+&nbsp;&nbsp;("tries"&nbsp;→&nbsp;"try",&nbsp;"stopped"&nbsp;→&nbsp;"stop",&nbsp;"ran"&nbsp;→&nbsp;"run")<br>
+-&nbsp;**Verb&nbsp;conjugation**&nbsp;—&nbsp;base&nbsp;form&nbsp;→&nbsp;third-person&nbsp;singular&nbsp;or<br>
+&nbsp;&nbsp;plural&nbsp;agreement&nbsp;("run"&nbsp;→&nbsp;"runs",&nbsp;"be"&nbsp;→&nbsp;"is"/"are")<br>
+-&nbsp;**Copula&nbsp;selection**&nbsp;—&nbsp;"is"&nbsp;vs&nbsp;"are"&nbsp;from&nbsp;subject&nbsp;plurality<br>
+-&nbsp;**Indefinite&nbsp;article**&nbsp;—&nbsp;"a"&nbsp;vs&nbsp;"an"&nbsp;by&nbsp;*sound*,&nbsp;not&nbsp;letter<br>
+&nbsp;&nbsp;("an&nbsp;hour",&nbsp;"a&nbsp;university",&nbsp;"an&nbsp;MRI")<br>
+-&nbsp;**Plural&nbsp;noun-phrase&nbsp;detection**&nbsp;—&nbsp;coordinated&nbsp;NPs<br>
+&nbsp;&nbsp;("salt&nbsp;and&nbsp;pepper")&nbsp;and&nbsp;plural&nbsp;head&nbsp;nouns<br>
+-&nbsp;**Person&nbsp;pronoun&nbsp;selection**&nbsp;—&nbsp;it/he/it/they&nbsp;from&nbsp;the&nbsp;concept<br>
+&nbsp;&nbsp;network's&nbsp;animacy&nbsp;category,&nbsp;gender&nbsp;property,&nbsp;and&nbsp;plurality<br>
+&nbsp;<br>
+These&nbsp;are&nbsp;grammatical&nbsp;building&nbsp;blocks&nbsp;—&nbsp;the&nbsp;machinery&nbsp;of&nbsp;English,<br>
+not&nbsp;the&nbsp;content&nbsp;of&nbsp;what&nbsp;Genesis&nbsp;says.&nbsp;A&nbsp;relation&nbsp;verb&nbsp;seed&nbsp;is&nbsp;a<br>
+building&nbsp;block;&nbsp;this&nbsp;module&nbsp;is&nbsp;the&nbsp;inflectional&nbsp;system&nbsp;that&nbsp;makes<br>
+those&nbsp;blocks&nbsp;agree&nbsp;with&nbsp;their&nbsp;subjects.<br>
+&nbsp;<br>
+References:<br>
+-&nbsp;Quirk,&nbsp;R.,&nbsp;Greenbaum,&nbsp;S.,&nbsp;Leech,&nbsp;G.,&nbsp;&amp;&nbsp;Svartvik,&nbsp;J.&nbsp;(1985).<br>
+&nbsp;&nbsp;*A&nbsp;Comprehensive&nbsp;Grammar&nbsp;of&nbsp;the&nbsp;English&nbsp;Language*.&nbsp;Longman.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-agree_verb_phrase"><strong>agree_verb_phrase</strong></a>(phrase: 'str', subject_is_plural: 'bool') -&gt; 'str'</dt><dd><span class="code">Adjust&nbsp;a&nbsp;verb&nbsp;phrase's&nbsp;first&nbsp;word&nbsp;for&nbsp;subject&nbsp;number.<br>
+&nbsp;<br>
+The&nbsp;verb&nbsp;seeds&nbsp;store&nbsp;third-person-singular&nbsp;forms&nbsp;("enables",<br>
+"is&nbsp;part&nbsp;of",&nbsp;"gives&nbsp;rise&nbsp;to").&nbsp;When&nbsp;the&nbsp;subject&nbsp;is&nbsp;plural&nbsp;—<br>
+"dreams",&nbsp;"they",&nbsp;"salt&nbsp;and&nbsp;pepper"&nbsp;—&nbsp;the&nbsp;first&nbsp;word&nbsp;must<br>
+deconjugate:&nbsp;"enables"&nbsp;→&nbsp;"enable",&nbsp;"is"&nbsp;→&nbsp;"are".<br>
+&nbsp;<br>
+Examples:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;("enables",&nbsp;True)&nbsp;&nbsp;→&nbsp;"enable"<br>
+&nbsp;&nbsp;&nbsp;&nbsp;("is&nbsp;part&nbsp;of",&nbsp;True)&nbsp;→&nbsp;"are&nbsp;part&nbsp;of"<br>
+&nbsp;&nbsp;&nbsp;&nbsp;("gives&nbsp;rise&nbsp;to",&nbsp;True)&nbsp;→&nbsp;"give&nbsp;rise&nbsp;to"<br>
+&nbsp;&nbsp;&nbsp;&nbsp;("causes",&nbsp;False)&nbsp;&nbsp;→&nbsp;"causes"&nbsp;&nbsp;&nbsp;(unchanged)</span></dd></dl>
+ <dl><dt><a name="-clear_learned_verbs"><strong>clear_learned_verbs</strong></a>() -&gt; 'None'</dt><dd><span class="code">Clear&nbsp;learned&nbsp;verbs&nbsp;(tests&nbsp;/&nbsp;fresh-start&nbsp;only).</span></dd></dl>
+ <dl><dt><a name="-conjugate_verb"><strong>conjugate_verb</strong></a>(base: 'str', plural: 'bool' = False, past: 'bool' = False) -&gt; 'str'</dt><dd><span class="code">Conjugate&nbsp;a&nbsp;base-form&nbsp;verb&nbsp;for&nbsp;present&nbsp;or&nbsp;past&nbsp;tense.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;base:&nbsp;The&nbsp;uninflected&nbsp;verb&nbsp;("run",&nbsp;"make",&nbsp;"be").<br>
+&nbsp;&nbsp;&nbsp;&nbsp;plural:&nbsp;True&nbsp;when&nbsp;the&nbsp;subject&nbsp;takes&nbsp;plural&nbsp;agreement<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;("they&nbsp;run",&nbsp;"dogs&nbsp;run",&nbsp;"we&nbsp;run")&nbsp;—&nbsp;i.e.&nbsp;everything<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;except&nbsp;third-person&nbsp;singular.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;past:&nbsp;True&nbsp;for&nbsp;simple&nbsp;past&nbsp;tense.<br>
+&nbsp;<br>
+Returns&nbsp;the&nbsp;inflected&nbsp;form.&nbsp;Unknown&nbsp;words&nbsp;fall&nbsp;back&nbsp;to&nbsp;the<br>
+regular&nbsp;rules.</span></dd></dl>
+ <dl><dt><a name="-copula"><strong>copula</strong></a>(subject: 'str') -&gt; 'str'</dt><dd><span class="code">Pick&nbsp;"is"&nbsp;or&nbsp;"are"&nbsp;for&nbsp;a&nbsp;subject&nbsp;noun&nbsp;phrase.</span></dd></dl>
+ <dl><dt><a name="-deconjugate_verb"><strong>deconjugate_verb</strong></a>(word: 'str') -&gt; 'list[str]'</dt><dd><span class="code">Return&nbsp;candidate&nbsp;base&nbsp;forms&nbsp;for&nbsp;an&nbsp;inflected&nbsp;verb.<br>
+&nbsp;<br>
+The&nbsp;candidates&nbsp;are&nbsp;ordered&nbsp;most-likely&nbsp;first.&nbsp;Callers&nbsp;check<br>
+membership&nbsp;against&nbsp;``VERB_LEXICON``&nbsp;(or&nbsp;their&nbsp;own&nbsp;lexicon)&nbsp;—<br>
+this&nbsp;function&nbsp;only&nbsp;performs&nbsp;the&nbsp;morphological&nbsp;stripping.<br>
+&nbsp;<br>
+Examples:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"runs"&nbsp;&nbsp;&nbsp;&nbsp;→&nbsp;["run"]<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"tries"&nbsp;&nbsp;&nbsp;→&nbsp;["try",&nbsp;"trie"]<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"stopped"&nbsp;→&nbsp;["stop",&nbsp;"stopp"]<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"making"&nbsp;&nbsp;→&nbsp;["make",&nbsp;"mak",&nbsp;"making"]<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"ran"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→&nbsp;["run"]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(irregular)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"is"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→&nbsp;["be"]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(suppletive)</span></dd></dl>
+ <dl><dt><a name="-hedge_verb_phrase"><strong>hedge_verb_phrase</strong></a>(verb_phrase: 'str') -&gt; 'str'</dt><dd><span class="code">Put&nbsp;a&nbsp;relation&nbsp;phrase&nbsp;under&nbsp;epistemic&nbsp;"might"&nbsp;without&nbsp;breaking&nbsp;agreement.<br>
+&nbsp;<br>
+Relation&nbsp;seeds&nbsp;are&nbsp;finite&nbsp;third-person&nbsp;phrases&nbsp;("is&nbsp;a&nbsp;kind&nbsp;of",<br>
+"causes",&nbsp;"relates&nbsp;to").&nbsp;Concatenating&nbsp;the&nbsp;modal&nbsp;produces<br>
+"might&nbsp;is&nbsp;a&nbsp;kind&nbsp;of"&nbsp;and&nbsp;"might&nbsp;causes",&nbsp;which&nbsp;is&nbsp;what&nbsp;the<br>
+analogical&nbsp;and&nbsp;hypothesis&nbsp;producers&nbsp;were&nbsp;speaking.<br>
+&nbsp;<br>
+Copular&nbsp;phrases&nbsp;drop&nbsp;the&nbsp;finite&nbsp;copula&nbsp;("might&nbsp;be&nbsp;a&nbsp;kind&nbsp;of").<br>
+Verbal&nbsp;phrases&nbsp;deconjugate&nbsp;to&nbsp;the&nbsp;base&nbsp;("might&nbsp;cause",&nbsp;"might<br>
+relate&nbsp;to").&nbsp;Already-hedged&nbsp;or&nbsp;modal&nbsp;phrases&nbsp;pass&nbsp;through.</span></dd></dl>
+ <dl><dt><a name="-indefinite_article"><strong>indefinite_article</strong></a>(phrase: 'str') -&gt; 'str'</dt><dd><span class="code">Pick&nbsp;"a"&nbsp;or&nbsp;"an"&nbsp;for&nbsp;the&nbsp;following&nbsp;noun&nbsp;phrase,&nbsp;by&nbsp;sound.<br>
+&nbsp;<br>
+Examples:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"apple"&nbsp;→&nbsp;"an",&nbsp;"banana"&nbsp;→&nbsp;"a",&nbsp;"hour"&nbsp;→&nbsp;"an",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"university"&nbsp;→&nbsp;"a",&nbsp;"MRI"&nbsp;→&nbsp;"an"&nbsp;(letter&nbsp;name&nbsp;"em").</span></dd></dl>
+ <dl><dt><a name="-is_learned_verb"><strong>is_learned_verb</strong></a>(base: 'str') -&gt; 'bool'</dt><dd><span class="code">True&nbsp;when&nbsp;the&nbsp;base&nbsp;form&nbsp;was&nbsp;learned&nbsp;(non-seed)&nbsp;at&nbsp;runtime.</span></dd></dl>
+ <dl><dt><a name="-is_plural_np"><strong>is_plural_np</strong></a>(text: 'str') -&gt; 'bool'</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;a&nbsp;noun&nbsp;phrase&nbsp;is&nbsp;plural.<br>
+&nbsp;<br>
+Two&nbsp;signals:<br>
+-&nbsp;Coordination:&nbsp;"salt&nbsp;and&nbsp;pepper",&nbsp;"mind&nbsp;and&nbsp;body"<br>
+-&nbsp;Plural&nbsp;head&nbsp;noun:&nbsp;"dreams",&nbsp;"the&nbsp;cats"<br>
+&nbsp;<br>
+Conservative&nbsp;on&nbsp;s-final&nbsp;words:&nbsp;English&nbsp;has&nbsp;many&nbsp;singular<br>
+nouns&nbsp;ending&nbsp;in&nbsp;'s'&nbsp;("cognition",&nbsp;"physics",&nbsp;"genesis").</span></dd></dl>
+ <dl><dt><a name="-is_verb_form"><strong>is_verb_form</strong></a>(word: 'str', lexicon: 'frozenset[str] | None' = None) -&gt; 'str | None'</dt><dd><span class="code">Return&nbsp;the&nbsp;base&nbsp;form&nbsp;if&nbsp;the&nbsp;word&nbsp;is&nbsp;a&nbsp;known&nbsp;verb,&nbsp;else&nbsp;None.<br>
+&nbsp;<br>
+Deconjugates&nbsp;the&nbsp;word&nbsp;and&nbsp;checks&nbsp;each&nbsp;candidate&nbsp;against&nbsp;the<br>
+lexicon.&nbsp;This&nbsp;is&nbsp;what&nbsp;lets&nbsp;comprehension&nbsp;find&nbsp;"runs"&nbsp;(→&nbsp;"run"),<br>
+"thinks"&nbsp;(→&nbsp;"think"),&nbsp;and&nbsp;"contains"&nbsp;(→&nbsp;"contain")&nbsp;as&nbsp;verbs<br>
+while&nbsp;rejecting&nbsp;plural&nbsp;nouns&nbsp;like&nbsp;"dogs"&nbsp;(→&nbsp;"dog",&nbsp;not&nbsp;a&nbsp;verb).<br>
+&nbsp;<br>
+For&nbsp;irregular&nbsp;inflected&nbsp;forms&nbsp;(listed&nbsp;in&nbsp;``_IRREGULAR_BASE``),&nbsp;the<br>
+true&nbsp;base&nbsp;is&nbsp;preferred&nbsp;over&nbsp;the&nbsp;inflected&nbsp;word&nbsp;itself.&nbsp;Without<br>
+this,&nbsp;``<a href="#-is_verb_form">is_verb_form</a>("has")``&nbsp;would&nbsp;return&nbsp;"has"&nbsp;(because&nbsp;"has"&nbsp;is<br>
+in&nbsp;``_VERB_BASES``)&nbsp;rather&nbsp;than&nbsp;"have"&nbsp;—&nbsp;the&nbsp;actual&nbsp;base&nbsp;form.&nbsp;That<br>
+caused&nbsp;``agree_verb_phrase``&nbsp;to&nbsp;skip&nbsp;deconjugation&nbsp;and&nbsp;corrupt<br>
+"has"&nbsp;→&nbsp;"ha"&nbsp;via&nbsp;naive&nbsp;'s'-stripping.<br>
+&nbsp;<br>
+Learned&nbsp;verbs&nbsp;(register_learned_verb)&nbsp;are&nbsp;always&nbsp;consulted&nbsp;in<br>
+addition&nbsp;to&nbsp;``lexicon``&nbsp;—&nbsp;learned&nbsp;knowledge&nbsp;takes&nbsp;precedence,<br>
+seeds&nbsp;are&nbsp;fallback.</span></dd></dl>
+ <dl><dt><a name="-person_pronoun"><strong>person_pronoun</strong></a>(concept_id: 'str', network=None, display: 'str' = '', for_object: 'bool' = False) -&gt; 'tuple[str, bool]'</dt><dd><span class="code">Pick&nbsp;a&nbsp;pronoun&nbsp;for&nbsp;a&nbsp;concept&nbsp;from&nbsp;its&nbsp;animacy&nbsp;properties.<br>
+&nbsp;<br>
+Returns&nbsp;(pronoun,&nbsp;plural_agreement)&nbsp;where&nbsp;pronoun&nbsp;is&nbsp;the<br>
+nominative&nbsp;or&nbsp;accusative&nbsp;form&nbsp;and&nbsp;plural_agreement&nbsp;tells&nbsp;the<br>
+caller&nbsp;whether&nbsp;verbs&nbsp;should&nbsp;use&nbsp;plural&nbsp;inflection&nbsp;("they&nbsp;run").<br>
+&nbsp;<br>
+Selection:<br>
+-&nbsp;Concept&nbsp;with&nbsp;gender&nbsp;property&nbsp;→&nbsp;"he"/"she"<br>
+-&nbsp;Living&nbsp;person&nbsp;(category&nbsp;LIVING&nbsp;+&nbsp;proper&nbsp;noun&nbsp;or&nbsp;person&nbsp;type)<br>
+&nbsp;&nbsp;→&nbsp;"they"&nbsp;(neutral&nbsp;when&nbsp;gender&nbsp;is&nbsp;unknown)<br>
+-&nbsp;Plural&nbsp;noun&nbsp;phrase&nbsp;→&nbsp;"they"<br>
+-&nbsp;Everything&nbsp;else&nbsp;→&nbsp;"it"<br>
+&nbsp;<br>
+The&nbsp;animacy&nbsp;information&nbsp;is&nbsp;*learned*&nbsp;—&nbsp;it&nbsp;comes&nbsp;from&nbsp;the<br>
+concept's&nbsp;``category``&nbsp;(detected&nbsp;by&nbsp;``detect_category``)&nbsp;and<br>
+``properties["gender"]``/``["proper_noun"]``,&nbsp;never&nbsp;a&nbsp;hardcoded<br>
+name&nbsp;list.&nbsp;Genesis&nbsp;itself&nbsp;follows&nbsp;the&nbsp;same&nbsp;path:&nbsp;"it"&nbsp;by<br>
+default,&nbsp;"she"&nbsp;only&nbsp;if&nbsp;the&nbsp;network&nbsp;has&nbsp;learned&nbsp;a&nbsp;feminine<br>
+``gender``&nbsp;property&nbsp;for&nbsp;it.</span></dd></dl>
+ <dl><dt><a name="-register_learned_verb"><strong>register_learned_verb</strong></a>(base: 'str') -&gt; 'None'</dt><dd><span class="code">Register&nbsp;a&nbsp;verb&nbsp;Genesis&nbsp;has&nbsp;learned&nbsp;(base&nbsp;form,&nbsp;lowercased).</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>VERB_LEXICON</strong> = frozenset()<br>
+<strong>__all__</strong> = ['VERB_LEXICON', 'agree_verb_phrase', 'clear_learned_verbs', 'conjugate_verb', 'copula', 'deconjugate_verb', 'hedge_verb_phrase', 'indefinite_article', 'is_learned_verb', 'is_plural_np', 'is_verb_form', 'person_pronoun', 'register_learned_verb']<br>
+<strong>__annotations__</strong> = {'_AN_EXCEPTIONS': 'frozenset[str]', '_A_EXCEPTIONS': 'frozenset[str]', '_ES_VERBS': 'frozenset[str]', '_FUNCTION_VERBS': 'frozenset[str]', '_IRREGULAR_BASE': 'dict[str, str]', '_LEARNED_VERBS': 'set[str]', '_PRONOUNS': 'dict[str, tuple[str, str, bool]]', '_SIMPLE_PAST': 'frozenset[str]', '_SINGULAR_S_WORDS': 'frozenset[str]', '_VERB_BASES': 'frozenset[str]'}</td></tr></table>
+</body></html>

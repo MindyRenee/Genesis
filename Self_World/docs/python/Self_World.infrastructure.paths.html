@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.infrastructure.paths</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.infrastructure.html" class="white">infrastructure</a>.paths</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/infrastructure/paths.py">/home/mindyrenee/GenAnd/Genesis/Self_World/infrastructure/paths.py</a></td></tr></table>
+    <p><span class="code">Install-layout-aware&nbsp;filesystem&nbsp;roots.<br>
+&nbsp;<br>
+Genesis's&nbsp;source&nbsp;is&nbsp;organized&nbsp;into&nbsp;three&nbsp;worlds&nbsp;—&nbsp;``Self_World/``<br>
+(the&nbsp;self&nbsp;and&nbsp;organism),&nbsp;``Inner_World/``&nbsp;(the&nbsp;non-physical<br>
+phenomena&nbsp;—&nbsp;field,&nbsp;waves,&nbsp;dreams,&nbsp;thoughts),&nbsp;and&nbsp;``Outer_World/``&nbsp;(the<br>
+environment)&nbsp;—&nbsp;each&nbsp;a&nbsp;package&nbsp;root&nbsp;holding&nbsp;the&nbsp;packages&nbsp;that&nbsp;belong<br>
+to&nbsp;it.&nbsp;In&nbsp;a&nbsp;source&nbsp;checkout&nbsp;all&nbsp;three&nbsp;sit&nbsp;under&nbsp;the&nbsp;repository<br>
+root;&nbsp;in&nbsp;a&nbsp;packaged&nbsp;install&nbsp;the&nbsp;same&nbsp;packages&nbsp;land&nbsp;flat&nbsp;in<br>
+``site-packages``,&nbsp;so&nbsp;one&nbsp;directory&nbsp;again&nbsp;holds&nbsp;them&nbsp;all.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="os.html">os</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-code_root"><strong>code_root</strong></a>() -&gt; 'Path'</dt><dd><span class="code">The&nbsp;root&nbsp;of&nbsp;the&nbsp;agent's&nbsp;own&nbsp;source&nbsp;tree.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;what&nbsp;modules&nbsp;mean&nbsp;when&nbsp;they&nbsp;ask&nbsp;for&nbsp;``project_root``&nbsp;—&nbsp;the<br>
+directory&nbsp;containing&nbsp;the&nbsp;three&nbsp;worlds,&nbsp;``scripts``,&nbsp;``genesis``,<br>
+and&nbsp;the&nbsp;helper&nbsp;files.&nbsp;With&nbsp;the&nbsp;worlds&nbsp;as&nbsp;package&nbsp;containers,&nbsp;the<br>
+checkout's&nbsp;repo&nbsp;root&nbsp;and&nbsp;the&nbsp;package&nbsp;root&nbsp;are&nbsp;the&nbsp;same&nbsp;directory,<br>
+so&nbsp;the&nbsp;resolution&nbsp;is:<br>
+&nbsp;<br>
+1.&nbsp;``GENESIS_ROOT``&nbsp;—&nbsp;explicit&nbsp;override&nbsp;for&nbsp;unusual&nbsp;layouts.<br>
+2.&nbsp;:func:`package_root`&nbsp;—&nbsp;in&nbsp;a&nbsp;checkout&nbsp;that&nbsp;is&nbsp;the&nbsp;repo&nbsp;root;&nbsp;in&nbsp;a<br>
+&nbsp;&nbsp;&nbsp;non-editable&nbsp;install&nbsp;it&nbsp;is&nbsp;``site-packages``,&nbsp;where&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;installed&nbsp;packages&nbsp;are&nbsp;the&nbsp;code.</span></dd></dl>
+ <dl><dt><a name="-package_root"><strong>package_root</strong></a>() -&gt; 'Path'</dt><dd><span class="code">The&nbsp;directory&nbsp;holding&nbsp;the&nbsp;top-level&nbsp;packages.<br>
+&nbsp;<br>
+In&nbsp;a&nbsp;checkout&nbsp;this&nbsp;is&nbsp;the&nbsp;repository&nbsp;root:&nbsp;its&nbsp;children&nbsp;are&nbsp;the<br>
+three&nbsp;world&nbsp;directories.&nbsp;In&nbsp;an&nbsp;installed&nbsp;wheel&nbsp;it&nbsp;is<br>
+``site-packages``.&nbsp;``infrastructure/``&nbsp;sits&nbsp;inside<br>
+``Self_World/``&nbsp;in&nbsp;a&nbsp;checkout&nbsp;and&nbsp;flat&nbsp;in&nbsp;``site-packages``&nbsp;—<br>
+the&nbsp;parent&nbsp;of&nbsp;that&nbsp;container&nbsp;is&nbsp;the&nbsp;package&nbsp;root&nbsp;in&nbsp;both&nbsp;cases.</span></dd></dl>
+</td></tr></table>
+</body></html>

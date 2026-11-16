@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["ASSOCIATION_CANDIDATE_LIMIT","ASSOCIATION_THRESHOLD","MIN_ASSOCIATION_DISTANCE"],"fn":["get_episode_hash","is_meta_memory","truncate_text"],"struct":["AssociationEngine","AssociationResult","DreamResult","XorShift64"]};

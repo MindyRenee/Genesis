@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.frontal_lobe.self_monitor</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.frontal_lobe.html" class="white">frontal_lobe</a>.self_monitor</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/self_monitor.py">/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/self_monitor.py</a></td></tr></table>
+    <p><span class="code">Self-monitoring&nbsp;in&nbsp;language&nbsp;production&nbsp;—&nbsp;Levelt's&nbsp;editor.<br>
+&nbsp;<br>
+Before&nbsp;Genesis&nbsp;speaks,&nbsp;an&nbsp;internal&nbsp;monitor&nbsp;checks&nbsp;the&nbsp;output&nbsp;for<br>
+errors&nbsp;and&nbsp;repairs&nbsp;them.&nbsp;This&nbsp;is&nbsp;the&nbsp;"editor"&nbsp;in&nbsp;Levelt's&nbsp;(1989)<br>
+model&nbsp;of&nbsp;speech&nbsp;production,&nbsp;which&nbsp;describes&nbsp;language&nbsp;generation&nbsp;as<br>
+a&nbsp;multi-stage&nbsp;process:<br>
+&nbsp;<br>
+1.&nbsp;**Conceptualization**&nbsp;—&nbsp;deciding&nbsp;what&nbsp;to&nbsp;say&nbsp;(the&nbsp;Thought)<br>
+2.&nbsp;**Formulation**&nbsp;—&nbsp;turning&nbsp;the&nbsp;concept&nbsp;into&nbsp;words&nbsp;(the&nbsp;GenerativeLanguage)<br>
+3.&nbsp;**Articulation**&nbsp;—&nbsp;producing&nbsp;the&nbsp;output&nbsp;(the&nbsp;rendered&nbsp;text)<br>
+4.&nbsp;**Self-monitoring**&nbsp;—&nbsp;checking&nbsp;the&nbsp;output&nbsp;before&nbsp;or&nbsp;during&nbsp;articulation<br>
+&nbsp;<br>
+The&nbsp;self-monitor&nbsp;sits&nbsp;between&nbsp;formulation&nbsp;and&nbsp;articulation.&nbsp;It&nbsp;checks<br>
+the&nbsp;planned&nbsp;output&nbsp;for:<br>
+&nbsp;<br>
+-&nbsp;**Grammatical&nbsp;errors**:&nbsp;basic&nbsp;syntax&nbsp;validation&nbsp;—&nbsp;does&nbsp;the&nbsp;sentence<br>
+&nbsp;&nbsp;have&nbsp;a&nbsp;subject&nbsp;and&nbsp;verb?&nbsp;Are&nbsp;there&nbsp;obvious&nbsp;structural&nbsp;problems?<br>
+-&nbsp;**Coherence**:&nbsp;does&nbsp;the&nbsp;response&nbsp;make&nbsp;sense&nbsp;given&nbsp;the&nbsp;context?&nbsp;Is<br>
+&nbsp;&nbsp;it&nbsp;relevant&nbsp;to&nbsp;what&nbsp;was&nbsp;said?<br>
+-&nbsp;**Pragmatic&nbsp;violations**:&nbsp;is&nbsp;the&nbsp;response&nbsp;appropriate&nbsp;for&nbsp;the&nbsp;social<br>
+&nbsp;&nbsp;context?&nbsp;Is&nbsp;it&nbsp;too&nbsp;long,&nbsp;too&nbsp;short,&nbsp;too&nbsp;formal,&nbsp;or&nbsp;too&nbsp;informal?<br>
+-&nbsp;**Factual&nbsp;accuracy**:&nbsp;does&nbsp;the&nbsp;response&nbsp;contradict&nbsp;known&nbsp;facts?<br>
+&nbsp;<br>
+When&nbsp;problems&nbsp;are&nbsp;detected,&nbsp;the&nbsp;monitor&nbsp;attempts&nbsp;to&nbsp;repair&nbsp;the&nbsp;output<br>
+before&nbsp;it&nbsp;is&nbsp;produced.&nbsp;Repairs&nbsp;include&nbsp;trimming&nbsp;overly&nbsp;long&nbsp;responses,<br>
+adding&nbsp;hedging&nbsp;when&nbsp;uncertain,&nbsp;removing&nbsp;contradictions,&nbsp;and&nbsp;fixing<br>
+obvious&nbsp;grammatical&nbsp;issues.<br>
+&nbsp;<br>
+#&nbsp;Levelt's&nbsp;perceptual&nbsp;loop&nbsp;theory<br>
+&nbsp;<br>
+Levelt&nbsp;(1989)&nbsp;proposed&nbsp;that&nbsp;self-monitoring&nbsp;operates&nbsp;via&nbsp;an&nbsp;inner<br>
+loop:&nbsp;the&nbsp;speaker&nbsp;"hears"&nbsp;their&nbsp;own&nbsp;planned&nbsp;speech&nbsp;internally&nbsp;(via<br>
+the&nbsp;speech&nbsp;comprehension&nbsp;system)&nbsp;and&nbsp;checks&nbsp;it&nbsp;for&nbsp;errors&nbsp;before<br>
+articulating.&nbsp;This&nbsp;is&nbsp;why&nbsp;we&nbsp;can&nbsp;catch&nbsp;errors&nbsp;before&nbsp;we&nbsp;speak&nbsp;them&nbsp;—<br>
+the&nbsp;monitor&nbsp;runs&nbsp;on&nbsp;the&nbsp;internal&nbsp;representation,&nbsp;not&nbsp;on&nbsp;the&nbsp;actual<br>
+sound.<br>
+&nbsp;<br>
+The&nbsp;monitor&nbsp;can&nbsp;catch&nbsp;errors&nbsp;at&nbsp;different&nbsp;levels:<br>
+-&nbsp;**Conceptual&nbsp;errors**:&nbsp;saying&nbsp;the&nbsp;wrong&nbsp;thing&nbsp;(wrong&nbsp;intention)<br>
+-&nbsp;**Formulation&nbsp;errors**:&nbsp;grammatical&nbsp;or&nbsp;lexical&nbsp;errors<br>
+-&nbsp;**Articulatory&nbsp;errors**:&nbsp;pronunciation&nbsp;errors&nbsp;(not&nbsp;applicable&nbsp;to&nbsp;text)<br>
+&nbsp;<br>
+This&nbsp;implementation&nbsp;focuses&nbsp;on&nbsp;conceptual&nbsp;and&nbsp;formulation&nbsp;errors,<br>
+since&nbsp;Genesis&nbsp;produces&nbsp;text&nbsp;rather&nbsp;than&nbsp;speech.<br>
+&nbsp;<br>
+References:<br>
+-&nbsp;Levelt,&nbsp;W.&nbsp;J.&nbsp;M.&nbsp;(1989).&nbsp;*Speaking:&nbsp;From&nbsp;Intention&nbsp;to<br>
+&nbsp;&nbsp;Articulation*.&nbsp;MIT&nbsp;Press.<br>
+-&nbsp;Levelt,&nbsp;W.&nbsp;J.&nbsp;M.&nbsp;(1993).&nbsp;Monitoring&nbsp;and&nbsp;self-repair&nbsp;in&nbsp;speech.<br>
+&nbsp;&nbsp;*Cognition*,&nbsp;14,&nbsp;41–104.<br>
+-&nbsp;Postma,&nbsp;A.&nbsp;(2000).&nbsp;Detection&nbsp;of&nbsp;errors&nbsp;during&nbsp;speech&nbsp;production:<br>
+&nbsp;&nbsp;A&nbsp;review&nbsp;of&nbsp;speech&nbsp;monitoring&nbsp;models.&nbsp;*Cognition*,&nbsp;77,&nbsp;97–131.<br>
+-&nbsp;Hartsuiker,&nbsp;R.&nbsp;J.,&nbsp;&amp;&nbsp;Kolk,&nbsp;H.&nbsp;H.&nbsp;J.&nbsp;(2001).&nbsp;Error&nbsp;monitoring&nbsp;in<br>
+&nbsp;&nbsp;speech&nbsp;production:&nbsp;A&nbsp;computational&nbsp;test&nbsp;of&nbsp;the&nbsp;perceptual&nbsp;loop<br>
+&nbsp;&nbsp;theory.&nbsp;*Psychological&nbsp;Review*,&nbsp;108(1),&nbsp;110–144.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="re.html">re</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.frontal_lobe.self_monitor.html#MonitorResult">MonitorResult</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.self_monitor.html#RepairAction">RepairAction</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.self_monitor.html#SelfMonitor">SelfMonitor</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="MonitorResult">class <strong>MonitorResult</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#MonitorResult">MonitorResult</a>(text:&nbsp;'str',&nbsp;repairs:&nbsp;'list[<a href="#RepairAction">RepairAction</a>]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;passed:&nbsp;'bool'&nbsp;=&nbsp;True,&nbsp;issues_found:&nbsp;'int'&nbsp;=&nbsp;0)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;result&nbsp;of&nbsp;a&nbsp;self-monitoring&nbsp;pass.<br>
+&nbsp;<br>
+Attributes:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;text:&nbsp;The&nbsp;(possibly&nbsp;repaired)&nbsp;output&nbsp;text.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;repairs:&nbsp;List&nbsp;of&nbsp;repair&nbsp;actions&nbsp;taken.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;passed:&nbsp;Whether&nbsp;the&nbsp;text&nbsp;passed&nbsp;all&nbsp;checks&nbsp;without&nbsp;repair.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;issues_found:&nbsp;Number&nbsp;of&nbsp;issues&nbsp;found&nbsp;(before&nbsp;repair).<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="MonitorResult-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="MonitorResult-__init__"><strong>__init__</strong></a>(self, text: 'str', repairs: 'list[RepairAction]' = &lt;factory&gt;, passed: 'bool' = True, issues_found: 'int' = 0) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="MonitorResult-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>issues_found</strong></dt>
+</dl>
+<dl><dt><strong>passed</strong></dt>
+</dl>
+<dl><dt><strong>repairs</strong></dt>
+</dl>
+<dl><dt><strong>text</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'issues_found': 'int', 'passed': 'bool', 'repairs': 'list[RepairAction]', 'text': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'issues_found': Field(name='issues_found',type='int',default=0,d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'passed': Field(name='passed',type='bool',default=True,def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'repairs': Field(name='repairs',type='list[RepairAction]',d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'text': Field(name='text',type='str',default=&lt;dataclasse...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('text', 'repairs', 'passed', 'issues_found')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="RepairAction">class <strong>RepairAction</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#RepairAction">RepairAction</a>(check_type:&nbsp;'str',&nbsp;issue:&nbsp;'str',&nbsp;repair:&nbsp;'str',&nbsp;original:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;fixed:&nbsp;'str'&nbsp;=&nbsp;'')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;single&nbsp;repair&nbsp;action&nbsp;taken&nbsp;by&nbsp;the&nbsp;self-monitor.<br>
+&nbsp;<br>
+Attributes:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;check_type:&nbsp;Which&nbsp;check&nbsp;found&nbsp;the&nbsp;issue&nbsp;("grammar",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"coherence",&nbsp;"pragmatics",&nbsp;"factual").<br>
+&nbsp;&nbsp;&nbsp;&nbsp;issue:&nbsp;Description&nbsp;of&nbsp;the&nbsp;problem&nbsp;found.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;repair:&nbsp;Description&nbsp;of&nbsp;the&nbsp;repair&nbsp;applied.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;original:&nbsp;The&nbsp;original&nbsp;text&nbsp;snippet&nbsp;that&nbsp;was&nbsp;problematic.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;fixed:&nbsp;The&nbsp;repaired&nbsp;text&nbsp;snippet.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="RepairAction-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="RepairAction-__init__"><strong>__init__</strong></a>(self, check_type: 'str', issue: 'str', repair: 'str', original: 'str' = '', fixed: 'str' = '') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="RepairAction-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>check_type</strong></dt>
+</dl>
+<dl><dt><strong>fixed</strong></dt>
+</dl>
+<dl><dt><strong>issue</strong></dt>
+</dl>
+<dl><dt><strong>original</strong></dt>
+</dl>
+<dl><dt><strong>repair</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'check_type': 'str', 'fixed': 'str', 'issue': 'str', 'original': 'str', 'repair': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'check_type': Field(name='check_type',type='str',default=&lt;data...appingproxy({}),kw_only=False,_field_type=_FIELD), 'fixed': Field(name='fixed',type='str',default='',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'issue': Field(name='issue',type='str',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD), 'original': Field(name='original',type='str',default='',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'repair': Field(name='repair',type='str',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('check_type', 'issue', 'repair', 'original', 'fixed')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SelfMonitor">class <strong>SelfMonitor</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SelfMonitor">SelfMonitor</a>(known_facts:&nbsp;'dict[str,&nbsp;str]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;language:&nbsp;'Any'&nbsp;=&nbsp;None,&nbsp;comprehension:&nbsp;'Any'&nbsp;=&nbsp;None,&nbsp;network:&nbsp;'Any'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Levelt's&nbsp;self-monitoring&nbsp;loop&nbsp;for&nbsp;language&nbsp;production.<br>
+&nbsp;<br>
+Before&nbsp;output&nbsp;is&nbsp;produced,&nbsp;the&nbsp;monitor&nbsp;checks&nbsp;the&nbsp;planned&nbsp;text<br>
+for&nbsp;grammatical&nbsp;errors,&nbsp;coherence,&nbsp;pragmatic&nbsp;appropriateness,&nbsp;and<br>
+factual&nbsp;accuracy.&nbsp;If&nbsp;problems&nbsp;are&nbsp;detected,&nbsp;the&nbsp;text&nbsp;is&nbsp;repaired<br>
+before&nbsp;output.<br>
+&nbsp;<br>
+Usage::<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;monitor&nbsp;=&nbsp;<a href="#SelfMonitor">SelfMonitor</a>()<br>
+&nbsp;&nbsp;&nbsp;&nbsp;repaired&nbsp;=&nbsp;monitor.<a href="#SelfMonitor-monitor">monitor</a>(<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"I&nbsp;are&nbsp;feeling&nbsp;good&nbsp;today.",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;context={"user_input":&nbsp;"How&nbsp;are&nbsp;you?"},<br>
+&nbsp;&nbsp;&nbsp;&nbsp;)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;repaired&nbsp;→&nbsp;"I&nbsp;am&nbsp;feeling&nbsp;good&nbsp;today."&nbsp;(grammar&nbsp;fixed)<br>
+&nbsp;<br>
+The&nbsp;monitor&nbsp;tracks&nbsp;repair_count&nbsp;—&nbsp;how&nbsp;many&nbsp;times&nbsp;it&nbsp;has&nbsp;repaired<br>
+output.&nbsp;This&nbsp;is&nbsp;useful&nbsp;for&nbsp;introspection:&nbsp;Genesis&nbsp;can&nbsp;observe&nbsp;how<br>
+often&nbsp;it&nbsp;catches&nbsp;its&nbsp;own&nbsp;errors.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="SelfMonitor-__init__"><strong>__init__</strong></a>(self, known_facts: 'dict[str, str] | None' = None, language: 'Any' = None, comprehension: 'Any' = None, network: 'Any' = None) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;self-monitor.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;known_facts:&nbsp;Optional&nbsp;dict&nbsp;of&nbsp;known&nbsp;facts&nbsp;for&nbsp;factual<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;accuracy&nbsp;checking.&nbsp;Keys&nbsp;are&nbsp;topics,&nbsp;values&nbsp;are<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;known&nbsp;truth.&nbsp;E.g.,&nbsp;{"genesis_origin":&nbsp;"HP&nbsp;13&nbsp;laptop"}.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;language:&nbsp;Optional&nbsp;language&nbsp;faculty&nbsp;for&nbsp;composing<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;repair&nbsp;text&nbsp;instead&nbsp;of&nbsp;using&nbsp;hardcoded&nbsp;strings.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;comprehension:&nbsp;Optional&nbsp;Comprehension&nbsp;for&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;perceptual&nbsp;inner&nbsp;loop&nbsp;—&nbsp;the&nbsp;monitor&nbsp;"hears"&nbsp;planned<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;speech&nbsp;by&nbsp;running&nbsp;it&nbsp;back&nbsp;through&nbsp;comprehension&nbsp;and<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;catching&nbsp;propositions&nbsp;that&nbsp;fail&nbsp;to&nbsp;parse.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;network:&nbsp;Optional&nbsp;ConceptNetwork&nbsp;—&nbsp;semantic&nbsp;memory.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Claims&nbsp;the&nbsp;perceptual&nbsp;loop&nbsp;extracts&nbsp;from&nbsp;planned<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;output&nbsp;are&nbsp;verified&nbsp;against&nbsp;its&nbsp;edges&nbsp;(factual<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;consistency,&nbsp;not&nbsp;just&nbsp;surface&nbsp;form).</span></dd></dl>
+
+<dl><dt><a name="SelfMonitor-add_known_fact"><strong>add_known_fact</strong></a>(self, topic: 'str', truth: 'str') -&gt; 'None'</dt><dd><span class="code">Add&nbsp;a&nbsp;known&nbsp;fact&nbsp;for&nbsp;future&nbsp;factual&nbsp;accuracy&nbsp;checks.</span></dd></dl>
+
+<dl><dt><a name="SelfMonitor-describe_monitoring"><strong>describe_monitoring</strong></a>(self) -&gt; 'dict[str, Any]'</dt><dd><span class="code">Return&nbsp;structured&nbsp;self-monitoring&nbsp;statistics.<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;dict&nbsp;with&nbsp;check_count,&nbsp;repair_count,&nbsp;repair_rate,<br>
+and&nbsp;last_repair&nbsp;fields.&nbsp;Callers&nbsp;that&nbsp;need&nbsp;text&nbsp;should&nbsp;route<br>
+this&nbsp;data&nbsp;through&nbsp;the&nbsp;language&nbsp;engine.</span></dd></dl>
+
+<dl><dt><a name="SelfMonitor-monitor"><strong>monitor</strong></a>(self, text: 'str', context: 'dict[str, Any] | None' = None) -&gt; 'str'</dt><dd><span class="code">Monitor&nbsp;and&nbsp;potentially&nbsp;repair&nbsp;planned&nbsp;output.<br>
+&nbsp;<br>
+Convenience&nbsp;wrapper&nbsp;around&nbsp;``monitor_detailed``&nbsp;that&nbsp;returns<br>
+only&nbsp;the&nbsp;repaired&nbsp;text.&nbsp;Production&nbsp;code&nbsp;uses&nbsp;``monitor_detailed``<br>
+for&nbsp;the&nbsp;full&nbsp;``<a href="#MonitorResult">MonitorResult</a>``&nbsp;including&nbsp;repair&nbsp;actions.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;text:&nbsp;The&nbsp;planned&nbsp;output&nbsp;text&nbsp;to&nbsp;monitor.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;context:&nbsp;Optional&nbsp;context&nbsp;dict&nbsp;(see&nbsp;``monitor_detailed``).<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;possibly-repaired&nbsp;text.&nbsp;If&nbsp;no&nbsp;issues&nbsp;are&nbsp;found,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;returns&nbsp;the&nbsp;original&nbsp;text&nbsp;unchanged.</span></dd></dl>
+
+<dl><dt><a name="SelfMonitor-monitor_detailed"><strong>monitor_detailed</strong></a>(self, text: 'str', context: 'dict[str, Any] | None' = None) -&gt; 'MonitorResult'</dt><dd><span class="code">Monitor&nbsp;and&nbsp;return&nbsp;a&nbsp;detailed&nbsp;result&nbsp;with&nbsp;repair&nbsp;info.<br>
+&nbsp;<br>
+Like&nbsp;<a href="#SelfMonitor-monitor">monitor</a>()&nbsp;but&nbsp;returns&nbsp;a&nbsp;<a href="#MonitorResult">MonitorResult</a>&nbsp;with&nbsp;the&nbsp;full&nbsp;list<br>
+of&nbsp;repairs,&nbsp;useful&nbsp;for&nbsp;introspection&nbsp;and&nbsp;debugging.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;text:&nbsp;The&nbsp;planned&nbsp;output&nbsp;text&nbsp;to&nbsp;monitor.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;context:&nbsp;Optional&nbsp;context&nbsp;dict&nbsp;(same&nbsp;as&nbsp;<a href="#SelfMonitor-monitor">monitor</a>()).<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;<a href="#MonitorResult">MonitorResult</a>&nbsp;with&nbsp;the&nbsp;repaired&nbsp;text&nbsp;and&nbsp;repair&nbsp;details.</span></dd></dl>
+
+<dl><dt><a name="SelfMonitor-reset"><strong>reset</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Reset&nbsp;the&nbsp;monitor's&nbsp;statistics.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>check_count</strong></dt>
+<dd><span class="code">How&nbsp;many&nbsp;times&nbsp;the&nbsp;monitor&nbsp;has&nbsp;checked&nbsp;output.</span></dd>
+</dl>
+<dl><dt><strong>last_pragmatic_analysis</strong></dt>
+<dd><span class="code">The&nbsp;last&nbsp;Gricean&nbsp;pragmatic&nbsp;analysis&nbsp;of&nbsp;the&nbsp;user's&nbsp;input.<br>
+&nbsp;<br>
+Returns&nbsp;the&nbsp;PragmaticAnalysis&nbsp;from&nbsp;the&nbsp;most&nbsp;recent<br>
+_check_pragmatics&nbsp;call,&nbsp;or&nbsp;None&nbsp;if&nbsp;no&nbsp;analysis&nbsp;has&nbsp;been<br>
+performed&nbsp;yet.&nbsp;Useful&nbsp;for&nbsp;introspection:&nbsp;Genesis&nbsp;can&nbsp;observe<br>
+what&nbsp;it&nbsp;understood&nbsp;the&nbsp;user&nbsp;to&nbsp;mean.</span></dd>
+</dl>
+<dl><dt><strong>recent_repairs</strong></dt>
+<dd><span class="code">Recent&nbsp;repair&nbsp;actions,&nbsp;for&nbsp;introspection.</span></dd>
+</dl>
+<dl><dt><strong>repair_count</strong></dt>
+<dd><span class="code">How&nbsp;many&nbsp;times&nbsp;the&nbsp;monitor&nbsp;has&nbsp;repaired&nbsp;output.</span></dd>
+</dl>
+<dl><dt><strong>repair_rate</strong></dt>
+<dd><span class="code">The&nbsp;proportion&nbsp;of&nbsp;checks&nbsp;that&nbsp;resulted&nbsp;in&nbsp;repair&nbsp;(0–1).</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['MonitorResult', 'RepairAction', 'SelfMonitor']</td></tr></table>
+</body></html>

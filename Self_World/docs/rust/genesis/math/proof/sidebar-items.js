@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["Prop"],"fn":["and_elim","and_intro","by_cases","by_contradiction","de_morgan","deduction","entails","hypothetical_syllogism","induction_evidence","is_contradiction","is_tautology","modus_ponens","modus_tollens","or_intro"]};

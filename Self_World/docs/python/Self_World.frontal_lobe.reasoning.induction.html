@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.frontal_lobe.reasoning.induction</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.frontal_lobe.html" class="white">frontal_lobe</a>.<a href="Self_World.frontal_lobe.reasoning.html" class="white">reasoning</a>.induction</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/reasoning/induction.py">/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/reasoning/induction.py</a></td></tr></table>
+    <p><span class="code">Induction&nbsp;—&nbsp;abstraction&nbsp;from&nbsp;paired&nbsp;examples.<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+WHAT&nbsp;THIS&nbsp;IS<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+Given&nbsp;*examples*&nbsp;—&nbsp;pairs&nbsp;of&nbsp;``(before,&nbsp;after)``&nbsp;patterns&nbsp;—&nbsp;infer&nbsp;the<br>
+*rule*&nbsp;that&nbsp;produced&nbsp;each&nbsp;consequent&nbsp;from&nbsp;its&nbsp;antecedent,&nbsp;so&nbsp;the&nbsp;rule<br>
+can&nbsp;be&nbsp;applied&nbsp;to&nbsp;a&nbsp;novel&nbsp;input.&nbsp;Six&nbsp;demonstrations&nbsp;of&nbsp;``glyph&nbsp;→<br>
+glyph``&nbsp;become&nbsp;"translate&nbsp;by&nbsp;substitution";&nbsp;two&nbsp;demonstrations&nbsp;of<br>
+``board&nbsp;→&nbsp;rotated&nbsp;board``&nbsp;become&nbsp;"rotate&nbsp;90°".&nbsp;The&nbsp;capacity&nbsp;this&nbsp;adds:<br>
+not&nbsp;"what&nbsp;does&nbsp;this&nbsp;action&nbsp;do"&nbsp;(the&nbsp;competence&nbsp;layer's&nbsp;effect&nbsp;models)<br>
+but&nbsp;"what&nbsp;single&nbsp;operation&nbsp;do&nbsp;all&nbsp;these&nbsp;exemplars&nbsp;share".<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+ANATOMY<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+This&nbsp;module&nbsp;is&nbsp;the&nbsp;frontopolar&nbsp;end&nbsp;of&nbsp;the&nbsp;prefrontal&nbsp;abstraction<br>
+gradient&nbsp;—&nbsp;the&nbsp;machinery&nbsp;lesion&nbsp;studies&nbsp;and&nbsp;fMRI&nbsp;localize&nbsp;to<br>
+rostrolateral&nbsp;PFC&nbsp;(lateral&nbsp;area&nbsp;10)&nbsp;and&nbsp;mid-dorsolateral&nbsp;PFC<br>
+(areas&nbsp;9/46):<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;**Relational&nbsp;integration&nbsp;(RLPFC)**.&nbsp;Christoff&nbsp;et&nbsp;al.&nbsp;(2001)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;showed&nbsp;RLPFC&nbsp;is&nbsp;recruited&nbsp;specifically&nbsp;when&nbsp;*two&nbsp;or&nbsp;more<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;relations&nbsp;must&nbsp;be&nbsp;considered&nbsp;simultaneously*&nbsp;—&nbsp;2-relational<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Raven's&nbsp;items,&nbsp;not&nbsp;1-relational&nbsp;ones.&nbsp;An&nbsp;induced&nbsp;rule&nbsp;is<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exactly&nbsp;that:&nbsp;a&nbsp;second-order&nbsp;relation&nbsp;over&nbsp;the&nbsp;set&nbsp;of<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pairwise&nbsp;(antecedent&nbsp;→&nbsp;consequent)&nbsp;relations.&nbsp;``induce()``<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;accepts&nbsp;a&nbsp;candidate&nbsp;only&nbsp;when&nbsp;it&nbsp;covers&nbsp;*every*&nbsp;exemplar&nbsp;at<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;once&nbsp;—&nbsp;integration,&nbsp;not&nbsp;one-pair&nbsp;pattern-matching.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;**Rule&nbsp;search&nbsp;(mid-DLPFC)**.&nbsp;Reverberi&nbsp;et&nbsp;al.&nbsp;(2011)&nbsp;found<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mid-DLPFC&nbsp;active&nbsp;during&nbsp;rule&nbsp;*search&nbsp;and&nbsp;discovery*&nbsp;but&nbsp;not<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;during&nbsp;rule&nbsp;*following*.&nbsp;The&nbsp;candidate&nbsp;space&nbsp;is&nbsp;searched&nbsp;in<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;order&nbsp;Badre&nbsp;&amp;&nbsp;D'Esposito's&nbsp;rostrocaudal&nbsp;gradient&nbsp;implies:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;response-level&nbsp;rules&nbsp;first&nbsp;(identity,&nbsp;constants),&nbsp;then<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;feature-level&nbsp;(rigid&nbsp;transforms,&nbsp;recolorings),&nbsp;then<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;relational-level&nbsp;(substitution-by-exemplar&nbsp;—&nbsp;a&nbsp;rule&nbsp;that<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*is*&nbsp;a&nbsp;set&nbsp;of&nbsp;relations).&nbsp;Concrete&nbsp;before&nbsp;abstract.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;**Rule-change&nbsp;signal&nbsp;(FPC)**.&nbsp;Strange&nbsp;et&nbsp;al.&nbsp;(2001):&nbsp;fronto-<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;polar&nbsp;cortex&nbsp;fires&nbsp;selectively&nbsp;after&nbsp;a&nbsp;rule&nbsp;change&nbsp;and&nbsp;its<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;response&nbsp;*declines&nbsp;as&nbsp;the&nbsp;rule&nbsp;is&nbsp;acquired*.&nbsp;``observe()``<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;encodes&nbsp;that:&nbsp;a&nbsp;new&nbsp;exemplar&nbsp;contradicting&nbsp;the&nbsp;standing&nbsp;rule<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;marks&nbsp;``needs_search``&nbsp;—&nbsp;the&nbsp;engagement&nbsp;signal&nbsp;—&nbsp;and&nbsp;a&nbsp;rule<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;that&nbsp;keeps&nbsp;predicting&nbsp;quiets&nbsp;it.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;**Two&nbsp;induction&nbsp;routes**&nbsp;(Carpenter&nbsp;et&nbsp;al.;&nbsp;exemplar-&nbsp;vs<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;rule-based&nbsp;transfer&nbsp;literatures).&nbsp;When&nbsp;an&nbsp;operator&nbsp;covers<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;all&nbsp;pairs&nbsp;the&nbsp;answer&nbsp;is&nbsp;a&nbsp;rule&nbsp;—&nbsp;the&nbsp;mPFC&nbsp;+&nbsp;anterior<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;hippocampus&nbsp;*schematic*&nbsp;route.&nbsp;When&nbsp;none&nbsp;does,&nbsp;``apply``<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;falls&nbsp;back&nbsp;to&nbsp;the&nbsp;nearest&nbsp;stored&nbsp;exemplar&nbsp;under&nbsp;rigid<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;transforms&nbsp;—&nbsp;the&nbsp;intraparietal-sulcus&nbsp;+&nbsp;posterior&nbsp;hippocampus<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*exemplar-similarity*&nbsp;route.&nbsp;Both&nbsp;are&nbsp;kept&nbsp;because&nbsp;the&nbsp;brain<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;keeps&nbsp;both.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;**Integrative&nbsp;encoding&nbsp;(aHPC/CA1)**.&nbsp;Pairs&nbsp;are&nbsp;stored&nbsp;as<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;observed&nbsp;and&nbsp;recombined&nbsp;at&nbsp;induction&nbsp;time&nbsp;—&nbsp;generalization<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;emerging&nbsp;from&nbsp;linked&nbsp;episodes&nbsp;rather&nbsp;than&nbsp;a&nbsp;blended&nbsp;trace.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;**Inhibition&nbsp;of&nbsp;irrelevant&nbsp;features**&nbsp;is&nbsp;itself&nbsp;a&nbsp;candidate:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;whether&nbsp;antecedent-matching&nbsp;must&nbsp;be&nbsp;exact&nbsp;or&nbsp;may&nbsp;be<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;orientation-invariant&nbsp;is&nbsp;*discovered*&nbsp;from&nbsp;the&nbsp;exemplars,&nbsp;not<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;assumed&nbsp;—&nbsp;a&nbsp;demonstrator&nbsp;may&nbsp;show&nbsp;tilt-invariant&nbsp;glyphs&nbsp;while<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;presenting&nbsp;query&nbsp;glyphs&nbsp;already&nbsp;rotated,&nbsp;so&nbsp;the&nbsp;match<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;transform&nbsp;must&nbsp;be&nbsp;learned&nbsp;rather&nbsp;than&nbsp;presumed.<br>
+&nbsp;<br>
+The&nbsp;parietal&nbsp;contribution&nbsp;(the&nbsp;bound&nbsp;relational&nbsp;representations&nbsp;the<br>
+search&nbsp;operates&nbsp;on&nbsp;—&nbsp;entities,&nbsp;panels,&nbsp;patterns)&nbsp;lives&nbsp;upstream&nbsp;in<br>
+``parietal_lobe``&nbsp;scene&nbsp;parsing;&nbsp;the&nbsp;acquired&nbsp;rule,&nbsp;once&nbsp;it&nbsp;keeps<br>
+predicting,&nbsp;is&nbsp;what&nbsp;``competence.py``&nbsp;consolidates&nbsp;as&nbsp;a&nbsp;skill&nbsp;—<br>
+rule&nbsp;*following*&nbsp;is&nbsp;temporal/motor,&nbsp;not&nbsp;prefrontal.<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.induction.html#ExampleInductor">ExampleInductor</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.induction.html#PairStore">PairStore</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.induction.html#TransformRule">TransformRule</a>
+</dt></dl>
+</dd>
+<dt class="heading-text"><a href="enum.html#Enum">enum.Enum</a>(<a href="builtins.html#object">builtins.object</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.induction.html#AbstractLevel">AbstractLevel</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.induction.html#RuleStatus">RuleStatus</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="AbstractLevel">class <strong>AbstractLevel</strong></a>(<a href="enum.html#Enum">enum.Enum</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#AbstractLevel">AbstractLevel</a>(*values)<br>
+&nbsp;<br>
+Candidate&nbsp;rules&nbsp;ordered&nbsp;by&nbsp;the&nbsp;rostrocaudal&nbsp;abstraction&nbsp;axis.<br>
+&nbsp;<br>
+Rostral-most&nbsp;last:&nbsp;each&nbsp;level's&nbsp;rules&nbsp;are&nbsp;tried&nbsp;only&nbsp;after&nbsp;every<br>
+more-concrete&nbsp;level&nbsp;fails&nbsp;to&nbsp;cover&nbsp;the&nbsp;exemplars&nbsp;—&nbsp;the&nbsp;search<br>
+prefers&nbsp;the&nbsp;least&nbsp;abstract&nbsp;rule&nbsp;that&nbsp;explains&nbsp;all&nbsp;the&nbsp;evidence.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.frontal_lobe.reasoning.induction.html#AbstractLevel">AbstractLevel</a></dd>
+<dd><a href="enum.html#Enum">enum.Enum</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>DIMENSION</strong> = &lt;AbstractLevel.DIMENSION: 2&gt;</dl>
+
+<dl><dt><strong>FEATURE</strong> = &lt;AbstractLevel.FEATURE: 1&gt;</dl>
+
+<dl><dt><strong>RELATIONAL</strong> = &lt;AbstractLevel.RELATIONAL: 3&gt;</dl>
+
+<dl><dt><strong>RESPONSE</strong> = &lt;AbstractLevel.RESPONSE: 0&gt;</dl>
+
+<hr>
+Data descriptors inherited from <a href="enum.html#Enum">enum.Enum</a>:<br>
+<dl><dt><strong>name</strong></dt>
+<dd><span class="code">The&nbsp;name&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<dl><dt><strong>value</strong></dt>
+<dd><span class="code">The&nbsp;value&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<hr>
+Static methods inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><a name="AbstractLevel-__contains__"><strong>__contains__</strong></a>(value)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;`value`&nbsp;is&nbsp;in&nbsp;`cls`.<br>
+&nbsp;<br>
+`value`&nbsp;is&nbsp;in&nbsp;`cls`&nbsp;if:<br>
+1)&nbsp;`value`&nbsp;is&nbsp;a&nbsp;member&nbsp;of&nbsp;`cls`,&nbsp;or<br>
+2)&nbsp;`value`&nbsp;is&nbsp;the&nbsp;value&nbsp;of&nbsp;one&nbsp;of&nbsp;the&nbsp;`cls`'s&nbsp;members.</span></dd></dl>
+
+<dl><dt><a name="AbstractLevel-__getitem__"><strong>__getitem__</strong></a>(name)</dt><dd><span class="code">Return&nbsp;the&nbsp;member&nbsp;matching&nbsp;`name`.</span></dd></dl>
+
+<dl><dt><a name="AbstractLevel-__iter__"><strong>__iter__</strong></a>()</dt><dd><span class="code">Return&nbsp;members&nbsp;in&nbsp;definition&nbsp;order.</span></dd></dl>
+
+<dl><dt><a name="AbstractLevel-__len__"><strong>__len__</strong></a>()</dt><dd><span class="code">Return&nbsp;the&nbsp;number&nbsp;of&nbsp;members&nbsp;(no&nbsp;aliases)</span></dd></dl>
+
+<hr>
+Readonly properties inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><strong>__members__</strong></dt>
+<dd><span class="code">Returns&nbsp;a&nbsp;mapping&nbsp;of&nbsp;member&nbsp;name-&gt;value.<br>
+&nbsp;<br>
+This&nbsp;mapping&nbsp;lists&nbsp;all&nbsp;enum&nbsp;members,&nbsp;including&nbsp;aliases.&nbsp;Note&nbsp;that&nbsp;this<br>
+is&nbsp;a&nbsp;read-only&nbsp;view&nbsp;of&nbsp;the&nbsp;internal&nbsp;mapping.</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ExampleInductor">class <strong>ExampleInductor</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ExampleInductor">ExampleInductor</a>(*,&nbsp;match_invariance:&nbsp;'bool'&nbsp;=&nbsp;True)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Rostrolateral-PFC&nbsp;machinery:&nbsp;integrate&nbsp;exemplar&nbsp;pairs&nbsp;into&nbsp;rules.<br>
+&nbsp;<br>
+Lifecycle&nbsp;mirrors&nbsp;the&nbsp;neural&nbsp;dissociation:<br>
+&nbsp;<br>
+&nbsp;&nbsp;-&nbsp;``<a href="#ExampleInductor-observe">observe</a>(a,&nbsp;b)``&nbsp;—&nbsp;encode&nbsp;a&nbsp;demonstration;&nbsp;a&nbsp;pair&nbsp;that<br>
+&nbsp;&nbsp;&nbsp;&nbsp;contradicts&nbsp;the&nbsp;standing&nbsp;rule&nbsp;flags&nbsp;``needs_search``&nbsp;(the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;FPC&nbsp;rule-change&nbsp;signal).<br>
+&nbsp;&nbsp;-&nbsp;``<a href="#ExampleInductor-induce">induce</a>()``&nbsp;—&nbsp;the&nbsp;mid-DLPFC&nbsp;search:&nbsp;candidates&nbsp;tried&nbsp;in<br>
+&nbsp;&nbsp;&nbsp;&nbsp;rostrocaudal&nbsp;order,&nbsp;each&nbsp;required&nbsp;to&nbsp;cover&nbsp;ALL&nbsp;pairs<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(relational&nbsp;integration).&nbsp;Returns&nbsp;the&nbsp;verified&nbsp;rule&nbsp;or&nbsp;None.<br>
+&nbsp;&nbsp;-&nbsp;``<a href="#ExampleInductor-apply">apply</a>(query)``&nbsp;—&nbsp;rule&nbsp;*following*:&nbsp;the&nbsp;verified&nbsp;rule's<br>
+&nbsp;&nbsp;&nbsp;&nbsp;prediction,&nbsp;else&nbsp;the&nbsp;exemplar-similarity&nbsp;fallback.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ExampleInductor-__init__"><strong>__init__</strong></a>(self, *, match_invariance: 'bool' = True) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="ExampleInductor-apply"><strong>apply</strong></a>(self, query: 'Grid') -&gt; 'Grid | None'</dt><dd><span class="code">Rule&nbsp;following&nbsp;—&nbsp;verified&nbsp;rule&nbsp;first,&nbsp;exemplar&nbsp;fallback.<br>
+&nbsp;<br>
+The&nbsp;fallback&nbsp;is&nbsp;the&nbsp;brain's&nbsp;second&nbsp;induction&nbsp;route:&nbsp;when&nbsp;no<br>
+operator&nbsp;covers&nbsp;the&nbsp;exemplars,&nbsp;the&nbsp;nearest&nbsp;stored&nbsp;exemplar<br>
+(exact&nbsp;or&nbsp;rigid-transform&nbsp;match)&nbsp;still&nbsp;answers&nbsp;—&nbsp;similarity-<br>
+based&nbsp;transfer&nbsp;instead&nbsp;of&nbsp;rule&nbsp;transfer.</span></dd></dl>
+
+<dl><dt><a name="ExampleInductor-apply_seq"><strong>apply_seq</strong></a>(self, query: 'Grid') -&gt; 'list[Grid] | None'</dt><dd><span class="code">The&nbsp;answer&nbsp;as&nbsp;a&nbsp;tile&nbsp;sequence&nbsp;—&nbsp;the&nbsp;substitution&nbsp;rule's<br>
+flat&nbsp;consequent&nbsp;list,&nbsp;before&nbsp;any&nbsp;reassembly&nbsp;layout.&nbsp;For&nbsp;a<br>
+slot-writer&nbsp;this&nbsp;is&nbsp;the&nbsp;target;&nbsp;for&nbsp;everything&nbsp;else<br>
+``apply``'s&nbsp;joined&nbsp;grid&nbsp;is&nbsp;equivalent.</span></dd></dl>
+
+<dl><dt><a name="ExampleInductor-begin_frame"><strong>begin_frame</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Advance&nbsp;the&nbsp;demonstration&nbsp;epoch&nbsp;—&nbsp;call&nbsp;once&nbsp;per&nbsp;observed<br>
+frame/scene&nbsp;so&nbsp;evidence&nbsp;freshness&nbsp;is&nbsp;measurable.</span></dd></dl>
+
+<dl><dt><a name="ExampleInductor-describe"><strong>describe</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">One-line&nbsp;telemetry&nbsp;—&nbsp;what&nbsp;the&nbsp;induced&nbsp;rule&nbsp;currently&nbsp;is.</span></dd></dl>
+
+<dl><dt><a name="ExampleInductor-induce"><strong>induce</strong></a>(self, *, force: 'bool' = False) -&gt; 'TransformRule | None'</dt><dd><span class="code">Search&nbsp;the&nbsp;candidate&nbsp;space,&nbsp;concrete&nbsp;→&nbsp;abstract.<br>
+&nbsp;<br>
+Runs&nbsp;only&nbsp;when&nbsp;evidence&nbsp;outran&nbsp;the&nbsp;rule&nbsp;(or&nbsp;forced):&nbsp;the&nbsp;FPC<br>
+declines&nbsp;its&nbsp;engagement&nbsp;as&nbsp;the&nbsp;rule&nbsp;is&nbsp;acquired&nbsp;—&nbsp;a&nbsp;covering<br>
+rule&nbsp;that&nbsp;keeps&nbsp;predicting&nbsp;is&nbsp;not&nbsp;re-searched.</span></dd></dl>
+
+<dl><dt><a name="ExampleInductor-observe"><strong>observe</strong></a>(self, antecedent: 'Grid', consequent: 'Grid') -&gt; 'bool'</dt><dd><span class="code">Encode&nbsp;one&nbsp;demonstration&nbsp;pair.<br>
+&nbsp;<br>
+Returns&nbsp;True&nbsp;when&nbsp;this&nbsp;observation&nbsp;changed&nbsp;the&nbsp;evidence&nbsp;base<br>
+(new&nbsp;pair,&nbsp;or&nbsp;a&nbsp;contradiction&nbsp;of&nbsp;the&nbsp;standing&nbsp;rule).<br>
+&nbsp;<br>
+A&nbsp;re-demonstrated&nbsp;antecedent&nbsp;carrying&nbsp;a&nbsp;*different*<br>
+consequent&nbsp;in&nbsp;a&nbsp;*later*&nbsp;epoch&nbsp;is&nbsp;a&nbsp;changed&nbsp;dictionary,&nbsp;not<br>
+accumulated&nbsp;evidence:&nbsp;the&nbsp;stale&nbsp;entry&nbsp;is&nbsp;replaced&nbsp;in&nbsp;place&nbsp;—<br>
+dictionary&nbsp;position&nbsp;keeps&nbsp;first-match&nbsp;ordering&nbsp;honest&nbsp;—<br>
+rather&nbsp;than&nbsp;left&nbsp;to&nbsp;shadow&nbsp;the&nbsp;live&nbsp;rule.&nbsp;Duplicates<br>
+committed&nbsp;in&nbsp;the&nbsp;*same*&nbsp;epoch&nbsp;are&nbsp;simultaneous&nbsp;entries&nbsp;and<br>
+keep&nbsp;first-wins&nbsp;order.&nbsp;(Same-antecedent-same-consequent<br>
+re-demonstrations&nbsp;still&nbsp;reinforce&nbsp;via&nbsp;the&nbsp;store.)</span></dd></dl>
+
+<dl><dt><a name="ExampleInductor-set_glyph_probe"><strong>set_glyph_probe</strong></a>(self, probe: 'Callable[[Grid], str | None] | None') -&gt; 'None'</dt><dd><span class="code">Install&nbsp;(or&nbsp;remove)&nbsp;the&nbsp;visual-identity&nbsp;lookup&nbsp;—&nbsp;also<br>
+stamped&nbsp;onto&nbsp;a&nbsp;standing&nbsp;substitution&nbsp;rule,&nbsp;since&nbsp;a&nbsp;rule<br>
+acquired&nbsp;before&nbsp;the&nbsp;probe&nbsp;arrived&nbsp;should&nbsp;not&nbsp;stay&nbsp;blind.</span></dd></dl>
+
+<dl><dt><a name="ExampleInductor-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict[str, Any]'</dt></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="ExampleInductor-from_dict"><strong>from_dict</strong></a>(data: 'dict[str, Any]') -&gt; 'ExampleInductor'</dt><dd><span class="code">Restore&nbsp;an&nbsp;inductor&nbsp;from&nbsp;``to_dict``&nbsp;—&nbsp;the&nbsp;pair&nbsp;store,<br>
+the&nbsp;evidence&nbsp;ledger,&nbsp;and&nbsp;the&nbsp;status&nbsp;the&nbsp;rule&nbsp;was&nbsp;left&nbsp;in.<br>
+The&nbsp;rule&nbsp;itself&nbsp;is&nbsp;*not*&nbsp;carried:&nbsp;it&nbsp;re-induces&nbsp;from&nbsp;the<br>
+pairs&nbsp;on&nbsp;next&nbsp;contact.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="PairStore">class <strong>PairStore</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#PairStore">PairStore</a>()&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+The&nbsp;exemplar&nbsp;memory&nbsp;—&nbsp;aHPC's&nbsp;integrative-encoding&nbsp;half.<br>
+&nbsp;<br>
+Pairs&nbsp;are&nbsp;stored&nbsp;as&nbsp;encoded,&nbsp;never&nbsp;blended;&nbsp;generalization<br>
+recombines&nbsp;them&nbsp;at&nbsp;induction&nbsp;time&nbsp;(retrieval-based&nbsp;accounts&nbsp;of<br>
+hippocampal&nbsp;generalization).&nbsp;Capped&nbsp;so&nbsp;a&nbsp;flood&nbsp;of&nbsp;near-identical<br>
+demonstrations&nbsp;doesn't&nbsp;bury&nbsp;informative&nbsp;ones:&nbsp;an&nbsp;incoming&nbsp;pair<br>
+identical&nbsp;to&nbsp;a&nbsp;stored&nbsp;one&nbsp;just&nbsp;reinforces&nbsp;it&nbsp;via&nbsp;``count``.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="PairStore-__init__"><strong>__init__</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="PairStore-__len__"><strong>__len__</strong></a>(self) -&gt; 'int'</dt></dl>
+
+<dl><dt><a name="PairStore-add"><strong>add</strong></a>(self, antecedent: 'Grid', consequent: 'Grid') -&gt; 'bool'</dt><dd><span class="code">Encode&nbsp;one&nbsp;(antecedent&nbsp;→&nbsp;consequent)&nbsp;demonstration.<br>
+&nbsp;<br>
+Returns&nbsp;True&nbsp;if&nbsp;a&nbsp;genuinely&nbsp;new&nbsp;pair&nbsp;was&nbsp;stored&nbsp;—&nbsp;i.e.&nbsp;the<br>
+evidence&nbsp;base&nbsp;changed&nbsp;and&nbsp;re-induction&nbsp;may&nbsp;be&nbsp;warranted.</span></dd></dl>
+
+<dl><dt><a name="PairStore-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict[str, Any]'</dt></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="PairStore-from_dict"><strong>from_dict</strong></a>(data: 'dict[str, Any]') -&gt; 'PairStore'</dt><dd><span class="code">Rebuild&nbsp;the&nbsp;exemplar&nbsp;ledger&nbsp;—&nbsp;pairs&nbsp;with&nbsp;their&nbsp;stored<br>
+reinforcement&nbsp;counts,&nbsp;exactly&nbsp;as&nbsp;``to_dict``&nbsp;wrote&nbsp;them.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>CAP</strong> = 64</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="RuleStatus">class <strong>RuleStatus</strong></a>(<a href="enum.html#Enum">enum.Enum</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#RuleStatus">RuleStatus</a>(*values)<br>
+&nbsp;<br>
+Same&nbsp;epistemic&nbsp;bookkeeping&nbsp;as&nbsp;hypotheses.py.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.frontal_lobe.reasoning.induction.html#RuleStatus">RuleStatus</a></dd>
+<dd><a href="enum.html#Enum">enum.Enum</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>PROPOSED</strong> = &lt;RuleStatus.PROPOSED: 'proposed'&gt;</dl>
+
+<dl><dt><strong>REFUTED</strong> = &lt;RuleStatus.REFUTED: 'refuted'&gt;</dl>
+
+<dl><dt><strong>VERIFIED</strong> = &lt;RuleStatus.VERIFIED: 'verified'&gt;</dl>
+
+<hr>
+Data descriptors inherited from <a href="enum.html#Enum">enum.Enum</a>:<br>
+<dl><dt><strong>name</strong></dt>
+<dd><span class="code">The&nbsp;name&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<dl><dt><strong>value</strong></dt>
+<dd><span class="code">The&nbsp;value&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<hr>
+Static methods inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><a name="RuleStatus-__contains__"><strong>__contains__</strong></a>(value)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;`value`&nbsp;is&nbsp;in&nbsp;`cls`.<br>
+&nbsp;<br>
+`value`&nbsp;is&nbsp;in&nbsp;`cls`&nbsp;if:<br>
+1)&nbsp;`value`&nbsp;is&nbsp;a&nbsp;member&nbsp;of&nbsp;`cls`,&nbsp;or<br>
+2)&nbsp;`value`&nbsp;is&nbsp;the&nbsp;value&nbsp;of&nbsp;one&nbsp;of&nbsp;the&nbsp;`cls`'s&nbsp;members.</span></dd></dl>
+
+<dl><dt><a name="RuleStatus-__getitem__"><strong>__getitem__</strong></a>(name)</dt><dd><span class="code">Return&nbsp;the&nbsp;member&nbsp;matching&nbsp;`name`.</span></dd></dl>
+
+<dl><dt><a name="RuleStatus-__iter__"><strong>__iter__</strong></a>()</dt><dd><span class="code">Return&nbsp;members&nbsp;in&nbsp;definition&nbsp;order.</span></dd></dl>
+
+<dl><dt><a name="RuleStatus-__len__"><strong>__len__</strong></a>()</dt><dd><span class="code">Return&nbsp;the&nbsp;number&nbsp;of&nbsp;members&nbsp;(no&nbsp;aliases)</span></dd></dl>
+
+<hr>
+Readonly properties inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><strong>__members__</strong></dt>
+<dd><span class="code">Returns&nbsp;a&nbsp;mapping&nbsp;of&nbsp;member&nbsp;name-&gt;value.<br>
+&nbsp;<br>
+This&nbsp;mapping&nbsp;lists&nbsp;all&nbsp;enum&nbsp;members,&nbsp;including&nbsp;aliases.&nbsp;Note&nbsp;that&nbsp;this<br>
+is&nbsp;a&nbsp;read-only&nbsp;view&nbsp;of&nbsp;the&nbsp;internal&nbsp;mapping.</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="TransformRule">class <strong>TransformRule</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code">A&nbsp;transformation&nbsp;rule&nbsp;induced&nbsp;from&nbsp;exemplars.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="TransformRule-describe"><strong>describe</strong></a>(self) -&gt; 'str'</dt></dl>
+
+<dl><dt><a name="TransformRule-predict"><strong>predict</strong></a>(self, query: 'Grid') -&gt; 'Grid | None'</dt></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>level</strong></dt>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'kind': 'str'}</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['AbstractLevel', 'ExampleInductor', 'PairStore', 'RuleStatus', 'TransformRule']</td></tr></table>
+</body></html>

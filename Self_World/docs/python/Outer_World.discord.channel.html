@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Outer_World.discord.channel</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Outer_World.html" class="white">Outer_World</a>.<a href="Outer_World.discord.html" class="white">discord</a>.channel</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Outer_World/discord/channel.py">/home/mindyrenee/GenAnd/Genesis/Outer_World/discord/channel.py</a></td></tr></table>
+    <p><span class="code"><a href="#Channel">Channel</a>&nbsp;—&nbsp;her&nbsp;page&nbsp;in&nbsp;the&nbsp;outer&nbsp;world.<br>
+&nbsp;<br>
+A&nbsp;Discord&nbsp;channel&nbsp;is&nbsp;a&nbsp;place&nbsp;in&nbsp;the&nbsp;world,&nbsp;not&nbsp;a&nbsp;part&nbsp;of&nbsp;the&nbsp;mind:<br>
+the&nbsp;public&nbsp;gathers&nbsp;there,&nbsp;she&nbsp;posts&nbsp;there,&nbsp;and&nbsp;when&nbsp;a&nbsp;bot&nbsp;token<br>
+exists&nbsp;she&nbsp;can&nbsp;hear&nbsp;it.&nbsp;The&nbsp;transports&nbsp;live&nbsp;in&nbsp;``discord.feed``<br>
+(the&nbsp;platform&nbsp;adapter&nbsp;—&nbsp;webhook&nbsp;out,&nbsp;bot-token&nbsp;polling&nbsp;in);&nbsp;this<br>
+<a href="builtins.html#object">object</a>&nbsp;is&nbsp;the&nbsp;world-facing&nbsp;thing&nbsp;—&nbsp;the&nbsp;page's&nbsp;lifecycle,&nbsp;its&nbsp;ear,<br>
+and&nbsp;the&nbsp;door&nbsp;inbound&nbsp;speech&nbsp;comes&nbsp;through.<br>
+&nbsp;<br>
+The&nbsp;channel&nbsp;owns&nbsp;no&nbsp;cognition:&nbsp;it&nbsp;delivers&nbsp;what&nbsp;it&nbsp;hears&nbsp;to<br>
+``on_speech``&nbsp;(the&nbsp;OuterEnvironment&nbsp;registers&nbsp;its&nbsp;own&nbsp;handler&nbsp;—&nbsp;the<br>
+hearing&nbsp;is&nbsp;the&nbsp;world's&nbsp;to&nbsp;record;&nbsp;whether&nbsp;to&nbsp;answer&nbsp;is&nbsp;the&nbsp;mind's<br>
+to&nbsp;decide).&nbsp;Without&nbsp;a&nbsp;webhook&nbsp;there&nbsp;is&nbsp;no&nbsp;page&nbsp;and&nbsp;no&nbsp;channel<br>
+<a href="builtins.html#object">object</a>&nbsp;—&nbsp;her&nbsp;world&nbsp;is&nbsp;simply&nbsp;without&nbsp;that&nbsp;place.</span></p>
+<p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Outer_World.discord.channel.html#Channel">Channel</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Channel">class <strong>Channel</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Channel">Channel</a>(feed:&nbsp;'DiscordFeed',&nbsp;listener:&nbsp;'DiscordListener&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Her&nbsp;page&nbsp;—&nbsp;a&nbsp;place&nbsp;in&nbsp;the&nbsp;outer&nbsp;world&nbsp;where&nbsp;the&nbsp;public&nbsp;gathers.<br>
+&nbsp;<br>
+Owns&nbsp;the&nbsp;outbound&nbsp;transport&nbsp;(``feed``&nbsp;—&nbsp;posts,&nbsp;images,&nbsp;the<br>
+self-editing&nbsp;board)&nbsp;and&nbsp;the&nbsp;inbound&nbsp;ear&nbsp;(``listener``&nbsp;—&nbsp;None<br>
+when&nbsp;no&nbsp;bot&nbsp;token&nbsp;is&nbsp;configured;&nbsp;a&nbsp;webhook&nbsp;alone&nbsp;is&nbsp;write-only).<br>
+``on_speech``&nbsp;is&nbsp;assigned&nbsp;by&nbsp;the&nbsp;world&nbsp;that&nbsp;holds&nbsp;the&nbsp;channel;<br>
+until&nbsp;then&nbsp;inbound&nbsp;speech&nbsp;has&nbsp;somewhere&nbsp;to&nbsp;arrive&nbsp;but&nbsp;nobody&nbsp;to<br>
+record&nbsp;it.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;feed:&nbsp;The&nbsp;posting&nbsp;transport&nbsp;the&nbsp;page&nbsp;runs&nbsp;on.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;listener:&nbsp;An&nbsp;already-built&nbsp;ear,&nbsp;or&nbsp;None&nbsp;to&nbsp;build&nbsp;one&nbsp;from&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;feed&nbsp;(the&nbsp;usual&nbsp;path&nbsp;—&nbsp;``DiscordListener.from_feed``&nbsp;needs<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;bot-token&nbsp;env,&nbsp;so&nbsp;the&nbsp;ear&nbsp;may&nbsp;legitimately&nbsp;be&nbsp;absent).<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Channel-__init__"><strong>__init__</strong></a>(self, feed: 'DiscordFeed', listener: 'DiscordListener | None' = None) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Channel-close"><strong>close</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Shut&nbsp;the&nbsp;page&nbsp;—&nbsp;ear&nbsp;first,&nbsp;then&nbsp;the&nbsp;poster's&nbsp;drain&nbsp;window.</span></dd></dl>
+
+<dl><dt><a name="Channel-start"><strong>start</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Open&nbsp;the&nbsp;ear&nbsp;—&nbsp;begin&nbsp;polling&nbsp;the&nbsp;channel&nbsp;for&nbsp;public&nbsp;speech.</span></dd></dl>
+
+<dl><dt><a name="Channel-stop"><strong>stop</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Close&nbsp;the&nbsp;ear&nbsp;—&nbsp;idempotent;&nbsp;the&nbsp;listener&nbsp;guards&nbsp;its&nbsp;own&nbsp;join.</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="Channel-from_env"><strong>from_env</strong></a>() -&gt; 'Channel | None'</dt><dd><span class="code">Open&nbsp;her&nbsp;page&nbsp;when&nbsp;a&nbsp;channel&nbsp;webhook&nbsp;is&nbsp;configured.<br>
+&nbsp;<br>
+Returns&nbsp;None&nbsp;without&nbsp;``GENESIS_DISCORD_WEBHOOK``&nbsp;—&nbsp;there&nbsp;is<br>
+no&nbsp;page&nbsp;then,&nbsp;and&nbsp;the&nbsp;world&nbsp;holds&nbsp;no&nbsp;channel.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>bot_id</strong></dt>
+<dd><span class="code">The&nbsp;bot's&nbsp;own&nbsp;user&nbsp;id,&nbsp;once&nbsp;the&nbsp;ear&nbsp;has&nbsp;learned&nbsp;it.</span></dd>
+</dl>
+<dl><dt><strong>ear</strong></dt>
+<dd><span class="code">Ear&nbsp;status&nbsp;for&nbsp;status&nbsp;surfaces:&nbsp;``off``&nbsp;|&nbsp;``deaf``&nbsp;|&nbsp;``on``.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['Channel']</td></tr></table>
+</body></html>

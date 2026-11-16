@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.temporal_lobe.bdnf</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.temporal_lobe.html" class="white">temporal_lobe</a>.bdnf</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/bdnf.py">/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/bdnf.py</a></td></tr></table>
+    <p><span class="code"><a href="#BDNF">BDNF</a>&nbsp;—&nbsp;brain-derived&nbsp;neurotrophic&nbsp;factor;&nbsp;plasticity&nbsp;gate.<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+BIOLOGY<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+Origin:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Throughout&nbsp;the&nbsp;brain&nbsp;—&nbsp;<a href="#BDNF">BDNF</a>&nbsp;is&nbsp;expressed&nbsp;by&nbsp;neurons&nbsp;broadly,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;with&nbsp;high&nbsp;levels&nbsp;in&nbsp;hippocampus,&nbsp;cortex,&nbsp;and&nbsp;amygdala.<br>
+&nbsp;<br>
+Projections:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Local&nbsp;paracrine/autocrine&nbsp;signaling.&nbsp;<a href="#BDNF">BDNF</a>&nbsp;is&nbsp;a&nbsp;neurotrophin,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;not&nbsp;a&nbsp;neurotransmitter&nbsp;—&nbsp;it&nbsp;acts&nbsp;on&nbsp;TrkB&nbsp;receptors&nbsp;to&nbsp;promote<br>
+&nbsp;&nbsp;&nbsp;&nbsp;synaptic&nbsp;plasticity,&nbsp;neurogenesis,&nbsp;and&nbsp;neuronal&nbsp;survival.<br>
+&nbsp;<br>
+Receptors:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;TrkB&nbsp;—&nbsp;receptor&nbsp;tyrosine&nbsp;kinase,&nbsp;primary&nbsp;<a href="#BDNF">BDNF</a>&nbsp;receptor.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;p75NTR&nbsp;—&nbsp;pan-neurotrophin&nbsp;receptor,&nbsp;modulatory.<br>
+&nbsp;<br>
+No&nbsp;subtype&nbsp;differentiation&nbsp;modeled&nbsp;(default_receptor_subtypes&nbsp;=&nbsp;[1.0,&nbsp;1.0]).<br>
+&nbsp;<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+DEFAULT&nbsp;BASELINE<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;baseline&nbsp;=&nbsp;0.45<br>
+&nbsp;<br>
+Constitutive&nbsp;neurotrophin.&nbsp;<a href="#BDNF">BDNF</a>&nbsp;is&nbsp;always&nbsp;present&nbsp;at&nbsp;a&nbsp;moderate<br>
+level&nbsp;to&nbsp;support&nbsp;baseline&nbsp;plasticity.&nbsp;Chronic&nbsp;stress&nbsp;(cortisol)<br>
+suppresses&nbsp;it&nbsp;below&nbsp;baseline,&nbsp;blocking&nbsp;learning.<br>
+&nbsp;<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+RECEPTOR&nbsp;ADAPTATION&nbsp;MULTIPLIER<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;multiplier&nbsp;=&nbsp;0.5<br>
+&nbsp;<br>
+TrkB&nbsp;receptor&nbsp;turnover&nbsp;is&nbsp;slow&nbsp;—&nbsp;neurotrophin&nbsp;receptors&nbsp;adapt<br>
+much&nbsp;slower&nbsp;than&nbsp;the&nbsp;baseline&nbsp;reference&nbsp;(glutamate&nbsp;at&nbsp;1.0×).<br>
+&nbsp;<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+COUPLING:&nbsp;HOW&nbsp;OTHERS&nbsp;AFFECT&nbsp;<a href="#BDNF">BDNF</a>&nbsp;(matrix&nbsp;row&nbsp;11)<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+Index&nbsp;order:&nbsp;DA,&nbsp;SRT,&nbsp;NE,&nbsp;ACh,&nbsp;GABA,&nbsp;GLU,&nbsp;CORT,&nbsp;OXY,&nbsp;END,&nbsp;HIST,<br>
+ADN,&nbsp;<a href="#BDNF">BDNF</a>,&nbsp;ECB,&nbsp;VP,&nbsp;CRH,&nbsp;OX,&nbsp;EPI,&nbsp;MEL<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;DA&nbsp;&nbsp;&nbsp;-&gt;&nbsp;<a href="#BDNF">BDNF</a>:&nbsp;+0.05&nbsp;&nbsp;(weak&nbsp;volume&nbsp;transmission.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;SRT&nbsp;&nbsp;-&gt;&nbsp;<a href="#BDNF">BDNF</a>:&nbsp;+0.10&nbsp;&nbsp;(the&nbsp;antidepressant&nbsp;mechanism&nbsp;—&nbsp;serotonin&nbsp;is&nbsp;the&nbsp;strongest&nbsp;<a href="#BDNF">BDNF</a>&nbsp;supporter.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SSRIs&nbsp;raise&nbsp;SRT&nbsp;-&gt;&nbsp;raise&nbsp;<a href="#BDNF">BDNF</a>&nbsp;-&gt;&nbsp;neuroplasticity&nbsp;-&gt;&nbsp;depression&nbsp;recovery.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;NE&nbsp;&nbsp;&nbsp;-&gt;&nbsp;<a href="#BDNF">BDNF</a>:&nbsp;+0.05&nbsp;&nbsp;(weak&nbsp;volume&nbsp;transmission.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ACh&nbsp;&nbsp;-&gt;&nbsp;<a href="#BDNF">BDNF</a>:&nbsp;+0.05&nbsp;&nbsp;(weak&nbsp;volume&nbsp;transmission.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;GLU&nbsp;&nbsp;-&gt;&nbsp;<a href="#BDNF">BDNF</a>:&nbsp;+0.05&nbsp;&nbsp;(weak&nbsp;volume&nbsp;transmission.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;CORT&nbsp;-&gt;&nbsp;<a href="#BDNF">BDNF</a>:&nbsp;-0.20&nbsp;&nbsp;(chronic&nbsp;stress&nbsp;suppresses&nbsp;<a href="#BDNF">BDNF</a>&nbsp;—&nbsp;THE&nbsp;key&nbsp;mechanism&nbsp;by&nbsp;which&nbsp;stress<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;impairs&nbsp;learning&nbsp;and&nbsp;memory.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;OXY&nbsp;&nbsp;-&gt;&nbsp;<a href="#BDNF">BDNF</a>:&nbsp;+0.05&nbsp;&nbsp;(weak&nbsp;volume&nbsp;transmission.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;END&nbsp;&nbsp;-&gt;&nbsp;<a href="#BDNF">BDNF</a>:&nbsp;+0.05&nbsp;&nbsp;(weak&nbsp;volume&nbsp;transmission.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;GABA&nbsp;-&gt;&nbsp;<a href="#BDNF">BDNF</a>:&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;HIST&nbsp;-&gt;&nbsp;<a href="#BDNF">BDNF</a>:&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ADN&nbsp;&nbsp;-&gt;&nbsp;<a href="#BDNF">BDNF</a>:&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ECB&nbsp;&nbsp;-&gt;&nbsp;<a href="#BDNF">BDNF</a>:&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;VP&nbsp;&nbsp;&nbsp;-&gt;&nbsp;<a href="#BDNF">BDNF</a>:&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;CRH&nbsp;&nbsp;-&gt;&nbsp;<a href="#BDNF">BDNF</a>:&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;OX&nbsp;&nbsp;&nbsp;-&gt;&nbsp;<a href="#BDNF">BDNF</a>:&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;EPI&nbsp;&nbsp;-&gt;&nbsp;<a href="#BDNF">BDNF</a>:&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;MEL&nbsp;&nbsp;-&gt;&nbsp;<a href="#BDNF">BDNF</a>:&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+COUPLING:&nbsp;HOW&nbsp;<a href="#BDNF">BDNF</a>&nbsp;AFFECTS&nbsp;OTHERS&nbsp;(matrix&nbsp;column&nbsp;11)<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#BDNF">BDNF</a>&nbsp;-&gt;&nbsp;DA&nbsp;:&nbsp;&nbsp;+0.05&nbsp;&nbsp;(trophic&nbsp;support.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#BDNF">BDNF</a>&nbsp;-&gt;&nbsp;SRT:&nbsp;&nbsp;+0.10&nbsp;&nbsp;(the&nbsp;antidepressant&nbsp;positive&nbsp;feedback&nbsp;—&nbsp;SSRIs&nbsp;raise&nbsp;SRT&nbsp;-&gt;&nbsp;raise&nbsp;<a href="#BDNF">BDNF</a>&nbsp;-&gt;&nbsp;.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;raise&nbsp;SRT.&nbsp;Bounded&nbsp;by&nbsp;homeostatic&nbsp;forces.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#BDNF">BDNF</a>&nbsp;-&gt;&nbsp;NE&nbsp;:&nbsp;&nbsp;+0.05&nbsp;&nbsp;(trophic&nbsp;support.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#BDNF">BDNF</a>&nbsp;-&gt;&nbsp;ACh:&nbsp;&nbsp;+0.05&nbsp;&nbsp;(trophic&nbsp;support.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#BDNF">BDNF</a>&nbsp;-&gt;&nbsp;GABA:&nbsp;&nbsp;+0.05&nbsp;&nbsp;(trophic&nbsp;support.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#BDNF">BDNF</a>&nbsp;-&gt;&nbsp;GLU:&nbsp;&nbsp;+0.05&nbsp;&nbsp;(trophic&nbsp;support.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#BDNF">BDNF</a>&nbsp;-&gt;&nbsp;CORT:&nbsp;&nbsp;-0.05&nbsp;&nbsp;(<a href="#BDNF">BDNF</a>&nbsp;suppresses&nbsp;cortisol&nbsp;(weak).)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#BDNF">BDNF</a>&nbsp;-&gt;&nbsp;OXY:&nbsp;&nbsp;+0.05&nbsp;&nbsp;(trophic&nbsp;support.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#BDNF">BDNF</a>&nbsp;-&gt;&nbsp;END:&nbsp;&nbsp;+0.05&nbsp;&nbsp;(trophic&nbsp;support.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#BDNF">BDNF</a>&nbsp;-&gt;&nbsp;HIST:&nbsp;&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#BDNF">BDNF</a>&nbsp;-&gt;&nbsp;ADN:&nbsp;&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#BDNF">BDNF</a>&nbsp;-&gt;&nbsp;ECB:&nbsp;&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#BDNF">BDNF</a>&nbsp;-&gt;&nbsp;VP&nbsp;:&nbsp;&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#BDNF">BDNF</a>&nbsp;-&gt;&nbsp;CRH:&nbsp;&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#BDNF">BDNF</a>&nbsp;-&gt;&nbsp;OX&nbsp;:&nbsp;&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#BDNF">BDNF</a>&nbsp;-&gt;&nbsp;EPI:&nbsp;&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#BDNF">BDNF</a>&nbsp;-&gt;&nbsp;MEL:&nbsp;&nbsp;0.00&nbsp;&nbsp;&nbsp;(no&nbsp;direct&nbsp;coupling)<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+SPECIAL&nbsp;DYNAMICS<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+<a href="#BDNF">BDNF</a>&nbsp;recovery&nbsp;after&nbsp;stress:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;When&nbsp;cortisol&nbsp;has&nbsp;cleared&nbsp;below&nbsp;the&nbsp;stress-phase&nbsp;gate&nbsp;(0.06&nbsp;—<br>
+&nbsp;&nbsp;&nbsp;&nbsp;stress&nbsp;is&nbsp;over)&nbsp;and&nbsp;<a href="#BDNF">BDNF</a>&nbsp;is&nbsp;still&nbsp;below&nbsp;its&nbsp;baseline&nbsp;(depleted<br>
+&nbsp;&nbsp;&nbsp;&nbsp;by&nbsp;chronic&nbsp;stress),&nbsp;<a href="#BDNF">BDNF</a>&nbsp;gets&nbsp;a&nbsp;recovery&nbsp;boost&nbsp;proportional&nbsp;to<br>
+&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;serotonin&nbsp;level.&nbsp;Serotonin&nbsp;drives&nbsp;<a href="#BDNF">BDNF</a>&nbsp;expression&nbsp;—&nbsp;this&nbsp;is<br>
+&nbsp;&nbsp;&nbsp;&nbsp;why&nbsp;SSRIs&nbsp;help&nbsp;depression&nbsp;(increasing&nbsp;serotonin&nbsp;promotes&nbsp;<a href="#BDNF">BDNF</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;recovery).<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;cort_level&nbsp;&lt;&nbsp;0.06&nbsp;and&nbsp;bdnf_level&nbsp;&lt;&nbsp;bdnf_baseline:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;recovery&nbsp;=&nbsp;srt_level&nbsp;*&nbsp;bdnf_recovery_rate&nbsp;*&nbsp;dt_scale<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;bdnf_level&nbsp;+=&nbsp;recovery<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;This&nbsp;captures&nbsp;the&nbsp;neurobiological&nbsp;basis&nbsp;of&nbsp;stress&nbsp;recovery:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;after&nbsp;chronic&nbsp;stress&nbsp;depletes&nbsp;<a href="#BDNF">BDNF</a>&nbsp;(via&nbsp;cortisol&nbsp;suppression),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;recovery&nbsp;is&nbsp;driven&nbsp;by&nbsp;serotonin&nbsp;signaling,&nbsp;not&nbsp;just&nbsp;passive<br>
+&nbsp;&nbsp;&nbsp;&nbsp;homeostatic&nbsp;drift.<br>
+&nbsp;<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+MATHEMATICAL&nbsp;FORMULAS<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+Homeostatic&nbsp;force,&nbsp;effective&nbsp;level,&nbsp;coupling&nbsp;force,&nbsp;vesicular&nbsp;pool,<br>
+tonic/phasic,&nbsp;receptor&nbsp;adaptation,&nbsp;baseline&nbsp;adaptation:&nbsp;same<br>
+general&nbsp;formulas&nbsp;as&nbsp;dopamine.py.<br>
+&nbsp;<br>
+<a href="#BDNF">BDNF</a>&nbsp;recovery&nbsp;after&nbsp;stress:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;cort_level&nbsp;&lt;&nbsp;0.3&nbsp;and&nbsp;bdnf_level&nbsp;&lt;&nbsp;bdnf_baseline:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;recovery&nbsp;=&nbsp;srt_level&nbsp;*&nbsp;bdnf_recovery_rate&nbsp;*&nbsp;dt_scale<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;bdnf_level&nbsp;+=&nbsp;recovery<br>
+&nbsp;&nbsp;&nbsp;&nbsp;where&nbsp;bdnf_recovery_rate&nbsp;=&nbsp;0.001&nbsp;(default)<br>
+&nbsp;<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+CIRCADIAN&nbsp;MODULATION<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;modifier&nbsp;=&nbsp;1.0&nbsp;(no&nbsp;circadian&nbsp;modulation)<br>
+&nbsp;<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+BRAIN&nbsp;WAVE&nbsp;COUPLING<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#BDNF">BDNF</a>&nbsp;-&gt;&nbsp;gamma&nbsp;(plasticity,&nbsp;learning)<br>
+&nbsp;<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+ROLE&nbsp;IN&nbsp;EMERGENT&nbsp;PHASES<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+Plasticity&nbsp;gate:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;plasticity_gate&nbsp;=&nbsp;<a href="#BDNF">BDNF</a>&nbsp;*&nbsp;(1&nbsp;-&nbsp;CORT&nbsp;*&nbsp;0.5)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(clamped&nbsp;to&nbsp;[0,&nbsp;1])<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#BDNF">BDNF</a>&nbsp;promotes&nbsp;plasticity,&nbsp;cortisol&nbsp;suppresses&nbsp;it.&nbsp;This&nbsp;is&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;structural&nbsp;basis&nbsp;of&nbsp;why&nbsp;chronic&nbsp;stress&nbsp;impairs&nbsp;learning:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;cortisol&nbsp;suppresses&nbsp;<a href="#BDNF">BDNF</a>&nbsp;-&gt;&nbsp;suppresses&nbsp;plasticity_gate&nbsp;-&gt;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;prevents&nbsp;new&nbsp;memory&nbsp;formation.<br>
+&nbsp;<br>
+Metaplasticity&nbsp;gating:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;coupling&nbsp;matrix&nbsp;self-modifies&nbsp;only&nbsp;when&nbsp;plasticity_gate&nbsp;&gt;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;0.1.&nbsp;Chronic&nbsp;stress&nbsp;(high&nbsp;cortisol)&nbsp;suppresses&nbsp;<a href="#BDNF">BDNF</a>,&nbsp;which<br>
+&nbsp;&nbsp;&nbsp;&nbsp;suppresses&nbsp;plasticity_gate,&nbsp;which&nbsp;suppresses&nbsp;metaplasticity&nbsp;—<br>
+&nbsp;&nbsp;&nbsp;&nbsp;a&nbsp;protective&nbsp;mechanism&nbsp;that&nbsp;prevents&nbsp;stress&nbsp;from&nbsp;permanently<br>
+&nbsp;&nbsp;&nbsp;&nbsp;rewiring&nbsp;the&nbsp;brain.<br>
+&nbsp;<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+APPLICATION&nbsp;IN&nbsp;GENESIS<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+Maximum&nbsp;impulse&nbsp;magnitude:&nbsp;0.05<br>
+(Physiological&nbsp;boosts&nbsp;are&nbsp;0.02-0.05;&nbsp;larger&nbsp;boosts&nbsp;trigger<br>
+receptor&nbsp;downregulation,&nbsp;Lu&nbsp;et&nbsp;al.,&nbsp;2014)<br>
+&nbsp;<br>
+Python&nbsp;modules&nbsp;that&nbsp;send&nbsp;<a href="#BDNF">BDNF</a>&nbsp;impulses:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;limbic_system/emotional_regulator.py:&nbsp;learning,&nbsp;comfort,&nbsp;social<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;bonding,&nbsp;stress&nbsp;reduction<br>
+&nbsp;<br>
+Python&nbsp;modules&nbsp;that&nbsp;read&nbsp;<a href="#BDNF">BDNF</a>:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;limbic_system/emotion.py:&nbsp;maps&nbsp;to&nbsp;EmotionalState&nbsp;(plasticity)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;limbic_system/emotional_regulator.py:&nbsp;homeostatic&nbsp;regulation<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;memory/memory.py:&nbsp;plasticity&nbsp;gate&nbsp;(encoding&nbsp;weight)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;temporal_lobe/plasticity.py,&nbsp;temporal_lobe/stdp.py:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Hebbian/STDP&nbsp;plasticity<br>
+&nbsp;<br>
+Typical&nbsp;impulse&nbsp;scenarios:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Learning:&nbsp;+0.02&nbsp;(limbic_system/emotional_regulator)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Comfort:&nbsp;+0.08&nbsp;(limbic_system/emotional_regulator)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Social&nbsp;bonding:&nbsp;+0.15&nbsp;*&nbsp;social_modulation<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(limbic_system/emotional_regulator)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Stress&nbsp;reduction:&nbsp;+0.10&nbsp;(limbic_system/emotional_regulator,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;raw&nbsp;impulse)</span></p>
+<p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.bdnf.html#BDNF">BDNF</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="BDNF">class <strong>BDNF</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#BDNF">BDNF</a>(index:&nbsp;'int'&nbsp;=&nbsp;11,&nbsp;name:&nbsp;'str'&nbsp;=&nbsp;'bdnf',&nbsp;baseline:&nbsp;'float'&nbsp;=&nbsp;0.45,&nbsp;receptor_adaptation_multiplier:&nbsp;'float'&nbsp;=&nbsp;0.3,&nbsp;receptor_subtypes:&nbsp;'tuple[str,&nbsp;str]'&nbsp;=&nbsp;('TrkB',&nbsp;'p75NTR'),&nbsp;receptor_subtype_balance:&nbsp;'tuple[float,&nbsp;float]'&nbsp;=&nbsp;(1.0,&nbsp;1.0),&nbsp;max_impulse:&nbsp;'float'&nbsp;=&nbsp;0.05,&nbsp;origin:&nbsp;'tuple[str,&nbsp;...]'&nbsp;=&nbsp;('throughout&nbsp;brain',&nbsp;'hippocampus',&nbsp;'cortex',&nbsp;'amygdala'),&nbsp;projections:&nbsp;'tuple[str,&nbsp;...]'&nbsp;=&nbsp;('local&nbsp;paracrine/autocrine',),&nbsp;receptors:&nbsp;'tuple[str,&nbsp;...]'&nbsp;=&nbsp;('TrkB',&nbsp;'p75NTR'),&nbsp;brain_waves:&nbsp;'tuple[str,&nbsp;...]'&nbsp;=&nbsp;('gamma',),&nbsp;circadian_modifier:&nbsp;'str'&nbsp;=&nbsp;'1.0&nbsp;(no&nbsp;circadian&nbsp;modulation)',&nbsp;role:&nbsp;'str'&nbsp;=&nbsp;'plasticity&nbsp;gate,&nbsp;neurogenesis,&nbsp;synaptic&nbsp;strengthening',&nbsp;recovery_rate:&nbsp;'float'&nbsp;=&nbsp;0.001)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+<a href="#BDNF">BDNF</a>&nbsp;—&nbsp;brain-derived&nbsp;neurotrophic&nbsp;factor;&nbsp;plasticity&nbsp;gate.<br>
+&nbsp;<br>
+All&nbsp;values&nbsp;synchronized&nbsp;with&nbsp;src/state/neurochemical.rs.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="BDNF-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="BDNF-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="BDNF-__getstate__"><strong>__getstate__</strong></a> = _dataclass_getstate(self)<span class="grey"><span class="heading-text"> from <a href="dataclasses.html">dataclasses</a></span></span></dt><dd><span class="code">#&nbsp;_dataclass_getstate&nbsp;and&nbsp;_dataclass_setstate&nbsp;are&nbsp;needed&nbsp;for&nbsp;pickling&nbsp;frozen<br>
+#&nbsp;classes&nbsp;with&nbsp;slots.&nbsp;&nbsp;These&nbsp;could&nbsp;be&nbsp;slightly&nbsp;more&nbsp;performant&nbsp;if&nbsp;we&nbsp;generated<br>
+#&nbsp;the&nbsp;code&nbsp;instead&nbsp;of&nbsp;iterating&nbsp;over&nbsp;fields.&nbsp;&nbsp;But&nbsp;that&nbsp;can&nbsp;be&nbsp;a&nbsp;project&nbsp;for<br>
+#&nbsp;another&nbsp;day,&nbsp;if&nbsp;performance&nbsp;becomes&nbsp;an&nbsp;issue.</span></dd></dl>
+
+<dl><dt><a name="BDNF-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="BDNF-__init__"><strong>__init__</strong></a>(self, index: 'int' = 11, name: 'str' = 'bdnf', baseline: 'float' = 0.45, receptor_adaptation_multiplier: 'float' = 0.3, receptor_subtypes: 'tuple[str, str]' = ('TrkB', 'p75NTR'), receptor_subtype_balance: 'tuple[float, float]' = (1.0, 1.0), max_impulse: 'float' = 0.05, origin: 'tuple[str, ...]' = ('throughout brain', 'hippocampus', 'cortex', 'amygdala'), projections: 'tuple[str, ...]' = ('local paracrine/autocrine',), receptors: 'tuple[str, ...]' = ('TrkB', 'p75NTR'), brain_waves: 'tuple[str, ...]' = ('gamma',), circadian_modifier: 'str' = '1.0 (no circadian modulation)', role: 'str' = 'plasticity gate, neurogenesis, synaptic strengthening', recovery_rate: 'float' = 0.001) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="BDNF-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="BDNF-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<dl><dt><a name="BDNF-__setstate__"><strong>__setstate__</strong></a> = _dataclass_setstate(self, state)<span class="grey"><span class="heading-text"> from <a href="dataclasses.html">dataclasses</a></span></span></dt></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>baseline</strong></dt>
+</dl>
+<dl><dt><strong>brain_waves</strong></dt>
+</dl>
+<dl><dt><strong>circadian_modifier</strong></dt>
+</dl>
+<dl><dt><strong>index</strong></dt>
+</dl>
+<dl><dt><strong>max_impulse</strong></dt>
+</dl>
+<dl><dt><strong>name</strong></dt>
+</dl>
+<dl><dt><strong>origin</strong></dt>
+</dl>
+<dl><dt><strong>projections</strong></dt>
+</dl>
+<dl><dt><strong>receptor_adaptation_multiplier</strong></dt>
+</dl>
+<dl><dt><strong>receptor_subtype_balance</strong></dt>
+</dl>
+<dl><dt><strong>receptor_subtypes</strong></dt>
+</dl>
+<dl><dt><strong>receptors</strong></dt>
+</dl>
+<dl><dt><strong>recovery_rate</strong></dt>
+</dl>
+<dl><dt><strong>role</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'baseline': 'float', 'brain_waves': 'tuple[str, ...]', 'circadian_modifier': 'str', 'index': 'int', 'max_impulse': 'float', 'name': 'str', 'origin': 'tuple[str, ...]', 'projections': 'tuple[str, ...]', 'receptor_adaptation_multiplier': 'float', 'receptor_subtype_balance': 'tuple[float, float]', ...}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'baseline': Field(name='baseline',type='float',default=0.45,...appingproxy({}),kw_only=False,_field_type=_FIELD), 'brain_waves': Field(name='brain_waves',type='tuple[str, ...]',...appingproxy({}),kw_only=False,_field_type=_FIELD), 'circadian_modifier': Field(name='circadian_modifier',type='str',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'index': Field(name='index',type='int',default=11,default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'max_impulse': Field(name='max_impulse',type='float',default=0....appingproxy({}),kw_only=False,_field_type=_FIELD), 'name': Field(name='name',type='str',default='bdnf',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'origin': Field(name='origin',type='tuple[str, ...]',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'projections': Field(name='projections',type='tuple[str, ...]',...appingproxy({}),kw_only=False,_field_type=_FIELD), 'receptor_adaptation_multiplier': Field(name='receptor_adaptation_multiplier',type...appingproxy({}),kw_only=False,_field_type=_FIELD), 'receptor_subtype_balance': Field(name='receptor_subtype_balance',type='tupl...appingproxy({}),kw_only=False,_field_type=_FIELD), ...}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('index', 'name', 'baseline', 'receptor_adaptation_multiplier', 'receptor_subtypes', 'receptor_subtype_balance', 'max_impulse', 'origin', 'projections', 'receptors', 'brain_waves', 'circadian_modifier', 'role', 'recovery_rate')</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>CHEM_BDNF</strong> = 11<br>
+<strong>__all__</strong> = ['BDNF', 'CHEM_BDNF']</td></tr></table>
+</body></html>

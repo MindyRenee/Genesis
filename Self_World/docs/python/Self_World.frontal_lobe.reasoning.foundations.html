@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.frontal_lobe.reasoning.foundations</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.frontal_lobe.html" class="white">frontal_lobe</a>.<a href="Self_World.frontal_lobe.reasoning.html" class="white">reasoning</a>.foundations</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/reasoning/foundations.py">/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/reasoning/foundations.py</a></td></tr></table>
+    <p><span class="code"><a href="#Foundations">Foundations</a>&nbsp;—&nbsp;first&nbsp;principles&nbsp;and&nbsp;the&nbsp;structure&nbsp;of&nbsp;justification.<br>
+&nbsp;<br>
+Aristotle's&nbsp;Posterior&nbsp;Analytics:&nbsp;demonstrative&nbsp;knowledge&nbsp;(episteme)<br>
+proceeds&nbsp;from&nbsp;premises&nbsp;that&nbsp;are&nbsp;true,&nbsp;primary,&nbsp;immediate,&nbsp;better<br>
+known&nbsp;than&nbsp;and&nbsp;prior&nbsp;to&nbsp;the&nbsp;conclusion&nbsp;—&nbsp;archai,&nbsp;first&nbsp;principles,<br>
+which&nbsp;cannot&nbsp;themselves&nbsp;be&nbsp;demonstrated&nbsp;(or&nbsp;nothing&nbsp;could&nbsp;be:&nbsp;the<br>
+regress&nbsp;would&nbsp;be&nbsp;infinite).&nbsp;What&nbsp;grasps&nbsp;them&nbsp;is&nbsp;not&nbsp;demonstration<br>
+but&nbsp;nous&nbsp;—&nbsp;direct&nbsp;apprehension.<br>
+&nbsp;<br>
+Foundationalism&nbsp;formalizes&nbsp;the&nbsp;picture&nbsp;for&nbsp;an&nbsp;arbitrary&nbsp;belief&nbsp;set:<br>
+a&nbsp;belief&nbsp;is&nbsp;**basic**&nbsp;(held&nbsp;as&nbsp;a&nbsp;first&nbsp;principle,&nbsp;needing&nbsp;no<br>
+derivation)&nbsp;or&nbsp;**derived**&nbsp;(deduced&nbsp;from&nbsp;the&nbsp;basics),&nbsp;and&nbsp;the&nbsp;whole<br>
+edifice&nbsp;is&nbsp;*grounded*&nbsp;iff&nbsp;every&nbsp;non-basic&nbsp;belief&nbsp;is&nbsp;entailed&nbsp;by&nbsp;the<br>
+basics.&nbsp;Agrippa's&nbsp;trilemma&nbsp;is&nbsp;the&nbsp;design&nbsp;pressure&nbsp;this&nbsp;answers:<br>
+justification&nbsp;can&nbsp;only&nbsp;terminate&nbsp;at&nbsp;indemonstrable&nbsp;foundations,<br>
+loop&nbsp;circularly,&nbsp;or&nbsp;regress&nbsp;without&nbsp;end&nbsp;—&nbsp;and&nbsp;of&nbsp;those,&nbsp;only&nbsp;the<br>
+first&nbsp;stands.<br>
+&nbsp;<br>
+What&nbsp;this&nbsp;module&nbsp;computes&nbsp;over&nbsp;``logic``'s&nbsp;model&nbsp;theory:<br>
+&nbsp;<br>
+-&nbsp;``proves``&nbsp;/&nbsp;``demonstrate``&nbsp;—&nbsp;deductive&nbsp;closure&nbsp;and&nbsp;its&nbsp;warrant;<br>
+-&nbsp;``support``&nbsp;—&nbsp;the&nbsp;minimal&nbsp;axiom&nbsp;subset&nbsp;entailing&nbsp;a&nbsp;claim<br>
+&nbsp;&nbsp;(abduction&nbsp;over&nbsp;the&nbsp;axioms:&nbsp;which&nbsp;first&nbsp;principles&nbsp;carry&nbsp;it);<br>
+-&nbsp;``indispensable``&nbsp;—&nbsp;which&nbsp;axioms&nbsp;a&nbsp;proof&nbsp;cannot&nbsp;do&nbsp;without<br>
+&nbsp;&nbsp;(drop&nbsp;one&nbsp;and&nbsp;the&nbsp;proof&nbsp;collapses&nbsp;—&nbsp;epistemic&nbsp;load-bearing);<br>
+-&nbsp;``audit``&nbsp;—&nbsp;the&nbsp;Agrippan&nbsp;check&nbsp;over&nbsp;a&nbsp;whole&nbsp;belief&nbsp;set:&nbsp;which<br>
+&nbsp;&nbsp;beliefs&nbsp;are&nbsp;basic,&nbsp;which&nbsp;derived,&nbsp;which&nbsp;ungrounded&nbsp;(reachable&nbsp;by<br>
+&nbsp;&nbsp;no&nbsp;chain&nbsp;from&nbsp;the&nbsp;basics&nbsp;—&nbsp;the&nbsp;infinite-regress&nbsp;symptom),&nbsp;and<br>
+&nbsp;&nbsp;which&nbsp;trapped&nbsp;in&nbsp;circular&nbsp;justification&nbsp;(each&nbsp;citing&nbsp;the&nbsp;next).</span></p>
+<p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.foundations.html#Audit">Audit</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.foundations.html#Foundations">Foundations</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Audit">class <strong>Audit</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Audit">Audit</a>(basic:&nbsp;'frozenset[Formula]',&nbsp;derived:&nbsp;'frozenset[Formula]',&nbsp;ungrounded:&nbsp;'frozenset[Formula]',&nbsp;circular:&nbsp;'frozenset[frozenset[Formula]]')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;Agrippan&nbsp;verdict&nbsp;on&nbsp;a&nbsp;belief&nbsp;set.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Audit-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="Audit-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="Audit-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="Audit-__init__"><strong>__init__</strong></a>(self, basic: 'frozenset[Formula]', derived: 'frozenset[Formula]', ungrounded: 'frozenset[Formula]', circular: 'frozenset[frozenset[Formula]]') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Audit-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="Audit-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>grounded</strong></dt>
+<dd><span class="code">Whether&nbsp;every&nbsp;belief&nbsp;bottoms&nbsp;out&nbsp;at&nbsp;a&nbsp;first&nbsp;principle&nbsp;—<br>
+the&nbsp;whole&nbsp;edifice&nbsp;stands&nbsp;on&nbsp;archai.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'basic': 'frozenset[Formula]', 'circular': 'frozenset[frozenset[Formula]]', 'derived': 'frozenset[Formula]', 'ungrounded': 'frozenset[Formula]'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'basic': Field(name='basic',type='frozenset[Formula]',def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'circular': Field(name='circular',type='frozenset[frozenset[...appingproxy({}),kw_only=False,_field_type=_FIELD), 'derived': Field(name='derived',type='frozenset[Formula]',d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'ungrounded': Field(name='ungrounded',type='frozenset[Formula]...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('basic', 'derived', 'ungrounded', 'circular')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Foundations">class <strong>Foundations</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Foundations">Foundations</a>(axioms:&nbsp;'BeliefSet'&nbsp;=&nbsp;frozenset())&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;foundationalist&nbsp;belief&nbsp;system:&nbsp;indemonstrable&nbsp;first<br>
+principles&nbsp;plus&nbsp;the&nbsp;deductive&nbsp;closure&nbsp;they&nbsp;ground.<br>
+&nbsp;<br>
+``axioms``&nbsp;are&nbsp;the&nbsp;archai&nbsp;—&nbsp;asserted,&nbsp;not&nbsp;derived.&nbsp;Everything<br>
+else&nbsp;this&nbsp;system&nbsp;knows&nbsp;is&nbsp;exactly&nbsp;what&nbsp;the&nbsp;axioms&nbsp;entail.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Foundations-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="Foundations-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="Foundations-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="Foundations-__init__"><strong>__init__</strong></a>(self, axioms: 'BeliefSet' = frozenset()) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Foundations-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="Foundations-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<dl><dt><a name="Foundations-demonstrate"><strong>demonstrate</strong></a>(self, q: 'Formula') -&gt; 'Deduction'</dt><dd><span class="code">Attempt&nbsp;the&nbsp;deduction;&nbsp;on&nbsp;failure&nbsp;return&nbsp;the&nbsp;countermodel&nbsp;—<br>
+the&nbsp;possibility&nbsp;where&nbsp;the&nbsp;principles&nbsp;hold&nbsp;and&nbsp;q&nbsp;does&nbsp;not.</span></dd></dl>
+
+<dl><dt><a name="Foundations-indispensable"><strong>indispensable</strong></a>(self, q: 'Formula') -&gt; 'frozenset[Formula]'</dt><dd><span class="code">The&nbsp;axioms&nbsp;every&nbsp;proof&nbsp;of&nbsp;q&nbsp;needs:&nbsp;a&nbsp;is&nbsp;indispensable&nbsp;iff<br>
+the&nbsp;whole&nbsp;set&nbsp;proves&nbsp;q&nbsp;but&nbsp;the&nbsp;set&nbsp;minus&nbsp;a&nbsp;does&nbsp;not&nbsp;—&nbsp;the<br>
+load-bearing&nbsp;members&nbsp;of&nbsp;the&nbsp;foundation.</span></dd></dl>
+
+<dl><dt><a name="Foundations-is_basic"><strong>is_basic</strong></a>(self, f: 'Formula') -&gt; 'bool'</dt></dl>
+
+<dl><dt><a name="Foundations-is_derived"><strong>is_derived</strong></a>(self, f: 'Formula') -&gt; 'bool'</dt></dl>
+
+<dl><dt><a name="Foundations-proves"><strong>proves</strong></a>(self, q: 'Formula') -&gt; 'bool'</dt><dd><span class="code">axioms&nbsp;⊨&nbsp;q&nbsp;—&nbsp;q&nbsp;is&nbsp;derived&nbsp;knowledge:&nbsp;episteme.</span></dd></dl>
+
+<dl><dt><a name="Foundations-support"><strong>support</strong></a>(self, q: 'Formula') -&gt; 'frozenset[Formula] | None'</dt><dd><span class="code">The&nbsp;minimal&nbsp;axiom&nbsp;subset&nbsp;that&nbsp;entails&nbsp;q&nbsp;—&nbsp;which&nbsp;first<br>
+principles&nbsp;the&nbsp;claim&nbsp;rests&nbsp;on.&nbsp;None&nbsp;when&nbsp;the&nbsp;axioms&nbsp;cannot<br>
+reach&nbsp;it&nbsp;at&nbsp;all.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'axioms': 'BeliefSet'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'axioms': Field(name='axioms',type='BeliefSet',default=fro...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('axioms',)</dl>
+
+<dl><dt><strong>axioms</strong> = frozenset()</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-audit"><strong>audit</strong></a>(foundations: 'Foundations', beliefs: 'Iterable[Formula]') -&gt; 'Audit'</dt><dd><span class="code">Classify&nbsp;each&nbsp;belief&nbsp;by&nbsp;its&nbsp;justificatory&nbsp;status.<br>
+&nbsp;<br>
+-&nbsp;*basic*:&nbsp;an&nbsp;axiom&nbsp;—&nbsp;indemonstrable&nbsp;by&nbsp;design.<br>
+-&nbsp;*derived*:&nbsp;entailed&nbsp;by&nbsp;the&nbsp;axioms.<br>
+-&nbsp;*circular*:&nbsp;not&nbsp;derived&nbsp;from&nbsp;the&nbsp;axioms,&nbsp;but&nbsp;justified&nbsp;by&nbsp;a<br>
+&nbsp;&nbsp;cycle&nbsp;of&nbsp;other&nbsp;beliefs&nbsp;(b₁&nbsp;supports&nbsp;b₂&nbsp;supports&nbsp;b₁)&nbsp;—&nbsp;Agrippa's<br>
+&nbsp;&nbsp;second&nbsp;horn.&nbsp;Justification&nbsp;within&nbsp;the&nbsp;set&nbsp;is&nbsp;found&nbsp;by&nbsp;minimal<br>
+&nbsp;&nbsp;abduction&nbsp;over&nbsp;the&nbsp;*other*&nbsp;beliefs:&nbsp;a&nbsp;belief's&nbsp;warrant&nbsp;is&nbsp;the<br>
+&nbsp;&nbsp;smallest&nbsp;set&nbsp;of&nbsp;its&nbsp;fellows&nbsp;entailing&nbsp;it.<br>
+-&nbsp;*ungrounded*:&nbsp;everything&nbsp;else&nbsp;—&nbsp;a&nbsp;belief&nbsp;with&nbsp;no&nbsp;route&nbsp;back&nbsp;to<br>
+&nbsp;&nbsp;a&nbsp;first&nbsp;principle,&nbsp;the&nbsp;infinite-regress&nbsp;symptom.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['Audit', 'Foundations', 'audit']</td></tr></table>
+</body></html>

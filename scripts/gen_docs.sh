@@ -3,15 +3,14 @@
 #
 # The two sides, documented the way each speaks:
 #   Rust   — cargo doc renders the /// doc comments (the math side)
-#            into target/doc/genesis/index.html
+#            into Self_World/docs/rust/
 #   Python — pydoc renders the module docstrings (the words side)
-#            into target/pydoc/<module>.html
+#            into Self_World/docs/python/<module>.html
 #
-# Both outputs land under target/, which is gitignored — they are
-# generated views of the code, never frozen artifacts. Run this any
-# time the tree changes:
-#
-#   scripts/gen_docs.sh
+# Generated docs live in the self world (self-knowledge) and replace
+# the hand-written subsystem man pages — docs regenerate from source
+# instead of drifting. Linux/ops man pages that generated API docs
+# cannot cover stay under docs/man/.
 #
 # Python modules that refuse to import are skipped with a note —
 # pydoc documents by importing, and some modules are not importable
@@ -20,31 +19,38 @@
 set -u
 cd "$(dirname "$0")/.."
 
+DOCS="Self_World/docs"
+RUST_OUT="target/doc"
+PY_OUT="$DOCS/python"
+
 echo "==> Rust: cargo doc --no-deps --document-private-items"
 cargo doc --no-deps --document-private-items 2>&1 | tail -3
+rm -rf "$DOCS/rust"
+mkdir -p "$DOCS"
+cp -r "$RUST_OUT" "$DOCS/rust"
 
-PYD="target/pydoc"
-mkdir -p "$PYD"
 VENV_PY="${VENV_PY:-.venv/bin/python}"
 [ -x "$VENV_PY" ] || VENV_PY=python3
+VENV_PY="$(readlink -f "$VENV_PY")"
+export PYTHONPATH="$PWD/Self_World:$PWD/Inner_World:$PWD/Outer_World:$PWD${PYTHONPATH:+:$PYTHONPATH}"
 
-export PYTHONPATH="Self_World:Inner_World:Outer_World:.${PYTHONPATH:+:$PYTHONPATH}"
-
-echo "==> Python: pydoc -> $PYD"
+echo "==> Python: pydoc -> $PY_OUT"
+rm -rf "$PY_OUT"
+mkdir -p "$PY_OUT"
 # Every .py under the three worlds becomes a dotted module name.
 # __init__.py documents its package, __main__.py is skipped.
-find Self_World Inner_World Outer_World -name '__pycache__' -prune -o \
-    -name '*.py' -print \
-    | sed -e 's/\.py$//' -e 's|/|.|g' -e 's/\.__init__$//' -e '/__main__$/d' \
+cd "$PY_OUT"
+find ../../../Self_World ../../../Inner_World ../../../Outer_World \
+    -name '__pycache__' -prune -o -name '*.py' -print \
+    | sed -E -e 's,.*(Self_World|Inner_World|Outer_World)/,\1/,' \
+          -e 's/\.py$//' -e 's|/|.|g' -e 's/\.__init__$//' -e '/__main__$/d' \
     | sort -u \
     | xargs -P"$(nproc)" -I{} sh -c \
         'timeout 15 "'"$VENV_PY"'" -m pydoc -w "{}" 2>/dev/null \
             || echo "SKIP {}"' \
     | sort | uniq -c
-
-# pydoc -w writes into cwd; sweep the rendered pages into place.
-find . -maxdepth 1 -name '*.html' -newer "$0" -exec mv -f {} "$PYD/" \; 2>/dev/null
+cd - >/dev/null
 
 echo "==> done"
-echo "    Rust:   target/doc/genesis/index.html"
-echo "    Python: $PYD/ ($(ls "$PYD" | wc -l) modules)"
+echo "    Rust:   $DOCS/rust/genesis/index.html"
+echo "    Python: $PY_OUT/ ($(ls "$PY_OUT" | wc -l) modules)"

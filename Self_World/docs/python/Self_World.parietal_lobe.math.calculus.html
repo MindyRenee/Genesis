@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.parietal_lobe.math.calculus</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.parietal_lobe.html" class="white">parietal_lobe</a>.<a href="Self_World.parietal_lobe.math.html" class="white">math</a>.calculus</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/parietal_lobe/math/calculus.py">/home/mindyrenee/GenAnd/Genesis/Self_World/parietal_lobe/math/calculus.py</a></td></tr></table>
+    <p><span class="code">Calculus&nbsp;—&nbsp;the&nbsp;parietal&nbsp;faculty's&nbsp;mathematics&nbsp;of&nbsp;change.<br>
+&nbsp;<br>
+Differentiation&nbsp;and&nbsp;integration&nbsp;over&nbsp;the&nbsp;expression&nbsp;trees&nbsp;of<br>
+``algebra.py``:&nbsp;the&nbsp;rules&nbsp;are&nbsp;the&nbsp;standard&nbsp;elementary&nbsp;table&nbsp;applied<br>
+to&nbsp;structure&nbsp;—&nbsp;power,&nbsp;product,&nbsp;quotient,&nbsp;chain,&nbsp;and&nbsp;the&nbsp;elementary<br>
+function&nbsp;derivatives&nbsp;—&nbsp;plus&nbsp;Simpson&nbsp;integration&nbsp;when&nbsp;no&nbsp;closed<br>
+antiderivative&nbsp;is&nbsp;found.&nbsp;``symbolic.py``&nbsp;remains&nbsp;the&nbsp;oracle;&nbsp;these<br>
+results&nbsp;are&nbsp;hers,&nbsp;verifiable,&nbsp;not&nbsp;asserted.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="math.html">math</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-derivative_at_text"><strong>derivative_at_text</strong></a>(text: 'str', var: 'str', at: 'float') -&gt; 'AlgebraResult'</dt><dd><span class="code">The&nbsp;derivative&nbsp;evaluated&nbsp;at&nbsp;a&nbsp;point&nbsp;—&nbsp;the&nbsp;slope&nbsp;there.</span></dd></dl>
+ <dl><dt><a name="-derivative_text"><strong>derivative_text</strong></a>(text: 'str', var: 'str' = 'x') -&gt; 'AlgebraResult'</dt><dd><span class="code">Differentiate&nbsp;expression&nbsp;text;&nbsp;render&nbsp;the&nbsp;simplified&nbsp;result.</span></dd></dl>
+ <dl><dt><a name="-differentiate"><strong>differentiate</strong></a>(expr: 'Expr', var: 'str' = 'x') -&gt; 'Expr'</dt><dd><span class="code">The&nbsp;derivative&nbsp;of&nbsp;a&nbsp;tree&nbsp;with&nbsp;respect&nbsp;to&nbsp;``var``.<br>
+&nbsp;<br>
+The&nbsp;rules,&nbsp;in&nbsp;structure&nbsp;order:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;d(c)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;d(x)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;1<br>
+&nbsp;&nbsp;&nbsp;&nbsp;d(u&nbsp;+&nbsp;v)&nbsp;&nbsp;=&nbsp;u'&nbsp;+&nbsp;v'&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;d(-u)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;-u'<br>
+&nbsp;&nbsp;&nbsp;&nbsp;d(uv)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;u'v&nbsp;+&nbsp;uv'&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;d(u**n)&nbsp;&nbsp;&nbsp;=&nbsp;n&nbsp;u**(n-1)&nbsp;u'<br>
+&nbsp;&nbsp;&nbsp;&nbsp;d(u**v)&nbsp;&nbsp;&nbsp;=&nbsp;u**v&nbsp;(v'&nbsp;ln&nbsp;u&nbsp;+&nbsp;v&nbsp;u'/u)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;d(sin&nbsp;u)&nbsp;&nbsp;=&nbsp;&nbsp;cos&nbsp;u&nbsp;·&nbsp;u'&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;d(cos&nbsp;u)&nbsp;&nbsp;=&nbsp;-sin&nbsp;u&nbsp;·&nbsp;u'<br>
+&nbsp;&nbsp;&nbsp;&nbsp;d(tan&nbsp;u)&nbsp;&nbsp;=&nbsp;&nbsp;sec²u&nbsp;·&nbsp;u'&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;d(exp&nbsp;u)&nbsp;&nbsp;=&nbsp;exp&nbsp;u&nbsp;·&nbsp;u'<br>
+&nbsp;&nbsp;&nbsp;&nbsp;d(ln&nbsp;u)&nbsp;&nbsp;&nbsp;=&nbsp;&nbsp;u'&nbsp;/&nbsp;u&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;d(sqrt&nbsp;u)&nbsp;=&nbsp;u'&nbsp;/&nbsp;(2&nbsp;sqrt&nbsp;u)</span></dd></dl>
+ <dl><dt><a name="-integral_between_text"><strong>integral_between_text</strong></a>(text: 'str', var: 'str', lo: 'float', hi: 'float') -&gt; 'AlgebraResult'</dt><dd><span class="code">The&nbsp;definite&nbsp;integral&nbsp;—&nbsp;the&nbsp;closed&nbsp;form&nbsp;when&nbsp;the&nbsp;table&nbsp;has<br>
+it,&nbsp;Simpson's&nbsp;estimate&nbsp;when&nbsp;it&nbsp;does&nbsp;not.</span></dd></dl>
+ <dl><dt><a name="-integral_text"><strong>integral_text</strong></a>(text: 'str', var: 'str' = 'x') -&gt; 'AlgebraResult'</dt><dd><span class="code">The&nbsp;antiderivative&nbsp;—&nbsp;'+&nbsp;C'&nbsp;is&nbsp;the&nbsp;truth,&nbsp;said&nbsp;plainly.</span></dd></dl>
+ <dl><dt><a name="-integrate"><strong>integrate</strong></a>(expr: 'Expr', var: 'str' = 'x') -&gt; 'Expr | None'</dt><dd><span class="code">The&nbsp;antiderivative,&nbsp;or&nbsp;None&nbsp;when&nbsp;the&nbsp;table&nbsp;has&nbsp;no&nbsp;rule&nbsp;—<br>
+the&nbsp;caller&nbsp;then&nbsp;falls&nbsp;back&nbsp;to&nbsp;numeric&nbsp;integration.</span></dd></dl>
+ <dl><dt><a name="-integrate_between"><strong>integrate_between</strong></a>(expr: 'Expr', var: 'str', lo: 'float', hi: 'float') -&gt; 'float'</dt><dd><span class="code">Definite&nbsp;integral&nbsp;by&nbsp;composite&nbsp;Simpson's&nbsp;rule&nbsp;—&nbsp;the&nbsp;honest<br>
+numeric&nbsp;path&nbsp;when&nbsp;the&nbsp;antiderivative&nbsp;table&nbsp;is&nbsp;silent.&nbsp;A&nbsp;fixed<br>
+even&nbsp;slice&nbsp;count&nbsp;keeps&nbsp;the&nbsp;estimate&nbsp;deterministic.</span></dd></dl>
+ <dl><dt><a name="-taylor"><strong>taylor</strong></a>(expr: 'Expr', var: 'str', at: 'float', order: 'int') -&gt; 'Expr'</dt><dd><span class="code">The&nbsp;Taylor&nbsp;polynomial&nbsp;—&nbsp;f(a)&nbsp;+&nbsp;f'(a)(x-a)&nbsp;+&nbsp;f''(a)/2!&nbsp;(x-a)²<br>
++&nbsp;…&nbsp;to&nbsp;``order``.&nbsp;Each&nbsp;term&nbsp;differentiates&nbsp;the&nbsp;last&nbsp;—&nbsp;the&nbsp;series<br>
+is&nbsp;the&nbsp;faculty&nbsp;composing&nbsp;itself.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>Expr</strong> = Self_World.parietal_lobe.math.algebra.Num | Self....Pow | Self_World.parietal_lobe.math.algebra.Call</td></tr></table>
+</body></html>

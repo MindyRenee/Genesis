@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.topology</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.topology</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/topology.py">/home/mindyrenee/GenAnd/Genesis/Self_World/topology.py</a></td></tr></table>
+    <p><span class="code">Topology&nbsp;—&nbsp;the&nbsp;anatomical&nbsp;region&nbsp;map&nbsp;of&nbsp;the&nbsp;organism.&nbsp;The&nbsp;spine<br>
+of&nbsp;the&nbsp;layout:&nbsp;every&nbsp;body&nbsp;region,&nbsp;the&nbsp;body&nbsp;modules&nbsp;that&nbsp;implement<br>
+it,&nbsp;and&nbsp;the&nbsp;mind-side&nbsp;package&nbsp;it&nbsp;projects&nbsp;to.<br>
+&nbsp;<br>
+Mirrors&nbsp;``Self_World/src/topology.rs``:&nbsp;the&nbsp;body&nbsp;declares&nbsp;the&nbsp;same&nbsp;table&nbsp;from<br>
+its&nbsp;side.&nbsp;Neither&nbsp;side&nbsp;can&nbsp;see&nbsp;the&nbsp;other's&nbsp;half&nbsp;—&nbsp;the&nbsp;daemon&nbsp;owns<br>
+the&nbsp;body's&nbsp;modules,&nbsp;the&nbsp;mind&nbsp;owns&nbsp;its&nbsp;packages&nbsp;—&nbsp;so&nbsp;the&nbsp;map&nbsp;is<br>
+written&nbsp;once&nbsp;per&nbsp;side&nbsp;and&nbsp;joined&nbsp;over&nbsp;the&nbsp;region&nbsp;names,&nbsp;which&nbsp;are<br>
+the&nbsp;same&nbsp;identifiers&nbsp;on&nbsp;both&nbsp;ends.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="importlib.html">importlib</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.topology.html#Region">Region</a>
+</dt><dt class="heading-text"><a href="Self_World.topology.html#RegionWiring">RegionWiring</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Region">class <strong>Region</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Region">Region</a>(name:&nbsp;'str',&nbsp;package:&nbsp;'str',&nbsp;modules:&nbsp;'tuple[str,&nbsp;...]',&nbsp;projections:&nbsp;'tuple[str,&nbsp;...]',&nbsp;fiber:&nbsp;'str')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+One&nbsp;anatomical&nbsp;region&nbsp;of&nbsp;the&nbsp;organism.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Region-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="Region-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="Region-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="Region-__init__"><strong>__init__</strong></a>(self, name: 'str', package: 'str', modules: 'tuple[str, ...]', projections: 'tuple[str, ...]', fiber: 'str') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Region-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="Region-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'fiber': 'str', 'modules': 'tuple[str, ...]', 'name': 'str', 'package': 'str', 'projections': 'tuple[str, ...]'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'fiber': Field(name='fiber',type='str',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD), 'modules': Field(name='modules',type='tuple[str, ...]',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'name': Field(name='name',type='str',default=&lt;dataclasse...appingproxy({}),kw_only=False,_field_type=_FIELD), 'package': Field(name='package',type='str',default=&lt;datacla...appingproxy({}),kw_only=False,_field_type=_FIELD), 'projections': Field(name='projections',type='tuple[str, ...]',...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('name', 'package', 'modules', 'projections', 'fiber')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="RegionWiring">class <strong>RegionWiring</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#RegionWiring">RegionWiring</a>(region:&nbsp;'<a href="#Region">Region</a>',&nbsp;package_live:&nbsp;'bool',&nbsp;missing_modules:&nbsp;'tuple[str,&nbsp;...]')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+One&nbsp;region's&nbsp;ends&nbsp;resolved&nbsp;against&nbsp;the&nbsp;live&nbsp;tree.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="RegionWiring-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="RegionWiring-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="RegionWiring-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="RegionWiring-__init__"><strong>__init__</strong></a>(self, region: 'Region', package_live: 'bool', missing_modules: 'tuple[str, ...]') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="RegionWiring-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="RegionWiring-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>connected</strong></dt>
+<dd><span class="code">Both&nbsp;ends&nbsp;present&nbsp;(a&nbsp;body-only&nbsp;region&nbsp;counts&nbsp;on&nbsp;modules).</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'missing_modules': 'tuple[str, ...]', 'package_live': 'bool', 'region': 'Region'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'missing_modules': Field(name='missing_modules',type='tuple[str, .....appingproxy({}),kw_only=False,_field_type=_FIELD), 'package_live': Field(name='package_live',type='bool',default=&lt;d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'region': Field(name='region',type='Region',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('region', 'package_live', 'missing_modules')</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-connect"><strong>connect</strong></a>(root: 'Path | None' = None) -&gt; 'tuple[RegionWiring, ...]'</dt><dd><span class="code">Join&nbsp;the&nbsp;topology:&nbsp;resolve&nbsp;every&nbsp;declared&nbsp;end&nbsp;against&nbsp;the&nbsp;tree.<br>
+&nbsp;<br>
+For&nbsp;each&nbsp;region&nbsp;the&nbsp;table&nbsp;names,&nbsp;the&nbsp;mind-side&nbsp;package&nbsp;must<br>
+import&nbsp;(``importlib.util.find_spec``)&nbsp;and&nbsp;every&nbsp;declared&nbsp;body<br>
+module&nbsp;must&nbsp;exist&nbsp;as&nbsp;a&nbsp;``src/**.rs``&nbsp;file.&nbsp;Returns&nbsp;one<br>
+:class:`<a href="#RegionWiring">RegionWiring</a>`&nbsp;per&nbsp;region&nbsp;—&nbsp;a&nbsp;region&nbsp;is&nbsp;*connected*&nbsp;when<br>
+both&nbsp;ends&nbsp;are&nbsp;present;&nbsp;a&nbsp;body-only&nbsp;region&nbsp;(``package&nbsp;==&nbsp;""``)<br>
+counts&nbsp;on&nbsp;its&nbsp;modules&nbsp;alone.</span></dd></dl>
+ <dl><dt><a name="-dangling"><strong>dangling</strong></a>(root: 'Path | None' = None) -&gt; 'list[str]'</dt><dd><span class="code"><a href="#Region">Region</a>&nbsp;names&nbsp;whose&nbsp;declared&nbsp;ends&nbsp;do&nbsp;not&nbsp;resolve&nbsp;—&nbsp;breaks&nbsp;in<br>
+the&nbsp;map,&nbsp;where&nbsp;the&nbsp;two&nbsp;halves&nbsp;have&nbsp;drifted&nbsp;apart.</span></dd></dl>
+ <dl><dt><a name="-package_for"><strong>package_for</strong></a>(name: 'str') -&gt; 'str | None'</dt><dd><span class="code">The&nbsp;mind-side&nbsp;package&nbsp;a&nbsp;region&nbsp;projects&nbsp;to,&nbsp;if&nbsp;it&nbsp;has&nbsp;one.</span></dd></dl>
+ <dl><dt><a name="-region"><strong>region</strong></a>(name: 'str') -&gt; 'Region | None'</dt><dd><span class="code">Look&nbsp;up&nbsp;a&nbsp;region&nbsp;by&nbsp;its&nbsp;identifier.</span></dd></dl>
+ <dl><dt><a name="-region_for_package"><strong>region_for_package</strong></a>(package: 'str') -&gt; 'Region | None'</dt><dd><span class="code">The&nbsp;region&nbsp;a&nbsp;mind-side&nbsp;package&nbsp;embodies,&nbsp;if&nbsp;it&nbsp;mirrors&nbsp;the&nbsp;body.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>MIND_ONLY</strong> = ('cerebellum', 'frontal_lobe', 'hypothalamus', 'insula', 'occipital_lobe', 'parietal_lobe', 'temporal_lobe', 'worlds')<br>
+<strong>REGIONS</strong> = (Region(name='basal_forebrain', package='basal_fo...jections=('memory', 'sleep'), fiber='prediction'), Region(name='basal_ganglia', package='basal_gang...on',), projections=('thalamus',), fiber='agency'), Region(name='brainstem', package='brainstem', mo...ions=('thalamus', 'limbic_system'), fiber='body'), Region(name='limbic_system', package='limbic_sys...l',), projections=('brainstem',), fiber='agency'), Region(name='thalamus', package='thalamus', modu... 'memory', 'self_', 'sleep'), fiber='prediction'), Region(name='memory', package='memory', modules=...ociation'), projections=('sleep',), fiber='body'), Region(name='self_', package='self', modules=('c...ojections=('limbic_system',), fiber='prediction'), Region(name='sleep', package='sleep', modules=('...rojections=('memory', 'brainstem'), fiber='body'), Region(name='neurochemical', package='', modules..._development'), projections=('*',), fiber='body'), Region(name='infrastructure', package='infrastru...ap_state', 'math'), projections=(), fiber='body'), Region(name='tools', package='tools', modules=('...code_analysis',), projections=(), fiber='agency'))<br>
+<strong>__all__</strong> = ['MIND_ONLY', 'REGIONS', 'Region', 'RegionWiring', 'connect', 'dangling', 'package_for', 'region', 'region_for_package']<br>
+<strong>__annotations__</strong> = {'MIND_ONLY': 'tuple[str, ...]', 'REGIONS': 'tuple[Region, ...]'}</td></tr></table>
+</body></html>

@@ -1,0 +1,133 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Optic nerve — the retinal afferent’s subcortical branches (SCN, superior colliculus, pretectum, TRN relay gate). Optic nerve — the whole retinal afferent path, held inside the body."><title>genesis::daemon::optic_nerve - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-203241e4.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="genesis" data-themes="" data-resource-suffix="" data-rustdoc-version="1.100.0 (0ef1bc386 2026-11-09)" data-channel="1.100.0" data-search-js="search-b167f383.js" data-stringdex-js="stringdex-b5109af9.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../../static.files/main-1814ead3.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-9f56287d.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module optic_nerve</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../genesis/index.html">genesis</a><span class="version">0.2.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module optic_<wbr>nerve</a></h2><h3><a href="#structs">Module Items</a></h3><ul class="block"><li><a href="#structs" title="Structs">Structs</a></li><li><a href="#constants" title="Constants">Constants</a></li><li><a href="#functions" title="Functions">Functions</a></li></ul></section><div id="rustdoc-modnav"><h2><a href="../index.html">In genesis::<wbr>daemon</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../index.html">genesis</a>::<wbr><a href="../index.html">daemon</a></div><h1>Module <span>optic_<wbr>nerve</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/genesis/daemon/optic_nerve.rs.html#1-1595">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Optic nerve — the retinal afferent’s subcortical branches (SCN,
+superior colliculus, pretectum, TRN relay gate).
+Optic nerve — the whole retinal afferent path, held inside the body.</p>
+<p>The nerve’s retinal end is the body’s own limb: the daemon opens
+the camera itself and writes raw frames into the POSIX
+shared-memory segment <code>/genesis_optic_nerve</code> — that segment is
+the optic nerve. Anatomically the nerve does not reach cortex
+directly: its ~10⁶ ganglion-cell axons fan out to roughly forty
+subcortical targets, and only the thalamocortical radiation
+carries what the thalamus relays onward. The subcortical
+recipients matter as much as the relay:</p>
+<ul>
+<li><strong>Suprachiasmatic nucleus (SCN)</strong> — retinal illuminance via the
+retinohypothalamic tract, carried almost exclusively by
+melanopsin ipRGCs (~480 nm peak). This is the dominant circadian
+zeitgeber. It feeds <code>sleep_network::VisualAfference::light</code>,
+replacing the wall-clock photoperiod whenever the eye is live.</li>
+<li><strong>Superior colliculus (SC)</strong> — motion/luminance transients drive
+orienting. During sleep the same channel is the sensory-gaining
+“wake-up call”: salient stimuli are still analysed and can
+arouse, so the transient becomes a brief excitatory pulse onto
+the LC wake population.</li>
+<li><strong>Pretectum (OPN)</strong> — global illuminance for the light reflex;
+published as <code>illuminance</code> for whatever consumes it. The reflex
+itself runs here: <code>pupil_mm</code> is the sphincter/dilator balance —
+log-compressive constriction to the photopic channel plus a
+sympathetic dilation from effective norepinephrine — published
+so the mind’s optics layer can scale retinal irradiance and
+depth of field by the aperture the body actually set.</li>
+<li><strong>dLGN + thalamic reticular nucleus (TRN)</strong> — the thalamic relay
+is <em>gated</em>, not a wire: TRN inhibition during NREM hyperpolarizes
+relay cells and sensory transmission to cortex is blocked at the
+thalamus. <code>relay_gain</code> is that gate, computed here in the body
+where the sleep network lives. The mind reads it via
+<code>GET_OPTIC_STATE</code> and honours it — cortex cannot see around a
+closed thalamus.</li>
+<li><strong>Corticothalamic feedback</strong> — V1 layer-6 projections back to
+the dLGN outnumber retinal input ~10:1 but are modulatory, not
+driving. The mind’s engagement arrives via <code>SET_OPTIC_GAIN</code> and
+scales the relay within ±40%, never opening it past what the
+sleep stage permits.</li>
+</ul>
+<p>The body’s own ocular state lives here too: the pupil (pretectal
+light reflex + LC sympathetic dilation), the ciliary lens power
+(accommodation, set by the mind’s <code>SET_FOCUS</code>), and the lids —
+the eye the hardware lacks. The lid is a phase-driven
+transmission on every afferent channel: closed in NREM/REM (a
+few percent leak — light through lids still entrains weakly and
+a flash can still wake), half-mast drowsy, open awake. Sleep
+miosis and the ciliary’s release to rest ride the same closure.</p>
+<p>What is deliberately NOT here: semantics. Everything in this
+module is machine math — bytes, atomics, pooled scalar channels
+(the same thing the RHT, tectal, and pretectal fibres carry —
+there is no image on those axons either). Image-forming content
+stays on the shared-memory bus for the mind’s V1, gated by
+<code>relay_gain</code>, and the meaning of the pixels lives entirely in the
+mind — the words side.</p>
+</div></details><h2 id="structs" class="section-header">Structs<a href="#structs" class="anchor">§</a></h2><dl class="item-table"><dt><a class="struct" href="struct.OpticCapture.html" title="struct genesis::daemon::optic_nerve::OpticCapture">Optic<wbr>Capture</a></dt><dd>The eye’s handle: a stop flag, the segment’s POSIX name for
+unlinking, and the capture thread. <code>stop()</code> flags the limb out
+and takes the name back; a thread still blocked in the driver’s
+dequeue is reaped by the daemon’s own exit — the same bound the
+process tree had.</dd><dt><a class="struct" href="struct.OpticNerve.html" title="struct genesis::daemon::optic_nerve::OpticNerve">Optic<wbr>Nerve</a></dt><dd>The optic nerve, attached to the body. Held by <code>TickLoop</code>; sampled
+once per physics advance so the afference fed to the integrator
+describes the same instant as the chemistry it rides beside.</dd><dt><a class="struct" href="struct.OpticState.html" title="struct genesis::daemon::optic_nerve::OpticState">Optic<wbr>State</a></dt><dd>What one <code>GET_OPTIC_STATE</code> returns — the nerve’s measured channel
+signals and the thalamic gate. Process-local, additive on the wire.</dd></dl><h2 id="constants" class="section-header">Constants<a href="#constants" class="anchor">§</a></h2><dl class="item-table"><dt><a class="constant" href="constant.ACCOM_MAX_DPT.html" title="constant genesis::daemon::optic_nerve::ACCOM_MAX_DPT">ACCOM_<wbr>MAX_<wbr>DPT</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="constant" href="constant.ACCOM_MIN_DPT.html" title="constant genesis::daemon::optic_nerve::ACCOM_MIN_DPT">ACCOM_<wbr>MIN_<wbr>DPT</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Accommodation bounds in dioptres — the added lens power over the
+distance refraction. 0 D is focus at infinity; 6 D is a ~17 cm
+near point, a generous accommodative amplitude.</dd><dt><a class="constant" href="constant.ACCOM_REST_DPT.html" title="constant genesis::daemon::optic_nerve::ACCOM_REST_DPT">ACCOM_<wbr>REST_<wbr>DPT</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Tonic resting position — the ciliary muscle’s anatomical rest is
+midrange, about a metre of focus in the dark.</dd><dt><a class="constant" href="constant.ACCOM_TAU_FAR_S.html" title="constant genesis::daemon::optic_nerve::ACCOM_TAU_FAR_S">ACCOM_<wbr>TAU_<wbr>FAR_<wbr>S</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="constant" href="constant.ACCOM_TAU_NEAR_S.html" title="constant genesis::daemon::optic_nerve::ACCOM_TAU_NEAR_S">ACCOM_<wbr>TAU_<wbr>NEAR_<wbr>S</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Accommodation time constants. Releasing the lens back to distance
+(disaccommodation) is the faster direction — the ciliary muscle
+relaxes onto the choroid’s elastic recoil — while pulling power in
+for near focus takes longer (Schaeffel et al., 1993; Beers &amp; Van
+Der Heijde, 1994; Vilupuru &amp; Glasser, 2002; Kalsi et al., 2003 —
+the opposite asymmetry to the pupil’s antagonists).</dd><dt><a class="constant" href="constant.CORTICAL_FLOOR.html" title="constant genesis::daemon::optic_nerve::CORTICAL_FLOOR">CORTICAL_<wbr>FLOOR</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Corticothalamic feedback range around the relay base: modulatory,
+not driving (Sherman &amp; Guillery) — it can amplify or attenuate the
+relay but cannot open a gate the sleep stage has closed.</dd><dt><a class="constant" href="constant.CORTICAL_SPAN.html" title="constant genesis::daemon::optic_nerve::CORTICAL_SPAN">CORTICAL_<wbr>SPAN</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="constant" href="constant.DEFAULT_CAMERA_PATH.html" title="constant genesis::daemon::optic_nerve::DEFAULT_CAMERA_PATH">DEFAULT_<wbr>CAMERA_<wbr>PATH</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>The socket the eye opens absent a <code>GENESIS_CAMERA</code> override —
+and the fallback when an exhausted override names another
+device: a working eye beats the preferred dead one.</dd><dt><a class="constant" href="constant.EYE_BACKOFF_S.html" title="constant genesis::daemon::optic_nerve::EYE_BACKOFF_S">EYE_<wbr>BACKOFF_<wbr>S</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Bounded re-open table: after each un-lived life the limb waits
+this long before the next attempt — the same widening sequence
+the process-level rebirth used.</dd><dt><a class="constant" href="constant.EYE_ERR_LIMIT.html" title="constant genesis::daemon::optic_nerve::EYE_ERR_LIMIT">EYE_<wbr>ERR_<wbr>LIMIT</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Consecutive dequeue errors that declare the device lost; at the
+500 ms error sleep this is ~15 s of a truly dead camera before
+the limb counts it a life ended and re-opens.</dd><dt><a class="constant" href="constant.EYE_STABLE_S.html" title="constant genesis::daemon::optic_nerve::EYE_STABLE_S">EYE_<wbr>STABLE_<wbr>S</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>A life at least this long counts the eye as having lived — the
+attempt count refunds, the same stability rule the watcher kept.</dd><dt><a class="constant" href="constant.FRESH_WINDOW_MS.html" title="constant genesis::daemon::optic_nerve::FRESH_WINDOW_MS">FRESH_<wbr>WINDOW_<wbr>MS</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>A frame is “live” while the last consumed frame is younger than
+this. Past it the feed is stale (camera stalled, the capture limb
+dead or still retrying) and the circadian input falls back to the
+photoperiod.</dd><dt><a class="constant" href="constant.HEADER_SIZE.html" title="constant genesis::daemon::optic_nerve::HEADER_SIZE">HEADER_<wbr>SIZE</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Header layout written by the capture limb:
+<code>[u64 frame counter][u32 width][u32 height][4B fourcc][u32 size][u32 stride]</code>.</dd><dt><a class="constant" href="constant.LID_CLOSED.html" title="constant genesis::daemon::optic_nerve::LID_CLOSED">LID_<wbr>CLOSED</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Lid closure at or above this counts the eye as shut — the point
+where the ciliary muscle releases its request and rests.</dd><dt><a class="constant" href="constant.MAX_SAMPLES.html" title="constant genesis::daemon::optic_nerve::MAX_SAMPLES">MAX_<wbr>SAMPLES</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Pixels sampled per frame read. The subcortical channels carry
+spatially pooled signals — a few thousand points is already far
+denser than the melanopsin/tectal receptive fields being modelled.</dd><dt><a class="constant" href="constant.MELANOPIC_LUX_GAMMA.html" title="constant genesis::daemon::optic_nerve::MELANOPIC_LUX_GAMMA">MELANOPIC_<wbr>LUX_<wbr>GAMMA</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="constant" href="constant.MELANOPIC_LUX_SCALE.html" title="constant genesis::daemon::optic_nerve::MELANOPIC_LUX_SCALE">MELANOPIC_<wbr>LUX_<wbr>SCALE</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Melanopic irradiance scaled onto the sleep oscillator’s lux axis
+(<code>I_0</code> in <code>sleep_network</code>; the scheduled photoperiod uses 500).
+A webcam has no absolute photometry, so this is a shaped proxy:
+gamma 1.3 keeps dim evening light visible to the SCN (melanopsin
+phase-shifts at single-digit lux) while a bright room approaches
+daylight drive.</dd><dt><a class="constant" href="constant.PUPIL_LIGHT_SPAN_MM.html" title="constant genesis::daemon::optic_nerve::PUPIL_LIGHT_SPAN_MM">PUPIL_<wbr>LIGHT_<wbr>SPAN_<wbr>MM</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>The light reflex is log-compressive: diameter tracks log
+illuminance, not linear luminance (Watson &amp; Yellott’s unified
+field formula has the same shape). This span maps the nerve’s
+[0, 1] photopic channel onto a ~4.5 mm reflex swing: darkness
+approaches <code>PUPIL_MAX_MM</code>, a saturated channel sits near 3.5 mm.</dd><dt><a class="constant" href="constant.PUPIL_MAX_MM.html" title="constant genesis::daemon::optic_nerve::PUPIL_MAX_MM">PUPIL_<wbr>MAX_<wbr>MM</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="constant" href="constant.PUPIL_MIN_MM.html" title="constant genesis::daemon::optic_nerve::PUPIL_MIN_MM">PUPIL_<wbr>MIN_<wbr>MM</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Pupil diameter bounds in mm — the physiological range of the
+sphincter/dilator antagonists.</dd><dt><a class="constant" href="constant.PUPIL_NE_GAIN_MM.html" title="constant genesis::daemon::optic_nerve::PUPIL_NE_GAIN_MM">PUPIL_<wbr>NE_<wbr>GAIN_<wbr>MM</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Sympathetic dilation per unit of effective norepinephrine — LC
+tone pulls the dilator against the sphincter’s set point. Tonic
+NE (~0.3) adds ~0.5 mm; a saturated channel adds ~1.5 mm.</dd><dt><a class="constant" href="constant.PUPIL_REST_MM.html" title="constant genesis::daemon::optic_nerve::PUPIL_REST_MM">PUPIL_<wbr>REST_<wbr>MM</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Diameter the reflex starts from before the first integration —
+mid-range, neither dark- nor light-adapted.</dd><dt><a class="constant" href="constant.PUPIL_SLEEP_CONSTRICT_MM.html" title="constant genesis::daemon::optic_nerve::PUPIL_SLEEP_CONSTRICT_MM">PUPIL_<wbr>SLEEP_<wbr>CONSTRICT_<wbr>MM</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Central miosis with the lids closed — in sleep the sphincter
+dominates (parasympathetic tone; LC is near-silent in NREM and
+silent in REM) and the pupil sits miotic ~2–4 mm whatever the
+room’s darkness says. Scaled by lid closure: half-mast lids
+carry half the drive.</dd><dt><a class="constant" href="constant.PUPIL_TAU_CONSTRICT_S.html" title="constant genesis::daemon::optic_nerve::PUPIL_TAU_CONSTRICT_S">PUPIL_<wbr>TAU_<wbr>CONSTRICT_<wbr>S</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Reflex time constants. Constriction is the fast parasympathetic
+arc (a light step covers most of its travel in well under a
+second); dilation is the slower sympathetic mix, several times
+slower.</dd><dt><a class="constant" href="constant.PUPIL_TAU_DILATE_S.html" title="constant genesis::daemon::optic_nerve::PUPIL_TAU_DILATE_S">PUPIL_<wbr>TAU_<wbr>DILATE_<wbr>S</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="constant" href="constant.SHM_NAME.html" title="constant genesis::daemon::optic_nerve::SHM_NAME">SHM_<wbr>NAME</a></dt><dd>POSIX name of the optic-nerve segment — the same constant the
+capture limb writes and the Python mind reads
+(<code>genesis_client/optic_nerve.py</code>).</dd></dl><h2 id="functions" class="section-header">Functions<a href="#functions" class="anchor">§</a></h2><dl class="item-table"><dt><a class="fn" href="fn.camera_candidates.html" title="fn genesis::daemon::optic_nerve::camera_candidates">camera_<wbr>candidates</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>The sockets the limb will try, preferred first: the configured
+device, then the default when the override names another.</dd><dt><a class="fn" href="fn.capture_limb.html" title="fn genesis::daemon::optic_nerve::capture_limb">capture_<wbr>limb</a></dt><dd>The limb’s whole existence: a life, a count, a pause, another
+life. Every death lands here once — the same accounting the
+mind’s rebirth watcher kept for the standalone process, now held
+where the loss actually happens. Bounded: after the table’s
+worth of un-lived lives the eye is accepted absent and the limb
+rests — the organism goes on without sight.</dd><dt><a class="fn" href="fn.eye_life.html" title="fn genesis::daemon::optic_nerve::eye_life">eye_<wbr>life</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>One life of the eye: device open → format negotiate → segment
+create → frame loop, until the hardware fails or <code>stop</code> lands.
+Returns the seconds the eye stayed open — <code>EYE_STABLE_S</code> is the
+refund threshold. Every failure inside is quiet logging, never a
+panic: this thread dying must never cost the body.</dd><dt><a class="fn" href="fn.lid_transmission.html" title="fn genesis::daemon::optic_nerve::lid_transmission">lid_<wbr>transmission</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Eyelid transmission by phase — the fraction of scene light that
+still reaches the retina. The camera hardware has no lid; this is
+the body’s <em>use</em> of its afference, the same status as the TRN
+gate. Lids are not shutters: a closed lid transmits a few percent,
+so bright light still entrains weakly through it and a strong
+flash still reaches the colliculus — both are real physiology.
+Drowsy lids sit half-mast. The mind’s voluntary closure
+(<code>SET_LID</code>) can only deepen what the phase sets — a will can
+shut an open eye, never force a sleeping one open.</dd><dt><a class="fn" href="fn.relay_base.html" title="fn genesis::daemon::optic_nerve::relay_base">relay_<wbr>base</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>TRN relay bases by state — the fraction of retinal drive the
+thalamus passes to cortex. NREM is the documented block (~zero);
+REM gates external input almost as hard (its imagery is
+internally generated). Drowsy is partial transmission; Overwhelmed
+is sensory shutdown short of sleep.</dd></dl></section></div></main></body></html>

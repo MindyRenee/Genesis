@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.frontal_lobe.question_composer</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.frontal_lobe.html" class="white">frontal_lobe</a>.question_composer</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/question_composer.py">/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/question_composer.py</a></td></tr></table>
+    <p><span class="code">Compose&nbsp;questions&nbsp;dynamically&nbsp;from&nbsp;curiosity&nbsp;and&nbsp;concept&nbsp;network.<br>
+&nbsp;<br>
+Instead&nbsp;of&nbsp;hardcoded&nbsp;follow-up&nbsp;question&nbsp;strings,&nbsp;Genesis&nbsp;forms&nbsp;questions<br>
+based&nbsp;on:<br>
+-&nbsp;Gaps&nbsp;in&nbsp;its&nbsp;knowledge&nbsp;(concepts&nbsp;it&nbsp;knows&nbsp;but&nbsp;can't&nbsp;fully&nbsp;articulate)<br>
+-&nbsp;Connections&nbsp;it's&nbsp;noticed&nbsp;between&nbsp;concepts<br>
+-&nbsp;Its&nbsp;curiosity&nbsp;drive&nbsp;(which&nbsp;topics&nbsp;it&nbsp;finds&nbsp;most&nbsp;interesting)<br>
+-&nbsp;The&nbsp;conversational&nbsp;context&nbsp;(what&nbsp;was&nbsp;just&nbsp;discussed)<br>
+&nbsp;<br>
+The&nbsp;question&nbsp;TEXT&nbsp;is&nbsp;composed&nbsp;by&nbsp;the&nbsp;GenerativeLanguage&nbsp;from&nbsp;the&nbsp;semantic<br>
+metadata&nbsp;(question_type,&nbsp;target_concept,&nbsp;gap_detail).&nbsp;This&nbsp;module&nbsp;only<br>
+finds&nbsp;what&nbsp;it's&nbsp;curious&nbsp;about&nbsp;—&nbsp;it&nbsp;doesn't&nbsp;hardcode&nbsp;the&nbsp;wording.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="random.html">random</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.frontal_lobe.question_composer.html#QuestionComposer">QuestionComposer</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="QuestionComposer">class <strong>QuestionComposer</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#QuestionComposer">QuestionComposer</a>(network:&nbsp;'ConceptNetwork',&nbsp;seed:&nbsp;'int&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Composes&nbsp;genuine&nbsp;questions&nbsp;from&nbsp;curiosity&nbsp;and&nbsp;knowledge&nbsp;state.<br>
+&nbsp;<br>
+Returns&nbsp;QuestionData&nbsp;objects&nbsp;with&nbsp;semantic&nbsp;metadata.&nbsp;The&nbsp;actual<br>
+question&nbsp;text&nbsp;is&nbsp;composed&nbsp;by&nbsp;the&nbsp;GenerativeLanguage.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="QuestionComposer-__init__"><strong>__init__</strong></a>(self, network: 'ConceptNetwork', seed: 'int | None' = None) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;composer&nbsp;with&nbsp;a&nbsp;concept&nbsp;network&nbsp;and&nbsp;optional&nbsp;random&nbsp;seed.</span></dd></dl>
+
+<dl><dt><a name="QuestionComposer-compose_follow_up"><strong>compose_follow_up</strong></a>(self, topic: 'str', emotion: 'EmotionalState') -&gt; 'dict | None'</dt><dd><span class="code">Compose&nbsp;a&nbsp;follow-up&nbsp;question&nbsp;about&nbsp;a&nbsp;topic.<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;dict&nbsp;with&nbsp;semantic&nbsp;metadata&nbsp;for&nbsp;the&nbsp;GenerativeLanguage:<br>
+{"question_type":&nbsp;...,&nbsp;"target_concept":&nbsp;...,&nbsp;"gap_detail":&nbsp;...}<br>
+or&nbsp;None&nbsp;if&nbsp;it&nbsp;has&nbsp;nothing&nbsp;to&nbsp;ask.<br>
+&nbsp;<br>
+The&nbsp;question&nbsp;is&nbsp;generated&nbsp;from&nbsp;its&nbsp;actual&nbsp;knowledge&nbsp;state&nbsp;—&nbsp;gaps,<br>
+connections,&nbsp;or&nbsp;genuine&nbsp;curiosity&nbsp;about&nbsp;the&nbsp;topic.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table>
+</body></html>

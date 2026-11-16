@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["REGIONS"],"fn":["package_for","region","region_for_package"],"struct":["Region"]};

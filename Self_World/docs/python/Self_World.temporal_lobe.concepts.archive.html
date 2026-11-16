@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.temporal_lobe.concepts.archive</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.temporal_lobe.html" class="white">temporal_lobe</a>.<a href="Self_World.temporal_lobe.concepts.html" class="white">concepts</a>.archive</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/concepts/archive.py">/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/concepts/archive.py</a></td></tr></table>
+    <p><span class="code">Concept&nbsp;archive&nbsp;—&nbsp;SQLite-backed&nbsp;cold&nbsp;storage&nbsp;for&nbsp;dormant&nbsp;concepts.<br>
+&nbsp;<br>
+The&nbsp;working-memory&nbsp;concept&nbsp;network&nbsp;is&nbsp;bounded:&nbsp;dormant&nbsp;concepts&nbsp;are<br>
+spilled&nbsp;here&nbsp;instead&nbsp;of&nbsp;being&nbsp;pruned&nbsp;outright,&nbsp;and&nbsp;recalled&nbsp;on&nbsp;demand<br>
+(see&nbsp;``archival.py``&nbsp;—&nbsp;the&nbsp;``ConceptNetwork``&nbsp;side&nbsp;of&nbsp;the&nbsp;protocol).<br>
+&nbsp;<br>
+Two&nbsp;tables&nbsp;plus&nbsp;an&nbsp;alias&nbsp;index:<br>
+&nbsp;<br>
+-&nbsp;``concepts``&nbsp;—&nbsp;``concept_id``&nbsp;→&nbsp;JSON-serialized&nbsp;concept&nbsp;dict<br>
+-&nbsp;``aliases``&nbsp;—&nbsp;alias&nbsp;→&nbsp;concept_id&nbsp;(case-insensitive&nbsp;lookup;&nbsp;the<br>
+&nbsp;&nbsp;canonical&nbsp;ID&nbsp;is&nbsp;indexed&nbsp;as&nbsp;an&nbsp;alias&nbsp;too)<br>
+-&nbsp;``edges``&nbsp;—&nbsp;archived&nbsp;edges&nbsp;involving&nbsp;spilled&nbsp;concepts<br>
+&nbsp;&nbsp;(``INSERT&nbsp;OR&nbsp;REPLACE``&nbsp;makes&nbsp;batch&nbsp;archival&nbsp;idempotent)<br>
+&nbsp;<br>
+The&nbsp;database&nbsp;lives&nbsp;at&nbsp;``&lt;data_dir&gt;/concept_archive.db``&nbsp;and&nbsp;runs&nbsp;in<br>
+WAL&nbsp;mode&nbsp;so&nbsp;the&nbsp;daemon's&nbsp;reader&nbsp;threads&nbsp;and&nbsp;the&nbsp;cognitive&nbsp;mind's<br>
+writer&nbsp;threads&nbsp;can&nbsp;coexist&nbsp;without&nbsp;blocking&nbsp;each&nbsp;other.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="json.html">json</a><br>
+</td><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="sqlite3.html">sqlite3</a><br>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.concepts.archive.html#ConceptArchive">ConceptArchive</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ConceptArchive">class <strong>ConceptArchive</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ConceptArchive">ConceptArchive</a>(db_path:&nbsp;'Path')&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+SQLite-backed&nbsp;long-term&nbsp;store&nbsp;for&nbsp;spilled&nbsp;concepts&nbsp;and&nbsp;edges.<br>
+&nbsp;<br>
+All&nbsp;mutating&nbsp;calls&nbsp;are&nbsp;serialized&nbsp;through&nbsp;an&nbsp;internal&nbsp;lock&nbsp;so&nbsp;the<br>
+archive&nbsp;is&nbsp;safe&nbsp;to&nbsp;share&nbsp;between&nbsp;the&nbsp;mind's&nbsp;worker&nbsp;threads.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ConceptArchive-__enter__"><strong>__enter__</strong></a>(self) -&gt; 'ConceptArchive'</dt></dl>
+
+<dl><dt><a name="ConceptArchive-__exit__"><strong>__exit__</strong></a>(self, exc_type: 'object', exc_val: 'object', exc_tb: 'object') -&gt; 'None'</dt></dl>
+
+<dl><dt><a name="ConceptArchive-__init__"><strong>__init__</strong></a>(self, db_path: 'Path') -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="ConceptArchive-archive_concept"><strong>archive_concept</strong></a>(self, concept_id: 'str', data: 'dict[str, Any]', aliases: 'set[str]') -&gt; 'None'</dt><dd><span class="code">Store&nbsp;a&nbsp;concept&nbsp;dict&nbsp;and&nbsp;index&nbsp;its&nbsp;aliases.<br>
+&nbsp;<br>
+The&nbsp;canonical&nbsp;ID&nbsp;is&nbsp;always&nbsp;indexed&nbsp;as&nbsp;an&nbsp;alias&nbsp;so<br>
+``find_by_alias``&nbsp;resolves&nbsp;both&nbsp;names&nbsp;and&nbsp;IDs.&nbsp;Aliases&nbsp;are<br>
+normalized&nbsp;to&nbsp;lowercase&nbsp;for&nbsp;case-insensitive&nbsp;lookup.</span></dd></dl>
+
+<dl><dt><a name="ConceptArchive-archive_concepts_batch"><strong>archive_concepts_batch</strong></a>(self, items: 'list[tuple[str, dict[str, Any], set[str]]]') -&gt; 'int'</dt><dd><span class="code">Archive&nbsp;many&nbsp;concepts&nbsp;in&nbsp;one&nbsp;transaction.&nbsp;Returns&nbsp;the&nbsp;count.</span></dd></dl>
+
+<dl><dt><a name="ConceptArchive-archive_edges_batch"><strong>archive_edges_batch</strong></a>(self, edge_dicts: 'list[dict[str, Any]]', *, overwrite: 'bool' = True) -&gt; 'int'</dt><dd><span class="code">Archive&nbsp;edges&nbsp;(source,&nbsp;target,&nbsp;relation,&nbsp;weight,&nbsp;created_at,<br>
+origin).&nbsp;Idempotent&nbsp;—&nbsp;INSERT&nbsp;OR&nbsp;REPLACE&nbsp;on&nbsp;the&nbsp;natural&nbsp;key.</span></dd></dl>
+
+<dl><dt><a name="ConceptArchive-close"><strong>close</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Close&nbsp;the&nbsp;database&nbsp;connection.&nbsp;Idempotent.</span></dd></dl>
+
+<dl><dt><a name="ConceptArchive-count"><strong>count</strong></a>(self) -&gt; 'int'</dt><dd><span class="code">Number&nbsp;of&nbsp;archived&nbsp;concepts.</span></dd></dl>
+
+<dl><dt><a name="ConceptArchive-find_by_alias"><strong>find_by_alias</strong></a>(self, alias: 'str') -&gt; 'list[str]'</dt><dd><span class="code">Resolve&nbsp;an&nbsp;alias&nbsp;(or&nbsp;canonical&nbsp;ID)&nbsp;to&nbsp;archived&nbsp;concept&nbsp;IDs.<br>
+&nbsp;<br>
+Case-insensitive:&nbsp;aliases&nbsp;are&nbsp;stored&nbsp;lowercased.</span></dd></dl>
+
+<dl><dt><a name="ConceptArchive-get_all_concepts"><strong>get_all_concepts</strong></a>(self) -&gt; 'list[tuple[str, dict[str, Any]]]'</dt><dd><span class="code">All&nbsp;archived&nbsp;``(concept_id,&nbsp;data)``&nbsp;pairs.</span></dd></dl>
+
+<dl><dt><a name="ConceptArchive-get_all_ids"><strong>get_all_ids</strong></a>(self) -&gt; 'set[str]'</dt><dd><span class="code">All&nbsp;archived&nbsp;concept&nbsp;IDs.</span></dd></dl>
+
+<dl><dt><a name="ConceptArchive-has_concept"><strong>has_concept</strong></a>(self, concept_id: 'str') -&gt; 'bool'</dt><dd><span class="code">True&nbsp;if&nbsp;the&nbsp;concept&nbsp;is&nbsp;in&nbsp;the&nbsp;archive.</span></dd></dl>
+
+<dl><dt><a name="ConceptArchive-peek_concept"><strong>peek_concept</strong></a>(self, concept_id: 'str') -&gt; 'dict[str, Any] | None'</dt><dd><span class="code">Return&nbsp;a&nbsp;concept's&nbsp;archived&nbsp;data&nbsp;**without&nbsp;removing&nbsp;it**.<br>
+&nbsp;<br>
+Use&nbsp;this&nbsp;for&nbsp;anything&nbsp;that&nbsp;only&nbsp;wants&nbsp;to&nbsp;look:&nbsp;verification,<br>
+inspection,&nbsp;reporting.&nbsp;:meth:`recall_concept`&nbsp;is&nbsp;a&nbsp;*move*&nbsp;—&nbsp;it<br>
+deletes&nbsp;the&nbsp;archive&nbsp;row&nbsp;on&nbsp;the&nbsp;assumption&nbsp;the&nbsp;concept&nbsp;is&nbsp;landing&nbsp;in<br>
+working&nbsp;memory&nbsp;and&nbsp;will&nbsp;be&nbsp;persisted&nbsp;by&nbsp;the&nbsp;next&nbsp;save.&nbsp;Anything<br>
+that&nbsp;recalls&nbsp;and&nbsp;then&nbsp;exits&nbsp;without&nbsp;saving&nbsp;has&nbsp;silently&nbsp;destroyed<br>
+what&nbsp;it&nbsp;read.&nbsp;That&nbsp;is&nbsp;not&nbsp;hypothetical:&nbsp;verifying&nbsp;a&nbsp;recovery&nbsp;with<br>
+``recall_concept``&nbsp;lost&nbsp;four&nbsp;concepts&nbsp;before&nbsp;this&nbsp;existed.<br>
+&nbsp;<br>
+Returns&nbsp;``None``&nbsp;if&nbsp;the&nbsp;concept&nbsp;is&nbsp;not&nbsp;archived.</span></dd></dl>
+
+<dl><dt><a name="ConceptArchive-recall_concept"><strong>recall_concept</strong></a>(self, concept_id: 'str') -&gt; 'dict[str, Any] | None'</dt><dd><span class="code">Remove&nbsp;a&nbsp;concept&nbsp;from&nbsp;the&nbsp;archive&nbsp;and&nbsp;return&nbsp;its&nbsp;data&nbsp;dict.<br>
+&nbsp;<br>
+**Destructive&nbsp;by&nbsp;design**&nbsp;—&nbsp;this&nbsp;is&nbsp;a&nbsp;move,&nbsp;not&nbsp;a&nbsp;read.&nbsp;The<br>
+concept&nbsp;is&nbsp;coming&nbsp;back&nbsp;into&nbsp;working&nbsp;memory,&nbsp;so&nbsp;its&nbsp;archive&nbsp;row&nbsp;and<br>
+alias&nbsp;index&nbsp;entries&nbsp;are&nbsp;deleted;&nbsp;the&nbsp;caller&nbsp;owns&nbsp;persisting&nbsp;it.<br>
+Calling&nbsp;this&nbsp;from&nbsp;anything&nbsp;that&nbsp;does&nbsp;not&nbsp;subsequently&nbsp;save&nbsp;loses<br>
+the&nbsp;concept&nbsp;outright.&nbsp;To&nbsp;look&nbsp;without&nbsp;consuming,&nbsp;use<br>
+:meth:`peek_concept`.<br>
+&nbsp;<br>
+Returns&nbsp;``None``&nbsp;if&nbsp;the&nbsp;concept&nbsp;is&nbsp;not&nbsp;archived.</span></dd></dl>
+
+<dl><dt><a name="ConceptArchive-recall_edges"><strong>recall_edges</strong></a>(self, concept_id: 'str') -&gt; 'list[dict[str, Any]]'</dt><dd><span class="code">Remove&nbsp;and&nbsp;return&nbsp;archived&nbsp;edges&nbsp;touching&nbsp;a&nbsp;concept.<br>
+&nbsp;<br>
+Called&nbsp;when&nbsp;a&nbsp;concept&nbsp;is&nbsp;recalled&nbsp;to&nbsp;working&nbsp;memory&nbsp;so&nbsp;its<br>
+relationships&nbsp;come&nbsp;back&nbsp;with&nbsp;it.</span></dd></dl>
+
+<dl><dt><a name="ConceptArchive-remove_concepts_batch"><strong>remove_concepts_batch</strong></a>(self, concept_ids: 'list[str]') -&gt; 'int'</dt><dd><span class="code">Permanently&nbsp;delete&nbsp;archived&nbsp;concepts&nbsp;and&nbsp;their&nbsp;alias/edge&nbsp;rows.<br>
+&nbsp;<br>
+Used&nbsp;to&nbsp;drop&nbsp;stale&nbsp;archive&nbsp;rows&nbsp;for&nbsp;concepts&nbsp;that&nbsp;are&nbsp;present<br>
+in&nbsp;working&nbsp;memory&nbsp;(e.g.&nbsp;restored&nbsp;from&nbsp;a&nbsp;save&nbsp;file&nbsp;written<br>
+before&nbsp;a&nbsp;spill&nbsp;ran).&nbsp;One&nbsp;transaction;&nbsp;returns&nbsp;the&nbsp;number&nbsp;of<br>
+concept&nbsp;rows&nbsp;deleted.</span></dd></dl>
+
+<dl><dt><a name="ConceptArchive-remove_edges_for_concept"><strong>remove_edges_for_concept</strong></a>(self, concept_id: 'str') -&gt; 'int'</dt><dd><span class="code">Delete&nbsp;archived&nbsp;edges&nbsp;touching&nbsp;a&nbsp;concept&nbsp;(permanent&nbsp;removal).</span></dd></dl>
+
+<dl><dt><a name="ConceptArchive-vacuum"><strong>vacuum</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Reclaim&nbsp;space&nbsp;after&nbsp;large&nbsp;deletions.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-open_archive"><strong>open_archive</strong></a>(data_dir: 'str | Path') -&gt; 'ConceptArchive'</dt><dd><span class="code">Open&nbsp;(creating&nbsp;if&nbsp;needed)&nbsp;the&nbsp;concept&nbsp;archive&nbsp;under&nbsp;``data_dir``.<br>
+&nbsp;<br>
+The&nbsp;database&nbsp;file&nbsp;is&nbsp;``&lt;data_dir&gt;/concept_archive.db``.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>logger</strong> = &lt;Logger Self_World.temporal_lobe.concepts.archive (WARNING)&gt;</td></tr></table>
+</body></html>

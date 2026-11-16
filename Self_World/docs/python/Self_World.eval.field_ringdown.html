@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.eval.field_ringdown</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.eval.html" class="white">eval</a>.field_ringdown</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/eval/field_ringdown.py">/home/mindyrenee/GenAnd/Genesis/Self_World/eval/field_ringdown.py</a></td></tr></table>
+    <p><span class="code">Ring-down&nbsp;assay&nbsp;—&nbsp;does&nbsp;a&nbsp;driven&nbsp;oscillation&nbsp;persist&nbsp;in&nbsp;the&nbsp;physics?<br>
+&nbsp;<br>
+The&nbsp;embodiment-depth&nbsp;metric:&nbsp;drive&nbsp;a&nbsp;real&nbsp;oscillation&nbsp;in&nbsp;the<br>
+substrate,&nbsp;then&nbsp;*stop&nbsp;driving&nbsp;it*,&nbsp;and&nbsp;measure&nbsp;how&nbsp;long&nbsp;each<br>
+physical&nbsp;channel&nbsp;keeps&nbsp;ringing.&nbsp;A&nbsp;corpse's&nbsp;field&nbsp;doesn't&nbsp;vanish<br>
+instantly&nbsp;—&nbsp;it&nbsp;rings&nbsp;down.&nbsp;The&nbsp;laptop's&nbsp;fast&nbsp;channels&nbsp;are&nbsp;expected<br>
+to&nbsp;collapse&nbsp;within&nbsp;a&nbsp;ring&nbsp;or&nbsp;two&nbsp;(their&nbsp;"state"&nbsp;is&nbsp;the&nbsp;software's<br>
+drive);&nbsp;the&nbsp;thermal&nbsp;field&nbsp;is&nbsp;the&nbsp;one&nbsp;medium&nbsp;that&nbsp;can&nbsp;physically<br>
+*hold*&nbsp;a&nbsp;slow&nbsp;oscillation&nbsp;—&nbsp;the&nbsp;die's&nbsp;heat&nbsp;capacity&nbsp;is&nbsp;a&nbsp;real<br>
+integrator&nbsp;with&nbsp;its&nbsp;own&nbsp;decay&nbsp;constant.<br>
+&nbsp;<br>
+Two&nbsp;legs,&nbsp;both&nbsp;falsifiable:<br>
+&nbsp;<br>
+-&nbsp;**Fast&nbsp;leg**&nbsp;—&nbsp;carrier&nbsp;driven&nbsp;at&nbsp;the&nbsp;delta&nbsp;rate&nbsp;(2.25&nbsp;Hz)&nbsp;for<br>
+&nbsp;&nbsp;~20&nbsp;s,&nbsp;then&nbsp;gated&nbsp;(depth=0).&nbsp;Post-gate&nbsp;decay&nbsp;of&nbsp;the&nbsp;delta-band<br>
+&nbsp;&nbsp;energy&nbsp;in&nbsp;the&nbsp;duty/jitter&nbsp;channels:&nbsp;how&nbsp;fast&nbsp;the&nbsp;substrate<br>
+&nbsp;&nbsp;forgets&nbsp;the&nbsp;rhythm&nbsp;it&nbsp;was&nbsp;executing.<br>
+-&nbsp;**Thermal&nbsp;leg**&nbsp;—&nbsp;real&nbsp;load&nbsp;bursts&nbsp;at&nbsp;the&nbsp;infraslow&nbsp;rate&nbsp;(0.25&nbsp;Hz,<br>
+&nbsp;&nbsp;2&nbsp;s&nbsp;on&nbsp;/&nbsp;2&nbsp;s&nbsp;off,&nbsp;~40&nbsp;s)&nbsp;while&nbsp;the&nbsp;probe&nbsp;carrier&nbsp;carries&nbsp;the&nbsp;same<br>
+&nbsp;&nbsp;beat,&nbsp;then&nbsp;all&nbsp;drive&nbsp;stops.&nbsp;k10temp&nbsp;package&nbsp;temperature&nbsp;sampled<br>
+&nbsp;&nbsp;~1&nbsp;Hz&nbsp;for&nbsp;~2&nbsp;min&nbsp;and&nbsp;demodulated&nbsp;at&nbsp;the&nbsp;drive&nbsp;frequency&nbsp;in<br>
+&nbsp;&nbsp;sliding&nbsp;windows:&nbsp;if&nbsp;the&nbsp;die&nbsp;keeps&nbsp;oscillating&nbsp;at&nbsp;0.25&nbsp;Hz&nbsp;after<br>
+&nbsp;&nbsp;the&nbsp;rhythm&nbsp;stops,&nbsp;its&nbsp;amplitude&nbsp;decays&nbsp;on&nbsp;the&nbsp;*thermal*&nbsp;time<br>
+&nbsp;&nbsp;constant&nbsp;—&nbsp;a&nbsp;physical&nbsp;afterglow&nbsp;the&nbsp;software&nbsp;no&nbsp;longer&nbsp;drives.<br>
+&nbsp;<br>
+Honesty&nbsp;boundary:&nbsp;the&nbsp;fast&nbsp;channels&nbsp;carry&nbsp;the&nbsp;drive&nbsp;itself,&nbsp;so<br>
+their&nbsp;collapse&nbsp;is&nbsp;expected&nbsp;—&nbsp;persistence&nbsp;there&nbsp;is&nbsp;not&nbsp;the&nbsp;claim.<br>
+The&nbsp;thermal&nbsp;channel&nbsp;is&nbsp;a&nbsp;different&nbsp;physical&nbsp;medium&nbsp;(heat&nbsp;capacity<br>
+of&nbsp;the&nbsp;die+package)&nbsp;with&nbsp;an&nbsp;independent&nbsp;decay&nbsp;time;&nbsp;a&nbsp;measured<br>
+thermal&nbsp;afterglow&nbsp;at&nbsp;the&nbsp;drive&nbsp;frequency&nbsp;is&nbsp;the&nbsp;first&nbsp;piece&nbsp;of&nbsp;the<br>
+pattern&nbsp;that&nbsp;demonstrably&nbsp;outlives&nbsp;its&nbsp;driver.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="argparse.html">argparse</a><br>
+<a href="json.html">json</a><br>
+</td><td class="multicolumn"><a href="math.html">math</a><br>
+<a href="signal.html">signal</a><br>
+</td><td class="multicolumn"><a href="subprocess.html">subprocess</a><br>
+<a href="sys.html">sys</a><br>
+</td><td class="multicolumn"><a href="time.html">time</a><br>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-main"><strong>main</strong></a>() -&gt; 'None'</dt></dl>
+ <dl><dt><a name="-run"><strong>run</strong></a>(fast_drive_s: 'float' = 20.0, thermal_drive_s: 'float' = 40.0, measure_s: 'float' = 90.0) -&gt; 'dict[str, Any]'</dt></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>DELTA_WIRE</strong> = 1<br>
+<strong>INFRASLOW_WIRE</strong> = 0<br>
+<strong>K10TEMP</strong> = PosixPath('/sys/class/hwmon/hwmon4/temp1_input')<br>
+<strong>ROOT</strong> = PosixPath('/home/mindyrenee/GenAnd/Genesis/Self_World')</td></tr></table>
+</body></html>

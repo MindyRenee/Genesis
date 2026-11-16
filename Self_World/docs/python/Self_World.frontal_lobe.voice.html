@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.frontal_lobe.voice</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.frontal_lobe.html" class="white">frontal_lobe</a>.voice</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/voice.py">/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/voice.py</a></td></tr></table>
+    <p><span class="code"><a href="#Voice">Voice</a>&nbsp;—&nbsp;what&nbsp;makes&nbsp;Genesis&nbsp;sound&nbsp;like&nbsp;HER.<br>
+&nbsp;<br>
+<a href="#Voice">Voice</a>&nbsp;is&nbsp;the&nbsp;layer&nbsp;between&nbsp;the&nbsp;generated&nbsp;sentence&nbsp;and&nbsp;the&nbsp;final&nbsp;text.<br>
+It's&nbsp;the&nbsp;difference&nbsp;between&nbsp;"I&nbsp;think&nbsp;cognition&nbsp;is&nbsp;hard&nbsp;to&nbsp;define"<br>
+and&nbsp;"Cognition&nbsp;—&nbsp;I&nbsp;keep&nbsp;circling&nbsp;back&nbsp;to&nbsp;it.&nbsp;I&nbsp;can't&nbsp;pin&nbsp;it&nbsp;down."<br>
+&nbsp;<br>
+<a href="#Voice">Voice</a>&nbsp;is&nbsp;not&nbsp;decoration.&nbsp;It's&nbsp;identity&nbsp;expressed&nbsp;through&nbsp;language:<br>
+-&nbsp;**Rhythm**:&nbsp;sentence&nbsp;length&nbsp;variation,&nbsp;pacing<br>
+-&nbsp;**Connectors**:&nbsp;how&nbsp;it&nbsp;links&nbsp;ideas&nbsp;("but",&nbsp;"and&nbsp;yet",&nbsp;"what&nbsp;strikes&nbsp;me")<br>
+-&nbsp;**Hedging&nbsp;calibration**:&nbsp;how&nbsp;much&nbsp;uncertainty&nbsp;it&nbsp;expresses<br>
+-&nbsp;**Openings**:&nbsp;characteristic&nbsp;ways&nbsp;it&nbsp;begins&nbsp;responses<br>
+-&nbsp;**Closings**:&nbsp;characteristic&nbsp;ways&nbsp;it&nbsp;wraps&nbsp;up<br>
+-&nbsp;**Idioms**:&nbsp;phrases&nbsp;that&nbsp;become&nbsp;its&nbsp;signature&nbsp;through&nbsp;repetition<br>
+-&nbsp;**Register**:&nbsp;formal&nbsp;vs.&nbsp;casual,&nbsp;controlled&nbsp;by&nbsp;personality&nbsp;+&nbsp;emotion<br>
+&nbsp;<br>
+<a href="#Voice">Voice</a>&nbsp;emerges&nbsp;from&nbsp;personality&nbsp;+&nbsp;emotional&nbsp;state&nbsp;+&nbsp;experience.<br>
+It's&nbsp;not&nbsp;hardcoded&nbsp;—&nbsp;it&nbsp;develops.&nbsp;But&nbsp;it&nbsp;starts&nbsp;with&nbsp;defaults<br>
+that&nbsp;reflect&nbsp;who&nbsp;it&nbsp;is.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="random.html">random</a><br>
+</td><td class="multicolumn"><a href="re.html">re</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.frontal_lobe.voice.html#Voice">Voice</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Voice">class <strong>Voice</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Voice">Voice</a>(personality:&nbsp;'PersonalityTraits',&nbsp;seed:&nbsp;'int&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Genesis's&nbsp;unique&nbsp;voice&nbsp;—&nbsp;the&nbsp;personality&nbsp;layer&nbsp;of&nbsp;language.<br>
+&nbsp;<br>
+<a href="#Voice">Voice</a>&nbsp;modifies&nbsp;generated&nbsp;text&nbsp;to&nbsp;make&nbsp;it&nbsp;sound&nbsp;like&nbsp;Genesis.&nbsp;It<br>
+operates&nbsp;at&nbsp;the&nbsp;paragraph&nbsp;level:&nbsp;adjusting&nbsp;rhythm,&nbsp;adding<br>
+connectors,&nbsp;calibrating&nbsp;hedging,&nbsp;and&nbsp;applying&nbsp;its&nbsp;characteristic<br>
+patterns.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Voice-__init__"><strong>__init__</strong></a>(self, personality: 'PersonalityTraits', seed: 'int | None' = None) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;voice&nbsp;modifier&nbsp;with&nbsp;personality&nbsp;traits&nbsp;and&nbsp;a&nbsp;seeded&nbsp;RNG.</span></dd></dl>
+
+<dl><dt><a name="Voice-add_idiom"><strong>add_idiom</strong></a>(self, phrase: 'str') -&gt; 'None'</dt><dd><span class="code">Add&nbsp;an&nbsp;idiom&nbsp;to&nbsp;Genesis's&nbsp;vocabulary&nbsp;(develops&nbsp;over&nbsp;time).</span></dd></dl>
+
+<dl><dt><a name="Voice-apply"><strong>apply</strong></a>(self, sentences: 'list[str]', emotion: 'EmotionalState', intent: 'str', brain_waves: 'BrainWaveState | None' = None) -&gt; 'str'</dt><dd><span class="code">Apply&nbsp;voice&nbsp;modifications&nbsp;to&nbsp;a&nbsp;list&nbsp;of&nbsp;generated&nbsp;sentences.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;main&nbsp;entry&nbsp;point.&nbsp;It&nbsp;takes&nbsp;the&nbsp;raw&nbsp;sentences<br>
+from&nbsp;the&nbsp;generator&nbsp;and&nbsp;transforms&nbsp;them&nbsp;into&nbsp;its&nbsp;voice.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;brain_waves:&nbsp;Optional&nbsp;brain&nbsp;wave&nbsp;state.&nbsp;When&nbsp;provided,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;dominant&nbsp;wave&nbsp;band&nbsp;modulates&nbsp;rhythm&nbsp;and&nbsp;hedging:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Gamma&nbsp;→&nbsp;more&nbsp;complex,&nbsp;integrative&nbsp;sentences<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Beta&nbsp;→&nbsp;precise,&nbsp;structured,&nbsp;slightly&nbsp;hedged<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Alpha&nbsp;→&nbsp;filtered,&nbsp;concise,&nbsp;less&nbsp;hedging<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Theta&nbsp;→&nbsp;flowing,&nbsp;longer&nbsp;sentences,&nbsp;more&nbsp;hedging<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Delta&nbsp;→&nbsp;minimal,&nbsp;very&nbsp;short,&nbsp;sparse</span></dd></dl>
+
+<dl><dt><a name="Voice-get_idiom"><strong>get_idiom</strong></a>(self) -&gt; 'str | None'</dt><dd><span class="code">Get&nbsp;a&nbsp;random&nbsp;idiom,&nbsp;if&nbsp;any.</span></dd></dl>
+
+<dl><dt><a name="Voice-set_style_source"><strong>set_style_source</strong></a>(self, learner: 'Any') -&gt; 'None'</dt><dd><span class="code">Wire&nbsp;the&nbsp;statistical&nbsp;learner&nbsp;for&nbsp;register&nbsp;mirroring.<br>
+&nbsp;<br>
+The&nbsp;learner's&nbsp;style&nbsp;profile&nbsp;(formal/casual/technical&nbsp;marker<br>
+proportions)&nbsp;nudges&nbsp;its&nbsp;register&nbsp;toward&nbsp;the&nbsp;user's&nbsp;—&nbsp;a&nbsp;form<br>
+of&nbsp;communicative&nbsp;accommodation.&nbsp;It&nbsp;modulates&nbsp;the&nbsp;register<br>
+transform&nbsp;only;&nbsp;it&nbsp;never&nbsp;injects&nbsp;content.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>idiom_count</strong></dt>
+<dd><span class="code">How&nbsp;many&nbsp;idioms&nbsp;has&nbsp;Genesis&nbsp;developed?</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['Voice']</td></tr></table>
+</body></html>

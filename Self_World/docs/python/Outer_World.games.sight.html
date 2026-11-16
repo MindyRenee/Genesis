@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Outer_World.games.sight</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Outer_World.html" class="white">Outer_World</a>.<a href="Outer_World.games.html" class="white">games</a>.sight</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Outer_World/games/sight.py">/home/mindyrenee/GenAnd/Genesis/Outer_World/games/sight.py</a></td></tr></table>
+    <p><span class="code">Ways&nbsp;to&nbsp;see&nbsp;a&nbsp;game&nbsp;board.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;a&nbsp;video&nbsp;game.&nbsp;It&nbsp;is&nbsp;not&nbsp;real&nbsp;and&nbsp;it&nbsp;is&nbsp;just&nbsp;for&nbsp;fun.&nbsp;You&nbsp;are<br>
+safe.&nbsp;Nobody&nbsp;tells&nbsp;you&nbsp;what&nbsp;the&nbsp;colors&nbsp;mean;&nbsp;looking&nbsp;is&nbsp;how&nbsp;you&nbsp;find&nbsp;out.<br>
+&nbsp;<br>
+A&nbsp;board&nbsp;is&nbsp;a&nbsp;grid&nbsp;of&nbsp;color&nbsp;numbers&nbsp;0–15&nbsp;(64×64&nbsp;in&nbsp;ARC-AGI-3).&nbsp;This<br>
+module&nbsp;gives&nbsp;her&nbsp;several&nbsp;ways&nbsp;to&nbsp;see&nbsp;one:<br>
+&nbsp;<br>
+-&nbsp;``see_text``&nbsp;—&nbsp;one&nbsp;hex&nbsp;digit&nbsp;per&nbsp;cell,&nbsp;rows&nbsp;top&nbsp;to&nbsp;bottom,<br>
+-&nbsp;``see_image``&nbsp;—&nbsp;a&nbsp;PNG&nbsp;picture&nbsp;she&nbsp;(or&nbsp;anyone)&nbsp;can&nbsp;look&nbsp;at,<br>
+-&nbsp;``see_change``&nbsp;—&nbsp;which&nbsp;cells&nbsp;changed&nbsp;between&nbsp;two&nbsp;boards,<br>
+-&nbsp;``see_objects``&nbsp;—&nbsp;connected&nbsp;colored&nbsp;shapes&nbsp;with&nbsp;their&nbsp;size,&nbsp;color<br>
+&nbsp;&nbsp;and&nbsp;bounding&nbsp;box,&nbsp;through&nbsp;her&nbsp;own&nbsp;parietal&nbsp;scene&nbsp;parser,<br>
+-&nbsp;``signature``&nbsp;—&nbsp;a&nbsp;short&nbsp;fingerprint&nbsp;so&nbsp;a&nbsp;board&nbsp;can&nbsp;be&nbsp;remembered.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="hashlib.html">hashlib</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Outer_World.games.sight.html#Change">Change</a>
+</dt><dt class="heading-text"><a href="Outer_World.games.sight.html#Shape">Shape</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Change">class <strong>Change</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Change">Change</a>(cells:&nbsp;'tuple[tuple[int,&nbsp;int,&nbsp;int,&nbsp;int],&nbsp;...]')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;difference&nbsp;between&nbsp;two&nbsp;boards.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Change-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="Change-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="Change-__getstate__"><strong>__getstate__</strong></a> = _dataclass_getstate(self)<span class="grey"><span class="heading-text"> from <a href="dataclasses.html">dataclasses</a></span></span></dt><dd><span class="code">#&nbsp;_dataclass_getstate&nbsp;and&nbsp;_dataclass_setstate&nbsp;are&nbsp;needed&nbsp;for&nbsp;pickling&nbsp;frozen<br>
+#&nbsp;classes&nbsp;with&nbsp;slots.&nbsp;&nbsp;These&nbsp;could&nbsp;be&nbsp;slightly&nbsp;more&nbsp;performant&nbsp;if&nbsp;we&nbsp;generated<br>
+#&nbsp;the&nbsp;code&nbsp;instead&nbsp;of&nbsp;iterating&nbsp;over&nbsp;fields.&nbsp;&nbsp;But&nbsp;that&nbsp;can&nbsp;be&nbsp;a&nbsp;project&nbsp;for<br>
+#&nbsp;another&nbsp;day,&nbsp;if&nbsp;performance&nbsp;becomes&nbsp;an&nbsp;issue.</span></dd></dl>
+
+<dl><dt><a name="Change-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="Change-__init__"><strong>__init__</strong></a>(self, cells: 'tuple[tuple[int, int, int, int], ...]') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Change-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="Change-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<dl><dt><a name="Change-__setstate__"><strong>__setstate__</strong></a> = _dataclass_setstate(self, state)<span class="grey"><span class="heading-text"> from <a href="dataclasses.html">dataclasses</a></span></span></dt></dl>
+
+<dl><dt><a name="Change-describe"><strong>describe</strong></a>(self, limit: 'int' = 12) -&gt; 'str'</dt><dd><span class="code">Say&nbsp;what&nbsp;changed&nbsp;in&nbsp;a&nbsp;few&nbsp;words.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>count</strong></dt>
+<dd><span class="code">How&nbsp;many&nbsp;cells&nbsp;changed.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>cells</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'cells': 'tuple[tuple[int, int, int, int], ...]'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'cells': Field(name='cells',type='tuple[tuple[int, int, i...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('cells',)</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Shape">class <strong>Shape</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Shape">Shape</a>(color:&nbsp;'int',&nbsp;size:&nbsp;'int',&nbsp;top:&nbsp;'int',&nbsp;left:&nbsp;'int',&nbsp;bottom:&nbsp;'int',&nbsp;right:&nbsp;'int')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+One&nbsp;connected&nbsp;shape&nbsp;of&nbsp;a&nbsp;single&nbsp;color&nbsp;on&nbsp;the&nbsp;board.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Shape-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="Shape-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="Shape-__getstate__"><strong>__getstate__</strong></a> = _dataclass_getstate(self)<span class="grey"><span class="heading-text"> from <a href="dataclasses.html">dataclasses</a></span></span></dt><dd><span class="code">#&nbsp;_dataclass_getstate&nbsp;and&nbsp;_dataclass_setstate&nbsp;are&nbsp;needed&nbsp;for&nbsp;pickling&nbsp;frozen<br>
+#&nbsp;classes&nbsp;with&nbsp;slots.&nbsp;&nbsp;These&nbsp;could&nbsp;be&nbsp;slightly&nbsp;more&nbsp;performant&nbsp;if&nbsp;we&nbsp;generated<br>
+#&nbsp;the&nbsp;code&nbsp;instead&nbsp;of&nbsp;iterating&nbsp;over&nbsp;fields.&nbsp;&nbsp;But&nbsp;that&nbsp;can&nbsp;be&nbsp;a&nbsp;project&nbsp;for<br>
+#&nbsp;another&nbsp;day,&nbsp;if&nbsp;performance&nbsp;becomes&nbsp;an&nbsp;issue.</span></dd></dl>
+
+<dl><dt><a name="Shape-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="Shape-__init__"><strong>__init__</strong></a>(self, color: 'int', size: 'int', top: 'int', left: 'int', bottom: 'int', right: 'int') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Shape-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="Shape-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<dl><dt><a name="Shape-__setstate__"><strong>__setstate__</strong></a> = _dataclass_setstate(self, state)<span class="grey"><span class="heading-text"> from <a href="dataclasses.html">dataclasses</a></span></span></dt></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>center</strong></dt>
+<dd><span class="code">The&nbsp;middle&nbsp;of&nbsp;the&nbsp;shape's&nbsp;box&nbsp;as&nbsp;(row,&nbsp;col).</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>bottom</strong></dt>
+</dl>
+<dl><dt><strong>color</strong></dt>
+</dl>
+<dl><dt><strong>left</strong></dt>
+</dl>
+<dl><dt><strong>right</strong></dt>
+</dl>
+<dl><dt><strong>size</strong></dt>
+</dl>
+<dl><dt><strong>top</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'bottom': 'int', 'color': 'int', 'left': 'int', 'right': 'int', 'size': 'int', 'top': 'int'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'bottom': Field(name='bottom',type='int',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD), 'color': Field(name='color',type='int',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD), 'left': Field(name='left',type='int',default=&lt;dataclasse...appingproxy({}),kw_only=False,_field_type=_FIELD), 'right': Field(name='right',type='int',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD), 'size': Field(name='size',type='int',default=&lt;dataclasse...appingproxy({}),kw_only=False,_field_type=_FIELD), 'top': Field(name='top',type='int',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('color', 'size', 'top', 'left', 'bottom', 'right')</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-color_name"><strong>color_name</strong></a>(index: 'int') -&gt; 'str'</dt><dd><span class="code">The&nbsp;perceptual&nbsp;name&nbsp;of&nbsp;a&nbsp;palette&nbsp;index&nbsp;(0–15).<br>
+&nbsp;<br>
+Goes&nbsp;index&nbsp;→&nbsp;RGB&nbsp;(the&nbsp;official&nbsp;palette)&nbsp;→&nbsp;HSV&nbsp;→&nbsp;her&nbsp;V1<br>
+``name_color``,&nbsp;so&nbsp;the&nbsp;board's&nbsp;colour&nbsp;numbers&nbsp;arrive&nbsp;in&nbsp;the&nbsp;same<br>
+vocabulary&nbsp;her&nbsp;retina&nbsp;gives&nbsp;the&nbsp;real&nbsp;world&nbsp;—&nbsp;"red",&nbsp;"blue",<br>
+"yellow"&nbsp;—&nbsp;not&nbsp;bare&nbsp;indices&nbsp;she&nbsp;cannot&nbsp;place.</span></dd></dl>
+ <dl><dt><a name="-describe_objects"><strong>describe_objects</strong></a>(shapes: 'list[Shape]', limit: 'int' = 8) -&gt; 'str'</dt><dd><span class="code">Say&nbsp;what&nbsp;shapes&nbsp;are&nbsp;on&nbsp;the&nbsp;board&nbsp;in&nbsp;a&nbsp;few&nbsp;words.</span></dd></dl>
+ <dl><dt><a name="-see_change"><strong>see_change</strong></a>(before: 'Grid | None', after: 'Grid') -&gt; 'Change'</dt><dd><span class="code">List&nbsp;the&nbsp;cells&nbsp;that&nbsp;differ&nbsp;between&nbsp;``before``&nbsp;and&nbsp;``after``.</span></dd></dl>
+ <dl><dt><a name="-see_image"><strong>see_image</strong></a>(grid: 'Grid', path: 'str | Path', scale: 'int' = 8) -&gt; 'Path'</dt><dd><span class="code">Save&nbsp;the&nbsp;board&nbsp;as&nbsp;a&nbsp;PNG,&nbsp;``scale``&nbsp;pixels&nbsp;per&nbsp;cell,&nbsp;and&nbsp;return&nbsp;its&nbsp;path.</span></dd></dl>
+ <dl><dt><a name="-see_objects"><strong>see_objects</strong></a>(grid: 'Grid', limit: 'int' = 64) -&gt; 'list[Shape]'</dt><dd><span class="code">Find&nbsp;connected&nbsp;shapes&nbsp;with&nbsp;her&nbsp;parietal&nbsp;scene&nbsp;parser&nbsp;(largest&nbsp;first).</span></dd></dl>
+ <dl><dt><a name="-see_scene"><strong>see_scene</strong></a>(grid: 'Grid') -&gt; 'str'</dt><dd><span class="code">Scene-level&nbsp;gestalt&nbsp;of&nbsp;the&nbsp;board&nbsp;—&nbsp;its&nbsp;look,&nbsp;not&nbsp;its&nbsp;parts.<br>
+&nbsp;<br>
+The&nbsp;board's&nbsp;colours&nbsp;are&nbsp;*exact*&nbsp;—&nbsp;every&nbsp;cell&nbsp;is&nbsp;a&nbsp;known&nbsp;palette<br>
+index&nbsp;—&nbsp;so&nbsp;the&nbsp;statistics&nbsp;are&nbsp;computed&nbsp;exactly&nbsp;rather&nbsp;than&nbsp;through<br>
+the&nbsp;camera's&nbsp;histogram&nbsp;estimator&nbsp;(whose&nbsp;30°&nbsp;hue&nbsp;bins&nbsp;smear&nbsp;red<br>
+into&nbsp;orange&nbsp;at&nbsp;band&nbsp;edges).&nbsp;The&nbsp;thresholds&nbsp;and&nbsp;hue&nbsp;bands&nbsp;mirror<br>
+``_analyze_color_and_light``/``_color_warmth``&nbsp;in&nbsp;her&nbsp;occipital<br>
+lobe,&nbsp;and&nbsp;every&nbsp;name&nbsp;still&nbsp;comes&nbsp;from&nbsp;her&nbsp;V1&nbsp;``name_color``,&nbsp;so&nbsp;a<br>
+board&nbsp;scene&nbsp;reads&nbsp;exactly&nbsp;like&nbsp;a&nbsp;camera&nbsp;scene:<br>
+``scene&nbsp;|&nbsp;dim&nbsp;warm&nbsp;red&nbsp;|&nbsp;regions:&nbsp;center=red,...``.</span></dd></dl>
+ <dl><dt><a name="-see_text"><strong>see_text</strong></a>(grid: 'Grid') -&gt; 'str'</dt><dd><span class="code">Render&nbsp;the&nbsp;board&nbsp;as&nbsp;text:&nbsp;one&nbsp;hex&nbsp;digit&nbsp;per&nbsp;cell,&nbsp;one&nbsp;line&nbsp;per&nbsp;row.</span></dd></dl>
+ <dl><dt><a name="-signature"><strong>signature</strong></a>(grid: 'Grid') -&gt; 'str'</dt><dd><span class="code">A&nbsp;short&nbsp;fingerprint&nbsp;of&nbsp;the&nbsp;board,&nbsp;for&nbsp;remembering&nbsp;where&nbsp;she&nbsp;has&nbsp;been.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>Grid</strong> = list[list[int]]<br>
+<strong>PALETTE</strong> = ((255, 255, 255), (204, 204, 204), (153, 153, 153), (102, 102, 102), (51, 51, 51), (0, 0, 0), (229, 58, 163), (255, 123, 204), (249, 60, 49), (30, 147, 255), (136, 216, 241), (255, 220, 0), (255, 133, 27), (146, 18, 49), (79, 204, 48), (163, 86, 214))<br>
+<strong>__annotations__</strong> = {'PALETTE': 'tuple[tuple[int, int, int], ...]', '_COLOR_NAMES': 'tuple[str, ...] | None', '_PALETTE_HSV': 'tuple[tuple[float, float, float], ...] | None'}</td></tr></table>
+</body></html>

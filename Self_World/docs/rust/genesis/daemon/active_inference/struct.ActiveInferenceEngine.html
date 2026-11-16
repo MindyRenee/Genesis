@@ -1,0 +1,422 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="The active inference engine — a generative model of Genesis’s own neurochemical trajectory."><title>ActiveInferenceEngine in genesis::daemon::active_inference - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-203241e4.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="genesis" data-themes="" data-resource-suffix="" data-rustdoc-version="1.100.0 (0ef1bc386 2026-11-09)" data-channel="1.100.0" data-search-js="search-b167f383.js" data-stringdex-js="stringdex-b5109af9.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../../static.files/main-1814ead3.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-9f56287d.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc struct"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">ActiveInferenceEngine</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../genesis/index.html">genesis</a><span class="version">0.2.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Active<wbr>Inference<wbr>Engine</a></h2><h3><a href="#fields">Fields</a></h3><ul class="block structfield"><li><a href="#structfield.ach_sensory_gain" title="ach_sensory_gain">ach_sensory_gain</a></li><li><a href="#structfield.action_matrix" title="action_matrix">action_matrix</a></li><li><a href="#structfield.allostasis_load" title="allostasis_load">allostasis_load</a></li><li><a href="#structfield.belief_mean" title="belief_mean">belief_mean</a></li><li><a href="#structfield.belief_var" title="belief_var">belief_var</a></li><li><a href="#structfield.bias" title="bias">bias</a></li><li><a href="#structfield.expected_fe_ema" title="expected_fe_ema">expected_fe_ema</a></li><li><a href="#structfield.initialized" title="initialized">initialized</a></li><li><a href="#structfield.last_action" title="last_action">last_action</a></li><li><a href="#structfield.last_free_energy" title="last_free_energy">last_free_energy</a></li><li><a href="#structfield.maturity_error_ema" title="maturity_error_ema">maturity_error_ema</a></li><li><a href="#structfield.model_maturity" title="model_maturity">model_maturity</a></li><li><a href="#structfield.policy_authority" title="policy_authority">policy_authority</a></li><li><a href="#structfield.precision" title="precision">precision</a></li><li><a href="#structfield.preference_precision" title="preference_precision">preference_precision</a></li><li><a href="#structfield.preferred" title="preferred">preferred</a></li><li><a href="#structfield.prior_var" title="prior_var">prior_var</a></li><li><a href="#structfield.rest_baseline" title="rest_baseline">rest_baseline</a></li><li><a href="#structfield.rng_state" title="rng_state">rng_state</a></li><li><a href="#structfield.surprise_ema" title="surprise_ema">surprise_ema</a></li><li><a href="#structfield.surprise_var_ema" title="surprise_var_ema">surprise_var_ema</a></li><li><a href="#structfield.tick_count" title="tick_count">tick_count</a></li><li><a href="#structfield.transition_matrix" title="transition_matrix">transition_matrix</a></li></ul><h3><a href="#implementations">Associated Functions</a></h3><ul class="block method"><li><a href="#method.new" title="new">new</a></li><li><a href="#method.load" title="load">load</a></li></ul><h3><a href="#implementations">Methods</a></h3><ul class="block method"><li><a href="#method._generate_feedback" title="_generate_feedback">_generate_feedback</a></li><li><a href="#method._select_policy" title="_select_policy">_select_policy</a></li><li><a href="#method._update_maturity" title="_update_maturity">_update_maturity</a></li><li><a href="#method.adapt_preference" title="adapt_preference">adapt_preference</a></li><li><a href="#method.allostasis_load" title="allostasis_load">allostasis_load</a></li><li><a href="#method.cycle" title="cycle">cycle</a></li><li><a href="#method.expected_information_gain" title="expected_information_gain">expected_information_gain</a></li><li><a href="#method.model_maturity" title="model_maturity">model_maturity</a></li><li><a href="#method.next_uniform" title="next_uniform">next_uniform</a></li><li><a href="#method.policy_authority" title="policy_authority">policy_authority</a></li><li><a href="#method.posterior_variance_mean" title="posterior_variance_mean">posterior_variance_mean</a></li><li><a href="#method.precision" title="precision">precision</a></li><li><a href="#method.predict" title="predict">predict</a></li><li><a href="#method.predict_with_action" title="predict_with_action">predict_with_action</a></li><li><a href="#method.predicted_variances" title="predicted_variances">predicted_variances</a></li><li><a href="#method.preference_precision" title="preference_precision">preference_precision</a></li><li><a href="#method.preferred" title="preferred">preferred</a></li><li><a href="#method.sanitize_internal_state" title="sanitize_internal_state">sanitize_internal_state</a></li><li><a href="#method.save" title="save">save</a></li><li><a href="#method.set_policy_authority" title="set_policy_authority">set_policy_authority</a></li><li><a href="#method.signals" title="signals">signals</a></li><li><a href="#method.test_set_allostasis_load" title="test_set_allostasis_load">test_set_allostasis_load</a></li><li><a href="#method.tick_count" title="tick_count">tick_count</a></li><li><a href="#method.update_signals" title="update_signals">update_signals</a></li></ul><h3><a href="#trait-implementations">Trait Implementations</a></h3><ul class="block trait-implementation"><li><a href="#impl-Default-for-ActiveInferenceEngine" title="Default">Default</a></li></ul><h3><a href="#synthetic-implementations">Auto Trait Implementations</a></h3><ul class="block synthetic-implementation"><li><a href="#impl-Freeze-for-ActiveInferenceEngine" title="Freeze">Freeze</a></li><li><a href="#impl-RefUnwindSafe-for-ActiveInferenceEngine" title="RefUnwindSafe">RefUnwindSafe</a></li><li><a href="#impl-Send-for-ActiveInferenceEngine" title="Send">Send</a></li><li><a href="#impl-Sync-for-ActiveInferenceEngine" title="Sync">Sync</a></li><li><a href="#impl-Unpin-for-ActiveInferenceEngine" title="Unpin">Unpin</a></li><li><a href="#impl-UnsafeUnpin-for-ActiveInferenceEngine" title="UnsafeUnpin">UnsafeUnpin</a></li><li><a href="#impl-UnwindSafe-for-ActiveInferenceEngine" title="UnwindSafe">UnwindSafe</a></li></ul><h3><a href="#blanket-implementations">Blanket Implementations</a></h3><ul class="block blanket-implementation"><li><a href="#impl-Any-for-T" title="Any">Any</a></li><li><a href="#impl-Borrow%3CT%3E-for-T" title="Borrow&#60;T&#62;">Borrow&#60;T&#62;</a></li><li><a href="#impl-BorrowMut%3CT%3E-for-T" title="BorrowMut&#60;T&#62;">BorrowMut&#60;T&#62;</a></li><li><a href="#impl-CastableFrom%3CST,+Initialized,+Initialized%3E-for-DT" title="CastableFrom&#60;ST, Initialized, Initialized&#62;">CastableFrom&#60;ST, Initialized, Initialized&#62;</a></li><li><a href="#impl-CastableFrom%3CST,+Uninit,+Uninit%3E-for-DT" title="CastableFrom&#60;ST, Uninit, Uninit&#62;">CastableFrom&#60;ST, Uninit, Uninit&#62;</a></li><li><a href="#impl-From%3CT%3E-for-T" title="From&#60;T&#62;">From&#60;T&#62;</a></li><li><a href="#impl-Into%3CU%3E-for-T" title="Into&#60;U&#62;">Into&#60;U&#62;</a></li><li><a href="#impl-Read%3CExclusive,+BecauseExclusive%3E-for-T" title="Read&#60;Exclusive, BecauseExclusive&#62;">Read&#60;Exclusive, BecauseExclusive&#62;</a></li><li><a href="#impl-TryFrom%3CU%3E-for-T" title="TryFrom&#60;U&#62;">TryFrom&#60;U&#62;</a></li><li><a href="#impl-TryInto%3CU%3E-for-T" title="TryInto&#60;U&#62;">TryInto&#60;U&#62;</a></li><li><a href="#impl-VZip%3CV%3E-for-T" title="VZip&#60;V&#62;">VZip&#60;V&#62;</a></li></ul></section><div id="rustdoc-modnav"><h2><a href="index.html">In genesis::<wbr>daemon::<wbr>active_<wbr>inference</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../index.html">genesis</a>::<wbr><a href="../index.html">daemon</a>::<wbr><a href="index.html">active_inference</a></div><h1>Struct <span class="struct">Active<wbr>Inference<wbr>Engine</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/genesis/daemon/active_inference.rs.html#1038-1190">Source</a> </span></div><pre class="rust item-decl"><code>pub struct ActiveInferenceEngine {<details class="toggle type-contents-toggle"><summary class="hideme"><span>Show 23 fields</span></summary>
+    transition_matrix: [[<a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.array.html">18</a>]; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.array.html">18</a>],
+    action_matrix: [[<a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.array.html">18</a>]; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.array.html">18</a>],
+    last_action: [<a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.array.html">18</a>],
+    bias: [<a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.array.html">18</a>],
+    precision: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>,
+    surprise_var_ema: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>,
+    surprise_ema: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>,
+    expected_fe_ema: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>,
+    allostasis_load: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>,
+    rest_baseline: <a class="struct" href="struct.RestBaseline.html" title="struct genesis::daemon::active_inference::RestBaseline">RestBaseline</a>,
+    tick_count: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.u32.html">u32</a>,
+    initialized: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.bool.html">bool</a>,
+    model_maturity: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>,
+    maturity_error_ema: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>,
+    rng_state: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.u32.html">u32</a>,
+    belief_mean: [<a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.array.html">18</a>],
+    belief_var: [<a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.array.html">18</a>],
+    prior_var: [<a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.array.html">18</a>],
+    ach_sensory_gain: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>,
+    last_free_energy: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>,
+    preferred: [<a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.array.html">18</a>],
+    preference_precision: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>,
+    policy_authority: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>,
+</details>}</code></pre><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>The active inference engine — a generative model of Genesis’s own
+neurochemical trajectory.</p>
+<p>The engine runs one inference cycle per neurochemical tick:</p>
+<ol>
+<li><strong>Predict</strong>: use the learned transition matrix to predict the
+next effective-level vector from the current one.</li>
+<li><strong>Observe</strong>: read the actual effective levels after the tick.</li>
+<li><strong>Compute error</strong>: per-chemical prediction error and overall
+surprise (normalized L2 norm).</li>
+<li><strong>Update model</strong>: delta-rule update of the transition matrix
+and bias, scaled by precision.</li>
+<li><strong>Update precision</strong>: adapt based on surprise history.</li>
+<li><strong>Update posterior</strong>: Kalman filter update of the variational
+posterior (belief_mean, belief_var) using the prediction as
+prior and the observation to compute the posterior.</li>
+<li><strong>Compute demand proxy</strong>: smoothed RMS error, heuristic uncertainty,
+and mean-shift distance between posterior and prior. This is
+bounded telemetry, not the full variational free energy.</li>
+<li><strong>Update expected free energy</strong>: EMA of recent free energy trend.</li>
+<li><strong>Update allostatic load</strong>: accumulate or recover based on
+expected free energy.</li>
+<li><strong>Generate feedback</strong>: dopamine PE impulse, NE orienting
+impulse, metaplasticity boost, active inference impulses
+(policy selection with epistemic + pragmatic EFE),
+cortisol baseline adjustment.</li>
+</ol>
+<p>The engine is stateful — it carries the learned model (transition
+matrix, bias, precision, variational posterior) between ticks. It
+persists to disk so the model survives daemon restarts.</p>
+</div></details><h2 id="fields" class="fields section-header">Fields<a href="#fields" class="anchor">§</a></h2><span id="structfield.transition_matrix" class="structfield section-header"><a href="#structfield.transition_matrix" class="anchor field">§</a><code>transition_matrix: [[<a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.array.html">18</a>]; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.array.html">18</a>]</code></span><div class="docblock"><p>The learned transition matrix: A[i][j] = how chemical j
+predicts the next value of chemical i. Initialized as identity
+(predict “no change”). This captures the <strong>endogenous
+dynamics</strong> — how the neurochemical state evolves on its own,
+without the engine’s own interventions.</p>
+</div><span id="structfield.action_matrix" class="structfield section-header"><a href="#structfield.action_matrix" class="anchor field">§</a><code>action_matrix: [[<a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.array.html">18</a>]; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.array.html">18</a>]</code></span><div class="docblock"><p>The learned action matrix: B[i][j] = how an impulse on
+chemical j affects the next value of chemical i. This
+captures the <strong>action effects</strong> — the engine’s own
+interventions, separate from the endogenous dynamics.</p>
+<p>Without this, the model conflates its own impulses with
+endogenous dynamics: <code>post = A*pre + action_effect</code>, but the
+model only sees <code>pre → post</code> and attributes the action effect
+to A, corrupting the endogenous dynamics estimate. As the
+policy changes, A becomes invalid and the closed-loop system
+oscillates — the model chases a moving target.</p>
+<p>With B, the prediction is <code>predicted = A*pre + B*action + bias</code>,
+so A learns only the endogenous dynamics and B learns only the
+action effects. Policy evaluation uses <code>predict_with_action</code>
+to correctly forecast the outcome of each candidate policy.</p>
+<p>Initialized as zero (the model starts by assuming its actions
+have no effect, then learns its own efficacy — the conservative
+default).</p>
+</div><span id="structfield.last_action" class="structfield section-header"><a href="#structfield.last_action" class="anchor field">§</a><code>last_action: [<a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.array.html">18</a>]</code></span><div class="docblock"><p>The impulses applied in the previous cycle, as a dense
+<code>[f32; DIM]</code> vector. This is the <code>action</code> input to the
+action-conditioned prediction. Updated at the end of each
+<code>_generate_feedback</code> call from the generated impulse list.</p>
+</div><span id="structfield.bias" class="structfield section-header"><a href="#structfield.bias" class="anchor field">§</a><code>bias: [<a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.array.html">18</a>]</code></span><div class="docblock"><p>The learned bias vector: bias[i] = additive offset for
+chemical i’s prediction. Initialized as zero.</p>
+</div><span id="structfield.precision" class="structfield section-header"><a href="#structfield.precision" class="anchor field">§</a><code>precision: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a></code></span><div class="docblock"><p>The current precision of the model [0, 1]. Starts at 0.5.
+Precision is the inverse variance of the likelihood — high
+precision means the model trusts its observations (low obs_var),
+low precision means it distrusts them (high obs_var).</p>
+<p>Precision seeks the inverse-variance target
+<code>1 / (1 + surprise_var_ema / PRECISION_REFERENCE_VAR)</code>,
+slewing toward it at the asymmetric recovery/decay rates. It
+saturates at 1.0 only when the model genuinely predicts well,
+and any sustained surprise above ~0.01 RMS pulls it back below
+the exploitation threshold — which is what re-opens the
+exploratory policy branch in practice.</p>
+</div><span id="structfield.surprise_var_ema" class="structfield section-header"><a href="#structfield.surprise_var_ema" class="anchor field">§</a><code>surprise_var_ema: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a></code></span><div class="docblock"><p>Slow EMA of squared instantaneous surprise (error variance).
+Drives the precision target. Time constant ~200 ticks at
+dt_scale = 1: single impulses don’t move it, regime changes do.</p>
+</div><span id="structfield.surprise_ema" class="structfield section-header"><a href="#structfield.surprise_ema" class="anchor field">§</a><code>surprise_ema: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a></code></span><div class="docblock"><p>The EMA of surprise over recent ticks [0, 1].</p>
+</div><span id="structfield.expected_fe_ema" class="structfield section-header"><a href="#structfield.expected_fe_ema" class="anchor field">§</a><code>expected_fe_ema: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a></code></span><div class="docblock"><p>The EMA of expected free energy [0, 1]. This tracks the trend
+of free energy to predict future free energy.</p>
+</div><span id="structfield.allostasis_load" class="structfield section-header"><a href="#structfield.allostasis_load" class="anchor field">§</a><code>allostasis_load: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a></code></span><div class="docblock"><p>The accumulated allostatic load [0, 1].</p>
+</div><span id="structfield.rest_baseline" class="structfield section-header"><a href="#structfield.rest_baseline" class="anchor field">§</a><code>rest_baseline: <a class="struct" href="struct.RestBaseline.html" title="struct genesis::daemon::active_inference::RestBaseline">RestBaseline</a></code></span><div class="docblock"><p>Tracked resting burden, the reference load is measured against.</p>
+</div><span id="structfield.tick_count" class="structfield section-header"><a href="#structfield.tick_count" class="anchor field">§</a><code>tick_count: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.u32.html">u32</a></code></span><div class="docblock"><p>The number of inference cycles completed.</p>
+</div><span id="structfield.initialized" class="structfield section-header"><a href="#structfield.initialized" class="anchor field">§</a><code>initialized: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.bool.html">bool</a></code></span><div class="docblock"><p>Whether the engine has made its first prediction yet. The
+first tick is observation-only (no prediction error can be
+computed without a prior prediction).</p>
+</div><span id="structfield.model_maturity" class="structfield section-header"><a href="#structfield.model_maturity" class="anchor field">§</a><code>model_maturity: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a></code></span><div class="docblock"><p>Model maturity [0, 1] — evidence of a useful model, not elapsed
+time. Computed in <a href="struct.ActiveInferenceEngine.html#method._update_maturity" title="method genesis::daemon::active_inference::ActiveInferenceEngine::_update_maturity"><code>Self::_update_maturity</code></a> as the predictive
+fit of <code>maturity_error_ema</code> (<code>exp(-err / MATURITY_ERROR_SCALE)</code>)
+tempered by posterior certainty, so experience alone cannot
+raise it. A fresh engine reads near 0 and must demonstrate
+accuracy to earn trust; sustained surprise drops it again. The
+cognitive mind treats this as a trust signal for the inference
+outputs.</p>
+</div><span id="structfield.maturity_error_ema" class="structfield section-header"><a href="#structfield.maturity_error_ema" class="anchor field">§</a><code>maturity_error_ema: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a></code></span><div class="docblock"><p>Slow EMA of instantaneous surprise, on the ~500-tick timescale
+over which <code>model_maturity</code> is earned.</p>
+<p>This is the live driver of <code>model_maturity</code>: <code>_update_maturity</code>
+maps it through <code>exp(-err / MATURITY_ERROR_SCALE)</code>. It is also
+serialized (format v4) and reloaded, and the pre-v4 load path
+reconstructs it from a stored maturity by inverting that
+mapping.</p>
+</div><span id="structfield.rng_state" class="structfield section-header"><a href="#structfield.rng_state" class="anchor field">§</a><code>rng_state: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.u32.html">u32</a></code></span><div class="docblock"><p>xorshift32 PRNG state for stochastic policy sampling. Seeded
+from tick_count so that each tick produces a different draw,
+but the sequence is deterministic for reproducibility. A
+proper PRNG avoids the pathological correlation patterns that
+arise from hashing tick_count (the old approach produced a
+single deterministic value per tick with no statistical
+uniformity — it was a hash, not a random source).</p>
+</div><span id="structfield.belief_mean" class="structfield section-header"><a href="#structfield.belief_mean" class="anchor field">§</a><code>belief_mean: [<a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.array.html">18</a>]</code></span><div class="docblock"><p>Posterior mean: q(s)_mean[i] = the model’s best estimate of
+chemical i’s true level after combining the prediction and
+the observation via Kalman update.</p>
+</div><span id="structfield.belief_var" class="structfield section-header"><a href="#structfield.belief_var" class="anchor field">§</a><code>belief_var: [<a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.array.html">18</a>]</code></span><div class="docblock"><p>Posterior variance: q(s)_var[i] = the model’s uncertainty
+about chemical i’s level. Updated via Kalman filter:
+belief_var = (1 - K) * prior_var, where K is the Kalman gain.
+Lower variance = higher confidence.</p>
+</div><span id="structfield.prior_var" class="structfield section-header"><a href="#structfield.prior_var" class="anchor field">§</a><code>prior_var: [<a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.array.html">18</a>]</code></span><div class="docblock"><p>Predicted marginal variance: propagated posterior uncertainty
+plus process noise. It changes with the model and belief variance.</p>
+</div><span id="structfield.ach_sensory_gain" class="structfield section-header"><a href="#structfield.ach_sensory_gain" class="anchor field">§</a><code>ach_sensory_gain: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a></code></span><div class="docblock"><p>Cholinergic gain on the sensory channel — the basal forebrain’s
+efferent edge. Acetylcholine optimizes the precision of
+bottom-up prediction errors by gain on the units reporting them
+(supragranular pyramidal cells: Feldman &amp; Friston, 2010; Moran
+et al., J. Neurosci. 2013 — cholinesterase inhibition shifted
+sensory PE responses through exactly this gain). Set each cycle
+from the observed effective ACh level; the precision-weighted
+observation variance is divided by it. Per-tick and recomputed,
+so it is never serialized.</p>
+</div><span id="structfield.last_free_energy" class="structfield section-header"><a href="#structfield.last_free_energy" class="anchor field">§</a><code>last_free_energy: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a></code></span><div class="docblock"><p>The last bounded regulatory demand proxy [0, 1]. Stored so
+that signals() can report it without recomputing.</p>
+</div><span id="structfield.preferred" class="structfield section-header"><a href="#structfield.preferred" class="anchor field">§</a><code>preferred: [<a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.array.html">18</a>]</code></span><div class="docblock"><p>What she prefers to be, as prior belief over outcomes.</p>
+<p>This is the preference term of the free energy, and it is the
+reason the machinery has a purpose. Expected free energy is the
+KL divergence between <em>predicted</em> and <em>preferred</em> outcomes, so a
+system with no preference cannot do anything except hold position:
+every state is equally (un)surprising relative to wherever it
+already is.</p>
+<p>It was previously absent, and the target vector was set to her
+current adapted baseline, which made expected free energy a
+measure of “am I where I already am”. That is the difference
+between a reflex and an agent.</p>
+<p>Seeded from the genetic defaults — a seed, not a prescription.
+It says where she starts out wanting to be, not what she is
+allowed to want; it is hers to move as she learns.</p>
+</div><span id="structfield.preference_precision" class="structfield section-header"><a href="#structfield.preference_precision" class="anchor field">§</a><code>preference_precision: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a></code></span><div class="docblock"><p>Confidence in the preference, which is the strength of the
+correction it produces.</p>
+<p>Precise preferences dominate policy selection and suppress
+exploration; imprecise ones let epistemic value take over. That
+makes this the control gain, and it is deliberately not 1.0 — a
+maximally confident preference would make her rigid, and rigidity
+is its own pathology, because a system that cannot move cannot
+learn which states suit it.</p>
+</div><span id="structfield.policy_authority" class="structfield section-header"><a href="#structfield.policy_authority" class="anchor field">§</a><code>policy_authority: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a></code></span><div class="docblock"><p>How much authority her cognition has delegated for autonomous
+policy action, in [0, 1]. Written by cognition through IPC;
+read here. Zero means she decides.</p>
+</div><h2 id="implementations" class="section-header">Implementations<a href="#implementations" class="anchor">§</a></h2><div id="implementations-list"><details class="toggle implementors-toggle" open><summary><section id="impl-ActiveInferenceEngine" class="impl"><a class="src rightside" href="../../../src/genesis/daemon/active_inference.rs.html#1192-3496">Source</a><a href="#impl-ActiveInferenceEngine" class="anchor">§</a><h3 class="code-header">impl <a class="struct" href="struct.ActiveInferenceEngine.html" title="struct genesis::daemon::active_inference::ActiveInferenceEngine">ActiveInferenceEngine</a></h3></section></summary><div class="impl-items"><details class="toggle method-toggle" open><summary><section id="method.new" class="method"><a class="src rightside" href="../../../src/genesis/daemon/active_inference.rs.html#1195-1225">Source</a><h4 class="code-header">pub fn <a href="#method.new" class="fn">new</a>() -&gt; Self</h4></section></summary><div class="docblock"><p>Create a new engine with an identity transition matrix and
+zero bias — the “predict no change” initial model.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.predict" class="method"><a class="src rightside" href="../../../src/genesis/daemon/active_inference.rs.html#1241-1243">Source</a><h4 class="code-header">pub fn <a href="#method.predict" class="fn">predict</a>(&amp;self, current: &amp;[<a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.array.html">18</a>]) -&gt; [<a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.array.html">18</a>]</h4></section></summary><div class="docblock"><p>Predict the next effective-level vector from the current one,
+<strong>without</strong> any action. This is the endogenous prediction —
+where the state will move on its own, without the engine’s
+interventions. Delegates to <code>predict_with_action</code> with a
+zero action vector.</p>
+<p>This is the top-down generative pass: the model uses its
+learned transition matrix to predict where the neurochemical
+state will move on the next tick.</p>
+<p>Non-dopamine predictions are clamped to [0, 2], matching the
+effective-level contract for those channels. Dopamine remains
+finite but unclamped so D1-weighted and phasic signals can move
+through the generative model without being flattened.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.predict_with_action" class="method"><a class="src rightside" href="../../../src/genesis/daemon/active_inference.rs.html#1260-1275">Source</a><h4 class="code-header">fn <a href="#method.predict_with_action" class="fn">predict_with_action</a>(
+    &amp;self,
+    current: &amp;[<a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.array.html">18</a>],
+    action: &amp;[<a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.array.html">18</a>],
+) -&gt; [<a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.array.html">18</a>]</h4></section></summary><div class="docblock"><p>Predict the next effective-level vector from the current state
+<strong>and</strong> an action (impulse vector).</p>
+<p>This is the <strong>action-conditioned generative prediction</strong>:</p>
+<div class="example-wrap"><pre class="language-text"><code>predicted[i] = Σ_j A[i][j] * current[j] + Σ_j B[i][j] * action[j] + bias[i]</code></pre></div>
+<p>where A is the endogenous transition matrix and B is the action
+matrix. This separates the system’s own dynamics (A) from the
+effects of its interventions (B), preventing the model from
+conflating the two and corrupting the endogenous dynamics
+estimate.</p>
+<p>Dopamine predictions are unclamped; other channels retain the
+effective-level range (see [<code>predict</code>] for rationale).</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.sanitize_internal_state" class="method"><a class="src rightside" href="../../../src/genesis/daemon/active_inference.rs.html#1304-1393">Source</a><h4 class="code-header">pub(crate) fn <a href="#method.sanitize_internal_state" class="fn">sanitize_internal_state</a>(&amp;mut self)</h4></section></summary><div class="docblock"><p>Circuit breaker: sanitize all internal state fields.</p>
+<p>This is the last-resort defense against NaN/inf propagation
+within the inference engine, mirroring the tick-level circuit
+breaker in <code>neurochemical::tick_with_params</code>. The engine is NOT
+covered by that circuit breaker (it lives in a separate struct,
+not in the mmap’d <code>NeurochemicalVector</code>), so a non-finite value
+in any engine field would persist across ticks and propagate
+through every computation: predictions, errors, model updates,
+belief updates, free energy, policy selection, and impulses.</p>
+<p>Sources of non-finite internal state:</p>
+<ul>
+<li>A corrupted model file (load() sanitizes, but defense-in-depth)</li>
+<li>A computation bug we missed in a previous cycle</li>
+<li>A mmap race or external modification (unlikely but possible)</li>
+<li>Bit-flip corruption on the persisted model between save and load</li>
+</ul>
+<p>The defaults are chosen to be “neutral” — the engine recovers
+to a sensible state via normal learning on the next cycles:</p>
+<ul>
+<li>Matrices: reset to identity (A) or zero (B), the “predict no
+change” initial model</li>
+<li>Scalar state: reset to the <code>new()</code> defaults</li>
+<li>Variational posterior: reset to the <code>new()</code> defaults</li>
+</ul>
+<p>This is called at the START of every <code>cycle</code>, before any
+computation, so a corrupted field is confined to one tick rather
+than propagating through the entire inference pipeline.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.cycle" class="method"><a class="src rightside" href="../../../src/genesis/daemon/active_inference.rs.html#1412-2169">Source</a><h4 class="code-header">pub fn <a href="#method.cycle" class="fn">cycle</a>(
+    &amp;mut self,
+    pre_tick: &amp;[<a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.array.html">18</a>],
+    post_tick: &amp;[<a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.array.html">18</a>],
+    dt: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>,
+    baselines: &amp;[<a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.array.html">18</a>],
+) -&gt; <a class="struct" href="struct.InferenceResult.html" title="struct genesis::daemon::active_inference::InferenceResult">InferenceResult</a></h4></section></summary><div class="docblock"><p>Run one inference cycle: predict, observe, compute error,
+update model, generate feedback.</p>
+<p>This should be called AFTER the neurochemical tick has
+advanced the state. <code>advance_neuro</code> snapshots the effective
+levels before and after the tick and passes both: the engine
+predicts from <code>pre_tick</code>, then scores that prediction against
+<code>post_tick</code>. Doing both steps in one call keeps the prediction
+and its observation paired without extra engine state.</p>
+<h5 id="parameters"><a class="doc-anchor" href="#parameters">§</a>Parameters</h5>
+<ul>
+<li><code>pre_tick</code>: effective levels before the neurochemical tick.</li>
+<li><code>post_tick</code>: effective levels after the neurochemical tick.</li>
+</ul>
+<h5 id="returns"><a class="doc-anchor" href="#returns">§</a>Returns</h5>
+<p>The inference result with errors, surprise, free energy, and
+feedback impulses.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method._generate_feedback" class="method"><a class="src rightside" href="../../../src/genesis/daemon/active_inference.rs.html#2176-2417">Source</a><h4 class="code-header">fn <a href="#method._generate_feedback" class="fn">_generate_feedback</a>(
+    &amp;mut self,
+    result: &amp;mut <a class="struct" href="struct.InferenceResult.html" title="struct genesis::daemon::active_inference::InferenceResult">InferenceResult</a>,
+    pre_tick: &amp;[<a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.array.html">18</a>],
+    target: &amp;[<a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.array.html">18</a>],
+    dt_scale: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>,
+)</h4></section></summary><div class="docblock"><p>Generate neurochemical feedback from the inference result.</p>
+<p>This is the “active” part of active inference — the system
+doesn’t just predict, it acts on its predictions to minimize
+future surprise.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.predicted_variances" class="method"><a class="src rightside" href="../../../src/genesis/daemon/active_inference.rs.html#2424-2433">Source</a><h4 class="code-header">fn <a href="#method.predicted_variances" class="fn">predicted_variances</a>(&amp;self, dt_scale: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>) -&gt; [<a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.array.html">18</a>]</h4></section></summary><div class="docblock"><p>Predicted prior variances for the next cycle’s horizon.</p>
+<p>Mirrors the predict step in <code>cycle()</code>: the process noise is
+scaled by dt_scale because the next observation’s interval is
+best estimated by the interval just measured.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.expected_information_gain" class="method"><a class="src rightside" href="../../../src/genesis/daemon/active_inference.rs.html#2447-2457">Source</a><h4 class="code-header">fn <a href="#method.expected_information_gain" class="fn">expected_information_gain</a>(&amp;self, dt_scale: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a></h4></section></summary><div class="docblock"><p>Expected information gain of the next observation, in nats.</p>
+<p>For the diagonal Gaussian posterior this is the entropy
+reduction <code>0.5 * mean(ln(1 + next_prior_var[i] / obs_var))</code>:
+how much uncertainty the next Kalman update is expected to remove.
+Crucially, with additive controls the posterior <em>covariance</em>
+update does not depend on the observation value (the Kalman
+gain is fixed before the observation arrives), so this
+quantity is identical for every candidate policy — it belongs
+in the published EFE decomposition but cannot arbitrate
+between policies. See the scoring loop for why the previous
+novelty-based substitute was removed.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method._select_policy" class="method"><a class="src rightside" href="../../../src/genesis/daemon/active_inference.rs.html#2472-2720">Source</a><h4 class="code-header">fn <a href="#method._select_policy" class="fn">_select_policy</a>(
+    &amp;mut self,
+    current: &amp;[<a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.array.html">18</a>],
+    target: &amp;[<a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.array.html">18</a>],
+    _result: &amp;<a class="struct" href="struct.InferenceResult.html" title="struct genesis::daemon::active_inference::InferenceResult">InferenceResult</a>,
+    dt_scale: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>,
+) -&gt; <a class="struct" href="struct.PolicyEvaluation.html" title="struct genesis::daemon::active_inference::PolicyEvaluation">PolicyEvaluation</a></h4></section></summary><div class="docblock"><p>Evaluate all candidate policies and select the one with lowest
+expected free energy.</p>
+<p>For each policy:</p>
+<ol>
+<li>Simulate applying the policy’s impulses to the current state</li>
+<li>Predict the resulting next state using the generative model</li>
+<li>Compute expected free energy (distance from homeostatic
+baseline + model uncertainty)</li>
+</ol>
+<p>The policy with lowest EFE is selected via softmax (precision-
+weighted). The softmax temperature controls exploration vs
+exploitation: high precision → low temperature → exploitative;
+low precision → high temperature → exploratory.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method._update_maturity" class="method"><a class="src rightside" href="../../../src/genesis/daemon/active_inference.rs.html#2739-2788">Source</a><h4 class="code-header">fn <a href="#method._update_maturity" class="fn">_update_maturity</a>(&amp;mut self)</h4></section></summary><div class="docblock"><p>Update model maturity from demonstrated competence — earned trust.</p>
+<p><code>maturity = predictive_fit * (0.5 + 0.5 * posterior_certainty)</code>.
+Both factors must be high for maturity to approach 1, so a
+long-running model that keeps mispredicting never becomes trusted
+merely because time passed. Sustained surprise pins
+<code>predictive_fit</code> toward 0 and maturity with it, and a diffuse
+posterior holds maturity below 1 even when prediction is good.</p>
+<p>There is no tick-count term. Two earlier revisions had one — a
+bare <code>1 - exp(-tick/500)</code> stopwatch, then that same stopwatch
+multiplied by quality. The second was described as making
+maturity “evidence-based instead of time-based”, but a tick
+count is a stopwatch however it is scaled: it capped a <em>perfect</em>
+model at ~0.70 after 600 ticks however well it predicted, so
+maturity could not be earned by accuracy. The time-scaling that
+matters lives in <code>maturity_error_ema</code>’s own ~500-tick constant.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.signals" class="method"><a class="src rightside" href="../../../src/genesis/daemon/active_inference.rs.html#2794-2817">Source</a><h4 class="code-header">pub fn <a href="#method.signals" class="fn">signals</a>(&amp;self) -&gt; <a class="struct" href="../../state/inference/struct.InferenceSignals.html" title="struct genesis::state::inference::InferenceSignals">InferenceSignals</a></h4></section></summary><div class="docblock"><p>Get the current inference signals for writing to the core state.</p>
+<p>This produces the 60-byte projection that the cognitive mind
+reads via the IPC <code>GetInferenceSummary</code> command.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.update_signals" class="method"><a class="src rightside" href="../../../src/genesis/daemon/active_inference.rs.html#2822-2852">Source</a><h4 class="code-header">pub fn <a href="#method.update_signals" class="fn">update_signals</a>(
+    &amp;self,
+    signals: &amp;mut <a class="struct" href="../../state/inference/struct.InferenceSignals.html" title="struct genesis::state::inference::InferenceSignals">InferenceSignals</a>,
+    da_pe: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>,
+    cort_pe: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>,
+    srt_pe: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>,
+    dyadic: &amp;<a class="struct" href="struct.DyadicSignals.html" title="struct genesis::daemon::active_inference::DyadicSignals">DyadicSignals</a>,
+)</h4></section></summary><div class="docblock"><p>Update the signals struct with the latest prediction errors
+and dyadic model values. This is called after both the
+inference engine and dyadic model have run.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.precision" class="method"><a class="src rightside" href="../../../src/genesis/daemon/active_inference.rs.html#2855-2857">Source</a><h4 class="code-header">pub fn <a href="#method.precision" class="fn">precision</a>(&amp;self) -&gt; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a></h4></section></summary><div class="docblock"><p>Get the current precision.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.allostasis_load" class="method"><a class="src rightside" href="../../../src/genesis/daemon/active_inference.rs.html#2860-2862">Source</a><h4 class="code-header">pub fn <a href="#method.allostasis_load" class="fn">allostasis_load</a>(&amp;self) -&gt; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a></h4></section></summary><div class="docblock"><p>Get the current allostatic load.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.model_maturity" class="method"><a class="src rightside" href="../../../src/genesis/daemon/active_inference.rs.html#2865-2867">Source</a><h4 class="code-header">pub fn <a href="#method.model_maturity" class="fn">model_maturity</a>(&amp;self) -&gt; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a></h4></section></summary><div class="docblock"><p>Get the model maturity.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.posterior_variance_mean" class="method"><a class="src rightside" href="../../../src/genesis/daemon/active_inference.rs.html#2875-2877">Source</a><h4 class="code-header">pub fn <a href="#method.posterior_variance_mean" class="fn">posterior_variance_mean</a>(&amp;self) -&gt; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a></h4></section></summary><div class="docblock"><p>Mean posterior variance across the belief dimensions.</p>
+<p>This is the diagonal of the variational posterior q(s) — the
+Kalman filter’s estimate uncertainty. It contracts under
+sustained predictability and grows under sustained surprise
+(via the precision-weighted observation noise).</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.tick_count" class="method"><a class="src rightside" href="../../../src/genesis/daemon/active_inference.rs.html#2880-2882">Source</a><h4 class="code-header">pub fn <a href="#method.tick_count" class="fn">tick_count</a>(&amp;self) -&gt; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.u32.html">u32</a></h4></section></summary><div class="docblock"><p>Get the tick count.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.next_uniform" class="method"><a class="src rightside" href="../../../src/genesis/daemon/active_inference.rs.html#2894-2903">Source</a><h4 class="code-header">fn <a href="#method.next_uniform" class="fn">next_uniform</a>(&amp;mut self) -&gt; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a></h4></section></summary><div class="docblock"><p>Draw a uniform [0, 1) random number from the internal xorshift32
+PRNG. This advances the PRNG state, so each call produces a
+different value. The PRNG is seeded from <code>tick_count</code> on each
+cycle so that the sequence is deterministic but varies tick to
+tick — reproducible but not correlated.</p>
+<p>xorshift32 (Marsaglia, 2003) has a period of 2³²−1 and passes
+standard statistical tests for uniformity. It is not
+cryptographically secure, but that is irrelevant here — the
+purpose is exploration in policy selection, not security.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.set_policy_authority" class="method"><a class="src rightside" href="../../../src/genesis/daemon/active_inference.rs.html#2955-2957">Source</a><h4 class="code-header">pub fn <a href="#method.set_policy_authority" class="fn">set_policy_authority</a>(&amp;mut self, authority: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>)</h4></section></summary><div class="docblock"><p>Persist the generative model to disk.</p>
+<p>The model file format (version 5):</p>
+<ul>
+<li>4 bytes: magic “AIFE”</li>
+<li>4 bytes: version (u32) = 5</li>
+<li>18×18×4 bytes: transition matrix A (row-major f32)</li>
+<li>18×4 bytes: bias vector (f32)</li>
+<li>4 bytes: precision (f32)</li>
+<li>4 bytes: surprise_ema (f32)</li>
+<li>4 bytes: expected_fe_ema (f32)</li>
+<li>4 bytes: allostasis_load (f32)</li>
+<li>4 bytes: model_maturity (f32)</li>
+<li>4 bytes: tick_count (u32)</li>
+<li>18×4 bytes: belief_mean (f32) [v2]</li>
+<li>18×4 bytes: belief_var (f32) [v2]</li>
+<li>18×4 bytes: prior_var (f32) [v2]</li>
+<li>4 bytes: last_free_energy (f32) [v2]</li>
+<li>18×18×4 bytes: action matrix B (row-major f32) [v3]</li>
+<li>18×4 bytes: last_action vector (f32) [v3]</li>
+<li>4 bytes: surprise_var_ema (f32) [v4]</li>
+<li>4 bytes: maturity_error_ema (f32) [v4]</li>
+</ul>
+<p>Total: 3068 bytes (v5, including the 18-element preference vector)
+Move her preference toward states she actually fares well in.</p>
+<p>The seed is the genetic defaults, but those are what her
+physiology was <em>built</em> around, not a statement of what suits
+her. This is where she learns the difference: states in which
+her load stays low and she keeps converging are evidence of
+wellbeing, and her preference drifts toward them.</p>
+<p>Two properties keep this from collapsing back into the
+circularity it replaces. It is slow relative to the tick rate,
+so it cannot chase moment-to-moment state — a preference that
+tracked the present would be the old target again. And it pulls
+toward genetics, so a preference that drifted on the strength
+of one bad episode walks back rather than becoming a new
+normal.</p>
+<p>Adenosine is excluded for the same reason its baseline is: it
+is driven by a dedicated sleep-pressure mechanism, so a
+preference built from its level would encode “prefer being
+exhausted”. Cortisol and CRH are excluded because they have no
+homeostatic set point to prefer.
+Adopt the authority her cognition has granted.</p>
+<p>Called each cycle from the state, because the grant is hers to
+change while running — she can delegate more, delegate less, or
+withdraw it entirely. Taking it from the state each tick is what
+makes the grant revocable rather than a one-time handshake.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.policy_authority" class="method"><a class="src rightside" href="../../../src/genesis/daemon/active_inference.rs.html#2960-2962">Source</a><h4 class="code-header">pub fn <a href="#method.policy_authority" class="fn">policy_authority</a>(&amp;self) -&gt; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a></h4></section></summary><div class="docblock"><p>The policy authority currently in force.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.preferred" class="method"><a class="src rightside" href="../../../src/genesis/daemon/active_inference.rs.html#2970-2972">Source</a><h4 class="code-header">pub fn <a href="#method.preferred" class="fn">preferred</a>(&amp;self) -&gt; &amp;[<a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.array.html">18</a>]</h4></section></summary><div class="docblock"><p>What she is currently aiming for, per dimension.</p>
+<p>Exposed so persistence and controller behaviour can be asserted
+directly. This is her preference, not a constant: it is seeded
+from genetics and then moved on evidence of what she fares well
+in, so a change here is a real change in what she wants.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.preference_precision" class="method"><a class="src rightside" href="../../../src/genesis/daemon/active_inference.rs.html#2980-2982">Source</a><h4 class="code-header">pub fn <a href="#method.preference_precision" class="fn">preference_precision</a>(&amp;self) -&gt; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a></h4></section></summary><div class="docblock"><p>How strongly her preferences steer her.</p>
+<p>High precision means her preferences dominate; low precision
+leaves room for exploration. It must not be maximised, because
+over-precise preferences are what make a system rigid and
+unable to revise itself.</p>
+</div></details><section id="method.adapt_preference" class="method"><a class="src rightside" href="../../../src/genesis/daemon/active_inference.rs.html#2984-3006">Source</a><h4 class="code-header">fn <a href="#method.adapt_preference" class="fn">adapt_preference</a>(&amp;mut self, levels: &amp;[<a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.array.html">18</a>], dt_scale: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>)</h4></section><section id="method.save" class="method"><a class="src rightside" href="../../../src/genesis/daemon/active_inference.rs.html#3008-3096">Source</a><h4 class="code-header">pub fn <a href="#method.save" class="fn">save</a>(&amp;self, path: &amp;<a class="struct" href="https://doc.rust-lang.org/1.100.0/std/path/struct.Path.html" title="struct std::path::Path">Path</a>) -&gt; <a class="type" href="https://doc.rust-lang.org/1.100.0/core/io/error/type.Result.html" title="type core::io::error::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.unit.html">()</a>&gt;</h4></section><details class="toggle method-toggle" open><summary><section id="method.load" class="method"><a class="src rightside" href="../../../src/genesis/daemon/active_inference.rs.html#3102-3360">Source</a><h4 class="code-header">pub fn <a href="#method.load" class="fn">load</a>(path: &amp;<a class="struct" href="https://doc.rust-lang.org/1.100.0/std/path/struct.Path.html" title="struct std::path::Path">Path</a>) -&gt; Self</h4></section></summary><div class="docblock"><p>Load the generative model from disk.</p>
+<p>Returns a new engine with the loaded model, or a fresh engine
+if the file doesn’t exist or is corrupted.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.test_set_allostasis_load" class="method"><a class="src rightside" href="../../../src/genesis/daemon/active_inference.rs.html#3384-3386">Source</a><h4 class="code-header">pub fn <a href="#method.test_set_allostasis_load" class="fn">test_set_allostasis_load</a>(&amp;mut self, load: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>)</h4></section></summary><div class="docblock"><p>Force the allostatic load.</p>
+<p>The “preference must not adapt under strain” path cannot be
+reached from a resting start, because load first has to be
+driven up over time. Exposed so that guard can actually be
+tested rather than assumed. Not <code>cfg(test)</code>, because the
+integration tests link the library without it.</p>
+</div></details></div></details></div><h2 id="trait-implementations" class="section-header">Trait Implementations<a href="#trait-implementations" class="anchor">§</a></h2><div id="trait-implementations-list"><details class="toggle implementors-toggle" open><summary><section id="impl-Default-for-ActiveInferenceEngine" class="impl"><a class="src rightside" href="../../../src/genesis/daemon/active_inference.rs.html#3498-3502">Source</a><a href="#impl-Default-for-ActiveInferenceEngine" class="anchor">§</a><h3 class="code-header">impl <a class="trait" href="https://doc.rust-lang.org/1.100.0/core/default/trait.Default.html" title="trait core::default::Default">Default</a> for <a class="struct" href="struct.ActiveInferenceEngine.html" title="struct genesis::daemon::active_inference::ActiveInferenceEngine">ActiveInferenceEngine</a></h3></section></summary><div class="impl-items"><details class="toggle method-toggle" open><summary><section id="method.default" class="method trait-impl"><a class="src rightside" href="../../../src/genesis/daemon/active_inference.rs.html#3499-3501">Source</a><a href="#method.default" class="anchor">§</a><h4 class="code-header">fn <a href="https://doc.rust-lang.org/1.100.0/core/default/trait.Default.html#tymethod.default" class="fn">default</a>() -&gt; Self</h4></section></summary><div class='docblock'>Returns the “default value” for a type. <a href="https://doc.rust-lang.org/1.100.0/core/default/trait.Default.html#tymethod.default">Read more</a></div></details></div></details></div><h2 id="synthetic-implementations" class="section-header">Auto Trait Implementations<a href="#synthetic-implementations" class="anchor">§</a></h2><div id="synthetic-implementations-list"><section id="impl-Freeze-for-ActiveInferenceEngine" class="impl"><a href="#impl-Freeze-for-ActiveInferenceEngine" class="anchor">§</a><h3 class="code-header">impl <a class="trait" href="https://doc.rust-lang.org/1.100.0/core/marker/trait.Freeze.html" title="trait core::marker::Freeze">Freeze</a> for <a class="struct" href="struct.ActiveInferenceEngine.html" title="struct genesis::daemon::active_inference::ActiveInferenceEngine">ActiveInferenceEngine</a></h3></section><section id="impl-RefUnwindSafe-for-ActiveInferenceEngine" class="impl"><a href="#impl-RefUnwindSafe-for-ActiveInferenceEngine" class="anchor">§</a><h3 class="code-header">impl <a class="trait" href="https://doc.rust-lang.org/1.100.0/core/panic/unwind_safe/trait.RefUnwindSafe.html" title="trait core::panic::unwind_safe::RefUnwindSafe">RefUnwindSafe</a> for <a class="struct" href="struct.ActiveInferenceEngine.html" title="struct genesis::daemon::active_inference::ActiveInferenceEngine">ActiveInferenceEngine</a></h3></section><section id="impl-Send-for-ActiveInferenceEngine" class="impl"><a href="#impl-Send-for-ActiveInferenceEngine" class="anchor">§</a><h3 class="code-header">impl <a class="trait" href="https://doc.rust-lang.org/1.100.0/core/marker/trait.Send.html" title="trait core::marker::Send">Send</a> for <a class="struct" href="struct.ActiveInferenceEngine.html" title="struct genesis::daemon::active_inference::ActiveInferenceEngine">ActiveInferenceEngine</a></h3></section><section id="impl-Sync-for-ActiveInferenceEngine" class="impl"><a href="#impl-Sync-for-ActiveInferenceEngine" class="anchor">§</a><h3 class="code-header">impl <a class="trait" href="https://doc.rust-lang.org/1.100.0/core/marker/trait.Sync.html" title="trait core::marker::Sync">Sync</a> for <a class="struct" href="struct.ActiveInferenceEngine.html" title="struct genesis::daemon::active_inference::ActiveInferenceEngine">ActiveInferenceEngine</a></h3></section><section id="impl-Unpin-for-ActiveInferenceEngine" class="impl"><a href="#impl-Unpin-for-ActiveInferenceEngine" class="anchor">§</a><h3 class="code-header">impl <a class="trait" href="https://doc.rust-lang.org/1.100.0/core/marker/trait.Unpin.html" title="trait core::marker::Unpin">Unpin</a> for <a class="struct" href="struct.ActiveInferenceEngine.html" title="struct genesis::daemon::active_inference::ActiveInferenceEngine">ActiveInferenceEngine</a></h3></section><section id="impl-UnsafeUnpin-for-ActiveInferenceEngine" class="impl"><a href="#impl-UnsafeUnpin-for-ActiveInferenceEngine" class="anchor">§</a><h3 class="code-header">impl <a class="trait" href="https://doc.rust-lang.org/1.100.0/core/marker/trait.UnsafeUnpin.html" title="trait core::marker::UnsafeUnpin">UnsafeUnpin</a> for <a class="struct" href="struct.ActiveInferenceEngine.html" title="struct genesis::daemon::active_inference::ActiveInferenceEngine">ActiveInferenceEngine</a></h3></section><section id="impl-UnwindSafe-for-ActiveInferenceEngine" class="impl"><a href="#impl-UnwindSafe-for-ActiveInferenceEngine" class="anchor">§</a><h3 class="code-header">impl <a class="trait" href="https://doc.rust-lang.org/1.100.0/core/panic/unwind_safe/trait.UnwindSafe.html" title="trait core::panic::unwind_safe::UnwindSafe">UnwindSafe</a> for <a class="struct" href="struct.ActiveInferenceEngine.html" title="struct genesis::daemon::active_inference::ActiveInferenceEngine">ActiveInferenceEngine</a></h3></section></div><h2 id="blanket-implementations" class="section-header">Blanket Implementations<a href="#blanket-implementations" class="anchor">§</a></h2><div id="blanket-implementations-list"><details class="toggle implementors-toggle"><summary><section id="impl-Any-for-T" class="impl"><a class="src rightside" href="https://doc.rust-lang.org/1.100.0/src/core/any.rs.html#141">Source</a><a href="#impl-Any-for-T" class="anchor">§</a><h3 class="code-header">impl&lt;T&gt; <a class="trait" href="https://doc.rust-lang.org/1.100.0/core/any/trait.Any.html" title="trait core::any::Any">Any</a> for T<div class="where">where
+    T: 'static + ?<a class="trait" href="https://doc.rust-lang.org/1.100.0/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a>,</div></h3></section></summary><div class="impl-items"><details class="toggle method-toggle" open><summary><section id="method.type_id" class="method trait-impl"><a class="src rightside" href="https://doc.rust-lang.org/1.100.0/src/core/any.rs.html#142">Source</a><a href="#method.type_id" class="anchor">§</a><h4 class="code-header">fn <a href="https://doc.rust-lang.org/1.100.0/core/any/trait.Any.html#tymethod.type_id" class="fn">type_id</a>(&amp;self) -&gt; <a class="struct" href="https://doc.rust-lang.org/1.100.0/core/any/struct.TypeId.html" title="struct core::any::TypeId">TypeId</a></h4></section></summary><div class='docblock'>Gets the <code>TypeId</code> of <code>self</code>. <a href="https://doc.rust-lang.org/1.100.0/core/any/trait.Any.html#tymethod.type_id">Read more</a></div></details></div></details><details class="toggle implementors-toggle"><summary><section id="impl-Borrow%3CT%3E-for-T" class="impl"><a class="src rightside" href="https://doc.rust-lang.org/1.100.0/src/core/borrow.rs.html#212">Source</a><a href="#impl-Borrow%3CT%3E-for-T" class="anchor">§</a><h3 class="code-header">impl&lt;T&gt; <a class="trait" href="https://doc.rust-lang.org/1.100.0/core/borrow/trait.Borrow.html" title="trait core::borrow::Borrow">Borrow</a>&lt;T&gt; for T<div class="where">where
+    T: ?<a class="trait" href="https://doc.rust-lang.org/1.100.0/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a>,</div></h3></section></summary><div class="impl-items"><details class="toggle method-toggle" open><summary><section id="method.borrow" class="method trait-impl"><a class="src rightside" href="https://doc.rust-lang.org/1.100.0/src/core/borrow.rs.html#214">Source</a><a href="#method.borrow" class="anchor">§</a><h4 class="code-header">fn <a href="https://doc.rust-lang.org/1.100.0/core/borrow/trait.Borrow.html#tymethod.borrow" class="fn">borrow</a>(&amp;self) -&gt; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.reference.html">&amp;T</a></h4></section></summary><div class='docblock'>Immutably borrows from an owned value. <a href="https://doc.rust-lang.org/1.100.0/core/borrow/trait.Borrow.html#tymethod.borrow">Read more</a></div></details></div></details><details class="toggle implementors-toggle"><summary><section id="impl-BorrowMut%3CT%3E-for-T" class="impl"><a class="src rightside" href="https://doc.rust-lang.org/1.100.0/src/core/borrow.rs.html#221">Source</a><a href="#impl-BorrowMut%3CT%3E-for-T" class="anchor">§</a><h3 class="code-header">impl&lt;T&gt; <a class="trait" href="https://doc.rust-lang.org/1.100.0/core/borrow/trait.BorrowMut.html" title="trait core::borrow::BorrowMut">BorrowMut</a>&lt;T&gt; for T<div class="where">where
+    T: ?<a class="trait" href="https://doc.rust-lang.org/1.100.0/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a>,</div></h3></section></summary><div class="impl-items"><details class="toggle method-toggle" open><summary><section id="method.borrow_mut" class="method trait-impl"><a class="src rightside" href="https://doc.rust-lang.org/1.100.0/src/core/borrow.rs.html#222">Source</a><a href="#method.borrow_mut" class="anchor">§</a><h4 class="code-header">fn <a href="https://doc.rust-lang.org/1.100.0/core/borrow/trait.BorrowMut.html#tymethod.borrow_mut" class="fn">borrow_mut</a>(&amp;mut self) -&gt; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.reference.html">&amp;mut T</a></h4></section></summary><div class='docblock'>Mutably borrows from an owned value. <a href="https://doc.rust-lang.org/1.100.0/core/borrow/trait.BorrowMut.html#tymethod.borrow_mut">Read more</a></div></details></div></details><section id="impl-CastableFrom%3CST,+Initialized,+Initialized%3E-for-DT" class="impl"><a href="#impl-CastableFrom%3CST,+Initialized,+Initialized%3E-for-DT" class="anchor">§</a><h3 class="code-header">impl&lt;ST, DT&gt; CastableFrom&lt;ST, Initialized, Initialized&gt; for DT<div class="where">where
+    ST: ?<a class="trait" href="https://doc.rust-lang.org/1.100.0/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a>,
+    DT: ?<a class="trait" href="https://doc.rust-lang.org/1.100.0/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a>,</div></h3></section><section id="impl-CastableFrom%3CST,+Uninit,+Uninit%3E-for-DT" class="impl"><a href="#impl-CastableFrom%3CST,+Uninit,+Uninit%3E-for-DT" class="anchor">§</a><h3 class="code-header">impl&lt;ST, DT&gt; CastableFrom&lt;ST, Uninit, Uninit&gt; for DT<div class="where">where
+    ST: ?<a class="trait" href="https://doc.rust-lang.org/1.100.0/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a>,
+    DT: ?<a class="trait" href="https://doc.rust-lang.org/1.100.0/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a>,</div></h3></section><details class="toggle implementors-toggle"><summary><section id="impl-From%3CT%3E-for-T" class="impl"><a class="src rightside" href="https://doc.rust-lang.org/1.100.0/src/core/convert/mod.rs.html#787">Source</a><a href="#impl-From%3CT%3E-for-T" class="anchor">§</a><h3 class="code-header">impl&lt;T&gt; <a class="trait" href="https://doc.rust-lang.org/1.100.0/core/convert/trait.From.html" title="trait core::convert::From">From</a>&lt;T&gt; for T</h3></section></summary><div class="impl-items"><details class="toggle method-toggle" open><summary><section id="method.from" class="method trait-impl"><a class="src rightside" href="https://doc.rust-lang.org/1.100.0/src/core/convert/mod.rs.html#790">Source</a><a href="#method.from" class="anchor">§</a><h4 class="code-header">fn <a href="https://doc.rust-lang.org/1.100.0/core/convert/trait.From.html#tymethod.from" class="fn">from</a>(t: T) -&gt; T</h4></section></summary><div class="docblock"><p>Returns the argument unchanged.</p>
+</div></details></div></details><details class="toggle implementors-toggle"><summary><section id="impl-Into%3CU%3E-for-T" class="impl"><a class="src rightside" href="https://doc.rust-lang.org/1.100.0/src/core/convert/mod.rs.html#769-771">Source</a><a href="#impl-Into%3CU%3E-for-T" class="anchor">§</a><h3 class="code-header">impl&lt;T, U&gt; <a class="trait" href="https://doc.rust-lang.org/1.100.0/core/convert/trait.Into.html" title="trait core::convert::Into">Into</a>&lt;U&gt; for T<div class="where">where
+    U: <a class="trait" href="https://doc.rust-lang.org/1.100.0/core/convert/trait.From.html" title="trait core::convert::From">From</a>&lt;T&gt;,</div></h3></section></summary><div class="impl-items"><details class="toggle method-toggle" open><summary><section id="method.into" class="method trait-impl"><a class="src rightside" href="https://doc.rust-lang.org/1.100.0/src/core/convert/mod.rs.html#779">Source</a><a href="#method.into" class="anchor">§</a><h4 class="code-header">fn <a href="https://doc.rust-lang.org/1.100.0/core/convert/trait.Into.html#tymethod.into" class="fn">into</a>(self) -&gt; U</h4></section></summary><div class="docblock"><p>Calls <code>U::from(self)</code>.</p>
+<p>That is, this conversion is whatever the implementation of
+<code><a href="https://doc.rust-lang.org/1.100.0/core/convert/trait.From.html" title="trait core::convert::From">From</a>&lt;T&gt; for U</code> chooses to do.</p>
+</div></details></div></details><section id="impl-Read%3CExclusive,+BecauseExclusive%3E-for-T" class="impl"><a href="#impl-Read%3CExclusive,+BecauseExclusive%3E-for-T" class="anchor">§</a><h3 class="code-header">impl&lt;T&gt; Read&lt;Exclusive, BecauseExclusive&gt; for T<div class="where">where
+    T: ?<a class="trait" href="https://doc.rust-lang.org/1.100.0/core/marker/trait.Sized.html" title="trait core::marker::Sized">Sized</a>,</div></h3></section><details class="toggle implementors-toggle"><summary><section id="impl-TryFrom%3CU%3E-for-T" class="impl"><a class="src rightside" href="https://doc.rust-lang.org/1.100.0/src/core/convert/mod.rs.html#814-816">Source</a><a href="#impl-TryFrom%3CU%3E-for-T" class="anchor">§</a><h3 class="code-header">impl&lt;T, U&gt; <a class="trait" href="https://doc.rust-lang.org/1.100.0/core/convert/trait.TryFrom.html" title="trait core::convert::TryFrom">TryFrom</a>&lt;U&gt; for T<div class="where">where
+    U: <a class="trait" href="https://doc.rust-lang.org/1.100.0/core/convert/trait.Into.html" title="trait core::convert::Into">Into</a>&lt;T&gt;,</div></h3></section></summary><div class="impl-items"><details class="toggle" open><summary><section id="associatedtype.Error" class="associatedtype trait-impl"><a class="src rightside" href="https://doc.rust-lang.org/1.100.0/src/core/convert/mod.rs.html#818">Source</a><a href="#associatedtype.Error" class="anchor">§</a><h4 class="code-header">type <a href="https://doc.rust-lang.org/1.100.0/core/convert/trait.TryFrom.html#associatedtype.Error" class="associatedtype">Error</a> = <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.never.html">!</a></h4></section></summary><div class='docblock'>The type returned in the event of a conversion error.</div></details><details class="toggle method-toggle" open><summary><section id="method.try_from" class="method trait-impl"><a class="src rightside" href="https://doc.rust-lang.org/1.100.0/src/core/convert/mod.rs.html#821">Source</a><a href="#method.try_from" class="anchor">§</a><h4 class="code-header">fn <a href="https://doc.rust-lang.org/1.100.0/core/convert/trait.TryFrom.html#tymethod.try_from" class="fn">try_from</a>(value: U) -&gt; <a class="enum" href="https://doc.rust-lang.org/1.100.0/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;T, <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.never.html">!</a>&gt;</h4></section></summary><div class='docblock'>Performs the conversion.</div></details></div></details><details class="toggle implementors-toggle"><summary><section id="impl-TryInto%3CU%3E-for-T" class="impl"><a class="src rightside" href="https://doc.rust-lang.org/1.100.0/src/core/convert/mod.rs.html#798-800">Source</a><a href="#impl-TryInto%3CU%3E-for-T" class="anchor">§</a><h3 class="code-header">impl&lt;T, U&gt; <a class="trait" href="https://doc.rust-lang.org/1.100.0/core/convert/trait.TryInto.html" title="trait core::convert::TryInto">TryInto</a>&lt;U&gt; for T<div class="where">where
+    U: <a class="trait" href="https://doc.rust-lang.org/1.100.0/core/convert/trait.TryFrom.html" title="trait core::convert::TryFrom">TryFrom</a>&lt;T&gt;,</div></h3></section></summary><div class="impl-items"><details class="toggle" open><summary><section id="associatedtype.Error-1" class="associatedtype trait-impl"><a class="src rightside" href="https://doc.rust-lang.org/1.100.0/src/core/convert/mod.rs.html#802">Source</a><a href="#associatedtype.Error-1" class="anchor">§</a><h4 class="code-header">type <a href="https://doc.rust-lang.org/1.100.0/core/convert/trait.TryInto.html#associatedtype.Error" class="associatedtype">Error</a> = &lt;U as <a class="trait" href="https://doc.rust-lang.org/1.100.0/core/convert/trait.TryFrom.html" title="trait core::convert::TryFrom">TryFrom</a>&lt;T&gt;&gt;::<a class="associatedtype" href="https://doc.rust-lang.org/1.100.0/core/convert/trait.TryFrom.html#associatedtype.Error" title="type core::convert::TryFrom::Error">Error</a></h4></section></summary><div class='docblock'>The type returned in the event of a conversion error.</div></details><details class="toggle method-toggle" open><summary><section id="method.try_into" class="method trait-impl"><a class="src rightside" href="https://doc.rust-lang.org/1.100.0/src/core/convert/mod.rs.html#805">Source</a><a href="#method.try_into" class="anchor">§</a><h4 class="code-header">fn <a href="https://doc.rust-lang.org/1.100.0/core/convert/trait.TryInto.html#tymethod.try_into" class="fn">try_into</a>(self) -&gt; <a class="enum" href="https://doc.rust-lang.org/1.100.0/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;U, &lt;U as <a class="trait" href="https://doc.rust-lang.org/1.100.0/core/convert/trait.TryFrom.html" title="trait core::convert::TryFrom">TryFrom</a>&lt;T&gt;&gt;::<a class="associatedtype" href="https://doc.rust-lang.org/1.100.0/core/convert/trait.TryFrom.html#associatedtype.Error" title="type core::convert::TryFrom::Error">Error</a>&gt;</h4></section></summary><div class='docblock'>Performs the conversion.</div></details></div></details><details class="toggle implementors-toggle"><summary><section id="impl-VZip%3CV%3E-for-T" class="impl"><a href="#impl-VZip%3CV%3E-for-T" class="anchor">§</a><h3 class="code-header">impl&lt;V, T&gt; VZip&lt;V&gt; for T<div class="where">where
+    V: MultiLane&lt;T&gt;,</div></h3></section></summary><div class="impl-items"><section id="method.vzip" class="method trait-impl"><a href="#method.vzip" class="anchor">§</a><h4 class="code-header">fn <a class="fn">vzip</a>(self) -&gt; V</h4></section></div></details></div></section></div></main></body></html>

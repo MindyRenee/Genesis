@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["SUBITIZING_LIMIT","WEBER_FRACTION"],"enum":["MagnitudeRelation"],"fn":["compare","estimate","plausible","represent","subitizes"],"struct":["MagnitudeJudgment"]};

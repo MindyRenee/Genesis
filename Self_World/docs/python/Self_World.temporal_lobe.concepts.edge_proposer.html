@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.temporal_lobe.concepts.edge_proposer</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.temporal_lobe.html" class="white">temporal_lobe</a>.<a href="Self_World.temporal_lobe.concepts.html" class="white">concepts</a>.edge_proposer</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/concepts/edge_proposer.py">/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/concepts/edge_proposer.py</a></td></tr></table>
+    <p><span class="code">Edge&nbsp;proposer&nbsp;—&nbsp;discovers&nbsp;new&nbsp;relationships&nbsp;from&nbsp;embedding&nbsp;proximity.<br>
+&nbsp;<br>
+During&nbsp;sleep,&nbsp;Genesis&nbsp;scans&nbsp;its&nbsp;latent&nbsp;space&nbsp;for&nbsp;pairs&nbsp;of&nbsp;concepts&nbsp;that<br>
+are&nbsp;close&nbsp;together&nbsp;in&nbsp;embedding&nbsp;space&nbsp;but&nbsp;have&nbsp;no&nbsp;graph&nbsp;edge&nbsp;between<br>
+them.&nbsp;These&nbsp;are&nbsp;candidate&nbsp;SIMILAR_TO&nbsp;relationships&nbsp;—&nbsp;connections&nbsp;it<br>
+wasn't&nbsp;explicitly&nbsp;told&nbsp;but&nbsp;can&nbsp;infer&nbsp;from&nbsp;semantic&nbsp;similarity.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;where&nbsp;generalization&nbsp;happens.&nbsp;The&nbsp;symbolic&nbsp;graph&nbsp;contains&nbsp;only<br>
+what&nbsp;it&nbsp;was&nbsp;taught.&nbsp;The&nbsp;embedding&nbsp;space&nbsp;contains&nbsp;implicit&nbsp;relationships<br>
+from&nbsp;the&nbsp;distributional&nbsp;structure&nbsp;of&nbsp;language.&nbsp;The&nbsp;edge&nbsp;proposer&nbsp;bridges<br>
+the&nbsp;two:&nbsp;it&nbsp;uses&nbsp;the&nbsp;latent&nbsp;space&nbsp;to&nbsp;discover&nbsp;patterns,&nbsp;then&nbsp;writes&nbsp;them<br>
+into&nbsp;the&nbsp;symbolic&nbsp;graph&nbsp;as&nbsp;explicit&nbsp;knowledge.<br>
+&nbsp;<br>
+The&nbsp;process&nbsp;is&nbsp;conservative:<br>
+-&nbsp;Only&nbsp;proposes&nbsp;edges&nbsp;above&nbsp;a&nbsp;high&nbsp;similarity&nbsp;threshold&nbsp;(default&nbsp;0.85)<br>
+-&nbsp;Skips&nbsp;pairs&nbsp;that&nbsp;already&nbsp;have&nbsp;any&nbsp;edge&nbsp;(avoids&nbsp;redundancy)<br>
+-&nbsp;Limits&nbsp;proposals&nbsp;per&nbsp;concept&nbsp;(avoids&nbsp;flooding&nbsp;the&nbsp;graph)<br>
+-&nbsp;Marks&nbsp;proposed&nbsp;edges&nbsp;with&nbsp;origin="discovered"&nbsp;so&nbsp;they&nbsp;can&nbsp;be<br>
+&nbsp;&nbsp;distinguished&nbsp;from&nbsp;taught&nbsp;knowledge<br>
+&nbsp;<br>
+This&nbsp;mirrors&nbsp;hippocampal&nbsp;consolidation:&nbsp;during&nbsp;sleep,&nbsp;the&nbsp;hippocampus<br>
+replays&nbsp;experiences,&nbsp;extracts&nbsp;patterns,&nbsp;and&nbsp;writes&nbsp;them&nbsp;into&nbsp;cortical<br>
+long-term&nbsp;memory.&nbsp;The&nbsp;embedding&nbsp;space&nbsp;is&nbsp;the&nbsp;hippocampal&nbsp;attractor<br>
+basin;&nbsp;the&nbsp;concept&nbsp;network&nbsp;is&nbsp;the&nbsp;cortical&nbsp;knowledge&nbsp;store.</span></p>
+<p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.concepts.edge_proposer.html#EdgeProposer">EdgeProposer</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="EdgeProposer">class <strong>EdgeProposer</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#EdgeProposer">EdgeProposer</a>(network:&nbsp;'ConceptNetwork',&nbsp;embeddings:&nbsp;'EmbeddingStore',&nbsp;threshold:&nbsp;'float'&nbsp;=&nbsp;0.85,&nbsp;max_per_concept:&nbsp;'int'&nbsp;=&nbsp;3,&nbsp;max_per_session:&nbsp;'int'&nbsp;=&nbsp;200)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Proposes&nbsp;new&nbsp;graph&nbsp;edges&nbsp;from&nbsp;embedding&nbsp;proximity.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="EdgeProposer-__init__"><strong>__init__</strong></a>(self, network: 'ConceptNetwork', embeddings: 'EmbeddingStore', threshold: 'float' = 0.85, max_per_concept: 'int' = 3, max_per_session: 'int' = 200) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;edge&nbsp;proposer&nbsp;with&nbsp;a&nbsp;concept&nbsp;network.</span></dd></dl>
+
+<dl><dt><a name="EdgeProposer-accept_proposals"><strong>accept_proposals</strong></a>(self, proposals: 'list[tuple[str, str, float]] | None' = None) -&gt; 'int'</dt><dd><span class="code">Write&nbsp;proposed&nbsp;edges&nbsp;into&nbsp;the&nbsp;concept&nbsp;network.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;proposals:&nbsp;The&nbsp;proposals&nbsp;to&nbsp;accept.&nbsp;If&nbsp;None,&nbsp;runs<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#EdgeProposer-propose_edges">propose_edges</a>()&nbsp;first.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Number&nbsp;of&nbsp;edges&nbsp;added.</span></dd></dl>
+
+<dl><dt><a name="EdgeProposer-discover_and_accept"><strong>discover_and_accept</strong></a>(self) -&gt; 'int'</dt><dd><span class="code">One-shot:&nbsp;propose&nbsp;edges&nbsp;and&nbsp;write&nbsp;them&nbsp;into&nbsp;the&nbsp;network.<br>
+&nbsp;<br>
+Convenience&nbsp;method&nbsp;for&nbsp;the&nbsp;sleep&nbsp;consolidation&nbsp;phase.</span></dd></dl>
+
+<dl><dt><a name="EdgeProposer-propose_edges"><strong>propose_edges</strong></a>(self) -&gt; 'list[tuple[str, str, float]]'</dt><dd><span class="code">Scan&nbsp;embedding&nbsp;space&nbsp;for&nbsp;candidate&nbsp;SIMILAR_TO&nbsp;edges.<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;list&nbsp;of&nbsp;(concept_a,&nbsp;concept_b,&nbsp;similarity)&nbsp;tuples<br>
+for&nbsp;pairs&nbsp;that&nbsp;are&nbsp;close&nbsp;in&nbsp;embedding&nbsp;space&nbsp;but&nbsp;have&nbsp;no<br>
+existing&nbsp;graph&nbsp;edge.&nbsp;Does&nbsp;not&nbsp;modify&nbsp;the&nbsp;network&nbsp;—&nbsp;the&nbsp;caller<br>
+decides&nbsp;whether&nbsp;to&nbsp;accept&nbsp;the&nbsp;proposals.<br>
+&nbsp;<br>
+This&nbsp;uses&nbsp;the&nbsp;TF-IDF&nbsp;(text/definition)&nbsp;component&nbsp;of&nbsp;the<br>
+embedding&nbsp;space&nbsp;rather&nbsp;than&nbsp;the&nbsp;spectral&nbsp;(graph-structure)<br>
+component.&nbsp;The&nbsp;spectral&nbsp;component&nbsp;is&nbsp;dominated&nbsp;by&nbsp;structural<br>
+bridge/hub-attachment&nbsp;edges,&nbsp;which&nbsp;produces&nbsp;nonsense&nbsp;pairings<br>
+like&nbsp;"subcognitive&nbsp;~&nbsp;gpu".&nbsp;Text-based&nbsp;similarity&nbsp;is&nbsp;noisier<br>
+for&nbsp;short&nbsp;single-word&nbsp;concepts&nbsp;but&nbsp;produces&nbsp;semantically<br>
+plausible&nbsp;pairings&nbsp;for&nbsp;concepts&nbsp;with&nbsp;multi-word&nbsp;names&nbsp;or<br>
+definitions.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>TYPE_CHECKING</strong> = False</td></tr></table>
+</body></html>

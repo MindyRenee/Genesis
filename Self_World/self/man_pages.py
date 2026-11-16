@@ -1,12 +1,14 @@
 """Her manual — the man pages that describe what she is.
 
 Genesis's man pages (``genesis.1``, ``genesis-cli.1``,
-``genesis-daemon.8``, ``genesis-math.7``, ``genesis-tools.7``,
-``genesis-browser.7``, ``genesis-arcade.7``) are part of her — how
-the machine, and she herself, knows what she is. The versioned
-sources in ``docs/man/`` are canonical; the installed copies under
-``~/.local/share/man`` are what ``man`` — and her ``man_page`` tool —
-actually reads.
+``genesis-daemon.8``, ``genesis-retina.1``, ``genesis-tools.7``)
+are part of her — how the machine, and she herself, knows what she
+is. The versioned sources in ``docs/man/`` are canonical; the
+installed copies under ``~/.local/share/man`` are what ``man`` —
+and her ``man_page`` tool — actually reads. Subsystem internals are
+not man pages: they are generated docs under ``Self_World/docs/``
+(rustdoc + pydoc via ``scripts/gen_docs.sh``), so they cannot
+drift from the code they describe.
 
 ``sync()`` keeps the two equal: each versioned source flows to the
 installed dir, and installed ``genesis*`` pages with no source are

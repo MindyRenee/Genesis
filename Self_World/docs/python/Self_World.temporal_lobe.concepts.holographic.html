@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.temporal_lobe.concepts.holographic</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.temporal_lobe.html" class="white">temporal_lobe</a>.<a href="Self_World.temporal_lobe.concepts.html" class="white">concepts</a>.holographic</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/concepts/holographic.py">/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/concepts/holographic.py</a></td></tr></table>
+    <p><span class="code">Holographic&nbsp;associative&nbsp;graph&nbsp;—&nbsp;fixed-size&nbsp;associative&nbsp;memory&nbsp;for&nbsp;Genesis.<br>
+&nbsp;<br>
+This&nbsp;module&nbsp;replaces&nbsp;the&nbsp;auto-generated&nbsp;bridge&nbsp;edges&nbsp;(semantic_bridge,<br>
+hub_attachment,&nbsp;associative_bridge)&nbsp;with&nbsp;a&nbsp;**fixed-size**&nbsp;holographic<br>
+associative&nbsp;memory&nbsp;based&nbsp;on&nbsp;Holographic&nbsp;Reduced&nbsp;Representations&nbsp;(HRRs)<br>
+/&nbsp;Vector&nbsp;Symbolic&nbsp;Architectures&nbsp;(VSAs).<br>
+&nbsp;<br>
+#&nbsp;The&nbsp;problem<br>
+&nbsp;<br>
+The&nbsp;concept&nbsp;network's&nbsp;edge&nbsp;list&nbsp;grows&nbsp;monotonically.&nbsp;70%&nbsp;of&nbsp;edges&nbsp;are<br>
+auto-generated&nbsp;bridges&nbsp;—&nbsp;``semantic_bridge``,&nbsp;``hub_attachment``,<br>
+``associative_bridge``&nbsp;—&nbsp;that&nbsp;materialize&nbsp;fuzzy&nbsp;similarity&nbsp;into&nbsp;explicit<br>
+graph&nbsp;edges.&nbsp;These&nbsp;edges&nbsp;are&nbsp;noisy,&nbsp;regenerate&nbsp;during&nbsp;every&nbsp;sleep&nbsp;cycle,<br>
+and&nbsp;dominate&nbsp;the&nbsp;serialized&nbsp;state&nbsp;size&nbsp;(11+&nbsp;MB&nbsp;of&nbsp;JSON).<br>
+&nbsp;<br>
+#&nbsp;The&nbsp;solution<br>
+&nbsp;<br>
+Holographic&nbsp;Reduced&nbsp;Representations&nbsp;store&nbsp;associations&nbsp;*implicitly*&nbsp;in<br>
+fixed-size&nbsp;high-dimensional&nbsp;vectors.&nbsp;The&nbsp;key&nbsp;operations:<br>
+&nbsp;<br>
+-&nbsp;**Binding**&nbsp;(circular&nbsp;convolution&nbsp;``⊗``):&nbsp;binds&nbsp;two&nbsp;vectors&nbsp;into&nbsp;a&nbsp;new<br>
+&nbsp;&nbsp;vector&nbsp;representing&nbsp;their&nbsp;association.&nbsp;``dog&nbsp;⊗&nbsp;chases``&nbsp;produces&nbsp;a<br>
+&nbsp;&nbsp;vector&nbsp;that&nbsp;IS&nbsp;the&nbsp;"dog-chases"&nbsp;association.<br>
+&nbsp;<br>
+-&nbsp;**Unbinding**&nbsp;(circular&nbsp;correlation&nbsp;``⊙``):&nbsp;recovers&nbsp;one&nbsp;element&nbsp;from<br>
+&nbsp;&nbsp;the&nbsp;bound&nbsp;pair.&nbsp;``(dog&nbsp;⊗&nbsp;chases)&nbsp;⊙&nbsp;chases&nbsp;≈&nbsp;dog``.&nbsp;It's&nbsp;approximate&nbsp;—<br>
+&nbsp;&nbsp;there's&nbsp;noise&nbsp;—&nbsp;but&nbsp;the&nbsp;association&nbsp;is&nbsp;there.<br>
+&nbsp;<br>
+-&nbsp;**Superposition**&nbsp;(vector&nbsp;addition&nbsp;``+``):&nbsp;piles&nbsp;multiple&nbsp;bindings&nbsp;into<br>
+&nbsp;&nbsp;the&nbsp;same&nbsp;vector.&nbsp;``dog⊗chases&nbsp;+&nbsp;cat⊗runs&nbsp;+&nbsp;bird⊗flies``&nbsp;all&nbsp;coexist&nbsp;in<br>
+&nbsp;&nbsp;one&nbsp;fixed-size&nbsp;vector.<br>
+&nbsp;<br>
+The&nbsp;critical&nbsp;property:&nbsp;**the&nbsp;vector&nbsp;is&nbsp;fixed-size&nbsp;regardless&nbsp;of&nbsp;how&nbsp;many<br>
+associations&nbsp;it&nbsp;holds**.&nbsp;10&nbsp;associations&nbsp;or&nbsp;10,000&nbsp;—&nbsp;same&nbsp;vector.&nbsp;The<br>
+tradeoff&nbsp;is&nbsp;signal-to-noise&nbsp;ratio&nbsp;degrades&nbsp;as&nbsp;you&nbsp;superpose&nbsp;more<br>
+bindings,&nbsp;but&nbsp;that's&nbsp;neuroscientifically&nbsp;correct&nbsp;—&nbsp;real&nbsp;associative<br>
+memory&nbsp;gets&nbsp;noisier&nbsp;as&nbsp;you&nbsp;load&nbsp;it.<br>
+&nbsp;<br>
+#&nbsp;Implementation<br>
+&nbsp;<br>
+We&nbsp;use&nbsp;**bucketed&nbsp;per-relation&nbsp;memory**&nbsp;to&nbsp;keep&nbsp;the&nbsp;signal-to-noise<br>
+ratio&nbsp;healthy:<br>
+&nbsp;<br>
+-&nbsp;D&nbsp;=&nbsp;2048&nbsp;dimensions&nbsp;(fixed)<br>
+-&nbsp;B&nbsp;=&nbsp;64&nbsp;buckets&nbsp;per&nbsp;relation&nbsp;type<br>
+-&nbsp;Each&nbsp;concept&nbsp;gets&nbsp;a&nbsp;deterministic&nbsp;random&nbsp;unit&nbsp;vector&nbsp;(its&nbsp;"address")<br>
+-&nbsp;Each&nbsp;relation&nbsp;type&nbsp;gets&nbsp;a&nbsp;deterministic&nbsp;random&nbsp;unit&nbsp;vector&nbsp;(its&nbsp;"role")<br>
+-&nbsp;Adding&nbsp;edge&nbsp;(A,&nbsp;R,&nbsp;B):&nbsp;``memory_R[hash(A)&nbsp;%&nbsp;B]&nbsp;+=&nbsp;bind(addr_A,&nbsp;addr_B)``<br>
+-&nbsp;Querying&nbsp;(A,&nbsp;R):&nbsp;``unbind(addr_A,&nbsp;memory_R[hash(A)&nbsp;%&nbsp;B])``&nbsp;→&nbsp;compare<br>
+&nbsp;&nbsp;to&nbsp;all&nbsp;concept&nbsp;addresses<br>
+&nbsp;<br>
+With&nbsp;~40K&nbsp;journaled&nbsp;edges&nbsp;across&nbsp;~11&nbsp;relation&nbsp;types&nbsp;and&nbsp;64&nbsp;buckets,&nbsp;each<br>
+bucket&nbsp;holds&nbsp;~50-200&nbsp;bindings.&nbsp;The&nbsp;SNR&nbsp;is&nbsp;sqrt(D/N)&nbsp;≈&nbsp;3-6,&nbsp;sufficient<br>
+for&nbsp;candidate&nbsp;generation&nbsp;—&nbsp;with&nbsp;the&nbsp;proviso&nbsp;that&nbsp;a&nbsp;hub&nbsp;concept&nbsp;carries<br>
+all&nbsp;its&nbsp;own&nbsp;bindings&nbsp;in&nbsp;one&nbsp;bucket,&nbsp;so&nbsp;the&nbsp;journal's&nbsp;weight-ordered<br>
+capacity&nbsp;bound&nbsp;is&nbsp;what&nbsp;keeps&nbsp;hub&nbsp;buckets&nbsp;retrievable.<br>
+&nbsp;<br>
+Storage:&nbsp;15&nbsp;relations&nbsp;×&nbsp;64&nbsp;buckets&nbsp;×&nbsp;2048&nbsp;dims&nbsp;×&nbsp;4&nbsp;bytes&nbsp;=&nbsp;7.9&nbsp;MB&nbsp;**fixed**.<br>
+&nbsp;<br>
+#&nbsp;Neuroscience&nbsp;grounding<br>
+&nbsp;<br>
+This&nbsp;models&nbsp;the&nbsp;hippocampal&nbsp;associative&nbsp;memory&nbsp;system.&nbsp;The&nbsp;hippocampus<br>
+performs&nbsp;pattern&nbsp;completion&nbsp;—&nbsp;given&nbsp;a&nbsp;partial&nbsp;cue,&nbsp;it&nbsp;retrieves&nbsp;the&nbsp;full<br>
+association.&nbsp;The&nbsp;holographic&nbsp;graph&nbsp;does&nbsp;the&nbsp;same:&nbsp;given&nbsp;a&nbsp;source&nbsp;concept<br>
+and&nbsp;a&nbsp;relation,&nbsp;it&nbsp;retrieves&nbsp;the&nbsp;most&nbsp;likely&nbsp;target.&nbsp;The&nbsp;noise&nbsp;in&nbsp;the<br>
+retrieval&nbsp;mirrors&nbsp;the&nbsp;probabilistic&nbsp;nature&nbsp;of&nbsp;biological&nbsp;memory&nbsp;recall.<br>
+&nbsp;<br>
+(Plate,&nbsp;1995;&nbsp;Kanerva,&nbsp;2009;&nbsp;Sutherland&nbsp;&amp;&nbsp;McNaughton,&nbsp;2000)</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="hashlib.html">hashlib</a><br>
+</td><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="numpy.html">numpy</a><br>
+</td><td class="multicolumn"><a href="os.html">os</a><br>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.concepts.holographic.html#HolographicGraph">HolographicGraph</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="HolographicGraph">class <strong>HolographicGraph</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#HolographicGraph">HolographicGraph</a>(dim:&nbsp;'int'&nbsp;=&nbsp;2048,&nbsp;n_buckets:&nbsp;'int'&nbsp;=&nbsp;64,&nbsp;journal_cap:&nbsp;'int'&nbsp;=&nbsp;49152)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Fixed-size&nbsp;holographic&nbsp;associative&nbsp;memory&nbsp;for&nbsp;concept&nbsp;associations.<br>
+&nbsp;<br>
+Replaces&nbsp;auto-generated&nbsp;bridge&nbsp;edges&nbsp;with&nbsp;a&nbsp;fixed-size&nbsp;vector<br>
+representation.&nbsp;The&nbsp;graph&nbsp;stores&nbsp;associations&nbsp;implicitly&nbsp;via<br>
+circular&nbsp;convolution&nbsp;binding&nbsp;and&nbsp;superposition.<br>
+&nbsp;<br>
+Thread-safe&nbsp;after&nbsp;initialization.&nbsp;All&nbsp;vectors&nbsp;are&nbsp;read-only&nbsp;post-build.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="HolographicGraph-__init__"><strong>__init__</strong></a>(self, dim: 'int' = 2048, n_buckets: 'int' = 64, journal_cap: 'int' = 49152) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;holographic&nbsp;graph&nbsp;store.</span></dd></dl>
+
+<dl><dt><a name="HolographicGraph-add"><strong>add</strong></a>(self, source: 'str', relation: 'str', target: 'str', weight: 'float' = 1.0) -&gt; 'None'</dt><dd><span class="code">Add&nbsp;an&nbsp;association&nbsp;to&nbsp;the&nbsp;holographic&nbsp;graph.<br>
+&nbsp;<br>
+The&nbsp;association&nbsp;(source,&nbsp;relation,&nbsp;target)&nbsp;is&nbsp;stored&nbsp;via<br>
+superposition&nbsp;of&nbsp;the&nbsp;bound&nbsp;role×target&nbsp;vector&nbsp;into&nbsp;the&nbsp;source's<br>
+bucket&nbsp;in&nbsp;the&nbsp;relation's&nbsp;memory,&nbsp;and&nbsp;journaled&nbsp;so&nbsp;periodic<br>
+rebuilds&nbsp;can&nbsp;re-encode&nbsp;the&nbsp;graph&nbsp;from&nbsp;a&nbsp;clean&nbsp;state.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;source:&nbsp;Source&nbsp;concept&nbsp;ID.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;relation:&nbsp;Relation&nbsp;type&nbsp;name&nbsp;(e.g.&nbsp;"related_to",&nbsp;"similar_to").<br>
+&nbsp;&nbsp;&nbsp;&nbsp;target:&nbsp;Target&nbsp;concept&nbsp;ID.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;weight:&nbsp;Association&nbsp;strength&nbsp;(0-1).&nbsp;Scales&nbsp;the&nbsp;superposed<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vector.&nbsp;Weaker&nbsp;associations&nbsp;contribute&nbsp;less&nbsp;signal.</span></dd></dl>
+
+<dl><dt><a name="HolographicGraph-add_edges"><strong>add_edges</strong></a>(self, edges: 'list[tuple[str, str, str, float]]') -&gt; 'int'</dt><dd><span class="code">Bulk&nbsp;add&nbsp;associations&nbsp;from&nbsp;a&nbsp;list&nbsp;of&nbsp;edges.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;edges:&nbsp;List&nbsp;of&nbsp;(source,&nbsp;relation,&nbsp;target,&nbsp;weight)&nbsp;tuples.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Number&nbsp;of&nbsp;edges&nbsp;added.</span></dd></dl>
+
+<dl><dt><a name="HolographicGraph-association_fidelity"><strong>association_fidelity</strong></a>(self, edges: 'list[tuple[str, str, str, float]]', top_k: 'int' = 10) -&gt; 'dict[str, float]'</dt><dd><span class="code">Measure&nbsp;retrieval&nbsp;fidelity&nbsp;against&nbsp;known&nbsp;associations.<br>
+&nbsp;<br>
+Holographic&nbsp;memory&nbsp;is&nbsp;an&nbsp;approximate&nbsp;associative&nbsp;representation,&nbsp;so<br>
+exact&nbsp;vector&nbsp;MSE&nbsp;is&nbsp;not&nbsp;an&nbsp;appropriate&nbsp;reconstruction&nbsp;metric.&nbsp;This<br>
+evaluates&nbsp;whether&nbsp;stored&nbsp;associations&nbsp;survive&nbsp;the&nbsp;encode/unbind<br>
+transform:&nbsp;recall@k,&nbsp;mean&nbsp;reciprocal&nbsp;rank,&nbsp;and&nbsp;target&nbsp;similarity.<br>
+The&nbsp;supplied&nbsp;edges&nbsp;are&nbsp;evaluation&nbsp;input&nbsp;and&nbsp;are&nbsp;not&nbsp;retained.</span></dd></dl>
+
+<dl><dt><a name="HolographicGraph-clear"><strong>clear</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Clear&nbsp;all&nbsp;associations&nbsp;from&nbsp;the&nbsp;holographic&nbsp;graph.<br>
+&nbsp;<br>
+Also&nbsp;invalidates&nbsp;the&nbsp;query&nbsp;cache&nbsp;and&nbsp;drops&nbsp;the&nbsp;concept/relation<br>
+registrations.&nbsp;Every&nbsp;other&nbsp;write&nbsp;path&nbsp;calls<br>
+`_invalidate_cache`,&nbsp;and&nbsp;`clear`&nbsp;did&nbsp;not&nbsp;—&nbsp;so&nbsp;after&nbsp;a&nbsp;clear,<br>
+`<a href="#HolographicGraph-query">query</a>()`&nbsp;short-circuited&nbsp;on&nbsp;the&nbsp;cache&nbsp;and&nbsp;returned&nbsp;the<br>
+pre-wipe&nbsp;associations&nbsp;out&nbsp;of&nbsp;a&nbsp;provably&nbsp;empty&nbsp;store.&nbsp;That&nbsp;is<br>
+fabricated&nbsp;memory,&nbsp;returned&nbsp;with&nbsp;the&nbsp;same&nbsp;confidence&nbsp;as&nbsp;a&nbsp;real<br>
+one,&nbsp;and&nbsp;it&nbsp;is&nbsp;reachable:&nbsp;`<a href="#HolographicGraph-rebuild_from_edges">rebuild_from_edges</a>([])`&nbsp;is<br>
+`<a href="#HolographicGraph-clear">clear</a>()`&nbsp;plus&nbsp;nothing.<br>
+&nbsp;<br>
+`_addresses`&nbsp;is&nbsp;dropped&nbsp;for&nbsp;the&nbsp;same&nbsp;reason.&nbsp;`<a href="#HolographicGraph-query">query</a>()`&nbsp;scores<br>
+candidates&nbsp;against&nbsp;the&nbsp;address&nbsp;map,&nbsp;so&nbsp;leaving&nbsp;it&nbsp;behind&nbsp;means<br>
+a&nbsp;cleared&nbsp;graph&nbsp;still&nbsp;enumerates&nbsp;concepts&nbsp;it&nbsp;no&nbsp;longer&nbsp;has&nbsp;any<br>
+association&nbsp;for.<br>
+&nbsp;<br>
+`_memory`&nbsp;must&nbsp;drop&nbsp;its&nbsp;keys&nbsp;with&nbsp;`_roles`,&nbsp;not&nbsp;keep&nbsp;zeroed<br>
+rows:&nbsp;the&nbsp;two&nbsp;dicts&nbsp;share&nbsp;one&nbsp;relation&nbsp;keyspace,&nbsp;populated<br>
+only&nbsp;by&nbsp;`_get_role`.&nbsp;Keeping&nbsp;a&nbsp;memory&nbsp;row&nbsp;whose&nbsp;role&nbsp;was<br>
+dropped&nbsp;left&nbsp;`<a href="#HolographicGraph-save">save</a>()`&nbsp;indexing&nbsp;`_roles[r]`&nbsp;for&nbsp;a&nbsp;relation<br>
+`_roles`&nbsp;no&nbsp;longer&nbsp;had&nbsp;—&nbsp;and&nbsp;a&nbsp;later&nbsp;`_get_role`&nbsp;re-register<br>
+would&nbsp;then&nbsp;zero&nbsp;the&nbsp;row,&nbsp;destroying&nbsp;bindings&nbsp;the&nbsp;journal&nbsp;had<br>
+already&nbsp;evicted&nbsp;but&nbsp;memory&nbsp;still&nbsp;held&nbsp;as&nbsp;a&nbsp;ghost.</span></dd></dl>
+
+<dl><dt><a name="HolographicGraph-extract_association_matrix"><strong>extract_association_matrix</strong></a>(self) -&gt; 'tuple[list[str], np.ndarray]'</dt><dd><span class="code">Extract&nbsp;a&nbsp;feature&nbsp;matrix&nbsp;from&nbsp;the&nbsp;holographic&nbsp;graph.<br>
+&nbsp;<br>
+For&nbsp;each&nbsp;(relation,&nbsp;bucket)&nbsp;pair&nbsp;—&nbsp;or,&nbsp;under&nbsp;v2&nbsp;encoding,<br>
+each&nbsp;(concept,&nbsp;relation)&nbsp;pair&nbsp;—&nbsp;the&nbsp;unbound&nbsp;vector&nbsp;is&nbsp;scored<br>
+into&nbsp;a&nbsp;compact&nbsp;feature&nbsp;representing&nbsp;the&nbsp;concept's&nbsp;association<br>
+pattern&nbsp;across&nbsp;the&nbsp;holographic&nbsp;memory.<br>
+&nbsp;<br>
+The&nbsp;resulting&nbsp;matrix&nbsp;is&nbsp;(N,&nbsp;n_relations&nbsp;*&nbsp;n_buckets)&nbsp;for&nbsp;a<br>
+v1-encoded&nbsp;graph&nbsp;and&nbsp;(N,&nbsp;n_relations)&nbsp;for&nbsp;v2&nbsp;—&nbsp;in&nbsp;v2&nbsp;a&nbsp;bucket's<br>
+contents&nbsp;only&nbsp;unbind&nbsp;meaningfully&nbsp;per-source,&nbsp;so&nbsp;the&nbsp;feature&nbsp;is<br>
+each&nbsp;concept's&nbsp;own&nbsp;recovered-association&nbsp;strength&nbsp;per&nbsp;relation.<br>
+Either&nbsp;way&nbsp;it&nbsp;is&nbsp;already&nbsp;low-dimensional,&nbsp;suitable&nbsp;for&nbsp;use&nbsp;as&nbsp;an<br>
+experiential&nbsp;embedding&nbsp;without&nbsp;further&nbsp;SVD.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(concept_ids,&nbsp;feature_matrix)&nbsp;where&nbsp;concept_ids&nbsp;is&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;list&nbsp;of&nbsp;registered&nbsp;concepts&nbsp;and&nbsp;feature_matrix&nbsp;is&nbsp;an<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(N,&nbsp;n_features)&nbsp;float32&nbsp;matrix.</span></dd></dl>
+
+<dl><dt><a name="HolographicGraph-journal_edges"><strong>journal_edges</strong></a>(self) -&gt; 'list[tuple[str, str, str, float]]'</dt><dd><span class="code">The&nbsp;journaled&nbsp;association&nbsp;set:&nbsp;(source,&nbsp;relation,&nbsp;target,&nbsp;weight).</span></dd></dl>
+
+<dl><dt><a name="HolographicGraph-load"><strong>load</strong></a>(self, path: 'str') -&gt; 'bool'</dt><dd><span class="code">Load&nbsp;the&nbsp;holographic&nbsp;graph&nbsp;from&nbsp;an&nbsp;.npz&nbsp;file.<br>
+&nbsp;<br>
+Returns&nbsp;True&nbsp;if&nbsp;loaded,&nbsp;False&nbsp;if&nbsp;file&nbsp;doesn't&nbsp;exist&nbsp;or&nbsp;is<br>
+incompatible.</span></dd></dl>
+
+<dl><dt><a name="HolographicGraph-query"><strong>query</strong></a>(self, source: 'str', relation: 'str', candidate_ids: 'list[str] | None' = None, top_k: 'int' = 10) -&gt; 'list[tuple[str, float]]'</dt><dd><span class="code">Query&nbsp;the&nbsp;holographic&nbsp;graph&nbsp;for&nbsp;associations.<br>
+&nbsp;<br>
+Given&nbsp;a&nbsp;source&nbsp;concept&nbsp;and&nbsp;a&nbsp;relation&nbsp;type,&nbsp;retrieve&nbsp;the&nbsp;most<br>
+likely&nbsp;target&nbsp;concepts.&nbsp;The&nbsp;result&nbsp;is&nbsp;approximate&nbsp;—&nbsp;the<br>
+holographic&nbsp;graph&nbsp;returns&nbsp;candidates&nbsp;that&nbsp;should&nbsp;be&nbsp;validated<br>
+against&nbsp;the&nbsp;embedding&nbsp;space&nbsp;or&nbsp;the&nbsp;explicit&nbsp;graph.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;source:&nbsp;Source&nbsp;concept&nbsp;ID.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;relation:&nbsp;Relation&nbsp;type&nbsp;name.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;candidate_ids:&nbsp;Optional&nbsp;list&nbsp;of&nbsp;candidate&nbsp;concept&nbsp;IDs&nbsp;to<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;score.&nbsp;If&nbsp;None,&nbsp;all&nbsp;registered&nbsp;concepts&nbsp;are&nbsp;scored.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;top_k:&nbsp;Maximum&nbsp;number&nbsp;of&nbsp;results.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;List&nbsp;of&nbsp;(concept_id,&nbsp;similarity)&nbsp;tuples,&nbsp;sorted&nbsp;by<br>
+&nbsp;&nbsp;&nbsp;&nbsp;similarity&nbsp;descending.&nbsp;Similarity&nbsp;is&nbsp;the&nbsp;dot&nbsp;product<br>
+&nbsp;&nbsp;&nbsp;&nbsp;between&nbsp;the&nbsp;unbound&nbsp;result&nbsp;and&nbsp;each&nbsp;candidate's&nbsp;address<br>
+&nbsp;&nbsp;&nbsp;&nbsp;vector&nbsp;(higher&nbsp;=&nbsp;more&nbsp;likely&nbsp;association).</span></dd></dl>
+
+<dl><dt><a name="HolographicGraph-query_all_relations"><strong>query_all_relations</strong></a>(self, source: 'str', candidate_ids: 'list[str] | None' = None, top_k: 'int' = 5) -&gt; 'dict[str, list[tuple[str, float]]]'</dt><dd><span class="code">Query&nbsp;all&nbsp;relation&nbsp;types&nbsp;for&nbsp;associations&nbsp;from&nbsp;a&nbsp;source.<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;dict&nbsp;mapping&nbsp;relation&nbsp;name&nbsp;→&nbsp;list&nbsp;of&nbsp;(target,&nbsp;similarity).</span></dd></dl>
+
+<dl><dt><a name="HolographicGraph-rebuild_from_edges"><strong>rebuild_from_edges</strong></a>(self, edges: 'list[tuple[str, str, str, float]]') -&gt; 'int'</dt><dd><span class="code">Clear&nbsp;and&nbsp;rebuild&nbsp;the&nbsp;graph&nbsp;from&nbsp;a&nbsp;list&nbsp;of&nbsp;edges.<br>
+&nbsp;<br>
+The&nbsp;journal&nbsp;is&nbsp;replaced&nbsp;wholesale&nbsp;by&nbsp;the&nbsp;deduplicated&nbsp;input<br>
+(max&nbsp;weight&nbsp;per&nbsp;edge&nbsp;triple)&nbsp;—&nbsp;a&nbsp;rebuild&nbsp;declares&nbsp;the&nbsp;complete<br>
+content&nbsp;set,&nbsp;so&nbsp;input&nbsp;edges&nbsp;are&nbsp;not&nbsp;accumulated&nbsp;on&nbsp;top&nbsp;of&nbsp;the<br>
+old&nbsp;journal.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;edges:&nbsp;List&nbsp;of&nbsp;(source,&nbsp;relation,&nbsp;target,&nbsp;weight)&nbsp;tuples.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Number&nbsp;of&nbsp;edges&nbsp;stored.</span></dd></dl>
+
+<dl><dt><a name="HolographicGraph-rebuild_from_journal"><strong>rebuild_from_journal</strong></a>(self) -&gt; 'int'</dt><dd><span class="code">Clear&nbsp;and&nbsp;re-encode&nbsp;the&nbsp;graph&nbsp;from&nbsp;its&nbsp;own&nbsp;journal.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;maintenance&nbsp;rebuild:&nbsp;the&nbsp;journal&nbsp;is&nbsp;the&nbsp;clean,<br>
+deduplicated&nbsp;record&nbsp;of&nbsp;what&nbsp;was&nbsp;bound,&nbsp;so&nbsp;re-binding&nbsp;it&nbsp;drops<br>
+the&nbsp;duplicate&nbsp;reinforcement&nbsp;and&nbsp;evicted-ghost&nbsp;bindings&nbsp;the<br>
+memory&nbsp;accumulated&nbsp;since&nbsp;the&nbsp;last&nbsp;rebuild.&nbsp;An&nbsp;empty&nbsp;journal<br>
+rebuilds&nbsp;nothing&nbsp;—&nbsp;the&nbsp;memory&nbsp;is&nbsp;left&nbsp;intact.</span></dd></dl>
+
+<dl><dt><a name="HolographicGraph-save"><strong>save</strong></a>(self, path: 'str') -&gt; 'None'</dt><dd><span class="code">Save&nbsp;the&nbsp;holographic&nbsp;graph&nbsp;to&nbsp;an&nbsp;.npz&nbsp;file.</span></dd></dl>
+
+<dl><dt><a name="HolographicGraph-stats"><strong>stats</strong></a>(self) -&gt; 'dict[str, float]'</dt><dd><span class="code">Return&nbsp;a&nbsp;summary&nbsp;of&nbsp;holographic&nbsp;graph&nbsp;statistics.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>bindings_per_bucket</strong></dt>
+<dd><span class="code">Mean&nbsp;raw&nbsp;bindings&nbsp;per&nbsp;(relation,&nbsp;bucket)&nbsp;memory&nbsp;vector.<br>
+&nbsp;<br>
+The&nbsp;SNR&nbsp;driver:&nbsp;noise&nbsp;grows&nbsp;with&nbsp;the&nbsp;number&nbsp;of&nbsp;superposed<br>
+bindings&nbsp;per&nbsp;memory&nbsp;vector,&nbsp;not&nbsp;with&nbsp;the&nbsp;total&nbsp;edge&nbsp;count.</span></dd>
+</dl>
+<dl><dt><strong>distinct_edges</strong></dt>
+<dd><span class="code">Number&nbsp;of&nbsp;distinct&nbsp;associations&nbsp;in&nbsp;the&nbsp;journal.</span></dd>
+</dl>
+<dl><dt><strong>edge_count</strong></dt>
+<dd><span class="code">Number&nbsp;of&nbsp;associations&nbsp;stored&nbsp;in&nbsp;the&nbsp;holographic&nbsp;graph.</span></dd>
+</dl>
+<dl><dt><strong>n_concepts</strong></dt>
+<dd><span class="code">Number&nbsp;of&nbsp;registered&nbsp;concepts.</span></dd>
+</dl>
+<dl><dt><strong>n_relations</strong></dt>
+<dd><span class="code">Number&nbsp;of&nbsp;registered&nbsp;relation&nbsp;types.</span></dd>
+</dl>
+<dl><dt><strong>snr_estimate</strong></dt>
+<dd><span class="code">Expected&nbsp;signal-to-noise&nbsp;ratio&nbsp;sqrt(D/N)&nbsp;at&nbsp;current&nbsp;load.</span></dd>
+</dl>
+<dl><dt><strong>storage_bytes</strong></dt>
+<dd><span class="code">Total&nbsp;storage&nbsp;size&nbsp;in&nbsp;bytes.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-circular_convolve"><strong>circular_convolve</strong></a>(a: 'np.ndarray', b: 'np.ndarray') -&gt; 'np.ndarray'</dt><dd><span class="code">Circular&nbsp;convolution&nbsp;(binding&nbsp;operation).<br>
+&nbsp;<br>
+bind(a,&nbsp;b)&nbsp;=&nbsp;IFFT(FFT(a)&nbsp;*&nbsp;FFT(b))<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;HRR&nbsp;binding&nbsp;operation.&nbsp;The&nbsp;result&nbsp;is&nbsp;a&nbsp;new&nbsp;vector<br>
+that&nbsp;represents&nbsp;the&nbsp;association&nbsp;of&nbsp;a&nbsp;and&nbsp;b.</span></dd></dl>
+ <dl><dt><a name="-circular_correlate"><strong>circular_correlate</strong></a>(a: 'np.ndarray', b: 'np.ndarray') -&gt; 'np.ndarray'</dt><dd><span class="code">HRR&nbsp;unbinding&nbsp;operation&nbsp;(circular&nbsp;convolution&nbsp;with&nbsp;approximate&nbsp;inverse).<br>
+&nbsp;<br>
+unbind(c,&nbsp;b)&nbsp;=&nbsp;IFFT(FFT(c)&nbsp;*&nbsp;conj(FFT(b)))<br>
+&nbsp;<br>
+This&nbsp;recovers&nbsp;an&nbsp;approximation&nbsp;of&nbsp;the&nbsp;vector&nbsp;that&nbsp;was&nbsp;bound&nbsp;with<br>
+``b``&nbsp;to&nbsp;produce&nbsp;``c``.&nbsp;If&nbsp;``c&nbsp;=&nbsp;bind(x,&nbsp;b)``,&nbsp;then<br>
+``unbind(c,&nbsp;b)&nbsp;≈&nbsp;x``&nbsp;(plus&nbsp;noise&nbsp;from&nbsp;other&nbsp;superposed&nbsp;bindings).<br>
+&nbsp;<br>
+Note:&nbsp;this&nbsp;is&nbsp;NOT&nbsp;the&nbsp;standard&nbsp;mathematical&nbsp;circular&nbsp;correlation<br>
+(which&nbsp;would&nbsp;be&nbsp;IFFT(conj(FFT(a))&nbsp;*&nbsp;FFT(b))).&nbsp;HRR&nbsp;unbinding&nbsp;uses<br>
+the&nbsp;convolution-with-inverse:&nbsp;IFFT(FFT(a)&nbsp;*&nbsp;conj(FFT(b))).</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>DEFAULT_BUCKETS</strong> = 64<br>
+<strong>DEFAULT_DIM</strong> = 2048<br>
+<strong>DEFAULT_JOURNAL_CAP</strong> = 49152<br>
+<strong>ENCODING</strong> = 2<br>
+<strong>logger</strong> = &lt;Logger Self_World.temporal_lobe.concepts.holographic (WARNING)&gt;</td></tr></table>
+</body></html>

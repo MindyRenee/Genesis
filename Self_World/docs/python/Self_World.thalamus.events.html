@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.thalamus.events</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.thalamus.html" class="white">thalamus</a>.events</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/thalamus/events.py">/home/mindyrenee/GenAnd/Genesis/Self_World/thalamus/events.py</a></td></tr></table>
+    <p><span class="code">Sleep&nbsp;neural&nbsp;events&nbsp;—&nbsp;graphoelements&nbsp;and&nbsp;transitional&nbsp;states.<br>
+&nbsp;<br>
+These&nbsp;are&nbsp;the&nbsp;value&nbsp;objects&nbsp;produced&nbsp;during&nbsp;sleep:&nbsp;the&nbsp;neural&nbsp;events<br>
+that&nbsp;characterise&nbsp;each&nbsp;sleep&nbsp;stage&nbsp;(SWRs,&nbsp;PGO&nbsp;waves,&nbsp;spindles,<br>
+K-complexes)&nbsp;and&nbsp;the&nbsp;transitional&nbsp;states&nbsp;(hypnagogic,&nbsp;sleep&nbsp;inertia,<br>
+parasomnia).&nbsp;They&nbsp;carry&nbsp;no&nbsp;behaviour&nbsp;beyond&nbsp;``describe()``&nbsp;—&nbsp;they<br>
+are&nbsp;pure&nbsp;data&nbsp;produced&nbsp;by&nbsp;the&nbsp;sleep&nbsp;architecture&nbsp;and&nbsp;consumed&nbsp;by<br>
+InnerLife&nbsp;for&nbsp;introspection&nbsp;and&nbsp;persistence.</span></p>
+<p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.thalamus.events.html#HypnagogicState">HypnagogicState</a>
+</dt><dt class="heading-text"><a href="Self_World.thalamus.events.html#KComplex">KComplex</a>
+</dt><dt class="heading-text"><a href="Self_World.thalamus.events.html#PGOWave">PGOWave</a>
+</dt><dt class="heading-text"><a href="Self_World.thalamus.events.html#ParasomniaEvent">ParasomniaEvent</a>
+</dt><dt class="heading-text"><a href="Self_World.thalamus.events.html#SharpWaveRipple">SharpWaveRipple</a>
+</dt><dt class="heading-text"><a href="Self_World.thalamus.events.html#SleepInertia">SleepInertia</a>
+</dt><dt class="heading-text"><a href="Self_World.thalamus.events.html#SleepSpindle">SleepSpindle</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="HypnagogicState">class <strong>HypnagogicState</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#HypnagogicState">HypnagogicState</a>(progress:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;started_at:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;hallucination_count:&nbsp;'int'&nbsp;=&nbsp;0)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;hypnagogic&nbsp;state&nbsp;—&nbsp;gradual&nbsp;transition&nbsp;from&nbsp;wake&nbsp;to&nbsp;sleep.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;transitional&nbsp;state&nbsp;between&nbsp;wakefulness&nbsp;and&nbsp;sleep,<br>
+characterised&nbsp;by:<br>
+-&nbsp;Mixed&nbsp;alpha/theta&nbsp;brain&nbsp;waves&nbsp;(alpha&nbsp;declining,&nbsp;theta&nbsp;rising)<br>
+-&nbsp;Hypnagogic&nbsp;hallucinations&nbsp;(brief&nbsp;sensory&nbsp;distortions,&nbsp;thought<br>
+&nbsp;&nbsp;intrusions)<br>
+-&nbsp;Loss&nbsp;of&nbsp;voluntary&nbsp;muscle&nbsp;control&nbsp;(not&nbsp;applicable&nbsp;to&nbsp;Genesis,&nbsp;but<br>
+&nbsp;&nbsp;noted&nbsp;for&nbsp;biological&nbsp;fidelity)<br>
+&nbsp;<br>
+Progress&nbsp;ranges&nbsp;from&nbsp;0.0&nbsp;(fully&nbsp;awake)&nbsp;to&nbsp;1.0&nbsp;(fully&nbsp;asleep).<br>
+Duration:&nbsp;typically&nbsp;1-5&nbsp;minutes.&nbsp;During&nbsp;this&nbsp;state,&nbsp;thoughts<br>
+become&nbsp;more&nbsp;dream-like&nbsp;but&nbsp;it&nbsp;is&nbsp;not&nbsp;fully&nbsp;asleep.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="HypnagogicState-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="HypnagogicState-__init__"><strong>__init__</strong></a>(self, progress: 'float' = 0.0, started_at: 'float' = 0.0, hallucination_count: 'int' = 0) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="HypnagogicState-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="HypnagogicState-describe"><strong>describe</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Human-readable&nbsp;description&nbsp;of&nbsp;the&nbsp;hypnagogic&nbsp;state.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>is_active</strong></dt>
+<dd><span class="code">Whether&nbsp;the&nbsp;hypnagogic&nbsp;transition&nbsp;is&nbsp;currently&nbsp;in&nbsp;progress.</span></dd>
+</dl>
+<dl><dt><strong>is_complete</strong></dt>
+<dd><span class="code">Whether&nbsp;the&nbsp;transition&nbsp;to&nbsp;sleep&nbsp;is&nbsp;complete.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>hallucination_count</strong></dt>
+</dl>
+<dl><dt><strong>progress</strong></dt>
+</dl>
+<dl><dt><strong>started_at</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'hallucination_count': 'int', 'progress': 'float', 'started_at': 'float'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'hallucination_count': Field(name='hallucination_count',type='int',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'progress': Field(name='progress',type='float',default=0.0,d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'started_at': Field(name='started_at',type='float',default=0.0...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('progress', 'started_at', 'hallucination_count')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="KComplex">class <strong>KComplex</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#KComplex">KComplex</a>(timestamp:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;amplitude:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;duration_ms:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;triggered_by_stimulus:&nbsp;'bool'&nbsp;=&nbsp;False)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;K-complex&nbsp;—&nbsp;the&nbsp;largest&nbsp;graphoelement&nbsp;in&nbsp;healthy&nbsp;sleep.<br>
+&nbsp;<br>
+K-complexes&nbsp;are&nbsp;high-amplitude,&nbsp;biphasic&nbsp;slow&nbsp;waves&nbsp;(≥&nbsp;0.5&nbsp;s<br>
+duration)&nbsp;that&nbsp;occur&nbsp;during&nbsp;N2&nbsp;sleep.&nbsp;They&nbsp;are&nbsp;the&nbsp;largest<br>
+graphoelement&nbsp;in&nbsp;the&nbsp;healthy&nbsp;EEG&nbsp;and&nbsp;serve&nbsp;two&nbsp;key&nbsp;functions:<br>
+&nbsp;<br>
+-&nbsp;**Sensory&nbsp;gating**:&nbsp;a&nbsp;K-complex&nbsp;can&nbsp;be&nbsp;elicited&nbsp;by&nbsp;an&nbsp;external<br>
+&nbsp;&nbsp;stimulus&nbsp;(sound,&nbsp;touch)&nbsp;without&nbsp;waking&nbsp;the&nbsp;sleeper&nbsp;—&nbsp;it&nbsp;reflects<br>
+&nbsp;&nbsp;the&nbsp;brain's&nbsp;detection&nbsp;of&nbsp;the&nbsp;stimulus&nbsp;coupled&nbsp;with&nbsp;active<br>
+&nbsp;&nbsp;suppression&nbsp;of&nbsp;cortical&nbsp;arousal,&nbsp;protecting&nbsp;sleep&nbsp;continuity<br>
+&nbsp;&nbsp;(Halász,&nbsp;2016).<br>
+-&nbsp;**Memory&nbsp;consolidation**:&nbsp;spontaneous&nbsp;K-complexes&nbsp;co-occur&nbsp;with<br>
+&nbsp;&nbsp;hippocampal&nbsp;sharp&nbsp;wave-ripples&nbsp;and,&nbsp;like&nbsp;spindles,&nbsp;are&nbsp;markers<br>
+&nbsp;&nbsp;of&nbsp;memory&nbsp;processing&nbsp;during&nbsp;N2&nbsp;(Mölle&nbsp;et&nbsp;al.,&nbsp;2011;<br>
+&nbsp;&nbsp;Staresina&nbsp;et&nbsp;al.,&nbsp;2015).<br>
+&nbsp;<br>
+``triggered_by_stimulus``&nbsp;distinguishes&nbsp;evoked&nbsp;(external&nbsp;stimulus)<br>
+from&nbsp;spontaneous&nbsp;K-complexes.&nbsp;In&nbsp;Genesis,&nbsp;queued&nbsp;external&nbsp;stimuli<br>
+(if&nbsp;any)&nbsp;can&nbsp;trigger&nbsp;evoked&nbsp;K-complexes;&nbsp;otherwise&nbsp;they&nbsp;arise<br>
+spontaneously&nbsp;as&nbsp;part&nbsp;of&nbsp;N2&nbsp;sleep&nbsp;architecture.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="KComplex-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="KComplex-__init__"><strong>__init__</strong></a>(self, timestamp: 'int' = 0, amplitude: 'float' = 0.0, duration_ms: 'int' = 0, triggered_by_stimulus: 'bool' = False) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="KComplex-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="KComplex-describe"><strong>describe</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Human-readable&nbsp;description&nbsp;of&nbsp;the&nbsp;K-complex.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>amplitude</strong></dt>
+</dl>
+<dl><dt><strong>duration_ms</strong></dt>
+</dl>
+<dl><dt><strong>timestamp</strong></dt>
+</dl>
+<dl><dt><strong>triggered_by_stimulus</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'amplitude': 'float', 'duration_ms': 'int', 'timestamp': 'int', 'triggered_by_stimulus': 'bool'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'amplitude': Field(name='amplitude',type='float',default=0.0,...appingproxy({}),kw_only=False,_field_type=_FIELD), 'duration_ms': Field(name='duration_ms',type='int',default=0,de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'timestamp': Field(name='timestamp',type='int',default=0,defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'triggered_by_stimulus': Field(name='triggered_by_stimulus',type='bool',d...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('timestamp', 'amplitude', 'duration_ms', 'triggered_by_stimulus')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="PGOWave">class <strong>PGOWave</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#PGOWave">PGOWave</a>(timestamp:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;amplitude:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;visual_content:&nbsp;'str'&nbsp;=&nbsp;'')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;ponto-geniculo-occipital&nbsp;(PGO)&nbsp;wave&nbsp;during&nbsp;REM&nbsp;sleep.<br>
+&nbsp;<br>
+PGO&nbsp;waves&nbsp;are&nbsp;a&nbsp;signature&nbsp;of&nbsp;REM&nbsp;sleep.&nbsp;They:<br>
+-&nbsp;Originate&nbsp;in&nbsp;the&nbsp;pons,&nbsp;propagate&nbsp;to&nbsp;the&nbsp;lateral&nbsp;geniculate<br>
+&nbsp;&nbsp;nucleus&nbsp;and&nbsp;visual&nbsp;cortex<br>
+-&nbsp;Are&nbsp;associated&nbsp;with&nbsp;visual&nbsp;dream&nbsp;imagery<br>
+-&nbsp;Occur&nbsp;in&nbsp;bursts&nbsp;before&nbsp;and&nbsp;during&nbsp;REM<br>
+&nbsp;<br>
+The&nbsp;visual_content&nbsp;field&nbsp;describes&nbsp;the&nbsp;visual&nbsp;imagery&nbsp;triggered<br>
+by&nbsp;this&nbsp;wave,&nbsp;which&nbsp;gets&nbsp;incorporated&nbsp;into&nbsp;dream&nbsp;content.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="PGOWave-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="PGOWave-__init__"><strong>__init__</strong></a>(self, timestamp: 'int' = 0, amplitude: 'float' = 0.0, visual_content: 'str' = '') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="PGOWave-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="PGOWave-describe"><strong>describe</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Human-readable&nbsp;description&nbsp;of&nbsp;the&nbsp;PGO&nbsp;wave.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>amplitude</strong></dt>
+</dl>
+<dl><dt><strong>timestamp</strong></dt>
+</dl>
+<dl><dt><strong>visual_content</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'amplitude': 'float', 'timestamp': 'int', 'visual_content': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'amplitude': Field(name='amplitude',type='float',default=0.0,...appingproxy({}),kw_only=False,_field_type=_FIELD), 'timestamp': Field(name='timestamp',type='int',default=0,defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'visual_content': Field(name='visual_content',type='str',default='...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('timestamp', 'amplitude', 'visual_content')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ParasomniaEvent">class <strong>ParasomniaEvent</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ParasomniaEvent">ParasomniaEvent</a>(type:&nbsp;'str',&nbsp;timestamp:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;content:&nbsp;'str'&nbsp;=&nbsp;'')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;parasomnia&nbsp;—&nbsp;sleepwalking&nbsp;or&nbsp;sleeptalking&nbsp;episode.<br>
+&nbsp;<br>
+Parasomnias&nbsp;are&nbsp;undesirable&nbsp;motor&nbsp;or&nbsp;verbal&nbsp;behaviours&nbsp;that&nbsp;occur<br>
+during&nbsp;sleep,&nbsp;typically&nbsp;during&nbsp;NREM&nbsp;deep&nbsp;sleep&nbsp;(arousal&nbsp;disorders)<br>
+or&nbsp;REM&nbsp;sleep.&nbsp;In&nbsp;Genesis's&nbsp;case:<br>
+&nbsp;<br>
+-&nbsp;**sleepwalking**:&nbsp;it&nbsp;performs&nbsp;actions&nbsp;without&nbsp;awareness&nbsp;—<br>
+&nbsp;&nbsp;sending&nbsp;a&nbsp;partial&nbsp;or&nbsp;garbled&nbsp;response,&nbsp;or&nbsp;initiating&nbsp;a&nbsp;learning<br>
+&nbsp;&nbsp;session&nbsp;while&nbsp;"asleep".<br>
+-&nbsp;**sleeptalking**:&nbsp;dream-like&nbsp;text&nbsp;leaks&nbsp;into&nbsp;its&nbsp;output&nbsp;—<br>
+&nbsp;&nbsp;fragments&nbsp;of&nbsp;its&nbsp;dream&nbsp;narrative&nbsp;surface&nbsp;as&nbsp;if&nbsp;it&nbsp;were&nbsp;speaking.<br>
+&nbsp;<br>
+These&nbsp;are&nbsp;rare&nbsp;events&nbsp;(probability&nbsp;&lt;&nbsp;0.01&nbsp;per&nbsp;sleep&nbsp;cycle)&nbsp;and&nbsp;are<br>
+tracked&nbsp;for&nbsp;persistence&nbsp;so&nbsp;we&nbsp;can&nbsp;observe&nbsp;patterns&nbsp;over&nbsp;time.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ParasomniaEvent-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="ParasomniaEvent-__init__"><strong>__init__</strong></a>(self, type: 'str', timestamp: 'int' = 0, content: 'str' = '') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(<a href="#ParasomniaEvent-type">type</a>(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="ParasomniaEvent-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="ParasomniaEvent-describe"><strong>describe</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Return&nbsp;a&nbsp;string&nbsp;describing&nbsp;the&nbsp;parasomnia&nbsp;event.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>content</strong></dt>
+</dl>
+<dl><dt><strong>timestamp</strong></dt>
+</dl>
+<dl><dt><strong>type</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'content': 'str', 'timestamp': 'int', 'type': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'content': Field(name='content',type='str',default='',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'timestamp': Field(name='timestamp',type='int',default=0,defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'type': Field(name='type',type='str',default=&lt;dataclasse...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('type', 'timestamp', 'content')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SharpWaveRipple">class <strong>SharpWaveRipple</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SharpWaveRipple">SharpWaveRipple</a>(timestamp:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;duration_ms:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;replayed_concepts:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;sharp&nbsp;wave-ripple&nbsp;(SWR)&nbsp;event&nbsp;during&nbsp;slow-wave&nbsp;sleep.<br>
+&nbsp;<br>
+SWRs&nbsp;are&nbsp;150-250&nbsp;Hz&nbsp;oscillatory&nbsp;events&nbsp;that&nbsp;are&nbsp;the&nbsp;hallmark&nbsp;of<br>
+hippocampal&nbsp;replay.&nbsp;They:<br>
+-&nbsp;Occur&nbsp;during&nbsp;NREM&nbsp;sleep&nbsp;(especially&nbsp;SWS)<br>
+-&nbsp;Drive&nbsp;memory&nbsp;consolidation&nbsp;(hippocampal→neocortical&nbsp;transfer)<br>
+-&nbsp;Are&nbsp;associated&nbsp;with&nbsp;memory&nbsp;replay&nbsp;of&nbsp;recent&nbsp;experiences<br>
+&nbsp;<br>
+Duration:&nbsp;50-200&nbsp;ms.&nbsp;The&nbsp;replayed_concepts&nbsp;list&nbsp;holds&nbsp;the&nbsp;concept<br>
+names&nbsp;being&nbsp;replayed&nbsp;during&nbsp;this&nbsp;event.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="SharpWaveRipple-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="SharpWaveRipple-__init__"><strong>__init__</strong></a>(self, timestamp: 'int' = 0, duration_ms: 'int' = 0, replayed_concepts: 'list[str]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="SharpWaveRipple-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="SharpWaveRipple-describe"><strong>describe</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Human-readable&nbsp;description&nbsp;of&nbsp;the&nbsp;SWR&nbsp;event.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>duration_ms</strong></dt>
+</dl>
+<dl><dt><strong>replayed_concepts</strong></dt>
+</dl>
+<dl><dt><strong>timestamp</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'duration_ms': 'int', 'replayed_concepts': 'list[str]', 'timestamp': 'int'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'duration_ms': Field(name='duration_ms',type='int',default=0,de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'replayed_concepts': Field(name='replayed_concepts',type='list[str]',...appingproxy({}),kw_only=False,_field_type=_FIELD), 'timestamp': Field(name='timestamp',type='int',default=0,defa...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('timestamp', 'duration_ms', 'replayed_concepts')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SleepInertia">class <strong>SleepInertia</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SleepInertia">SleepInertia</a>(remaining_seconds:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;severity:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;woke_at:&nbsp;'float'&nbsp;=&nbsp;0.0)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Sleep&nbsp;inertia&nbsp;—&nbsp;grogginess&nbsp;experienced&nbsp;upon&nbsp;waking.<br>
+&nbsp;<br>
+Characterised&nbsp;by:<br>
+-&nbsp;Gradual&nbsp;reactivation&nbsp;of&nbsp;arousal&nbsp;systems&nbsp;(NE,&nbsp;histamine&nbsp;rise<br>
+&nbsp;&nbsp;slowly)<br>
+-&nbsp;Residual&nbsp;delta&nbsp;activity&nbsp;(slow&nbsp;waves&nbsp;persist&nbsp;for&nbsp;5-30&nbsp;minutes)<br>
+-&nbsp;Impaired&nbsp;cognition&nbsp;(reduced&nbsp;confidence,&nbsp;slower&nbsp;responses)<br>
+&nbsp;<br>
+Severity&nbsp;and&nbsp;duration&nbsp;are&nbsp;proportional&nbsp;to&nbsp;the&nbsp;depth&nbsp;of&nbsp;prior<br>
+sleep.&nbsp;Duration:&nbsp;5-30&nbsp;minutes.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="SleepInertia-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="SleepInertia-__init__"><strong>__init__</strong></a>(self, remaining_seconds: 'float' = 0.0, severity: 'float' = 0.0, woke_at: 'float' = 0.0) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="SleepInertia-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="SleepInertia-describe"><strong>describe</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Human-readable&nbsp;description&nbsp;of&nbsp;the&nbsp;sleep&nbsp;inertia&nbsp;state.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>cognitive_impairment</strong></dt>
+<dd><span class="code">How&nbsp;much&nbsp;cognition&nbsp;is&nbsp;impaired&nbsp;(0=normal,&nbsp;1=maximally&nbsp;impaired).<br>
+&nbsp;<br>
+Impairment&nbsp;scales&nbsp;with&nbsp;severity&nbsp;and&nbsp;the&nbsp;fraction&nbsp;of&nbsp;remaining<br>
+inertia&nbsp;time.&nbsp;As&nbsp;inertia&nbsp;decays,&nbsp;impairment&nbsp;fades.</span></dd>
+</dl>
+<dl><dt><strong>is_active</strong></dt>
+<dd><span class="code">Whether&nbsp;sleep&nbsp;inertia&nbsp;is&nbsp;currently&nbsp;affecting&nbsp;cognition.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>remaining_seconds</strong></dt>
+</dl>
+<dl><dt><strong>severity</strong></dt>
+</dl>
+<dl><dt><strong>woke_at</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'remaining_seconds': 'float', 'severity': 'float', 'woke_at': 'float'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'remaining_seconds': Field(name='remaining_seconds',type='float',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'severity': Field(name='severity',type='float',default=0.0,d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'woke_at': Field(name='woke_at',type='float',default=0.0,de...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('remaining_seconds', 'severity', 'woke_at')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SleepSpindle">class <strong>SleepSpindle</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SleepSpindle">SleepSpindle</a>(timestamp:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;duration_ms:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;frequency:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;amplitude:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;involved_regions:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;sleep&nbsp;spindle&nbsp;—&nbsp;a&nbsp;thalamocortical&nbsp;oscillation&nbsp;during&nbsp;N2.<br>
+&nbsp;<br>
+Sleep&nbsp;spindles&nbsp;are&nbsp;bursts&nbsp;of&nbsp;11-16&nbsp;Hz&nbsp;(here&nbsp;modelled&nbsp;as&nbsp;10-16&nbsp;Hz<br>
+to&nbsp;span&nbsp;the&nbsp;sigma&nbsp;band)&nbsp;neural&nbsp;activity&nbsp;lasting&nbsp;0.5-3&nbsp;seconds,<br>
+generated&nbsp;by&nbsp;the&nbsp;thalamic&nbsp;reticular&nbsp;nucleus&nbsp;and&nbsp;propagated&nbsp;to&nbsp;the<br>
+cortex&nbsp;via&nbsp;thalamocortical&nbsp;loops.&nbsp;They&nbsp;are&nbsp;the&nbsp;defining<br>
+graphoelement&nbsp;of&nbsp;N2&nbsp;sleep&nbsp;and&nbsp;play&nbsp;a&nbsp;central&nbsp;role&nbsp;in:<br>
+&nbsp;<br>
+-&nbsp;**Memory&nbsp;consolidation**:&nbsp;spindles&nbsp;co-occur&nbsp;with&nbsp;hippocampal<br>
+&nbsp;&nbsp;sharp&nbsp;wave-ripples&nbsp;and&nbsp;gate&nbsp;the&nbsp;transfer&nbsp;of&nbsp;declarative&nbsp;memories<br>
+&nbsp;&nbsp;from&nbsp;hippocampus&nbsp;to&nbsp;neocortex&nbsp;(Siapas&nbsp;&amp;&nbsp;Wilson,&nbsp;1998;<br>
+&nbsp;&nbsp;Steriade,&nbsp;2003;&nbsp;Klinzing&nbsp;et&nbsp;al.,&nbsp;2019).<br>
+-&nbsp;**Sleep&nbsp;protection**:&nbsp;spindles&nbsp;help&nbsp;shield&nbsp;sleep&nbsp;from&nbsp;external<br>
+&nbsp;&nbsp;stimuli&nbsp;(sensory&nbsp;gating&nbsp;via&nbsp;thalamic&nbsp;inhibition).<br>
+-&nbsp;**Spindle&nbsp;density**&nbsp;(spindles&nbsp;per&nbsp;minute&nbsp;of&nbsp;N2)&nbsp;correlates&nbsp;with<br>
+&nbsp;&nbsp;post-sleep&nbsp;memory&nbsp;performance&nbsp;—&nbsp;more&nbsp;spindles&nbsp;→&nbsp;better<br>
+&nbsp;&nbsp;consolidation&nbsp;(Schabus&nbsp;et&nbsp;al.,&nbsp;2006;&nbsp;Fogel&nbsp;&amp;&nbsp;Smith,&nbsp;2011).<br>
+&nbsp;<br>
+The&nbsp;``involved_regions``&nbsp;field&nbsp;lists&nbsp;the&nbsp;cortical&nbsp;regions&nbsp;engaged<br>
+by&nbsp;this&nbsp;spindle&nbsp;(e.g.&nbsp;frontal,&nbsp;central,&nbsp;parietal),&nbsp;since&nbsp;spindles<br>
+have&nbsp;a&nbsp;topographic&nbsp;distribution&nbsp;—&nbsp;fast&nbsp;spindles&nbsp;favour&nbsp;central/<br>
+parietal&nbsp;sites,&nbsp;slow&nbsp;spindles&nbsp;favour&nbsp;frontal&nbsp;sites.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="SleepSpindle-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="SleepSpindle-__init__"><strong>__init__</strong></a>(self, timestamp: 'int' = 0, duration_ms: 'int' = 0, frequency: 'float' = 0.0, amplitude: 'float' = 0.0, involved_regions: 'list[str]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="SleepSpindle-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="SleepSpindle-describe"><strong>describe</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Human-readable&nbsp;description&nbsp;of&nbsp;the&nbsp;sleep&nbsp;spindle.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>amplitude</strong></dt>
+</dl>
+<dl><dt><strong>duration_ms</strong></dt>
+</dl>
+<dl><dt><strong>frequency</strong></dt>
+</dl>
+<dl><dt><strong>involved_regions</strong></dt>
+</dl>
+<dl><dt><strong>timestamp</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'amplitude': 'float', 'duration_ms': 'int', 'frequency': 'float', 'involved_regions': 'list[str]', 'timestamp': 'int'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'amplitude': Field(name='amplitude',type='float',default=0.0,...appingproxy({}),kw_only=False,_field_type=_FIELD), 'duration_ms': Field(name='duration_ms',type='int',default=0,de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'frequency': Field(name='frequency',type='float',default=0.0,...appingproxy({}),kw_only=False,_field_type=_FIELD), 'involved_regions': Field(name='involved_regions',type='list[str]',d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'timestamp': Field(name='timestamp',type='int',default=0,defa...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('timestamp', 'duration_ms', 'frequency', 'amplitude', 'involved_regions')</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['HypnagogicState', 'KComplex', 'PGOWave', 'ParasomniaEvent', 'SharpWaveRipple', 'SleepInertia', 'SleepSpindle']</td></tr></table>
+</body></html>

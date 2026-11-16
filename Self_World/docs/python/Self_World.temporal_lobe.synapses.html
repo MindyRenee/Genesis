@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.temporal_lobe.synapses</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.temporal_lobe.html" class="white">temporal_lobe</a>.synapses</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/synapses.py">/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/synapses.py</a></td></tr></table>
+    <p><span class="code">Experience-dependent&nbsp;synaptic&nbsp;efficacy&nbsp;for&nbsp;associative&nbsp;learning.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;plastic&nbsp;substrate&nbsp;used&nbsp;by&nbsp;timing-dependent&nbsp;learning.<br>
+It&nbsp;is&nbsp;deliberately&nbsp;separate&nbsp;from&nbsp;Genesis's&nbsp;semantic&nbsp;concept&nbsp;graph&nbsp;and<br>
+from&nbsp;the&nbsp;semantic&nbsp;embedding&nbsp;space:<br>
+&nbsp;<br>
+*&nbsp;ConceptNetwork&nbsp;edges&nbsp;encode&nbsp;explicit&nbsp;semantic&nbsp;relationships.<br>
+*&nbsp;Embeddings&nbsp;encode&nbsp;representational&nbsp;similarity.<br>
+*&nbsp;Synaptic&nbsp;efficacy&nbsp;encodes&nbsp;learned&nbsp;strength&nbsp;between&nbsp;active&nbsp;units.<br>
+&nbsp;<br>
+STDP&nbsp;changes&nbsp;synaptic&nbsp;efficacy;&nbsp;it&nbsp;does&nbsp;not&nbsp;rewrite&nbsp;semantic&nbsp;facts&nbsp;or<br>
+move&nbsp;semantic&nbsp;representations.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="math.html">math</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.synapses.html#SynapticStore">SynapticStore</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SynapticStore">class <strong>SynapticStore</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SynapticStore">SynapticStore</a>()&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Sparse&nbsp;directed&nbsp;store&nbsp;of&nbsp;experience-dependent&nbsp;connection&nbsp;strength.<br>
+&nbsp;<br>
+A&nbsp;connection&nbsp;is&nbsp;identified&nbsp;by&nbsp;its&nbsp;pre/post&nbsp;active-unit&nbsp;labels,&nbsp;but<br>
+its&nbsp;weight&nbsp;has&nbsp;no&nbsp;semantic&nbsp;meaning.&nbsp;Connections&nbsp;are&nbsp;created&nbsp;lazily<br>
+when&nbsp;plasticity&nbsp;first&nbsp;acts&nbsp;on&nbsp;a&nbsp;pair.&nbsp;Weights&nbsp;are&nbsp;bounded&nbsp;to&nbsp;the<br>
+biologically&nbsp;useful&nbsp;computational&nbsp;range&nbsp;[0,&nbsp;1].<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="SynapticStore-__init__"><strong>__init__</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="SynapticStore-apply_delta"><strong>apply_delta</strong></a>(self, pre: 'str', post: 'str', delta: 'float') -&gt; 'float'</dt><dd><span class="code">Apply&nbsp;a&nbsp;plasticity&nbsp;delta&nbsp;to&nbsp;a&nbsp;connection&nbsp;and&nbsp;return&nbsp;its&nbsp;new&nbsp;weight.</span></dd></dl>
+
+<dl><dt><a name="SynapticStore-connections"><strong>connections</strong></a>(self) -&gt; 'dict[tuple[str, str], float]'</dt><dd><span class="code">Return&nbsp;a&nbsp;snapshot&nbsp;of&nbsp;all&nbsp;expressed&nbsp;plastic&nbsp;connections.</span></dd></dl>
+
+<dl><dt><a name="SynapticStore-get_weight"><strong>get_weight</strong></a>(self, pre: 'str', post: 'str') -&gt; 'float'</dt><dd><span class="code">Return&nbsp;synaptic&nbsp;efficacy,&nbsp;or&nbsp;zero&nbsp;when&nbsp;no&nbsp;learned&nbsp;connection&nbsp;exists.</span></dd></dl>
+
+<dl><dt><a name="SynapticStore-has_connection"><strong>has_connection</strong></a>(self, pre: 'str', post: 'str') -&gt; 'bool'</dt><dd><span class="code">Return&nbsp;whether&nbsp;this&nbsp;directed&nbsp;plastic&nbsp;connection&nbsp;has&nbsp;been&nbsp;expressed.</span></dd></dl>
+
+<dl><dt><a name="SynapticStore-load_state"><strong>load_state</strong></a>(self, state: 'dict[str, float]') -&gt; 'None'</dt><dd><span class="code">Restore&nbsp;expressed&nbsp;synaptic&nbsp;efficacies&nbsp;from&nbsp;persisted&nbsp;state.</span></dd></dl>
+
+<dl><dt><a name="SynapticStore-propagate"><strong>propagate</strong></a>(self, seeds: 'list[str]', amount: 'float' = 1.0) -&gt; 'dict[str, float]'</dt><dd><span class="code">Propagate&nbsp;activation&nbsp;through&nbsp;expressed&nbsp;learned&nbsp;connections.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;downstream&nbsp;read&nbsp;path&nbsp;for&nbsp;synaptic&nbsp;efficacy.&nbsp;It&nbsp;does<br>
+not&nbsp;create&nbsp;or&nbsp;alter&nbsp;semantic&nbsp;graph&nbsp;edges&nbsp;or&nbsp;embeddings.&nbsp;Each<br>
+directly&nbsp;connected&nbsp;post-unit&nbsp;receives&nbsp;seed&nbsp;activation&nbsp;multiplied<br>
+by&nbsp;its&nbsp;learned&nbsp;efficacy.<br>
+&nbsp;<br>
+Convergent&nbsp;inputs&nbsp;summate:&nbsp;total&nbsp;drive&nbsp;to&nbsp;a&nbsp;post-unit&nbsp;is&nbsp;the&nbsp;sum<br>
+over&nbsp;all&nbsp;active&nbsp;pre-units&nbsp;(linear&nbsp;synaptic&nbsp;integration),&nbsp;passed<br>
+through&nbsp;a&nbsp;saturating&nbsp;Naka–Rushton&nbsp;nonlinearity<br>
+``act&nbsp;=&nbsp;total&nbsp;/&nbsp;(1&nbsp;+&nbsp;total)``&nbsp;(Naka&nbsp;&amp;&nbsp;Rushton,&nbsp;1966;&nbsp;Heeger,<br>
+1992;&nbsp;Carandini&nbsp;&amp;&nbsp;Heeger,&nbsp;2011&nbsp;divisive&nbsp;normalization).&nbsp;This<br>
+keeps&nbsp;activation&nbsp;in&nbsp;[0,&nbsp;1)&nbsp;while&nbsp;preserving&nbsp;monotonic&nbsp;fan-in,<br>
+unlike&nbsp;a&nbsp;max-take-all&nbsp;which&nbsp;undercounts&nbsp;convergent&nbsp;evidence.</span></dd></dl>
+
+<dl><dt><a name="SynapticStore-save_state"><strong>save_state</strong></a>(self) -&gt; 'dict[str, float]'</dt><dd><span class="code">Serialize&nbsp;expressed&nbsp;synaptic&nbsp;efficacies.</span></dd></dl>
+
+<dl><dt><a name="SynapticStore-set_weight"><strong>set_weight</strong></a>(self, pre: 'str', post: 'str', weight: 'float') -&gt; 'float'</dt><dd><span class="code">Set&nbsp;and&nbsp;return&nbsp;a&nbsp;bounded&nbsp;synaptic&nbsp;efficacy.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>MAX_WEIGHT</strong> = 1.0</dl>
+
+<dl><dt><strong>MIN_WEIGHT</strong> = 0.0</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['SynapticStore']</td></tr></table>
+</body></html>

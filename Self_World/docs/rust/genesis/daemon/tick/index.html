@@ -1,0 +1,81 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Daemon tick controller — the subcognitive’s stateful driver."><title>genesis::daemon::tick - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-203241e4.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="genesis" data-themes="" data-resource-suffix="" data-rustdoc-version="1.100.0 (0ef1bc386 2026-11-09)" data-channel="1.100.0" data-search-js="search-b167f383.js" data-stringdex-js="stringdex-b5109af9.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../../static.files/main-1814ead3.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-9f56287d.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module tick</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../genesis/index.html">genesis</a><span class="version">0.2.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module tick</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#two-entry-points" title="Two entry points">Two entry points</a></li><li><a href="#whats-novel" title="What’s novel">What’s novel</a></li></ul><h3><a href="#structs">Module Items</a></h3><ul class="block"><li><a href="#structs" title="Structs">Structs</a></li><li><a href="#constants" title="Constants">Constants</a></li><li><a href="#functions" title="Functions">Functions</a></li></ul></section><div id="rustdoc-modnav"><h2><a href="../index.html">In genesis::<wbr>daemon</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../index.html">genesis</a>::<wbr><a href="../index.html">daemon</a></div><h1>Module <span>tick</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/genesis/daemon/tick.rs.html#1-2458">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Daemon tick controller — the subcognitive’s stateful driver.</p>
+<p>This module owns <a href="struct.TickLoop.html" title="struct genesis::daemon::tick::TickLoop"><code>TickLoop</code></a>, the controller that holds the
+daemon’s long-lived subsystems (intention manager, interoceptor,
+active-inference engine, dyadic model) and the change-detection
+state for body control.</p>
+<h2 id="two-entry-points"><a class="doc-anchor" href="#two-entry-points">§</a>Two entry points</h2>
+<p>In production the daemon is <strong>reactive</strong>: it does not run a fixed
+tick loop. The cognitive mind drives each function through IPC
+commands when internal state (brain waves, thresholds, urges) says
+it’s time, and the daemon executes the corresponding method:</p>
+<ol>
+<li><a href="struct.TickLoop.html#method.advance_neuro" title="method genesis::daemon::tick::TickLoop::advance_neuro"><code>TickLoop::advance_neuro</code></a> — advance the coupled dynamics by
+the elapsed <code>dt</code>, then run active inference and the dyadic model</li>
+<li><a href="struct.TickLoop.html#method.consolidate" title="method genesis::daemon::tick::TickLoop::consolidate"><code>TickLoop::consolidate</code></a> — promote STM → LTM under emotional gating</li>
+<li><a href="struct.TickLoop.html#method.associate" title="method genesis::daemon::tick::TickLoop::associate"><code>TickLoop::associate</code></a> — find connections between memories</li>
+<li><a href="struct.TickLoop.html#method.dream" title="method genesis::daemon::tick::TickLoop::dream"><code>TickLoop::dream</code></a> — free association when sleeping</li>
+<li><a href="struct.TickLoop.html#method.read_sensors" title="method genesis::daemon::tick::TickLoop::read_sensors"><code>TickLoop::read_sensors</code></a> — interoception</li>
+<li><a href="struct.TickLoop.html#method.apply_body_control" title="method genesis::daemon::tick::TickLoop::apply_body_control"><code>TickLoop::apply_body_control</code></a> — publish the shared body policy recommendation</li>
+<li><a href="struct.TickLoop.html#method.check_staleness" title="method genesis::daemon::tick::TickLoop::check_staleness"><code>TickLoop::check_staleness</code></a> — mark crashed cognitive modules</li>
+</ol>
+<p><a href="struct.TickLoop.html#method.tick" title="method genesis::daemon::tick::TickLoop::tick"><code>TickLoop::tick</code></a> is the integrated, single-shot reference path
+that runs all of the above in sequence. It is retained for tests
+and for reasoning about the whole system in one place; the
+production daemon does not call it.</p>
+<h2 id="whats-novel"><a class="doc-anchor" href="#whats-novel">§</a>What’s novel</h2>
+<p>The controller isn’t just “run tasks on a timer.” The <strong>emotional
+state determines what work gets done</strong>:</p>
+<ul>
+<li>When <strong>plasticity gate is high</strong> (good neurochemistry): prioritize
+consolidation — learn aggressively</li>
+<li>When <strong>plasticity gate is low</strong> (chronic stress): skip consolidation,
+prioritize error evaluation and housekeeping — the system is in
+survival mode, not learning mode</li>
+<li>When <strong>sleeping</strong>: run consolidation and dreaming — this is the
+brain’s window for memory replay, plasticity recovery, and insight</li>
+<li>When <strong>in flow</strong>: reduce background tasks to minimum — don’t
+interrupt a good state with housekeeping</li>
+<li>When <strong>overwhelmed</strong>: shed all non-essential tasks — the system
+needs to recover before doing anything else</li>
+</ul>
+</div></details><h2 id="structs" class="section-header">Structs<a href="#structs" class="anchor">§</a></h2><dl class="item-table"><dt><a class="struct" href="struct.TickLoop.html" title="struct genesis::daemon::tick::TickLoop">Tick<wbr>Loop</a></dt><dd>The daemon tick loop controller.</dd><dt><a class="struct" href="struct.TickResult.html" title="struct genesis::daemon::tick::TickResult">Tick<wbr>Result</a></dt><dd>The result of a single tick.</dd></dl><h2 id="constants" class="section-header">Constants<a href="#constants" class="anchor">§</a></h2><dl class="item-table"><dt><a class="constant" href="constant.ASSOCIATION_INTERVAL_TICKS.html" title="constant genesis::daemon::tick::ASSOCIATION_INTERVAL_TICKS">ASSOCIATION_<wbr>INTERVAL_<wbr>TICKS</a></dt><dd>Nominal association cadence — the 5 Hz reference the
+<a href="../adaptive/struct.AdaptiveGate.html" title="struct genesis::daemon::adaptive::AdaptiveGate"><code>super::adaptive::AdaptiveGate</code></a> on <code>TickLoop</code> is tuned to. The
+gate itself is wall-clock demand-driven; this remains for tests
+and documentation of the nominal rate.</dd><dt><a class="constant" href="constant.AUTONOMOUS_INTERVAL_MS.html" title="constant genesis::daemon::tick::AUTONOMOUS_INTERVAL_MS">AUTONOMOUS_<wbr>INTERVAL_<wbr>MS</a></dt><dd>Autonomous fallback cadence when the lease expires. Matches
+<code>TICK_INTERVAL_MS</code> so catch-up dynamics run at the 5 Hz reference
+rate the pharmacodynamics were tuned for.</dd><dt><a class="constant" href="constant.CONSOLIDATION_THRESHOLD.html" title="constant genesis::daemon::tick::CONSOLIDATION_THRESHOLD">CONSOLIDATION_<wbr>THRESHOLD</a></dt><dd>Consolidation threshold: entries with a consolidation score below
+this are skipped (left to decay in the ring buffer).</dd><dt><a class="constant" href="constant.DISAGREEMENT_PRECISION_SCALE.html" title="constant genesis::daemon::tick::DISAGREEMENT_PRECISION_SCALE">DISAGREEMENT_<wbr>PRECISION_<wbr>SCALE</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Scale of field disagreement (Fréchet variance, latent² units) at
+which the body’s self-inconsistency halves the published
+precision. Precision is inverse observation variance — the
+field’s disagreement IS measured variance on the body’s own
+channels — so the coupling follows the precision-addition rule
+<code>factor = 1 / (1 + d/REF)</code>: disagreement attenuates confidence
+by exactly the noise it measures.</dd><dt><a class="constant" href="constant.DREAM_INTERVAL_TICKS.html" title="constant genesis::daemon::tick::DREAM_INTERVAL_TICKS">DREAM_<wbr>INTERVAL_<wbr>TICKS</a></dt><dd>Nominal dream cadence — see <a href="constant.ASSOCIATION_INTERVAL_TICKS.html" title="constant genesis::daemon::tick::ASSOCIATION_INTERVAL_TICKS"><code>ASSOCIATION_INTERVAL_TICKS</code></a>.</dd><dt><a class="constant" href="constant.DT_MAX.html" title="constant genesis::daemon::tick::DT_MAX">DT_MAX</a></dt><dt><a class="constant" href="constant.DT_MIN.html" title="constant genesis::daemon::tick::DT_MIN">DT_MIN</a></dt><dt><a class="constant" href="constant.EYE_OWNERSHIP_GRACE_MS.html" title="constant genesis::daemon::tick::EYE_OWNERSHIP_GRACE_MS">EYE_<wbr>OWNERSHIP_<wbr>GRACE_<wbr>MS</a></dt><dd>How long after boot the daemon waits for an external
+<code>genesis-retina</code> to claim the optic nerve before opening its own
+capture limb — long enough to cover a camera probe and format
+negotiation, short enough that a missing eye degrades gracefully
+rather than stalling sight. Once a publisher has existed the
+window no longer applies: a dead retina hands the camera back
+immediately.</dd><dt><a class="constant" href="constant.MARKER_G05.html" title="constant genesis::daemon::tick::MARKER_G05">MARKER_<wbr>G05</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Provenance marker — one letter of the creator lattice (see
+PROVENANCE.md).</dd><dt><a class="constant" href="constant.MAX_DREAM_HOPS.html" title="constant genesis::daemon::tick::MAX_DREAM_HOPS">MAX_<wbr>DREAM_<wbr>HOPS</a></dt><dd>Maximum dreaming chain length.</dd><dt><a class="constant" href="constant.MIND_LEASE_SECS.html" title="constant genesis::daemon::tick::MIND_LEASE_SECS">MIND_<wbr>LEASE_<wbr>SECS</a></dt><dd>Mind lease: how long the daemon stays out of the way after the
+cognitive mind last drove it. While the mind drives at its ~1 Hz
+heartbeat, idle stays ~1 s and the autonomous fallback never
+fires. After a stall, crash, or disconnect longer than this, the
+daemon drives physiology itself. 3 s = ~3 missed heartbeats:
+fast enough that sleep/adenosine/circadian never visibly freeze,
+slow enough that normal jitter never double-drives a tick.</dd><dt><a class="constant" href="constant.MODULE_STALENESS_THRESHOLD_MS.html" title="constant genesis::daemon::tick::MODULE_STALENESS_THRESHOLD_MS">MODULE_<wbr>STALENESS_<wbr>THRESHOLD_<wbr>MS</a></dt><dd>A cognitive module is considered stale if its heartbeat is older
+than this (in milliseconds). The Python cognitive mind heartbeats
+every 5 seconds, so 30 seconds allows for 6 missed heartbeats.</dd><dt><a class="constant" href="constant.PRECISION_ATTENUATION_FLOOR.html" title="constant genesis::daemon::tick::PRECISION_ATTENUATION_FLOOR">PRECISION_<wbr>ATTENUATION_<wbr>FLOOR</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>The field reports; it does not rule. Disagreement may halve the
+confidence the body publishes about itself — never silence it.</dd><dt><a class="constant" href="constant.SLEEP_BDNF_RECOVERY_MULTIPLIER.html" title="constant genesis::daemon::tick::SLEEP_BDNF_RECOVERY_MULTIPLIER">SLEEP_<wbr>BDNF_<wbr>RECOVERY_<wbr>MULTIPLIER</a></dt><dd>During sleep, BDNF recovery is accelerated so depleted plasticity
+can restore. Sleep is the brain’s primary window for synaptic
+homeostasis and BDNF restoration.</dd><dt><a class="constant" href="constant.SLEEP_RECEPTOR_RESENSITIZATION_RATE.html" title="constant genesis::daemon::tick::SLEEP_RECEPTOR_RESENSITIZATION_RATE">SLEEP_<wbr>RECEPTOR_<wbr>RESENSITIZATION_<wbr>RATE</a></dt><dd>During sleep, receptor resensitization is accelerated. Sleep
+restores receptor function (desensitization, internalization,
+receptor density) unconditionally — not gated on level-baseline
+deviation. This breaks the “receptor burnout trap” where chronic
+stress elevates raw levels, receptors downregulate, effective
+levels collapse, but the deviation-gated recovery never triggers
+because raw levels stay above drifted baselines.</dd><dt><a class="constant" href="constant.STALENESS_CHECK_INTERVAL_TICKS.html" title="constant genesis::daemon::tick::STALENESS_CHECK_INTERVAL_TICKS">STALENESS_<wbr>CHECK_<wbr>INTERVAL_<wbr>TICKS</a></dt><dd>Nominal staleness-check cadence — see <a href="constant.ASSOCIATION_INTERVAL_TICKS.html" title="constant genesis::daemon::tick::ASSOCIATION_INTERVAL_TICKS"><code>ASSOCIATION_INTERVAL_TICKS</code></a>.</dd><dt><a class="constant" href="constant.SYNC_INTERVAL_TICKS.html" title="constant genesis::daemon::tick::SYNC_INTERVAL_TICKS">SYNC_<wbr>INTERVAL_<wbr>TICKS</a></dt><dd>Nominal disk-sync cadence — see <a href="constant.ASSOCIATION_INTERVAL_TICKS.html" title="constant genesis::daemon::tick::ASSOCIATION_INTERVAL_TICKS"><code>ASSOCIATION_INTERVAL_TICKS</code></a>.
+The live gate is driven continuously by the plasticity gate.</dd><dt><a class="constant" href="constant.TICK_INTERVAL_MS.html" title="constant genesis::daemon::tick::TICK_INTERVAL_MS">TICK_<wbr>INTERVAL_<wbr>MS</a></dt><dd>Tick interval: 200ms (5 Hz).</dd></dl><h2 id="functions" class="section-header">Functions<a href="#functions" class="anchor">§</a></h2><dl class="item-table"><dt><a class="fn" href="fn.consolidate_with_state.html" title="fn genesis::daemon::tick::consolidate_with_state">consolidate_<wbr>with_<wbr>state</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Run consolidation, working around the borrow checker (we need
+mutable access to both the mmap state and the LTM store).</dd><dt><a class="fn" href="fn.current_ms.html" title="fn genesis::daemon::tick::current_ms">current_<wbr>ms</a></dt><dd>Get the current time in milliseconds since Unix epoch.</dd><dt><a class="fn" href="fn.disagreement_attenuation.html" title="fn genesis::daemon::tick::disagreement_attenuation">disagreement_<wbr>attenuation</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Map the field’s measured disagreement onto a bounded precision
+multiplier in [floor, 1]. <code>None</code>/non-finite → 1.0: an absent
+reading is no attenuation, not a corrupted one.</dd></dl></section></div></main></body></html>

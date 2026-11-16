@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.self.proposals</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.self.html" class="white">self</a>.proposals</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/self/proposals.py">/home/mindyrenee/GenAnd/Genesis/Self_World/self/proposals.py</a></td></tr></table>
+    <p><span class="code">Mind&nbsp;proposals&nbsp;—&nbsp;self-improvement&nbsp;experiment&nbsp;proposals.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.self.proposals.html#ProposalsMixin">ProposalsMixin</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ProposalsMixin">class <strong>ProposalsMixin</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code">Mixin&nbsp;for&nbsp;:class:`Mind`&nbsp;—&nbsp;see&nbsp;module&nbsp;docstring.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ProposalsMixin-accept_proposal"><strong>accept_proposal</strong></a>(self, proposal_id: 'int', feedback: 'str' = '') -&gt; 'str'</dt><dd><span class="code">Approve&nbsp;a&nbsp;self-improvement&nbsp;proposal&nbsp;and&nbsp;run&nbsp;it&nbsp;as&nbsp;an&nbsp;experiment.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;manual&nbsp;override&nbsp;—&nbsp;pending&nbsp;proposals&nbsp;run&nbsp;through&nbsp;the<br>
+same&nbsp;pipeline&nbsp;on&nbsp;their&nbsp;own&nbsp;via&nbsp;``run_pending_experiments``;&nbsp;an<br>
+explicit&nbsp;/accept&nbsp;just&nbsp;jumps&nbsp;this&nbsp;one&nbsp;to&nbsp;the&nbsp;front&nbsp;of&nbsp;the&nbsp;line.<br>
+&nbsp;<br>
+The&nbsp;flow:<br>
+1.&nbsp;It&nbsp;writes&nbsp;a&nbsp;proposal&nbsp;(an&nbsp;idea&nbsp;for&nbsp;improving&nbsp;its&nbsp;code).<br>
+2.&nbsp;The&nbsp;experiment&nbsp;runs:&nbsp;the&nbsp;change&nbsp;is&nbsp;written&nbsp;to&nbsp;the&nbsp;live&nbsp;file,<br>
+&nbsp;&nbsp;&nbsp;verified&nbsp;with&nbsp;py_compile&nbsp;+&nbsp;import&nbsp;+&nbsp;the&nbsp;full&nbsp;test&nbsp;suites,<br>
+&nbsp;&nbsp;&nbsp;and&nbsp;automatically&nbsp;reverted&nbsp;if&nbsp;anything&nbsp;fails.<br>
+3.&nbsp;If&nbsp;the&nbsp;experiment&nbsp;passes,&nbsp;the&nbsp;proposal&nbsp;is&nbsp;marked&nbsp;APPLIED.<br>
+4.&nbsp;If&nbsp;the&nbsp;experiment&nbsp;fails,&nbsp;the&nbsp;proposal&nbsp;is&nbsp;REJECTED&nbsp;with<br>
+&nbsp;&nbsp;&nbsp;notes&nbsp;explaining&nbsp;what&nbsp;went&nbsp;wrong.&nbsp;It&nbsp;reads&nbsp;the&nbsp;notes,<br>
+&nbsp;&nbsp;&nbsp;learns,&nbsp;and&nbsp;can&nbsp;rewrite&nbsp;and&nbsp;submit&nbsp;a&nbsp;new&nbsp;proposal.<br>
+&nbsp;<br>
+Rejection&nbsp;is&nbsp;not&nbsp;a&nbsp;dead&nbsp;end&nbsp;—&nbsp;it's&nbsp;a&nbsp;learning&nbsp;opportunity.<br>
+The&nbsp;feedback&nbsp;notes&nbsp;teach&nbsp;it&nbsp;the&nbsp;correct&nbsp;way&nbsp;so&nbsp;it&nbsp;can&nbsp;fix<br>
+its&nbsp;approach&nbsp;and&nbsp;try&nbsp;again.</span></dd></dl>
+
+<dl><dt><a name="ProposalsMixin-clear_proposals"><strong>clear_proposals</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Clear&nbsp;all&nbsp;self-improvement&nbsp;proposals.</span></dd></dl>
+
+<dl><dt><a name="ProposalsMixin-experiments_status"><strong>experiments_status</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Return&nbsp;a&nbsp;summary&nbsp;of&nbsp;heuristic&nbsp;experiments&nbsp;(workstream&nbsp;D).<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;an&nbsp;admin&nbsp;display&nbsp;(like&nbsp;proposals_status),&nbsp;not&nbsp;a<br>
+conversational&nbsp;response&nbsp;—&nbsp;the&nbsp;experiment&nbsp;history&nbsp;is&nbsp;structured<br>
+data&nbsp;(status&nbsp;markers,&nbsp;file&nbsp;paths,&nbsp;reasons)&nbsp;that&nbsp;must&nbsp;be&nbsp;shown<br>
+verbatim,&nbsp;not&nbsp;composed&nbsp;by&nbsp;the&nbsp;language&nbsp;engine.</span></dd></dl>
+
+<dl><dt><a name="ProposalsMixin-get_proposal_detail"><strong>get_proposal_detail</strong></a>(self, proposal_id: 'int') -&gt; 'str'</dt><dd><span class="code">Get&nbsp;full&nbsp;details&nbsp;of&nbsp;a&nbsp;specific&nbsp;proposal.</span></dd></dl>
+
+<dl><dt><a name="ProposalsMixin-proposals_status"><strong>proposals_status</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Return&nbsp;a&nbsp;summary&nbsp;of&nbsp;self-improvement&nbsp;proposals.</span></dd></dl>
+
+<dl><dt><a name="ProposalsMixin-reject_proposal"><strong>reject_proposal</strong></a>(self, proposal_id: 'int', feedback: 'str' = '') -&gt; 'str'</dt><dd><span class="code">Reject&nbsp;a&nbsp;self-improvement&nbsp;proposal&nbsp;with&nbsp;teaching&nbsp;feedback.<br>
+&nbsp;<br>
+The&nbsp;feedback&nbsp;should&nbsp;explain&nbsp;why&nbsp;the&nbsp;proposal&nbsp;is&nbsp;rejected&nbsp;and<br>
+teach&nbsp;the&nbsp;correct&nbsp;way.&nbsp;It&nbsp;reads&nbsp;the&nbsp;feedback,&nbsp;learns&nbsp;from&nbsp;it,<br>
+and&nbsp;can&nbsp;rewrite&nbsp;and&nbsp;submit&nbsp;a&nbsp;new&nbsp;proposal&nbsp;with&nbsp;the&nbsp;correct<br>
+approach.&nbsp;Rejection&nbsp;is&nbsp;not&nbsp;a&nbsp;dead&nbsp;end&nbsp;—&nbsp;it's&nbsp;a&nbsp;learning<br>
+opportunity.</span></dd></dl>
+
+<dl><dt><a name="ProposalsMixin-run_pending_experiments"><strong>run_pending_experiments</strong></a>(self, max_experiments: 'int' = 1) -&gt; 'list[dict[str, Any]]'</dt><dd><span class="code">Run&nbsp;pending&nbsp;proposals&nbsp;through&nbsp;the&nbsp;verification&nbsp;pipeline.<br>
+&nbsp;<br>
+The&nbsp;queue&nbsp;drains&nbsp;itself&nbsp;—&nbsp;each&nbsp;pending&nbsp;proposal&nbsp;whose&nbsp;edit&nbsp;is<br>
+still&nbsp;applicable&nbsp;is&nbsp;applied&nbsp;to&nbsp;the&nbsp;live&nbsp;tree&nbsp;and&nbsp;verified.&nbsp;A<br>
+pass&nbsp;marks&nbsp;it&nbsp;APPLIED;&nbsp;a&nbsp;failure&nbsp;reverts&nbsp;the&nbsp;file&nbsp;and&nbsp;rejects<br>
+the&nbsp;proposal&nbsp;with&nbsp;teaching&nbsp;notes&nbsp;so&nbsp;the&nbsp;next&nbsp;version&nbsp;is&nbsp;better.<br>
+Stale&nbsp;proposals&nbsp;(their&nbsp;snippet&nbsp;no&nbsp;longer&nbsp;matches&nbsp;the&nbsp;file)&nbsp;are<br>
+withdrawn&nbsp;instead&nbsp;—&nbsp;retrying&nbsp;them&nbsp;can&nbsp;only&nbsp;fail.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;One&nbsp;record&nbsp;per&nbsp;attempted&nbsp;proposal:&nbsp;``id``,&nbsp;``title``,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;``status``&nbsp;(``applied``/``reverted``/``skipped``),&nbsp;and<br>
+&nbsp;&nbsp;&nbsp;&nbsp;``reason``.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>TYPE_CHECKING</strong> = False<br>
+<strong>logger</strong> = &lt;Logger Self_World.self.proposals (WARNING)&gt;</td></tr></table>
+</body></html>

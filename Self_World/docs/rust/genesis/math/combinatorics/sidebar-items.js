@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["arrangements","bell","binomial","catalan","degree_sequence_possible","derangements","factorial","factorial64","fibonacci","multinomial","partitions","pigeonhole_holds","pigeonhole_min","power_set_size","stars_and_bars","stirling2"]};

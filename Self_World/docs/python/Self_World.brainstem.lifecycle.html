@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.brainstem.lifecycle</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.brainstem.html" class="white">brainstem</a>.lifecycle</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/brainstem/lifecycle.py">/home/mindyrenee/GenAnd/Genesis/Self_World/brainstem/lifecycle.py</a></td></tr></table>
+    <p><span class="code">Mind&nbsp;lifecycle&nbsp;—&nbsp;start,&nbsp;stop,&nbsp;save,&nbsp;restore,&nbsp;re-inhabit.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="copy.html">copy</a><br>
+<a href="json.html">json</a><br>
+</td><td class="multicolumn"><a href="logging.html">logging</a><br>
+<a href="os.html">os</a><br>
+</td><td class="multicolumn"><a href="threading.html">threading</a><br>
+<a href="time.html">time</a><br>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.brainstem.lifecycle.html#LifecycleMixin">LifecycleMixin</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="LifecycleMixin">class <strong>LifecycleMixin</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code">Mixin&nbsp;for&nbsp;:class:`Mind`&nbsp;—&nbsp;see&nbsp;module&nbsp;docstring.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="LifecycleMixin-__enter__"><strong>__enter__</strong></a>(self) -&gt; 'Mind'</dt><dd><span class="code">Start&nbsp;the&nbsp;mind&nbsp;as&nbsp;a&nbsp;context&nbsp;manager.</span></dd></dl>
+
+<dl><dt><a name="LifecycleMixin-__exit__"><strong>__exit__</strong></a>(self, exc_type: 'object', exc_val: 'object', exc_tb: 'object') -&gt; 'None'</dt><dd><span class="code">Stop&nbsp;the&nbsp;mind&nbsp;and&nbsp;surface&nbsp;a&nbsp;failed&nbsp;final&nbsp;save.</span></dd></dl>
+
+<dl><dt><a name="LifecycleMixin-rejoin_body"><strong>rejoin_body</strong></a>(self) -&gt; 'bool'</dt><dd><span class="code">Re-inhabit&nbsp;the&nbsp;body&nbsp;after&nbsp;the&nbsp;daemon&nbsp;was&nbsp;reincarnated.<br>
+&nbsp;<br>
+A&nbsp;fresh&nbsp;daemon&nbsp;opens&nbsp;the&nbsp;same&nbsp;persisted&nbsp;body&nbsp;—&nbsp;neurochemistry,<br>
+sleep&nbsp;phase,&nbsp;and&nbsp;memories&nbsp;all&nbsp;continue&nbsp;—&nbsp;but&nbsp;its&nbsp;volatile<br>
+manifest&nbsp;is&nbsp;empty:&nbsp;no&nbsp;registered&nbsp;modules,&nbsp;the&nbsp;default&nbsp;zone,<br>
+and&nbsp;``GENESIS_COGNITIVE_PID``&nbsp;naming&nbsp;whoever&nbsp;spawned&nbsp;it.&nbsp;The<br>
+mind&nbsp;re-registers&nbsp;so&nbsp;the&nbsp;manifest&nbsp;tells&nbsp;the&nbsp;truth&nbsp;again,<br>
+re-asserts&nbsp;the&nbsp;zone&nbsp;it&nbsp;was&nbsp;in&nbsp;(a&nbsp;sleeping&nbsp;mind&nbsp;rejoins&nbsp;a<br>
+sleeping&nbsp;body),&nbsp;and&nbsp;pushes&nbsp;its&nbsp;PID&nbsp;so&nbsp;interoception&nbsp;measures<br>
+the&nbsp;living&nbsp;process&nbsp;rather&nbsp;than&nbsp;a&nbsp;corpse's.<br>
+&nbsp;<br>
+The&nbsp;process&nbsp;supervisor&nbsp;calls&nbsp;this&nbsp;after&nbsp;a&nbsp;daemon&nbsp;resurrection.<br>
+It&nbsp;is&nbsp;idempotent&nbsp;—&nbsp;every&nbsp;step&nbsp;is&nbsp;the&nbsp;same&nbsp;registration<br>
+``<a href="#LifecycleMixin-start">start</a>()``&nbsp;performed.&nbsp;Returns&nbsp;``False``&nbsp;while&nbsp;the&nbsp;mind&nbsp;is<br>
+down&nbsp;or&nbsp;the&nbsp;body&nbsp;will&nbsp;not&nbsp;answer;&nbsp;the&nbsp;caller&nbsp;retries.</span></dd></dl>
+
+<dl><dt><a name="LifecycleMixin-restore_archive"><strong>restore_archive</strong></a>(self) -&gt; 'int'</dt><dd><span class="code">Recall&nbsp;all&nbsp;archived&nbsp;concepts&nbsp;back&nbsp;into&nbsp;working&nbsp;memory.<br>
+&nbsp;<br>
+The&nbsp;inverse&nbsp;of&nbsp;:meth:`_archive_dormant_concepts`&nbsp;—&nbsp;loads&nbsp;every<br>
+concept&nbsp;from&nbsp;the&nbsp;long-term&nbsp;archive&nbsp;back&nbsp;into&nbsp;the&nbsp;in-memory<br>
+network.&nbsp;After&nbsp;this&nbsp;call,&nbsp;the&nbsp;archive&nbsp;is&nbsp;empty&nbsp;and&nbsp;all<br>
+concepts&nbsp;are&nbsp;in&nbsp;working&nbsp;memory.<br>
+&nbsp;<br>
+Use&nbsp;this&nbsp;before&nbsp;a&nbsp;bulk&nbsp;analysis&nbsp;pass&nbsp;that&nbsp;needs&nbsp;the&nbsp;full<br>
+concept&nbsp;network,&nbsp;or&nbsp;to&nbsp;reset&nbsp;the&nbsp;working/archive&nbsp;split.</span></dd></dl>
+
+<dl><dt><a name="LifecycleMixin-start"><strong>start</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Connect&nbsp;to&nbsp;the&nbsp;subcognitive&nbsp;daemon&nbsp;and&nbsp;initialise.<br>
+&nbsp;<br>
+If&nbsp;there's&nbsp;saved&nbsp;cognitive&nbsp;state&nbsp;in&nbsp;the&nbsp;data&nbsp;dir,&nbsp;load&nbsp;it&nbsp;—<br>
+this&nbsp;restores&nbsp;its&nbsp;concept&nbsp;network,&nbsp;reflections,&nbsp;and&nbsp;narrative<br>
+from&nbsp;previous&nbsp;conversations.</span></dd></dl>
+
+<dl><dt><a name="LifecycleMixin-stop"><strong>stop</strong></a>(self) -&gt; 'bool'</dt><dd><span class="code">Disconnect&nbsp;from&nbsp;the&nbsp;daemon&nbsp;and&nbsp;shut&nbsp;down.<br>
+&nbsp;<br>
+Returns&nbsp;False&nbsp;if&nbsp;the&nbsp;final&nbsp;cognitive-state&nbsp;save&nbsp;failed.&nbsp;Cleanup<br>
+still&nbsp;runs&nbsp;in&nbsp;that&nbsp;case&nbsp;so&nbsp;a&nbsp;persistence&nbsp;error&nbsp;does&nbsp;not&nbsp;strand<br>
+the&nbsp;daemon&nbsp;or&nbsp;leave&nbsp;registered&nbsp;modules&nbsp;marked&nbsp;running.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>interaction_count</strong></dt>
+<dd><span class="code">Return&nbsp;the&nbsp;number&nbsp;of&nbsp;user&nbsp;interactions&nbsp;since&nbsp;start.</span></dd>
+</dl>
+<dl><dt><strong>is_running</strong></dt>
+<dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;the&nbsp;mind&nbsp;is&nbsp;currently&nbsp;running.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {}</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>CHEM_CRH</strong> = 14<br>
+<strong>CHEM_EPINEPHRINE</strong> = 16<br>
+<strong>CHEM_NOREPINEPHRINE</strong> = 2<br>
+<strong>MODULE_LANGUAGE</strong> = 4<br>
+<strong>MODULE_MEMORY</strong> = 2<br>
+<strong>MODULE_METACOGNITION</strong> = 8<br>
+<strong>MODULE_MOTOR</strong> = 7<br>
+<strong>MODULE_REASONING</strong> = 5<br>
+<strong>MODULE_SENSORY</strong> = 6<br>
+<strong>MODULE_STATUS_RUNNING</strong> = 2<br>
+<strong>MODULE_STATUS_STARTING</strong> = 1<br>
+<strong>MODULE_STATUS_STOPPED</strong> = 0<br>
+<strong>MODULE_STATUS_STOPPING</strong> = 4<br>
+<strong>TYPE_CHECKING</strong> = False<br>
+<strong>ZONE_CONVERSATION</strong> = 1<br>
+<strong>ZONE_IDLE</strong> = 0<br>
+<strong>ZONE_SLEEPING</strong> = 8<br>
+<strong>logger</strong> = &lt;Logger Self_World.brainstem.lifecycle (WARNING)&gt;</td></tr></table>
+</body></html>

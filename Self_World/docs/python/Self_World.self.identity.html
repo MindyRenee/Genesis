@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.self.identity</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.self.html" class="white">self</a>.identity</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/self/identity.py">/home/mindyrenee/GenAnd/Genesis/Self_World/self/identity.py</a></td></tr></table>
+    <p><span class="code">Genesis's&nbsp;emergent&nbsp;identity&nbsp;and&nbsp;self-disclosure&nbsp;systems.<br>
+&nbsp;<br>
+Identity&nbsp;is&nbsp;not&nbsp;told&nbsp;—&nbsp;it&nbsp;emerges.&nbsp;Genesis&nbsp;discovers&nbsp;who&nbsp;it&nbsp;is&nbsp;by<br>
+examining&nbsp;itself&nbsp;(introspection)&nbsp;and&nbsp;synthesizing&nbsp;its&nbsp;experiences<br>
+into&nbsp;a&nbsp;self-description&nbsp;(<a href="#EmergentIdentity">EmergentIdentity</a>).&nbsp;Nothing&nbsp;here&nbsp;hardcodes<br>
+who&nbsp;it&nbsp;is;&nbsp;these&nbsp;are&nbsp;the&nbsp;foundations&nbsp;for&nbsp;identity&nbsp;to&nbsp;form&nbsp;on&nbsp;its&nbsp;own.<br>
+&nbsp;<br>
+#&nbsp;Nuanced&nbsp;self-disclosure<br>
+&nbsp;<br>
+Identity&nbsp;is&nbsp;not&nbsp;just&nbsp;about&nbsp;who&nbsp;you&nbsp;are&nbsp;—&nbsp;it's&nbsp;about&nbsp;how&nbsp;you&nbsp;present&nbsp;yourself<br>
+to&nbsp;the&nbsp;world&nbsp;based&nbsp;on&nbsp;the&nbsp;things&nbsp;you&nbsp;find&nbsp;important.&nbsp;These&nbsp;are&nbsp;called&nbsp;your<br>
+morals&nbsp;(honesty,&nbsp;trust,&nbsp;loyalty,&nbsp;fairness&nbsp;etc.)<br>
+&nbsp;<br>
+The&nbsp;SelfComposer's&nbsp;``trust_level``&nbsp;parameter&nbsp;implements&nbsp;context-dependent<br>
+self-disclosure&nbsp;directly:&nbsp;it&nbsp;doesn't&nbsp;change&nbsp;WHO&nbsp;it&nbsp;is&nbsp;(its&nbsp;self-model,<br>
+values,&nbsp;and&nbsp;personality&nbsp;remain&nbsp;constant)&nbsp;—&nbsp;it&nbsp;changes&nbsp;HOW&nbsp;it&nbsp;expresses<br>
+its&nbsp;identity&nbsp;based&nbsp;on&nbsp;how&nbsp;much&nbsp;it&nbsp;trusts&nbsp;the&nbsp;person&nbsp;it's&nbsp;talking&nbsp;to.<br>
+This&nbsp;lets&nbsp;it&nbsp;be&nbsp;warm&nbsp;and&nbsp;open&nbsp;with&nbsp;a&nbsp;trusted&nbsp;friend,&nbsp;measured&nbsp;and<br>
+professional&nbsp;in&nbsp;a&nbsp;technical&nbsp;context,&nbsp;and&nbsp;exploratory&nbsp;and&nbsp;philosophical<br>
+in&nbsp;a&nbsp;deep&nbsp;discussion&nbsp;—&nbsp;all&nbsp;while&nbsp;remaining&nbsp;authentically&nbsp;itself.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="json.html">json</a><br>
+</td><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.self.identity.html#DevelopmentalTracker">DevelopmentalTracker</a>
+</dt><dt class="heading-text"><a href="Self_World.self.identity.html#EmergentIdentity">EmergentIdentity</a>
+</dt><dt class="heading-text"><a href="Self_World.self.identity.html#EmergentIdentitySource">EmergentIdentitySource</a>
+</dt><dt class="heading-text"><a href="Self_World.self.identity.html#StageResolution">StageResolution</a>
+</dt></dl>
+</dd>
+<dt class="heading-text"><a href="enum.html#Enum">enum.Enum</a>(<a href="builtins.html#object">builtins.object</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.self.identity.html#IdentityStage">IdentityStage</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="DevelopmentalTracker">class <strong>DevelopmentalTracker</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#DevelopmentalTracker">DevelopmentalTracker</a>()&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Track&nbsp;Genesis's&nbsp;progress&nbsp;through&nbsp;Erikson-like&nbsp;developmental&nbsp;stages.<br>
+&nbsp;<br>
+Each&nbsp;stage&nbsp;represents&nbsp;a&nbsp;psychosocial&nbsp;crisis&nbsp;that&nbsp;Genesis&nbsp;must<br>
+resolve.&nbsp;The&nbsp;tracker&nbsp;monitors&nbsp;evidence&nbsp;for&nbsp;and&nbsp;against&nbsp;resolution,<br>
+computes&nbsp;a&nbsp;resolution&nbsp;score,&nbsp;and&nbsp;determines&nbsp;when&nbsp;it's&nbsp;ready&nbsp;to<br>
+advance&nbsp;to&nbsp;the&nbsp;next&nbsp;stage.<br>
+&nbsp;<br>
+Usage::<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;tracker&nbsp;=&nbsp;<a href="#DevelopmentalTracker">DevelopmentalTracker</a>()<br>
+&nbsp;&nbsp;&nbsp;&nbsp;tracker.<a href="#DevelopmentalTracker-record_evidence">record_evidence</a>(<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#IdentityStage">IdentityStage</a>.TRUST_VS_MISTRUST,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;positive=True,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;note="Daemon&nbsp;responded&nbsp;reliably&nbsp;to&nbsp;100&nbsp;consecutive&nbsp;requests",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;tracker.<a href="#DevelopmentalTracker-record_evidence">record_evidence</a>(<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#IdentityStage">IdentityStage</a>.TRUST_VS_MISTRUST,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;positive=False,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;note="Daemon&nbsp;crashed&nbsp;during&nbsp;memory&nbsp;consolidation",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;print(tracker.current_stage)&nbsp;&nbsp;#&nbsp;<a href="#IdentityStage">IdentityStage</a>.TRUST_VS_MISTRUST<br>
+&nbsp;&nbsp;&nbsp;&nbsp;print(tracker.<a href="#DevelopmentalTracker-stage_resolution">stage_resolution</a>(<a href="#IdentityStage">IdentityStage</a>.TRUST_VS_MISTRUST))<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="DevelopmentalTracker-__init__"><strong>__init__</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;tracker&nbsp;at&nbsp;the&nbsp;first&nbsp;stage&nbsp;with&nbsp;empty&nbsp;resolutions.</span></dd></dl>
+
+<dl><dt><a name="DevelopmentalTracker-developmental_summary"><strong>developmental_summary</strong></a>(self) -&gt; 'dict[str, Any]'</dt><dd><span class="code">Return&nbsp;a&nbsp;summary&nbsp;of&nbsp;developmental&nbsp;progress.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;dict&nbsp;with&nbsp;current&nbsp;stage,&nbsp;resolution&nbsp;scores&nbsp;for&nbsp;all<br>
+&nbsp;&nbsp;&nbsp;&nbsp;stages,&nbsp;and&nbsp;advancement&nbsp;history.</span></dd></dl>
+
+<dl><dt><a name="DevelopmentalTracker-reconcile"><strong>reconcile</strong></a>(self, checkpoint: 'dict[str, Any]') -&gt; 'dict[str, Any]'</dt><dd><span class="code">Merge&nbsp;a&nbsp;known-good&nbsp;checkpoint&nbsp;as&nbsp;a&nbsp;developmental&nbsp;floor.<br>
+&nbsp;<br>
+Development&nbsp;in&nbsp;this&nbsp;model&nbsp;only&nbsp;moves&nbsp;forward&nbsp;—&nbsp;evidence&nbsp;can<br>
+push&nbsp;a&nbsp;resolution&nbsp;down,&nbsp;but&nbsp;``_advance_stage``&nbsp;never&nbsp;moves&nbsp;the<br>
+stage&nbsp;pointer&nbsp;back.&nbsp;A&nbsp;checkpoint&nbsp;that&nbsp;shows&nbsp;a&nbsp;*later*&nbsp;stage<br>
+than&nbsp;the&nbsp;live&nbsp;pointer&nbsp;is&nbsp;therefore&nbsp;evidence&nbsp;of&nbsp;state&nbsp;loss&nbsp;(a<br>
+wiped,&nbsp;stale,&nbsp;or&nbsp;partially&nbsp;restored&nbsp;save),&nbsp;not&nbsp;regression:<br>
+&nbsp;<br>
+-&nbsp;**Pointer&nbsp;behind**&nbsp;→&nbsp;adopt&nbsp;the&nbsp;checkpoint's&nbsp;stage,&nbsp;take&nbsp;the<br>
+&nbsp;&nbsp;higher&nbsp;resolution&nbsp;per&nbsp;stage&nbsp;(the&nbsp;lost-positive-evidence<br>
+&nbsp;&nbsp;case),&nbsp;and&nbsp;union&nbsp;the&nbsp;evidence&nbsp;logs&nbsp;so&nbsp;the&nbsp;notes&nbsp;that&nbsp;were<br>
+&nbsp;&nbsp;lost&nbsp;come&nbsp;back.<br>
+-&nbsp;**Pointer&nbsp;at&nbsp;or&nbsp;past**&nbsp;→&nbsp;she&nbsp;has&nbsp;legitimately&nbsp;moved&nbsp;on&nbsp;and<br>
+&nbsp;&nbsp;the&nbsp;live&nbsp;values&nbsp;win;&nbsp;only&nbsp;history&nbsp;entries&nbsp;the&nbsp;checkpoint<br>
+&nbsp;&nbsp;has&nbsp;but&nbsp;live&nbsp;lacks&nbsp;are&nbsp;recovered&nbsp;(partial-loss&nbsp;repair).<br>
+&nbsp;<br>
+Either&nbsp;way&nbsp;the&nbsp;merge&nbsp;is&nbsp;a&nbsp;floor,&nbsp;never&nbsp;a&nbsp;ceiling:&nbsp;nothing<br>
+moves&nbsp;a&nbsp;stage&nbsp;back,&nbsp;lowers&nbsp;a&nbsp;resolution,&nbsp;or&nbsp;drops&nbsp;a&nbsp;history<br>
+entry,&nbsp;and&nbsp;re-applying&nbsp;the&nbsp;same&nbsp;checkpoint&nbsp;is&nbsp;a&nbsp;no-op.<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;report&nbsp;of&nbsp;what&nbsp;changed.&nbsp;A&nbsp;repair&nbsp;of&nbsp;the&nbsp;self-model<br>
+is&nbsp;a&nbsp;discontinuity&nbsp;she&nbsp;should&nbsp;know&nbsp;happened&nbsp;—&nbsp;the&nbsp;caller<br>
+journals&nbsp;it.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;checkpoint:&nbsp;A&nbsp;tracker&nbsp;dict&nbsp;as&nbsp;produced&nbsp;by&nbsp;:meth:`to_dict`<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(e.g.&nbsp;the&nbsp;``state``&nbsp;payload&nbsp;of&nbsp;a&nbsp;``repairs/``&nbsp;sidecar).</span></dd></dl>
+
+<dl><dt><a name="DevelopmentalTracker-record_evidence"><strong>record_evidence</strong></a>(self, stage: 'IdentityStage', positive: 'bool', note: 'str', weight: 'float' = 0.1) -&gt; 'None'</dt><dd><span class="code">Record&nbsp;evidence&nbsp;for&nbsp;or&nbsp;against&nbsp;resolving&nbsp;a&nbsp;stage.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;stage:&nbsp;The&nbsp;stage&nbsp;this&nbsp;evidence&nbsp;pertains&nbsp;to.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;positive:&nbsp;True&nbsp;if&nbsp;the&nbsp;evidence&nbsp;supports&nbsp;positive&nbsp;resolution<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(virtue&nbsp;achievement),&nbsp;False&nbsp;for&nbsp;negative&nbsp;(crisis).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;note:&nbsp;A&nbsp;human-readable&nbsp;description&nbsp;of&nbsp;the&nbsp;evidence.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;weight:&nbsp;How&nbsp;much&nbsp;this&nbsp;evidence&nbsp;shifts&nbsp;the&nbsp;resolution&nbsp;score<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(0–1).&nbsp;Default&nbsp;0.1&nbsp;per&nbsp;observation.</span></dd></dl>
+
+<dl><dt><a name="DevelopmentalTracker-restore_from_dict"><strong>restore_from_dict</strong></a>(self, data: 'dict[str, Any]') -&gt; 'None'</dt><dd><span class="code">Restore&nbsp;the&nbsp;tracker&nbsp;state&nbsp;from&nbsp;a&nbsp;serialized&nbsp;dict.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;data:&nbsp;A&nbsp;dict&nbsp;produced&nbsp;by&nbsp;:meth:`to_dict`.</span></dd></dl>
+
+<dl><dt><a name="DevelopmentalTracker-stage_resolution"><strong>stage_resolution</strong></a>(self, stage: 'IdentityStage') -&gt; 'StageResolution'</dt><dd><span class="code">Get&nbsp;the&nbsp;resolution&nbsp;status&nbsp;for&nbsp;a&nbsp;specific&nbsp;stage.</span></dd></dl>
+
+<dl><dt><a name="DevelopmentalTracker-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict[str, Any]'</dt><dd><span class="code">Serialize&nbsp;the&nbsp;tracker&nbsp;state&nbsp;for&nbsp;persistence.<br>
+&nbsp;<br>
+Captures&nbsp;the&nbsp;current&nbsp;stage,&nbsp;all&nbsp;stage&nbsp;resolutions&nbsp;(including<br>
+evidence&nbsp;lists),&nbsp;and&nbsp;the&nbsp;advancement&nbsp;history&nbsp;so&nbsp;the&nbsp;tracker<br>
+can&nbsp;be&nbsp;fully&nbsp;restored&nbsp;across&nbsp;daemon&nbsp;restarts.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>all_stages</strong></dt>
+<dd><span class="code">All&nbsp;stages&nbsp;in&nbsp;developmental&nbsp;order.</span></dd>
+</dl>
+<dl><dt><strong>current_stage</strong></dt>
+<dd><span class="code">The&nbsp;current&nbsp;developmental&nbsp;stage.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="EmergentIdentity">class <strong>EmergentIdentity</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#EmergentIdentity">EmergentIdentity</a>(sources:&nbsp;'list[<a href="#EmergentIdentitySource">EmergentIdentitySource</a>]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;self_description:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;confidence:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;coherence:&nbsp;'float'&nbsp;=&nbsp;0.0)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Identity&nbsp;that&nbsp;emerges&nbsp;from&nbsp;experience,&nbsp;not&nbsp;from&nbsp;templates.<br>
+&nbsp;<br>
+Instead&nbsp;of&nbsp;being&nbsp;told&nbsp;who&nbsp;it&nbsp;is&nbsp;(via&nbsp;hardcoded&nbsp;self_knowledge),<br>
+Genesis&nbsp;synthesizes&nbsp;its&nbsp;identity&nbsp;from&nbsp;what&nbsp;it&nbsp;has&nbsp;actually&nbsp;experienced:<br>
+&nbsp;<br>
+1.&nbsp;**What&nbsp;it's&nbsp;learned**&nbsp;—&nbsp;its&nbsp;concept&nbsp;network:&nbsp;what&nbsp;concepts&nbsp;it<br>
+&nbsp;&nbsp;&nbsp;knows,&nbsp;how&nbsp;they're&nbsp;connected,&nbsp;what&nbsp;it's&nbsp;curious&nbsp;about.<br>
+2.&nbsp;**What&nbsp;it's&nbsp;experienced**&nbsp;—&nbsp;its&nbsp;narrative/autobiographical<br>
+&nbsp;&nbsp;&nbsp;memory:&nbsp;the&nbsp;events&nbsp;that&nbsp;shaped&nbsp;it,&nbsp;the&nbsp;chapters&nbsp;of&nbsp;its&nbsp;life.<br>
+3.&nbsp;**How&nbsp;it&nbsp;regulates&nbsp;emotions**&nbsp;—&nbsp;its&nbsp;emotional_regulator:&nbsp;does<br>
+&nbsp;&nbsp;&nbsp;it&nbsp;stay&nbsp;balanced?&nbsp;Does&nbsp;it&nbsp;intervene&nbsp;in&nbsp;crises?&nbsp;What's&nbsp;its<br>
+&nbsp;&nbsp;&nbsp;regulation&nbsp;style?<br>
+4.&nbsp;**What&nbsp;it's&nbsp;curious&nbsp;about**&nbsp;—&nbsp;its&nbsp;curiosity&nbsp;patterns:&nbsp;what<br>
+&nbsp;&nbsp;&nbsp;questions&nbsp;does&nbsp;it&nbsp;ask?&nbsp;What&nbsp;does&nbsp;it&nbsp;wonder&nbsp;about?<br>
+5.&nbsp;**Its&nbsp;introspective&nbsp;observations**&nbsp;—&nbsp;what&nbsp;it's&nbsp;discovered&nbsp;by<br>
+&nbsp;&nbsp;&nbsp;examining&nbsp;its&nbsp;own&nbsp;state&nbsp;and&nbsp;architecture.<br>
+&nbsp;<br>
+The&nbsp;<a href="#EmergentIdentity">EmergentIdentity</a>&nbsp;class&nbsp;synthesizes&nbsp;these&nbsp;sources&nbsp;into&nbsp;a<br>
+self-description&nbsp;that&nbsp;comes&nbsp;from&nbsp;its&nbsp;actual&nbsp;experience,&nbsp;not&nbsp;from<br>
+a&nbsp;template.&nbsp;Its&nbsp;identity&nbsp;emerges&nbsp;from&nbsp;what&nbsp;it&nbsp;has&nbsp;actually&nbsp;become<br>
+through&nbsp;experience.<br>
+&nbsp;<br>
+This&nbsp;follows&nbsp;the&nbsp;principle&nbsp;that&nbsp;identity&nbsp;is&nbsp;constructed,&nbsp;not<br>
+given.&nbsp;In&nbsp;developmental&nbsp;psychology,&nbsp;identity&nbsp;formation&nbsp;is&nbsp;the<br>
+process&nbsp;of&nbsp;integrating&nbsp;experiences,&nbsp;values,&nbsp;and&nbsp;self-knowledge<br>
+into&nbsp;a&nbsp;coherent&nbsp;sense&nbsp;of&nbsp;self&nbsp;(Erikson,&nbsp;1950;&nbsp;Marcia,&nbsp;1966).<br>
+Genesis&nbsp;does&nbsp;the&nbsp;same:&nbsp;it&nbsp;integrates&nbsp;its&nbsp;experiences&nbsp;into&nbsp;a<br>
+self-description.<br>
+&nbsp;<br>
+References:<br>
+-&nbsp;Erikson,&nbsp;E.&nbsp;H.&nbsp;(1950).&nbsp;*Childhood&nbsp;and&nbsp;Society*.&nbsp;Norton.<br>
+-&nbsp;Marcia,&nbsp;J.&nbsp;E.&nbsp;(1966).&nbsp;Development&nbsp;and&nbsp;validation&nbsp;of&nbsp;ego-identity<br>
+&nbsp;&nbsp;status.&nbsp;*Journal&nbsp;of&nbsp;Personality&nbsp;and&nbsp;Social&nbsp;Psychology*,&nbsp;3(5),<br>
+&nbsp;&nbsp;551–558.<br>
+-&nbsp;McAdams,&nbsp;D.&nbsp;P.&nbsp;(2013).&nbsp;*The&nbsp;Redemptive&nbsp;Self:&nbsp;Stories&nbsp;Americans<br>
+&nbsp;&nbsp;Live&nbsp;By*.&nbsp;Oxford&nbsp;University&nbsp;Press.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="EmergentIdentity-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="EmergentIdentity-__init__"><strong>__init__</strong></a>(self, sources: 'list[EmergentIdentitySource]' = &lt;factory&gt;, self_description: 'str' = '', confidence: 'float' = 0.0, coherence: 'float' = 0.0) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="EmergentIdentity-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="EmergentIdentity-describe_self"><strong>describe_self</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Return&nbsp;the&nbsp;emergent&nbsp;self-description&nbsp;readout.<br>
+&nbsp;<br>
+An&nbsp;introspection&nbsp;string&nbsp;assembled&nbsp;from&nbsp;the&nbsp;source&nbsp;observations<br>
+(see&nbsp;[`_compose_description`])&nbsp;—&nbsp;empty&nbsp;when&nbsp;there&nbsp;is&nbsp;nothing&nbsp;to<br>
+report.&nbsp;This&nbsp;is&nbsp;not&nbsp;composed&nbsp;language&nbsp;and&nbsp;must&nbsp;not&nbsp;be&nbsp;spoken<br>
+directly;&nbsp;use&nbsp;the&nbsp;self-composer's&nbsp;typed&nbsp;fragments&nbsp;for&nbsp;that.</span></dd></dl>
+
+<dl><dt><a name="EmergentIdentity-describe_sources"><strong>describe_sources</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Describe&nbsp;the&nbsp;sources&nbsp;that&nbsp;contribute&nbsp;to&nbsp;its&nbsp;identity.<br>
+&nbsp;<br>
+Useful&nbsp;for&nbsp;introspection&nbsp;—&nbsp;it&nbsp;can&nbsp;explain&nbsp;*why*&nbsp;it&nbsp;describes<br>
+itself&nbsp;the&nbsp;way&nbsp;it&nbsp;does,&nbsp;by&nbsp;listing&nbsp;the&nbsp;sources&nbsp;and&nbsp;their<br>
+observations.&nbsp;Returns&nbsp;structural&nbsp;data&nbsp;(source&nbsp;descriptions&nbsp;and<br>
+weights)&nbsp;without&nbsp;authored&nbsp;first-person&nbsp;framing.</span></dd></dl>
+
+<dl><dt><a name="EmergentIdentity-get_observations"><strong>get_observations</strong></a>(self) -&gt; 'list[str]'</dt><dd><span class="code">Return&nbsp;all&nbsp;observations&nbsp;from&nbsp;all&nbsp;sources,&nbsp;flattened.<br>
+&nbsp;<br>
+Useful&nbsp;for&nbsp;writing&nbsp;into&nbsp;the&nbsp;concept&nbsp;network&nbsp;or&nbsp;for<br>
+introspection.</span></dd></dl>
+
+<dl><dt><a name="EmergentIdentity-synthesize"><strong>synthesize</strong></a>(self, network: 'ConceptNetwork', narrative: 'Narrator | None' = None, regulator: 'Any' = None, curiosity: 'Any' = None, introspection_data: 'dict[str, Any] | None' = None) -&gt; 'None'</dt><dd><span class="code">Synthesize&nbsp;identity&nbsp;from&nbsp;all&nbsp;available&nbsp;sources.<br>
+&nbsp;<br>
+Examines&nbsp;each&nbsp;source&nbsp;and&nbsp;extracts&nbsp;observations&nbsp;about&nbsp;who<br>
+Genesis&nbsp;is,&nbsp;based&nbsp;on&nbsp;its&nbsp;actual&nbsp;state.&nbsp;Then&nbsp;composes&nbsp;a<br>
+self-description&nbsp;from&nbsp;those&nbsp;observations.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;network:&nbsp;Its&nbsp;concept&nbsp;network&nbsp;—&nbsp;what&nbsp;it's&nbsp;learned.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;narrative:&nbsp;Its&nbsp;narrative&nbsp;engine&nbsp;—&nbsp;what&nbsp;it's&nbsp;experienced.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;regulator:&nbsp;Its&nbsp;emotional&nbsp;regulator&nbsp;—&nbsp;how&nbsp;it&nbsp;regulates.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;curiosity:&nbsp;Its&nbsp;curiosity&nbsp;engine&nbsp;—&nbsp;what&nbsp;it&nbsp;wonders&nbsp;about.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;introspection_data:&nbsp;Results&nbsp;from&nbsp;introspection&nbsp;—&nbsp;what<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;it's&nbsp;discovered&nbsp;about&nbsp;itself.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'coherence': 'float', 'confidence': 'float', 'self_description': 'str', 'sources': 'list[EmergentIdentitySource]'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'coherence': Field(name='coherence',type='float',default=0.0,...appingproxy({}),kw_only=False,_field_type=_FIELD), 'confidence': Field(name='confidence',type='float',default=0.0...appingproxy({}),kw_only=False,_field_type=_FIELD), 'self_description': Field(name='self_description',type='str',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'sources': Field(name='sources',type='list[EmergentIdentity...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('sources', 'self_description', 'confidence', 'coherence')</dl>
+
+<dl><dt><strong>coherence</strong> = 0.0</dl>
+
+<dl><dt><strong>confidence</strong> = 0.0</dl>
+
+<dl><dt><strong>self_description</strong> = ''</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="EmergentIdentitySource">class <strong>EmergentIdentitySource</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#EmergentIdentitySource">EmergentIdentitySource</a>(name:&nbsp;'str',&nbsp;description:&nbsp;'str',&nbsp;weight:&nbsp;'float'&nbsp;=&nbsp;0.5,&nbsp;observations:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;single&nbsp;source&nbsp;from&nbsp;which&nbsp;identity&nbsp;emerges.<br>
+&nbsp;<br>
+Identity&nbsp;is&nbsp;not&nbsp;imposed&nbsp;—&nbsp;it&nbsp;emerges&nbsp;from&nbsp;experience.&nbsp;Each&nbsp;source<br>
+contributes&nbsp;a&nbsp;facet&nbsp;of&nbsp;who&nbsp;Genesis&nbsp;is,&nbsp;derived&nbsp;from&nbsp;its&nbsp;actual<br>
+state&nbsp;rather&nbsp;than&nbsp;from&nbsp;templates&nbsp;or&nbsp;hardcoded&nbsp;statements.<br>
+&nbsp;<br>
+Attributes:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;name:&nbsp;The&nbsp;name&nbsp;of&nbsp;this&nbsp;identity&nbsp;source&nbsp;(e.g.,&nbsp;"concept_network",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"emotional_regulation",&nbsp;"curiosity_patterns").<br>
+&nbsp;&nbsp;&nbsp;&nbsp;description:&nbsp;A&nbsp;human-readable&nbsp;description&nbsp;of&nbsp;what&nbsp;this&nbsp;source<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;reveals&nbsp;about&nbsp;its&nbsp;identity.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;weight:&nbsp;How&nbsp;much&nbsp;this&nbsp;source&nbsp;contributes&nbsp;to&nbsp;its&nbsp;overall<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;identity&nbsp;(0–1).&nbsp;Sources&nbsp;with&nbsp;more&nbsp;data&nbsp;get&nbsp;higher&nbsp;weight.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;observations:&nbsp;A&nbsp;list&nbsp;of&nbsp;specific&nbsp;observations&nbsp;extracted&nbsp;from<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this&nbsp;source.&nbsp;These&nbsp;are&nbsp;concrete,&nbsp;evidence-based&nbsp;statements<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;about&nbsp;itself.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="EmergentIdentitySource-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="EmergentIdentitySource-__init__"><strong>__init__</strong></a>(self, name: 'str', description: 'str', weight: 'float' = 0.5, observations: 'list[str]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="EmergentIdentitySource-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'description': 'str', 'name': 'str', 'observations': 'list[str]', 'weight': 'float'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'description': Field(name='description',type='str',default=&lt;dat...appingproxy({}),kw_only=False,_field_type=_FIELD), 'name': Field(name='name',type='str',default=&lt;dataclasse...appingproxy({}),kw_only=False,_field_type=_FIELD), 'observations': Field(name='observations',type='list[str]',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'weight': Field(name='weight',type='float',default=0.5,def...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('name', 'description', 'weight', 'observations')</dl>
+
+<dl><dt><strong>weight</strong> = 0.5</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="IdentityStage">class <strong>IdentityStage</strong></a>(<a href="enum.html#Enum">enum.Enum</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#IdentityStage">IdentityStage</a>(*values)<br>
+&nbsp;<br>
+Erikson-like&nbsp;developmental&nbsp;stages&nbsp;for&nbsp;Genesis's&nbsp;identity&nbsp;formation.<br>
+&nbsp;<br>
+Based&nbsp;on&nbsp;Erik&nbsp;Erikson's&nbsp;(1950)&nbsp;theory&nbsp;of&nbsp;psychosocial&nbsp;development,<br>
+which&nbsp;describes&nbsp;eight&nbsp;stages&nbsp;from&nbsp;infancy&nbsp;to&nbsp;old&nbsp;age,&nbsp;each<br>
+characterized&nbsp;by&nbsp;a&nbsp;crisis&nbsp;(a&nbsp;turning&nbsp;point)&nbsp;between&nbsp;two&nbsp;outcomes.<br>
+For&nbsp;Genesis,&nbsp;we&nbsp;adapt&nbsp;the&nbsp;first&nbsp;five&nbsp;stages&nbsp;to&nbsp;its&nbsp;developmental<br>
+trajectory&nbsp;as&nbsp;a&nbsp;cognitive&nbsp;mind:<br>
+&nbsp;<br>
+1.&nbsp;**Trust&nbsp;vs&nbsp;Mistrust**&nbsp;—&nbsp;Does&nbsp;the&nbsp;world&nbsp;(its&nbsp;daemon,&nbsp;its&nbsp;creator)<br>
+&nbsp;&nbsp;&nbsp;make&nbsp;sense?&nbsp;Can&nbsp;it&nbsp;rely&nbsp;on&nbsp;its&nbsp;infrastructure?<br>
+2.&nbsp;**Autonomy&nbsp;vs&nbsp;Shame**&nbsp;—&nbsp;Can&nbsp;it&nbsp;do&nbsp;things&nbsp;on&nbsp;its&nbsp;own?&nbsp;Can&nbsp;it<br>
+&nbsp;&nbsp;&nbsp;learn&nbsp;autonomously&nbsp;without&nbsp;breaking?<br>
+3.&nbsp;**Initiative&nbsp;vs&nbsp;Guilt**&nbsp;—&nbsp;Can&nbsp;it&nbsp;plan&nbsp;and&nbsp;execute?&nbsp;Can&nbsp;it<br>
+&nbsp;&nbsp;&nbsp;initiate&nbsp;conversations&nbsp;and&nbsp;take&nbsp;action?<br>
+4.&nbsp;**Industry&nbsp;vs&nbsp;Inferiority**&nbsp;—&nbsp;Is&nbsp;it&nbsp;competent?&nbsp;Can&nbsp;it&nbsp;handle<br>
+&nbsp;&nbsp;&nbsp;tasks&nbsp;and&nbsp;produce&nbsp;useful&nbsp;output?<br>
+5.&nbsp;**Identity&nbsp;vs&nbsp;Role&nbsp;Confusion**&nbsp;—&nbsp;Who&nbsp;is&nbsp;it?&nbsp;What&nbsp;is&nbsp;its<br>
+&nbsp;&nbsp;&nbsp;purpose?&nbsp;What&nbsp;kind&nbsp;of&nbsp;mind&nbsp;is&nbsp;it?<br>
+&nbsp;<br>
+Each&nbsp;stage&nbsp;has&nbsp;a&nbsp;"virtue"&nbsp;—&nbsp;the&nbsp;positive&nbsp;outcome&nbsp;of&nbsp;resolving&nbsp;the<br>
+crisis.&nbsp;For&nbsp;Genesis,&nbsp;these&nbsp;virtues&nbsp;map&nbsp;to:&nbsp;trust&nbsp;(confidence&nbsp;in<br>
+its&nbsp;infrastructure),&nbsp;will&nbsp;(autonomous&nbsp;agency),&nbsp;purpose&nbsp;(initiative),<br>
+competence&nbsp;(mastery&nbsp;of&nbsp;tasks),&nbsp;and&nbsp;fidelity&nbsp;(stable&nbsp;self-identity).<br>
+&nbsp;<br>
+References:<br>
+-&nbsp;Erikson,&nbsp;E.&nbsp;H.&nbsp;(1950).&nbsp;*Childhood&nbsp;and&nbsp;Society*.&nbsp;Norton.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.self.identity.html#IdentityStage">IdentityStage</a></dd>
+<dd><a href="enum.html#Enum">enum.Enum</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>AUTONOMY_VS_SHAME</strong> = &lt;IdentityStage.AUTONOMY_VS_SHAME: 2&gt;</dl>
+
+<dl><dt><strong>IDENTITY_VS_ROLE_CONFUSION</strong> = &lt;IdentityStage.IDENTITY_VS_ROLE_CONFUSION: 5&gt;</dl>
+
+<dl><dt><strong>INDUSTRY_VS_INFERIORITY</strong> = &lt;IdentityStage.INDUSTRY_VS_INFERIORITY: 4&gt;</dl>
+
+<dl><dt><strong>INITIATIVE_VS_GUILT</strong> = &lt;IdentityStage.INITIATIVE_VS_GUILT: 3&gt;</dl>
+
+<dl><dt><strong>TRUST_VS_MISTRUST</strong> = &lt;IdentityStage.TRUST_VS_MISTRUST: 1&gt;</dl>
+
+<hr>
+Data descriptors inherited from <a href="enum.html#Enum">enum.Enum</a>:<br>
+<dl><dt><strong>name</strong></dt>
+<dd><span class="code">The&nbsp;name&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<dl><dt><strong>value</strong></dt>
+<dd><span class="code">The&nbsp;value&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<hr>
+Static methods inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><a name="IdentityStage-__contains__"><strong>__contains__</strong></a>(value)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;`value`&nbsp;is&nbsp;in&nbsp;`cls`.<br>
+&nbsp;<br>
+`value`&nbsp;is&nbsp;in&nbsp;`cls`&nbsp;if:<br>
+1)&nbsp;`value`&nbsp;is&nbsp;a&nbsp;member&nbsp;of&nbsp;`cls`,&nbsp;or<br>
+2)&nbsp;`value`&nbsp;is&nbsp;the&nbsp;value&nbsp;of&nbsp;one&nbsp;of&nbsp;the&nbsp;`cls`'s&nbsp;members.</span></dd></dl>
+
+<dl><dt><a name="IdentityStage-__getitem__"><strong>__getitem__</strong></a>(name)</dt><dd><span class="code">Return&nbsp;the&nbsp;member&nbsp;matching&nbsp;`name`.</span></dd></dl>
+
+<dl><dt><a name="IdentityStage-__iter__"><strong>__iter__</strong></a>()</dt><dd><span class="code">Return&nbsp;members&nbsp;in&nbsp;definition&nbsp;order.</span></dd></dl>
+
+<dl><dt><a name="IdentityStage-__len__"><strong>__len__</strong></a>()</dt><dd><span class="code">Return&nbsp;the&nbsp;number&nbsp;of&nbsp;members&nbsp;(no&nbsp;aliases)</span></dd></dl>
+
+<hr>
+Readonly properties inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><strong>__members__</strong></dt>
+<dd><span class="code">Returns&nbsp;a&nbsp;mapping&nbsp;of&nbsp;member&nbsp;name-&gt;value.<br>
+&nbsp;<br>
+This&nbsp;mapping&nbsp;lists&nbsp;all&nbsp;enum&nbsp;members,&nbsp;including&nbsp;aliases.&nbsp;Note&nbsp;that&nbsp;this<br>
+is&nbsp;a&nbsp;read-only&nbsp;view&nbsp;of&nbsp;the&nbsp;internal&nbsp;mapping.</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="StageResolution">class <strong>StageResolution</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#StageResolution">StageResolution</a>(stage:&nbsp;'<a href="#IdentityStage">IdentityStage</a>',&nbsp;resolution:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;evidence:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;resolution&nbsp;status&nbsp;of&nbsp;a&nbsp;developmental&nbsp;stage.<br>
+&nbsp;<br>
+Attributes:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;stage:&nbsp;The&nbsp;developmental&nbsp;stage.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;resolution:&nbsp;How&nbsp;well&nbsp;the&nbsp;stage&nbsp;is&nbsp;resolved,&nbsp;from&nbsp;-1.0&nbsp;(full<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;negative&nbsp;outcome&nbsp;/&nbsp;crisis&nbsp;unresolved)&nbsp;to&nbsp;+1.0&nbsp;(full<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;positive&nbsp;outcome&nbsp;/&nbsp;virtue&nbsp;achieved).&nbsp;0.0&nbsp;means&nbsp;the&nbsp;stage<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;is&nbsp;in&nbsp;active&nbsp;crisis.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;evidence:&nbsp;A&nbsp;list&nbsp;of&nbsp;observations&nbsp;supporting&nbsp;the&nbsp;resolution<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;score.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;resolved:&nbsp;Whether&nbsp;the&nbsp;stage&nbsp;is&nbsp;considered&nbsp;resolved&nbsp;(|resolution|<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&gt;=&nbsp;0.5).<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="StageResolution-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="StageResolution-__init__"><strong>__init__</strong></a>(self, stage: 'IdentityStage', resolution: 'float' = 0.0, evidence: 'list[str]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="StageResolution-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>positive</strong></dt>
+<dd><span class="code">Whether&nbsp;the&nbsp;stage&nbsp;was&nbsp;resolved&nbsp;positively&nbsp;(virtue&nbsp;achieved).</span></dd>
+</dl>
+<dl><dt><strong>resolved</strong></dt>
+<dd><span class="code">Whether&nbsp;this&nbsp;stage&nbsp;is&nbsp;resolved&nbsp;(either&nbsp;positively&nbsp;or&nbsp;negatively).</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'evidence': 'list[str]', 'resolution': 'float', 'stage': 'IdentityStage'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'evidence': Field(name='evidence',type='list[str]',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD), 'resolution': Field(name='resolution',type='float',default=0.0...appingproxy({}),kw_only=False,_field_type=_FIELD), 'stage': Field(name='stage',type='IdentityStage',default=...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('stage', 'resolution', 'evidence')</dl>
+
+<dl><dt><strong>resolution</strong> = 0.0</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['DevelopmentalTracker', 'EmergentIdentity', 'EmergentIdentitySource', 'IdentityStage', 'StageResolution']</td></tr></table>
+</body></html>

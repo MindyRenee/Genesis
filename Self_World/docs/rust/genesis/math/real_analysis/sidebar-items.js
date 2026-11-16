@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["SumKind"],"fn":["bisection","check_continuous","check_delta","find_delta","fixed_point","integral","is_cauchy_tail","limit_numeric","newton","plot","ratio_test","seq_limit","sup_inf","uniform_modulus"]};

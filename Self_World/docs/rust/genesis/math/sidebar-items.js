@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["abstract_algebra","algebra","arithmetic","axioms","calculus","combinatorics","complex_analysis","discrete","geometry","linear_algebra","number_sense","number_theory","proof","real_analysis","statistics","topology","trig"]};

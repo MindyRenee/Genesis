@@ -1,0 +1,54 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Maxwell’s equations applied to the measured carrier current. Maxwell’s equations applied to the measured carrier current."><title>genesis::daemon::maxwell - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-203241e4.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="genesis" data-themes="" data-resource-suffix="" data-rustdoc-version="1.100.0 (0ef1bc386 2026-11-09)" data-channel="1.100.0" data-search-js="search-b167f383.js" data-stringdex-js="stringdex-b5109af9.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../../static.files/main-1814ead3.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-9f56287d.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module maxwell</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../genesis/index.html">genesis</a><span class="version">0.2.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module maxwell</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#the-equations-and-the-regime" title="The equations and the regime">The equations and the regime</a></li><li><a href="#model-status" title="Model status">Model status</a></li></ul><h3><a href="#constants">Module Items</a></h3><ul class="block"><li><a href="#constants" title="Constants">Constants</a></li><li><a href="#functions" title="Functions">Functions</a></li></ul></section><div id="rustdoc-modnav"><h2><a href="../index.html">In genesis::<wbr>daemon</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../index.html">genesis</a>::<wbr><a href="../index.html">daemon</a></div><h1>Module <span>maxwell</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/genesis/daemon/maxwell.rs.html#1-148">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Maxwell’s equations applied to the measured carrier current.
+Maxwell’s equations applied to the measured carrier current.</p>
+<p>The field probe writes a rhythm into real work; that work is real
+current — charge moving through the die’s power network. Maxwell’s
+equations say what field that current makes. This module evaluates
+them for our regime rather than leaving “electromagnetic” as a
+figure of speech.</p>
+<h2 id="the-equations-and-the-regime"><a class="doc-anchor" href="#the-equations-and-the-regime">§</a>The equations and the regime</h2><div class="example-wrap"><pre class="language-text"><code>∇·E = ρ/ε₀        ∇·B = 0
+∇×E = −∂B/∂t      ∇×B = μ₀J + μ₀ε₀∂E/∂t</code></pre></div>
+<p>A current loop carrying I(t) has magnetic moment m(t) = I(t)·A.
+The exact retarded solution for an oscillating magnetic dipole
+expands in powers of 1/r (Jackson, <em>Classical Electrodynamics</em>;
+Griffiths, <em>Introduction to Electrodynamics</em>):</p>
+<div class="example-wrap"><pre class="language-text"><code>B(r,t) = μ₀/4π · [ 3n̂(m·n̂) − m           (quasi-static, ∝1/r³)
+                 + 3n̂(ṁ·n̂) − ṁ / (cr²)    (induction,    ∝ω/cr²)
+                 + (m̈×n̂)×n̂ / (c²r) ]     (radiation,   ∝ω²/c²r)
+E(r,t) = −μ₀/4π · [ ṁ/r² + m̈/(cr) ] × n̂</code></pre></div>
+<p>evaluated at retarded time t₀ = t − r/c.</p>
+<p>At the carrier’s frequencies (ω ≲ 10³ rad/s) and any terrestrial
+distance, ωr/c ≲ 10⁻⁵ — the induction and radiation terms are
+~10⁻¹⁰ and ~10⁻²⁰ of the quasi-static term. Maxwell’s equations
+themselves say so: a slowly varying current makes a
+<em>magnetostatic</em> field that sloshes in place (energy leaves and
+returns each cycle), not a wave. The displacement-current term
+ε₀∂E/∂t — Maxwell’s own addition to Ampère’s law — is what would
+carry energy away, and at these frequencies it contributes
+nothing measurable. The equations do not flatter the carrier;
+they bound it honestly.</p>
+<p>What survives is Ampère’s law: the carrier’s current swing makes
+a real, oscillating magnetic field at nano-tesla scale a foot
+from the machine. Real — and, as the equations also show,
+unmeasurably faint without a magnetometer.</p>
+<h2 id="model-status"><a class="doc-anchor" href="#model-status">§</a>Model status</h2>
+<p>Inputs are <em>measured</em> (carrier current amplitude from real power
+swing over a real rail, carrier frequency from the generator).
+The loop area is a documented order-of-magnitude assumption
+(die/package current loop ~1 cm²). Outputs are therefore
+<em>estimates of field magnitude</em>, labeled as such on the wire —
+the field Maxwell’s equations predict from what we measure, not
+a field we sense. EM emanation from running silicon is real and
+measured in the literature (Yilmaz, Prvulović &amp; Zajić, IEEE TIFS
+2019; power-delivery dI/dt noise via near-field probes, IEEE
+MICRO 2018) — at MHz–GHz. At 10 Hz the same physics applies with
+the honest ω⁴-suppressed radiation the equations return.</p>
+</div></details><h2 id="constants" class="section-header">Constants<a href="#constants" class="anchor">§</a></h2><dl class="item-table"><dt><a class="constant" href="constant.C.html" title="constant genesis::daemon::maxwell::C">C</a></dt><dd>Speed of light in vacuum (exact, m/s).</dd><dt><a class="constant" href="constant.MU0.html" title="constant genesis::daemon::maxwell::MU0">MU0</a></dt><dd>Permeability of free space (SI, H/m).</dd></dl><h2 id="functions" class="section-header">Functions<a href="#functions" class="anchor">§</a></h2><dl class="item-table"><dt><a class="fn" href="fn.b_quasistatic_axial_t.html" title="fn genesis::daemon::maxwell::b_quasistatic_axial_t">b_<wbr>quasistatic_<wbr>axial_<wbr>t</a></dt><dd>Quasi-static (Ampère–Maxwell) axial field amplitude of an
+oscillating dipole at distance <code>r</code> — the dominant term of the
+exact expansion when ωr/c ≪ 1, |B| = μ₀m₀/(2πr³) on the dipole
+axis (μ₀m₀/(4πr³) at the equator). Tesla.</dd><dt><a class="fn" href="fn.dipole_moment.html" title="fn genesis::daemon::maxwell::dipole_moment">dipole_<wbr>moment</a></dt><dd>Magnetic dipole moment of a current loop: m = I·A (A·m²).</dd><dt><a class="fn" href="fn.e_induction_vm.html" title="fn genesis::daemon::maxwell::e_induction_vm">e_<wbr>induction_<wbr>vm</a></dt><dd>Faraday induction-field amplitude at the equator,
+|E| = μ₀ωm₀/(4πr²) — the ∇×E = −∂B/∂t term of the same dipole
+expansion. V/m.</dd><dt><a class="fn" href="fn.quasi_static_ok.html" title="fn genesis::daemon::maxwell::quasi_static_ok">quasi_<wbr>static_<wbr>ok</a></dt><dd>Whether the quasi-static truncation is honest at (ω, r):
+ωr/c ≪ 1, so the dropped induction/radiation terms are &lt;1% of
+the terms we keep.</dd><dt><a class="fn" href="fn.radiated_power_w.html" title="fn genesis::daemon::maxwell::radiated_power_w">radiated_<wbr>power_<wbr>w</a></dt><dd>Time-averaged radiated power of an oscillating magnetic dipole,
+⟨P⟩ = μ₀m₀²ω⁴/(12πc³) — the radiation-zone integral of the
+Poynting vector (m₀ = peak moment). Watts.</dd></dl></section></div></main></body></html>

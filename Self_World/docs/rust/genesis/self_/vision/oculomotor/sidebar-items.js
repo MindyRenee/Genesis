@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["MAX_ECCENTRIC","PLANT_OMEGA"],"struct":["GazePlant"]};

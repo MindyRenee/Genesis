@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.eval.abstraction_gradient</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.eval.html" class="white">eval</a>.abstraction_gradient</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/eval/abstraction_gradient.py">/home/mindyrenee/GenAnd/Genesis/Self_World/eval/abstraction_gradient.py</a></td></tr></table>
+    <p><span class="code">Abstraction-gradient&nbsp;analysis&nbsp;over&nbsp;the&nbsp;canonical&nbsp;edge&nbsp;log.<br>
+&nbsp;<br>
+Answers&nbsp;one&nbsp;question:&nbsp;is&nbsp;what&nbsp;Genesis&nbsp;assembles&nbsp;rising&nbsp;in&nbsp;abstraction<br>
+over&nbsp;time?&nbsp;Buckets&nbsp;edges&nbsp;by&nbsp;``created_at``&nbsp;and&nbsp;reports,&nbsp;per&nbsp;day:<br>
+&nbsp;<br>
+-&nbsp;provenance&nbsp;tier&nbsp;mix&nbsp;(seed&nbsp;/&nbsp;experienced&nbsp;/&nbsp;machine&nbsp;/&nbsp;labeling&nbsp;/<br>
+&nbsp;&nbsp;generative)&nbsp;—&nbsp;does&nbsp;self-assembled&nbsp;structure's&nbsp;share&nbsp;rise?<br>
+-&nbsp;new&nbsp;concepts&nbsp;born&nbsp;via&nbsp;generative&nbsp;origins&nbsp;—&nbsp;does&nbsp;her&nbsp;ontology&nbsp;fill<br>
+&nbsp;&nbsp;with&nbsp;things&nbsp;she&nbsp;constructed,&nbsp;or&nbsp;things&nbsp;she&nbsp;was&nbsp;told?<br>
+-&nbsp;second-order&nbsp;assembly&nbsp;—&nbsp;edges&nbsp;where&nbsp;both&nbsp;endpoints&nbsp;were&nbsp;born&nbsp;via<br>
+&nbsp;&nbsp;generative&nbsp;origins&nbsp;(assembly&nbsp;of&nbsp;assemblies)<br>
+-&nbsp;relation&nbsp;sophistication&nbsp;—&nbsp;causal/functional&nbsp;vs&nbsp;bare&nbsp;association<br>
+&nbsp;<br>
+Run:&nbsp;``python&nbsp;eval/abstraction_gradient.py``<br>
+Reads&nbsp;``&lt;data&nbsp;dir&gt;/edge_log.jsonl``&nbsp;(the&nbsp;live&nbsp;fold),&nbsp;resolving&nbsp;the<br>
+data&nbsp;dir&nbsp;the&nbsp;way&nbsp;genesis&nbsp;does.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="collections.html">collections</a><br>
+<a href="datetime.html">datetime</a><br>
+</td><td class="multicolumn"><a href="json.html">json</a><br>
+<a href="math.html">math</a><br>
+</td><td class="multicolumn"><a href="statistics.html">statistics</a><br>
+<a href="sys.html">sys</a><br>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-day_of"><strong>day_of</strong></a>(edge: 'dict') -&gt; 'datetime.date'</dt></dl>
+ <dl><dt><a name="-is_cat"><strong>is_cat</strong></a>(name: 'str') -&gt; 'bool'</dt><dd><span class="code">True&nbsp;for&nbsp;category&nbsp;concepts&nbsp;—&nbsp;the&nbsp;``_cat:``-prefixed&nbsp;names.</span></dd></dl>
+ <dl><dt><a name="-main"><strong>main</strong></a>() -&gt; 'None'</dt></dl>
+ <dl><dt><a name="-rank"><strong>rank</strong></a>(values: 'list[float]') -&gt; 'list[float]'</dt></dl>
+ <dl><dt><a name="-spearman"><strong>spearman</strong></a>(a: 'list[float]', b: 'list[float]') -&gt; 'float'</dt></dl>
+ <dl><dt><a name="-tier"><strong>tier</strong></a>(origin: 'str') -&gt; 'str'</dt></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>ASSOC</strong> = {'related_to', 'similar_to'}<br>
+<strong>CAUSAL</strong> = {'causes', 'contradicts', 'creates', 'emerges_from', 'enables', 'goal_directed', ...}<br>
+<strong>CODE</strong> = {'calls', 'defines', 'depends_on'}<br>
+<strong>EDGE_LOG</strong> = PosixPath('/home/mindyrenee/.local/share/genesis/edge_log.jsonl')<br>
+<strong>GENERATIVE</strong> = {'analogy', 'corrected', 'discovered', 'dream-synthesis', 'exploration', 'insight', ...}<br>
+<strong>LABELING</strong> = {'emotion_labeling', 'emotion_share', 'labeling', 'mode_labeling', 'plasticity_labeling', 'valence_labeling'}<br>
+<strong>MACHINE</strong> = {'semantic'}<br>
+<strong>SEEDS</strong> = {'relation_phrase_seed', 'relation_verb_seed', 'situation_verb_seed', 'vocabulary_seed'}<br>
+<strong>TAXONOMIC</strong> = {'is_a', 'part_of'}</td></tr></table>
+</body></html>

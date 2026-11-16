@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.parietal_lobe.strips</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.parietal_lobe.html" class="white">parietal_lobe</a>.strips</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/parietal_lobe/strips.py">/home/mindyrenee/GenAnd/Genesis/Self_World/parietal_lobe/strips.py</a></td></tr></table>
+    <p><span class="code">Strip&nbsp;and&nbsp;glyph&nbsp;parsing&nbsp;—&nbsp;the&nbsp;segmentation&nbsp;primitives.<br>
+&nbsp;<br>
+Wall-segmented&nbsp;runs&nbsp;of&nbsp;same-shaped&nbsp;tiles&nbsp;are&nbsp;how&nbsp;demonstration<br>
+formats&nbsp;lay&nbsp;out&nbsp;glyphs:&nbsp;a&nbsp;query&nbsp;strip&nbsp;reads&nbsp;as&nbsp;``tile&nbsp;wall&nbsp;tile<br>
+wall&nbsp;tile``,&nbsp;a&nbsp;dictionary's&nbsp;runs&nbsp;read&nbsp;the&nbsp;same&nbsp;way&nbsp;inside&nbsp;panels.<br>
+Splitting&nbsp;those&nbsp;strips&nbsp;is&nbsp;*perception*&nbsp;—&nbsp;the&nbsp;parietal&nbsp;job&nbsp;of<br>
+binding&nbsp;structure&nbsp;out&nbsp;of&nbsp;pixels&nbsp;before&nbsp;any&nbsp;rule&nbsp;machinery<br>
+(``frontal_lobe.reasoning.induction``)&nbsp;reasons&nbsp;about&nbsp;what&nbsp;the<br>
+tiles&nbsp;mean.&nbsp;Everything&nbsp;here&nbsp;is&nbsp;geometry&nbsp;over&nbsp;``Grid``&nbsp;values;<br>
+nothing&nbsp;knows&nbsp;what&nbsp;a&nbsp;tile&nbsp;demonstrates.<br>
+&nbsp;<br>
+-&nbsp;``orbit``&nbsp;—&nbsp;a&nbsp;glyph&nbsp;under&nbsp;every&nbsp;rigid&nbsp;transform&nbsp;(tilt&nbsp;is&nbsp;not<br>
+&nbsp;&nbsp;identity;&nbsp;it&nbsp;is&nbsp;only&nbsp;a&nbsp;*view*).<br>
+-&nbsp;``segment``/``segment_ex``&nbsp;—&nbsp;split&nbsp;a&nbsp;strip&nbsp;on&nbsp;uniform&nbsp;wall<br>
+&nbsp;&nbsp;columns&nbsp;or&nbsp;rows.<br>
+-&nbsp;``tile_seq``&nbsp;—&nbsp;split&nbsp;a&nbsp;run&nbsp;at&nbsp;a&nbsp;known&nbsp;tile&nbsp;shape&nbsp;and&nbsp;fixed<br>
+&nbsp;&nbsp;pitch&nbsp;(immune&nbsp;to&nbsp;wall-colored&nbsp;columns&nbsp;*inside*&nbsp;a&nbsp;glyph).<br>
+-&nbsp;``unit_shape``&nbsp;—&nbsp;derive&nbsp;the&nbsp;shared&nbsp;tile&nbsp;footprint&nbsp;across&nbsp;a<br>
+&nbsp;&nbsp;scene's&nbsp;run&nbsp;interiors.<br>
+-&nbsp;``join``/``join_run``&nbsp;—&nbsp;reassemble&nbsp;a&nbsp;strip;&nbsp;``join_run``&nbsp;writes<br>
+&nbsp;&nbsp;the&nbsp;layout&nbsp;runs&nbsp;actually&nbsp;use&nbsp;(walls&nbsp;*between*&nbsp;tiles,&nbsp;none&nbsp;at<br>
+&nbsp;&nbsp;the&nbsp;edges).</span></p>
+<p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-join"><strong>join</strong></a>(blocks: 'list[Grid]', separator: 'int | None') -&gt; 'Grid | None'</dt><dd><span class="code">Reassemble&nbsp;blocks&nbsp;into&nbsp;a&nbsp;strip&nbsp;—&nbsp;walls&nbsp;between&nbsp;when&nbsp;known.</span></dd></dl>
+ <dl><dt><a name="-join_run"><strong>join_run</strong></a>(blocks: 'list[Grid]', separator: 'int | None', gap: 'int' = 1) -&gt; 'Grid | None'</dt><dd><span class="code">Concatenate&nbsp;tiles&nbsp;into&nbsp;a&nbsp;run&nbsp;interior&nbsp;—&nbsp;``gap``&nbsp;wall&nbsp;columns<br>
+*between*&nbsp;tiles,&nbsp;none&nbsp;at&nbsp;the&nbsp;edges:&nbsp;the&nbsp;layout&nbsp;a&nbsp;dictionary's<br>
+right-hand&nbsp;side&nbsp;(and&nbsp;the&nbsp;answer&nbsp;strip)&nbsp;actually&nbsp;uses.</span></dd></dl>
+ <dl><dt><a name="-orbit"><strong>orbit</strong></a>(g: 'Grid') -&gt; 'list[Grid]'</dt><dd><span class="code">All&nbsp;dihedral&nbsp;views&nbsp;of&nbsp;a&nbsp;pattern&nbsp;(the&nbsp;glyph&nbsp;under&nbsp;tilt).</span></dd></dl>
+ <dl><dt><a name="-segment"><strong>segment</strong></a>(grid: 'Grid', separator: 'int | None' = None, exemplar_shape: 'tuple[int, int] | None' = None) -&gt; 'list[Grid] | None'</dt><dd><span class="code">Split&nbsp;a&nbsp;strip&nbsp;into&nbsp;equal&nbsp;blocks&nbsp;on&nbsp;uniform&nbsp;separator&nbsp;walls.<br>
+&nbsp;<br>
+``separator``&nbsp;forces&nbsp;the&nbsp;wall&nbsp;color&nbsp;when&nbsp;known;&nbsp;``exemplar_shape``<br>
+is&nbsp;``(height,&nbsp;width)``&nbsp;of&nbsp;the&nbsp;tile&nbsp;each&nbsp;block&nbsp;should&nbsp;be.&nbsp;Returns<br>
+None&nbsp;when&nbsp;no&nbsp;consistent&nbsp;segmentation&nbsp;exists&nbsp;—&nbsp;silence,&nbsp;not&nbsp;a&nbsp;guess.</span></dd></dl>
+ <dl><dt><a name="-segment_ex"><strong>segment_ex</strong></a>(grid: 'Grid', separator: 'int | None' = None, exemplar_shape: 'tuple[int, int] | None' = None) -&gt; 'tuple[list[Grid], int] | None'</dt><dd><span class="code">``segment``&nbsp;plus&nbsp;the&nbsp;separator&nbsp;color&nbsp;the&nbsp;winning&nbsp;parse&nbsp;used.</span></dd></dl>
+ <dl><dt><a name="-tile_seq"><strong>tile_seq</strong></a>(strip: 'Grid', tile_shape: 'tuple[int, int]') -&gt; 'tuple[list[Grid], int | None, int] | None'</dt><dd><span class="code">Split&nbsp;a&nbsp;run&nbsp;interior&nbsp;into&nbsp;``tile_shape``&nbsp;blocks&nbsp;at&nbsp;fixed&nbsp;pitch.<br>
+&nbsp;<br>
+``segment_ex``&nbsp;finds&nbsp;tiles&nbsp;by&nbsp;hunting&nbsp;uniform&nbsp;separator&nbsp;columns;<br>
+that&nbsp;fails&nbsp;when&nbsp;a&nbsp;glyph&nbsp;contains&nbsp;a&nbsp;column&nbsp;of&nbsp;the&nbsp;wall's&nbsp;own<br>
+color&nbsp;—&nbsp;a&nbsp;solid&nbsp;vertical&nbsp;stripe&nbsp;inside&nbsp;a&nbsp;tile&nbsp;reads&nbsp;as&nbsp;a<br>
+separator&nbsp;and&nbsp;the&nbsp;uniform-span&nbsp;check&nbsp;rejects&nbsp;the&nbsp;split.&nbsp;A&nbsp;run&nbsp;is&nbsp;also&nbsp;just&nbsp;*periodic*:&nbsp;``n``<br>
+tiles&nbsp;of&nbsp;width&nbsp;``tw``&nbsp;separated&nbsp;by&nbsp;``gap``&nbsp;wall&nbsp;columns&nbsp;fills<br>
+``n*(tw+gap)&nbsp;-&nbsp;gap``.&nbsp;The&nbsp;wall&nbsp;check&nbsp;stays&nbsp;—&nbsp;a&nbsp;pitch&nbsp;that<br>
+doesn't&nbsp;land&nbsp;on&nbsp;uniform&nbsp;columns&nbsp;isn't&nbsp;a&nbsp;tiled&nbsp;run.&nbsp;Returns<br>
+``(tiles,&nbsp;wall_color,&nbsp;gap)``&nbsp;—&nbsp;the&nbsp;wall's&nbsp;color&nbsp;and&nbsp;its&nbsp;column<br>
+width&nbsp;—&nbsp;or&nbsp;None&nbsp;when&nbsp;the&nbsp;strip&nbsp;isn't&nbsp;a&nbsp;clean&nbsp;tiling&nbsp;of&nbsp;the<br>
+shape.&nbsp;An&nbsp;exact-shape&nbsp;strip&nbsp;is&nbsp;one&nbsp;tile.</span></dd></dl>
+ <dl><dt><a name="-unit_shape"><strong>unit_shape</strong></a>(grids: 'list[Grid]') -&gt; 'tuple[int, int] | None'</dt><dd><span class="code">The&nbsp;tile&nbsp;unit&nbsp;a&nbsp;set&nbsp;of&nbsp;run&nbsp;interiors&nbsp;shares.<br>
+&nbsp;<br>
+Both&nbsp;sides&nbsp;of&nbsp;a&nbsp;rule&nbsp;are&nbsp;*runs*:&nbsp;one&nbsp;or&nbsp;more&nbsp;tiles&nbsp;of&nbsp;a&nbsp;common<br>
+footprint&nbsp;behind&nbsp;shared&nbsp;walls.&nbsp;The&nbsp;unit&nbsp;is&nbsp;the&nbsp;widest&nbsp;footprint<br>
+every&nbsp;interior&nbsp;(of&nbsp;the&nbsp;modal&nbsp;height)&nbsp;tiles&nbsp;at&nbsp;—&nbsp;a&nbsp;single&nbsp;tile<br>
+always&nbsp;qualifies,&nbsp;a&nbsp;run&nbsp;only&nbsp;tiles&nbsp;at&nbsp;the&nbsp;true&nbsp;unit.</span></dd></dl>
+</td></tr></table>
+</body></html>

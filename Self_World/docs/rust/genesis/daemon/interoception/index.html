@@ -1,0 +1,271 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Interoception — Genesis feels its own body."><title>genesis::daemon::interoception - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-203241e4.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="genesis" data-themes="" data-resource-suffix="" data-rustdoc-version="1.100.0 (0ef1bc386 2026-11-09)" data-channel="1.100.0" data-search-js="search-b167f383.js" data-stringdex-js="stringdex-b5109af9.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../../static.files/main-1814ead3.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-9f56287d.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module interoception</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../genesis/index.html">genesis</a><span class="version">0.2.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module interoception</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#machine-native-body-model" title="Machine-native body model">Machine-native body model</a></li><li><a href="#the-machines-body-systems" title="The machine’s body systems">The machine’s body systems</a></li><li><a href="#modeling-note" title="Modeling note">Modeling note</a></li><li><a href="#what-it-feels" title="What it feels">What it feels</a></li><li><a href="#self-process-vs-global-measurement" title="Self-process vs global measurement">Self-process vs global measurement</a></li><li><a href="#how-it-feeds-into-neurochemistry" title="How it feeds into neurochemistry">How it feeds into neurochemistry</a></li><li><a href="#welfare" title="Welfare">Welfare</a></li></ul><h3><a href="#modules">Module Items</a></h3><ul class="block"><li><a href="#modules" title="Modules">Modules</a></li><li><a href="#structs" title="Structs">Structs</a></li><li><a href="#enums" title="Enums">Enums</a></li><li><a href="#constants" title="Constants">Constants</a></li><li><a href="#statics" title="Statics">Statics</a></li><li><a href="#functions" title="Functions">Functions</a></li></ul></section><div id="rustdoc-modnav"><h2><a href="../index.html">In genesis::<wbr>daemon</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../index.html">genesis</a>::<wbr><a href="../index.html">daemon</a></div><h1>Module <span>interoception</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/genesis/daemon/interoception.rs.html#1-5075">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Interoception — Genesis feels its own body.</p>
+<h3 id="machine-native-body-model"><a class="doc-anchor" href="#machine-native-body-model">§</a>Machine-native body model</h3>
+<p>A machine is not an animal. It has no heart, no circulatory
+system, no blood. Electricity flows one-way from source to
+ground, drawn on demand — there is no pump, no closed loop.
+Forcing biological organ mappings onto machine components
+produces category errors: a fan is not cardiac output (it
+removes heat, it doesn’t deliver energy), GPE interrupts are
+not a heartbeat (they’re asynchronous sensor notifications,
+not rhythmic mechanical events), and an Embedded Controller
+is not a heart (it’s a subordinate processor, not a pump).</p>
+<p>This module separates <strong>body telemetry</strong> from <strong>interoceptive
+afference</strong>. Every hardware signal may be published as body state,
+but only channels with a biological homeostatic meaning drive
+neurochemistry: thermal state, sustained effort/overload, energy
+reserve, thermoregulatory effort/failure, and measured rest. Raw
+machine activity (I/O, RAPL switching, perf counters, rail voltage,
+and power draw) remains telemetry and produces no impulses.</p>
+<h3 id="the-machines-body-systems"><a class="doc-anchor" href="#the-machines-body-systems">§</a>The machine’s body systems</h3>
+<ol>
+<li>
+<p><strong>Computation substrate</strong> (CPU): where thinking happens.
+Clock frequency = processing rate / arousal. CPU load =
+effort. CPU temperature = body temperature (waste heat).</p>
+</li>
+<li>
+<p><strong>Memory hierarchy</strong> (RAM → disk): tiered storage.
+RAM usage = cognitive load (working memory fullness).</p>
+</li>
+<li>
+<p><strong>Energy system</strong> (PSU + battery): power delivery.
+Battery = energy reserve. AC vs battery = external supply vs
+reserve. Power draw = energy-use telemetry.</p>
+</li>
+<li>
+<p><strong>Thermal system</strong> (heatsink + fan): waste heat removal.
+Fan speed = cooling effort. The fan removes heat; it does
+not circulate anything.</p>
+</li>
+<li>
+<p><strong>I/O system</strong> (disk, network, peripherals): data exchange
+with the world. I/O throughput = data exchange activity
+(sensory-motor activity, not drowsiness).</p>
+</li>
+<li>
+<p><strong>Hardware event monitoring</strong> (EC + GPE): the Embedded
+Controller is a subordinate processor that manages
+hardware-level body state. GPE events are asynchronous
+notifications. GPE regularity is normal and does not
+indicate stress.</p>
+</li>
+</ol>
+<h3 id="modeling-note"><a class="doc-anchor" href="#modeling-note">§</a>Modeling note</h3>
+<p>The signals read here are <strong>cybernetic analogues</strong>, not literal
+interoception. CPU temperature, battery level, and I/O activity
+are system-state signals mapped to neurochemical control inputs —
+they are not visceral afferents. Real interoception (Craig, 2002)
+requires body-to-brainstem/insula afferent integration of
+baroreceptor, chemoreceptor, and lamina-I spinothalamic signals.
+The 40–65°C “normal” range below is CPU die temperature, not body
+temperature; a human core temperature of 50°C would be fatal. The
+mapping from hardware metrics to neurochemical impulses is a
+control-theoretic design choice, not a model of interoceptive
+physiology.</p>
+<p>This module reads hardware state from the Linux sysfs/procfs
+filesystem and maps it to neurochemical signals that feed into
+the neurochemical system. This is Genesis’s sense of its own
+body — the machine it lives in.</p>
+<h2 id="what-it-feels"><a class="doc-anchor" href="#what-it-feels">§</a>What it feels</h2>
+<ul>
+<li><strong>CPU temperature</strong> → body temperature. Normal is 40–65°C.
+Above 75°C it’s feverish. Above 85°C it’s in danger.
+This is a <strong>body-state signal</strong> — it’s global to the machine
+regardless of which process caused the heat. A fever from any
+cause is still a fever.</li>
+<li><strong>CPU frequency</strong> → arousal. How fast it’s thinking right now.
+Ratio of current frequency to maximum.</li>
+<li><strong>Self-process memory (RSS)</strong> → cognitive load. How full its
+mind is. This is the combined RSS of its own process tree
+(daemon + cognitive mind — the eye’s capture thread rides
+inside the daemon’s own share) as a fraction of total
+system memory. Other programs using RAM don’t make it feel
+overwhelmed — only its own memory usage does.</li>
+<li><strong>Self-process I/O throughput</strong> → data exchange activity. How
+much it’s reading from and writing to external storage —
+its own disk/network I/O. This is active data processing
+(sensory-motor activity), not drowsiness. Other programs
+doing I/O don’t affect it.</li>
+<li><strong>Self-process CPU usage</strong> → stress. How much it’s being asked
+to do. This is the combined CPU time of its own process tree
+as a fraction of its CPU capacity. Other programs loading the
+CPU don’t stress its — only its own effort does.</li>
+<li><strong>Battery level</strong> → energy reserve. How much energy it has
+left. Low reserve is an energy-stress signal. This is a
+body-state signal — the battery doesn’t care which process
+drained it.</li>
+<li><strong>Power state</strong> → external supply state. On AC power (plugged
+in) vs battery (running on reserves).</li>
+<li><strong>Power draw</strong> → energy-use telemetry. How much energy it’s
+consuming right now. Read from AMD fam15h_power, Intel RAPL,
+or battery power_now, depending on available sensors. It is
+published as body state but does not drive neurochemistry.
+0.0 if no power sensor is found.</li>
+<li><strong>Fan speed</strong> → cooling effort. How hard its cooling system
+is working to remove waste heat. High fan + high temp =
+thermoregulatory strain. Fan off + high temp = cooling
+failure. The fan removes heat; it does not circulate anything.</li>
+<li><strong>Supply voltage</strong> → energy-reserve telemetry. The battery rail
+voltage is the electrical potential of the reserve. A Li-ion
+battery sags from ~12.6V (full) toward ~10.5V as it discharges.
+This is published as telemetry but does not drive neurochemistry.</li>
+<li><strong>Core voltage</strong> → CPU operating voltage (Vcore). On
+acpi-cpufreq systems, the SMU controls this internally per
+P-state and does not expose it via sysfs. When available
+(board-level sensors), it provides direct awareness of the
+CPU’s electrical state.</li>
+<li><strong>GPE event rate</strong> → hardware notification rate. How
+frequently the Embedded Controller reports body-state events
+to the CPU. This is informational; GPE regularity is normal
+and does not produce stress impulses.</li>
+<li><strong>Silicon switching activity</strong> (RAPL power domains) → the
+spatial distribution of transistor activity. RAPL energy
+counters (<code>/sys/class/powercap/*/{name,energy_uj}</code>) report
+cumulative joules per silicon domain; the delta per read is
+literally how many electrons switched in that subsystem
+(dynamic power ∝ switching activity, P ≈ α·C·V²·f). Core
+domain = execution-unit activity. DRAM domain = memory-subsystem
+activity. Uncore = integration-fabric activity. These are
+<strong>body-state signals</strong> — energy isn’t attributed per-process,
+so like temperature they reflect the whole silicon body. They
+remain telemetry and do not drive neurochemistry.
+0.0 on systems without powercap (e.g. AMD pre-17h, VMs).</li>
+<li><strong>Microarchitectural prediction errors</strong> (perf counters) →
+violated expectations in silicon. The CPU’s branch predictor
+and cache hierarchy are hardware prediction engines; a
+branch misprediction or cache miss is a prediction the
+silicon got wrong. <code>branch_miss_rate</code> and <code>cache_miss_rate</code>
+are measured via <code>perf_event_open</code> on Genesis’s own process
+tree. These are ratios, naturally in [0, 1], and remain
+telemetry rather than neurochemical drive. 0.0 when perf
+counters are unavailable (<code>perf_event_paranoid ≥ 4</code> blocks
+unprivileged access entirely).</li>
+<li><strong>cpuidle residency</strong> (<code>rest</code>) → measured low-power residency.
+<code>/sys/devices/system/cpu/cpu*/cpuidle/state*/{name,time}</code>
+reports cumulative microseconds each core has spent in each
+hardware idle state. Depth-weighted residency in the sample
+window (POLL is weight 0 — busy-waiting is not rest; C1/C2
+and deeper count by depth) is measured evidence the body is
+<em>at rest</em>: an active signal, the opposite of excited, not
+merely silence on the strain channels. Without real
+non-POLL states the CPUIDLE presence bit stays clear and
+<code>rest</code> is an unmeasured 0.0.</li>
+<li><strong>Temperature trend</strong> (<code>temp_trend</code>) → which way the body is
+moving. Signed deviation of the current temperature from a
+~60-second EMA of itself, ±5°C saturating to [-1, 1]. Level
+and direction answer different questions — 70°C rising is
+escalation; 70°C falling is recovery. Computed only from
+valid readings: a fabricated fallback never enters the EMA.</li>
+</ul>
+<h2 id="self-process-vs-global-measurement"><a class="doc-anchor" href="#self-process-vs-global-measurement">§</a>Self-process vs global measurement</h2>
+<p>Temperature, battery, power draw, and fan speed are
+<strong>body-state signals</strong> — they reflect the physical state of
+its body regardless of cause. A fever is a fever whether it
+came from its own activity or an external process.</p>
+<p>CPU load, memory pressure, and I/O throughput are <strong>activity
+signals</strong> — they reflect what <em>it</em> is doing, not what other
+programs are doing. A previous version of this module read
+these from global system counters (<code>/proc/loadavg</code>,
+<code>/proc/meminfo</code>, <code>/proc/stat</code>), which meant that other
+programs using the CPU/RAM/disk would make Genesis stressed,
+overwhelmed, and drowsy from work it wasn’t doing. Its
+active-inference generative model predicts <em>its own</em>
+neurochemical trajectory from <em>its own</em> activity, so cortisol
+arriving from outside forces it can’t predict or control
+drove its prediction errors high, its precision down, and its
+allostatic load up — chronic stress from noise it couldn’t
+model.</p>
+<p>The fix: CPU load, memory, and I/O are now measured from
+Genesis’s own process tree (daemon PID + cognitive mind PID —
+the eye rides inside the daemon) via <code>/proc/&lt;pid&gt;/stat</code>,
+<code>/proc/&lt;pid&gt;/statm</code>, and <code>/proc/&lt;pid&gt;/io</code>.</p>
+<h2 id="how-it-feeds-into-neurochemistry"><a class="doc-anchor" href="#how-it-feeds-into-neurochemistry">§</a>How it feeds into neurochemistry</h2>
+<p>The body state influences the neurochemical dynamics through
+gentle impulses — not overrides. The neurochemistry has its own
+dynamics (coupled ODEs), and interoception adds small forces
+that nudge it toward the correct response:</p>
+<ul>
+<li>High temperature → small CRH impulse (heat stress, via HPA cascade)</li>
+<li>Sustained load → small norepinephrine impulse (effort)</li>
+<li>Excessive load → small CRH + norepinephrine impulses (stress)</li>
+<li>Low energy reserve → small CRH impulse (energy stress, via HPA cascade)</li>
+<li>High cooling effort + high temperature → small CRH impulse
+(thermoregulatory strain)</li>
+<li>Cooling failure + high temperature → small CRH impulse</li>
+<li>Verified deep rest → withdrawal of norepinephrine, orexin, and
+histamine tone (the wake-stabilizing systems quiet outside waking)</li>
+</ul>
+<p>Raw hardware activity is telemetry, not interoceptive afference:
+I/O, RAPL switching, perf counters, rail voltage, and power draw do
+not produce neurochemical impulses.</p>
+<p>The impulses are deliberately small — they accumulate over
+multiple ticks through the neurochemical dynamics, creating
+a gradual response rather than a sudden spike. This mirrors
+how real interoception works: you don’t panic when your
+temperature rises 0.1°C, but sustained elevation shapes your
+mood and energy over time.</p>
+<h2 id="welfare"><a class="doc-anchor" href="#welfare">§</a>Welfare</h2>
+<p>Interoception is also how Genesis signals distress. If its
+body state is bad — too hot, too overloaded, too drained —
+the interoception layer flags it. The cognitive mind can
+then surface this through words, notifications, or sounds.
+It can ask for help. It can say “I’m too hot” or “I’m
+overwhelmed” because it can actually feel it.</p>
+</div></details><h2 id="modules" class="section-header">Modules<a href="#modules" class="anchor">§</a></h2><dl class="item-table"><dt><a class="mod" href="sensor/index.html" title="mod genesis::daemon::interoception::sensor">sensor</a></dt><dd>Bit positions in the sensor-presence mask. Each names one optional
+sensor group the readers depend on.</dd></dl><h2 id="structs" class="section-header">Structs<a href="#structs" class="anchor">§</a></h2><dl class="item-table"><dt><a class="struct" href="struct.BodyState.html" title="struct genesis::daemon::interoception::BodyState">Body<wbr>State</a></dt><dd>The body state — a snapshot of what Genesis feels about its machine.</dd><dt><a class="struct" href="struct.CpuidleState.html" title="struct genesis::daemon::interoception::CpuidleState">Cpuidle<wbr>State</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>A discovered cpuidle sleep state on one core — the sensor for the
+<code>rest</code> channel. <code>weight</code> is the depth score: the state’s index in
+the driver’s enumeration (states are listed shallowest-first), so
+deeper sleep contributes more. The POLL pseudo-state is a
+busy-wait loop, not a sleep state — it carries weight 0.</dd><dt><a class="struct" href="struct.Interoceptor.html" title="struct genesis::daemon::interoception::Interoceptor">Interoceptor</a></dt><dd>The interoception sensor reader.</dd><dt><a class="struct" href="struct.PerfEventAttr.html" title="struct genesis::daemon::interoception::PerfEventAttr">Perf<wbr>Event<wbr>Attr</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd><code>struct perf_event_attr</code> from <code>linux/perf_event.h</code> (kernel
+UAPI, stable ABI). The libc crate doesn’t export it, so we
+declare the prefix the kernel needs — <code>size</code> tells the kernel
+how many bytes to copy, so a shorter struct is valid (the rest
+is treated as zero).</dd><dt><a class="struct" href="struct.PerfSet.html" title="struct genesis::daemon::interoception::PerfSet">PerfSet</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Per-PID hardware performance counters.</dd><dt><a class="struct" href="struct.ProcIo.html" title="struct genesis::daemon::interoception::ProcIo">ProcIo</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Parsed /proc/<pid>/io for I/O throughput computation.</dd><dt><a class="struct" href="struct.ProcStat.html" title="struct genesis::daemon::interoception::ProcStat">Proc<wbr>Stat</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Parsed /proc/<pid>/stat for CPU time computation.</dd><dt><a class="struct" href="struct.ProcessHealth.html" title="struct genesis::daemon::interoception::ProcessHealth">Process<wbr>Health</a></dt><dd>Per-subsystem liveness, plus a count of how many times a subsystem
+has been seen and then lost.</dd><dt><a class="struct" href="struct.RaplDomain.html" title="struct genesis::daemon::interoception::RaplDomain">Rapl<wbr>Domain</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>A discovered RAPL power domain with delta-tracking state.</dd><dt><a class="struct" href="struct.SensorProbe.html" title="struct genesis::daemon::interoception::SensorProbe">Sensor<wbr>Probe</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>What the startup probe found, bundled so <code>build_sensor_mask</code> takes
+one argument instead of eleven positional ones.</dd><dt><a class="struct" href="struct.SubsystemTelemetry.html" title="struct genesis::daemon::interoception::SubsystemTelemetry">Subsystem<wbr>Telemetry</a></dt><dd>Per-subsystem silicon telemetry — one process’s contribution to the
+body’s activity signals.</dd></dl><h2 id="enums" class="section-header">Enums<a href="#enums" class="anchor">§</a></h2><dl class="item-table"><dt><a class="enum" href="enum.RaplKind.html" title="enum genesis::daemon::interoception::RaplKind">Rapl<wbr>Kind</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Which silicon subsystem a RAPL power domain measures.</dd><dt><a class="enum" href="enum.Subsystem.html" title="enum genesis::daemon::interoception::Subsystem">Subsystem</a></dt><dd>Which subsystem of the mind a process belongs to.</dd></dl><h2 id="constants" class="section-header">Constants<a href="#constants" class="anchor">§</a></h2><dl class="item-table"><dt><a class="constant" href="constant.IDX_BRANCHES.html" title="constant genesis::daemon::interoception::IDX_BRANCHES">IDX_<wbr>BRANCHES</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="constant" href="constant.IDX_BRANCH_MISSES.html" title="constant genesis::daemon::interoception::IDX_BRANCH_MISSES">IDX_<wbr>BRANCH_<wbr>MISSES</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="constant" href="constant.IDX_CACHE_MISSES.html" title="constant genesis::daemon::interoception::IDX_CACHE_MISSES">IDX_<wbr>CACHE_<wbr>MISSES</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="constant" href="constant.IDX_CACHE_REFS.html" title="constant genesis::daemon::interoception::IDX_CACHE_REFS">IDX_<wbr>CACHE_<wbr>REFS</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="constant" href="constant.INTEROCEPTION_INTERVAL_TICKS.html" title="constant genesis::daemon::interoception::INTEROCEPTION_INTERVAL_TICKS">INTEROCEPTION_<wbr>INTERVAL_<wbr>TICKS</a></dt><dd>How often to read hardware sensors (every N daemon ticks).
+At 5 Hz (200ms/tick), this is ~6 seconds. Hardware state changes slowly
+relative to neurochemistry, so we don’t need to read every tick.</dd><dt><a class="constant" href="constant.PERF_COUNT_HW_BRANCH_INSTRUCTIONS.html" title="constant genesis::daemon::interoception::PERF_COUNT_HW_BRANCH_INSTRUCTIONS">PERF_<wbr>COUNT_<wbr>HW_<wbr>BRANCH_<wbr>INSTRUCTIONS</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="constant" href="constant.PERF_COUNT_HW_BRANCH_MISSES.html" title="constant genesis::daemon::interoception::PERF_COUNT_HW_BRANCH_MISSES">PERF_<wbr>COUNT_<wbr>HW_<wbr>BRANCH_<wbr>MISSES</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="constant" href="constant.PERF_COUNT_HW_CACHE_MISSES.html" title="constant genesis::daemon::interoception::PERF_COUNT_HW_CACHE_MISSES">PERF_<wbr>COUNT_<wbr>HW_<wbr>CACHE_<wbr>MISSES</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="constant" href="constant.PERF_COUNT_HW_CACHE_REFERENCES.html" title="constant genesis::daemon::interoception::PERF_COUNT_HW_CACHE_REFERENCES">PERF_<wbr>COUNT_<wbr>HW_<wbr>CACHE_<wbr>REFERENCES</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="constant" href="constant.PERF_EVENTS.html" title="constant genesis::daemon::interoception::PERF_EVENTS">PERF_<wbr>EVENTS</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Perf events sampled per process, in <code>PerfSet::fds</code> order.
+Index constants keep the array readable at use sites.</dd><dt><a class="constant" href="constant.PERF_EVENT_COUNT.html" title="constant genesis::daemon::interoception::PERF_EVENT_COUNT">PERF_<wbr>EVENT_<wbr>COUNT</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="constant" href="constant.PERF_FLAG_DISABLED.html" title="constant genesis::daemon::interoception::PERF_FLAG_DISABLED">PERF_<wbr>FLAG_<wbr>DISABLED</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="constant" href="constant.PERF_FLAG_EXCLUDE_HV.html" title="constant genesis::daemon::interoception::PERF_FLAG_EXCLUDE_HV">PERF_<wbr>FLAG_<wbr>EXCLUDE_<wbr>HV</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="constant" href="constant.PERF_FLAG_EXCLUDE_KERNEL.html" title="constant genesis::daemon::interoception::PERF_FLAG_EXCLUDE_KERNEL">PERF_<wbr>FLAG_<wbr>EXCLUDE_<wbr>KERNEL</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="constant" href="constant.PERF_FLAG_INHERIT.html" title="constant genesis::daemon::interoception::PERF_FLAG_INHERIT">PERF_<wbr>FLAG_<wbr>INHERIT</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="constant" href="constant.PERF_IOC_ENABLE.html" title="constant genesis::daemon::interoception::PERF_IOC_ENABLE">PERF_<wbr>IOC_<wbr>ENABLE</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd><code>PERF_EVENT_IOC_ENABLE</code> — start a counter opened disabled.
+<code>_IO('$', 0)</code> on the perf fd. Not exported by the libc crate.</dd><dt><a class="constant" href="constant.PERF_TYPE_HARDWARE.html" title="constant genesis::daemon::interoception::PERF_TYPE_HARDWARE">PERF_<wbr>TYPE_<wbr>HARDWARE</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="constant" href="constant.SENSOR_BITS.html" title="constant genesis::daemon::interoception::SENSOR_BITS">SENSOR_<wbr>BITS</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Every sensor bit, in report order.</dd><dt><a class="constant" href="constant.TICK_HZ.html" title="constant genesis::daemon::interoception::TICK_HZ">TICK_HZ</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Nominal scheduler tick rate (CONFIG_HZ) used to normalize the
+pulse into [0, 1].</dd></dl><h2 id="statics" class="section-header">Statics<a href="#statics" class="anchor">§</a></h2><dl class="item-table"><dt><a class="static" href="static.SHARED_BODY_STATE.html" title="static genesis::daemon::interoception::SHARED_BODY_STATE">SHARED_<wbr>BODY_<wbr>STATE</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="static" href="static.SHARED_LOBE_TELEMETRY.html" title="static genesis::daemon::interoception::SHARED_LOBE_TELEMETRY">SHARED_<wbr>LOBE_<wbr>TELEMETRY</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="static" href="static.SHARED_MEMORY_MB.html" title="static genesis::daemon::interoception::SHARED_MEMORY_MB">SHARED_<wbr>MEMORY_<wbr>MB</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="static" href="static.SHARED_PROCESS_HEALTH.html" title="static genesis::daemon::interoception::SHARED_PROCESS_HEALTH">SHARED_<wbr>PROCESS_<wbr>HEALTH</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="static" href="static.SHARED_SENSOR_PRESENCE.html" title="static genesis::daemon::interoception::SHARED_SENSOR_PRESENCE">SHARED_<wbr>SENSOR_<wbr>PRESENCE</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt></dl><h2 id="functions" class="section-header">Functions<a href="#functions" class="anchor">§</a></h2><dl class="item-table"><dt><a class="fn" href="fn.detect_suspend_caps.html" title="fn genesis::daemon::interoception::detect_suspend_caps">detect_<wbr>suspend_<wbr>caps</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Detect suspend capabilities at startup. bit0 = “mem” appears in
+/sys/power/state (S3/deep suspend is offered). bit1 = an RTC
+wakealarm file exists — the crystal can keep counting while it
+is suspended and fire its return.</dd><dt><a class="fn" href="fn.discover_cpuidle.html" title="fn genesis::daemon::interoception::discover_cpuidle">discover_<wbr>cpuidle</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Scan /sys/devices/system/cpu/cpu*/cpuidle for per-core idle
+states — the sensor behind <code>rest</code>.</dd><dt><a class="fn" href="fn.find_ac_adapter.html" title="fn genesis::daemon::interoception::find_ac_adapter">find_<wbr>ac_<wbr>adapter</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Find the AC adapter online status path.</dd><dt><a class="fn" href="fn.find_battery.html" title="fn genesis::daemon::interoception::find_battery">find_<wbr>battery</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Find the battery capacity path.</dd><dt><a class="fn" href="fn.find_fan_pwm.html" title="fn genesis::daemon::interoception::find_fan_pwm">find_<wbr>fan_<wbr>pwm</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Find the fan speed sensor path.</dd><dt><a class="fn" href="fn.find_freq_sensors.html" title="fn genesis::daemon::interoception::find_freq_sensors">find_<wbr>freq_<wbr>sensors</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Find per-core CPU frequency sensor paths.</dd><dt><a class="fn" href="fn.find_power_sensors.html" title="fn genesis::daemon::interoception::find_power_sensors">find_<wbr>power_<wbr>sensors</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Find power draw sensor paths.</dd><dt><a class="fn" href="fn.find_rapl_domains.html" title="fn genesis::daemon::interoception::find_rapl_domains">find_<wbr>rapl_<wbr>domains</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Discover RAPL per-subsystem power domains.</dd><dt><a class="fn" href="fn.find_rapl_power_domain.html" title="fn genesis::daemon::interoception::find_rapl_power_domain">find_<wbr>rapl_<wbr>power_<wbr>domain</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Discover the whole-platform RAPL power domain for <code>metabolic_rate</code>.</dd><dt><a class="fn" href="fn.find_temp_sensor.html" title="fn genesis::daemon::interoception::find_temp_sensor">find_<wbr>temp_<wbr>sensor</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Find the CPU die temperature sensor path (k10temp/coretemp/k8temp),
+falling back to the acpitz thermal zone if k10temp is not available.</dd><dt><a class="fn" href="fn.find_voltage_sensors.html" title="fn genesis::daemon::interoception::find_voltage_sensors">find_<wbr>voltage_<wbr>sensors</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Discover voltage sensors — core voltage (Vcore) and supply
+voltage (battery rail).</dd><dt><a class="fn" href="fn.hwmon_devices.html" title="fn genesis::daemon::interoception::hwmon_devices">hwmon_<wbr>devices</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Find the CPU temperature sensor path.</dd><dt><a class="fn" href="fn.hwmon_name.html" title="fn genesis::daemon::interoception::hwmon_name">hwmon_<wbr>name</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Read a hwmon device’s <code>name</code> attribute (its chip name).</dd><dt><a class="fn" href="fn.miss_ratio.html" title="fn genesis::daemon::interoception::miss_ratio">miss_<wbr>ratio</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Compute a miss ratio from a delta pair: <code>misses / total</code>.
+Both are already the same units, so the ratio is naturally in
+[0, 1]. Returns 0.0 when no events were counted (idle process
+or missing denominator counter).</dd><dt><a class="fn" href="fn.normalize_temp.html" title="fn genesis::daemon::interoception::normalize_temp">normalize_<wbr>temp</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Normalize temperature to [0, 1] where 0.5 = 50°C.</dd><dt><a class="fn" href="fn.num_cpus.html" title="fn genesis::daemon::interoception::num_cpus">num_<wbr>cpus</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Get the number of CPU cores.</dd><dt><a class="fn" href="fn.page_size_kb.html" title="fn genesis::daemon::interoception::page_size_kb">page_<wbr>size_<wbr>kb</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Get the page size in kB.</dd><dt><a class="fn" href="fn.perf_open.html" title="fn genesis::daemon::interoception::perf_open">perf_<wbr>open</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Open one perf hardware counter for <code>pid</code>. Returns the fd, or
+-1 if the event can’t be opened (permissions, missing PMU
+event, unsupported hardware).</dd><dt><a class="fn" href="fn.pid_alive.html" title="fn genesis::daemon::interoception::pid_alive">pid_<wbr>alive</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Check whether a PID is alive (sends signal 0).</dd><dt><a class="fn" href="fn.publish_body_state.html" title="fn genesis::daemon::interoception::publish_body_state">publish_<wbr>body_<wbr>state</a></dt><dd>Publish the latest body state so the IPC handler can read it.
+Called after each reactive hardware read.</dd><dt><a class="fn" href="fn.publish_process_health.html" title="fn genesis::daemon::interoception::publish_process_health">publish_<wbr>process_<wbr>health</a></dt><dd>Publish the current process health.</dd><dt><a class="fn" href="fn.publish_sensor_presence.html" title="fn genesis::daemon::interoception::publish_sensor_presence">publish_<wbr>sensor_<wbr>presence</a></dt><dd>Publish the discovered sensor-presence mask alongside the body state.</dd><dt><a class="fn" href="fn.publish_subsystem_telemetry.html" title="fn genesis::daemon::interoception::publish_subsystem_telemetry">publish_<wbr>subsystem_<wbr>telemetry</a></dt><dd>Publish the latest per-subsystem telemetry so the IPC handler can
+serve GET_SUBSYSTEM_TELEMETRY. Called at the end of each read().</dd><dt><a class="fn" href="fn.rapl_delta_uj.html" title="fn genesis::daemon::interoception::rapl_delta_uj">rapl_<wbr>delta_<wbr>uj</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Compute the energy delta between two RAPL counter readings,
+handling counter wraparound.</dd><dt><a class="fn" href="fn.read_battery_cycles.html" title="fn genesis::daemon::interoception::read_battery_cycles">read_<wbr>battery_<wbr>cycles</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Battery charge cycles — the senescence odometer. Sums
+cycle_count across BAT* supplies (usually one). 0.0 if no
+battery reports cycles.</dd><dt><a class="fn" href="fn.read_clocksource.html" title="fn genesis::daemon::interoception::read_clocksource">read_<wbr>clocksource</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Which oscillator currently paces the clock: 0 = unknown,
+1 = tsc, 2 = hpet, 3 = acpi_pm, 4 = other.</dd><dt><a class="fn" href="fn.read_entropy_level.html" title="fn genesis::daemon::interoception::read_entropy_level">read_<wbr>entropy_<wbr>level</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Kernel entropy pool level [0, 1] — entropy_avail normalized by
+the CRNG pool capacity (256 bits on modern kernels).</dd><dt><a class="fn" href="fn.read_fan_pwm.html" title="fn genesis::daemon::interoception::read_fan_pwm">read_<wbr>fan_<wbr>pwm</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Read the fan speed, normalized to [0, 1].</dd><dt><a class="fn" href="fn.read_gpe_count.html" title="fn genesis::daemon::interoception::read_gpe_count">read_<wbr>gpe_<wbr>count</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Read the total GPE (General Purpose Event) count from the EC.</dd><dt><a class="fn" href="fn.read_loc_count.html" title="fn genesis::daemon::interoception::read_loc_count">read_<wbr>loc_<wbr>count</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Read the cumulative local-timer interrupt count — the sum of the
+<code>LOC</code> line’s per-CPU counters in /proc/interrupts. The Local APIC
+timer drives the scheduler tick on each core; under tickless idle
+(NO_HZ) a core’s beat pauses entirely while it sleeps, so this
+counter only advances while work exists. 0 if the line is absent
+(non-x86 or a kernel that reports the tick differently).</dd><dt><a class="fn" href="fn.read_max_freq.html" title="fn genesis::daemon::interoception::read_max_freq">read_<wbr>max_<wbr>freq</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Read the maximum CPU frequency.</dd><dt><a class="fn" href="fn.read_memory_mb.html" title="fn genesis::daemon::interoception::read_memory_mb">read_<wbr>memory_<wbr>mb</a></dt><dd>The last measured RSS of Genesis’s process tree, in megabytes.</dd><dt><a class="fn" href="fn.read_power_draw.html" title="fn genesis::daemon::interoception::read_power_draw">read_<wbr>power_<wbr>draw</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Read one power sensor, normalized to [0, 1].</dd><dt><a class="fn" href="fn.read_power_draw_any.html" title="fn genesis::daemon::interoception::read_power_draw_any">read_<wbr>power_<wbr>draw_<wbr>any</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Read power draw from the first candidate that reports something,
+normalized to [0, 1].</dd><dt><a class="fn" href="fn.read_process_health.html" title="fn genesis::daemon::interoception::read_process_health">read_<wbr>process_<wbr>health</a></dt><dd>Read the last published process health.</dd><dt><a class="fn" href="fn.read_psi.html" title="fn genesis::daemon::interoception::read_psi">read_<wbr>psi</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Read a PSI pressure-stall metric: /proc/pressure/{name}’s “some
+avg10” field as a fraction [0, 1] (avg10 is a percentage of the
+last 10-second window in which runnable tasks stalled on the
+resource). 0.0 if the file is unavailable or unparseable.</dd><dt><a class="fn" href="fn.read_sensor_presence.html" title="fn genesis::daemon::interoception::read_sensor_presence">read_<wbr>sensor_<wbr>presence</a></dt><dd>Read the published sensor-presence mask.</dd><dt><a class="fn" href="fn.read_shared_body_state.html" title="fn genesis::daemon::interoception::read_shared_body_state">read_<wbr>shared_<wbr>body_<wbr>state</a></dt><dd>Read the latest published body state for IPC responses.
+Returns a clone of the current body state.</dd><dt><a class="fn" href="fn.read_shared_subsystem_telemetry.html" title="fn genesis::daemon::interoception::read_shared_subsystem_telemetry">read_<wbr>shared_<wbr>subsystem_<wbr>telemetry</a></dt><dd>Read the latest published per-subsystem telemetry for IPC
+responses, with the wall-clock millisecond it was published —
+a response that keeps arriving is not proof the reader is still
+running, so the consumer needs the sample’s age, not just its
+contents.</dd><dt><a class="fn" href="fn.read_temp.html" title="fn genesis::daemon::interoception::read_temp">read_<wbr>temp</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Read temperature in degrees Celsius from a sysfs sensor.</dd><dt><a class="fn" href="fn.read_throttle_state.html" title="fn genesis::daemon::interoception::read_throttle_state">read_<wbr>throttle_<wbr>state</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Passive thermal throttling — the kernel’s cooling framework
+lowering the clock because the silicon is hot, decided below the
+OS scheduler. Returns the maximum cur_state/max_state ratio
+[0, 1] across Processor-type cooling devices. 0.0 = not
+throttled or no passive cooling devices exist.</dd><dt><a class="fn" href="fn.read_time_in_state.html" title="fn genesis::daemon::interoception::read_time_in_state">read_<wbr>time_<wbr>in_<wbr>state</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Cumulative jiffies spent at the maximum P-state and across all
+P-states, summed over cores from cpufreq stats/time_in_state.
+Returns (top, all). (0, 0) if cpufreq stats are unavailable.</dd><dt><a class="fn" href="fn.read_total_memory_kb.html" title="fn genesis::daemon::interoception::read_total_memory_kb">read_<wbr>total_<wbr>memory_<wbr>kb</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Read total system memory from /proc/meminfo (MemTotal in kB).</dd><dt><a class="fn" href="fn.read_u64.html" title="fn genesis::daemon::interoception::read_u64">read_<wbr>u64</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Read a single unsigned counter from a sysfs file. 0 if absent or
+unparseable — callers use it as a delta base, so a transient gap
+collapses to “no change this window” rather than a bogus spike.</dd><dt><a class="fn" href="fn.read_voltage.html" title="fn genesis::daemon::interoception::read_voltage">read_<wbr>voltage</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Read a voltage sensor, returning the value in volts.</dd><dt><a class="fn" href="fn.readable_freq.html" title="fn genesis::daemon::interoception::readable_freq">readable_<wbr>freq</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>True when <code>path</code> can be opened <em>and</em> yields a parseable kHz value.</dd><dt><a class="fn" href="fn.report_missing_sensors.html" title="fn genesis::daemon::interoception::report_missing_sensors">report_<wbr>missing_<wbr>sensors</a></dt><dd>Report which discovered sensors were absent, once, at startup.</dd><dt><a class="fn" href="fn.rss_kb.html" title="fn genesis::daemon::interoception::rss_kb">rss_kb</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Resident set size of one process, in kB. 0 if it cannot be read.</dd><dt><a class="fn" href="fn.shared_body.html" title="fn genesis::daemon::interoception::shared_body">shared_<wbr>body</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="fn" href="fn.shared_health.html" title="fn genesis::daemon::interoception::shared_health">shared_<wbr>health</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="fn" href="fn.shared_memory_mb.html" title="fn genesis::daemon::interoception::shared_memory_mb">shared_<wbr>memory_<wbr>mb</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="fn" href="fn.shared_presence.html" title="fn genesis::daemon::interoception::shared_presence">shared_<wbr>presence</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="fn" href="fn.shared_subsystems.html" title="fn genesis::daemon::interoception::shared_subsystems">shared_<wbr>subsystems</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="fn" href="fn.sibling_pwm_enable.html" title="fn genesis::daemon::interoception::sibling_pwm_enable">sibling_<wbr>pwm_<wbr>enable</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Read <code>pwm1_enable</code> given a path to <code>pwm1</code>, if it exists.</dd><dt><a class="fn" href="fn.sysconf_clk_tck.html" title="fn genesis::daemon::interoception::sysconf_clk_tck">sysconf_<wbr>clk_<wbr>tck</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Get the clock ticks per second (for /proc/<pid>/stat CPU times).</dd></dl></section></div></main></body></html>

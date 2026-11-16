@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.infrastructure.persistence</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.infrastructure.html" class="white">infrastructure</a>.persistence</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/infrastructure/persistence.py">/home/mindyrenee/GenAnd/Genesis/Self_World/infrastructure/persistence.py</a></td></tr></table>
+    <p><span class="code">Persistence&nbsp;—&nbsp;Genesis's&nbsp;memory&nbsp;across&nbsp;restarts.<br>
+&nbsp;<br>
+This&nbsp;module&nbsp;saves&nbsp;and&nbsp;loads&nbsp;Genesis's&nbsp;learned&nbsp;state&nbsp;to&nbsp;disk&nbsp;so&nbsp;it<br>
+remembers&nbsp;what&nbsp;it's&nbsp;learned&nbsp;between&nbsp;conversations.<br>
+&nbsp;<br>
+#&nbsp;What&nbsp;persists<br>
+&nbsp;<br>
+-&nbsp;**Concept&nbsp;network**:&nbsp;all&nbsp;concepts,&nbsp;aliases,&nbsp;relationships,&nbsp;confidence<br>
+-&nbsp;**Reflection&nbsp;state**:&nbsp;insights,&nbsp;interaction&nbsp;count,&nbsp;mood&nbsp;history<br>
+-&nbsp;**Narrative**:&nbsp;life&nbsp;events,&nbsp;chapters,&nbsp;personality&nbsp;snapshots<br>
+-&nbsp;**Self-model**:&nbsp;personality&nbsp;drift&nbsp;(if&nbsp;it's&nbsp;changed&nbsp;from&nbsp;defaults)<br>
+-&nbsp;**Self-directed&nbsp;learner**:&nbsp;cumulative&nbsp;stats,&nbsp;learning&nbsp;log,&nbsp;studied&nbsp;concepts<br>
+&nbsp;<br>
+#&nbsp;What&nbsp;doesn't&nbsp;persist<br>
+&nbsp;<br>
+-&nbsp;Working&nbsp;memory&nbsp;(current&nbsp;conversation&nbsp;context&nbsp;—&nbsp;that's&nbsp;ephemeral)<br>
+-&nbsp;Emotional&nbsp;state&nbsp;(that's&nbsp;in&nbsp;the&nbsp;Rust&nbsp;daemon's&nbsp;mmap'd&nbsp;state&nbsp;file)<br>
+-&nbsp;LTM&nbsp;episodes&nbsp;(those&nbsp;are&nbsp;already&nbsp;persisted&nbsp;by&nbsp;the&nbsp;Rust&nbsp;daemon)<br>
+&nbsp;<br>
+#&nbsp;Format<br>
+&nbsp;<br>
+JSON&nbsp;files&nbsp;in&nbsp;the&nbsp;data&nbsp;directory:<br>
+-&nbsp;`cognitive_state.json`&nbsp;—&nbsp;all&nbsp;cognitive&nbsp;mind&nbsp;state&nbsp;in&nbsp;one&nbsp;file<br>
+&nbsp;<br>
+Using&nbsp;a&nbsp;single&nbsp;file&nbsp;keeps&nbsp;it&nbsp;simple.&nbsp;The&nbsp;file&nbsp;is&nbsp;written&nbsp;atomically<br>
+(write&nbsp;to&nbsp;temp,&nbsp;rename)&nbsp;so&nbsp;a&nbsp;crash&nbsp;can't&nbsp;corrupt&nbsp;it.<br>
+&nbsp;<br>
+#&nbsp;Performance<br>
+&nbsp;<br>
+Uses&nbsp;``orjson``&nbsp;(Rust-backed&nbsp;JSON&nbsp;library)&nbsp;when&nbsp;available&nbsp;for&nbsp;6x<br>
+faster&nbsp;serialization.&nbsp;Falls&nbsp;back&nbsp;to&nbsp;stdlib&nbsp;``json``&nbsp;if&nbsp;orjson&nbsp;is<br>
+not&nbsp;installed.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="gzip.html">gzip</a><br>
+<a href="json.html">json</a><br>
+</td><td class="multicolumn"><a href="logging.html">logging</a><br>
+<a href="math.html">math</a><br>
+</td><td class="multicolumn"><a href="os.html">os</a><br>
+<a href="tempfile.html">tempfile</a><br>
+</td><td class="multicolumn"><a href="zlib.html">zlib</a><br>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-load_state"><strong>load_state</strong></a>(data_dir: 'str') -&gt; 'dict[str, Any] | None'</dt><dd><span class="code">Load&nbsp;Genesis's&nbsp;cognitive&nbsp;state&nbsp;from&nbsp;disk.<br>
+&nbsp;<br>
+Returns&nbsp;None&nbsp;if&nbsp;no&nbsp;saved&nbsp;state&nbsp;exists.<br>
+&nbsp;<br>
+Auto-detects&nbsp;gzip-compressed&nbsp;files&nbsp;by&nbsp;checking&nbsp;the&nbsp;magic&nbsp;bytes,<br>
+so&nbsp;both&nbsp;old&nbsp;uncompressed&nbsp;files&nbsp;and&nbsp;new&nbsp;compressed&nbsp;files&nbsp;are<br>
+readable.</span></dd></dl>
+ <dl><dt><a name="-restore_allostatic_load"><strong>restore_allostatic_load</strong></a>(allostatic_load: 'AllostaticLoadTracker', data: 'dict[str, Any]') -&gt; 'None'</dt><dd><span class="code">Restore&nbsp;allostatic&nbsp;load&nbsp;tracker&nbsp;from&nbsp;saved&nbsp;data.<br>
+&nbsp;<br>
+Handles&nbsp;backward&nbsp;compatibility&nbsp;with&nbsp;old&nbsp;save&nbsp;files&nbsp;that&nbsp;contain<br>
+``adjusted_baselines``&nbsp;(now&nbsp;removed)&nbsp;—&nbsp;those&nbsp;entries&nbsp;are&nbsp;silently<br>
+ignored.&nbsp;The&nbsp;``substrate_connected``&nbsp;field&nbsp;is&nbsp;always&nbsp;restored&nbsp;as<br>
+False;&nbsp;it&nbsp;will&nbsp;be&nbsp;set&nbsp;to&nbsp;True&nbsp;on&nbsp;the&nbsp;next&nbsp;``set_inference_load``<br>
+call&nbsp;from&nbsp;the&nbsp;Mind's&nbsp;reactive&nbsp;cycle.<br>
+&nbsp;<br>
+Finite&nbsp;values&nbsp;restore&nbsp;verbatim.&nbsp;``load_state``&nbsp;validates&nbsp;the&nbsp;save<br>
+file's&nbsp;version&nbsp;but&nbsp;not&nbsp;the&nbsp;values&nbsp;inside&nbsp;it,&nbsp;so&nbsp;malformed&nbsp;and<br>
+non-finite&nbsp;values&nbsp;are&nbsp;mapped&nbsp;to&nbsp;0.0&nbsp;at&nbsp;the&nbsp;persistence&nbsp;boundary.</span></dd></dl>
+ <dl><dt><a name="-restore_attractor"><strong>restore_attractor</strong></a>(attractor: 'AttractorNetwork', data: 'dict[str, Any]') -&gt; 'None'</dt><dd><span class="code">Restore&nbsp;attractor&nbsp;network&nbsp;from&nbsp;saved&nbsp;data.</span></dd></dl>
+ <dl><dt><a name="-restore_emergent_identity"><strong>restore_emergent_identity</strong></a>(emergent_identity: 'EmergentIdentity', data: 'dict[str, Any]') -&gt; 'tuple[list[EmergentIdentitySource], str, float, float]'</dt><dd><span class="code">Restore&nbsp;emergent&nbsp;identity&nbsp;from&nbsp;saved&nbsp;data.<br>
+&nbsp;<br>
+Returns&nbsp;the&nbsp;experience&nbsp;sources,&nbsp;self_description,&nbsp;confidence,&nbsp;and<br>
+coherence&nbsp;so&nbsp;the&nbsp;caller&nbsp;can&nbsp;wire&nbsp;them&nbsp;into&nbsp;the&nbsp;mind.</span></dd></dl>
+ <dl><dt><a name="-restore_emotional_memory"><strong>restore_emotional_memory</strong></a>(emotional_memory: 'EmotionalMemorySystem', data: 'dict[str, Any]') -&gt; 'None'</dt><dd><span class="code">Restore&nbsp;emotional&nbsp;memory&nbsp;system&nbsp;from&nbsp;saved&nbsp;data.</span></dd></dl>
+ <dl><dt><a name="-restore_error_monitor"><strong>restore_error_monitor</strong></a>(error_monitor: 'ErrorMonitor', data: 'dict[str, Any]') -&gt; 'None'</dt><dd><span class="code">Restore&nbsp;error&nbsp;monitor&nbsp;from&nbsp;saved&nbsp;data.</span></dd></dl>
+ <dl><dt><a name="-restore_hpa_axis"><strong>restore_hpa_axis</strong></a>(hpa_axis: 'HPAAxis', data: 'dict[str, Any]') -&gt; 'None'</dt><dd><span class="code">Restore&nbsp;HPA&nbsp;axis&nbsp;cascade&nbsp;state&nbsp;from&nbsp;saved&nbsp;data.</span></dd></dl>
+ <dl><dt><a name="-restore_narrative"><strong>restore_narrative</strong></a>(narrative: 'Narrator', data: 'dict[str, Any]') -&gt; 'None'</dt><dd><span class="code">Restore&nbsp;narrative&nbsp;engine&nbsp;state&nbsp;from&nbsp;saved&nbsp;data.<br>
+&nbsp;<br>
+Restores&nbsp;all&nbsp;narrative&nbsp;state:&nbsp;chapters,&nbsp;events,&nbsp;personality<br>
+snapshots,&nbsp;event&nbsp;counter,&nbsp;life&nbsp;script&nbsp;milestones,&nbsp;autobiographical<br>
+memory&nbsp;hierarchy,&nbsp;temporal/causal&nbsp;links,&nbsp;birth&nbsp;timestamp,&nbsp;and<br>
+restructuring&nbsp;count.&nbsp;Backward-compatible&nbsp;with&nbsp;older&nbsp;save&nbsp;files<br>
+that&nbsp;only&nbsp;contain&nbsp;chapters&nbsp;and&nbsp;personality_snapshots.</span></dd></dl>
+ <dl><dt><a name="-restore_network"><strong>restore_network</strong></a>(network: 'ConceptNetwork', data: 'dict[str, Any]', *, prune_dictionary: 'bool' = False) -&gt; 'None'</dt><dd><span class="code">Restore&nbsp;concept&nbsp;network&nbsp;from&nbsp;saved&nbsp;data.<br>
+&nbsp;<br>
+Concept&nbsp;IDs&nbsp;and&nbsp;edge&nbsp;references&nbsp;are&nbsp;normalized&nbsp;using<br>
+``_normalize_id``&nbsp;so&nbsp;that&nbsp;old&nbsp;save&nbsp;files&nbsp;(which&nbsp;may&nbsp;contain<br>
+non-normalized&nbsp;IDs&nbsp;like&nbsp;"micro-animal")&nbsp;are&nbsp;compatible&nbsp;with<br>
+the&nbsp;normalized&nbsp;ID&nbsp;scheme.</span></dd></dl>
+ <dl><dt><a name="-restore_predictive_coding"><strong>restore_predictive_coding</strong></a>(predictive_coding: 'PredictiveCodingLayer', data: 'dict[str, Any]') -&gt; 'None'</dt><dd><span class="code">Restore&nbsp;predictive&nbsp;coding&nbsp;layer&nbsp;from&nbsp;saved&nbsp;data.</span></dd></dl>
+ <dl><dt><a name="-restore_procedural_memory"><strong>restore_procedural_memory</strong></a>(procedural_memory: 'ProceduralMemory', data: 'dict[str, Any]') -&gt; 'None'</dt><dd><span class="code">Restore&nbsp;procedural&nbsp;memory&nbsp;(skills)&nbsp;from&nbsp;saved&nbsp;data.<br>
+&nbsp;<br>
+Backward-compatible&nbsp;with&nbsp;old&nbsp;save&nbsp;files&nbsp;that&nbsp;used&nbsp;``response``&nbsp;(a<br>
+string)&nbsp;instead&nbsp;of&nbsp;``strategy``&nbsp;(a&nbsp;dict).&nbsp;Old&nbsp;skills&nbsp;are&nbsp;restored<br>
+with&nbsp;a&nbsp;default&nbsp;strategy.</span></dd></dl>
+ <dl><dt><a name="-restore_reflection"><strong>restore_reflection</strong></a>(reflection: 'Reflection', data: 'dict[str, Any]') -&gt; 'None'</dt><dd><span class="code">Restore&nbsp;reflection&nbsp;engine&nbsp;state&nbsp;from&nbsp;saved&nbsp;data.</span></dd></dl>
+ <dl><dt><a name="-restore_self_directed_learner"><strong>restore_self_directed_learner</strong></a>(learner: 'SelfDirectedLearner', data: 'dict[str, Any]') -&gt; 'None'</dt><dd><span class="code">Restore&nbsp;self-directed&nbsp;learner&nbsp;state&nbsp;from&nbsp;saved&nbsp;data.<br>
+&nbsp;<br>
+Restores&nbsp;the&nbsp;learner's&nbsp;cumulative&nbsp;stats,&nbsp;studied&nbsp;concepts,&nbsp;and<br>
+learning&nbsp;log.&nbsp;The&nbsp;concept&nbsp;network&nbsp;itself&nbsp;is&nbsp;restored&nbsp;separately<br>
+via&nbsp;``restore_network``&nbsp;—&nbsp;this&nbsp;only&nbsp;restores&nbsp;the&nbsp;learner's<br>
+telemetry&nbsp;and&nbsp;internal&nbsp;state.</span></dd></dl>
+ <dl><dt><a name="-restore_self_improvement"><strong>restore_self_improvement</strong></a>(engine: 'SelfImprovement', data: 'dict[str, Any]') -&gt; 'None'</dt><dd><span class="code">Restore&nbsp;self-improvement&nbsp;engine&nbsp;state&nbsp;from&nbsp;saved&nbsp;data.<br>
+&nbsp;<br>
+Restores&nbsp;all&nbsp;proposals&nbsp;(with&nbsp;their&nbsp;statuses&nbsp;and&nbsp;feedback),<br>
+the&nbsp;feedback&nbsp;history,&nbsp;and&nbsp;the&nbsp;category&nbsp;success&nbsp;statistics.<br>
+This&nbsp;allows&nbsp;Genesis&nbsp;to&nbsp;remember&nbsp;what&nbsp;it&nbsp;proposed,&nbsp;what&nbsp;was<br>
+accepted/rejected,&nbsp;and&nbsp;what&nbsp;it&nbsp;learned&nbsp;from&nbsp;the&nbsp;feedback.</span></dd></dl>
+ <dl><dt><a name="-restore_self_model"><strong>restore_self_model</strong></a>(self_model: 'SelfModel', data: 'dict[str, Any]') -&gt; 'None'</dt><dd><span class="code">Restore&nbsp;self-model&nbsp;from&nbsp;saved&nbsp;data&nbsp;(personality&nbsp;drift).</span></dd></dl>
+ <dl><dt><a name="-restore_semantic_memory"><strong>restore_semantic_memory</strong></a>(semantic_memory: 'SemanticMemory', data: 'dict[str, Any]') -&gt; 'None'</dt><dd><span class="code">Restore&nbsp;the&nbsp;semantic&nbsp;fact/schema&nbsp;store&nbsp;from&nbsp;persisted&nbsp;state.<br>
+&nbsp;<br>
+Never&nbsp;raises:&nbsp;a&nbsp;corrupt&nbsp;or&nbsp;partial&nbsp;payload&nbsp;costs&nbsp;the&nbsp;learned&nbsp;facts,<br>
+not&nbsp;the&nbsp;ability&nbsp;to&nbsp;start.&nbsp;`SemanticMemory.restore`&nbsp;does&nbsp;the<br>
+per-record&nbsp;validation.</span></dd></dl>
+ <dl><dt><a name="-restore_sleep_cycle"><strong>restore_sleep_cycle</strong></a>(sleep_cycle: 'Any', data: 'dict[str, Any]') -&gt; 'None'</dt><dd><span class="code">Restore&nbsp;a&nbsp;SleepCycleTracker&nbsp;from&nbsp;saved&nbsp;data.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;sleep_cycle:&nbsp;The&nbsp;SleepCycleTracker&nbsp;to&nbsp;restore&nbsp;(in-place).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;data:&nbsp;The&nbsp;saved&nbsp;cycle&nbsp;data&nbsp;from&nbsp;serialize_sleep_state.</span></dd></dl>
+ <dl><dt><a name="-restore_spaced_repetition"><strong>restore_spaced_repetition</strong></a>(spaced_repetition: 'SpacedRepetitionScheduler', data: 'dict[str, Any]') -&gt; 'None'</dt><dd><span class="code">Restore&nbsp;spaced&nbsp;repetition&nbsp;scheduler&nbsp;from&nbsp;saved&nbsp;data.</span></dd></dl>
+ <dl><dt><a name="-restore_synapses"><strong>restore_synapses</strong></a>(synapses: 'SynapticStore', data: 'dict[str, Any]') -&gt; 'None'</dt><dd><span class="code">Restore&nbsp;learned&nbsp;synaptic&nbsp;efficacies&nbsp;from&nbsp;saved&nbsp;state.</span></dd></dl>
+ <dl><dt><a name="-restore_task_competence"><strong>restore_task_competence</strong></a>(task_competence: 'TaskCompetence', data: 'dict[str, Any]') -&gt; 'None'</dt><dd><span class="code">Restore&nbsp;learned&nbsp;task&nbsp;schemas,&nbsp;affordances,&nbsp;and&nbsp;skills.</span></dd></dl>
+ <dl><dt><a name="-restore_td_learner"><strong>restore_td_learner</strong></a>(td_learner: 'TDLearner', data: 'dict[str, Any]') -&gt; 'None'</dt><dd><span class="code">Restore&nbsp;TD&nbsp;learner&nbsp;from&nbsp;saved&nbsp;data.</span></dd></dl>
+ <dl><dt><a name="-restore_theory_of_mind"><strong>restore_theory_of_mind</strong></a>(theory_of_mind: 'TheoryOfMind', data: 'dict[str, Any]') -&gt; 'None'</dt><dd><span class="code">Restore&nbsp;theory&nbsp;of&nbsp;mind&nbsp;(user&nbsp;model)&nbsp;from&nbsp;saved&nbsp;data.</span></dd></dl>
+ <dl><dt><a name="-save_state"><strong>save_state</strong></a>(data_dir: 'str', network: 'ConceptNetwork', reflection: 'Reflection', narrative: 'Narrator', self_model: 'SelfModel', *, predictive_coding: 'PredictiveCodingLayer | None' = None, theory_of_mind: 'TheoryOfMind | None' = None, procedural_memory: 'ProceduralMemory | None' = None, task_competence: 'TaskCompetence | None' = None, spaced_repetition: 'SpacedRepetitionScheduler | None' = None, td_learner: 'TDLearner | None' = None, synapses: 'SynapticStore | None' = None, emotional_memory: 'EmotionalMemorySystem | None' = None, semantic_memory: 'SemanticMemory | None' = None, attractor: 'AttractorNetwork | None' = None, error_monitor: 'ErrorMonitor | None' = None, emergent_identity: 'EmergentIdentity | None' = None, emergent_identity_sources: 'list[EmergentIdentitySource] | None' = None, hpa_axis: 'HPAAxis | None' = None, allostatic_load: 'AllostaticLoadTracker | None' = None, self_directed_learner: 'SelfDirectedLearner | None' = None, autonomous_learner: 'AutonomousLearner | None' = None, self_improvement: 'SelfImprovement | None' = None, growth_ledger: 'GrowthLedger | None' = None, plasticity: 'HebbianPlasticity | None' = None, developmental_tracker: 'DevelopmentalTracker | None' = None, sleep_state: 'dict[str, Any] | None' = None, memory_records: 'dict[str, Any] | None' = None, cognitive_trajectory: 'CognitiveTrajectoryModel | None' = None, dream_synthesis: 'Any' = None, inner_life_state: 'dict[str, Any] | None' = None, world_state: 'dict[str, Any] | None' = None, executive: 'ExecutiveFunction | None' = None, curiosity: 'Curiosity | None' = None, cognitive_map: 'CognitiveMap | None' = None) -&gt; 'None'</dt><dd><span class="code">Save&nbsp;Genesis's&nbsp;cognitive&nbsp;state&nbsp;to&nbsp;disk.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;data_dir:&nbsp;The&nbsp;data&nbsp;directory&nbsp;(same&nbsp;one&nbsp;the&nbsp;daemon&nbsp;uses).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;network:&nbsp;The&nbsp;concept&nbsp;network&nbsp;to&nbsp;save.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;reflection:&nbsp;The&nbsp;reflection&nbsp;engine&nbsp;state&nbsp;to&nbsp;save.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;narrative:&nbsp;The&nbsp;narrative&nbsp;engine&nbsp;state&nbsp;to&nbsp;save.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;self_model:&nbsp;The&nbsp;self-model&nbsp;(for&nbsp;personality&nbsp;drift).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;semantic_memory:&nbsp;The&nbsp;neocortical&nbsp;fact/schema&nbsp;store.&nbsp;Omitting&nbsp;it<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;loses&nbsp;every&nbsp;consolidated&nbsp;fact,&nbsp;because&nbsp;those&nbsp;edges&nbsp;are<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;rejected&nbsp;by&nbsp;the&nbsp;canonical&nbsp;edge&nbsp;log&nbsp;(see<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;``_serialize_semantic_memory``).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;sleep_state:&nbsp;Sleep&nbsp;state&nbsp;(is_sleeping,&nbsp;user_initiated,&nbsp;cycle<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;tracker&nbsp;position)&nbsp;so&nbsp;sleep&nbsp;survives&nbsp;restarts.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;memory_records:&nbsp;Python-side&nbsp;memory&nbsp;metadata&nbsp;(consolidation,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;forgetting,&nbsp;source&nbsp;tags)&nbsp;from&nbsp;``MemorySystem.serialize_records``.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;world_state:&nbsp;Its&nbsp;external&nbsp;world&nbsp;(presences,&nbsp;recent&nbsp;events,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;social&nbsp;clock)&nbsp;from&nbsp;``OuterEnvironment.to_dict``.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;curiosity:&nbsp;Asked/resolved&nbsp;question&nbsp;history&nbsp;and&nbsp;gap&nbsp;habituation&nbsp;—<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;novelty&nbsp;window&nbsp;that&nbsp;stops&nbsp;questions&nbsp;re-firing&nbsp;on&nbsp;restart.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;remaining&nbsp;kwargs:&nbsp;Optional&nbsp;subsystem&nbsp;states,&nbsp;each&nbsp;serialized&nbsp;iff<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;present&nbsp;—&nbsp;see&nbsp;``_add_optional_state``&nbsp;for&nbsp;the&nbsp;full&nbsp;list.</span></dd></dl>
+ <dl><dt><a name="-serialize_sleep_state"><strong>serialize_sleep_state</strong></a>(is_sleeping: 'bool', user_initiated_sleep: 'bool', sleep_cycle: 'Any', sleep_start_time: 'float' = 0.0, sleep_start_cycles: 'int' = 0) -&gt; 'dict[str, Any]'</dt><dd><span class="code">Serialize&nbsp;sleep&nbsp;state&nbsp;so&nbsp;it&nbsp;survives&nbsp;restarts.<br>
+&nbsp;<br>
+The&nbsp;daemon's&nbsp;mmap&nbsp;state&nbsp;(core_state.bin)&nbsp;already&nbsp;persists&nbsp;the<br>
+neurochemical&nbsp;levels&nbsp;and&nbsp;emergent_phase&nbsp;(nrem/rem),&nbsp;but&nbsp;the<br>
+Python-side&nbsp;sleep&nbsp;flags&nbsp;and&nbsp;the&nbsp;ultradian&nbsp;cycle&nbsp;tracker<br>
+(N1→N2→N3→N2→REM&nbsp;position)&nbsp;are&nbsp;in-memory&nbsp;only.&nbsp;Without&nbsp;this,<br>
+a&nbsp;restart&nbsp;forces&nbsp;it&nbsp;awake&nbsp;(Mind.start&nbsp;sets&nbsp;ZONE_CONVERSATION)<br>
+and&nbsp;clears&nbsp;adenosine&nbsp;—&nbsp;it&nbsp;loses&nbsp;its&nbsp;place&nbsp;in&nbsp;the&nbsp;sleep&nbsp;cycle<br>
+and&nbsp;any&nbsp;N3&nbsp;consolidation&nbsp;that&nbsp;hadn't&nbsp;fired&nbsp;yet.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;is_sleeping:&nbsp;Whether&nbsp;it's&nbsp;currently&nbsp;asleep.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;user_initiated_sleep:&nbsp;Whether&nbsp;the&nbsp;user&nbsp;put&nbsp;it&nbsp;to&nbsp;bed<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(vs.&nbsp;a&nbsp;body-joined&nbsp;or&nbsp;urge-invoked&nbsp;sleep).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;sleep_cycle:&nbsp;The&nbsp;SleepCycleTracker&nbsp;(or&nbsp;None&nbsp;if&nbsp;awake).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;sleep_start_time:&nbsp;Wall-clock&nbsp;time&nbsp;the&nbsp;episode&nbsp;began.&nbsp;The&nbsp;wake<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;event's&nbsp;duration&nbsp;accounting&nbsp;measures&nbsp;from&nbsp;it;&nbsp;without&nbsp;it&nbsp;a<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;resumed&nbsp;sleep&nbsp;reports&nbsp;every&nbsp;wake&nbsp;as&nbsp;zero-length.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;sleep_start_cycles:&nbsp;``cycles_completed``&nbsp;at&nbsp;sleep&nbsp;onset&nbsp;—&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;episode's&nbsp;anchor&nbsp;into&nbsp;the&nbsp;tracker's&nbsp;cumulative&nbsp;count,&nbsp;so&nbsp;a<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;resumed&nbsp;sleep&nbsp;knows&nbsp;where&nbsp;its&nbsp;own&nbsp;cycles&nbsp;begin.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>TYPE_CHECKING</strong> = False<br>
+<strong>logger</strong> = &lt;Logger Self_World.infrastructure.persistence (WARNING)&gt;</td></tr></table>
+</body></html>

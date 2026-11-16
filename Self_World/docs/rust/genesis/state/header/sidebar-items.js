@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["MAGIC","MARKER_G06","SCHEMA_VERSION"],"struct":["CoreStateHeader"]};

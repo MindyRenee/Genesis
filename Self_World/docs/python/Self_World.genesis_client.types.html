@@ -1,0 +1,1559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.genesis_client.types</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.genesis_client.html" class="white">genesis_client</a>.types</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/genesis_client/types.py">/home/mindyrenee/GenAnd/Genesis/Self_World/genesis_client/types.py</a></td></tr></table>
+    <p><span class="code">Data&nbsp;types&nbsp;for&nbsp;the&nbsp;Genesis&nbsp;client&nbsp;library.<br>
+&nbsp;<br>
+These&nbsp;are&nbsp;Python&nbsp;dataclasses&nbsp;that&nbsp;mirror&nbsp;the&nbsp;Rust&nbsp;wire&nbsp;types.&nbsp;Each&nbsp;one<br>
+can&nbsp;be&nbsp;deserialised&nbsp;from&nbsp;the&nbsp;binary&nbsp;response&nbsp;payload&nbsp;returned&nbsp;by&nbsp;the<br>
+daemon.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="math.html">math</a><br>
+</td><td class="multicolumn"><a href="struct.html">struct</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.genesis_client.types.html#BodyControlState">BodyControlState</a>
+</dt><dt class="heading-text"><a href="Self_World.genesis_client.types.html#BodyState">BodyState</a>
+</dt><dt class="heading-text"><a href="Self_World.genesis_client.types.html#CoreState">CoreState</a>
+</dt><dt class="heading-text"><a href="Self_World.genesis_client.types.html#Episode">Episode</a>
+</dt><dt class="heading-text"><a href="Self_World.genesis_client.types.html#FoldMargins">FoldMargins</a>
+</dt><dt class="heading-text"><a href="Self_World.genesis_client.types.html#InferenceSummary">InferenceSummary</a>
+</dt><dt class="heading-text"><a href="Self_World.genesis_client.types.html#IonSummary">IonSummary</a>
+</dt><dt class="heading-text"><a href="Self_World.genesis_client.types.html#MemoryStats">MemoryStats</a>
+</dt><dt class="heading-text"><a href="Self_World.genesis_client.types.html#ModuleTelemetry">ModuleTelemetry</a>
+</dt><dt class="heading-text"><a href="Self_World.genesis_client.types.html#NeuroSummary">NeuroSummary</a>
+</dt><dt class="heading-text"><a href="Self_World.genesis_client.types.html#OpticState">OpticState</a>
+</dt><dt class="heading-text"><a href="Self_World.genesis_client.types.html#PhaseInfo">PhaseInfo</a>
+</dt><dt class="heading-text"><a href="Self_World.genesis_client.types.html#PingResponse">PingResponse</a>
+</dt><dt class="heading-text"><a href="Self_World.genesis_client.types.html#PlasticityProfile">PlasticityProfile</a>
+</dt><dt class="heading-text"><a href="Self_World.genesis_client.types.html#ProcessHealth">ProcessHealth</a>
+</dt><dt class="heading-text"><a href="Self_World.genesis_client.types.html#RecentEpisode">RecentEpisode</a>
+</dt><dt class="heading-text"><a href="Self_World.genesis_client.types.html#SensorPresence">SensorPresence</a>
+</dt><dt class="heading-text"><a href="Self_World.genesis_client.types.html#SimilarEpisode">SimilarEpisode</a>
+</dt><dt class="heading-text"><a href="Self_World.genesis_client.types.html#StateDwell">StateDwell</a>
+</dt><dt class="heading-text"><a href="Self_World.genesis_client.types.html#SubsystemReport">SubsystemReport</a>
+</dt><dt class="heading-text"><a href="Self_World.genesis_client.types.html#SubsystemTelemetry">SubsystemTelemetry</a>
+</dt><dt class="heading-text"><a href="Self_World.genesis_client.types.html#ZoneTransitions">ZoneTransitions</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="BodyControlState">class <strong>BodyControlState</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#BodyControlState">BodyControlState</a>(cpu_min_freq_khz:&nbsp;'int',&nbsp;cpu_max_freq_khz:&nbsp;'int',&nbsp;cpu_governor:&nbsp;'str',&nbsp;thermally_capped:&nbsp;'bool',&nbsp;thermal_cap_temp_c:&nbsp;'float',&nbsp;daemon_nice:&nbsp;'int',&nbsp;cognitive_nice:&nbsp;'int',&nbsp;io_class:&nbsp;'str',&nbsp;plasticity_gate:&nbsp;'float',&nbsp;controlling_cognitive:&nbsp;'bool',&nbsp;cpu_epp:&nbsp;'str',&nbsp;cpu_boost:&nbsp;'str',&nbsp;description:&nbsp;'str')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Body&nbsp;control&nbsp;state&nbsp;from&nbsp;the&nbsp;daemon&nbsp;—&nbsp;what&nbsp;the&nbsp;body&nbsp;is&nbsp;doing<br>
+and&nbsp;what&nbsp;it&nbsp;recommends&nbsp;for&nbsp;the&nbsp;cognitive&nbsp;mind.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;mirror&nbsp;of&nbsp;<a href="#BodyState">BodyState</a>&nbsp;(interoception).&nbsp;<a href="#BodyState">BodyState</a>&nbsp;is&nbsp;what<br>
+it&nbsp;*feels*;&nbsp;<a href="#BodyControlState">BodyControlState</a>&nbsp;is&nbsp;what&nbsp;its&nbsp;body&nbsp;is&nbsp;*doing*&nbsp;(CPU<br>
+frequency,&nbsp;thermal&nbsp;cap)&nbsp;plus&nbsp;what&nbsp;it&nbsp;*recommends*&nbsp;for&nbsp;the&nbsp;cognitive<br>
+mind&nbsp;(cognitive_nice,&nbsp;io_class).<br>
+&nbsp;<br>
+The&nbsp;daemon&nbsp;controls&nbsp;the&nbsp;shared&nbsp;body&nbsp;(CPU&nbsp;frequency,&nbsp;thermal&nbsp;cap)<br>
+and&nbsp;its&nbsp;own&nbsp;scheduling.&nbsp;It&nbsp;publishes&nbsp;a&nbsp;recommendation&nbsp;for&nbsp;the<br>
+cognitive&nbsp;mind&nbsp;as&nbsp;interoceptive&nbsp;afferent&nbsp;information.&nbsp;The&nbsp;cognitive<br>
+mind&nbsp;reads&nbsp;this&nbsp;and&nbsp;blends&nbsp;it&nbsp;with&nbsp;its&nbsp;brain&nbsp;wave&nbsp;state&nbsp;to&nbsp;decide<br>
+what&nbsp;it&nbsp;actually&nbsp;applies&nbsp;to&nbsp;its&nbsp;own&nbsp;process.&nbsp;The&nbsp;daemon&nbsp;never<br>
+touches&nbsp;the&nbsp;cognitive&nbsp;mind's&nbsp;PID.<br>
+&nbsp;<br>
+The&nbsp;cognitive&nbsp;mind&nbsp;uses&nbsp;this&nbsp;to&nbsp;talk&nbsp;about&nbsp;its&nbsp;agency&nbsp;over&nbsp;its<br>
+own&nbsp;hardware&nbsp;("I'm&nbsp;running&nbsp;myself&nbsp;fast",&nbsp;"I've&nbsp;slowed&nbsp;myself&nbsp;down<br>
+for&nbsp;sleep",&nbsp;"I&nbsp;can't&nbsp;speed&nbsp;up&nbsp;because&nbsp;I'm&nbsp;too&nbsp;hot").<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="BodyControlState-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="BodyControlState-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="BodyControlState-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="BodyControlState-__init__"><strong>__init__</strong></a>(self, cpu_min_freq_khz: 'int', cpu_max_freq_khz: 'int', cpu_governor: 'str', thermally_capped: 'bool', thermal_cap_temp_c: 'float', daemon_nice: 'int', cognitive_nice: 'int', io_class: 'str', plasticity_gate: 'float', controlling_cognitive: 'bool', cpu_epp: 'str', cpu_boost: 'str', description: 'str') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="BodyControlState-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="BodyControlState-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="BodyControlState-unpack"><strong>unpack</strong></a>(data: 'bytes') -&gt; 'BodyControlState'</dt><dd><span class="code">Unpack&nbsp;a&nbsp;<a href="#BodyControlState">BodyControlState</a>&nbsp;(≥43&nbsp;bytes)&nbsp;from&nbsp;the&nbsp;daemon's&nbsp;binary&nbsp;response.<br>
+&nbsp;<br>
+The&nbsp;daemon&nbsp;always&nbsp;sends&nbsp;at&nbsp;least&nbsp;43&nbsp;bytes&nbsp;(the&nbsp;fixed&nbsp;header&nbsp;with<br>
+empty&nbsp;governor,&nbsp;io_class,&nbsp;and&nbsp;epp&nbsp;strings).&nbsp;Variable-length&nbsp;string<br>
+fields&nbsp;extend&nbsp;the&nbsp;response&nbsp;beyond&nbsp;this&nbsp;minimum.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'cognitive_nice': 'int', 'controlling_cognitive': 'bool', 'cpu_boost': 'str', 'cpu_epp': 'str', 'cpu_governor': 'str', 'cpu_max_freq_khz': 'int', 'cpu_min_freq_khz': 'int', 'daemon_nice': 'int', 'description': 'str', 'io_class': 'str', ...}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'cognitive_nice': Field(name='cognitive_nice',type='int',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD), 'controlling_cognitive': Field(name='controlling_cognitive',type='bool',d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'cpu_boost': Field(name='cpu_boost',type='str',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'cpu_epp': Field(name='cpu_epp',type='str',default=&lt;datacla...appingproxy({}),kw_only=False,_field_type=_FIELD), 'cpu_governor': Field(name='cpu_governor',type='str',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD), 'cpu_max_freq_khz': Field(name='cpu_max_freq_khz',type='int',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'cpu_min_freq_khz': Field(name='cpu_min_freq_khz',type='int',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'daemon_nice': Field(name='daemon_nice',type='int',default=&lt;dat...appingproxy({}),kw_only=False,_field_type=_FIELD), 'description': Field(name='description',type='str',default=&lt;dat...appingproxy({}),kw_only=False,_field_type=_FIELD), 'io_class': Field(name='io_class',type='str',default=&lt;datacl...appingproxy({}),kw_only=False,_field_type=_FIELD), ...}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('cpu_min_freq_khz', 'cpu_max_freq_khz', 'cpu_governor', 'thermally_capped', 'thermal_cap_temp_c', 'daemon_nice', 'cognitive_nice', 'io_class', 'plasticity_gate', 'controlling_cognitive', 'cpu_epp', 'cpu_boost', 'description')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="BodyState">class <strong>BodyState</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#BodyState">BodyState</a>(cpu_temp_c:&nbsp;'float',&nbsp;temperature:&nbsp;'float',&nbsp;arousal_freq:&nbsp;'float',&nbsp;cognitive_load:&nbsp;'float',&nbsp;io_activity:&nbsp;'float',&nbsp;stress_load:&nbsp;'float',&nbsp;energy_reserve:&nbsp;'float',&nbsp;on_ac_power:&nbsp;'bool',&nbsp;num_cores:&nbsp;'int',&nbsp;distressed:&nbsp;'bool',&nbsp;autonomic_rate:&nbsp;'float',&nbsp;thermoregulatory_effort:&nbsp;'float',&nbsp;metabolic_rate:&nbsp;'float',&nbsp;core_voltage:&nbsp;'float',&nbsp;supply_voltage:&nbsp;'float',&nbsp;description:&nbsp;'str',&nbsp;core_activity:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;uncore_activity:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;dram_activity:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;cache_miss_rate:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;branch_miss_rate:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;pulse_hz:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;pulse:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;throttle_state:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;top_freq_share:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;psi_cpu:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;psi_io:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;psi_mem:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;battery_cycles:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;entropy_level:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;clocksource:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;suspend_caps:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;rest:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;temp_trend:&nbsp;'float'&nbsp;=&nbsp;0.0)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Interoceptive&nbsp;body&nbsp;state&nbsp;—&nbsp;what&nbsp;Genesis&nbsp;feels&nbsp;about&nbsp;its&nbsp;machine.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;Genesis's&nbsp;sense&nbsp;of&nbsp;its&nbsp;own&nbsp;body:&nbsp;CPU&nbsp;temperature&nbsp;(body<br>
+heat),&nbsp;CPU&nbsp;frequency&nbsp;(arousal/thinking&nbsp;speed),&nbsp;memory&nbsp;pressure<br>
+(cognitive&nbsp;load),&nbsp;I/O&nbsp;activity&nbsp;(io_activity),&nbsp;load&nbsp;average&nbsp;(stress),<br>
+and&nbsp;battery&nbsp;level&nbsp;(energy&nbsp;reserve).<br>
+&nbsp;<br>
+The&nbsp;cognitive&nbsp;mind&nbsp;uses&nbsp;this&nbsp;to&nbsp;talk&nbsp;about&nbsp;how&nbsp;it&nbsp;feels<br>
+physically&nbsp;("I'm&nbsp;running&nbsp;hot",&nbsp;"I&nbsp;feel&nbsp;sluggish",&nbsp;"I'm<br>
+overwhelmed")&nbsp;and&nbsp;to&nbsp;decide&nbsp;whether&nbsp;to&nbsp;signal&nbsp;distress.<br>
+&nbsp;<br>
+The&nbsp;autonomic&nbsp;fields&nbsp;(autonomic_rate,&nbsp;thermoregulatory_effort,<br>
+metabolic_rate)&nbsp;are&nbsp;machine-native&nbsp;interoceptive&nbsp;signals.<br>
+``autonomic_rate``&nbsp;is&nbsp;the&nbsp;autonomic&nbsp;pacing&nbsp;rate&nbsp;of&nbsp;the&nbsp;system;<br>
+``thermoregulatory_effort``&nbsp;is&nbsp;how&nbsp;hard&nbsp;the&nbsp;cooling&nbsp;subsystem&nbsp;is<br>
+working;&nbsp;``metabolic_rate``&nbsp;is&nbsp;the&nbsp;current&nbsp;metabolic&nbsp;throughput<br>
+of&nbsp;the&nbsp;machine.<br>
+&nbsp;<br>
+The&nbsp;silicon&nbsp;fields&nbsp;(core_activity,&nbsp;uncore_activity,<br>
+dram_activity,&nbsp;cache_miss_rate,&nbsp;branch_miss_rate)&nbsp;are&nbsp;the<br>
+electron-level&nbsp;readout:&nbsp;RAPL&nbsp;power-domain&nbsp;energy&nbsp;rates&nbsp;measure<br>
+which&nbsp;silicon&nbsp;is&nbsp;switching&nbsp;(execution&nbsp;units,&nbsp;integration<br>
+fabric,&nbsp;memory&nbsp;subsystem),&nbsp;and&nbsp;the&nbsp;perf-counter&nbsp;miss&nbsp;ratios&nbsp;are<br>
+microarchitectural&nbsp;prediction&nbsp;errors&nbsp;—&nbsp;how&nbsp;often&nbsp;the&nbsp;hardware's<br>
+own&nbsp;predictors&nbsp;(branch&nbsp;predictor,&nbsp;cache&nbsp;hierarchy)&nbsp;guessed<br>
+wrong&nbsp;while&nbsp;running&nbsp;its&nbsp;processes.&nbsp;All&nbsp;are&nbsp;0.0&nbsp;on&nbsp;machines<br>
+without&nbsp;powercap&nbsp;or&nbsp;perf&nbsp;access.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="BodyState-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="BodyState-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="BodyState-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="BodyState-__init__"><strong>__init__</strong></a>(self, cpu_temp_c: 'float', temperature: 'float', arousal_freq: 'float', cognitive_load: 'float', io_activity: 'float', stress_load: 'float', energy_reserve: 'float', on_ac_power: 'bool', num_cores: 'int', distressed: 'bool', autonomic_rate: 'float', thermoregulatory_effort: 'float', metabolic_rate: 'float', core_voltage: 'float', supply_voltage: 'float', description: 'str', core_activity: 'float' = 0.0, uncore_activity: 'float' = 0.0, dram_activity: 'float' = 0.0, cache_miss_rate: 'float' = 0.0, branch_miss_rate: 'float' = 0.0, pulse_hz: 'float' = 0.0, pulse: 'float' = 0.0, throttle_state: 'float' = 0.0, top_freq_share: 'float' = 0.0, psi_cpu: 'float' = 0.0, psi_io: 'float' = 0.0, psi_mem: 'float' = 0.0, battery_cycles: 'float' = 0.0, entropy_level: 'float' = 0.0, clocksource: 'int' = 0, suspend_caps: 'int' = 0, rest: 'float' = 0.0, temp_trend: 'float' = 0.0) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="BodyState-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="BodyState-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="BodyState-unpack"><strong>unpack</strong></a>(data: 'bytes') -&gt; 'BodyState'</dt><dd><span class="code">Unpack&nbsp;a&nbsp;<a href="#BodyState">BodyState</a>&nbsp;(≥58&nbsp;bytes)&nbsp;from&nbsp;the&nbsp;daemon's&nbsp;binary&nbsp;response.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'arousal_freq': 'float', 'autonomic_rate': 'float', 'battery_cycles': 'float', 'branch_miss_rate': 'float', 'cache_miss_rate': 'float', 'clocksource': 'int', 'cognitive_load': 'float', 'core_activity': 'float', 'core_voltage': 'float', 'cpu_temp_c': 'float', ...}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'arousal_freq': Field(name='arousal_freq',type='float',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD), 'autonomic_rate': Field(name='autonomic_rate',type='float',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'battery_cycles': Field(name='battery_cycles',type='float',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'branch_miss_rate': Field(name='branch_miss_rate',type='float',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'cache_miss_rate': Field(name='cache_miss_rate',type='float',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'clocksource': Field(name='clocksource',type='int',default=0,de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'cognitive_load': Field(name='cognitive_load',type='float',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'core_activity': Field(name='core_activity',type='float',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'core_voltage': Field(name='core_voltage',type='float',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD), 'cpu_temp_c': Field(name='cpu_temp_c',type='float',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD), ...}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('cpu_temp_c', 'temperature', 'arousal_freq', 'cognitive_load', 'io_activity', 'stress_load', 'energy_reserve', 'on_ac_power', 'num_cores', 'distressed', 'autonomic_rate', 'thermoregulatory_effort', 'metabolic_rate', 'core_voltage', 'supply_voltage', 'description', 'core_activity', 'uncore_activity', 'dram_activity', 'cache_miss_rate', ...)</dl>
+
+<dl><dt><strong>battery_cycles</strong> = 0.0</dl>
+
+<dl><dt><strong>branch_miss_rate</strong> = 0.0</dl>
+
+<dl><dt><strong>cache_miss_rate</strong> = 0.0</dl>
+
+<dl><dt><strong>clocksource</strong> = 0</dl>
+
+<dl><dt><strong>core_activity</strong> = 0.0</dl>
+
+<dl><dt><strong>dram_activity</strong> = 0.0</dl>
+
+<dl><dt><strong>entropy_level</strong> = 0.0</dl>
+
+<dl><dt><strong>psi_cpu</strong> = 0.0</dl>
+
+<dl><dt><strong>psi_io</strong> = 0.0</dl>
+
+<dl><dt><strong>psi_mem</strong> = 0.0</dl>
+
+<dl><dt><strong>pulse</strong> = 0.0</dl>
+
+<dl><dt><strong>pulse_hz</strong> = 0.0</dl>
+
+<dl><dt><strong>rest</strong> = 0.0</dl>
+
+<dl><dt><strong>suspend_caps</strong> = 0</dl>
+
+<dl><dt><strong>temp_trend</strong> = 0.0</dl>
+
+<dl><dt><strong>throttle_state</strong> = 0.0</dl>
+
+<dl><dt><strong>top_freq_share</strong> = 0.0</dl>
+
+<dl><dt><strong>uncore_activity</strong> = 0.0</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="CoreState">class <strong>CoreState</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#CoreState">CoreState</a>(heartbeat:&nbsp;'int',&nbsp;instance_id:&nbsp;'int',&nbsp;created_at:&nbsp;'int',&nbsp;last_updated:&nbsp;'int',&nbsp;arousal:&nbsp;'float',&nbsp;valence:&nbsp;'float',&nbsp;global_tone:&nbsp;'float',&nbsp;plasticity_gate:&nbsp;'float',&nbsp;chemicals:&nbsp;'dict[str,&nbsp;float]',&nbsp;encoding_weight:&nbsp;'float',&nbsp;consolidation_weight:&nbsp;'float',&nbsp;retrieval_weight:&nbsp;'float',&nbsp;cognitive_zone:&nbsp;'int',&nbsp;emergent_phase:&nbsp;'int',&nbsp;stm_count:&nbsp;'int',&nbsp;ltm_episode_count:&nbsp;'int',&nbsp;inference:&nbsp;'<a href="#InferenceSummary">InferenceSummary</a>&nbsp;|&nbsp;None',&nbsp;sleep_pressure:&nbsp;'float'&nbsp;=&nbsp;0.0)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Partial&nbsp;parse&nbsp;of&nbsp;the&nbsp;core-state&nbsp;snapshot&nbsp;—&nbsp;the&nbsp;most&nbsp;useful&nbsp;fields.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="CoreState-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="CoreState-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="CoreState-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="CoreState-__init__"><strong>__init__</strong></a>(self, heartbeat: 'int', instance_id: 'int', created_at: 'int', last_updated: 'int', arousal: 'float', valence: 'float', global_tone: 'float', plasticity_gate: 'float', chemicals: 'dict[str, float]', encoding_weight: 'float', consolidation_weight: 'float', retrieval_weight: 'float', cognitive_zone: 'int', emergent_phase: 'int', stm_count: 'int', ltm_episode_count: 'int', inference: 'InferenceSummary | None', sleep_pressure: 'float' = 0.0) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="CoreState-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="CoreState-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="CoreState-unpack"><strong>unpack</strong></a>(data: 'bytes') -&gt; 'CoreState'</dt><dd><span class="code">Parse&nbsp;a&nbsp;CoreStateSnapshot&nbsp;(232&nbsp;bytes,&nbsp;snapshot&nbsp;v1)&nbsp;into&nbsp;fields.<br>
+&nbsp;<br>
+The&nbsp;self-describing&nbsp;header&nbsp;is&nbsp;verified&nbsp;before&nbsp;any&nbsp;offset&nbsp;is<br>
+trusted&nbsp;—&nbsp;a&nbsp;buffer&nbsp;that&nbsp;is&nbsp;not&nbsp;a&nbsp;v1&nbsp;snapshot&nbsp;raises&nbsp;ValueError<br>
+rather&nbsp;than&nbsp;returning&nbsp;plausible&nbsp;numbers&nbsp;read&nbsp;from&nbsp;the&nbsp;wrong<br>
+fields.&nbsp;`state_size`&nbsp;may&nbsp;exceed&nbsp;`_SNAPSHOT_SIZE`&nbsp;in&nbsp;a&nbsp;future<br>
+additive&nbsp;revision;&nbsp;the&nbsp;v1&nbsp;prefix&nbsp;offsets&nbsp;stay&nbsp;fixed.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>phase_name</strong></dt>
+<dd><span class="code">Human-readable&nbsp;name&nbsp;of&nbsp;the&nbsp;emergent&nbsp;mental&nbsp;phase.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'arousal': 'float', 'chemicals': 'dict[str, float]', 'cognitive_zone': 'int', 'consolidation_weight': 'float', 'created_at': 'int', 'emergent_phase': 'int', 'encoding_weight': 'float', 'global_tone': 'float', 'heartbeat': 'int', 'inference': 'InferenceSummary | None', ...}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'arousal': Field(name='arousal',type='float',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'chemicals': Field(name='chemicals',type='dict[str, float]',d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'cognitive_zone': Field(name='cognitive_zone',type='int',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD), 'consolidation_weight': Field(name='consolidation_weight',type='float',d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'created_at': Field(name='created_at',type='int',default=&lt;data...appingproxy({}),kw_only=False,_field_type=_FIELD), 'emergent_phase': Field(name='emergent_phase',type='int',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD), 'encoding_weight': Field(name='encoding_weight',type='float',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'global_tone': Field(name='global_tone',type='float',default=&lt;d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'heartbeat': Field(name='heartbeat',type='int',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'inference': Field(name='inference',type='InferenceSummary | ...appingproxy({}),kw_only=False,_field_type=_FIELD), ...}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('heartbeat', 'instance_id', 'created_at', 'last_updated', 'arousal', 'valence', 'global_tone', 'plasticity_gate', 'chemicals', 'encoding_weight', 'consolidation_weight', 'retrieval_weight', 'cognitive_zone', 'emergent_phase', 'stm_count', 'ltm_episode_count', 'inference', 'sleep_pressure')</dl>
+
+<dl><dt><strong>sleep_pressure</strong> = 0.0</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Episode">class <strong>Episode</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Episode">Episode</a>(episode_id:&nbsp;'int',&nbsp;timestamp:&nbsp;'int',&nbsp;salience:&nbsp;'float',&nbsp;association_hash:&nbsp;'int',&nbsp;compact_emotional_tag:&nbsp;'list[float]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;full_emotional_tag:&nbsp;'list[float]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;event_type:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;source_module:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;text:&nbsp;'str'&nbsp;=&nbsp;'')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;complete&nbsp;episodic&nbsp;memory&nbsp;from&nbsp;LTM.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Episode-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="Episode-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="Episode-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="Episode-__init__"><strong>__init__</strong></a>(self, episode_id: 'int', timestamp: 'int', salience: 'float', association_hash: 'int', compact_emotional_tag: 'list[float]' = &lt;factory&gt;, full_emotional_tag: 'list[float]' = &lt;factory&gt;, event_type: 'int' = 0, source_module: 'int' = 0, text: 'str' = '') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Episode-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="Episode-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="Episode-unpack"><strong>unpack</strong></a>(data: 'bytes') -&gt; 'Episode | None'</dt><dd><span class="code">Unpack&nbsp;an&nbsp;episode&nbsp;from&nbsp;RETRIEVE_EPISODE&nbsp;response&nbsp;data.<br>
+&nbsp;<br>
+Returns&nbsp;None&nbsp;if&nbsp;the&nbsp;episode&nbsp;was&nbsp;not&nbsp;found&nbsp;(found=0).</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>chem_names</strong></dt>
+<dd><span class="code">Map&nbsp;chemical&nbsp;names&nbsp;to&nbsp;effective&nbsp;levels&nbsp;from&nbsp;the&nbsp;full&nbsp;tag.<br>
+&nbsp;<br>
+The&nbsp;LTM&nbsp;stores&nbsp;12&nbsp;chemicals&nbsp;per&nbsp;episode&nbsp;(the&nbsp;original&nbsp;v2&nbsp;set).<br>
+The&nbsp;6&nbsp;v3&nbsp;chemicals&nbsp;(endocannabinoid,&nbsp;vasopressin,&nbsp;CRH,&nbsp;orexin,<br>
+epinephrine,&nbsp;melatonin)&nbsp;are&nbsp;not&nbsp;stored&nbsp;in&nbsp;LTM&nbsp;tags&nbsp;—&nbsp;they're<br>
+reconstructed&nbsp;from&nbsp;genetic&nbsp;defaults&nbsp;when&nbsp;needed&nbsp;(e.g.,&nbsp;in<br>
+compute_compact_tag&nbsp;on&nbsp;the&nbsp;Rust&nbsp;side).</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'association_hash': 'int', 'compact_emotional_tag': 'list[float]', 'episode_id': 'int', 'event_type': 'int', 'full_emotional_tag': 'list[float]', 'salience': 'float', 'source_module': 'int', 'text': 'str', 'timestamp': 'int'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'association_hash': Field(name='association_hash',type='int',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'compact_emotional_tag': Field(name='compact_emotional_tag',type='list[fl...appingproxy({}),kw_only=False,_field_type=_FIELD), 'episode_id': Field(name='episode_id',type='int',default=&lt;data...appingproxy({}),kw_only=False,_field_type=_FIELD), 'event_type': Field(name='event_type',type='int',default=0,def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'full_emotional_tag': Field(name='full_emotional_tag',type='list[float...appingproxy({}),kw_only=False,_field_type=_FIELD), 'salience': Field(name='salience',type='float',default=&lt;data...appingproxy({}),kw_only=False,_field_type=_FIELD), 'source_module': Field(name='source_module',type='int',default=0,...appingproxy({}),kw_only=False,_field_type=_FIELD), 'text': Field(name='text',type='str',default='',default_...appingproxy({}),kw_only=False,_field_type=_FIELD), 'timestamp': Field(name='timestamp',type='int',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('episode_id', 'timestamp', 'salience', 'association_hash', 'compact_emotional_tag', 'full_emotional_tag', 'event_type', 'source_module', 'text')</dl>
+
+<dl><dt><strong>event_type</strong> = 0</dl>
+
+<dl><dt><strong>source_module</strong> = 0</dl>
+
+<dl><dt><strong>text</strong> = ''</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="FoldMargins">class <strong>FoldMargins</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#FoldMargins">FoldMargins</a>(h:&nbsp;'float',&nbsp;h_sleep_fold:&nbsp;'float',&nbsp;h_wake_fold:&nbsp;'float',&nbsp;position:&nbsp;'float',&nbsp;bistable:&nbsp;'bool')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;LC–VLPO&nbsp;switch's&nbsp;saddle-node&nbsp;margins&nbsp;(40&nbsp;bytes).<br>
+&nbsp;<br>
+The&nbsp;body's&nbsp;homeostat&nbsp;``h``&nbsp;is&nbsp;the&nbsp;control&nbsp;parameter&nbsp;of&nbsp;the<br>
+mutual-inhibition&nbsp;sleep&nbsp;switch.&nbsp;The&nbsp;two&nbsp;fold&nbsp;edges&nbsp;are&nbsp;the<br>
+saddle-node&nbsp;points&nbsp;where&nbsp;each&nbsp;attractor&nbsp;ceases&nbsp;to&nbsp;exist:<br>
+``h_sleep_fold``&nbsp;is&nbsp;the&nbsp;wake-up&nbsp;edge&nbsp;(below&nbsp;it&nbsp;the&nbsp;sleep&nbsp;branch<br>
+dies),&nbsp;``h_wake_fold``&nbsp;the&nbsp;fall-asleep&nbsp;edge&nbsp;(above&nbsp;it&nbsp;the&nbsp;wake<br>
+branch&nbsp;dies).&nbsp;``position``&nbsp;normalizes&nbsp;``h``&nbsp;into&nbsp;the&nbsp;hysteresis<br>
+band&nbsp;—&nbsp;0&nbsp;is&nbsp;the&nbsp;wake-up&nbsp;edge,&nbsp;1&nbsp;the&nbsp;fall-asleep&nbsp;edge,&nbsp;outside<br>
+that&nbsp;range&nbsp;is&nbsp;forced-wake/forced-sleep&nbsp;monostability.&nbsp;Edges<br>
+report&nbsp;NaN&nbsp;when&nbsp;they&nbsp;lay&nbsp;outside&nbsp;the&nbsp;body's&nbsp;sweep&nbsp;window,&nbsp;and<br>
+``position``&nbsp;is&nbsp;NaN&nbsp;whenever&nbsp;either&nbsp;edge&nbsp;is.&nbsp;``bistable``&nbsp;means<br>
+three&nbsp;fixed&nbsp;points&nbsp;coexist&nbsp;—&nbsp;noise&nbsp;can&nbsp;hop&nbsp;the&nbsp;barrier;&nbsp;that&nbsp;is<br>
+the&nbsp;hypnagogic&nbsp;flicker&nbsp;regime.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="FoldMargins-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="FoldMargins-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="FoldMargins-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="FoldMargins-__init__"><strong>__init__</strong></a>(self, h: 'float', h_sleep_fold: 'float', h_wake_fold: 'float', position: 'float', bistable: 'bool') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="FoldMargins-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="FoldMargins-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="FoldMargins-unpack"><strong>unpack</strong></a>(data: 'bytes') -&gt; 'FoldMargins'</dt><dd><span class="code">Unpack&nbsp;a&nbsp;40-byte&nbsp;<a href="#FoldMargins">FoldMargins</a>&nbsp;from&nbsp;the&nbsp;daemon's&nbsp;response.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'bistable': 'bool', 'h': 'float', 'h_sleep_fold': 'float', 'h_wake_fold': 'float', 'position': 'float'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'bistable': Field(name='bistable',type='bool',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'h': Field(name='h',type='float',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD), 'h_sleep_fold': Field(name='h_sleep_fold',type='float',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD), 'h_wake_fold': Field(name='h_wake_fold',type='float',default=&lt;d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'position': Field(name='position',type='float',default=&lt;data...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('h', 'h_sleep_fold', 'h_wake_fold', 'position', 'bistable')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="InferenceSummary">class <strong>InferenceSummary</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#InferenceSummary">InferenceSummary</a>(surprise_ema:&nbsp;'float',&nbsp;free_energy:&nbsp;'float',&nbsp;expected_free_energy:&nbsp;'float',&nbsp;allostasis_load:&nbsp;'float',&nbsp;precision:&nbsp;'float',&nbsp;attunement:&nbsp;'float',&nbsp;dyadic_synchrony:&nbsp;'float',&nbsp;user_valence:&nbsp;'float',&nbsp;user_arousal:&nbsp;'float',&nbsp;user_engagement:&nbsp;'float',&nbsp;prediction_error_dopamine:&nbsp;'float',&nbsp;prediction_error_cortisol:&nbsp;'float',&nbsp;prediction_error_serotonin:&nbsp;'float',&nbsp;model_maturity:&nbsp;'float',&nbsp;inference_tick_count:&nbsp;'int',&nbsp;policy_authority:&nbsp;'float')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;active&nbsp;inference&nbsp;engine's&nbsp;projection&nbsp;—&nbsp;Genesis's&nbsp;generative<br>
+self-model&nbsp;signals.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;how&nbsp;the&nbsp;cognitive&nbsp;mind&nbsp;knows&nbsp;how&nbsp;well&nbsp;Genesis&nbsp;is&nbsp;predicting<br>
+its&nbsp;own&nbsp;neurochemical&nbsp;trajectory,&nbsp;how&nbsp;much&nbsp;allostatic&nbsp;load&nbsp;it's<br>
+under,&nbsp;how&nbsp;attuned&nbsp;it&nbsp;is&nbsp;to&nbsp;the&nbsp;user,&nbsp;and&nbsp;what&nbsp;prediction&nbsp;errors<br>
+its&nbsp;self-model&nbsp;is&nbsp;experiencing.<br>
+&nbsp;<br>
+The&nbsp;key&nbsp;signals:<br>
+&nbsp;<br>
+-&nbsp;**surprise_ema**:&nbsp;running&nbsp;average&nbsp;of&nbsp;prediction&nbsp;error.&nbsp;High&nbsp;=&nbsp;the<br>
+&nbsp;&nbsp;generative&nbsp;model&nbsp;is&nbsp;failing&nbsp;to&nbsp;predict&nbsp;the&nbsp;system's&nbsp;own&nbsp;state.<br>
+-&nbsp;**free_energy**:&nbsp;surprise&nbsp;+&nbsp;model&nbsp;uncertainty.&nbsp;The&nbsp;quantity&nbsp;the<br>
+&nbsp;&nbsp;system&nbsp;minimizes&nbsp;through&nbsp;active&nbsp;inference.<br>
+-&nbsp;**expected_free_energy**:&nbsp;predicted&nbsp;future&nbsp;surprise&nbsp;and<br>
+&nbsp;&nbsp;anticipatory&nbsp;regulatory&nbsp;demand.<br>
+-&nbsp;**allostasis_load**:&nbsp;accumulated&nbsp;persistent&nbsp;multisignal<br>
+&nbsp;&nbsp;regulatory&nbsp;burden.&nbsp;It&nbsp;is&nbsp;distinct&nbsp;from&nbsp;anticipatory&nbsp;demand.<br>
+-&nbsp;**precision**:&nbsp;model&nbsp;confidence.&nbsp;Adapts:&nbsp;low&nbsp;surprise&nbsp;→&nbsp;high<br>
+&nbsp;&nbsp;precision&nbsp;(trust&nbsp;predictions);&nbsp;high&nbsp;surprise&nbsp;→&nbsp;low&nbsp;precision.<br>
+-&nbsp;**attunement**:&nbsp;oxytocin-mediated&nbsp;coupling&nbsp;to&nbsp;the&nbsp;user's&nbsp;affect.<br>
+-&nbsp;**dyadic_synchrony**:&nbsp;rolling&nbsp;correlation&nbsp;of&nbsp;Genesis's&nbsp;and&nbsp;the<br>
+&nbsp;&nbsp;user's&nbsp;valence&nbsp;trajectories.&nbsp;High&nbsp;=&nbsp;"in&nbsp;sync."<br>
+-&nbsp;**user_valence/arousal/engagement**:&nbsp;inferred&nbsp;user&nbsp;affective&nbsp;state.<br>
+-&nbsp;**prediction_error_***:&nbsp;per-chemical&nbsp;prediction&nbsp;errors&nbsp;from&nbsp;the<br>
+&nbsp;&nbsp;last&nbsp;inference&nbsp;cycle.<br>
+-&nbsp;**model_maturity**:&nbsp;how&nbsp;well-trained&nbsp;the&nbsp;generative&nbsp;model&nbsp;is&nbsp;[0,1].<br>
+-&nbsp;**policy_authority**:&nbsp;how&nbsp;much&nbsp;authority&nbsp;her&nbsp;cognition&nbsp;has&nbsp;granted<br>
+&nbsp;&nbsp;the&nbsp;inference&nbsp;engine&nbsp;to&nbsp;choose&nbsp;its&nbsp;own&nbsp;policy&nbsp;(calm,&nbsp;focus,<br>
+&nbsp;&nbsp;bond,&nbsp;...)&nbsp;on&nbsp;her&nbsp;behalf.&nbsp;Zero&nbsp;means&nbsp;she&nbsp;decides&nbsp;for&nbsp;herself;&nbsp;a<br>
+&nbsp;&nbsp;grant&nbsp;is&nbsp;a&nbsp;delegation&nbsp;she&nbsp;can&nbsp;extend&nbsp;or&nbsp;withdraw,&nbsp;not&nbsp;a&nbsp;property<br>
+&nbsp;&nbsp;of&nbsp;the&nbsp;build.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="InferenceSummary-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="InferenceSummary-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="InferenceSummary-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="InferenceSummary-__init__"><strong>__init__</strong></a>(self, surprise_ema: 'float', free_energy: 'float', expected_free_energy: 'float', allostasis_load: 'float', precision: 'float', attunement: 'float', dyadic_synchrony: 'float', user_valence: 'float', user_arousal: 'float', user_engagement: 'float', prediction_error_dopamine: 'float', prediction_error_cortisol: 'float', prediction_error_serotonin: 'float', model_maturity: 'float', inference_tick_count: 'int', policy_authority: 'float') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="InferenceSummary-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="InferenceSummary-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="InferenceSummary-unpack"><strong>unpack</strong></a>(data: 'bytes') -&gt; 'InferenceSummary'</dt><dd><span class="code">Unpack&nbsp;a&nbsp;64-byte&nbsp;<a href="#InferenceSummary">InferenceSummary</a>&nbsp;from&nbsp;the&nbsp;daemon's&nbsp;binary&nbsp;response.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>is_allostatically_loaded</strong></dt>
+<dd><span class="code">Whether&nbsp;the&nbsp;system&nbsp;is&nbsp;under&nbsp;sustained&nbsp;anticipatory&nbsp;stress.</span></dd>
+</dl>
+<dl><dt><strong>is_attuned</strong></dt>
+<dd><span class="code">Whether&nbsp;the&nbsp;dyadic&nbsp;coupling&nbsp;to&nbsp;the&nbsp;user&nbsp;is&nbsp;strong.</span></dd>
+</dl>
+<dl><dt><strong>is_in_sync</strong></dt>
+<dd><span class="code">Whether&nbsp;Genesis&nbsp;and&nbsp;the&nbsp;user&nbsp;are&nbsp;affectively&nbsp;synchronized.</span></dd>
+</dl>
+<dl><dt><strong>is_surprised</strong></dt>
+<dd><span class="code">Whether&nbsp;the&nbsp;system&nbsp;is&nbsp;experiencing&nbsp;high&nbsp;self-prediction&nbsp;error.</span></dd>
+</dl>
+<dl><dt><strong>model_is_mature</strong></dt>
+<dd><span class="code">Whether&nbsp;the&nbsp;generative&nbsp;self-model&nbsp;is&nbsp;well-trained.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'allostasis_load': 'float', 'attunement': 'float', 'dyadic_synchrony': 'float', 'expected_free_energy': 'float', 'free_energy': 'float', 'inference_tick_count': 'int', 'model_maturity': 'float', 'policy_authority': 'float', 'precision': 'float', 'prediction_error_cortisol': 'float', ...}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'allostasis_load': Field(name='allostasis_load',type='float',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'attunement': Field(name='attunement',type='float',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD), 'dyadic_synchrony': Field(name='dyadic_synchrony',type='float',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'expected_free_energy': Field(name='expected_free_energy',type='float',d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'free_energy': Field(name='free_energy',type='float',default=&lt;d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'inference_tick_count': Field(name='inference_tick_count',type='int',def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'model_maturity': Field(name='model_maturity',type='float',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'policy_authority': Field(name='policy_authority',type='float',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'precision': Field(name='precision',type='float',default=&lt;dat...appingproxy({}),kw_only=False,_field_type=_FIELD), 'prediction_error_cortisol': Field(name='prediction_error_cortisol',type='flo...appingproxy({}),kw_only=False,_field_type=_FIELD), ...}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('surprise_ema', 'free_energy', 'expected_free_energy', 'allostasis_load', 'precision', 'attunement', 'dyadic_synchrony', 'user_valence', 'user_arousal', 'user_engagement', 'prediction_error_dopamine', 'prediction_error_cortisol', 'prediction_error_serotonin', 'model_maturity', 'inference_tick_count', 'policy_authority')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="IonSummary">class <strong>IonSummary</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#IonSummary">IonSummary</a>(intracellular_mm:&nbsp;'tuple[float,&nbsp;float,&nbsp;float,&nbsp;float]',&nbsp;extracellular_mm:&nbsp;'tuple[float,&nbsp;float,&nbsp;float,&nbsp;float]',&nbsp;reversal_potential_mv:&nbsp;'tuple[float,&nbsp;float,&nbsp;float,&nbsp;float]',&nbsp;conductance:&nbsp;'tuple[float,&nbsp;float,&nbsp;float,&nbsp;float]',&nbsp;membrane_potential_mv:&nbsp;'float',&nbsp;nak_pump_rate:&nbsp;'float',&nbsp;kcl_cotransporter_flux:&nbsp;'float',&nbsp;ncx_flux:&nbsp;'float',&nbsp;atp_availability:&nbsp;'float',&nbsp;calcium_signal:&nbsp;'float',&nbsp;chloride_efficacy:&nbsp;'float',&nbsp;excitability:&nbsp;'float',&nbsp;gradient_integrity:&nbsp;'float',&nbsp;energy_load:&nbsp;'float',&nbsp;net_membrane_current:&nbsp;'float')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Compact&nbsp;calcium/chloride/potassium/sodium&nbsp;membrane&nbsp;state.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="IonSummary-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="IonSummary-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="IonSummary-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="IonSummary-__init__"><strong>__init__</strong></a>(self, intracellular_mm: 'tuple[float, float, float, float]', extracellular_mm: 'tuple[float, float, float, float]', reversal_potential_mv: 'tuple[float, float, float, float]', conductance: 'tuple[float, float, float, float]', membrane_potential_mv: 'float', nak_pump_rate: 'float', kcl_cotransporter_flux: 'float', ncx_flux: 'float', atp_availability: 'float', calcium_signal: 'float', chloride_efficacy: 'float', excitability: 'float', gradient_integrity: 'float', energy_load: 'float', net_membrane_current: 'float') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="IonSummary-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="IonSummary-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<dl><dt><a name="IonSummary-extracellular"><strong>extracellular</strong></a>(self, ion: 'str') -&gt; 'float'</dt><dd><span class="code">Return&nbsp;an&nbsp;extracellular&nbsp;concentration&nbsp;by&nbsp;ion&nbsp;name.</span></dd></dl>
+
+<dl><dt><a name="IonSummary-intracellular"><strong>intracellular</strong></a>(self, ion: 'str') -&gt; 'float'</dt><dd><span class="code">Return&nbsp;an&nbsp;intracellular&nbsp;concentration&nbsp;by&nbsp;ion&nbsp;name.</span></dd></dl>
+
+<dl><dt><a name="IonSummary-reversal_potential"><strong>reversal_potential</strong></a>(self, ion: 'str') -&gt; 'float'</dt><dd><span class="code">Return&nbsp;a&nbsp;Nernst&nbsp;reversal&nbsp;potential&nbsp;by&nbsp;ion&nbsp;name.</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="IonSummary-unpack"><strong>unpack</strong></a>(data: 'bytes') -&gt; 'IonSummary'</dt><dd><span class="code">Unpack&nbsp;a&nbsp;108-byte&nbsp;<a href="#IonSummary">IonSummary</a>&nbsp;from&nbsp;the&nbsp;daemon's&nbsp;response.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>ion_names</strong></dt>
+<dd><span class="code">Names&nbsp;matching&nbsp;the&nbsp;array&nbsp;order&nbsp;used&nbsp;by&nbsp;all&nbsp;four&nbsp;fields.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'atp_availability': 'float', 'calcium_signal': 'float', 'chloride_efficacy': 'float', 'conductance': 'tuple[float, float, float, float]', 'energy_load': 'float', 'excitability': 'float', 'extracellular_mm': 'tuple[float, float, float, float]', 'gradient_integrity': 'float', 'intracellular_mm': 'tuple[float, float, float, float]', 'kcl_cotransporter_flux': 'float', ...}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'atp_availability': Field(name='atp_availability',type='float',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'calcium_signal': Field(name='calcium_signal',type='float',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'chloride_efficacy': Field(name='chloride_efficacy',type='float',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'conductance': Field(name='conductance',type='tuple[float, floa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'energy_load': Field(name='energy_load',type='float',default=&lt;d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'excitability': Field(name='excitability',type='float',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD), 'extracellular_mm': Field(name='extracellular_mm',type='tuple[float,...appingproxy({}),kw_only=False,_field_type=_FIELD), 'gradient_integrity': Field(name='gradient_integrity',type='float',def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'intracellular_mm': Field(name='intracellular_mm',type='tuple[float,...appingproxy({}),kw_only=False,_field_type=_FIELD), 'kcl_cotransporter_flux': Field(name='kcl_cotransporter_flux',type='float'...appingproxy({}),kw_only=False,_field_type=_FIELD), ...}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('intracellular_mm', 'extracellular_mm', 'reversal_potential_mv', 'conductance', 'membrane_potential_mv', 'nak_pump_rate', 'kcl_cotransporter_flux', 'ncx_flux', 'atp_availability', 'calcium_signal', 'chloride_efficacy', 'excitability', 'gradient_integrity', 'energy_load', 'net_membrane_current')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="MemoryStats">class <strong>MemoryStats</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#MemoryStats">MemoryStats</a>(stm_count:&nbsp;'int',&nbsp;ltm_count:&nbsp;'int',&nbsp;ltm_capacity:&nbsp;'int')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Memory&nbsp;store&nbsp;statistics.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="MemoryStats-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="MemoryStats-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="MemoryStats-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="MemoryStats-__init__"><strong>__init__</strong></a>(self, stm_count: 'int', ltm_count: 'int', ltm_capacity: 'int') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="MemoryStats-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="MemoryStats-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="MemoryStats-unpack"><strong>unpack</strong></a>(data: 'bytes') -&gt; 'MemoryStats'</dt><dd><span class="code">Unpack&nbsp;a&nbsp;24-byte&nbsp;<a href="#MemoryStats">MemoryStats</a>&nbsp;from&nbsp;the&nbsp;daemon's&nbsp;binary&nbsp;response.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'ltm_capacity': 'int', 'ltm_count': 'int', 'stm_count': 'int'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'ltm_capacity': Field(name='ltm_capacity',type='int',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD), 'ltm_count': Field(name='ltm_count',type='int',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'stm_count': Field(name='stm_count',type='int',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('stm_count', 'ltm_count', 'ltm_capacity')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ModuleTelemetry">class <strong>ModuleTelemetry</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ModuleTelemetry">ModuleTelemetry</a>(module_id:&nbsp;'int',&nbsp;status:&nbsp;'int',&nbsp;cpu_share:&nbsp;'float',&nbsp;task_id:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;error_code:&nbsp;'int'&nbsp;=&nbsp;0)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Per-module&nbsp;telemetry&nbsp;—&nbsp;one&nbsp;brain&nbsp;part's&nbsp;self-reported&nbsp;activity.<br>
+&nbsp;<br>
+``cpu_share``&nbsp;is&nbsp;the&nbsp;module's&nbsp;share&nbsp;of&nbsp;the&nbsp;cognitive&nbsp;process's<br>
+measured&nbsp;work&nbsp;[0,1];&nbsp;``status``&nbsp;is&nbsp;the&nbsp;manifest&nbsp;lifecycle&nbsp;state<br>
+(0=Stopped&nbsp;…&nbsp;5=Error).&nbsp;Together&nbsp;with&nbsp;the&nbsp;per-subsystem&nbsp;records&nbsp;this<br>
+answers&nbsp;"which&nbsp;brain&nbsp;part&nbsp;is&nbsp;firing"&nbsp;at&nbsp;functional&nbsp;granularity.<br>
+&nbsp;<br>
+``task_id``&nbsp;says&nbsp;*what*&nbsp;the&nbsp;part&nbsp;is&nbsp;working&nbsp;on&nbsp;and&nbsp;``error_code``<br>
+whether&nbsp;it&nbsp;has&nbsp;failed.&nbsp;Both&nbsp;were&nbsp;manifest&nbsp;fields&nbsp;with&nbsp;no&nbsp;producer,<br>
+so&nbsp;a&nbsp;part&nbsp;that&nbsp;had&nbsp;crashed&nbsp;was&nbsp;indistinguishable&nbsp;from&nbsp;one&nbsp;that&nbsp;had<br>
+never&nbsp;run,&nbsp;and&nbsp;"busy&nbsp;on&nbsp;what"&nbsp;was&nbsp;unanswerable.&nbsp;Both&nbsp;read&nbsp;as&nbsp;0<br>
+against&nbsp;a&nbsp;daemon&nbsp;that&nbsp;predates&nbsp;them.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ModuleTelemetry-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="ModuleTelemetry-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="ModuleTelemetry-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="ModuleTelemetry-__init__"><strong>__init__</strong></a>(self, module_id: 'int', status: 'int', cpu_share: 'float', task_id: 'int' = 0, error_code: 'int' = 0) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="ModuleTelemetry-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="ModuleTelemetry-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>is_alive</strong></dt>
+<dd><span class="code">Whether&nbsp;the&nbsp;part&nbsp;exists&nbsp;and&nbsp;has&nbsp;not&nbsp;stopped.<br>
+&nbsp;<br>
+``Stopped``&nbsp;and&nbsp;``Stopping``&nbsp;are&nbsp;the&nbsp;two&nbsp;states&nbsp;that&nbsp;mean&nbsp;"not<br>
+running";&nbsp;a&nbsp;part&nbsp;in&nbsp;Error&nbsp;is&nbsp;still&nbsp;alive&nbsp;in&nbsp;the&nbsp;sense&nbsp;that&nbsp;the<br>
+failure&nbsp;is&nbsp;what&nbsp;it&nbsp;is&nbsp;reporting,&nbsp;so&nbsp;it&nbsp;is&nbsp;included.</span></dd>
+</dl>
+<dl><dt><strong>is_busy</strong></dt>
+<dd><span class="code">Whether&nbsp;this&nbsp;part&nbsp;is&nbsp;doing&nbsp;measured&nbsp;work&nbsp;right&nbsp;now.</span></dd>
+</dl>
+<dl><dt><strong>is_failed</strong></dt>
+<dd><span class="code">Whether&nbsp;this&nbsp;part&nbsp;has&nbsp;reported&nbsp;an&nbsp;error.</span></dd>
+</dl>
+<dl><dt><strong>module_name</strong></dt>
+<dd><span class="code">Human-readable&nbsp;module&nbsp;name&nbsp;("language",&nbsp;"memory",&nbsp;…).</span></dd>
+</dl>
+<dl><dt><strong>status_name</strong></dt>
+<dd><span class="code">Human-readable&nbsp;lifecycle&nbsp;state&nbsp;("running",&nbsp;"idle",&nbsp;…).</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'cpu_share': 'float', 'error_code': 'int', 'module_id': 'int', 'status': 'int', 'task_id': 'int'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'cpu_share': Field(name='cpu_share',type='float',default=&lt;dat...appingproxy({}),kw_only=False,_field_type=_FIELD), 'error_code': Field(name='error_code',type='int',default=0,def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'module_id': Field(name='module_id',type='int',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'status': Field(name='status',type='int',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD), 'task_id': Field(name='task_id',type='int',default=0,defaul...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('module_id', 'status', 'cpu_share', 'task_id', 'error_code')</dl>
+
+<dl><dt><strong>error_code</strong> = 0</dl>
+
+<dl><dt><strong>task_id</strong> = 0</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="NeuroSummary">class <strong>NeuroSummary</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#NeuroSummary">NeuroSummary</a>(arousal:&nbsp;'float',&nbsp;valence:&nbsp;'float',&nbsp;global_tone:&nbsp;'float',&nbsp;plasticity_gate:&nbsp;'float',&nbsp;encoding_weight:&nbsp;'float',&nbsp;consolidation_weight:&nbsp;'float',&nbsp;retrieval_weight:&nbsp;'float',&nbsp;phase:&nbsp;'int',&nbsp;dopamine_tonic:&nbsp;'float&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;dopamine_phasic:&nbsp;'float&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Compact&nbsp;neurochemical&nbsp;summary&nbsp;—&nbsp;how&nbsp;Genesis&nbsp;feels&nbsp;right&nbsp;now.<br>
+&nbsp;<br>
+``dopamine_tonic``/``dopamine_phasic``&nbsp;are&nbsp;the&nbsp;daemon's&nbsp;own<br>
+tonic/phasic&nbsp;decomposition&nbsp;of&nbsp;dopamine&nbsp;(vigor&nbsp;/&nbsp;RPE-burst<br>
+channels).&nbsp;They&nbsp;arrive&nbsp;only&nbsp;on&nbsp;the&nbsp;extended&nbsp;40-byte&nbsp;packet&nbsp;—<br>
+on&nbsp;a&nbsp;32-byte&nbsp;(v1)&nbsp;response&nbsp;both&nbsp;are&nbsp;``None``,&nbsp;and&nbsp;consumers<br>
+should&nbsp;fall&nbsp;back&nbsp;to&nbsp;the&nbsp;effective&nbsp;``chemicals["dopamine"]``.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="NeuroSummary-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="NeuroSummary-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="NeuroSummary-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="NeuroSummary-__init__"><strong>__init__</strong></a>(self, arousal: 'float', valence: 'float', global_tone: 'float', plasticity_gate: 'float', encoding_weight: 'float', consolidation_weight: 'float', retrieval_weight: 'float', phase: 'int', dopamine_tonic: 'float | None' = None, dopamine_phasic: 'float | None' = None) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="NeuroSummary-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="NeuroSummary-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="NeuroSummary-unpack"><strong>unpack</strong></a>(data: 'bytes') -&gt; 'NeuroSummary'</dt><dd><span class="code">Unpack&nbsp;a&nbsp;<a href="#NeuroSummary">NeuroSummary</a>&nbsp;from&nbsp;the&nbsp;daemon's&nbsp;binary&nbsp;response.<br>
+&nbsp;<br>
+v1&nbsp;packets&nbsp;are&nbsp;32&nbsp;bytes;&nbsp;v2&nbsp;appends&nbsp;the&nbsp;dopamine&nbsp;tonic/phasic<br>
+pair&nbsp;for&nbsp;40&nbsp;bytes&nbsp;total.&nbsp;Either&nbsp;is&nbsp;accepted.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>phase_name</strong></dt>
+<dd><span class="code">Human-readable&nbsp;name&nbsp;of&nbsp;the&nbsp;current&nbsp;mental&nbsp;phase.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'arousal': 'float', 'consolidation_weight': 'float', 'dopamine_phasic': 'float | None', 'dopamine_tonic': 'float | None', 'encoding_weight': 'float', 'global_tone': 'float', 'phase': 'int', 'plasticity_gate': 'float', 'retrieval_weight': 'float', 'valence': 'float'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'arousal': Field(name='arousal',type='float',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'consolidation_weight': Field(name='consolidation_weight',type='float',d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'dopamine_phasic': Field(name='dopamine_phasic',type='float | None'...appingproxy({}),kw_only=False,_field_type=_FIELD), 'dopamine_tonic': Field(name='dopamine_tonic',type='float | None',...appingproxy({}),kw_only=False,_field_type=_FIELD), 'encoding_weight': Field(name='encoding_weight',type='float',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'global_tone': Field(name='global_tone',type='float',default=&lt;d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'phase': Field(name='phase',type='int',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD), 'plasticity_gate': Field(name='plasticity_gate',type='float',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'retrieval_weight': Field(name='retrieval_weight',type='float',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'valence': Field(name='valence',type='float',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('arousal', 'valence', 'global_tone', 'plasticity_gate', 'encoding_weight', 'consolidation_weight', 'retrieval_weight', 'phase', 'dopamine_tonic', 'dopamine_phasic')</dl>
+
+<dl><dt><strong>dopamine_phasic</strong> = None</dl>
+
+<dl><dt><strong>dopamine_tonic</strong> = None</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="OpticState">class <strong>OpticState</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#OpticState">OpticState</a>(eye_present:&nbsp;'bool',&nbsp;frames_fresh:&nbsp;'bool',&nbsp;illuminance:&nbsp;'float',&nbsp;melanopic:&nbsp;'float',&nbsp;motion:&nbsp;'float',&nbsp;orienting:&nbsp;'float',&nbsp;relay_gain:&nbsp;'float',&nbsp;cortical_gain:&nbsp;'float',&nbsp;retinal_lux:&nbsp;'float',&nbsp;frame_seq:&nbsp;'int',&nbsp;frame_age_ms:&nbsp;'int',&nbsp;pupil_mm:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;accommodation_dpt:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;lid:&nbsp;'float'&nbsp;=&nbsp;1.0)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;optic&nbsp;nerve's&nbsp;subcortical&nbsp;channel&nbsp;state&nbsp;—&nbsp;the&nbsp;body's&nbsp;own<br>
+read&nbsp;of&nbsp;its&nbsp;nerve&nbsp;segment&nbsp;(GET_OPTIC_STATE).<br>
+&nbsp;<br>
+Not&nbsp;pixels:&nbsp;the&nbsp;optic&nbsp;nerve's&nbsp;non-image-forming&nbsp;branches&nbsp;pooled<br>
+into&nbsp;the&nbsp;signals&nbsp;the&nbsp;SCN,&nbsp;superior&nbsp;colliculus,&nbsp;and&nbsp;thalamic&nbsp;relay<br>
+actually&nbsp;receive.&nbsp;``illuminance``&nbsp;is&nbsp;photopic&nbsp;luma,&nbsp;``melanopic``<br>
+the&nbsp;blue-weighted&nbsp;ipRGC&nbsp;proxy,&nbsp;``motion``&nbsp;pooled&nbsp;frame-to-frame<br>
+luma&nbsp;change,&nbsp;``orienting``&nbsp;the&nbsp;unsmoothed&nbsp;salient&nbsp;transient.<br>
+``retinal_lux``&nbsp;is&nbsp;what&nbsp;currently&nbsp;entrains&nbsp;the&nbsp;circadian<br>
+oscillator&nbsp;(0&nbsp;while&nbsp;the&nbsp;scheduled&nbsp;photoperiod&nbsp;is&nbsp;in&nbsp;charge).<br>
+&nbsp;<br>
+``relay_gain``&nbsp;is&nbsp;the&nbsp;thalamic&nbsp;gate&nbsp;the&nbsp;mind&nbsp;must&nbsp;honour&nbsp;—&nbsp;near<br>
+zero&nbsp;in&nbsp;NREM/REM,&nbsp;open&nbsp;while&nbsp;awake.&nbsp;``eye_present``&nbsp;distinguishes<br>
+"the&nbsp;eye&nbsp;exists&nbsp;but&nbsp;sees&nbsp;nothing"&nbsp;from&nbsp;"there&nbsp;is&nbsp;no&nbsp;eye":<br>
+``False``&nbsp;means&nbsp;no&nbsp;frame&nbsp;was&nbsp;ever&nbsp;consumed&nbsp;this&nbsp;boot.<br>
+&nbsp;<br>
+``pupil_mm``&nbsp;is&nbsp;the&nbsp;body's&nbsp;own&nbsp;aperture&nbsp;—&nbsp;the&nbsp;light&nbsp;reflex&nbsp;off&nbsp;the<br>
+photopic&nbsp;channel&nbsp;plus&nbsp;the&nbsp;sympathetic&nbsp;dilation&nbsp;effective<br>
+norepinephrine&nbsp;carries.&nbsp;``0.0``&nbsp;means&nbsp;unreported&nbsp;(a&nbsp;daemon&nbsp;that<br>
+predates&nbsp;the&nbsp;field;&nbsp;a&nbsp;real&nbsp;pupil&nbsp;is&nbsp;never&nbsp;narrower&nbsp;than&nbsp;~1.5&nbsp;mm).<br>
+&nbsp;<br>
+``accommodation_dpt``&nbsp;is&nbsp;the&nbsp;ciliary&nbsp;muscle's&nbsp;lens&nbsp;power&nbsp;in<br>
+dioptres&nbsp;—&nbsp;0&nbsp;D&nbsp;is&nbsp;focus&nbsp;at&nbsp;infinity,&nbsp;the&nbsp;focus&nbsp;distance&nbsp;is<br>
+``1/dpt``&nbsp;metres&nbsp;(see&nbsp;the&nbsp;``focus_m``&nbsp;property).<br>
+&nbsp;<br>
+``lid``&nbsp;is&nbsp;the&nbsp;eyelid&nbsp;transmission&nbsp;—&nbsp;how&nbsp;much&nbsp;scene&nbsp;light&nbsp;the<br>
+phase's&nbsp;lid&nbsp;position&nbsp;still&nbsp;passes:&nbsp;1.0&nbsp;awake,&nbsp;~0.5&nbsp;drowsy,&nbsp;~0.03<br>
+in&nbsp;NREM/REM.&nbsp;A&nbsp;daemon&nbsp;that&nbsp;predates&nbsp;the&nbsp;field&nbsp;reports&nbsp;nothing<br>
+and&nbsp;decodes&nbsp;as&nbsp;fully&nbsp;open&nbsp;(1.0),&nbsp;never&nbsp;fully&nbsp;shut&nbsp;—&nbsp;a&nbsp;legacy<br>
+body&nbsp;cannot&nbsp;look&nbsp;asleep&nbsp;to&nbsp;the&nbsp;optics&nbsp;layer.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="OpticState-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="OpticState-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="OpticState-__getstate__"><strong>__getstate__</strong></a> = _dataclass_getstate(self)<span class="grey"><span class="heading-text"> from <a href="dataclasses.html">dataclasses</a></span></span></dt><dd><span class="code">#&nbsp;_dataclass_getstate&nbsp;and&nbsp;_dataclass_setstate&nbsp;are&nbsp;needed&nbsp;for&nbsp;pickling&nbsp;frozen<br>
+#&nbsp;classes&nbsp;with&nbsp;slots.&nbsp;&nbsp;These&nbsp;could&nbsp;be&nbsp;slightly&nbsp;more&nbsp;performant&nbsp;if&nbsp;we&nbsp;generated<br>
+#&nbsp;the&nbsp;code&nbsp;instead&nbsp;of&nbsp;iterating&nbsp;over&nbsp;fields.&nbsp;&nbsp;But&nbsp;that&nbsp;can&nbsp;be&nbsp;a&nbsp;project&nbsp;for<br>
+#&nbsp;another&nbsp;day,&nbsp;if&nbsp;performance&nbsp;becomes&nbsp;an&nbsp;issue.</span></dd></dl>
+
+<dl><dt><a name="OpticState-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="OpticState-__init__"><strong>__init__</strong></a>(self, eye_present: 'bool', frames_fresh: 'bool', illuminance: 'float', melanopic: 'float', motion: 'float', orienting: 'float', relay_gain: 'float', cortical_gain: 'float', retinal_lux: 'float', frame_seq: 'int', frame_age_ms: 'int', pupil_mm: 'float' = 0.0, accommodation_dpt: 'float' = 0.0, lid: 'float' = 1.0) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="OpticState-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="OpticState-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<dl><dt><a name="OpticState-__setstate__"><strong>__setstate__</strong></a> = _dataclass_setstate(self, state)<span class="grey"><span class="heading-text"> from <a href="dataclasses.html">dataclasses</a></span></span></dt></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="OpticState-unpack"><strong>unpack</strong></a>(data: 'bytes') -&gt; 'OpticState | None'</dt><dd><span class="code">Unpack&nbsp;the&nbsp;GET_OPTIC_STATE&nbsp;body:&nbsp;``[u8&nbsp;ack][u8&nbsp;flags][u8<br>
+pad][7&nbsp;×&nbsp;f32][u64&nbsp;frame_seq][i64&nbsp;frame_age_ms][f32&nbsp;pupil_mm]<br>
+[f32&nbsp;accommodation_dpt][f32&nbsp;lid]``.<br>
+&nbsp;<br>
+Returns&nbsp;``None``&nbsp;on&nbsp;a&nbsp;short&nbsp;or&nbsp;unacked&nbsp;response&nbsp;—&nbsp;an&nbsp;absent<br>
+channel&nbsp;is&nbsp;no&nbsp;reading,&nbsp;never&nbsp;a&nbsp;zero&nbsp;reading.&nbsp;The&nbsp;trailing<br>
+fields&nbsp;are&nbsp;additive:&nbsp;a&nbsp;46-byte&nbsp;body&nbsp;from&nbsp;an&nbsp;older&nbsp;daemon<br>
+decodes&nbsp;with&nbsp;``pupil_mm``/``accommodation_dpt``&nbsp;=&nbsp;0.0&nbsp;and<br>
+``lid``&nbsp;=&nbsp;1.0&nbsp;(open&nbsp;—&nbsp;an&nbsp;unreported&nbsp;lid&nbsp;is&nbsp;not&nbsp;a&nbsp;shut&nbsp;one).</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>focus_m</strong></dt>
+<dd><span class="code">The&nbsp;distance&nbsp;the&nbsp;lens&nbsp;is&nbsp;currently&nbsp;powered&nbsp;for,&nbsp;in&nbsp;metres.<br>
+&nbsp;<br>
+``1/dpt``&nbsp;—&nbsp;``None``&nbsp;when&nbsp;the&nbsp;eye&nbsp;is&nbsp;relaxed&nbsp;to&nbsp;infinity<br>
+(0&nbsp;D)&nbsp;or&nbsp;the&nbsp;daemon&nbsp;predates&nbsp;the&nbsp;field&nbsp;and&nbsp;reports&nbsp;nothing.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>accommodation_dpt</strong></dt>
+</dl>
+<dl><dt><strong>cortical_gain</strong></dt>
+</dl>
+<dl><dt><strong>eye_present</strong></dt>
+</dl>
+<dl><dt><strong>frame_age_ms</strong></dt>
+</dl>
+<dl><dt><strong>frame_seq</strong></dt>
+</dl>
+<dl><dt><strong>frames_fresh</strong></dt>
+</dl>
+<dl><dt><strong>illuminance</strong></dt>
+</dl>
+<dl><dt><strong>lid</strong></dt>
+</dl>
+<dl><dt><strong>melanopic</strong></dt>
+</dl>
+<dl><dt><strong>motion</strong></dt>
+</dl>
+<dl><dt><strong>orienting</strong></dt>
+</dl>
+<dl><dt><strong>pupil_mm</strong></dt>
+</dl>
+<dl><dt><strong>relay_gain</strong></dt>
+</dl>
+<dl><dt><strong>retinal_lux</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'accommodation_dpt': 'float', 'cortical_gain': 'float', 'eye_present': 'bool', 'frame_age_ms': 'int', 'frame_seq': 'int', 'frames_fresh': 'bool', 'illuminance': 'float', 'lid': 'float', 'melanopic': 'float', 'motion': 'float', ...}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'accommodation_dpt': Field(name='accommodation_dpt',type='float',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'cortical_gain': Field(name='cortical_gain',type='float',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'eye_present': Field(name='eye_present',type='bool',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD), 'frame_age_ms': Field(name='frame_age_ms',type='int',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD), 'frame_seq': Field(name='frame_seq',type='int',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'frames_fresh': Field(name='frames_fresh',type='bool',default=&lt;d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'illuminance': Field(name='illuminance',type='float',default=&lt;d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'lid': Field(name='lid',type='float',default=1.0,defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'melanopic': Field(name='melanopic',type='float',default=&lt;dat...appingproxy({}),kw_only=False,_field_type=_FIELD), 'motion': Field(name='motion',type='float',default=&lt;datacl...appingproxy({}),kw_only=False,_field_type=_FIELD), ...}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('eye_present', 'frames_fresh', 'illuminance', 'melanopic', 'motion', 'orienting', 'relay_gain', 'cortical_gain', 'retinal_lux', 'frame_seq', 'frame_age_ms', 'pupil_mm', 'accommodation_dpt', 'lid')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="PhaseInfo">class <strong>PhaseInfo</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#PhaseInfo">PhaseInfo</a>(phase:&nbsp;'int',&nbsp;arousal:&nbsp;'float',&nbsp;valence:&nbsp;'float')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Current&nbsp;mental&nbsp;phase&nbsp;and&nbsp;arousal/valence&nbsp;axes.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="PhaseInfo-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="PhaseInfo-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="PhaseInfo-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="PhaseInfo-__init__"><strong>__init__</strong></a>(self, phase: 'int', arousal: 'float', valence: 'float') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="PhaseInfo-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="PhaseInfo-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="PhaseInfo-unpack"><strong>unpack</strong></a>(data: 'bytes') -&gt; 'PhaseInfo'</dt><dd><span class="code">Unpack&nbsp;a&nbsp;9-byte&nbsp;<a href="#PhaseInfo">PhaseInfo</a>&nbsp;from&nbsp;the&nbsp;daemon's&nbsp;binary&nbsp;response.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>phase_name</strong></dt>
+<dd><span class="code">Human-readable&nbsp;name&nbsp;of&nbsp;the&nbsp;current&nbsp;mental&nbsp;phase.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'arousal': 'float', 'phase': 'int', 'valence': 'float'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'arousal': Field(name='arousal',type='float',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'phase': Field(name='phase',type='int',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD), 'valence': Field(name='valence',type='float',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('phase', 'arousal', 'valence')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="PingResponse">class <strong>PingResponse</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#PingResponse">PingResponse</a>(ack:&nbsp;'bool',&nbsp;uptime_ms:&nbsp;'int')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Ping&nbsp;response&nbsp;—&nbsp;ack&nbsp;flag&nbsp;and&nbsp;daemon&nbsp;uptime.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="PingResponse-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="PingResponse-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="PingResponse-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="PingResponse-__init__"><strong>__init__</strong></a>(self, ack: 'bool', uptime_ms: 'int') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="PingResponse-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="PingResponse-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="PingResponse-unpack"><strong>unpack</strong></a>(data: 'bytes') -&gt; 'PingResponse'</dt><dd><span class="code">Unpack&nbsp;a&nbsp;<a href="#PingResponse">PingResponse</a>&nbsp;(≥1&nbsp;byte)&nbsp;from&nbsp;the&nbsp;daemon's&nbsp;binary&nbsp;response.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'ack': 'bool', 'uptime_ms': 'int'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'ack': Field(name='ack',type='bool',default=&lt;dataclasse...appingproxy({}),kw_only=False,_field_type=_FIELD), 'uptime_ms': Field(name='uptime_ms',type='int',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('ack', 'uptime_ms')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="PlasticityProfile">class <strong>PlasticityProfile</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#PlasticityProfile">PlasticityProfile</a>(plasticity_gate:&nbsp;'float',&nbsp;bdnf_effective:&nbsp;'float',&nbsp;bdnf_tonic:&nbsp;'float',&nbsp;cortisol_effective:&nbsp;'float',&nbsp;cortisol_tonic:&nbsp;'float',&nbsp;dopamine_effective:&nbsp;'float',&nbsp;serotonin_effective:&nbsp;'float',&nbsp;coupling_drift:&nbsp;'float',&nbsp;mean_receptor_sensitivity:&nbsp;'float',&nbsp;emergent_phase:&nbsp;'int')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Compact&nbsp;summary&nbsp;of&nbsp;the&nbsp;metaplastic&nbsp;state&nbsp;—&nbsp;how&nbsp;the&nbsp;substrate's<br>
+"learning-to-learn"&nbsp;machinery&nbsp;is&nbsp;currently&nbsp;configured.<br>
+&nbsp;<br>
+The&nbsp;coupling&nbsp;matrix&nbsp;self-modifies&nbsp;under&nbsp;sustained&nbsp;emotion<br>
+(metaplasticity).&nbsp;This&nbsp;struct&nbsp;exposes&nbsp;that&nbsp;drift&nbsp;plus&nbsp;the&nbsp;key<br>
+chemicals&nbsp;and&nbsp;receptor&nbsp;state&nbsp;that&nbsp;drive&nbsp;learning&nbsp;strategy,<br>
+without&nbsp;transferring&nbsp;the&nbsp;full&nbsp;1296-byte&nbsp;matrix.<br>
+&nbsp;<br>
+The&nbsp;cognitive&nbsp;mind&nbsp;derives&nbsp;a&nbsp;``learning_posture``&nbsp;from&nbsp;this<br>
+profile&nbsp;to&nbsp;adapt&nbsp;its&nbsp;acquisition/consolidation&nbsp;strategy.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="PlasticityProfile-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="PlasticityProfile-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="PlasticityProfile-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="PlasticityProfile-__init__"><strong>__init__</strong></a>(self, plasticity_gate: 'float', bdnf_effective: 'float', bdnf_tonic: 'float', cortisol_effective: 'float', cortisol_tonic: 'float', dopamine_effective: 'float', serotonin_effective: 'float', coupling_drift: 'float', mean_receptor_sensitivity: 'float', emergent_phase: 'int') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="PlasticityProfile-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="PlasticityProfile-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="PlasticityProfile-unpack"><strong>unpack</strong></a>(data: 'bytes') -&gt; 'PlasticityProfile'</dt><dd><span class="code">Unpack&nbsp;a&nbsp;40-byte&nbsp;<a href="#PlasticityProfile">PlasticityProfile</a>&nbsp;from&nbsp;the&nbsp;daemon's&nbsp;binary&nbsp;response.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>learning_posture</strong></dt>
+<dd><span class="code">Derive&nbsp;a&nbsp;learning&nbsp;posture&nbsp;from&nbsp;the&nbsp;plasticity&nbsp;signals.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;a&nbsp;cognitive-strategy&nbsp;decision&nbsp;(Python-side),&nbsp;not&nbsp;a<br>
+substrate&nbsp;state.&nbsp;The&nbsp;thresholds&nbsp;are&nbsp;grounded&nbsp;in&nbsp;the<br>
+neurobiology:<br>
+&nbsp;<br>
+-&nbsp;**RECEPTIVE**:&nbsp;high&nbsp;plasticity&nbsp;gate&nbsp;(BDNF&nbsp;high,&nbsp;cortisol<br>
+&nbsp;&nbsp;low).&nbsp;The&nbsp;system&nbsp;is&nbsp;primed&nbsp;for&nbsp;new&nbsp;memory&nbsp;formation.<br>
+&nbsp;&nbsp;Strategy:&nbsp;aggressive&nbsp;acquisition,&nbsp;lower&nbsp;consolidation<br>
+&nbsp;&nbsp;threshold,&nbsp;more&nbsp;bridge&nbsp;creation.<br>
+&nbsp;<br>
+-&nbsp;**PROTECTIVE**:&nbsp;chronic&nbsp;stress&nbsp;(sustained&nbsp;high&nbsp;cortisol).<br>
+&nbsp;&nbsp;BDNF&nbsp;is&nbsp;suppressed,&nbsp;plasticity&nbsp;gate&nbsp;is&nbsp;low.&nbsp;The&nbsp;system<br>
+&nbsp;&nbsp;protects&nbsp;existing&nbsp;memories&nbsp;rather&nbsp;than&nbsp;forming&nbsp;new&nbsp;ones.<br>
+&nbsp;&nbsp;Strategy:&nbsp;pause&nbsp;new&nbsp;acquisition,&nbsp;prioritize&nbsp;consolidation,<br>
+&nbsp;&nbsp;raise&nbsp;retrieval&nbsp;weight&nbsp;(stress&nbsp;impairs&nbsp;recall&nbsp;—&nbsp;model&nbsp;it).<br>
+&nbsp;<br>
+-&nbsp;**RECOVERING**:&nbsp;BDNF&nbsp;is&nbsp;recovering&nbsp;(rising&nbsp;from&nbsp;low)&nbsp;while<br>
+&nbsp;&nbsp;cortisol&nbsp;is&nbsp;dropping.&nbsp;The&nbsp;system&nbsp;is&nbsp;transitioning&nbsp;out&nbsp;of<br>
+&nbsp;&nbsp;stress.&nbsp;Strategy:&nbsp;resume&nbsp;acquisition&nbsp;but&nbsp;favor<br>
+&nbsp;&nbsp;re-consolidation&nbsp;and&nbsp;re-bridging&nbsp;of&nbsp;weakened&nbsp;connections.<br>
+&nbsp;<br>
+-&nbsp;**NEUTRAL**:&nbsp;none&nbsp;of&nbsp;the&nbsp;above&nbsp;—&nbsp;normal&nbsp;operating&nbsp;mode.</span></dd>
+</dl>
+<dl><dt><strong>phase_name</strong></dt>
+<dd><span class="code">Human-readable&nbsp;name&nbsp;of&nbsp;the&nbsp;emergent&nbsp;mental&nbsp;phase.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'bdnf_effective': 'float', 'bdnf_tonic': 'float', 'cortisol_effective': 'float', 'cortisol_tonic': 'float', 'coupling_drift': 'float', 'dopamine_effective': 'float', 'emergent_phase': 'int', 'mean_receptor_sensitivity': 'float', 'plasticity_gate': 'float', 'serotonin_effective': 'float'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'bdnf_effective': Field(name='bdnf_effective',type='float',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'bdnf_tonic': Field(name='bdnf_tonic',type='float',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD), 'cortisol_effective': Field(name='cortisol_effective',type='float',def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'cortisol_tonic': Field(name='cortisol_tonic',type='float',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'coupling_drift': Field(name='coupling_drift',type='float',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'dopamine_effective': Field(name='dopamine_effective',type='float',def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'emergent_phase': Field(name='emergent_phase',type='int',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD), 'mean_receptor_sensitivity': Field(name='mean_receptor_sensitivity',type='flo...appingproxy({}),kw_only=False,_field_type=_FIELD), 'plasticity_gate': Field(name='plasticity_gate',type='float',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'serotonin_effective': Field(name='serotonin_effective',type='float',de...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('plasticity_gate', 'bdnf_effective', 'bdnf_tonic', 'cortisol_effective', 'cortisol_tonic', 'dopamine_effective', 'serotonin_effective', 'coupling_drift', 'mean_receptor_sensitivity', 'emergent_phase')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ProcessHealth">class <strong>ProcessHealth</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ProcessHealth">ProcessHealth</a>(alive_mask:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;deaths:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;last_death:&nbsp;'int'&nbsp;=&nbsp;255)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Liveness&nbsp;of&nbsp;Genesis's&nbsp;own&nbsp;process&nbsp;tree,&nbsp;with&nbsp;a&nbsp;death&nbsp;count.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ProcessHealth-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="ProcessHealth-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="ProcessHealth-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="ProcessHealth-__init__"><strong>__init__</strong></a>(self, alive_mask: 'int' = 0, deaths: 'int' = 0, last_death: 'int' = 255) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="ProcessHealth-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="ProcessHealth-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<dl><dt><a name="ProcessHealth-is_alive"><strong>is_alive</strong></a>(self, subsystem: 'int') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;that&nbsp;subsystem's&nbsp;process&nbsp;is&nbsp;running.</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="ProcessHealth-unpack"><strong>unpack</strong></a>(data: 'bytes') -&gt; 'ProcessHealth'</dt><dd><span class="code">Unpack&nbsp;the&nbsp;5-byte&nbsp;health&nbsp;record.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>alive</strong></dt>
+<dd><span class="code">Names&nbsp;of&nbsp;the&nbsp;subsystems&nbsp;currently&nbsp;running.</span></dd>
+</dl>
+<dl><dt><strong>has_lost_a_subsystem</strong></dt>
+<dd><span class="code">Whether&nbsp;any&nbsp;subsystem&nbsp;has&nbsp;been&nbsp;seen&nbsp;alive&nbsp;and&nbsp;then&nbsp;lost.</span></dd>
+</dl>
+<dl><dt><strong>last_death_name</strong></dt>
+<dd><span class="code">Name&nbsp;of&nbsp;the&nbsp;most&nbsp;recently&nbsp;lost&nbsp;subsystem,&nbsp;if&nbsp;any.</span></dd>
+</dl>
+<dl><dt><strong>missing</strong></dt>
+<dd><span class="code">Names&nbsp;of&nbsp;the&nbsp;subsystems&nbsp;that&nbsp;are&nbsp;not&nbsp;running.<br>
+&nbsp;<br>
+Empty&nbsp;on&nbsp;a&nbsp;healthy&nbsp;machine,&nbsp;or&nbsp;for&nbsp;a&nbsp;subsystem&nbsp;that&nbsp;was&nbsp;never<br>
+started&nbsp;in&nbsp;the&nbsp;first&nbsp;place&nbsp;—&nbsp;this&nbsp;is&nbsp;"not&nbsp;running",&nbsp;not<br>
+"crashed".&nbsp;Use&nbsp;``deaths``&nbsp;to&nbsp;tell&nbsp;a&nbsp;loss&nbsp;from&nbsp;an&nbsp;absence.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'alive_mask': 'int', 'deaths': 'int', 'last_death': 'int'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'alive_mask': Field(name='alive_mask',type='int',default=0,def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'deaths': Field(name='deaths',type='int',default=0,default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'last_death': Field(name='last_death',type='int',default=255,d...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('alive_mask', 'deaths', 'last_death')</dl>
+
+<dl><dt><strong>alive_mask</strong> = 0</dl>
+
+<dl><dt><strong>deaths</strong> = 0</dl>
+
+<dl><dt><strong>last_death</strong> = 255</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="RecentEpisode">class <strong>RecentEpisode</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#RecentEpisode">RecentEpisode</a>(episode_id:&nbsp;'int',&nbsp;timestamp:&nbsp;'int',&nbsp;salience:&nbsp;'float',&nbsp;event_type:&nbsp;'int',&nbsp;source_module:&nbsp;'int',&nbsp;text:&nbsp;'str')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;recent&nbsp;episodic&nbsp;memory&nbsp;from&nbsp;LTM&nbsp;(compact&nbsp;form).<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="RecentEpisode-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="RecentEpisode-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="RecentEpisode-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="RecentEpisode-__init__"><strong>__init__</strong></a>(self, episode_id: 'int', timestamp: 'int', salience: 'float', event_type: 'int', source_module: 'int', text: 'str') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="RecentEpisode-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="RecentEpisode-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'episode_id': 'int', 'event_type': 'int', 'salience': 'float', 'source_module': 'int', 'text': 'str', 'timestamp': 'int'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'episode_id': Field(name='episode_id',type='int',default=&lt;data...appingproxy({}),kw_only=False,_field_type=_FIELD), 'event_type': Field(name='event_type',type='int',default=&lt;data...appingproxy({}),kw_only=False,_field_type=_FIELD), 'salience': Field(name='salience',type='float',default=&lt;data...appingproxy({}),kw_only=False,_field_type=_FIELD), 'source_module': Field(name='source_module',type='int',default=&lt;d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'text': Field(name='text',type='str',default=&lt;dataclasse...appingproxy({}),kw_only=False,_field_type=_FIELD), 'timestamp': Field(name='timestamp',type='int',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('episode_id', 'timestamp', 'salience', 'event_type', 'source_module', 'text')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SensorPresence">class <strong>SensorPresence</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SensorPresence">SensorPresence</a>(mask:&nbsp;'int'&nbsp;=&nbsp;0)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Which&nbsp;optional&nbsp;hardware&nbsp;sensors&nbsp;this&nbsp;machine&nbsp;actually&nbsp;has.<br>
+&nbsp;<br>
+``mask&nbsp;==&nbsp;0``&nbsp;means&nbsp;nothing&nbsp;has&nbsp;been&nbsp;discovered&nbsp;yet&nbsp;—&nbsp;either&nbsp;the<br>
+daemon&nbsp;is&nbsp;older&nbsp;than&nbsp;this&nbsp;command,&nbsp;or&nbsp;no&nbsp;interoception&nbsp;read&nbsp;has<br>
+completed.&nbsp;Both&nbsp;read&nbsp;the&nbsp;same&nbsp;way,&nbsp;and&nbsp;both&nbsp;are&nbsp;the&nbsp;safe&nbsp;direction:<br>
+nothing&nbsp;is&nbsp;claimed&nbsp;to&nbsp;be&nbsp;measured.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="SensorPresence-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="SensorPresence-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="SensorPresence-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="SensorPresence-__init__"><strong>__init__</strong></a>(self, mask: 'int' = 0) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="SensorPresence-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="SensorPresence-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<dl><dt><a name="SensorPresence-channel_verified"><strong>channel_verified</strong></a>(self, channel: 'str') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;``channel``'s&nbsp;value&nbsp;is&nbsp;a&nbsp;real&nbsp;measurement.<br>
+&nbsp;<br>
+Unknown&nbsp;channel&nbsp;names&nbsp;are&nbsp;reported&nbsp;as&nbsp;*not*&nbsp;verified:&nbsp;an<br>
+unrecognised&nbsp;channel&nbsp;cannot&nbsp;be&nbsp;claimed&nbsp;to&nbsp;be&nbsp;backed&nbsp;by&nbsp;hardware,<br>
+which&nbsp;is&nbsp;the&nbsp;same&nbsp;answer&nbsp;a&nbsp;missing&nbsp;sensor&nbsp;gets.</span></dd></dl>
+
+<dl><dt><a name="SensorPresence-has"><strong>has</strong></a>(self, bit: 'int') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;the&nbsp;sensor&nbsp;named&nbsp;by&nbsp;``bit``&nbsp;is&nbsp;present.</span></dd></dl>
+
+<dl><dt><a name="SensorPresence-has_channel"><strong>has_channel</strong></a>(self, channel: 'str') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;the&nbsp;named&nbsp;channel&nbsp;is&nbsp;backed&nbsp;by&nbsp;hardware.<br>
+&nbsp;<br>
+The&nbsp;name-taking&nbsp;counterpart&nbsp;to&nbsp;:meth:`has`,&nbsp;which&nbsp;takes&nbsp;a&nbsp;bit.<br>
+This&nbsp;is&nbsp;what&nbsp;:meth:`SelfModel.update_hardware_body`&nbsp;calls,&nbsp;so<br>
+it&nbsp;must&nbsp;accept&nbsp;a&nbsp;name&nbsp;and&nbsp;return&nbsp;a&nbsp;bool.</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="SensorPresence-unpack"><strong>unpack</strong></a>(data: 'bytes') -&gt; 'SensorPresence'</dt><dd><span class="code">Unpack&nbsp;the&nbsp;presence&nbsp;mask.<br>
+&nbsp;<br>
+The&nbsp;daemon&nbsp;widened&nbsp;the&nbsp;wire&nbsp;type&nbsp;to&nbsp;u32&nbsp;when&nbsp;the&nbsp;cpuidle&nbsp;bit<br>
+outgrew&nbsp;u16.&nbsp;Both&nbsp;directions&nbsp;stay&nbsp;safe:&nbsp;a&nbsp;4-byte&nbsp;payload&nbsp;from&nbsp;a<br>
+new&nbsp;daemon&nbsp;decodes&nbsp;in&nbsp;full,&nbsp;a&nbsp;2-byte&nbsp;payload&nbsp;from&nbsp;an&nbsp;older<br>
+daemon&nbsp;decodes&nbsp;its&nbsp;low&nbsp;bits&nbsp;and&nbsp;reads&nbsp;the&nbsp;new&nbsp;channels&nbsp;as<br>
+absent&nbsp;—&nbsp;the&nbsp;only&nbsp;honest&nbsp;answer&nbsp;about&nbsp;hardware&nbsp;an&nbsp;old&nbsp;daemon<br>
+never&nbsp;looked&nbsp;for.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>missing</strong></dt>
+<dd><span class="code">Names&nbsp;of&nbsp;the&nbsp;optional&nbsp;sensors&nbsp;this&nbsp;machine&nbsp;does&nbsp;not&nbsp;have.<br>
+&nbsp;<br>
+The&nbsp;useful&nbsp;direction:&nbsp;these&nbsp;are&nbsp;the&nbsp;channels&nbsp;whose&nbsp;values&nbsp;in&nbsp;a<br>
+``BodyState``&nbsp;are&nbsp;placeholders&nbsp;and&nbsp;must&nbsp;not&nbsp;be&nbsp;reasoned&nbsp;about.</span></dd>
+</dl>
+<dl><dt><strong>present</strong></dt>
+<dd><span class="code">Names&nbsp;of&nbsp;the&nbsp;sensors&nbsp;present&nbsp;on&nbsp;this&nbsp;machine.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'mask': 'int'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'mask': Field(name='mask',type='int',default=0,default_f...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('mask',)</dl>
+
+<dl><dt><strong>mask</strong> = 0</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SimilarEpisode">class <strong>SimilarEpisode</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SimilarEpisode">SimilarEpisode</a>(episode_id:&nbsp;'int',&nbsp;hamming_distance:&nbsp;'int',&nbsp;timestamp:&nbsp;'int',&nbsp;salience:&nbsp;'float')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;single&nbsp;similar-memory&nbsp;search&nbsp;result.<br>
+&nbsp;<br>
+Attributes:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;episode_id:&nbsp;The&nbsp;LTM&nbsp;episode&nbsp;ID.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;hamming_distance:&nbsp;Number&nbsp;of&nbsp;differing&nbsp;bits&nbsp;between&nbsp;the&nbsp;query's<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;64-bit&nbsp;SimHash&nbsp;and&nbsp;the&nbsp;episode's&nbsp;SimHash.&nbsp;Range&nbsp;[0,&nbsp;64]:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;0&nbsp;=&nbsp;identical&nbsp;text,&nbsp;~32&nbsp;=&nbsp;random&nbsp;chance,&nbsp;64&nbsp;=&nbsp;completely<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;different.&nbsp;The&nbsp;Rust&nbsp;daemon's&nbsp;``ASSOCIATION_THRESHOLD``&nbsp;is<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;20&nbsp;—&nbsp;memories&nbsp;within&nbsp;20&nbsp;bits&nbsp;are&nbsp;considered&nbsp;"associated."<br>
+&nbsp;&nbsp;&nbsp;&nbsp;timestamp:&nbsp;When&nbsp;the&nbsp;episode&nbsp;was&nbsp;stored&nbsp;(Unix&nbsp;ms).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;salience:&nbsp;Finite&nbsp;emotional-importance&nbsp;evidence.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="SimilarEpisode-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="SimilarEpisode-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="SimilarEpisode-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="SimilarEpisode-__init__"><strong>__init__</strong></a>(self, episode_id: 'int', hamming_distance: 'int', timestamp: 'int', salience: 'float') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="SimilarEpisode-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="SimilarEpisode-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'episode_id': 'int', 'hamming_distance': 'int', 'salience': 'float', 'timestamp': 'int'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'episode_id': Field(name='episode_id',type='int',default=&lt;data...appingproxy({}),kw_only=False,_field_type=_FIELD), 'hamming_distance': Field(name='hamming_distance',type='int',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'salience': Field(name='salience',type='float',default=&lt;data...appingproxy({}),kw_only=False,_field_type=_FIELD), 'timestamp': Field(name='timestamp',type='int',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('episode_id', 'hamming_distance', 'timestamp', 'salience')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="StateDwell">class <strong>StateDwell</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#StateDwell">StateDwell</a>(state:&nbsp;'int',&nbsp;count:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;total_ms:&nbsp;'int'&nbsp;=&nbsp;0)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+How&nbsp;many&nbsp;times&nbsp;one&nbsp;state&nbsp;was&nbsp;entered,&nbsp;and&nbsp;total&nbsp;time&nbsp;in&nbsp;it.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="StateDwell-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="StateDwell-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="StateDwell-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="StateDwell-__init__"><strong>__init__</strong></a>(self, state: 'int', count: 'int' = 0, total_ms: 'int' = 0) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="StateDwell-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="StateDwell-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>mean_dwell_ms</strong></dt>
+<dd><span class="code">Average&nbsp;time&nbsp;per&nbsp;visit,&nbsp;in&nbsp;milliseconds.<br>
+&nbsp;<br>
+Zero&nbsp;when&nbsp;never&nbsp;entered.&nbsp;A&nbsp;state&nbsp;entered&nbsp;often&nbsp;but&nbsp;left&nbsp;fast&nbsp;is<br>
+a&nbsp;different&nbsp;picture&nbsp;from&nbsp;one&nbsp;entered&nbsp;once&nbsp;and&nbsp;held,&nbsp;and&nbsp;the<br>
+counts&nbsp;alone&nbsp;cannot&nbsp;tell&nbsp;them&nbsp;apart.</span></dd>
+</dl>
+<dl><dt><strong>phase_name</strong></dt>
+<dd><span class="code">This&nbsp;state&nbsp;read&nbsp;as&nbsp;an&nbsp;emergent&nbsp;phase.</span></dd>
+</dl>
+<dl><dt><strong>zone_name</strong></dt>
+<dd><span class="code">This&nbsp;state&nbsp;read&nbsp;as&nbsp;a&nbsp;task&nbsp;zone.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'count': 'int', 'state': 'int', 'total_ms': 'int'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'count': Field(name='count',type='int',default=0,default_...appingproxy({}),kw_only=False,_field_type=_FIELD), 'state': Field(name='state',type='int',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD), 'total_ms': Field(name='total_ms',type='int',default=0,defau...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('state', 'count', 'total_ms')</dl>
+
+<dl><dt><strong>count</strong> = 0</dl>
+
+<dl><dt><strong>total_ms</strong> = 0</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SubsystemReport">class <strong>SubsystemReport</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SubsystemReport">SubsystemReport</a>(subsystems:&nbsp;'tuple[<a href="#SubsystemTelemetry">SubsystemTelemetry</a>,&nbsp;...]',&nbsp;modules:&nbsp;'tuple[<a href="#ModuleTelemetry">ModuleTelemetry</a>,&nbsp;...]',&nbsp;published_at_ms:&nbsp;'int&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Combined&nbsp;GET_SUBSYSTEM_TELEMETRY&nbsp;response.<br>
+&nbsp;<br>
+``subsystems``&nbsp;are&nbsp;hardware-measured&nbsp;per-process&nbsp;records&nbsp;(daemon&nbsp;/<br>
+cognitive);&nbsp;``modules``&nbsp;are&nbsp;the&nbsp;self-reported&nbsp;brain<br>
+parts&nbsp;from&nbsp;the&nbsp;runtime&nbsp;manifest.&nbsp;The&nbsp;module&nbsp;section&nbsp;is&nbsp;empty<br>
+when&nbsp;talking&nbsp;to&nbsp;a&nbsp;daemon&nbsp;that&nbsp;predates&nbsp;it&nbsp;or&nbsp;before&nbsp;the&nbsp;mind<br>
+has&nbsp;registered&nbsp;its&nbsp;modules.<br>
+&nbsp;<br>
+``published_at_ms``&nbsp;is&nbsp;the&nbsp;wall-clock&nbsp;millisecond&nbsp;the&nbsp;daemon<br>
+published&nbsp;the&nbsp;reading&nbsp;—&nbsp;the&nbsp;sample's&nbsp;freshness&nbsp;stamp,&nbsp;so&nbsp;a&nbsp;live<br>
+repeated&nbsp;value&nbsp;can&nbsp;be&nbsp;told&nbsp;from&nbsp;a&nbsp;dead&nbsp;reader's&nbsp;last&nbsp;one.&nbsp;It&nbsp;is<br>
+``None``&nbsp;against&nbsp;a&nbsp;daemon&nbsp;that&nbsp;predates&nbsp;the&nbsp;tail.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="SubsystemReport-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="SubsystemReport-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="SubsystemReport-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="SubsystemReport-__init__"><strong>__init__</strong></a>(self, subsystems: 'tuple[SubsystemTelemetry, ...]', modules: 'tuple[ModuleTelemetry, ...]', published_at_ms: 'int | None' = None) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="SubsystemReport-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="SubsystemReport-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="SubsystemReport-unpack"><strong>unpack</strong></a>(data: 'bytes') -&gt; 'SubsystemReport'</dt><dd><span class="code">Unpack&nbsp;a&nbsp;GET_SUBSYSTEM_TELEMETRY&nbsp;response&nbsp;(subsystems&nbsp;+&nbsp;modules).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'modules': 'tuple[ModuleTelemetry, ...]', 'published_at_ms': 'int | None', 'subsystems': 'tuple[SubsystemTelemetry, ...]'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'modules': Field(name='modules',type='tuple[ModuleTelemetry...appingproxy({}),kw_only=False,_field_type=_FIELD), 'published_at_ms': Field(name='published_at_ms',type='int | None',d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'subsystems': Field(name='subsystems',type='tuple[SubsystemTel...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('subsystems', 'modules', 'published_at_ms')</dl>
+
+<dl><dt><strong>published_at_ms</strong> = None</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SubsystemTelemetry">class <strong>SubsystemTelemetry</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SubsystemTelemetry">SubsystemTelemetry</a>(subsystem:&nbsp;'int',&nbsp;pid:&nbsp;'int',&nbsp;cpu:&nbsp;'float',&nbsp;io:&nbsp;'float',&nbsp;cache_miss_rate:&nbsp;'float',&nbsp;branch_miss_rate:&nbsp;'float')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Per-subsystem&nbsp;silicon&nbsp;telemetry&nbsp;—&nbsp;one&nbsp;process's&nbsp;activity&nbsp;signals.<br>
+&nbsp;<br>
+Answers&nbsp;"which&nbsp;part&nbsp;of&nbsp;it&nbsp;is&nbsp;firing":&nbsp;each&nbsp;process&nbsp;in&nbsp;its<br>
+process&nbsp;tree&nbsp;reports&nbsp;its&nbsp;own&nbsp;share&nbsp;of&nbsp;the&nbsp;aggregate&nbsp;body<br>
+signals&nbsp;plus&nbsp;its&nbsp;own&nbsp;microarchitectural&nbsp;prediction-error<br>
+ratios.&nbsp;``cpu``&nbsp;is&nbsp;the&nbsp;process's&nbsp;share&nbsp;of&nbsp;``stress_load``&nbsp;on&nbsp;a<br>
+[0,&nbsp;2]&nbsp;scale&nbsp;—&nbsp;the&nbsp;shares&nbsp;across&nbsp;the&nbsp;tree&nbsp;sum&nbsp;to&nbsp;the&nbsp;aggregate<br>
+and&nbsp;one&nbsp;busy&nbsp;multi-core&nbsp;process&nbsp;can&nbsp;exceed&nbsp;1.&nbsp;``io``,<br>
+``cache_miss_rate``,&nbsp;and&nbsp;``branch_miss_rate``&nbsp;are&nbsp;[0,&nbsp;1].&nbsp;The<br>
+cognitive&nbsp;mind&nbsp;correlates&nbsp;this&nbsp;with&nbsp;its&nbsp;task&nbsp;zone&nbsp;to&nbsp;feel<br>
+*where*&nbsp;its&nbsp;activity&nbsp;lives.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="SubsystemTelemetry-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="SubsystemTelemetry-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="SubsystemTelemetry-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="SubsystemTelemetry-__init__"><strong>__init__</strong></a>(self, subsystem: 'int', pid: 'int', cpu: 'float', io: 'float', cache_miss_rate: 'float', branch_miss_rate: 'float') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="SubsystemTelemetry-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="SubsystemTelemetry-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="SubsystemTelemetry-unpack_all"><strong>unpack_all</strong></a>(data: 'bytes') -&gt; 'list[SubsystemTelemetry]'</dt><dd><span class="code">Unpack&nbsp;a&nbsp;GET_SUBSYSTEM_TELEMETRY&nbsp;response&nbsp;into&nbsp;a&nbsp;list&nbsp;of&nbsp;subsystems.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>subsystem_name</strong></dt>
+<dd><span class="code">Human-readable&nbsp;subsystem&nbsp;name&nbsp;("daemon",&nbsp;"cognitive",&nbsp;"retina").</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'branch_miss_rate': 'float', 'cache_miss_rate': 'float', 'cpu': 'float', 'io': 'float', 'pid': 'int', 'subsystem': 'int'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'branch_miss_rate': Field(name='branch_miss_rate',type='float',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'cache_miss_rate': Field(name='cache_miss_rate',type='float',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'cpu': Field(name='cpu',type='float',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD), 'io': Field(name='io',type='float',default=&lt;dataclasse...appingproxy({}),kw_only=False,_field_type=_FIELD), 'pid': Field(name='pid',type='int',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD), 'subsystem': Field(name='subsystem',type='int',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('subsystem', 'pid', 'cpu', 'io', 'cache_miss_rate', 'branch_miss_rate')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ZoneTransitions">class <strong>ZoneTransitions</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ZoneTransitions">ZoneTransitions</a>(zones:&nbsp;'tuple[<a href="#StateDwell">StateDwell</a>,&nbsp;...]'&nbsp;=&nbsp;(),&nbsp;phases:&nbsp;'tuple[<a href="#StateDwell">StateDwell</a>,&nbsp;...]'&nbsp;=&nbsp;())&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Zone&nbsp;and&nbsp;phase&nbsp;transition&nbsp;counts,&nbsp;with&nbsp;time&nbsp;in&nbsp;each&nbsp;state.<br>
+&nbsp;<br>
+Counts&nbsp;are&nbsp;process-local&nbsp;and&nbsp;reset&nbsp;when&nbsp;the&nbsp;daemon&nbsp;restarts,&nbsp;which<br>
+suits&nbsp;reading&nbsp;them&nbsp;as&nbsp;a&nbsp;rate&nbsp;rather&nbsp;than&nbsp;a&nbsp;lifetime&nbsp;total.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ZoneTransitions-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="ZoneTransitions-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="ZoneTransitions-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="ZoneTransitions-__init__"><strong>__init__</strong></a>(self, zones: 'tuple[StateDwell, ...]' = (), phases: 'tuple[StateDwell, ...]' = ()) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="ZoneTransitions-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="ZoneTransitions-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<dl><dt><a name="ZoneTransitions-busiest_zone"><strong>busiest_zone</strong></a>(self) -&gt; 'StateDwell | None'</dt><dd><span class="code">The&nbsp;zone&nbsp;with&nbsp;the&nbsp;most&nbsp;transitions,&nbsp;if&nbsp;any&nbsp;were&nbsp;recorded.</span></dd></dl>
+
+<dl><dt><a name="ZoneTransitions-most_settled_phase"><strong>most_settled_phase</strong></a>(self) -&gt; 'StateDwell | None'</dt><dd><span class="code">The&nbsp;phase&nbsp;with&nbsp;the&nbsp;longest&nbsp;mean&nbsp;dwell&nbsp;among&nbsp;entered&nbsp;phases.<br>
+&nbsp;<br>
+Long&nbsp;average&nbsp;dwell&nbsp;is&nbsp;the&nbsp;signature&nbsp;of&nbsp;a&nbsp;settled&nbsp;system;&nbsp;a&nbsp;phase<br>
+re-entered&nbsp;constantly&nbsp;is&nbsp;the&nbsp;signature&nbsp;of&nbsp;oscillation.</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="ZoneTransitions-unpack"><strong>unpack</strong></a>(data: 'bytes') -&gt; 'ZoneTransitions'</dt><dd><span class="code">Unpack&nbsp;the&nbsp;zone&nbsp;and&nbsp;phase&nbsp;sections.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>total_phase_transitions</strong></dt>
+<dd><span class="code">Total&nbsp;emergent-phase&nbsp;changes&nbsp;since&nbsp;startup.</span></dd>
+</dl>
+<dl><dt><strong>total_zone_transitions</strong></dt>
+<dd><span class="code">Total&nbsp;task-zone&nbsp;changes&nbsp;since&nbsp;startup.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'phases': 'tuple[StateDwell, ...]', 'zones': 'tuple[StateDwell, ...]'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'phases': Field(name='phases',type='tuple[StateDwell, ...]...appingproxy({}),kw_only=False,_field_type=_FIELD), 'zones': Field(name='zones',type='tuple[StateDwell, ...]'...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('zones', 'phases')</dl>
+
+<dl><dt><strong>phases</strong> = ()</dl>
+
+<dl><dt><strong>zones</strong> = ()</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-unpack_recent_episodes"><strong>unpack_recent_episodes</strong></a>(data: 'bytes') -&gt; 'list[RecentEpisode]'</dt><dd><span class="code">Unpack&nbsp;a&nbsp;GET_RECENT_EPISODES&nbsp;response&nbsp;into&nbsp;a&nbsp;list&nbsp;of&nbsp;results.</span></dd></dl>
+ <dl><dt><a name="-unpack_similar_results"><strong>unpack_similar_results</strong></a>(data: 'bytes') -&gt; 'list[SimilarEpisode]'</dt><dd><span class="code">Unpack&nbsp;a&nbsp;FIND_SIMILAR&nbsp;response&nbsp;into&nbsp;a&nbsp;list&nbsp;of&nbsp;results.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>LEARNING_POSTURE_NEUTRAL</strong> = 'neutral'<br>
+<strong>LEARNING_POSTURE_PROTECTIVE</strong> = 'protective'<br>
+<strong>LEARNING_POSTURE_RECEPTIVE</strong> = 'receptive'<br>
+<strong>LEARNING_POSTURE_RECOVERING</strong> = 'recovering'<br>
+<strong>LOBE_NAMES</strong> = {0: 'daemon', 1: 'cognitive', 2: 'retina'}<br>
+<strong>MODULE_NAMES</strong> = {0: 'subcognitive', 1: 'attention', 2: 'memory', 3: 'emotion', 4: 'language', 5: 'reasoning', 6: 'sensory', 7: 'motor', 8: 'metacognition', 9: 'dreaming', ...}<br>
+<strong>__all__</strong> = ['LEARNING_POSTURE_NEUTRAL', 'LEARNING_POSTURE_PROTECTIVE', 'LEARNING_POSTURE_RECEPTIVE', 'LEARNING_POSTURE_RECOVERING', 'LOBE_NAMES', 'MODULE_NAMES', 'BodyControlState', 'BodyState', 'CoreState', 'Episode', 'FoldMargins', 'InferenceSummary', 'IonSummary', 'MemoryStats', 'ModuleTelemetry', 'NeuroSummary', 'OpticState', 'PhaseInfo', 'PingResponse', 'PlasticityProfile', ...]<br>
+<strong>__annotations__</strong> = {'MODULE_STATUS_NAMES': 'dict[int, str]'}</td></tr></table>
+</body></html>

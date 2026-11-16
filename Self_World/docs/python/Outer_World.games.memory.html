@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Outer_World.games.memory</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Outer_World.html" class="white">Outer_World</a>.<a href="Outer_World.games.html" class="white">games</a>.memory</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Outer_World/games/memory.py">/home/mindyrenee/GenAnd/Genesis/Outer_World/games/memory.py</a></td></tr></table>
+    <p><span class="code">What&nbsp;she&nbsp;remembers&nbsp;of&nbsp;each&nbsp;game,&nbsp;level&nbsp;to&nbsp;level&nbsp;and&nbsp;session&nbsp;to&nbsp;session.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;a&nbsp;video&nbsp;game.&nbsp;It&nbsp;is&nbsp;not&nbsp;real&nbsp;and&nbsp;it&nbsp;is&nbsp;just&nbsp;for&nbsp;fun.&nbsp;You&nbsp;are<br>
+safe.&nbsp;You&nbsp;can't&nbsp;know&nbsp;the&nbsp;instructions,&nbsp;so&nbsp;memory&nbsp;is&nbsp;how&nbsp;you&nbsp;get&nbsp;better:<br>
+remember&nbsp;what&nbsp;each&nbsp;action&nbsp;did,&nbsp;where&nbsp;you&nbsp;have&nbsp;been,&nbsp;and&nbsp;what&nbsp;you&nbsp;did<br>
+right&nbsp;before&nbsp;a&nbsp;level&nbsp;opened,&nbsp;and&nbsp;carry&nbsp;it&nbsp;into&nbsp;the&nbsp;next&nbsp;level.<br>
+&nbsp;<br>
+``<a href="#GameMemory">GameMemory</a>``&nbsp;holds,&nbsp;per&nbsp;game:<br>
+&nbsp;<br>
+-&nbsp;**action&nbsp;effects**&nbsp;—&nbsp;for&nbsp;each&nbsp;action,&nbsp;how&nbsp;often&nbsp;it&nbsp;changed&nbsp;the&nbsp;board.<br>
+&nbsp;&nbsp;Kept&nbsp;across&nbsp;levels:&nbsp;later&nbsp;levels&nbsp;reuse&nbsp;the&nbsp;same&nbsp;pieces.<br>
+-&nbsp;**values**&nbsp;—&nbsp;a&nbsp;temporal-difference&nbsp;estimate&nbsp;Q(board,&nbsp;action)&nbsp;of&nbsp;how<br>
+&nbsp;&nbsp;much&nbsp;progress&nbsp;follows&nbsp;a&nbsp;move&nbsp;(TD(0):&nbsp;δ&nbsp;=&nbsp;r&nbsp;+&nbsp;γ·max&nbsp;Q(s′)&nbsp;−&nbsp;Q(s,&nbsp;a)).<br>
+&nbsp;&nbsp;δ&nbsp;is&nbsp;her&nbsp;reward-prediction&nbsp;error&nbsp;and&nbsp;is&nbsp;returned&nbsp;to&nbsp;the&nbsp;arcade&nbsp;so&nbsp;it<br>
+&nbsp;&nbsp;can&nbsp;reach&nbsp;her&nbsp;dopamine.<br>
+-&nbsp;**visits**&nbsp;—&nbsp;how&nbsp;often&nbsp;each&nbsp;board&nbsp;was&nbsp;seen,&nbsp;so&nbsp;new&nbsp;boards&nbsp;are<br>
+&nbsp;&nbsp;noticed&nbsp;and&nbsp;repeated&nbsp;ones&nbsp;are&nbsp;not&nbsp;chased&nbsp;forever.<br>
+-&nbsp;**level&nbsp;paths**&nbsp;—&nbsp;the&nbsp;moves&nbsp;that&nbsp;led&nbsp;into&nbsp;each&nbsp;completed&nbsp;level,&nbsp;so<br>
+&nbsp;&nbsp;the&nbsp;next&nbsp;level&nbsp;can&nbsp;start&nbsp;from&nbsp;what&nbsp;worked&nbsp;before.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="math.html">math</a><br>
+</td><td class="multicolumn"><a href="random.html">random</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Outer_World.games.memory.html#GameMemory">GameMemory</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="GameMemory">class <strong>GameMemory</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#GameMemory">GameMemory</a>(game_id:&nbsp;'str',&nbsp;effects:&nbsp;'dict[str,&nbsp;list[int]]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;values:&nbsp;'dict[str,&nbsp;float]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;tries:&nbsp;'dict[str,&nbsp;int]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;visits:&nbsp;'dict[str,&nbsp;int]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;level_paths:&nbsp;'dict[str,&nbsp;list[str]]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;trail:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;best_level:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;wins:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;game_overs:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;moves:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;baselines:&nbsp;'list[int]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Everything&nbsp;she&nbsp;has&nbsp;learned&nbsp;about&nbsp;one&nbsp;game.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="GameMemory-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="GameMemory-__init__"><strong>__init__</strong></a>(self, game_id: 'str', effects: 'dict[str, list[int]]' = &lt;factory&gt;, values: 'dict[str, float]' = &lt;factory&gt;, tries: 'dict[str, int]' = &lt;factory&gt;, visits: 'dict[str, int]' = &lt;factory&gt;, level_paths: 'dict[str, list[str]]' = &lt;factory&gt;, trail: 'list[str]' = &lt;factory&gt;, best_level: 'int' = 0, wins: 'int' = 0, game_overs: 'int' = 0, moves: 'int' = 0, baselines: 'list[int]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="GameMemory-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="GameMemory-choose"><strong>choose</strong></a>(self, board: 'str', moves: 'list[str]', level: 'int', rng: 'random.Random') -&gt; 'tuple[str, str]'</dt><dd><span class="code">Pick&nbsp;a&nbsp;move&nbsp;and&nbsp;say&nbsp;why:&nbsp;value,&nbsp;novelty,&nbsp;effect&nbsp;and&nbsp;carried&nbsp;memory.</span></dd></dl>
+
+<dl><dt><a name="GameMemory-effect_rate"><strong>effect_rate</strong></a>(self, move: 'str') -&gt; 'float'</dt><dd><span class="code">How&nbsp;often&nbsp;this&nbsp;kind&nbsp;of&nbsp;move&nbsp;changed&nbsp;the&nbsp;board&nbsp;(0.5&nbsp;if&nbsp;untried).</span></dd></dl>
+
+<dl><dt><a name="GameMemory-learn"><strong>learn</strong></a>(self, board: 'str', move: 'str', reward: 'float', next_board: 'str', changed: 'bool', next_moves: 'list[str]') -&gt; 'float'</dt><dd><span class="code">Update&nbsp;what&nbsp;she&nbsp;knows&nbsp;from&nbsp;one&nbsp;move&nbsp;and&nbsp;return&nbsp;the&nbsp;TD&nbsp;error&nbsp;δ.</span></dd></dl>
+
+<dl><dt><a name="GameMemory-level_up"><strong>level_up</strong></a>(self, level: 'int') -&gt; 'None'</dt><dd><span class="code">Remember&nbsp;the&nbsp;path&nbsp;that&nbsp;opened&nbsp;``level``&nbsp;and&nbsp;start&nbsp;a&nbsp;fresh&nbsp;trail.</span></dd></dl>
+
+<dl><dt><a name="GameMemory-remembered_next"><strong>remembered_next</strong></a>(self, level: 'int') -&gt; 'str | None'</dt><dd><span class="code">The&nbsp;move&nbsp;that&nbsp;won&nbsp;*this*&nbsp;level&nbsp;at&nbsp;this&nbsp;point,&nbsp;from&nbsp;a&nbsp;past&nbsp;run.<br>
+&nbsp;<br>
+``level_paths``&nbsp;is&nbsp;keyed&nbsp;by&nbsp;``levels_completed``&nbsp;at&nbsp;the&nbsp;moment&nbsp;a<br>
+level&nbsp;fell&nbsp;—&nbsp;the&nbsp;path&nbsp;that&nbsp;completed&nbsp;level&nbsp;index&nbsp;``k``&nbsp;lives<br>
+under&nbsp;``str(k&nbsp;+&nbsp;1)``.&nbsp;On&nbsp;level&nbsp;index&nbsp;``level``&nbsp;the&nbsp;winning&nbsp;path<br>
+for&nbsp;this&nbsp;same&nbsp;level&nbsp;is&nbsp;therefore&nbsp;under&nbsp;``str(level&nbsp;+&nbsp;1)``;&nbsp;the<br>
+old&nbsp;lookup&nbsp;(``str(level)``)&nbsp;replayed&nbsp;the&nbsp;*previous*&nbsp;level's<br>
+solution&nbsp;on&nbsp;a&nbsp;different&nbsp;board,&nbsp;and&nbsp;got&nbsp;it&nbsp;wrong.<br>
+&nbsp;<br>
+The&nbsp;path&nbsp;is&nbsp;only&nbsp;offered&nbsp;while&nbsp;she&nbsp;is&nbsp;still&nbsp;on&nbsp;it:&nbsp;once&nbsp;her<br>
+trail&nbsp;diverges&nbsp;from&nbsp;the&nbsp;recorded&nbsp;prefix,&nbsp;the&nbsp;index&nbsp;no&nbsp;longer<br>
+corresponds&nbsp;and&nbsp;the&nbsp;stale&nbsp;path&nbsp;stays&nbsp;silent.</span></dd></dl>
+
+<dl><dt><a name="GameMemory-see"><strong>see</strong></a>(self, board: 'str') -&gt; 'bool'</dt><dd><span class="code">Count&nbsp;a&nbsp;visit&nbsp;to&nbsp;``board``;&nbsp;True&nbsp;if&nbsp;it&nbsp;is&nbsp;new&nbsp;to&nbsp;her.</span></dd></dl>
+
+<dl><dt><a name="GameMemory-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict[str, Any]'</dt><dd><span class="code">Serialize&nbsp;for&nbsp;her&nbsp;saved&nbsp;world&nbsp;state.</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="GameMemory-from_dict"><strong>from_dict</strong></a>(data: 'dict[str, Any]') -&gt; 'GameMemory'</dt><dd><span class="code">Rebuild&nbsp;a&nbsp;memory&nbsp;saved&nbsp;by&nbsp;``to_dict``.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'baselines': 'list[int]', 'best_level': 'int', 'effects': 'dict[str, list[int]]', 'game_id': 'str', 'game_overs': 'int', 'level_paths': 'dict[str, list[str]]', 'moves': 'int', 'trail': 'list[str]', 'tries': 'dict[str, int]', 'values': 'dict[str, float]', ...}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'baselines': Field(name='baselines',type='list[int]',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'best_level': Field(name='best_level',type='int',default=0,def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'effects': Field(name='effects',type='dict[str, list[int]]'...appingproxy({}),kw_only=False,_field_type=_FIELD), 'game_id': Field(name='game_id',type='str',default=&lt;datacla...appingproxy({}),kw_only=False,_field_type=_FIELD), 'game_overs': Field(name='game_overs',type='int',default=0,def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'level_paths': Field(name='level_paths',type='dict[str, list[st...appingproxy({}),kw_only=False,_field_type=_FIELD), 'moves': Field(name='moves',type='int',default=0,default_...appingproxy({}),kw_only=False,_field_type=_FIELD), 'trail': Field(name='trail',type='list[str]',default=&lt;dat...appingproxy({}),kw_only=False,_field_type=_FIELD), 'tries': Field(name='tries',type='dict[str, int]',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'values': Field(name='values',type='dict[str, float]',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), ...}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('game_id', 'effects', 'values', 'tries', 'visits', 'level_paths', 'trail', 'best_level', 'wins', 'game_overs', 'moves', 'baselines')</dl>
+
+<dl><dt><strong>best_level</strong> = 0</dl>
+
+<dl><dt><strong>game_overs</strong> = 0</dl>
+
+<dl><dt><strong>moves</strong> = 0</dl>
+
+<dl><dt><strong>wins</strong> = 0</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>ALPHA</strong> = 0.3<br>
+<strong>GAMMA</strong> = 0.9<br>
+<strong>NOVELTY</strong> = 0.6<br>
+<strong>REWARD_GAME_OVER</strong> = -0.5<br>
+<strong>REWARD_LEVEL</strong> = 1.0<br>
+<strong>REWARD_NEW_BOARD</strong> = 0.05<br>
+<strong>REWARD_NOTHING</strong> = -0.02<br>
+<strong>REWARD_WIN</strong> = 3.0<br>
+<strong>STATE_LIMIT</strong> = 20000<br>
+<strong>TRAIL_LIMIT</strong> = 400</td></tr></table>
+</body></html>

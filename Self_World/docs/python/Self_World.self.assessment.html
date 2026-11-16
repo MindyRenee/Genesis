@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.self.assessment</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.self.html" class="white">self</a>.assessment</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/self/assessment.py">/home/mindyrenee/GenAnd/Genesis/Self_World/self/assessment.py</a></td></tr></table>
+    <p><span class="code">Self-assessment&nbsp;engine&nbsp;—&nbsp;Genesis&nbsp;evaluating&nbsp;its&nbsp;own&nbsp;knowledge&nbsp;and&nbsp;answers.<br>
+&nbsp;<br>
+This&nbsp;module&nbsp;gives&nbsp;Genesis&nbsp;metacognitive&nbsp;awareness:&nbsp;the&nbsp;ability&nbsp;to<br>
+evaluate&nbsp;whether&nbsp;it&nbsp;actually&nbsp;knows&nbsp;something,&nbsp;how&nbsp;confident&nbsp;it&nbsp;is,<br>
+and&nbsp;what&nbsp;it&nbsp;doesn't&nbsp;know.<br>
+&nbsp;<br>
+##&nbsp;What&nbsp;this&nbsp;provides<br>
+&nbsp;<br>
+1.&nbsp;**Knowledge&nbsp;verification**&nbsp;—&nbsp;given&nbsp;a&nbsp;topic,&nbsp;check&nbsp;whether&nbsp;it<br>
+&nbsp;&nbsp;&nbsp;actually&nbsp;has&nbsp;learned&nbsp;knowledge&nbsp;about&nbsp;it&nbsp;in&nbsp;the&nbsp;concept&nbsp;network.<br>
+&nbsp;&nbsp;&nbsp;Not&nbsp;just&nbsp;"does&nbsp;the&nbsp;concept&nbsp;exist"&nbsp;but&nbsp;"does&nbsp;it&nbsp;have&nbsp;meaningful<br>
+&nbsp;&nbsp;&nbsp;content"&nbsp;(definition,&nbsp;relationships,&nbsp;properties).<br>
+&nbsp;<br>
+2.&nbsp;**Confidence&nbsp;calibration**&nbsp;—&nbsp;given&nbsp;a&nbsp;planned&nbsp;answer,&nbsp;estimate<br>
+&nbsp;&nbsp;&nbsp;how&nbsp;confident&nbsp;it&nbsp;should&nbsp;be.&nbsp;This&nbsp;is&nbsp;based&nbsp;on:<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;How&nbsp;well-connected&nbsp;the&nbsp;relevant&nbsp;concepts&nbsp;are&nbsp;in&nbsp;the&nbsp;network<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;Whether&nbsp;the&nbsp;answer&nbsp;relies&nbsp;on&nbsp;concepts&nbsp;it&nbsp;actually&nbsp;knows&nbsp;about<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;Whether&nbsp;it's&nbsp;answering&nbsp;from&nbsp;learned&nbsp;knowledge&nbsp;or&nbsp;making&nbsp;things&nbsp;up<br>
+&nbsp;<br>
+3.&nbsp;**Knowledge&nbsp;gap&nbsp;detection**&nbsp;—&nbsp;systematically&nbsp;identify&nbsp;what&nbsp;it<br>
+&nbsp;&nbsp;&nbsp;doesn't&nbsp;know.&nbsp;A&nbsp;concept&nbsp;exists&nbsp;but&nbsp;has&nbsp;no&nbsp;definition.&nbsp;A&nbsp;concept<br>
+&nbsp;&nbsp;&nbsp;has&nbsp;no&nbsp;relationships.&nbsp;A&nbsp;topic&nbsp;was&nbsp;asked&nbsp;about&nbsp;but&nbsp;it&nbsp;has&nbsp;no<br>
+&nbsp;&nbsp;&nbsp;concept&nbsp;for&nbsp;it&nbsp;at&nbsp;all.<br>
+&nbsp;<br>
+4.&nbsp;**Answer&nbsp;quality&nbsp;scoring**&nbsp;—&nbsp;after&nbsp;producing&nbsp;an&nbsp;answer,&nbsp;evaluate<br>
+&nbsp;&nbsp;&nbsp;whether&nbsp;it&nbsp;was&nbsp;relevant,&nbsp;complete,&nbsp;and&nbsp;grounded&nbsp;in&nbsp;actual&nbsp;knowledge<br>
+&nbsp;&nbsp;&nbsp;vs.&nbsp;being&nbsp;vague&nbsp;or&nbsp;fabricated.<br>
+&nbsp;<br>
+5.&nbsp;**Capability&nbsp;awareness**&nbsp;—&nbsp;track&nbsp;what&nbsp;kinds&nbsp;of&nbsp;questions&nbsp;it&nbsp;can<br>
+&nbsp;&nbsp;&nbsp;answer&nbsp;well&nbsp;and&nbsp;which&nbsp;ones&nbsp;it&nbsp;struggles&nbsp;with,&nbsp;so&nbsp;it&nbsp;can&nbsp;be<br>
+&nbsp;&nbsp;&nbsp;honest&nbsp;about&nbsp;its&nbsp;limitations.<br>
+&nbsp;<br>
+##&nbsp;How&nbsp;it&nbsp;connects&nbsp;to&nbsp;the&nbsp;rest&nbsp;of&nbsp;the&nbsp;system<br>
+&nbsp;<br>
+-&nbsp;**SelfMonitor**&nbsp;(frontal_lobe/self_monitor.py)&nbsp;checks&nbsp;output&nbsp;for<br>
+&nbsp;&nbsp;grammar&nbsp;and&nbsp;coherence.&nbsp;This&nbsp;module&nbsp;checks&nbsp;for&nbsp;*epistemic*&nbsp;quality<br>
+&nbsp;&nbsp;—&nbsp;is&nbsp;the&nbsp;content&nbsp;actually&nbsp;grounded&nbsp;in&nbsp;knowledge?<br>
+&nbsp;<br>
+-&nbsp;**ErrorMonitor**&nbsp;(reflection.py)&nbsp;detects&nbsp;prediction-outcome<br>
+&nbsp;&nbsp;mismatches.&nbsp;This&nbsp;module&nbsp;provides&nbsp;the&nbsp;ground&nbsp;truth&nbsp;for&nbsp;those<br>
+&nbsp;&nbsp;comparisons&nbsp;—&nbsp;was&nbsp;the&nbsp;answer&nbsp;actually&nbsp;correct?<br>
+&nbsp;<br>
+-&nbsp;**Curiosity**&nbsp;(curiosity.py)&nbsp;generates&nbsp;questions&nbsp;from&nbsp;gaps.<br>
+&nbsp;&nbsp;This&nbsp;module&nbsp;identifies&nbsp;those&nbsp;gaps&nbsp;systematically.<br>
+&nbsp;<br>
+-&nbsp;**Reflection**&nbsp;(reflection.py)&nbsp;produces&nbsp;insights.&nbsp;This<br>
+&nbsp;&nbsp;module&nbsp;feeds&nbsp;it&nbsp;actionable&nbsp;insights&nbsp;about&nbsp;knowledge&nbsp;quality.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.self.assessment.html#AnswerAssessment">AnswerAssessment</a>
+</dt><dt class="heading-text"><a href="Self_World.self.assessment.html#CapabilityProfile">CapabilityProfile</a>
+</dt><dt class="heading-text"><a href="Self_World.self.assessment.html#KnowledgeAssessment">KnowledgeAssessment</a>
+</dt><dt class="heading-text"><a href="Self_World.self.assessment.html#SelfAssessment">SelfAssessment</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="AnswerAssessment">class <strong>AnswerAssessment</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#AnswerAssessment">AnswerAssessment</a>(answer:&nbsp;'str',&nbsp;topics:&nbsp;'list[str]',&nbsp;grounded:&nbsp;'bool'&nbsp;=&nbsp;False,&nbsp;confidence:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;issues:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;knows_all_topics:&nbsp;'bool'&nbsp;=&nbsp;True,&nbsp;missing_topics:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Assessment&nbsp;of&nbsp;a&nbsp;generated&nbsp;answer.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="AnswerAssessment-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="AnswerAssessment-__init__"><strong>__init__</strong></a>(self, answer: 'str', topics: 'list[str]', grounded: 'bool' = False, confidence: 'float' = 0.0, issues: 'list[str]' = &lt;factory&gt;, knows_all_topics: 'bool' = True, missing_topics: 'list[str]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="AnswerAssessment-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>answer</strong></dt>
+</dl>
+<dl><dt><strong>confidence</strong></dt>
+</dl>
+<dl><dt><strong>grounded</strong></dt>
+</dl>
+<dl><dt><strong>issues</strong></dt>
+</dl>
+<dl><dt><strong>knows_all_topics</strong></dt>
+</dl>
+<dl><dt><strong>missing_topics</strong></dt>
+</dl>
+<dl><dt><strong>topics</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'answer': 'str', 'confidence': 'float', 'grounded': 'bool', 'issues': 'list[str]', 'knows_all_topics': 'bool', 'missing_topics': 'list[str]', 'topics': 'list[str]'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'answer': Field(name='answer',type='str',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD), 'confidence': Field(name='confidence',type='float',default=0.0...appingproxy({}),kw_only=False,_field_type=_FIELD), 'grounded': Field(name='grounded',type='bool',default=False,...appingproxy({}),kw_only=False,_field_type=_FIELD), 'issues': Field(name='issues',type='list[str]',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD), 'knows_all_topics': Field(name='knows_all_topics',type='bool',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'missing_topics': Field(name='missing_topics',type='list[str]',def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'topics': Field(name='topics',type='list[str]',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('answer', 'topics', 'grounded', 'confidence', 'issues', 'knows_all_topics', 'missing_topics')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="CapabilityProfile">class <strong>CapabilityProfile</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#CapabilityProfile">CapabilityProfile</a>(question_type_stats:&nbsp;'dict[str,&nbsp;dict[str,&nbsp;int]]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;known_gaps:&nbsp;'set[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;recently_learned:&nbsp;'deque[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;confident_topics:&nbsp;'set[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;total_assessments:&nbsp;'int'&nbsp;=&nbsp;0)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Profile&nbsp;of&nbsp;what&nbsp;Genesis&nbsp;can&nbsp;and&nbsp;can't&nbsp;do&nbsp;well.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="CapabilityProfile-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="CapabilityProfile-__init__"><strong>__init__</strong></a>(self, question_type_stats: 'dict[str, dict[str, int]]' = &lt;factory&gt;, known_gaps: 'set[str]' = &lt;factory&gt;, recently_learned: 'deque[str]' = &lt;factory&gt;, confident_topics: 'set[str]' = &lt;factory&gt;, total_assessments: 'int' = 0) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="CapabilityProfile-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>confident_topics</strong></dt>
+</dl>
+<dl><dt><strong>known_gaps</strong></dt>
+</dl>
+<dl><dt><strong>question_type_stats</strong></dt>
+</dl>
+<dl><dt><strong>recently_learned</strong></dt>
+</dl>
+<dl><dt><strong>total_assessments</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'confident_topics': 'set[str]', 'known_gaps': 'set[str]', 'question_type_stats': 'dict[str, dict[str, int]]', 'recently_learned': 'deque[str]', 'total_assessments': 'int'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'confident_topics': Field(name='confident_topics',type='set[str]',de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'known_gaps': Field(name='known_gaps',type='set[str]',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'question_type_stats': Field(name='question_type_stats',type='dict[str,...appingproxy({}),kw_only=False,_field_type=_FIELD), 'recently_learned': Field(name='recently_learned',type='deque[str]',...appingproxy({}),kw_only=False,_field_type=_FIELD), 'total_assessments': Field(name='total_assessments',type='int',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('question_type_stats', 'known_gaps', 'recently_learned', 'confident_topics', 'total_assessments')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="KnowledgeAssessment">class <strong>KnowledgeAssessment</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#KnowledgeAssessment">KnowledgeAssessment</a>(topic:&nbsp;'str',&nbsp;concept_exists:&nbsp;'bool'&nbsp;=&nbsp;False,&nbsp;has_definition:&nbsp;'bool'&nbsp;=&nbsp;False,&nbsp;has_relationships:&nbsp;'bool'&nbsp;=&nbsp;False,&nbsp;has_properties:&nbsp;'bool'&nbsp;=&nbsp;False,&nbsp;connection_count:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;confidence:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;gaps:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Assessment&nbsp;of&nbsp;Genesis's&nbsp;knowledge&nbsp;about&nbsp;a&nbsp;topic.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="KnowledgeAssessment-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="KnowledgeAssessment-__init__"><strong>__init__</strong></a>(self, topic: 'str', concept_exists: 'bool' = False, has_definition: 'bool' = False, has_relationships: 'bool' = False, has_properties: 'bool' = False, connection_count: 'int' = 0, confidence: 'float' = 0.0, gaps: 'list[str]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="KnowledgeAssessment-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>concept_exists</strong></dt>
+</dl>
+<dl><dt><strong>confidence</strong></dt>
+</dl>
+<dl><dt><strong>connection_count</strong></dt>
+</dl>
+<dl><dt><strong>gaps</strong></dt>
+</dl>
+<dl><dt><strong>has_definition</strong></dt>
+</dl>
+<dl><dt><strong>has_properties</strong></dt>
+</dl>
+<dl><dt><strong>has_relationships</strong></dt>
+</dl>
+<dl><dt><strong>topic</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'concept_exists': 'bool', 'confidence': 'float', 'connection_count': 'int', 'gaps': 'list[str]', 'has_definition': 'bool', 'has_properties': 'bool', 'has_relationships': 'bool', 'topic': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'concept_exists': Field(name='concept_exists',type='bool',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'confidence': Field(name='confidence',type='float',default=0.0...appingproxy({}),kw_only=False,_field_type=_FIELD), 'connection_count': Field(name='connection_count',type='int',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'gaps': Field(name='gaps',type='list[str]',default=&lt;data...appingproxy({}),kw_only=False,_field_type=_FIELD), 'has_definition': Field(name='has_definition',type='bool',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'has_properties': Field(name='has_properties',type='bool',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'has_relationships': Field(name='has_relationships',type='bool',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'topic': Field(name='topic',type='str',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('topic', 'concept_exists', 'has_definition', 'has_relationships', 'has_properties', 'connection_count', 'confidence', 'gaps')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SelfAssessment">class <strong>SelfAssessment</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SelfAssessment">SelfAssessment</a>(network:&nbsp;'ConceptNetwork')&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Metacognitive&nbsp;self-assessment&nbsp;—&nbsp;knowing&nbsp;what&nbsp;it&nbsp;knows&nbsp;and&nbsp;doesn't.<br>
+&nbsp;<br>
+This&nbsp;engine&nbsp;runs&nbsp;alongside&nbsp;the&nbsp;main&nbsp;cognition&nbsp;loop.&nbsp;Before&nbsp;answering,<br>
+it&nbsp;assesses&nbsp;whether&nbsp;it&nbsp;actually&nbsp;has&nbsp;the&nbsp;knowledge&nbsp;to&nbsp;answer&nbsp;well.<br>
+After&nbsp;answering,&nbsp;it&nbsp;scores&nbsp;the&nbsp;answer&nbsp;quality.&nbsp;Over&nbsp;time,&nbsp;it&nbsp;builds<br>
+a&nbsp;profile&nbsp;of&nbsp;its&nbsp;capabilities.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="SelfAssessment-__init__"><strong>__init__</strong></a>(self, network: 'ConceptNetwork') -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;assessment&nbsp;engine&nbsp;with&nbsp;a&nbsp;concept&nbsp;network&nbsp;and&nbsp;empty&nbsp;capability&nbsp;profile.</span></dd></dl>
+
+<dl><dt><a name="SelfAssessment-assess_answer"><strong>assess_answer</strong></a>(self, answer: 'str', topics: 'list[str]', user_input: 'str' = '') -&gt; 'AnswerAssessment'</dt><dd><span class="code">Assess&nbsp;the&nbsp;quality&nbsp;and&nbsp;confidence&nbsp;of&nbsp;a&nbsp;planned&nbsp;answer.<br>
+&nbsp;<br>
+This&nbsp;runs&nbsp;BEFORE&nbsp;the&nbsp;answer&nbsp;is&nbsp;spoken&nbsp;(or&nbsp;right&nbsp;after).&nbsp;It<br>
+checks&nbsp;whether&nbsp;the&nbsp;answer&nbsp;is&nbsp;grounded&nbsp;in&nbsp;actual&nbsp;knowledge&nbsp;or<br>
+whether&nbsp;it's&nbsp;fabricating.<br>
+&nbsp;<br>
+Key&nbsp;signals:<br>
+-&nbsp;Do&nbsp;all&nbsp;topics&nbsp;in&nbsp;the&nbsp;answer&nbsp;have&nbsp;concepts&nbsp;in&nbsp;the&nbsp;network?<br>
+-&nbsp;Does&nbsp;the&nbsp;answer&nbsp;contain&nbsp;words&nbsp;from&nbsp;concept&nbsp;definitions?<br>
+-&nbsp;Is&nbsp;the&nbsp;answer&nbsp;vague/hedging&nbsp;("maybe",&nbsp;"perhaps",&nbsp;"I&nbsp;think")<br>
+&nbsp;&nbsp;which&nbsp;suggests&nbsp;low&nbsp;confidence?<br>
+-&nbsp;Does&nbsp;the&nbsp;answer&nbsp;contain&nbsp;"I&nbsp;don't&nbsp;know"&nbsp;language?</span></dd></dl>
+
+<dl><dt><a name="SelfAssessment-assess_knowledge"><strong>assess_knowledge</strong></a>(self, topic: 'str') -&gt; 'KnowledgeAssessment'</dt><dd><span class="code">Assess&nbsp;how&nbsp;well&nbsp;Genesis&nbsp;knows&nbsp;a&nbsp;topic.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;core&nbsp;metacognitive&nbsp;function:&nbsp;given&nbsp;a&nbsp;topic,&nbsp;how<br>
+much&nbsp;does&nbsp;it&nbsp;actually&nbsp;know&nbsp;about&nbsp;it?&nbsp;The&nbsp;assessment&nbsp;is&nbsp;based<br>
+entirely&nbsp;on&nbsp;the&nbsp;concept&nbsp;network&nbsp;—&nbsp;no&nbsp;hardcoded&nbsp;knowledge.<br>
+&nbsp;<br>
+A&nbsp;concept&nbsp;is&nbsp;"well&nbsp;known"&nbsp;if&nbsp;it&nbsp;has:<br>
+-&nbsp;A&nbsp;definition&nbsp;(learned&nbsp;content)<br>
+-&nbsp;Multiple&nbsp;relationships&nbsp;(connected&nbsp;to&nbsp;other&nbsp;concepts)<br>
+-&nbsp;Properties&nbsp;beyond&nbsp;defaults<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;<a href="#KnowledgeAssessment">KnowledgeAssessment</a>&nbsp;with&nbsp;confidence&nbsp;and&nbsp;identified&nbsp;gaps.</span></dd></dl>
+
+<dl><dt><a name="SelfAssessment-detect_gaps"><strong>detect_gaps</strong></a>(self, topics: 'list[str]') -&gt; 'list[str]'</dt><dd><span class="code">Detect&nbsp;knowledge&nbsp;gaps&nbsp;for&nbsp;a&nbsp;set&nbsp;of&nbsp;topics.<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;list&nbsp;of&nbsp;gap&nbsp;descriptions&nbsp;—&nbsp;things&nbsp;it&nbsp;doesn't&nbsp;know<br>
+that&nbsp;are&nbsp;relevant&nbsp;to&nbsp;the&nbsp;topics.&nbsp;These&nbsp;can&nbsp;be&nbsp;fed&nbsp;to&nbsp;the<br>
+curiosity&nbsp;engine&nbsp;to&nbsp;generate&nbsp;learning&nbsp;questions.</span></dd></dl>
+
+<dl><dt><a name="SelfAssessment-find_weak_concepts"><strong>find_weak_concepts</strong></a>(self, limit: 'int' = 20) -&gt; 'list[tuple[str, float]]'</dt><dd><span class="code">Find&nbsp;concepts&nbsp;in&nbsp;the&nbsp;network&nbsp;that&nbsp;are&nbsp;weakly&nbsp;connected.<br>
+&nbsp;<br>
+These&nbsp;are&nbsp;concepts&nbsp;that&nbsp;exist&nbsp;but&nbsp;have&nbsp;poor&nbsp;knowledge&nbsp;—<br>
+few&nbsp;relationships,&nbsp;no&nbsp;definition,&nbsp;etc.&nbsp;They're&nbsp;candidates<br>
+for&nbsp;learning&nbsp;more&nbsp;about.<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;list&nbsp;of&nbsp;(concept_name,&nbsp;confidence)&nbsp;sorted&nbsp;by<br>
+lowest&nbsp;confidence&nbsp;first.</span></dd></dl>
+
+<dl><dt><a name="SelfAssessment-get_capability_summary"><strong>get_capability_summary</strong></a>(self) -&gt; 'list[tuple[str, str]]'</dt><dd><span class="code">Structured&nbsp;summary&nbsp;of&nbsp;what&nbsp;it&nbsp;knows&nbsp;well&nbsp;and&nbsp;what&nbsp;it&nbsp;lacks.<br>
+&nbsp;<br>
+Returns&nbsp;``(kind,&nbsp;text)``&nbsp;semantic&nbsp;fragments&nbsp;for&nbsp;the&nbsp;language<br>
+engine&nbsp;to&nbsp;compose&nbsp;from,&nbsp;not&nbsp;a&nbsp;finished&nbsp;report.&nbsp;This&nbsp;used&nbsp;to<br>
+return&nbsp;a&nbsp;single&nbsp;English&nbsp;string&nbsp;("confident&nbsp;about:&nbsp;X.&nbsp;handles&nbsp;Y<br>
+questions&nbsp;well&nbsp;(80%&nbsp;success).&nbsp;…")&nbsp;that&nbsp;the&nbsp;caller&nbsp;wrapped&nbsp;as&nbsp;a<br>
+``clause``&nbsp;fragment&nbsp;—&nbsp;and&nbsp;because&nbsp;``clause``&nbsp;is&nbsp;the&nbsp;verbatim<br>
+recitation&nbsp;channel,&nbsp;asking&nbsp;"what&nbsp;do&nbsp;you&nbsp;know"&nbsp;recited&nbsp;that<br>
+report&nbsp;word&nbsp;for&nbsp;word.&nbsp;Handing&nbsp;back&nbsp;typed&nbsp;fragments&nbsp;keeps<br>
+surface&nbsp;realization&nbsp;in&nbsp;the&nbsp;language&nbsp;engine.<br>
+&nbsp;<br>
+Returns&nbsp;an&nbsp;empty&nbsp;list&nbsp;when&nbsp;there&nbsp;is&nbsp;nothing&nbsp;measured&nbsp;yet,&nbsp;so<br>
+the&nbsp;caller&nbsp;stays&nbsp;silent&nbsp;rather&nbsp;than&nbsp;reciting&nbsp;a&nbsp;placeholder.</span></dd></dl>
+
+<dl><dt><a name="SelfAssessment-get_confidence_for_topic"><strong>get_confidence_for_topic</strong></a>(self, topic: 'str') -&gt; 'float'</dt><dd><span class="code">Get&nbsp;cached&nbsp;confidence&nbsp;for&nbsp;a&nbsp;topic,&nbsp;or&nbsp;assess&nbsp;it&nbsp;fresh.</span></dd></dl>
+
+<dl><dt><a name="SelfAssessment-get_learning_priorities"><strong>get_learning_priorities</strong></a>(self) -&gt; 'list[str]'</dt><dd><span class="code">Get&nbsp;a&nbsp;prioritized&nbsp;list&nbsp;of&nbsp;things&nbsp;Genesis&nbsp;should&nbsp;learn&nbsp;about.<br>
+&nbsp;<br>
+This&nbsp;feeds&nbsp;the&nbsp;curiosity&nbsp;engine&nbsp;—&nbsp;the&nbsp;most&nbsp;important&nbsp;gaps<br>
+are&nbsp;ones&nbsp;that:<br>
+1.&nbsp;Have&nbsp;been&nbsp;asked&nbsp;about&nbsp;but&nbsp;couldn't&nbsp;answer<br>
+2.&nbsp;Are&nbsp;weakly&nbsp;connected&nbsp;but&nbsp;exist&nbsp;in&nbsp;the&nbsp;network<br>
+3.&nbsp;Are&nbsp;related&nbsp;to&nbsp;concepts&nbsp;it&nbsp;already&nbsp;knows&nbsp;well</span></dd></dl>
+
+<dl><dt><a name="SelfAssessment-invalidate_confidence"><strong>invalidate_confidence</strong></a>(self, topics: 'list[str]') -&gt; 'None'</dt><dd><span class="code">Invalidate&nbsp;cached&nbsp;confidence&nbsp;for&nbsp;topics&nbsp;that&nbsp;were&nbsp;just&nbsp;learned.<br>
+&nbsp;<br>
+When&nbsp;new&nbsp;knowledge&nbsp;is&nbsp;added&nbsp;to&nbsp;the&nbsp;concept&nbsp;network,&nbsp;any<br>
+previously&nbsp;cached&nbsp;confidence&nbsp;values&nbsp;for&nbsp;those&nbsp;topics&nbsp;are<br>
+stale&nbsp;(they&nbsp;may&nbsp;have&nbsp;been&nbsp;0.0&nbsp;when&nbsp;the&nbsp;concept&nbsp;didn't&nbsp;exist).<br>
+This&nbsp;clears&nbsp;the&nbsp;cache&nbsp;so&nbsp;the&nbsp;next&nbsp;assessment&nbsp;reflects&nbsp;the<br>
+current&nbsp;network&nbsp;state.</span></dd></dl>
+
+<dl><dt><a name="SelfAssessment-reconcile_gaps"><strong>reconcile_gaps</strong></a>(self, concepts: 'list[str]') -&gt; 'None'</dt><dd><span class="code">Reconcile&nbsp;known_gaps&nbsp;with&nbsp;the&nbsp;current&nbsp;network&nbsp;state.<br>
+&nbsp;<br>
+After&nbsp;learning&nbsp;new&nbsp;concepts,&nbsp;check&nbsp;whether&nbsp;any&nbsp;previously<br>
+recorded&nbsp;gaps&nbsp;have&nbsp;been&nbsp;filled.&nbsp;This&nbsp;prevents&nbsp;the&nbsp;self-<br>
+assessment&nbsp;from&nbsp;listing&nbsp;concepts&nbsp;as&nbsp;unknown&nbsp;that&nbsp;it&nbsp;has<br>
+since&nbsp;learned&nbsp;about.</span></dd></dl>
+
+<dl><dt><a name="SelfAssessment-record_question_outcome"><strong>record_question_outcome</strong></a>(self, question_type: 'str', success: 'bool', topic: 'str' = '') -&gt; 'None'</dt><dd><span class="code">Record&nbsp;the&nbsp;outcome&nbsp;of&nbsp;answering&nbsp;a&nbsp;question.<br>
+&nbsp;<br>
+This&nbsp;builds&nbsp;a&nbsp;profile&nbsp;of&nbsp;what&nbsp;Genesis&nbsp;can&nbsp;and&nbsp;can't&nbsp;do&nbsp;well.<br>
+Called&nbsp;after&nbsp;each&nbsp;interaction&nbsp;to&nbsp;track&nbsp;performance&nbsp;over&nbsp;time.</span></dd></dl>
+
+<dl><dt><a name="SelfAssessment-remember_gap"><strong>remember_gap</strong></a>(self, topic: 'str') -&gt; 'None'</dt><dd><span class="code">Record&nbsp;a&nbsp;topic&nbsp;it&nbsp;doesn't&nbsp;know,&nbsp;with&nbsp;a&nbsp;bound&nbsp;on&nbsp;the&nbsp;set.<br>
+&nbsp;<br>
+Topics&nbsp;come&nbsp;from&nbsp;arbitrary&nbsp;user&nbsp;input,&nbsp;so&nbsp;``known_gaps``&nbsp;would<br>
+grow&nbsp;without&nbsp;bound&nbsp;in&nbsp;a&nbsp;long-running&nbsp;daemon.&nbsp;When&nbsp;the&nbsp;set&nbsp;is<br>
+full,&nbsp;an&nbsp;arbitrary&nbsp;existing&nbsp;gap&nbsp;is&nbsp;evicted&nbsp;—&nbsp;the&nbsp;gaps&nbsp;that<br>
+matter&nbsp;recur&nbsp;in&nbsp;conversation&nbsp;and&nbsp;are&nbsp;re-added.</span></dd></dl>
+
+<dl><dt><a name="SelfAssessment-score_answer_quality"><strong>score_answer_quality</strong></a>(self, answer: 'str', user_input: 'str', topics: 'list[str]') -&gt; 'float'</dt><dd><span class="code">Score&nbsp;the&nbsp;quality&nbsp;of&nbsp;an&nbsp;answer&nbsp;after&nbsp;it's&nbsp;been&nbsp;given.<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;score&nbsp;from&nbsp;0&nbsp;to&nbsp;1:<br>
+-&nbsp;1.0:&nbsp;excellent&nbsp;—&nbsp;relevant,&nbsp;grounded,&nbsp;complete<br>
+-&nbsp;0.5:&nbsp;mediocre&nbsp;—&nbsp;partially&nbsp;relevant&nbsp;or&nbsp;partially&nbsp;grounded<br>
+-&nbsp;0.0:&nbsp;poor&nbsp;—&nbsp;irrelevant,&nbsp;fabricated,&nbsp;or&nbsp;admits&nbsp;ignorance<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;used&nbsp;for&nbsp;self-improvement:&nbsp;low&nbsp;scores&nbsp;trigger<br>
+reflection&nbsp;and&nbsp;learning.</span></dd></dl>
+
+<dl><dt><a name="SelfAssessment-should_hedge"><strong>should_hedge</strong></a>(self, topics: 'list[str]') -&gt; 'bool'</dt><dd><span class="code">Should&nbsp;Genesis&nbsp;hedge&nbsp;its&nbsp;answer&nbsp;given&nbsp;the&nbsp;topics?<br>
+&nbsp;<br>
+Returns&nbsp;True&nbsp;if&nbsp;it&nbsp;should&nbsp;express&nbsp;uncertainty&nbsp;—&nbsp;either<br>
+because&nbsp;it&nbsp;doesn't&nbsp;know&nbsp;the&nbsp;topics&nbsp;well,&nbsp;or&nbsp;because&nbsp;it<br>
+has&nbsp;a&nbsp;history&nbsp;of&nbsp;errors&nbsp;on&nbsp;similar&nbsp;topics.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['AnswerAssessment', 'CapabilityProfile', 'KnowledgeAssessment', 'SelfAssessment']<br>
+<strong>__annotations__</strong> = {'UNCONNECTED_CONFIDENCE_CAP': 'float', 'WEAK_CONCEPT_CONFIDENCE': 'float'}</td></tr></table>
+</body></html>

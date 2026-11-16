@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.parietal_lobe.math.geometry</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.parietal_lobe.html" class="white">parietal_lobe</a>.<a href="Self_World.parietal_lobe.math.html" class="white">math</a>.geometry</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/parietal_lobe/math/geometry.py">/home/mindyrenee/GenAnd/Genesis/Self_World/parietal_lobe/math/geometry.py</a></td></tr></table>
+    <p><span class="code">Geometry&nbsp;—&nbsp;the&nbsp;words&nbsp;for&nbsp;position&nbsp;and&nbsp;shape&nbsp;with&nbsp;distance.<br>
+&nbsp;<br>
+Points&nbsp;are&nbsp;"(x,&nbsp;y)",&nbsp;polygons&nbsp;are&nbsp;lists&nbsp;of&nbsp;them.&nbsp;The&nbsp;faculty<br>
+hears&nbsp;"the&nbsp;area&nbsp;of&nbsp;the&nbsp;triangle&nbsp;(0,0)&nbsp;(4,0)&nbsp;(0,3)",&nbsp;"how&nbsp;far<br>
+apart",&nbsp;"is&nbsp;the&nbsp;point&nbsp;inside",&nbsp;"the&nbsp;convex&nbsp;hull"&nbsp;—&nbsp;and&nbsp;answers<br>
+with&nbsp;a&nbsp;number&nbsp;and&nbsp;its&nbsp;derivation.&nbsp;Convexity&nbsp;of&nbsp;a&nbsp;hull&nbsp;is&nbsp;decided<br>
+by&nbsp;walking&nbsp;it,&nbsp;and&nbsp;winding&nbsp;is&nbsp;honest&nbsp;orientation.<br>
+&nbsp;<br>
+The&nbsp;machine&nbsp;half&nbsp;is&nbsp;``src/math/geometry.rs``:&nbsp;distance,&nbsp;polygon<br>
+area&nbsp;(the&nbsp;shoelace),&nbsp;point-in-polygon&nbsp;(ray&nbsp;casting),&nbsp;convex&nbsp;hull<br>
+(the&nbsp;monotone&nbsp;chain).&nbsp;Here:&nbsp;the&nbsp;coordinate&nbsp;words&nbsp;and&nbsp;the&nbsp;reply.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="math.html">math</a><br>
+</td><td class="multicolumn"><a href="re.html">re</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.parietal_lobe.math.geometry.html#GeoResult">GeoResult</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="GeoResult">class <strong>GeoResult</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#GeoResult">GeoResult</a>(operation:&nbsp;'str',&nbsp;input:&nbsp;'str',&nbsp;output:&nbsp;'str',&nbsp;ok:&nbsp;'bool',&nbsp;error:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;data:&nbsp;'dict[str,&nbsp;Any]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;outcome&nbsp;of&nbsp;a&nbsp;geometric&nbsp;question.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="GeoResult-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="GeoResult-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="GeoResult-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="GeoResult-__init__"><strong>__init__</strong></a>(self, operation: 'str', input: 'str', output: 'str', ok: 'bool', error: 'str' = '', data: 'dict[str, Any]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="GeoResult-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="GeoResult-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'data': 'dict[str, Any]', 'error': 'str', 'input': 'str', 'ok': 'bool', 'operation': 'str', 'output': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'data': Field(name='data',type='dict[str, Any]',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'error': Field(name='error',type='str',default='',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'input': Field(name='input',type='str',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD), 'ok': Field(name='ok',type='bool',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD), 'operation': Field(name='operation',type='str',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'output': Field(name='output',type='str',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('operation', 'input', 'output', 'ok', 'error', 'data')</dl>
+
+<dl><dt><strong>error</strong> = ''</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-area_text"><strong>area_text</strong></a>(text: 'str') -&gt; 'GeoResult'</dt><dd><span class="code">"area&nbsp;of&nbsp;(0,0)&nbsp;(4,0)&nbsp;(0,3)"&nbsp;-&gt;&nbsp;6&nbsp;—&nbsp;the&nbsp;shoelace's&nbsp;answer.</span></dd></dl>
+ <dl><dt><a name="-convex_hull"><strong>convex_hull</strong></a>(pts: 'list[Point]') -&gt; 'list[Point]'</dt><dd><span class="code">The&nbsp;monotone&nbsp;chain&nbsp;—&nbsp;sorted&nbsp;points&nbsp;walked&nbsp;around&nbsp;the&nbsp;hull<br>
+keeping&nbsp;only&nbsp;counterclockwise&nbsp;turns.</span></dd></dl>
+ <dl><dt><a name="-distance"><strong>distance</strong></a>(a: 'Point', b: 'Point') -&gt; 'float'</dt></dl>
+ <dl><dt><a name="-distance_text"><strong>distance_text</strong></a>(text: 'str') -&gt; 'GeoResult'</dt><dd><span class="code">"distance&nbsp;between&nbsp;(0,0)&nbsp;and&nbsp;(3,4)"&nbsp;-&gt;&nbsp;5.</span></dd></dl>
+ <dl><dt><a name="-hull_text"><strong>hull_text</strong></a>(text: 'str') -&gt; 'GeoResult'</dt><dd><span class="code">"convex&nbsp;hull&nbsp;of&nbsp;..."&nbsp;-&gt;&nbsp;the&nbsp;vertices&nbsp;that&nbsp;hold&nbsp;the&nbsp;shape.</span></dd></dl>
+ <dl><dt><a name="-inside_text"><strong>inside_text</strong></a>(point_text: 'str', poly_text: 'str') -&gt; 'GeoResult'</dt><dd><span class="code">"is&nbsp;(1,1)&nbsp;inside&nbsp;(0,0)&nbsp;(4,0)&nbsp;(0,4)"&nbsp;-&gt;&nbsp;yes.</span></dd></dl>
+ <dl><dt><a name="-looks_like_geometry"><strong>looks_like_geometry</strong></a>(text: 'str') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;the&nbsp;text&nbsp;asks&nbsp;about&nbsp;points,&nbsp;areas,&nbsp;hulls&nbsp;—&nbsp;shape<br>
+with&nbsp;distance.</span></dd></dl>
+ <dl><dt><a name="-parse_points"><strong>parse_points</strong></a>(text: 'str') -&gt; 'list[Point]'</dt><dd><span class="code">Read&nbsp;"(0,0)&nbsp;(4,0)&nbsp;(0,3)"&nbsp;or&nbsp;"[0,0;&nbsp;4,0]"&nbsp;into&nbsp;points.</span></dd></dl>
+ <dl><dt><a name="-point_in_polygon"><strong>point_in_polygon</strong></a>(p: 'Point', pts: 'list[Point]') -&gt; 'bool'</dt><dd><span class="code">Ray&nbsp;casting&nbsp;—&nbsp;count&nbsp;edge&nbsp;crossings&nbsp;of&nbsp;a&nbsp;ray&nbsp;going&nbsp;right.</span></dd></dl>
+ <dl><dt><a name="-polygon_area"><strong>polygon_area</strong></a>(pts: 'list[Point]') -&gt; 'float'</dt><dd><span class="code">The&nbsp;shoelace&nbsp;—&nbsp;half&nbsp;the&nbsp;sum&nbsp;of&nbsp;cross&nbsp;products&nbsp;of&nbsp;edges.</span></dd></dl>
+ <dl><dt><a name="-signed_area"><strong>signed_area</strong></a>(pts: 'list[Point]') -&gt; 'float'</dt><dd><span class="code">Signed&nbsp;shoelace&nbsp;—&nbsp;positive&nbsp;means&nbsp;counterclockwise&nbsp;winding.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>Point</strong> = tuple[float, float]</td></tr></table>
+</body></html>

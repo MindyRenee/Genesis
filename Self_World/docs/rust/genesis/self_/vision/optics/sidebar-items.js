@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["BLINK_CENTER_S","BLINK_DEPTH","BLINK_DURATION_S","BLINK_WIDTH_S","PUPIL_MAX_MM","PUPIL_MIN_MM","PUPIL_RATE"],"struct":["Eyelid","OcularState","Pupil"]};

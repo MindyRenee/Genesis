@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["F32","F64","I32","U8"],"fn":["name","width"]};

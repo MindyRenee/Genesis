@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["find_wakealarm","read_wake_alarm","set_wake_alarm","sudo_available"]};

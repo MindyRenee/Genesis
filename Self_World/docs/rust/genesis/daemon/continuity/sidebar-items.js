@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["SENTINEL_NAME"],"fn":["field_bool","field_raw","field_u64","fmt_dark","note_boot","note_clean_stop","read_sentinel","render","sentinel_path","write_sentinel"],"struct":["Boot"]};

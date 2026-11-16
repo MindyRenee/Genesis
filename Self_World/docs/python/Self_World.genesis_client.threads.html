@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.genesis_client.threads</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.genesis_client.html" class="white">genesis_client</a>.threads</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/genesis_client/threads.py">/home/mindyrenee/GenAnd/Genesis/Self_World/genesis_client/threads.py</a></td></tr></table>
+    <p><span class="code">Named&nbsp;threads&nbsp;—&nbsp;Python&nbsp;``name``&nbsp;plus&nbsp;kernel&nbsp;``comm``&nbsp;name.<br>
+&nbsp;<br>
+Python's&nbsp;``Thread.name``&nbsp;never&nbsp;reaches&nbsp;``/proc/&lt;pid&gt;/task/*/comm``:<br>
+from&nbsp;outside&nbsp;the&nbsp;process&nbsp;every&nbsp;one&nbsp;of&nbsp;the&nbsp;mind's&nbsp;threads&nbsp;shows&nbsp;the<br>
+process&nbsp;name,&nbsp;which&nbsp;is&nbsp;why&nbsp;"which&nbsp;organ&nbsp;is&nbsp;this&nbsp;hot&nbsp;thread?"&nbsp;was<br>
+undiagnosable&nbsp;(thirty-plus&nbsp;threads&nbsp;all&nbsp;named&nbsp;``genesis``).&nbsp;The&nbsp;kernel<br>
+name&nbsp;is&nbsp;set&nbsp;by&nbsp;``prctl(PR_SET_NAME)``&nbsp;and&nbsp;must&nbsp;be&nbsp;invoked&nbsp;*by*&nbsp;the<br>
+thread&nbsp;itself,&nbsp;so&nbsp;:func:`named_thread`&nbsp;wraps&nbsp;the&nbsp;target&nbsp;—&nbsp;on&nbsp;start&nbsp;it<br>
+sets&nbsp;the&nbsp;comm&nbsp;name&nbsp;(≤15&nbsp;bytes),&nbsp;then&nbsp;runs&nbsp;the&nbsp;real&nbsp;target.<br>
+&nbsp;<br>
+Comm&nbsp;names&nbsp;carry&nbsp;a&nbsp;``g-``&nbsp;prefix&nbsp;so&nbsp;her&nbsp;threads&nbsp;are&nbsp;recognisable&nbsp;in<br>
+``ps&nbsp;-eL``&nbsp;output&nbsp;at&nbsp;a&nbsp;glance.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="ctypes.html">ctypes</a><br>
+</td><td class="multicolumn"><a href="threading.html">threading</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-call_on_named_thread"><strong>call_on_named_thread</strong></a>(name: 'str', fn: 'Callable[[], Any]', *, comm: 'str | None' = None, timeout: 'float' = 30.0) -&gt; 'Any'</dt><dd><span class="code">Run&nbsp;*fn*&nbsp;on&nbsp;a&nbsp;short-lived&nbsp;named&nbsp;thread&nbsp;and&nbsp;return&nbsp;its&nbsp;result.<br>
+&nbsp;<br>
+C&nbsp;libraries&nbsp;spawn&nbsp;workers&nbsp;with&nbsp;``clone()``&nbsp;from&nbsp;inside&nbsp;their&nbsp;open<br>
+or&nbsp;start&nbsp;calls&nbsp;—&nbsp;PortAudio's&nbsp;stream&nbsp;callback&nbsp;thread&nbsp;is&nbsp;born&nbsp;inside<br>
+``Pa_OpenStream``&nbsp;or&nbsp;``Pa_StartStream``&nbsp;depending&nbsp;on&nbsp;the&nbsp;backend.<br>
+``clone()``&nbsp;copies&nbsp;the&nbsp;creating&nbsp;thread's&nbsp;comm&nbsp;name&nbsp;and&nbsp;those<br>
+workers&nbsp;are&nbsp;never&nbsp;renamed,&nbsp;so&nbsp;a&nbsp;stream&nbsp;opened&nbsp;or&nbsp;started&nbsp;on&nbsp;a<br>
+``g-*``&nbsp;cognitive&nbsp;thread&nbsp;leaves&nbsp;a&nbsp;permanent,&nbsp;mislabeled&nbsp;"second<br>
+worker"&nbsp;in&nbsp;``ps&nbsp;-L``&nbsp;(the&nbsp;``g-inner-life``&nbsp;duplicate&nbsp;seen&nbsp;in&nbsp;the<br>
+field&nbsp;was&nbsp;the&nbsp;field-audio&nbsp;capture&nbsp;stream&nbsp;opened&nbsp;lazily&nbsp;on&nbsp;the<br>
+inner-life&nbsp;thread).&nbsp;Callers&nbsp;should&nbsp;do&nbsp;both&nbsp;open&nbsp;and&nbsp;start&nbsp;inside<br>
+*fn*&nbsp;—&nbsp;running&nbsp;only&nbsp;one&nbsp;leaves&nbsp;the&nbsp;worker&nbsp;labeled&nbsp;after&nbsp;the&nbsp;caller.<br>
+&nbsp;<br>
+The&nbsp;exception&nbsp;*fn*&nbsp;raises&nbsp;is&nbsp;re-raised&nbsp;on&nbsp;the&nbsp;calling&nbsp;thread;&nbsp;a<br>
+``TimeoutError``&nbsp;bounds&nbsp;the&nbsp;wait&nbsp;when&nbsp;a&nbsp;device&nbsp;open&nbsp;wedges.</span></dd></dl>
+ <dl><dt><a name="-comm_name"><strong>comm_name</strong></a>() -&gt; 'str'</dt><dd><span class="code">This&nbsp;thread's&nbsp;kernel&nbsp;name&nbsp;(used&nbsp;by&nbsp;tests&nbsp;to&nbsp;verify&nbsp;naming&nbsp;landed).</span></dd></dl>
+ <dl><dt><a name="-named_thread"><strong>named_thread</strong></a>(name: 'str', target: 'Callable[..., Any]', *, args: 'tuple[Any, ...]' = (), kwargs: 'dict[str, Any] | None' = None, daemon: 'bool' = True, comm: 'str | None' = None) -&gt; 'threading.Thread'</dt><dd><span class="code">Return&nbsp;a&nbsp;daemon&nbsp;:class:`threading.Thread`&nbsp;that&nbsp;also&nbsp;names&nbsp;itself&nbsp;to&nbsp;the&nbsp;kernel.<br>
+&nbsp;<br>
+``name``&nbsp;is&nbsp;the&nbsp;Python&nbsp;thread&nbsp;name&nbsp;(stack&nbsp;dumps,&nbsp;``threading.enumerate``);<br>
+``comm``&nbsp;is&nbsp;the&nbsp;≤15-byte&nbsp;kernel&nbsp;name&nbsp;(``/proc``,&nbsp;``ps&nbsp;-L``)&nbsp;—&nbsp;when&nbsp;omitted<br>
+the&nbsp;truncated&nbsp;Python&nbsp;name&nbsp;is&nbsp;used.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__annotations__</strong> = {'_libc': 'Any'}</td></tr></table>
+</body></html>

@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.brainstem.active_inference</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.brainstem.html" class="white">brainstem</a>.active_inference</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/brainstem/active_inference.py">/home/mindyrenee/GenAnd/Genesis/Self_World/brainstem/active_inference.py</a></td></tr></table>
+    <p><span class="code">Active&nbsp;inference&nbsp;—&nbsp;the&nbsp;cognitive&nbsp;mind's&nbsp;interface&nbsp;to&nbsp;the&nbsp;generative&nbsp;self-model.<br>
+&nbsp;<br>
+This&nbsp;module&nbsp;is&nbsp;the&nbsp;Python-side&nbsp;counterpart&nbsp;to&nbsp;the&nbsp;Rust&nbsp;active&nbsp;inference<br>
+engine&nbsp;(``src/daemon/active_inference.rs``).&nbsp;It&nbsp;reads&nbsp;the&nbsp;inference<br>
+signals&nbsp;from&nbsp;the&nbsp;daemon&nbsp;via&nbsp;IPC&nbsp;and&nbsp;interprets&nbsp;them&nbsp;for&nbsp;the&nbsp;cognitive<br>
+mind's&nbsp;cognitive&nbsp;processes.<br>
+&nbsp;<br>
+The&nbsp;key&nbsp;insight&nbsp;is&nbsp;that&nbsp;the&nbsp;generative&nbsp;self-model&nbsp;runs&nbsp;in&nbsp;the<br>
+subcognitive&nbsp;(Rust&nbsp;daemon)&nbsp;—&nbsp;it&nbsp;predicts&nbsp;Genesis's&nbsp;own&nbsp;neurochemical<br>
+trajectory&nbsp;and&nbsp;feeds&nbsp;prediction&nbsp;errors&nbsp;back&nbsp;into&nbsp;the&nbsp;dynamics.&nbsp;The<br>
+cognitive&nbsp;mind&nbsp;doesn't&nbsp;run&nbsp;the&nbsp;model;&nbsp;it&nbsp;*reads*&nbsp;the&nbsp;model's&nbsp;signals<br>
+and&nbsp;uses&nbsp;them&nbsp;to&nbsp;modulate&nbsp;cognition:<br>
+&nbsp;<br>
+-&nbsp;**Surprise**&nbsp;→&nbsp;attention&nbsp;orienting,&nbsp;metacognitive&nbsp;awareness<br>
+-&nbsp;**Free&nbsp;energy**&nbsp;→&nbsp;sense&nbsp;of&nbsp;effort,&nbsp;cognitive&nbsp;load<br>
+-&nbsp;**Allostatic&nbsp;load**&nbsp;→&nbsp;feeling&nbsp;of&nbsp;strain,&nbsp;need&nbsp;for&nbsp;rest<br>
+-&nbsp;**Precision**&nbsp;→&nbsp;confidence&nbsp;in&nbsp;own&nbsp;state,&nbsp;willingness&nbsp;to&nbsp;act<br>
+-&nbsp;**Attunement**&nbsp;→&nbsp;social&nbsp;presence,&nbsp;connection&nbsp;to&nbsp;user<br>
+-&nbsp;**Dyadic&nbsp;synchrony**&nbsp;→&nbsp;feeling&nbsp;of&nbsp;being&nbsp;"in&nbsp;sync"<br>
+-&nbsp;**User&nbsp;affect**&nbsp;→&nbsp;empathic&nbsp;response,&nbsp;conversational&nbsp;adaptation<br>
+-&nbsp;**Prediction&nbsp;errors**&nbsp;→&nbsp;self-awareness&nbsp;of&nbsp;neurochemical&nbsp;shifts<br>
+&nbsp;<br>
+This&nbsp;module&nbsp;also&nbsp;handles&nbsp;the&nbsp;**reverse&nbsp;pathway**:&nbsp;it&nbsp;infers&nbsp;the&nbsp;user's<br>
+affective&nbsp;state&nbsp;from&nbsp;conversation&nbsp;features&nbsp;and&nbsp;sends&nbsp;it&nbsp;to&nbsp;the&nbsp;daemon<br>
+via&nbsp;``update_user_affect``,&nbsp;closing&nbsp;the&nbsp;dyadic&nbsp;loop.<br>
+&nbsp;<br>
+The&nbsp;boundary&nbsp;principle:&nbsp;the&nbsp;substrate&nbsp;(Rust)&nbsp;runs&nbsp;the&nbsp;generative&nbsp;model<br>
+and&nbsp;computes&nbsp;prediction&nbsp;errors.&nbsp;The&nbsp;cognitive&nbsp;mind&nbsp;(Python)&nbsp;interprets<br>
+those&nbsp;signals&nbsp;and&nbsp;decides&nbsp;how&nbsp;to&nbsp;use&nbsp;them&nbsp;cognitively.&nbsp;The&nbsp;substrate<br>
+exposes&nbsp;state;&nbsp;the&nbsp;cognitive&nbsp;mind&nbsp;decides&nbsp;what&nbsp;it&nbsp;means.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.brainstem.active_inference.html#ActiveInferenceReader">ActiveInferenceReader</a>
+</dt><dt class="heading-text"><a href="Self_World.brainstem.active_inference.html#SelfModelReading">SelfModelReading</a>
+</dt><dt class="heading-text"><a href="Self_World.brainstem.active_inference.html#UserAffectEstimate">UserAffectEstimate</a>
+</dt></dl>
+</dd>
+<dt class="heading-text"><a href="enum.html#IntEnum">enum.IntEnum</a>(<a href="builtins.html#int">builtins.int</a>, <a href="enum.html#ReprEnum">enum.ReprEnum</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.brainstem.active_inference.html#DyadicState">DyadicState</a>
+</dt><dt class="heading-text"><a href="Self_World.brainstem.active_inference.html#SelfModelState">SelfModelState</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ActiveInferenceReader">class <strong>ActiveInferenceReader</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ActiveInferenceReader">ActiveInferenceReader</a>(client:&nbsp;'GenesisClient')&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Reads&nbsp;the&nbsp;generative&nbsp;self-model's&nbsp;signals&nbsp;from&nbsp;the&nbsp;daemon&nbsp;and<br>
+interprets&nbsp;them&nbsp;for&nbsp;the&nbsp;cognitive&nbsp;mind.<br>
+&nbsp;<br>
+This&nbsp;class&nbsp;is&nbsp;the&nbsp;bridge&nbsp;between&nbsp;the&nbsp;substrate's&nbsp;active&nbsp;inference<br>
+engine&nbsp;(Rust)&nbsp;and&nbsp;the&nbsp;cognitive&nbsp;mind's&nbsp;cognitive&nbsp;processes&nbsp;(Python).<br>
+It:<br>
+&nbsp;<br>
+1.&nbsp;Reads&nbsp;inference&nbsp;signals&nbsp;from&nbsp;the&nbsp;daemon&nbsp;via&nbsp;IPC<br>
+2.&nbsp;Interprets&nbsp;them&nbsp;into&nbsp;qualitative&nbsp;states&nbsp;and&nbsp;cognitive&nbsp;implications<br>
+3.&nbsp;Provides&nbsp;the&nbsp;interpretation&nbsp;to&nbsp;the&nbsp;cognitive&nbsp;mind's&nbsp;modules<br>
+4.&nbsp;Infers&nbsp;user&nbsp;affect&nbsp;from&nbsp;conversation&nbsp;and&nbsp;sends&nbsp;it&nbsp;to&nbsp;the&nbsp;daemon<br>
+&nbsp;<br>
+The&nbsp;reader&nbsp;is&nbsp;stateless&nbsp;between&nbsp;calls&nbsp;—&nbsp;it&nbsp;reads&nbsp;fresh&nbsp;signals<br>
+each&nbsp;time.&nbsp;The&nbsp;substrate&nbsp;maintains&nbsp;the&nbsp;model&nbsp;state;&nbsp;the&nbsp;reader<br>
+just&nbsp;interprets&nbsp;it.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ActiveInferenceReader-__init__"><strong>__init__</strong></a>(self, client: 'GenesisClient') -&gt; 'None'</dt><dd><span class="code">Wire&nbsp;the&nbsp;reader&nbsp;to&nbsp;the&nbsp;daemon&nbsp;client&nbsp;for&nbsp;inference&nbsp;signal&nbsp;reads.</span></dd></dl>
+
+<dl><dt><a name="ActiveInferenceReader-read"><strong>read</strong></a>(self, acetylcholine: 'float | None' = None) -&gt; 'SelfModelReading | None'</dt><dd><span class="code">Read&nbsp;the&nbsp;current&nbsp;inference&nbsp;signals&nbsp;and&nbsp;interpret&nbsp;them.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;acetylcholine:&nbsp;The&nbsp;body's&nbsp;effective&nbsp;ACh&nbsp;level&nbsp;[0,&nbsp;1].<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Yu&nbsp;&amp;&nbsp;Dayan&nbsp;(2005)&nbsp;assign&nbsp;ACh&nbsp;the&nbsp;*expected*&nbsp;uncertainty<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;signal&nbsp;—&nbsp;high&nbsp;ACh&nbsp;means&nbsp;the&nbsp;top-down&nbsp;model&nbsp;is&nbsp;known&nbsp;to<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;be&nbsp;unreliable,&nbsp;so&nbsp;prior&nbsp;precision&nbsp;is&nbsp;discounted&nbsp;before<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;it&nbsp;becomes&nbsp;self-confidence.&nbsp;``None``&nbsp;leaves&nbsp;the&nbsp;raw<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;precision&nbsp;unmodulated.<br>
+&nbsp;<br>
+Returns&nbsp;None&nbsp;if&nbsp;the&nbsp;daemon&nbsp;can't&nbsp;be&nbsp;reached&nbsp;(offline&nbsp;mode).<br>
+The&nbsp;caller&nbsp;should&nbsp;handle&nbsp;None&nbsp;gracefully&nbsp;—&nbsp;the&nbsp;cognitive&nbsp;mind<br>
+can&nbsp;function&nbsp;without&nbsp;active&nbsp;inference&nbsp;signals,&nbsp;just&nbsp;without<br>
+the&nbsp;self-model&nbsp;awareness&nbsp;they&nbsp;provide.</span></dd></dl>
+
+<dl><dt><a name="ActiveInferenceReader-update_user_affect"><strong>update_user_affect</strong></a>(self, estimate: 'UserAffectEstimate') -&gt; 'bool'</dt><dd><span class="code">Send&nbsp;a&nbsp;user&nbsp;affect&nbsp;estimate&nbsp;to&nbsp;the&nbsp;daemon's&nbsp;dyadic&nbsp;model.<br>
+&nbsp;<br>
+Returns&nbsp;True&nbsp;if&nbsp;the&nbsp;update&nbsp;was&nbsp;accepted,&nbsp;False&nbsp;if&nbsp;the&nbsp;daemon<br>
+couldn't&nbsp;be&nbsp;reached.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>last_reading</strong></dt>
+<dd><span class="code">The&nbsp;last&nbsp;successful&nbsp;reading,&nbsp;or&nbsp;None&nbsp;if&nbsp;none&nbsp;yet.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'_ACH_BASELINE': 'float', '_ACH_UNCERTAINTY_GAIN': 'float'}</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="DyadicState">class <strong>DyadicState</strong></a>(<a href="enum.html#IntEnum">enum.IntEnum</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#DyadicState">DyadicState</a>(*values)<br>
+&nbsp;<br>
+Qualitative&nbsp;states&nbsp;of&nbsp;the&nbsp;dyadic&nbsp;(user)&nbsp;coupling.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.brainstem.active_inference.html#DyadicState">DyadicState</a></dd>
+<dd><a href="enum.html#IntEnum">enum.IntEnum</a></dd>
+<dd><a href="builtins.html#int">builtins.int</a></dd>
+<dd><a href="enum.html#ReprEnum">enum.ReprEnum</a></dd>
+<dd><a href="enum.html#Enum">enum.Enum</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="DyadicState-__format__"><strong>__format__</strong></a>(self, format_spec, /)<span class="grey"><span class="heading-text"> from <a href="builtins.html#int">builtins.int</a></span></span></dt><dd><span class="code">Convert&nbsp;to&nbsp;a&nbsp;string&nbsp;according&nbsp;to&nbsp;format_spec.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__new__"><strong>__new__</strong></a>(cls, value)<span class="grey"><span class="heading-text"> from enum.Enum</span></span></dt><dd><span class="code">Create&nbsp;and&nbsp;return&nbsp;a&nbsp;new&nbsp;<a href="builtins.html#object">object</a>.&nbsp;&nbsp;See&nbsp;help(type)&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>ATTUNED</strong> = &lt;DyadicState.ATTUNED: 1&gt;</dl>
+
+<dl><dt><strong>DISCORDANT</strong> = &lt;DyadicState.DISCORDANT: 3&gt;</dl>
+
+<dl><dt><strong>SYNCHRONIZED</strong> = &lt;DyadicState.SYNCHRONIZED: 2&gt;</dl>
+
+<dl><dt><strong>UNCOUPLED</strong> = &lt;DyadicState.UNCOUPLED: 0&gt;</dl>
+
+<hr>
+Methods inherited from <a href="enum.html#IntEnum">enum.IntEnum</a>:<br>
+<dl><dt><a name="DyadicState-__repr__"><strong>__repr__</strong></a>(self)<span class="grey"><span class="heading-text"> from enum.Enum</span></span></dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__str__"><strong>__str__</strong></a> = __repr__(self, /)<span class="grey"><span class="heading-text"> from <a href="builtins.html#int">builtins.int</a></span></span></dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Methods inherited from <a href="builtins.html#int">builtins.int</a>:<br>
+<dl><dt><a name="DyadicState-__abs__"><strong>__abs__</strong></a>(self, /)</dt><dd><span class="code">abs(self)</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__add__"><strong>__add__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self+value.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__and__"><strong>__and__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self&amp;value.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__bool__"><strong>__bool__</strong></a>(self, /)</dt><dd><span class="code">True&nbsp;if&nbsp;self&nbsp;else&nbsp;False</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__ceil__"><strong>__ceil__</strong></a>(...)</dt><dd><span class="code">Ceiling&nbsp;of&nbsp;an&nbsp;Integral&nbsp;returns&nbsp;itself.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__divmod__"><strong>__divmod__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;divmod(self,&nbsp;value).</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__eq__"><strong>__eq__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__float__"><strong>__float__</strong></a>(self, /)</dt><dd><span class="code">float(self)</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__floor__"><strong>__floor__</strong></a>(...)</dt><dd><span class="code">Flooring&nbsp;an&nbsp;Integral&nbsp;returns&nbsp;itself.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__floordiv__"><strong>__floordiv__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self//value.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__ge__"><strong>__ge__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self&gt;=value.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__getattribute__"><strong>__getattribute__</strong></a>(self, name, /)</dt><dd><span class="code">Return&nbsp;getattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__getnewargs__"><strong>__getnewargs__</strong></a>(self, /)</dt></dl>
+
+<dl><dt><a name="DyadicState-__gt__"><strong>__gt__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self&gt;value.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__hash__"><strong>__hash__</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__index__"><strong>__index__</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;self&nbsp;converted&nbsp;to&nbsp;an&nbsp;integer,&nbsp;if&nbsp;self&nbsp;is&nbsp;suitable&nbsp;for&nbsp;use&nbsp;as&nbsp;an&nbsp;index&nbsp;into&nbsp;a&nbsp;list.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__int__"><strong>__int__</strong></a>(self, /)</dt><dd><span class="code">int(self)</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__invert__"><strong>__invert__</strong></a>(self, /)</dt><dd><span class="code">~self</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__le__"><strong>__le__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self&lt;=value.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__lshift__"><strong>__lshift__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self&lt;&lt;value.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__lt__"><strong>__lt__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self&lt;value.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__mod__"><strong>__mod__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self%value.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__mul__"><strong>__mul__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self*value.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__ne__"><strong>__ne__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self!=value.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__neg__"><strong>__neg__</strong></a>(self, /)</dt><dd><span class="code">-self</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__or__"><strong>__or__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self|value.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__pos__"><strong>__pos__</strong></a>(self, /)</dt><dd><span class="code">+self</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__pow__"><strong>__pow__</strong></a>(self, value, mod=None, /)</dt><dd><span class="code">Return&nbsp;pow(self,&nbsp;value,&nbsp;mod).</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__radd__"><strong>__radd__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;value+self.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__rand__"><strong>__rand__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;value&amp;self.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__rdivmod__"><strong>__rdivmod__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;divmod(value,&nbsp;self).</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__rfloordiv__"><strong>__rfloordiv__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;value//self.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__rlshift__"><strong>__rlshift__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;value&lt;&lt;self.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__rmod__"><strong>__rmod__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;value%self.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__rmul__"><strong>__rmul__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;value*self.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__ror__"><strong>__ror__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;value|self.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__round__"><strong>__round__</strong></a>(...)</dt><dd><span class="code">Rounding&nbsp;an&nbsp;Integral&nbsp;returns&nbsp;itself.<br>
+&nbsp;<br>
+Rounding&nbsp;with&nbsp;an&nbsp;ndigits&nbsp;argument&nbsp;also&nbsp;returns&nbsp;an&nbsp;integer.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__rpow__"><strong>__rpow__</strong></a>(self, value, mod=None, /)</dt><dd><span class="code">Return&nbsp;pow(value,&nbsp;self,&nbsp;mod).</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__rrshift__"><strong>__rrshift__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;value&gt;&gt;self.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__rshift__"><strong>__rshift__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self&gt;&gt;value.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__rsub__"><strong>__rsub__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;value-self.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__rtruediv__"><strong>__rtruediv__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;value/self.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__rxor__"><strong>__rxor__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;value^self.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__sizeof__"><strong>__sizeof__</strong></a>(self, /)</dt><dd><span class="code">Returns&nbsp;size&nbsp;in&nbsp;memory,&nbsp;in&nbsp;bytes.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__sub__"><strong>__sub__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self-value.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__truediv__"><strong>__truediv__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self/value.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__trunc__"><strong>__trunc__</strong></a>(...)</dt><dd><span class="code">Truncating&nbsp;an&nbsp;Integral&nbsp;returns&nbsp;itself.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__xor__"><strong>__xor__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self^value.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-as_integer_ratio"><strong>as_integer_ratio</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;a&nbsp;pair&nbsp;of&nbsp;integers,&nbsp;whose&nbsp;ratio&nbsp;is&nbsp;equal&nbsp;to&nbsp;the&nbsp;original&nbsp;int.<br>
+&nbsp;<br>
+The&nbsp;ratio&nbsp;is&nbsp;in&nbsp;lowest&nbsp;terms&nbsp;and&nbsp;has&nbsp;a&nbsp;positive&nbsp;denominator.<br>
+&nbsp;<br>
+&gt;&gt;&gt;&nbsp;(10).<a href="#DyadicState-as_integer_ratio">as_integer_ratio</a>()<br>
+(10,&nbsp;1)<br>
+&gt;&gt;&gt;&nbsp;(-10).<a href="#DyadicState-as_integer_ratio">as_integer_ratio</a>()<br>
+(-10,&nbsp;1)<br>
+&gt;&gt;&gt;&nbsp;(0).<a href="#DyadicState-as_integer_ratio">as_integer_ratio</a>()<br>
+(0,&nbsp;1)</span></dd></dl>
+
+<dl><dt><a name="DyadicState-bit_count"><strong>bit_count</strong></a>(self, /)</dt><dd><span class="code">Number&nbsp;of&nbsp;ones&nbsp;in&nbsp;the&nbsp;binary&nbsp;representation&nbsp;of&nbsp;the&nbsp;absolute&nbsp;value&nbsp;of&nbsp;self.<br>
+&nbsp;<br>
+Also&nbsp;known&nbsp;as&nbsp;the&nbsp;population&nbsp;count.<br>
+&nbsp;<br>
+&gt;&gt;&gt;&nbsp;bin(13)<br>
+'0b1101'<br>
+&gt;&gt;&gt;&nbsp;(13).<a href="#DyadicState-bit_count">bit_count</a>()<br>
+3</span></dd></dl>
+
+<dl><dt><a name="DyadicState-bit_length"><strong>bit_length</strong></a>(self, /)</dt><dd><span class="code">Number&nbsp;of&nbsp;bits&nbsp;necessary&nbsp;to&nbsp;represent&nbsp;self&nbsp;in&nbsp;binary.<br>
+&nbsp;<br>
+&gt;&gt;&gt;&nbsp;bin(37)<br>
+'0b100101'<br>
+&gt;&gt;&gt;&nbsp;(37).<a href="#DyadicState-bit_length">bit_length</a>()<br>
+6</span></dd></dl>
+
+<dl><dt><a name="DyadicState-conjugate"><strong>conjugate</strong></a>(...)</dt><dd><span class="code">Returns&nbsp;self,&nbsp;the&nbsp;complex&nbsp;conjugate&nbsp;of&nbsp;any&nbsp;int.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-is_integer"><strong>is_integer</strong></a>(self, /)</dt><dd><span class="code">Returns&nbsp;True.&nbsp;Exists&nbsp;for&nbsp;duck&nbsp;type&nbsp;compatibility&nbsp;with&nbsp;float.is_integer.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-to_bytes"><strong>to_bytes</strong></a>(self, /, length=1, byteorder='big', *, signed=False)</dt><dd><span class="code">Return&nbsp;an&nbsp;array&nbsp;of&nbsp;bytes&nbsp;representing&nbsp;an&nbsp;integer.<br>
+&nbsp;<br>
+length<br>
+&nbsp;&nbsp;Length&nbsp;of&nbsp;bytes&nbsp;<a href="builtins.html#object">object</a>&nbsp;to&nbsp;use.&nbsp;&nbsp;An&nbsp;OverflowError&nbsp;is&nbsp;raised&nbsp;if&nbsp;the<br>
+&nbsp;&nbsp;integer&nbsp;is&nbsp;not&nbsp;representable&nbsp;with&nbsp;the&nbsp;given&nbsp;number&nbsp;of&nbsp;bytes.&nbsp;&nbsp;Default<br>
+&nbsp;&nbsp;is&nbsp;length&nbsp;1.<br>
+byteorder<br>
+&nbsp;&nbsp;The&nbsp;byte&nbsp;order&nbsp;used&nbsp;to&nbsp;represent&nbsp;the&nbsp;integer.&nbsp;&nbsp;If&nbsp;byteorder&nbsp;is&nbsp;'big',<br>
+&nbsp;&nbsp;the&nbsp;most&nbsp;significant&nbsp;byte&nbsp;is&nbsp;at&nbsp;the&nbsp;beginning&nbsp;of&nbsp;the&nbsp;byte&nbsp;array.&nbsp;&nbsp;If<br>
+&nbsp;&nbsp;byteorder&nbsp;is&nbsp;'little',&nbsp;the&nbsp;most&nbsp;significant&nbsp;byte&nbsp;is&nbsp;at&nbsp;the&nbsp;end&nbsp;of&nbsp;the<br>
+&nbsp;&nbsp;byte&nbsp;array.&nbsp;&nbsp;To&nbsp;request&nbsp;the&nbsp;native&nbsp;byte&nbsp;order&nbsp;of&nbsp;the&nbsp;host&nbsp;system,&nbsp;use<br>
+&nbsp;&nbsp;`sys.byteorder'&nbsp;as&nbsp;the&nbsp;byte&nbsp;order&nbsp;value.&nbsp;&nbsp;Default&nbsp;is&nbsp;to&nbsp;use&nbsp;'big'.<br>
+signed<br>
+&nbsp;&nbsp;Determines&nbsp;whether&nbsp;two's&nbsp;complement&nbsp;is&nbsp;used&nbsp;to&nbsp;represent&nbsp;the&nbsp;integer.<br>
+&nbsp;&nbsp;If&nbsp;signed&nbsp;is&nbsp;False&nbsp;and&nbsp;a&nbsp;negative&nbsp;integer&nbsp;is&nbsp;given,&nbsp;an&nbsp;OverflowError<br>
+&nbsp;&nbsp;is&nbsp;raised.</span></dd></dl>
+
+<hr>
+Class methods inherited from <a href="builtins.html#int">builtins.int</a>:<br>
+<dl><dt><a name="DyadicState-from_bytes"><strong>from_bytes</strong></a>(bytes, byteorder='big', *, signed=False)</dt><dd><span class="code">Return&nbsp;the&nbsp;integer&nbsp;represented&nbsp;by&nbsp;the&nbsp;given&nbsp;array&nbsp;of&nbsp;bytes.<br>
+&nbsp;<br>
+bytes<br>
+&nbsp;&nbsp;Holds&nbsp;the&nbsp;array&nbsp;of&nbsp;bytes&nbsp;to&nbsp;convert.&nbsp;&nbsp;The&nbsp;argument&nbsp;must&nbsp;either<br>
+&nbsp;&nbsp;support&nbsp;the&nbsp;buffer&nbsp;protocol&nbsp;or&nbsp;be&nbsp;an&nbsp;iterable&nbsp;<a href="builtins.html#object">object</a>&nbsp;producing&nbsp;bytes.<br>
+&nbsp;&nbsp;Bytes&nbsp;and&nbsp;bytearray&nbsp;are&nbsp;examples&nbsp;of&nbsp;built-in&nbsp;objects&nbsp;that&nbsp;support&nbsp;the<br>
+&nbsp;&nbsp;buffer&nbsp;protocol.<br>
+byteorder<br>
+&nbsp;&nbsp;The&nbsp;byte&nbsp;order&nbsp;used&nbsp;to&nbsp;represent&nbsp;the&nbsp;integer.&nbsp;&nbsp;If&nbsp;byteorder&nbsp;is&nbsp;'big',<br>
+&nbsp;&nbsp;the&nbsp;most&nbsp;significant&nbsp;byte&nbsp;is&nbsp;at&nbsp;the&nbsp;beginning&nbsp;of&nbsp;the&nbsp;byte&nbsp;array.&nbsp;&nbsp;If<br>
+&nbsp;&nbsp;byteorder&nbsp;is&nbsp;'little',&nbsp;the&nbsp;most&nbsp;significant&nbsp;byte&nbsp;is&nbsp;at&nbsp;the&nbsp;end&nbsp;of&nbsp;the<br>
+&nbsp;&nbsp;byte&nbsp;array.&nbsp;&nbsp;To&nbsp;request&nbsp;the&nbsp;native&nbsp;byte&nbsp;order&nbsp;of&nbsp;the&nbsp;host&nbsp;system,&nbsp;use<br>
+&nbsp;&nbsp;`sys.byteorder'&nbsp;as&nbsp;the&nbsp;byte&nbsp;order&nbsp;value.&nbsp;&nbsp;Default&nbsp;is&nbsp;to&nbsp;use&nbsp;'big'.<br>
+signed<br>
+&nbsp;&nbsp;Indicates&nbsp;whether&nbsp;two's&nbsp;complement&nbsp;is&nbsp;used&nbsp;to&nbsp;represent&nbsp;the&nbsp;integer.</span></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="builtins.html#int">builtins.int</a>:<br>
+<dl><dt><strong>denominator</strong></dt>
+<dd><span class="code">the&nbsp;denominator&nbsp;of&nbsp;a&nbsp;rational&nbsp;number&nbsp;in&nbsp;lowest&nbsp;terms</span></dd>
+</dl>
+<dl><dt><strong>imag</strong></dt>
+<dd><span class="code">the&nbsp;imaginary&nbsp;part&nbsp;of&nbsp;a&nbsp;complex&nbsp;number</span></dd>
+</dl>
+<dl><dt><strong>numerator</strong></dt>
+<dd><span class="code">the&nbsp;numerator&nbsp;of&nbsp;a&nbsp;rational&nbsp;number&nbsp;in&nbsp;lowest&nbsp;terms</span></dd>
+</dl>
+<dl><dt><strong>real</strong></dt>
+<dd><span class="code">the&nbsp;real&nbsp;part&nbsp;of&nbsp;a&nbsp;complex&nbsp;number</span></dd>
+</dl>
+<hr>
+Methods inherited from <a href="enum.html#Enum">enum.Enum</a>:<br>
+<dl><dt><a name="DyadicState-__dir__"><strong>__dir__</strong></a>(self)</dt><dd><span class="code">Returns&nbsp;public&nbsp;methods&nbsp;and&nbsp;other&nbsp;interesting&nbsp;attributes.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__init__"><strong>__init__</strong></a>(self, *args, **kwds)</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__reduce_ex__"><strong>__reduce_ex__</strong></a>(self, proto)</dt><dd><span class="code">Helper&nbsp;for&nbsp;pickle.</span></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="enum.html#Enum">enum.Enum</a>:<br>
+<dl><dt><strong>name</strong></dt>
+<dd><span class="code">The&nbsp;name&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<dl><dt><strong>value</strong></dt>
+<dd><span class="code">The&nbsp;value&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<hr>
+Static methods inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><a name="DyadicState-__contains__"><strong>__contains__</strong></a>(value)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;`value`&nbsp;is&nbsp;in&nbsp;`cls`.<br>
+&nbsp;<br>
+`value`&nbsp;is&nbsp;in&nbsp;`cls`&nbsp;if:<br>
+1)&nbsp;`value`&nbsp;is&nbsp;a&nbsp;member&nbsp;of&nbsp;`cls`,&nbsp;or<br>
+2)&nbsp;`value`&nbsp;is&nbsp;the&nbsp;value&nbsp;of&nbsp;one&nbsp;of&nbsp;the&nbsp;`cls`'s&nbsp;members.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__getitem__"><strong>__getitem__</strong></a>(name)</dt><dd><span class="code">Return&nbsp;the&nbsp;member&nbsp;matching&nbsp;`name`.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__iter__"><strong>__iter__</strong></a>()</dt><dd><span class="code">Return&nbsp;members&nbsp;in&nbsp;definition&nbsp;order.</span></dd></dl>
+
+<dl><dt><a name="DyadicState-__len__"><strong>__len__</strong></a>()</dt><dd><span class="code">Return&nbsp;the&nbsp;number&nbsp;of&nbsp;members&nbsp;(no&nbsp;aliases)</span></dd></dl>
+
+<hr>
+Readonly properties inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><strong>__members__</strong></dt>
+<dd><span class="code">Returns&nbsp;a&nbsp;mapping&nbsp;of&nbsp;member&nbsp;name-&gt;value.<br>
+&nbsp;<br>
+This&nbsp;mapping&nbsp;lists&nbsp;all&nbsp;enum&nbsp;members,&nbsp;including&nbsp;aliases.&nbsp;Note&nbsp;that&nbsp;this<br>
+is&nbsp;a&nbsp;read-only&nbsp;view&nbsp;of&nbsp;the&nbsp;internal&nbsp;mapping.</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SelfModelReading">class <strong>SelfModelReading</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SelfModelReading">SelfModelReading</a>(signals:&nbsp;'InferenceSummary',&nbsp;self_model_state:&nbsp;'<a href="#SelfModelState">SelfModelState</a>',&nbsp;dyadic_state:&nbsp;'<a href="#DyadicState">DyadicState</a>',&nbsp;cognitive_effort:&nbsp;'float',&nbsp;self_confidence:&nbsp;'float',&nbsp;social_presence:&nbsp;'float',&nbsp;needs_recovery:&nbsp;'bool',&nbsp;state_label:&nbsp;'str')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;reading&nbsp;from&nbsp;the&nbsp;generative&nbsp;self-model&nbsp;—&nbsp;the&nbsp;cognitive&nbsp;mind's<br>
+interpretation&nbsp;of&nbsp;the&nbsp;inference&nbsp;signals.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;cognitive&nbsp;layer's&nbsp;view&nbsp;of&nbsp;the&nbsp;substrate's&nbsp;active<br>
+inference&nbsp;state.&nbsp;It&nbsp;translates&nbsp;raw&nbsp;signals&nbsp;(surprise,&nbsp;free&nbsp;energy,<br>
+etc.)&nbsp;into&nbsp;qualitative&nbsp;states&nbsp;and&nbsp;cognitive&nbsp;implications.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="SelfModelReading-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="SelfModelReading-__init__"><strong>__init__</strong></a>(self, signals: 'InferenceSummary', self_model_state: 'SelfModelState', dyadic_state: 'DyadicState', cognitive_effort: 'float', self_confidence: 'float', social_presence: 'float', needs_recovery: 'bool', state_label: 'str') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="SelfModelReading-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>is_in_sync</strong></dt>
+<dd><span class="code">Whether&nbsp;the&nbsp;dyadic&nbsp;coupling&nbsp;is&nbsp;synchronized.</span></dd>
+</dl>
+<dl><dt><strong>is_strained</strong></dt>
+<dd><span class="code">Whether&nbsp;the&nbsp;self-model&nbsp;is&nbsp;under&nbsp;allostatic&nbsp;load.</span></dd>
+</dl>
+<dl><dt><strong>is_surprised</strong></dt>
+<dd><span class="code">Whether&nbsp;the&nbsp;self-model&nbsp;is&nbsp;currently&nbsp;surprised.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'cognitive_effort': 'float', 'dyadic_state': 'DyadicState', 'needs_recovery': 'bool', 'self_confidence': 'float', 'self_model_state': 'SelfModelState', 'signals': 'InferenceSummary', 'social_presence': 'float', 'state_label': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'cognitive_effort': Field(name='cognitive_effort',type='float',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'dyadic_state': Field(name='dyadic_state',type='DyadicState',def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'needs_recovery': Field(name='needs_recovery',type='bool',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'self_confidence': Field(name='self_confidence',type='float',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'self_model_state': Field(name='self_model_state',type='SelfModelSta...appingproxy({}),kw_only=False,_field_type=_FIELD), 'signals': Field(name='signals',type='InferenceSummary',def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'social_presence': Field(name='social_presence',type='float',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'state_label': Field(name='state_label',type='str',default=&lt;dat...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('signals', 'self_model_state', 'dyadic_state', 'cognitive_effort', 'self_confidence', 'social_presence', 'needs_recovery', 'state_label')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SelfModelState">class <strong>SelfModelState</strong></a>(<a href="enum.html#IntEnum">enum.IntEnum</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SelfModelState">SelfModelState</a>(*values)<br>
+&nbsp;<br>
+Qualitative&nbsp;states&nbsp;of&nbsp;the&nbsp;generative&nbsp;self-model.<br>
+&nbsp;<br>
+These&nbsp;are&nbsp;cognitive&nbsp;interpretations&nbsp;of&nbsp;the&nbsp;inference&nbsp;signals,<br>
+not&nbsp;substrate&nbsp;states.&nbsp;The&nbsp;cognitive&nbsp;mind&nbsp;uses&nbsp;them&nbsp;to&nbsp;decide<br>
+how&nbsp;to&nbsp;behave.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.brainstem.active_inference.html#SelfModelState">SelfModelState</a></dd>
+<dd><a href="enum.html#IntEnum">enum.IntEnum</a></dd>
+<dd><a href="builtins.html#int">builtins.int</a></dd>
+<dd><a href="enum.html#ReprEnum">enum.ReprEnum</a></dd>
+<dd><a href="enum.html#Enum">enum.Enum</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="SelfModelState-__format__"><strong>__format__</strong></a>(self, format_spec, /)<span class="grey"><span class="heading-text"> from <a href="builtins.html#int">builtins.int</a></span></span></dt><dd><span class="code">Convert&nbsp;to&nbsp;a&nbsp;string&nbsp;according&nbsp;to&nbsp;format_spec.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__new__"><strong>__new__</strong></a>(cls, value)<span class="grey"><span class="heading-text"> from enum.Enum</span></span></dt><dd><span class="code">Create&nbsp;and&nbsp;return&nbsp;a&nbsp;new&nbsp;<a href="builtins.html#object">object</a>.&nbsp;&nbsp;See&nbsp;help(type)&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>COHERENT</strong> = &lt;SelfModelState.COHERENT: 0&gt;</dl>
+
+<dl><dt><strong>NASCENT</strong> = &lt;SelfModelState.NASCENT: 3&gt;</dl>
+
+<dl><dt><strong>STRAINED</strong> = &lt;SelfModelState.STRAINED: 2&gt;</dl>
+
+<dl><dt><strong>SURPRISED</strong> = &lt;SelfModelState.SURPRISED: 1&gt;</dl>
+
+<hr>
+Methods inherited from <a href="enum.html#IntEnum">enum.IntEnum</a>:<br>
+<dl><dt><a name="SelfModelState-__repr__"><strong>__repr__</strong></a>(self)<span class="grey"><span class="heading-text"> from enum.Enum</span></span></dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__str__"><strong>__str__</strong></a> = __repr__(self, /)<span class="grey"><span class="heading-text"> from <a href="builtins.html#int">builtins.int</a></span></span></dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Methods inherited from <a href="builtins.html#int">builtins.int</a>:<br>
+<dl><dt><a name="SelfModelState-__abs__"><strong>__abs__</strong></a>(self, /)</dt><dd><span class="code">abs(self)</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__add__"><strong>__add__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self+value.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__and__"><strong>__and__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self&amp;value.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__bool__"><strong>__bool__</strong></a>(self, /)</dt><dd><span class="code">True&nbsp;if&nbsp;self&nbsp;else&nbsp;False</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__ceil__"><strong>__ceil__</strong></a>(...)</dt><dd><span class="code">Ceiling&nbsp;of&nbsp;an&nbsp;Integral&nbsp;returns&nbsp;itself.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__divmod__"><strong>__divmod__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;divmod(self,&nbsp;value).</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__eq__"><strong>__eq__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__float__"><strong>__float__</strong></a>(self, /)</dt><dd><span class="code">float(self)</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__floor__"><strong>__floor__</strong></a>(...)</dt><dd><span class="code">Flooring&nbsp;an&nbsp;Integral&nbsp;returns&nbsp;itself.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__floordiv__"><strong>__floordiv__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self//value.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__ge__"><strong>__ge__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self&gt;=value.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__getattribute__"><strong>__getattribute__</strong></a>(self, name, /)</dt><dd><span class="code">Return&nbsp;getattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__getnewargs__"><strong>__getnewargs__</strong></a>(self, /)</dt></dl>
+
+<dl><dt><a name="SelfModelState-__gt__"><strong>__gt__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self&gt;value.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__hash__"><strong>__hash__</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__index__"><strong>__index__</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;self&nbsp;converted&nbsp;to&nbsp;an&nbsp;integer,&nbsp;if&nbsp;self&nbsp;is&nbsp;suitable&nbsp;for&nbsp;use&nbsp;as&nbsp;an&nbsp;index&nbsp;into&nbsp;a&nbsp;list.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__int__"><strong>__int__</strong></a>(self, /)</dt><dd><span class="code">int(self)</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__invert__"><strong>__invert__</strong></a>(self, /)</dt><dd><span class="code">~self</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__le__"><strong>__le__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self&lt;=value.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__lshift__"><strong>__lshift__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self&lt;&lt;value.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__lt__"><strong>__lt__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self&lt;value.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__mod__"><strong>__mod__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self%value.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__mul__"><strong>__mul__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self*value.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__ne__"><strong>__ne__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self!=value.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__neg__"><strong>__neg__</strong></a>(self, /)</dt><dd><span class="code">-self</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__or__"><strong>__or__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self|value.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__pos__"><strong>__pos__</strong></a>(self, /)</dt><dd><span class="code">+self</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__pow__"><strong>__pow__</strong></a>(self, value, mod=None, /)</dt><dd><span class="code">Return&nbsp;pow(self,&nbsp;value,&nbsp;mod).</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__radd__"><strong>__radd__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;value+self.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__rand__"><strong>__rand__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;value&amp;self.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__rdivmod__"><strong>__rdivmod__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;divmod(value,&nbsp;self).</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__rfloordiv__"><strong>__rfloordiv__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;value//self.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__rlshift__"><strong>__rlshift__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;value&lt;&lt;self.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__rmod__"><strong>__rmod__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;value%self.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__rmul__"><strong>__rmul__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;value*self.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__ror__"><strong>__ror__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;value|self.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__round__"><strong>__round__</strong></a>(...)</dt><dd><span class="code">Rounding&nbsp;an&nbsp;Integral&nbsp;returns&nbsp;itself.<br>
+&nbsp;<br>
+Rounding&nbsp;with&nbsp;an&nbsp;ndigits&nbsp;argument&nbsp;also&nbsp;returns&nbsp;an&nbsp;integer.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__rpow__"><strong>__rpow__</strong></a>(self, value, mod=None, /)</dt><dd><span class="code">Return&nbsp;pow(value,&nbsp;self,&nbsp;mod).</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__rrshift__"><strong>__rrshift__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;value&gt;&gt;self.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__rshift__"><strong>__rshift__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self&gt;&gt;value.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__rsub__"><strong>__rsub__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;value-self.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__rtruediv__"><strong>__rtruediv__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;value/self.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__rxor__"><strong>__rxor__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;value^self.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__sizeof__"><strong>__sizeof__</strong></a>(self, /)</dt><dd><span class="code">Returns&nbsp;size&nbsp;in&nbsp;memory,&nbsp;in&nbsp;bytes.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__sub__"><strong>__sub__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self-value.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__truediv__"><strong>__truediv__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self/value.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__trunc__"><strong>__trunc__</strong></a>(...)</dt><dd><span class="code">Truncating&nbsp;an&nbsp;Integral&nbsp;returns&nbsp;itself.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__xor__"><strong>__xor__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self^value.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-as_integer_ratio"><strong>as_integer_ratio</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;a&nbsp;pair&nbsp;of&nbsp;integers,&nbsp;whose&nbsp;ratio&nbsp;is&nbsp;equal&nbsp;to&nbsp;the&nbsp;original&nbsp;int.<br>
+&nbsp;<br>
+The&nbsp;ratio&nbsp;is&nbsp;in&nbsp;lowest&nbsp;terms&nbsp;and&nbsp;has&nbsp;a&nbsp;positive&nbsp;denominator.<br>
+&nbsp;<br>
+&gt;&gt;&gt;&nbsp;(10).<a href="#SelfModelState-as_integer_ratio">as_integer_ratio</a>()<br>
+(10,&nbsp;1)<br>
+&gt;&gt;&gt;&nbsp;(-10).<a href="#SelfModelState-as_integer_ratio">as_integer_ratio</a>()<br>
+(-10,&nbsp;1)<br>
+&gt;&gt;&gt;&nbsp;(0).<a href="#SelfModelState-as_integer_ratio">as_integer_ratio</a>()<br>
+(0,&nbsp;1)</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-bit_count"><strong>bit_count</strong></a>(self, /)</dt><dd><span class="code">Number&nbsp;of&nbsp;ones&nbsp;in&nbsp;the&nbsp;binary&nbsp;representation&nbsp;of&nbsp;the&nbsp;absolute&nbsp;value&nbsp;of&nbsp;self.<br>
+&nbsp;<br>
+Also&nbsp;known&nbsp;as&nbsp;the&nbsp;population&nbsp;count.<br>
+&nbsp;<br>
+&gt;&gt;&gt;&nbsp;bin(13)<br>
+'0b1101'<br>
+&gt;&gt;&gt;&nbsp;(13).<a href="#SelfModelState-bit_count">bit_count</a>()<br>
+3</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-bit_length"><strong>bit_length</strong></a>(self, /)</dt><dd><span class="code">Number&nbsp;of&nbsp;bits&nbsp;necessary&nbsp;to&nbsp;represent&nbsp;self&nbsp;in&nbsp;binary.<br>
+&nbsp;<br>
+&gt;&gt;&gt;&nbsp;bin(37)<br>
+'0b100101'<br>
+&gt;&gt;&gt;&nbsp;(37).<a href="#SelfModelState-bit_length">bit_length</a>()<br>
+6</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-conjugate"><strong>conjugate</strong></a>(...)</dt><dd><span class="code">Returns&nbsp;self,&nbsp;the&nbsp;complex&nbsp;conjugate&nbsp;of&nbsp;any&nbsp;int.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-is_integer"><strong>is_integer</strong></a>(self, /)</dt><dd><span class="code">Returns&nbsp;True.&nbsp;Exists&nbsp;for&nbsp;duck&nbsp;type&nbsp;compatibility&nbsp;with&nbsp;float.is_integer.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-to_bytes"><strong>to_bytes</strong></a>(self, /, length=1, byteorder='big', *, signed=False)</dt><dd><span class="code">Return&nbsp;an&nbsp;array&nbsp;of&nbsp;bytes&nbsp;representing&nbsp;an&nbsp;integer.<br>
+&nbsp;<br>
+length<br>
+&nbsp;&nbsp;Length&nbsp;of&nbsp;bytes&nbsp;<a href="builtins.html#object">object</a>&nbsp;to&nbsp;use.&nbsp;&nbsp;An&nbsp;OverflowError&nbsp;is&nbsp;raised&nbsp;if&nbsp;the<br>
+&nbsp;&nbsp;integer&nbsp;is&nbsp;not&nbsp;representable&nbsp;with&nbsp;the&nbsp;given&nbsp;number&nbsp;of&nbsp;bytes.&nbsp;&nbsp;Default<br>
+&nbsp;&nbsp;is&nbsp;length&nbsp;1.<br>
+byteorder<br>
+&nbsp;&nbsp;The&nbsp;byte&nbsp;order&nbsp;used&nbsp;to&nbsp;represent&nbsp;the&nbsp;integer.&nbsp;&nbsp;If&nbsp;byteorder&nbsp;is&nbsp;'big',<br>
+&nbsp;&nbsp;the&nbsp;most&nbsp;significant&nbsp;byte&nbsp;is&nbsp;at&nbsp;the&nbsp;beginning&nbsp;of&nbsp;the&nbsp;byte&nbsp;array.&nbsp;&nbsp;If<br>
+&nbsp;&nbsp;byteorder&nbsp;is&nbsp;'little',&nbsp;the&nbsp;most&nbsp;significant&nbsp;byte&nbsp;is&nbsp;at&nbsp;the&nbsp;end&nbsp;of&nbsp;the<br>
+&nbsp;&nbsp;byte&nbsp;array.&nbsp;&nbsp;To&nbsp;request&nbsp;the&nbsp;native&nbsp;byte&nbsp;order&nbsp;of&nbsp;the&nbsp;host&nbsp;system,&nbsp;use<br>
+&nbsp;&nbsp;`sys.byteorder'&nbsp;as&nbsp;the&nbsp;byte&nbsp;order&nbsp;value.&nbsp;&nbsp;Default&nbsp;is&nbsp;to&nbsp;use&nbsp;'big'.<br>
+signed<br>
+&nbsp;&nbsp;Determines&nbsp;whether&nbsp;two's&nbsp;complement&nbsp;is&nbsp;used&nbsp;to&nbsp;represent&nbsp;the&nbsp;integer.<br>
+&nbsp;&nbsp;If&nbsp;signed&nbsp;is&nbsp;False&nbsp;and&nbsp;a&nbsp;negative&nbsp;integer&nbsp;is&nbsp;given,&nbsp;an&nbsp;OverflowError<br>
+&nbsp;&nbsp;is&nbsp;raised.</span></dd></dl>
+
+<hr>
+Class methods inherited from <a href="builtins.html#int">builtins.int</a>:<br>
+<dl><dt><a name="SelfModelState-from_bytes"><strong>from_bytes</strong></a>(bytes, byteorder='big', *, signed=False)</dt><dd><span class="code">Return&nbsp;the&nbsp;integer&nbsp;represented&nbsp;by&nbsp;the&nbsp;given&nbsp;array&nbsp;of&nbsp;bytes.<br>
+&nbsp;<br>
+bytes<br>
+&nbsp;&nbsp;Holds&nbsp;the&nbsp;array&nbsp;of&nbsp;bytes&nbsp;to&nbsp;convert.&nbsp;&nbsp;The&nbsp;argument&nbsp;must&nbsp;either<br>
+&nbsp;&nbsp;support&nbsp;the&nbsp;buffer&nbsp;protocol&nbsp;or&nbsp;be&nbsp;an&nbsp;iterable&nbsp;<a href="builtins.html#object">object</a>&nbsp;producing&nbsp;bytes.<br>
+&nbsp;&nbsp;Bytes&nbsp;and&nbsp;bytearray&nbsp;are&nbsp;examples&nbsp;of&nbsp;built-in&nbsp;objects&nbsp;that&nbsp;support&nbsp;the<br>
+&nbsp;&nbsp;buffer&nbsp;protocol.<br>
+byteorder<br>
+&nbsp;&nbsp;The&nbsp;byte&nbsp;order&nbsp;used&nbsp;to&nbsp;represent&nbsp;the&nbsp;integer.&nbsp;&nbsp;If&nbsp;byteorder&nbsp;is&nbsp;'big',<br>
+&nbsp;&nbsp;the&nbsp;most&nbsp;significant&nbsp;byte&nbsp;is&nbsp;at&nbsp;the&nbsp;beginning&nbsp;of&nbsp;the&nbsp;byte&nbsp;array.&nbsp;&nbsp;If<br>
+&nbsp;&nbsp;byteorder&nbsp;is&nbsp;'little',&nbsp;the&nbsp;most&nbsp;significant&nbsp;byte&nbsp;is&nbsp;at&nbsp;the&nbsp;end&nbsp;of&nbsp;the<br>
+&nbsp;&nbsp;byte&nbsp;array.&nbsp;&nbsp;To&nbsp;request&nbsp;the&nbsp;native&nbsp;byte&nbsp;order&nbsp;of&nbsp;the&nbsp;host&nbsp;system,&nbsp;use<br>
+&nbsp;&nbsp;`sys.byteorder'&nbsp;as&nbsp;the&nbsp;byte&nbsp;order&nbsp;value.&nbsp;&nbsp;Default&nbsp;is&nbsp;to&nbsp;use&nbsp;'big'.<br>
+signed<br>
+&nbsp;&nbsp;Indicates&nbsp;whether&nbsp;two's&nbsp;complement&nbsp;is&nbsp;used&nbsp;to&nbsp;represent&nbsp;the&nbsp;integer.</span></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="builtins.html#int">builtins.int</a>:<br>
+<dl><dt><strong>denominator</strong></dt>
+<dd><span class="code">the&nbsp;denominator&nbsp;of&nbsp;a&nbsp;rational&nbsp;number&nbsp;in&nbsp;lowest&nbsp;terms</span></dd>
+</dl>
+<dl><dt><strong>imag</strong></dt>
+<dd><span class="code">the&nbsp;imaginary&nbsp;part&nbsp;of&nbsp;a&nbsp;complex&nbsp;number</span></dd>
+</dl>
+<dl><dt><strong>numerator</strong></dt>
+<dd><span class="code">the&nbsp;numerator&nbsp;of&nbsp;a&nbsp;rational&nbsp;number&nbsp;in&nbsp;lowest&nbsp;terms</span></dd>
+</dl>
+<dl><dt><strong>real</strong></dt>
+<dd><span class="code">the&nbsp;real&nbsp;part&nbsp;of&nbsp;a&nbsp;complex&nbsp;number</span></dd>
+</dl>
+<hr>
+Methods inherited from <a href="enum.html#Enum">enum.Enum</a>:<br>
+<dl><dt><a name="SelfModelState-__dir__"><strong>__dir__</strong></a>(self)</dt><dd><span class="code">Returns&nbsp;public&nbsp;methods&nbsp;and&nbsp;other&nbsp;interesting&nbsp;attributes.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__init__"><strong>__init__</strong></a>(self, *args, **kwds)</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__reduce_ex__"><strong>__reduce_ex__</strong></a>(self, proto)</dt><dd><span class="code">Helper&nbsp;for&nbsp;pickle.</span></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="enum.html#Enum">enum.Enum</a>:<br>
+<dl><dt><strong>name</strong></dt>
+<dd><span class="code">The&nbsp;name&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<dl><dt><strong>value</strong></dt>
+<dd><span class="code">The&nbsp;value&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<hr>
+Static methods inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><a name="SelfModelState-__contains__"><strong>__contains__</strong></a>(value)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;`value`&nbsp;is&nbsp;in&nbsp;`cls`.<br>
+&nbsp;<br>
+`value`&nbsp;is&nbsp;in&nbsp;`cls`&nbsp;if:<br>
+1)&nbsp;`value`&nbsp;is&nbsp;a&nbsp;member&nbsp;of&nbsp;`cls`,&nbsp;or<br>
+2)&nbsp;`value`&nbsp;is&nbsp;the&nbsp;value&nbsp;of&nbsp;one&nbsp;of&nbsp;the&nbsp;`cls`'s&nbsp;members.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__getitem__"><strong>__getitem__</strong></a>(name)</dt><dd><span class="code">Return&nbsp;the&nbsp;member&nbsp;matching&nbsp;`name`.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__iter__"><strong>__iter__</strong></a>()</dt><dd><span class="code">Return&nbsp;members&nbsp;in&nbsp;definition&nbsp;order.</span></dd></dl>
+
+<dl><dt><a name="SelfModelState-__len__"><strong>__len__</strong></a>()</dt><dd><span class="code">Return&nbsp;the&nbsp;number&nbsp;of&nbsp;members&nbsp;(no&nbsp;aliases)</span></dd></dl>
+
+<hr>
+Readonly properties inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><strong>__members__</strong></dt>
+<dd><span class="code">Returns&nbsp;a&nbsp;mapping&nbsp;of&nbsp;member&nbsp;name-&gt;value.<br>
+&nbsp;<br>
+This&nbsp;mapping&nbsp;lists&nbsp;all&nbsp;enum&nbsp;members,&nbsp;including&nbsp;aliases.&nbsp;Note&nbsp;that&nbsp;this<br>
+is&nbsp;a&nbsp;read-only&nbsp;view&nbsp;of&nbsp;the&nbsp;internal&nbsp;mapping.</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="UserAffectEstimate">class <strong>UserAffectEstimate</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#UserAffectEstimate">UserAffectEstimate</a>(valence:&nbsp;'float',&nbsp;arousal:&nbsp;'float',&nbsp;engagement:&nbsp;'float',&nbsp;confidence:&nbsp;'float')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+An&nbsp;estimate&nbsp;of&nbsp;the&nbsp;user's&nbsp;affective&nbsp;state&nbsp;from&nbsp;conversation&nbsp;features.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;computed&nbsp;by&nbsp;the&nbsp;cognitive&nbsp;mind&nbsp;from&nbsp;conversation&nbsp;features<br>
+(sentiment,&nbsp;message&nbsp;length,&nbsp;response&nbsp;latency,&nbsp;question&nbsp;density)<br>
+and&nbsp;sent&nbsp;to&nbsp;the&nbsp;daemon&nbsp;via&nbsp;``update_user_affect``&nbsp;to&nbsp;feed&nbsp;the<br>
+dyadic&nbsp;affective&nbsp;model.<br>
+&nbsp;<br>
+The&nbsp;features&nbsp;are&nbsp;simple&nbsp;heuristics&nbsp;—&nbsp;not&nbsp;a&nbsp;deep&nbsp;sentiment&nbsp;model.<br>
+The&nbsp;point&nbsp;is&nbsp;to&nbsp;give&nbsp;the&nbsp;dyadic&nbsp;model&nbsp;*some*&nbsp;signal&nbsp;to&nbsp;work&nbsp;with;<br>
+the&nbsp;model's&nbsp;EMA&nbsp;smoothing&nbsp;and&nbsp;the&nbsp;oxytocin-mediated&nbsp;coupling<br>
+handle&nbsp;the&nbsp;rest.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="UserAffectEstimate-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="UserAffectEstimate-__init__"><strong>__init__</strong></a>(self, valence: 'float', arousal: 'float', engagement: 'float', confidence: 'float') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="UserAffectEstimate-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="UserAffectEstimate-from_message"><strong>from_message</strong></a>(message: 'str', response_latency_s: 'float | None' = None, is_question: 'bool' = False, is_continuation: 'bool' = False) -&gt; 'UserAffectEstimate'</dt><dd><span class="code">Estimate&nbsp;the&nbsp;user's&nbsp;affective&nbsp;state&nbsp;from&nbsp;a&nbsp;message.<br>
+&nbsp;<br>
+Uses&nbsp;a&nbsp;VADER-style&nbsp;lexicon-based&nbsp;sentiment&nbsp;analyzer&nbsp;(Gilbert&nbsp;&amp;<br>
+Hutto,&nbsp;2014)&nbsp;with&nbsp;negation,&nbsp;intensifier,&nbsp;and&nbsp;diminisher&nbsp;handling.<br>
+This&nbsp;is&nbsp;not&nbsp;a&nbsp;deep&nbsp;sentiment&nbsp;model&nbsp;—&nbsp;it's&nbsp;a&nbsp;lightweight&nbsp;rule-based<br>
+analyzer&nbsp;that&nbsp;gives&nbsp;the&nbsp;dyadic&nbsp;model&nbsp;a&nbsp;richer&nbsp;signal&nbsp;than&nbsp;simple<br>
+word-list&nbsp;matching.<br>
+&nbsp;<br>
+Handles:<br>
+-&nbsp;Negation:&nbsp;"not&nbsp;bad"&nbsp;→&nbsp;positive,&nbsp;"don't&nbsp;like"&nbsp;→&nbsp;negative<br>
+-&nbsp;Intensifiers:&nbsp;"very&nbsp;good"&nbsp;&gt;&nbsp;"good"<br>
+-&nbsp;Diminishers:&nbsp;"slightly&nbsp;bad"&nbsp;&lt;&nbsp;"bad"<br>
+-&nbsp;Contrastive&nbsp;conjunctions:&nbsp;"good&nbsp;but&nbsp;slow"&nbsp;→&nbsp;emphasis&nbsp;on&nbsp;"slow"<br>
+-&nbsp;Punctuation&nbsp;and&nbsp;capitalization&nbsp;boosts<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;message:&nbsp;The&nbsp;user's&nbsp;message&nbsp;text.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;response_latency_s:&nbsp;Time&nbsp;since&nbsp;the&nbsp;last&nbsp;message,&nbsp;in&nbsp;seconds.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Fast&nbsp;responses&nbsp;=&nbsp;high&nbsp;arousal.&nbsp;None&nbsp;=&nbsp;unknown.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;is_question:&nbsp;Whether&nbsp;the&nbsp;message&nbsp;is&nbsp;a&nbsp;question.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;is_continuation:&nbsp;Whether&nbsp;the&nbsp;message&nbsp;continues&nbsp;a&nbsp;previous<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;topic&nbsp;(high&nbsp;engagement)&nbsp;or&nbsp;starts&nbsp;a&nbsp;new&nbsp;one.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;<a href="#UserAffectEstimate">UserAffectEstimate</a>&nbsp;with&nbsp;valence,&nbsp;arousal,&nbsp;engagement,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;and&nbsp;confidence.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'arousal': 'float', 'confidence': 'float', 'engagement': 'float', 'valence': 'float'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'arousal': Field(name='arousal',type='float',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'confidence': Field(name='confidence',type='float',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD), 'engagement': Field(name='engagement',type='float',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD), 'valence': Field(name='valence',type='float',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('valence', 'arousal', 'engagement', 'confidence')</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['ActiveInferenceReader', 'DyadicState', 'SelfModelReading', 'SelfModelState', 'UserAffectEstimate']</td></tr></table>
+</body></html>

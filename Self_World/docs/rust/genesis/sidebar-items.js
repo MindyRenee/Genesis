@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["basal_forebrain","basal_ganglia","brainstem","cerebellum","cognition","daemon","data_dir","field","frontal_lobe","hypothalamus","infrastructure","inhibition","insula","limbic_system","math","memory","neurochemical","occipital_lobe","parietal_lobe","self_","sleep","state","store","temporal_lobe","thalamus","tools","topology","worlds"]};

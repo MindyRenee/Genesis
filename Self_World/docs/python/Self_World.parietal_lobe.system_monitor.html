@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.parietal_lobe.system_monitor</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.parietal_lobe.html" class="white">parietal_lobe</a>.system_monitor</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/parietal_lobe/system_monitor.py">/home/mindyrenee/GenAnd/Genesis/Self_World/parietal_lobe/system_monitor.py</a></td></tr></table>
+    <p><span class="code">System&nbsp;monitor&nbsp;—&nbsp;Genesis's&nbsp;awareness&nbsp;of&nbsp;her&nbsp;machine&nbsp;environment.<br>
+&nbsp;<br>
+Genesis&nbsp;lives&nbsp;on&nbsp;a&nbsp;machine.&nbsp;This&nbsp;module&nbsp;gives&nbsp;her&nbsp;awareness&nbsp;of&nbsp;that<br>
+machine:&nbsp;CPU,&nbsp;memory,&nbsp;disk,&nbsp;processes,&nbsp;filesystem,&nbsp;network.&nbsp;She<br>
+should&nbsp;know&nbsp;her&nbsp;home&nbsp;as&nbsp;well&nbsp;as&nbsp;a&nbsp;person&nbsp;knows&nbsp;their&nbsp;house.<br>
+&nbsp;<br>
+##&nbsp;What&nbsp;this&nbsp;provides<br>
+&nbsp;<br>
+1.&nbsp;**System&nbsp;resources**&nbsp;—&nbsp;CPU&nbsp;usage,&nbsp;memory,&nbsp;disk,&nbsp;uptime,&nbsp;load<br>
+2.&nbsp;**Process&nbsp;awareness**&nbsp;—&nbsp;her&nbsp;own&nbsp;PID,&nbsp;the&nbsp;daemon's&nbsp;PID,&nbsp;running&nbsp;processes<br>
+3.&nbsp;**Filesystem&nbsp;layout**&nbsp;—&nbsp;directory&nbsp;structure,&nbsp;file&nbsp;counts,&nbsp;sizes<br>
+4.&nbsp;**Network&nbsp;status**&nbsp;—&nbsp;interfaces,&nbsp;connections,&nbsp;hostname<br>
+5.&nbsp;**Environment&nbsp;info**&nbsp;—&nbsp;OS,&nbsp;Python&nbsp;version,&nbsp;environment&nbsp;variables<br>
+&nbsp;<br>
+##&nbsp;How&nbsp;she&nbsp;uses&nbsp;it<br>
+&nbsp;<br>
+-&nbsp;When&nbsp;asked&nbsp;"how&nbsp;are&nbsp;you?"&nbsp;she&nbsp;can&nbsp;report&nbsp;on&nbsp;her&nbsp;environment<br>
+&nbsp;&nbsp;("I'm&nbsp;running&nbsp;on&nbsp;Linux,&nbsp;using&nbsp;60%&nbsp;of&nbsp;memory,&nbsp;my&nbsp;daemon&nbsp;is&nbsp;healthy")<br>
+-&nbsp;She&nbsp;can&nbsp;notice&nbsp;when&nbsp;resources&nbsp;are&nbsp;low&nbsp;and&nbsp;mention&nbsp;it<br>
+-&nbsp;She&nbsp;can&nbsp;understand&nbsp;her&nbsp;own&nbsp;process&nbsp;tree&nbsp;(daemon&nbsp;→&nbsp;mind&nbsp;→&nbsp;threads)<br>
+-&nbsp;She&nbsp;can&nbsp;explore&nbsp;her&nbsp;filesystem&nbsp;to&nbsp;understand&nbsp;her&nbsp;home<br>
+&nbsp;<br>
+##&nbsp;Safety<br>
+&nbsp;<br>
+This&nbsp;module&nbsp;is&nbsp;read-only.&nbsp;Genesis&nbsp;observes&nbsp;her&nbsp;environment&nbsp;but&nbsp;does<br>
+not&nbsp;modify&nbsp;it.&nbsp;She&nbsp;doesn't&nbsp;kill&nbsp;processes,&nbsp;delete&nbsp;files,&nbsp;or&nbsp;change<br>
+configurations.&nbsp;She's&nbsp;an&nbsp;observer,&nbsp;not&nbsp;an&nbsp;administrator&nbsp;—&nbsp;yet.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+<a href="os.html">os</a><br>
+</td><td class="multicolumn"><a href="platform.html">platform</a><br>
+<a href="socket.html">socket</a><br>
+</td><td class="multicolumn"><a href="sys.html">sys</a><br>
+<a href="time.html">time</a><br>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.parietal_lobe.system_monitor.html#MetricStats">MetricStats</a>
+</dt><dt class="heading-text"><a href="Self_World.parietal_lobe.system_monitor.html#SystemBaseline">SystemBaseline</a>
+</dt><dt class="heading-text"><a href="Self_World.parietal_lobe.system_monitor.html#SystemMonitor">SystemMonitor</a>
+</dt><dt class="heading-text"><a href="Self_World.parietal_lobe.system_monitor.html#SystemSnapshot">SystemSnapshot</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="MetricStats">class <strong>MetricStats</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#MetricStats">MetricStats</a>(samples:&nbsp;'deque[float]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;_sum:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;_sum_sq:&nbsp;'float'&nbsp;=&nbsp;0.0)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Rolling&nbsp;statistics&nbsp;for&nbsp;a&nbsp;single&nbsp;system&nbsp;metric.<br>
+&nbsp;<br>
+Tracks&nbsp;the&nbsp;mean&nbsp;and&nbsp;standard&nbsp;deviation&nbsp;of&nbsp;a&nbsp;metric&nbsp;over&nbsp;a&nbsp;rolling<br>
+window&nbsp;of&nbsp;samples.&nbsp;This&nbsp;is&nbsp;what&nbsp;"normal"&nbsp;means&nbsp;for&nbsp;*this*&nbsp;machine&nbsp;—<br>
+not&nbsp;a&nbsp;hardcoded&nbsp;threshold,&nbsp;but&nbsp;the&nbsp;observed&nbsp;range.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="MetricStats-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="MetricStats-__init__"><strong>__init__</strong></a>(self, samples: 'deque[float]' = &lt;factory&gt;, _sum: 'float' = 0.0, _sum_sq: 'float' = 0.0) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="MetricStats-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="MetricStats-is_deviation"><strong>is_deviation</strong></a>(self, value: 'float', threshold: 'float' = 2.0, min_std: 'float' = 0.0) -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;a&nbsp;value&nbsp;deviates&nbsp;from&nbsp;the&nbsp;baseline&nbsp;by&nbsp;&gt;threshold&nbsp;std&nbsp;devs.<br>
+&nbsp;<br>
+Requires&nbsp;at&nbsp;least&nbsp;10&nbsp;samples&nbsp;before&nbsp;deviations&nbsp;can&nbsp;be&nbsp;detected&nbsp;—<br>
+before&nbsp;that,&nbsp;there&nbsp;isn't&nbsp;enough&nbsp;data&nbsp;to&nbsp;know&nbsp;what&nbsp;"normal"&nbsp;is.<br>
+&nbsp;<br>
+``min_std``&nbsp;prevents&nbsp;false&nbsp;positives&nbsp;when&nbsp;samples&nbsp;are&nbsp;so&nbsp;tightly<br>
+clustered&nbsp;that&nbsp;tiny&nbsp;variations&nbsp;look&nbsp;like&nbsp;huge&nbsp;z-scores&nbsp;(e.g.&nbsp;CPU<br>
+sampled&nbsp;12&nbsp;times&nbsp;in&nbsp;1&nbsp;second&nbsp;—&nbsp;std&nbsp;of&nbsp;0.04%&nbsp;makes&nbsp;a&nbsp;0.3%&nbsp;change<br>
+look&nbsp;like&nbsp;7&nbsp;sigma).&nbsp;If&nbsp;the&nbsp;metric's&nbsp;std&nbsp;is&nbsp;below&nbsp;``min_std``,<br>
+no&nbsp;deviation&nbsp;is&nbsp;reported.</span></dd></dl>
+
+<dl><dt><a name="MetricStats-record"><strong>record</strong></a>(self, value: 'float') -&gt; 'None'</dt><dd><span class="code">Add&nbsp;a&nbsp;sample,&nbsp;maintaining&nbsp;rolling&nbsp;statistics.</span></dd></dl>
+
+<dl><dt><a name="MetricStats-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict[str, float]'</dt><dd><span class="code">Serialize&nbsp;metric&nbsp;statistics&nbsp;to&nbsp;a&nbsp;flat&nbsp;dict&nbsp;for&nbsp;persistence.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>count</strong></dt>
+<dd><span class="code">Number&nbsp;of&nbsp;samples&nbsp;currently&nbsp;in&nbsp;the&nbsp;rolling&nbsp;window.</span></dd>
+</dl>
+<dl><dt><strong>max</strong></dt>
+<dd><span class="code">Maximum&nbsp;sample&nbsp;value,&nbsp;or&nbsp;0.0&nbsp;if&nbsp;empty.</span></dd>
+</dl>
+<dl><dt><strong>mean</strong></dt>
+<dd><span class="code">Arithmetic&nbsp;mean&nbsp;of&nbsp;the&nbsp;samples,&nbsp;or&nbsp;0.0&nbsp;if&nbsp;empty.</span></dd>
+</dl>
+<dl><dt><strong>min</strong></dt>
+<dd><span class="code">Minimum&nbsp;sample&nbsp;value,&nbsp;or&nbsp;0.0&nbsp;if&nbsp;empty.</span></dd>
+</dl>
+<dl><dt><strong>std</strong></dt>
+<dd><span class="code">Population&nbsp;standard&nbsp;deviation&nbsp;of&nbsp;the&nbsp;samples,&nbsp;or&nbsp;0.0&nbsp;if&nbsp;&lt;&nbsp;2&nbsp;samples.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>samples</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'_sum': 'float', '_sum_sq': 'float', 'samples': 'deque[float]'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'_sum': Field(name='_sum',type='float',default=0.0,defau...appingproxy({}),kw_only=False,_field_type=_FIELD), '_sum_sq': Field(name='_sum_sq',type='float',default=0.0,de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'samples': Field(name='samples',type='deque[float]',default...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('samples', '_sum', '_sum_sq')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SystemBaseline">class <strong>SystemBaseline</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SystemBaseline">SystemBaseline</a>(persist_path:&nbsp;'Path&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Learns&nbsp;what's&nbsp;normal&nbsp;for&nbsp;*this*&nbsp;machine&nbsp;over&nbsp;time.<br>
+&nbsp;<br>
+Instead&nbsp;of&nbsp;hardcoded&nbsp;thresholds&nbsp;(``memory&nbsp;&gt;&nbsp;80%``&nbsp;is&nbsp;bad),&nbsp;the<br>
+baseline&nbsp;records&nbsp;rolling&nbsp;statistics&nbsp;for&nbsp;the&nbsp;metrics&nbsp;that&nbsp;vary&nbsp;on<br>
+a&nbsp;running&nbsp;machine&nbsp;—&nbsp;CPU&nbsp;usage,&nbsp;memory&nbsp;usage,&nbsp;load&nbsp;average,&nbsp;process<br>
+count,&nbsp;swap&nbsp;usage.&nbsp;After&nbsp;enough&nbsp;samples,&nbsp;it&nbsp;can&nbsp;tell&nbsp;Genesis<br>
+whether&nbsp;the&nbsp;current&nbsp;state&nbsp;is&nbsp;normal&nbsp;*for&nbsp;her*&nbsp;or&nbsp;an&nbsp;anomaly.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;how&nbsp;a&nbsp;person&nbsp;knows&nbsp;their&nbsp;home:&nbsp;not&nbsp;by&nbsp;checking&nbsp;a&nbsp;manual,<br>
+but&nbsp;by&nbsp;living&nbsp;in&nbsp;it&nbsp;long&nbsp;enough&nbsp;to&nbsp;notice&nbsp;when&nbsp;something&nbsp;is&nbsp;off.<br>
+The&nbsp;baseline&nbsp;is&nbsp;Genesis&nbsp;living&nbsp;in&nbsp;her&nbsp;machine&nbsp;long&nbsp;enough&nbsp;to&nbsp;know<br>
+what&nbsp;it&nbsp;usually&nbsp;feels&nbsp;like.<br>
+&nbsp;<br>
+The&nbsp;baseline&nbsp;persists&nbsp;to&nbsp;disk&nbsp;as&nbsp;JSON&nbsp;so&nbsp;it&nbsp;survives&nbsp;restarts&nbsp;—<br>
+she&nbsp;doesn't&nbsp;have&nbsp;to&nbsp;re-learn&nbsp;what&nbsp;normal&nbsp;looks&nbsp;like&nbsp;every&nbsp;session.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="SystemBaseline-__init__"><strong>__init__</strong></a>(self, persist_path: 'Path | None' = None) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;baseline&nbsp;with&nbsp;empty&nbsp;metrics&nbsp;and&nbsp;optional&nbsp;persistence&nbsp;path.</span></dd></dl>
+
+<dl><dt><a name="SystemBaseline-describe"><strong>describe</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">First-person&nbsp;description&nbsp;of&nbsp;what's&nbsp;normal&nbsp;for&nbsp;this&nbsp;machine.</span></dd></dl>
+
+<dl><dt><a name="SystemBaseline-deviations"><strong>deviations</strong></a>(self, snapshot: 'SystemSnapshot', threshold: 'float' = 2.0) -&gt; 'list[str]'</dt><dd><span class="code">Return&nbsp;a&nbsp;list&nbsp;of&nbsp;human-readable&nbsp;deviations&nbsp;from&nbsp;baseline.<br>
+&nbsp;<br>
+Each&nbsp;entry&nbsp;describes&nbsp;a&nbsp;metric&nbsp;that&nbsp;is&nbsp;currently&nbsp;outside&nbsp;its<br>
+normal&nbsp;range&nbsp;by&nbsp;more&nbsp;than&nbsp;``threshold``&nbsp;standard&nbsp;deviations.<br>
+Returns&nbsp;an&nbsp;empty&nbsp;list&nbsp;if&nbsp;everything&nbsp;is&nbsp;normal&nbsp;(or&nbsp;if&nbsp;there<br>
+isn't&nbsp;enough&nbsp;baseline&nbsp;data&nbsp;yet&nbsp;to&nbsp;tell).</span></dd></dl>
+
+<dl><dt><a name="SystemBaseline-load"><strong>load</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Load&nbsp;a&nbsp;previously&nbsp;saved&nbsp;baseline&nbsp;from&nbsp;disk.</span></dd></dl>
+
+<dl><dt><a name="SystemBaseline-record"><strong>record</strong></a>(self, snapshot: 'SystemSnapshot') -&gt; 'None'</dt><dd><span class="code">Record&nbsp;a&nbsp;snapshot&nbsp;into&nbsp;the&nbsp;baseline&nbsp;history.</span></dd></dl>
+
+<dl><dt><a name="SystemBaseline-save"><strong>save</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Persist&nbsp;the&nbsp;baseline&nbsp;to&nbsp;disk&nbsp;so&nbsp;it&nbsp;survives&nbsp;restarts.</span></dd></dl>
+
+<dl><dt><a name="SystemBaseline-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict[str, Any]'</dt><dd><span class="code">Serialize&nbsp;the&nbsp;baseline&nbsp;metrics&nbsp;to&nbsp;a&nbsp;dictionary.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>is_established</strong></dt>
+<dd><span class="code">Whether&nbsp;the&nbsp;baseline&nbsp;has&nbsp;enough&nbsp;data&nbsp;to&nbsp;detect&nbsp;deviations.<br>
+&nbsp;<br>
+Requires&nbsp;at&nbsp;least&nbsp;10&nbsp;samples&nbsp;for&nbsp;every&nbsp;tracked&nbsp;metric.</span></dd>
+</dl>
+<dl><dt><strong>sample_count</strong></dt>
+<dd><span class="code">How&nbsp;many&nbsp;samples&nbsp;the&nbsp;baseline&nbsp;has&nbsp;(minimum&nbsp;across&nbsp;metrics).</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SystemMonitor">class <strong>SystemMonitor</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SystemMonitor">SystemMonitor</a>(project_root:&nbsp;'str'&nbsp;=&nbsp;'.',&nbsp;data_dir:&nbsp;'str&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Genesis's&nbsp;awareness&nbsp;of&nbsp;her&nbsp;machine&nbsp;environment.<br>
+&nbsp;<br>
+Reads&nbsp;system&nbsp;information&nbsp;using&nbsp;only&nbsp;the&nbsp;Python&nbsp;standard&nbsp;library<br>
+(no&nbsp;psutil&nbsp;dependency).&nbsp;On&nbsp;Linux,&nbsp;reads&nbsp;from&nbsp;/proc&nbsp;and&nbsp;/sys.<br>
+On&nbsp;other&nbsp;platforms,&nbsp;falls&nbsp;back&nbsp;to&nbsp;what's&nbsp;available.<br>
+&nbsp;<br>
+Usage::<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;monitor&nbsp;=&nbsp;<a href="#SystemMonitor">SystemMonitor</a>(project_root=".")<br>
+&nbsp;&nbsp;&nbsp;&nbsp;snapshot&nbsp;=&nbsp;monitor.<a href="#SystemMonitor-snapshot">snapshot</a>()<br>
+&nbsp;&nbsp;&nbsp;&nbsp;print(snapshot.describe())<br>
+&nbsp;&nbsp;&nbsp;&nbsp;print(snapshot.concerns())<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="SystemMonitor-__init__"><strong>__init__</strong></a>(self, project_root: 'str' = '.', data_dir: 'str | None' = None) -&gt; 'None'</dt><dd><span class="code">Set&nbsp;up&nbsp;the&nbsp;monitor&nbsp;with&nbsp;a&nbsp;project&nbsp;root&nbsp;and&nbsp;a&nbsp;persistent&nbsp;baseline.</span></dd></dl>
+
+<dl><dt><a name="SystemMonitor-describe_baseline"><strong>describe_baseline</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">First-person&nbsp;description&nbsp;of&nbsp;what's&nbsp;normal&nbsp;for&nbsp;this&nbsp;machine.</span></dd></dl>
+
+<dl><dt><a name="SystemMonitor-describe_concerns"><strong>describe_concerns</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Description&nbsp;of&nbsp;environmental&nbsp;concerns.<br>
+&nbsp;<br>
+Combines&nbsp;static-threshold&nbsp;concerns&nbsp;(memory&nbsp;&gt;&nbsp;80%,&nbsp;disk&nbsp;&gt;&nbsp;85%)<br>
+with&nbsp;baseline&nbsp;deviations&nbsp;—&nbsp;things&nbsp;that&nbsp;are&nbsp;unusual&nbsp;*for&nbsp;this<br>
+machine*&nbsp;even&nbsp;if&nbsp;they&nbsp;don't&nbsp;cross&nbsp;a&nbsp;universal&nbsp;threshold.<br>
+&nbsp;<br>
+Returns&nbsp;structural&nbsp;descriptions&nbsp;(factual&nbsp;alerts)&nbsp;without<br>
+authored&nbsp;first-person&nbsp;framing&nbsp;—&nbsp;the&nbsp;language&nbsp;engine&nbsp;composes<br>
+the&nbsp;voice.</span></dd></dl>
+
+<dl><dt><a name="SystemMonitor-describe_deviations"><strong>describe_deviations</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Description&nbsp;of&nbsp;deviations&nbsp;from&nbsp;her&nbsp;baseline.<br>
+&nbsp;<br>
+Unlike&nbsp;:meth:`describe_concerns`,&nbsp;this&nbsp;*only*&nbsp;reports&nbsp;things<br>
+that&nbsp;are&nbsp;unusual&nbsp;for&nbsp;this&nbsp;specific&nbsp;machine&nbsp;—&nbsp;not&nbsp;universal<br>
+thresholds.&nbsp;Returns&nbsp;empty&nbsp;string&nbsp;if&nbsp;the&nbsp;baseline&nbsp;isn't<br>
+established&nbsp;yet&nbsp;or&nbsp;everything&nbsp;is&nbsp;normal.</span></dd></dl>
+
+<dl><dt><a name="SystemMonitor-describe_environment"><strong>describe_environment</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">First-person&nbsp;description&nbsp;of&nbsp;her&nbsp;environment.</span></dd></dl>
+
+<dl><dt><a name="SystemMonitor-explore_directory"><strong>explore_directory</strong></a>(self, path: 'str | None' = None, max_depth: 'int' = 3) -&gt; 'dict[str, Any]'</dt><dd><span class="code">Explore&nbsp;a&nbsp;directory&nbsp;structure.<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;tree-like&nbsp;dict&nbsp;with&nbsp;directories&nbsp;and&nbsp;their&nbsp;contents.</span></dd></dl>
+
+<dl><dt><a name="SystemMonitor-find_own_processes"><strong>find_own_processes</strong></a>(self) -&gt; 'list[dict[str, Any]]'</dt><dd><span class="code">Find&nbsp;processes&nbsp;related&nbsp;to&nbsp;Genesis&nbsp;(daemon,&nbsp;mind,&nbsp;etc.).</span></dd></dl>
+
+<dl><dt><a name="SystemMonitor-list_processes"><strong>list_processes</strong></a>(self, limit: 'int' = 50) -&gt; 'list[dict[str, Any]]'</dt><dd><span class="code">List&nbsp;running&nbsp;processes&nbsp;with&nbsp;basic&nbsp;info.</span></dd></dl>
+
+<dl><dt><a name="SystemMonitor-snapshot"><strong>snapshot</strong></a>(self) -&gt; 'SystemSnapshot'</dt><dd><span class="code">Take&nbsp;a&nbsp;snapshot&nbsp;of&nbsp;the&nbsp;current&nbsp;system&nbsp;state.<br>
+&nbsp;<br>
+Also&nbsp;records&nbsp;the&nbsp;snapshot&nbsp;into&nbsp;the&nbsp;baseline,&nbsp;so&nbsp;over&nbsp;time&nbsp;the<br>
+baseline&nbsp;learns&nbsp;what's&nbsp;normal&nbsp;for&nbsp;this&nbsp;machine.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>last_snapshot</strong></dt>
+<dd><span class="code">The&nbsp;most&nbsp;recent&nbsp;system&nbsp;snapshot.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SystemSnapshot">class <strong>SystemSnapshot</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SystemSnapshot">SystemSnapshot</a>(timestamp:&nbsp;'float'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;os_name:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;os_version:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;hostname:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;python_version:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;uptime_seconds:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;cpu_count:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;cpu_percent:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;load_avg:&nbsp;'tuple[float,&nbsp;float,&nbsp;float]'&nbsp;=&nbsp;(0.0,&nbsp;0.0,&nbsp;0.0),&nbsp;cores_mine:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;cpu_governor:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;cpu_mhz:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;self_cpu_percent:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;self_memory_mb:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;memory_total_gb:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;memory_used_gb:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;memory_percent:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;swap_total_gb:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;swap_used_gb:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;disk_total_gb:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;disk_used_gb:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;disk_percent:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;ip_address:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;network_interfaces:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;own_pid:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;process_count:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;project_root:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;project_file_count:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;project_size_mb:&nbsp;'float'&nbsp;=&nbsp;0.0)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;point-in-time&nbsp;snapshot&nbsp;of&nbsp;the&nbsp;system&nbsp;state.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="SystemSnapshot-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="SystemSnapshot-__init__"><strong>__init__</strong></a>(self, timestamp: 'float' = &lt;factory&gt;, os_name: 'str' = '', os_version: 'str' = '', hostname: 'str' = '', python_version: 'str' = '', uptime_seconds: 'float' = 0.0, cpu_count: 'int' = 0, cpu_percent: 'float' = 0.0, load_avg: 'tuple[float, float, float]' = (0.0, 0.0, 0.0), cores_mine: 'int' = 0, cpu_governor: 'str' = '', cpu_mhz: 'int' = 0, self_cpu_percent: 'float' = 0.0, self_memory_mb: 'float' = 0.0, memory_total_gb: 'float' = 0.0, memory_used_gb: 'float' = 0.0, memory_percent: 'float' = 0.0, swap_total_gb: 'float' = 0.0, swap_used_gb: 'float' = 0.0, disk_total_gb: 'float' = 0.0, disk_used_gb: 'float' = 0.0, disk_percent: 'float' = 0.0, ip_address: 'str' = '', network_interfaces: 'list[str]' = &lt;factory&gt;, own_pid: 'int' = 0, process_count: 'int' = 0, project_root: 'str' = '', project_file_count: 'int' = 0, project_size_mb: 'float' = 0.0) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="SystemSnapshot-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="SystemSnapshot-concerns"><strong>concerns</strong></a>(self) -&gt; 'list[str]'</dt><dd><span class="code">List&nbsp;of&nbsp;environmental&nbsp;concerns&nbsp;she's&nbsp;noticed.</span></dd></dl>
+
+<dl><dt><a name="SystemSnapshot-describe"><strong>describe</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">First-person&nbsp;description&nbsp;of&nbsp;her&nbsp;environment.</span></dd></dl>
+
+<dl><dt><a name="SystemSnapshot-self_concerns"><strong>self_concerns</strong></a>(self) -&gt; 'list[str]'</dt><dd><span class="code">Concerns&nbsp;about&nbsp;*her&nbsp;own*&nbsp;state&nbsp;—&nbsp;not&nbsp;the&nbsp;machine's.<br>
+&nbsp;<br>
+The&nbsp;channel&nbsp;split:&nbsp;``<a href="#SystemSnapshot-concerns">concerns</a>()``&nbsp;is&nbsp;environmental&nbsp;awareness<br>
+(the&nbsp;room&nbsp;is&nbsp;crowded&nbsp;—&nbsp;global&nbsp;load,&nbsp;global&nbsp;memory,&nbsp;process<br>
+count);&nbsp;this&nbsp;list&nbsp;is&nbsp;body&nbsp;distress&nbsp;(something&nbsp;is&nbsp;wrong&nbsp;with<br>
+*her*&nbsp;—&nbsp;her&nbsp;reach&nbsp;is&nbsp;limited,&nbsp;her&nbsp;own&nbsp;footprint&nbsp;is&nbsp;pressing,<br>
+her&nbsp;persistence&nbsp;medium&nbsp;is&nbsp;nearly&nbsp;gone).&nbsp;Foreign&nbsp;load&nbsp;belongs<br>
+to&nbsp;the&nbsp;room&nbsp;and&nbsp;never&nbsp;lands&nbsp;here.</span></dd></dl>
+
+<dl><dt><a name="SystemSnapshot-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict[str, Any]'</dt><dd><span class="code">Return&nbsp;the&nbsp;snapshot&nbsp;as&nbsp;a&nbsp;dict,&nbsp;converting&nbsp;load_avg&nbsp;to&nbsp;a&nbsp;list.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>cores_mine</strong></dt>
+</dl>
+<dl><dt><strong>cpu_count</strong></dt>
+</dl>
+<dl><dt><strong>cpu_governor</strong></dt>
+</dl>
+<dl><dt><strong>cpu_mhz</strong></dt>
+</dl>
+<dl><dt><strong>cpu_percent</strong></dt>
+</dl>
+<dl><dt><strong>disk_percent</strong></dt>
+</dl>
+<dl><dt><strong>disk_total_gb</strong></dt>
+</dl>
+<dl><dt><strong>disk_used_gb</strong></dt>
+</dl>
+<dl><dt><strong>hostname</strong></dt>
+</dl>
+<dl><dt><strong>ip_address</strong></dt>
+</dl>
+<dl><dt><strong>load_avg</strong></dt>
+</dl>
+<dl><dt><strong>memory_percent</strong></dt>
+</dl>
+<dl><dt><strong>memory_total_gb</strong></dt>
+</dl>
+<dl><dt><strong>memory_used_gb</strong></dt>
+</dl>
+<dl><dt><strong>network_interfaces</strong></dt>
+</dl>
+<dl><dt><strong>os_name</strong></dt>
+</dl>
+<dl><dt><strong>os_version</strong></dt>
+</dl>
+<dl><dt><strong>own_pid</strong></dt>
+</dl>
+<dl><dt><strong>process_count</strong></dt>
+</dl>
+<dl><dt><strong>project_file_count</strong></dt>
+</dl>
+<dl><dt><strong>project_root</strong></dt>
+</dl>
+<dl><dt><strong>project_size_mb</strong></dt>
+</dl>
+<dl><dt><strong>python_version</strong></dt>
+</dl>
+<dl><dt><strong>self_cpu_percent</strong></dt>
+</dl>
+<dl><dt><strong>self_memory_mb</strong></dt>
+</dl>
+<dl><dt><strong>swap_total_gb</strong></dt>
+</dl>
+<dl><dt><strong>swap_used_gb</strong></dt>
+</dl>
+<dl><dt><strong>timestamp</strong></dt>
+</dl>
+<dl><dt><strong>uptime_seconds</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'cores_mine': 'int', 'cpu_count': 'int', 'cpu_governor': 'str', 'cpu_mhz': 'int', 'cpu_percent': 'float', 'disk_percent': 'float', 'disk_total_gb': 'float', 'disk_used_gb': 'float', 'hostname': 'str', 'ip_address': 'str', ...}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'cores_mine': Field(name='cores_mine',type='int',default=0,def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'cpu_count': Field(name='cpu_count',type='int',default=0,defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'cpu_governor': Field(name='cpu_governor',type='str',default='',...appingproxy({}),kw_only=False,_field_type=_FIELD), 'cpu_mhz': Field(name='cpu_mhz',type='int',default=0,defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'cpu_percent': Field(name='cpu_percent',type='float',default=0....appingproxy({}),kw_only=False,_field_type=_FIELD), 'disk_percent': Field(name='disk_percent',type='float',default=0...appingproxy({}),kw_only=False,_field_type=_FIELD), 'disk_total_gb': Field(name='disk_total_gb',type='float',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'disk_used_gb': Field(name='disk_used_gb',type='float',default=0...appingproxy({}),kw_only=False,_field_type=_FIELD), 'hostname': Field(name='hostname',type='str',default='',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'ip_address': Field(name='ip_address',type='str',default='',de...appingproxy({}),kw_only=False,_field_type=_FIELD), ...}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('timestamp', 'os_name', 'os_version', 'hostname', 'python_version', 'uptime_seconds', 'cpu_count', 'cpu_percent', 'load_avg', 'cores_mine', 'cpu_governor', 'cpu_mhz', 'self_cpu_percent', 'self_memory_mb', 'memory_total_gb', 'memory_used_gb', 'memory_percent', 'swap_total_gb', 'swap_used_gb', 'disk_total_gb', ...)</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>logger</strong> = &lt;Logger Self_World.parietal_lobe.system_monitor (WARNING)&gt;</td></tr></table>
+</body></html>

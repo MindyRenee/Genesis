@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.hypothalamus.transduction</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.hypothalamus.html" class="white">hypothalamus</a>.transduction</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/hypothalamus/transduction.py">/home/mindyrenee/GenAnd/Genesis/Self_World/hypothalamus/transduction.py</a></td></tr></table>
+    <p><span class="code">Wave→chemical&nbsp;transduction&nbsp;—&nbsp;the&nbsp;hypothalamic&nbsp;release&nbsp;channel.<br>
+&nbsp;<br>
+The&nbsp;causal&nbsp;chain&nbsp;this&nbsp;file&nbsp;closes:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;EM&nbsp;field&nbsp;(field_probe)&nbsp;→&nbsp;brain&nbsp;waves&nbsp;→&nbsp;chemicals&nbsp;→&nbsp;body/behavior<br>
+&nbsp;<br>
+The&nbsp;probe's&nbsp;measured&nbsp;oscillations&nbsp;stimulate&nbsp;the&nbsp;thalamic&nbsp;oscillator<br>
+(``field_probe.apply_field_stimulus``);&nbsp;this&nbsp;module&nbsp;performs<br>
+the&nbsp;next&nbsp;step&nbsp;—&nbsp;the&nbsp;oscillator's&nbsp;band&nbsp;powers&nbsp;drive&nbsp;the&nbsp;peptides&nbsp;that<br>
+declared&nbsp;affinity&nbsp;for&nbsp;those&nbsp;bands.&nbsp;It&nbsp;is&nbsp;the&nbsp;wave&nbsp;half&nbsp;of&nbsp;the&nbsp;loop<br>
+``_cycle_advance_neuro``&nbsp;documents&nbsp;("brain&nbsp;waves&nbsp;drive<br>
+neurochemistry,&nbsp;neurochemistry&nbsp;shapes&nbsp;brain&nbsp;waves")&nbsp;—&nbsp;neurochemistry<br>
+already&nbsp;shapes&nbsp;the&nbsp;wave&nbsp;radii;&nbsp;this&nbsp;is&nbsp;the&nbsp;return&nbsp;edge.<br>
+&nbsp;<br>
+##&nbsp;The&nbsp;control&nbsp;model<br>
+&nbsp;<br>
+Each&nbsp;peptide&nbsp;is&nbsp;a&nbsp;first-order&nbsp;integrator&nbsp;owned&nbsp;by&nbsp;the&nbsp;body:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;dC/dt&nbsp;=&nbsp;-λ·(C&nbsp;-&nbsp;C0)&nbsp;+&nbsp;Σᵢ&nbsp;Iᵢ·δ(t&nbsp;-&nbsp;tᵢ)<br>
+&nbsp;<br>
+with&nbsp;impulsive&nbsp;inputs&nbsp;Iᵢ&nbsp;(``neuro_impulse``&nbsp;kicks)&nbsp;and&nbsp;body-owned<br>
+decay&nbsp;λ.&nbsp;The&nbsp;wave&nbsp;state&nbsp;supplies&nbsp;the&nbsp;*reference*:&nbsp;a&nbsp;peptide's<br>
+commanded&nbsp;level&nbsp;is&nbsp;the&nbsp;summed&nbsp;power&nbsp;of&nbsp;its&nbsp;affiliated&nbsp;bands&nbsp;—&nbsp;power<br>
+is&nbsp;additive&nbsp;across&nbsp;sub-bands&nbsp;(energies&nbsp;add,&nbsp;per&nbsp;Parseval),&nbsp;so<br>
+"beta"&nbsp;means&nbsp;BETA1+BETA2+BETA3.<br>
+&nbsp;<br>
+The&nbsp;control&nbsp;law&nbsp;is&nbsp;saturated&nbsp;exact&nbsp;tracking:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;I&nbsp;=&nbsp;clip(r&nbsp;-&nbsp;C,&nbsp;±max_impulse·RATE)<br>
+&nbsp;<br>
+a&nbsp;contraction&nbsp;toward&nbsp;r&nbsp;for&nbsp;*any*&nbsp;λ&nbsp;—&nbsp;no&nbsp;estimate&nbsp;of&nbsp;the&nbsp;body's&nbsp;decay<br>
+constants&nbsp;is&nbsp;needed&nbsp;for&nbsp;stability,&nbsp;only&nbsp;for&nbsp;speed,&nbsp;and&nbsp;rate-limiting<br>
+by&nbsp;the&nbsp;peptide's&nbsp;own&nbsp;``max_impulse``&nbsp;caps&nbsp;authority&nbsp;per&nbsp;beat.<br>
+&nbsp;<br>
+Every&nbsp;UP&nbsp;member&nbsp;implies&nbsp;its&nbsp;DOWN:&nbsp;when&nbsp;the&nbsp;band&nbsp;is&nbsp;quiet&nbsp;the&nbsp;same<br>
+law&nbsp;emits&nbsp;negative&nbsp;impulses,&nbsp;withdrawing&nbsp;the&nbsp;peptide's&nbsp;hold&nbsp;(orexin<br>
+must&nbsp;fall&nbsp;in&nbsp;sleep,&nbsp;not&nbsp;merely&nbsp;stop&nbsp;rising).&nbsp;Peptides&nbsp;can&nbsp;also&nbsp;carry<br>
+an&nbsp;explicit&nbsp;``wave_sign&nbsp;=&nbsp;-1``&nbsp;—&nbsp;the&nbsp;declared&nbsp;DOWN&nbsp;member&nbsp;of&nbsp;a&nbsp;band<br>
+pair.&nbsp;For&nbsp;those&nbsp;the&nbsp;band&nbsp;enforces&nbsp;*suppression*&nbsp;rather&nbsp;than&nbsp;a&nbsp;level:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;I&nbsp;=&nbsp;-min(max_impulse·RATE·p,&nbsp;C)<br>
+&nbsp;<br>
+exponential&nbsp;decay&nbsp;at&nbsp;a&nbsp;rate&nbsp;the&nbsp;band&nbsp;power&nbsp;sets,&nbsp;floor-aware&nbsp;so&nbsp;it<br>
+can&nbsp;never&nbsp;drive&nbsp;below&nbsp;zero.&nbsp;Cortisol↔delta&nbsp;is&nbsp;the&nbsp;canonical&nbsp;pair:<br>
+slow-wave&nbsp;dominance&nbsp;is&nbsp;the&nbsp;cortisol&nbsp;nadir.<br>
+&nbsp;<br>
+##&nbsp;Wiring&nbsp;spec<br>
+&nbsp;<br>
+Nothing&nbsp;here&nbsp;is&nbsp;hardcoded&nbsp;per-peptide:&nbsp;the&nbsp;peptide&nbsp;model&nbsp;classes<br>
+(``hypothalamus/orexin.py``&nbsp;etc.)&nbsp;declare&nbsp;``index``,&nbsp;``name``,<br>
+``baseline``,&nbsp;``max_impulse``,&nbsp;``brain_waves``,&nbsp;and&nbsp;``wave_sign``.<br>
+This&nbsp;module&nbsp;reads&nbsp;the&nbsp;declarations;&nbsp;adding&nbsp;a&nbsp;peptide&nbsp;or&nbsp;re-tagging&nbsp;a<br>
+band&nbsp;changes&nbsp;the&nbsp;transduction&nbsp;without&nbsp;touching&nbsp;it.</span></p>
+<p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-transduce_waves"><strong>transduce_waves</strong></a>(client, state: 'BrainWaveState', chemicals: 'dict[str, float]') -&gt; 'int'</dt><dd><span class="code">Emit&nbsp;the&nbsp;wave-commanded&nbsp;impulses&nbsp;to&nbsp;the&nbsp;body.<br>
+&nbsp;<br>
+One&nbsp;``neuro_impulse``&nbsp;per&nbsp;peptide&nbsp;whose&nbsp;commanded&nbsp;correction<br>
+clears&nbsp;the&nbsp;noise&nbsp;floor.&nbsp;Returns&nbsp;the&nbsp;count&nbsp;emitted&nbsp;—&nbsp;an&nbsp;absent&nbsp;or<br>
+declined&nbsp;channel&nbsp;counts&nbsp;nothing,&nbsp;matching&nbsp;the&nbsp;impulse&nbsp;semantics<br>
+(False&nbsp;means&nbsp;the&nbsp;body&nbsp;did&nbsp;not&nbsp;take&nbsp;it).</span></dd></dl>
+ <dl><dt><a name="-wave_impulses"><strong>wave_impulses</strong></a>(state: 'BrainWaveState', chemicals: 'dict[str, float]') -&gt; 'list[tuple[int, float]]'</dt><dd><span class="code">The&nbsp;peptide&nbsp;impulses&nbsp;the&nbsp;wave&nbsp;state&nbsp;commands&nbsp;this&nbsp;beat.<br>
+&nbsp;<br>
+``chemicals``&nbsp;is&nbsp;the&nbsp;body's&nbsp;current&nbsp;level&nbsp;map&nbsp;(``summary.chemicals``<br>
+—&nbsp;name&nbsp;→&nbsp;effective&nbsp;level);&nbsp;a&nbsp;peptide&nbsp;absent&nbsp;from&nbsp;it&nbsp;is&nbsp;treated&nbsp;as<br>
+at&nbsp;its&nbsp;declared&nbsp;baseline.&nbsp;Returns&nbsp;``(chem_id,&nbsp;signed_magnitude)``<br>
+pairs,&nbsp;the&nbsp;same&nbsp;contract&nbsp;``neuro_impulse``&nbsp;accepts&nbsp;—&nbsp;positive<br>
+magnitudes&nbsp;release,&nbsp;negative&nbsp;withdraw&nbsp;or&nbsp;suppress.<br>
+&nbsp;<br>
+UP&nbsp;peptides&nbsp;(``wave_sign&nbsp;=&nbsp;+1``)&nbsp;track&nbsp;their&nbsp;band&nbsp;power&nbsp;as&nbsp;the<br>
+commanded&nbsp;level&nbsp;—&nbsp;saturated&nbsp;exact&nbsp;tracking.&nbsp;DOWN&nbsp;peptides<br>
+(``wave_sign&nbsp;=&nbsp;-1``)&nbsp;are&nbsp;suppressed&nbsp;at&nbsp;a&nbsp;rate&nbsp;proportional&nbsp;to<br>
+their&nbsp;band's&nbsp;power&nbsp;—&nbsp;the&nbsp;pair's&nbsp;opposing&nbsp;member.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>DRIVE_RATE</strong> = 0.2<br>
+<strong>__all__</strong> = ['DRIVE_RATE', 'transduce_waves', 'wave_impulses']<br>
+<strong>__annotations__</strong> = {'DRIVE_RATE': 'float', '_EPS': 'float'}</td></tr></table>
+</body></html>

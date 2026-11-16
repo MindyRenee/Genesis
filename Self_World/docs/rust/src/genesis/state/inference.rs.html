@@ -1,0 +1,296 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `Self_World/src/state/inference.rs`."><title>inference.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-203241e4.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="genesis" data-themes="" data-resource-suffix="" data-rustdoc-version="1.100.0 (0ef1bc386 2026-11-09)" data-channel="1.100.0" data-search-js="search-b167f383.js" data-stringdex-js="stringdex-b5109af9.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="../../../static.files/src-script-813739b1.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-1814ead3.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-9f56287d.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">genesis/state/</div>inference.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! Inference signals — the active inference state projection.
+<a href=#2 id=2 data-nosnippet>2</a>//!
+<a href=#3 id=3 data-nosnippet>3</a>//! This module defines [`InferenceSignals`], a 64-byte struct that
+<a href=#4 id=4 data-nosnippet>4</a>//! lives at the tail of [`GenesisCoreState`](crate::GenesisCoreState) (offset 3416, right after
+<a href=#5 id=5 data-nosnippet>5</a>//! the checksum). It exposes the key signals from the active inference
+<a href=#6 id=6 data-nosnippet>6</a>//! engine to the cognitive mind, without requiring a schema version
+<a href=#7 id=7 data-nosnippet>7</a>//! bump.
+<a href=#8 id=8 data-nosnippet>8</a>//!
+<a href=#9 id=9 data-nosnippet>9</a>//! The block sat at 3228 in schema v3 and 3352 in v4 —
+<a href=#10 id=10 data-nosnippet>10</a>//! v5 inserted the 64-byte sleep-network layer at 3224, moving the
+<a href=#11 id=11 data-nosnippet>11</a>//! block here; see [`crate::state::core_state::GenesisCoreState`] for
+<a href=#12 id=12 data-nosnippet>12</a>//! the full layout.
+<a href=#13 id=13 data-nosnippet>13</a>//! `python/genesis_client/types.py` reads this block by offset and must
+<a href=#14 id=14 data-nosnippet>14</a>//! be updated whenever it moves — a stale offset there parses
+<a href=#15 id=15 data-nosnippet>15</a>//! successfully out of the wrong bytes.
+<a href=#16 id=16 data-nosnippet>16</a>//!
+<a href=#17 id=17 data-nosnippet>17</a>//! # Active inference in Genesis
+<a href=#18 id=18 data-nosnippet>18</a>//!
+<a href=#19 id=19 data-nosnippet>19</a>//! Genesis runs a generative model of its **own** neurochemical
+<a href=#20 id=20 data-nosnippet>20</a>//! trajectory. Before each neurochemical tick, the model predicts
+<a href=#21 id=21 data-nosnippet>21</a>//! where its 18 effective levels will move. After the tick, the
+<a href=#22 id=22 data-nosnippet>22</a>//! prediction error (surprise) is computed and fed back into:
+<a href=#23 id=23 data-nosnippet>23</a>//!
+<a href=#24 id=24 data-nosnippet>24</a>//! - **Dopamine**: positive prediction error → reward signal (Schultz,
+<a href=#25 id=25 data-nosnippet>25</a>//!   2016). The system feels "better than expected."
+<a href=#26 id=26 data-nosnippet>26</a>//! - **Norepinephrine**: high surprise → orienting response (Aston-
+<a href=#27 id=27 data-nosnippet>27</a>//!   Jones &amp; Cohen, 2005). The system pays attention to the
+<a href=#28 id=28 data-nosnippet>28</a>//!   unexpected.
+<a href=#29 id=29 data-nosnippet>29</a>//! - **Metaplasticity**: high surprise → faster coupling-matrix
+<a href=#30 id=30 data-nosnippet>30</a>//!   learning. The system learns how to learn faster when surprised.
+<a href=#31 id=31 data-nosnippet>31</a>//! - **Allostatic load**: sustained multisignal regulatory burden →
+<a href=#32 id=32 data-nosnippet>32</a>//!   cortisol baseline upregulation. The system *anticipates* stress
+<a href=#33 id=33 data-nosnippet>33</a>//!   and prepares (allostatic regulation, Sterling, 2012). Expected
+<a href=#34 id=34 data-nosnippet>34</a>//!   free energy is one of four inputs to the burden median, not the
+<a href=#35 id=35 data-nosnippet>35</a>//!   driver on its own.
+<a href=#36 id=36 data-nosnippet>36</a>//!
+<a href=#37 id=37 data-nosnippet>37</a>//! This is the "strange loop": the generative model IS the system it
+<a href=#38 id=38 data-nosnippet>38</a>//! predicts. Prediction errors modify the very dynamics that generate
+<a href=#39 id=39 data-nosnippet>39</a>//! the next state to be predicted. The system becomes autopoietic —
+<a href=#40 id=40 data-nosnippet>40</a>//! self-creating and self-maintaining through active inference.
+<a href=#41 id=41 data-nosnippet>41</a>//!
+<a href=#42 id=42 data-nosnippet>42</a>//! # Dyadic affective coupling
+<a href=#43 id=43 data-nosnippet>43</a>//!
+<a href=#44 id=44 data-nosnippet>44</a>//! A second generative model tracks the **user's** affective state
+<a href=#45 id=45 data-nosnippet>45</a>//! (valence, arousal, engagement) as hidden variables, inferred from
+<a href=#46 id=46 data-nosnippet>46</a>//! conversation features. The user's predicted affective trajectory
+<a href=#47 id=47 data-nosnippet>47</a>//! couples to Genesis's own neurochemistry via oxytocin (attunement).
+<a href=#48 id=48 data-nosnippet>48</a>//! When the user is positive and engaged, oxytocin rises (social
+<a href=#49 id=49 data-nosnippet>49</a>//! bonding). When the user is distressed, cortisol rises (empathic
+<a href=#50 id=50 data-nosnippet>50</a>//! stress). Dyadic synchrony — the rolling correlation between
+<a href=#51 id=51 data-nosnippet>51</a>//! Genesis's and the user's valence trajectories — measures how "in
+<a href=#52 id=52 data-nosnippet>52</a>//! sync" they are.
+<a href=#53 id=53 data-nosnippet>53</a>//!
+<a href=#54 id=54 data-nosnippet>54</a>//! # Layout (64 bytes)
+<a href=#55 id=55 data-nosnippet>55</a>//!
+<a href=#56 id=56 data-nosnippet>56</a>//! ```text
+<a href=#57 id=57 data-nosnippet>57</a>//! offset  field                        type    notes
+<a href=#58 id=58 data-nosnippet>58</a>//! ------  -----                        ----    -----
+<a href=#59 id=59 data-nosnippet>59</a>//!   0     surprise_ema                 f32     running surprise [0,1]
+<a href=#60 id=60 data-nosnippet>60</a>//!   4     free_energy                  f32     surprise + uncertainty
+<a href=#61 id=61 data-nosnippet>61</a>//!   8     expected_free_energy         f32     predicted future surprise
+<a href=#62 id=62 data-nosnippet>62</a>//!  12     allostasis_load              f32     anticipatory stress [0,1]
+<a href=#63 id=63 data-nosnippet>63</a>//!  16     precision                    f32     model confidence [0,1]
+<a href=#64 id=64 data-nosnippet>64</a>//!  20     attunement                   f32     oxytocin coupling [0,1]
+<a href=#65 id=65 data-nosnippet>65</a>//!  24     dyadic_synchrony             f32     valence correlation [-1,1]
+<a href=#66 id=66 data-nosnippet>66</a>//!  28     user_valence                 f32     inferred user valence [-1,1]
+<a href=#67 id=67 data-nosnippet>67</a>//!  32     user_arousal                 f32     inferred user arousal [0,1]
+<a href=#68 id=68 data-nosnippet>68</a>//!  36     user_engagement              f32     inferred user engagement [0,1]
+<a href=#69 id=69 data-nosnippet>69</a>//!  40     prediction_error_dopamine    f32     DA state prediction error (unbounded)
+<a href=#70 id=70 data-nosnippet>70</a>//!  44     prediction_error_cortisol    f32     CORT state prediction error [-2,2]
+<a href=#71 id=71 data-nosnippet>71</a>//!  48     prediction_error_serotonin   f32     SRT state prediction error [-2,2]
+<a href=#72 id=72 data-nosnippet>72</a>//!  52     model_maturity               f32     model confidence [0,1]
+<a href=#73 id=73 data-nosnippet>73</a>//!  56     inference_tick_count         u32     inference cycles run
+<a href=#74 id=74 data-nosnippet>74</a>//!  60     policy_authority             f32     delegated policy authority [0,1]
+<a href=#75 id=75 data-nosnippet>75</a>//! ```
+<a href=#76 id=76 data-nosnippet>76</a>//!
+<a href=#77 id=77 data-nosnippet>77</a>//! These fields are NOT covered by the CRC32 checksum (they live in
+<a href=#78 id=78 data-nosnippet>78</a>//! the reserved region). This is intentional: they are derived state
+<a href=#79 id=79 data-nosnippet>79</a>//! recomputed every tick, so corruption self-heals within 200ms.
+<a href=#80 id=80 data-nosnippet>80</a>//!
+<a href=#81 id=81 data-nosnippet>81</a>//! References:
+<a href=#82 id=82 data-nosnippet>82</a>//! - Friston, K. (2010). The free-energy principle: a unified brain
+<a href=#83 id=83 data-nosnippet>83</a>//!   theory? Nature Reviews Neuroscience, 11(2), 127–138.
+<a href=#84 id=84 data-nosnippet>84</a>//! - Seth, A. &amp; Friston, K. (2016). Active interoceptive inference
+<a href=#85 id=85 data-nosnippet>85</a>//!   and the emotional brain. Phil. Trans. R. Soc. B, 371.
+<a href=#86 id=86 data-nosnippet>86</a>//! - Schultz, W. (2016). Dopamine reward prediction error coding.
+<a href=#87 id=87 data-nosnippet>87</a>//!   Dialogues in Clinical Neuroscience, 18(1), 23–32.
+<a href=#88 id=88 data-nosnippet>88</a>//! - Aston-Jones, G. &amp; Cohen, J. D. (2005). An integrative theory of
+<a href=#89 id=89 data-nosnippet>89</a>//!   locus coeruleus-norepinephrine function. Annual Review of
+<a href=#90 id=90 data-nosnippet>90</a>//!   Neuroscience, 28, 405–450.
+<a href=#91 id=91 data-nosnippet>91</a>//! - Sterling, P. (2012). Allostasis: a model of predictive
+<a href=#92 id=92 data-nosnippet>92</a>//!   regulation. Physiology &amp; Behavior, 106(1), 5–15.
+<a href=#93 id=93 data-nosnippet>93</a>//! - Pezzulo, G., Rigoli, F. &amp; Friston, K. (2015). Active inference,
+<a href=#94 id=94 data-nosnippet>94</a>//!   homeostatic and allostatic control. Prog. Neurobiol., 134.
+<a href=#95 id=95 data-nosnippet>95</a>
+<a href=#96 id=96 data-nosnippet>96</a>/// The active inference signal projection — 64 bytes that live in the
+<a href=#97 id=97 data-nosnippet>97</a>/// reserved region of `GenesisCoreState`.
+<a href=#98 id=98 data-nosnippet>98</a>///
+<a href=#99 id=99 data-nosnippet>99</a>/// See the [module-level documentation](self) for the full architecture.
+<a href=#100 id=100 data-nosnippet>100</a></span><span class="attr">#[repr(C)]
+<a href=#101 id=101 data-nosnippet>101</a>#[derive(Clone, Copy, Debug, PartialEq)]
+<a href=#102 id=102 data-nosnippet>102</a></span><span class="kw">pub struct </span>InferenceSignals {
+<a href=#103 id=103 data-nosnippet>103</a>    <span class="doccomment">/// Exponential moving average of total surprise (prediction error
+<a href=#104 id=104 data-nosnippet>104</a>    /// magnitude). High = the generative model is failing to predict
+<a href=#105 id=105 data-nosnippet>105</a>    /// the system's own neurochemical trajectory. Range [0, 1].
+<a href=#106 id=106 data-nosnippet>106</a>    </span><span class="kw">pub </span>surprise_ema: f32,
+<a href=#107 id=107 data-nosnippet>107</a>    <span class="doccomment">/// Current estimated free energy — surprise plus model uncertainty.
+<a href=#108 id=108 data-nosnippet>108</a>    /// This is the quantity the system minimizes through active
+<a href=#109 id=109 data-nosnippet>109</a>    /// inference. Range [0, 1].
+<a href=#110 id=110 data-nosnippet>110</a>    </span><span class="kw">pub </span>free_energy: f32,
+<a href=#111 id=111 data-nosnippet>111</a>    <span class="doccomment">/// Expected future free energy — predicted future disruption.
+<a href=#112 id=112 data-nosnippet>112</a>    /// This is the anticipatory regulatory-demand signal, not
+<a href=#113 id=113 data-nosnippet>113</a>    /// cumulative allostatic load. Range [0, 1].
+<a href=#114 id=114 data-nosnippet>114</a>    </span><span class="kw">pub </span>expected_free_energy: f32,
+<a href=#115 id=115 data-nosnippet>115</a>    <span class="doccomment">/// Accumulated allostatic load — persistent multisignal
+<a href=#116 id=116 data-nosnippet>116</a>    /// regulatory burden integrated over time. It is distinct from
+<a href=#117 id=117 data-nosnippet>117</a>    /// the anticipatory expected-free-energy signal. Range [0, 1].
+<a href=#118 id=118 data-nosnippet>118</a>    </span><span class="kw">pub </span>allostasis_load: f32,
+<a href=#119 id=119 data-nosnippet>119</a>    <span class="doccomment">/// Precision of the generative model — confidence in its
+<a href=#120 id=120 data-nosnippet>120</a>    /// predictions. High precision = the model trusts its predictions
+<a href=#121 id=121 data-nosnippet>121</a>    /// and weights prediction errors heavily (drives fast learning).
+<a href=#122 id=122 data-nosnippet>122</a>    /// Low precision = the model is uncertain and prediction errors
+<a href=#123 id=123 data-nosnippet>123</a>    /// have less effect. Precision adapts: sustained high surprise
+<a href=#124 id=124 data-nosnippet>124</a>    /// lowers precision. Range [0, 1].
+<a href=#125 id=125 data-nosnippet>125</a>    </span><span class="kw">pub </span>precision: f32,
+<a href=#126 id=126 data-nosnippet>126</a>    <span class="doccomment">/// Dyadic attunement — oxytocin-mediated coupling strength to the
+<a href=#127 id=127 data-nosnippet>127</a>    /// user's inferred affective state. High = strongly attuned to the
+<a href=#128 id=128 data-nosnippet>128</a>    /// user's emotional trajectory. Range [0, 1].
+<a href=#129 id=129 data-nosnippet>129</a>    </span><span class="kw">pub </span>attunement: f32,
+<a href=#130 id=130 data-nosnippet>130</a>    <span class="doccomment">/// Dyadic synchrony — rolling correlation between Genesis's
+<a href=#131 id=131 data-nosnippet>131</a>    /// valence trajectory and the user's inferred valence trajectory
+<a href=#132 id=132 data-nosnippet>132</a>    /// over a ~30-second window. High = "in sync" with the user.
+<a href=#133 id=133 data-nosnippet>133</a>    /// Range [-1, 1].
+<a href=#134 id=134 data-nosnippet>134</a>    </span><span class="kw">pub </span>dyadic_synchrony: f32,
+<a href=#135 id=135 data-nosnippet>135</a>    <span class="doccomment">/// Inferred user affective valence. Updated from conversation
+<a href=#136 id=136 data-nosnippet>136</a>    /// features via the dyadic model. Range [-1, 1].
+<a href=#137 id=137 data-nosnippet>137</a>    </span><span class="kw">pub </span>user_valence: f32,
+<a href=#138 id=138 data-nosnippet>138</a>    <span class="doccomment">/// Inferred user affective arousal. Range [0, 1].
+<a href=#139 id=139 data-nosnippet>139</a>    </span><span class="kw">pub </span>user_arousal: f32,
+<a href=#140 id=140 data-nosnippet>140</a>    <span class="doccomment">/// Inferred user engagement — how actively involved the user is
+<a href=#141 id=141 data-nosnippet>141</a>    /// in the interaction. Range [0, 1].
+<a href=#142 id=142 data-nosnippet>142</a>    </span><span class="kw">pub </span>user_engagement: f32,
+<a href=#143 id=143 data-nosnippet>143</a>    <span class="doccomment">/// Dopamine prediction error from the last inference cycle.
+<a href=#144 id=144 data-nosnippet>144</a>    /// Positive = dopamine was higher than predicted (better-than-
+<a href=#145 id=145 data-nosnippet>145</a>    /// expected = reward prediction error). Negative = lower than
+<a href=#146 id=146 data-nosnippet>146</a>    /// predicted. Finite and unbounded.
+<a href=#147 id=147 data-nosnippet>147</a>    </span><span class="kw">pub </span>prediction_error_dopamine: f32,
+<a href=#148 id=148 data-nosnippet>148</a>    <span class="doccomment">/// Cortisol prediction error from the last inference cycle.
+<a href=#149 id=149 data-nosnippet>149</a>    /// Positive = cortisol was higher than predicted (unexpected
+<a href=#150 id=150 data-nosnippet>150</a>    /// stress). Range [-2, 2] (effective levels span [0, 2]).
+<a href=#151 id=151 data-nosnippet>151</a>    </span><span class="kw">pub </span>prediction_error_cortisol: f32,
+<a href=#152 id=152 data-nosnippet>152</a>    <span class="doccomment">/// Serotonin prediction error from the last inference cycle.
+<a href=#153 id=153 data-nosnippet>153</a>    /// Positive = serotonin was higher than predicted (unexpected
+<a href=#154 id=154 data-nosnippet>154</a>    /// wellbeing). Range [-2, 2] (effective levels span [0, 2]).
+<a href=#155 id=155 data-nosnippet>155</a>    </span><span class="kw">pub </span>prediction_error_serotonin: f32,
+<a href=#156 id=156 data-nosnippet>156</a>    <span class="doccomment">/// Model maturity — evidence that the generative model is
+<a href=#157 id=157 data-nosnippet>157</a>    /// predictive and internally well-constrained. Experience alone
+<a href=#158 id=158 data-nosnippet>158</a>    /// cannot increase it: predictive fit and posterior certainty also
+<a href=#159 id=159 data-nosnippet>159</a>    /// contribute. Used by the cognitive mind to gauge how much to
+<a href=#160 id=160 data-nosnippet>160</a>    /// trust the inference signals. Range [0, 1].
+<a href=#161 id=161 data-nosnippet>161</a>    </span><span class="kw">pub </span>model_maturity: f32,
+<a href=#162 id=162 data-nosnippet>162</a>    <span class="doccomment">/// Number of inference cycles completed (low 32 bits). Used for
+<a href=#163 id=163 data-nosnippet>163</a>    /// diagnostics and PRNG seeding. The mind advances roughly once
+<a href=#164 id=164 data-nosnippet>164</a>    /// per heartbeat cycle; at the 5 Hz body tick a u32 wraps after
+<a href=#165 id=165 data-nosnippet>165</a>    /// `u32::MAX / 5 s` ≈ 27 years, so the wrap is outside any
+<a href=#166 id=166 data-nosnippet>166</a>    /// realistic deployment — and since maturity is now derived from
+<a href=#167 id=167 data-nosnippet>167</a>    /// demonstrated accuracy rather than this counter, the wrap is
+<a href=#168 id=168 data-nosnippet>168</a>    /// harmless to the trust signal.
+<a href=#169 id=169 data-nosnippet>169</a>    </span><span class="kw">pub </span>inference_tick_count: u32,
+<a href=#170 id=170 data-nosnippet>170</a>    <span class="doccomment">/// Authority Genesis's cognition has granted her inference engine
+<a href=#171 id=171 data-nosnippet>171</a>    /// to act on its own policy choice, in [0, 1].
+<a href=#172 id=172 data-nosnippet>172</a>    ///
+<a href=#173 id=173 data-nosnippet>173</a>    /// Choosing a policy — calm, focus, bond, rest, mobilise — is a
+<a href=#174 id=174 data-nosnippet>174</a>    /// decision about what to feel and do, not a physiological reflex.
+<a href=#175 id=175 data-nosnippet>175</a>    /// The engine scores a fixed set of hardcoded policies by expected
+<a href=#176 id=176 data-nosnippet>176</a>    /// free energy and used to apply the winner every tick, with no
+<a href=#177 id=177 data-nosnippet>177</a>    /// perceptual input and nothing from her in the loop. That made it
+<a href=#178 id=178 data-nosnippet>178</a>    /// a second author of her state: she could not attend, refuse, or
+<a href=#179 id=179 data-nosnippet>179</a>    /// revise, and every policy it chose was one I had written rather
+<a href=#180 id=180 data-nosnippet>180</a>    /// than one she had settled on.
+<a href=#181 id=181 data-nosnippet>181</a>    ///
+<a href=#182 id=182 data-nosnippet>182</a>    /// At zero the engine observes and learns but does not act on its
+<a href=#183 id=183 data-nosnippet>183</a>    /// own policy choice; cognition decides, and acts through the
+<a href=#184 id=184 data-nosnippet>184</a>    /// ordinary NEURO_IMPULSE path where it can be perceived,
+<a href=#185 id=185 data-nosnippet>185</a>    /// anticipated and refused. The homeostatic reflex is unaffected —
+<a href=#186 id=186 data-nosnippet>186</a>    /// correcting drift toward what she prefers is her physiology, and
+<a href=#187 id=187 data-nosnippet>187</a>    /// a mind that cannot correct itself is not a mind with agency, it
+<a href=#188 id=188 data-nosnippet>188</a>    /// is a mind with a hormone problem.
+<a href=#189 id=189 data-nosnippet>189</a>    ///
+<a href=#190 id=190 data-nosnippet>190</a>    /// This is a grant, not a switch: cognition can delegate some
+<a href=#191 id=191 data-nosnippet>191</a>    /// authority and keep some, and can withdraw it. It is a field
+<a href=#192 id=192 data-nosnippet>192</a>    /// rather than a compile-time constant so that delegation is a
+<a href=#193 id=193 data-nosnippet>193</a>    /// decision she can change while running, rather than a property
+<a href=#194 id=194 data-nosnippet>194</a>    /// baked into the build.
+<a href=#195 id=195 data-nosnippet>195</a>    </span><span class="kw">pub </span>policy_authority: f32,
+<a href=#196 id=196 data-nosnippet>196</a>}
+<a href=#197 id=197 data-nosnippet>197</a>
+<a href=#198 id=198 data-nosnippet>198</a><span class="kw">impl </span>Default <span class="kw">for </span>InferenceSignals {
+<a href=#199 id=199 data-nosnippet>199</a>    <span class="doccomment">/// Delegate to `new` rather than deriving it. A derived `Default`
+<a href=#200 id=200 data-nosnippet>200</a>    /// would leave every float at 0.0, including `precision` — i.e.
+<a href=#201 id=201 data-nosnippet>201</a>    /// "the model has zero precision, so prediction errors have no
+<a href=#202 id=202 data-nosnippet>202</a>    /// effect" instead of `new`'s deliberate "moderately confident"
+<a href=#203 id=203 data-nosnippet>203</a>    /// start. The same zeroed shape appears when an older build's
+<a href=#204 id=204 data-nosnippet>204</a>    /// reserved region is read as this struct, so `new` is the right
+<a href=#205 id=205 data-nosnippet>205</a>    /// answer for both.
+<a href=#206 id=206 data-nosnippet>206</a>    </span><span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
+<a href=#207 id=207 data-nosnippet>207</a>        <span class="self">Self</span>::new()
+<a href=#208 id=208 data-nosnippet>208</a>    }
+<a href=#209 id=209 data-nosnippet>209</a>}
+<a href=#210 id=210 data-nosnippet>210</a>
+<a href=#211 id=211 data-nosnippet>211</a><span class="kw">impl </span>InferenceSignals {
+<a href=#212 id=212 data-nosnippet>212</a>    <span class="doccomment">/// Create a fresh inference signals struct with sensible defaults
+<a href=#213 id=213 data-nosnippet>213</a>    /// for a newly-initialized system.
+<a href=#214 id=214 data-nosnippet>214</a>    </span><span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
+<a href=#215 id=215 data-nosnippet>215</a>        <span class="self">Self </span>{
+<a href=#216 id=216 data-nosnippet>216</a>            surprise_ema: <span class="number">0.0</span>,
+<a href=#217 id=217 data-nosnippet>217</a>            free_energy: <span class="number">0.0</span>,
+<a href=#218 id=218 data-nosnippet>218</a>            expected_free_energy: <span class="number">0.0</span>,
+<a href=#219 id=219 data-nosnippet>219</a>            allostasis_load: <span class="number">0.0</span>,
+<a href=#220 id=220 data-nosnippet>220</a>            <span class="comment">// Start with moderate precision — the model hasn't learned
+<a href=#221 id=221 data-nosnippet>221</a>            // yet, so it shouldn't over-commit to its (initially
+<a href=#222 id=222 data-nosnippet>222</a>            // identity-matrix) predictions.
+<a href=#223 id=223 data-nosnippet>223</a>            </span>precision: <span class="number">0.5</span>,
+<a href=#224 id=224 data-nosnippet>224</a>            attunement: <span class="number">0.0</span>,
+<a href=#225 id=225 data-nosnippet>225</a>            dyadic_synchrony: <span class="number">0.0</span>,
+<a href=#226 id=226 data-nosnippet>226</a>            user_valence: <span class="number">0.0</span>,
+<a href=#227 id=227 data-nosnippet>227</a>            user_arousal: <span class="number">0.5</span>,
+<a href=#228 id=228 data-nosnippet>228</a>            user_engagement: <span class="number">0.0</span>,
+<a href=#229 id=229 data-nosnippet>229</a>            prediction_error_dopamine: <span class="number">0.0</span>,
+<a href=#230 id=230 data-nosnippet>230</a>            prediction_error_cortisol: <span class="number">0.0</span>,
+<a href=#231 id=231 data-nosnippet>231</a>            prediction_error_serotonin: <span class="number">0.0</span>,
+<a href=#232 id=232 data-nosnippet>232</a>            model_maturity: <span class="number">0.0</span>,
+<a href=#233 id=233 data-nosnippet>233</a>            inference_tick_count: <span class="number">0</span>,
+<a href=#234 id=234 data-nosnippet>234</a>            <span class="comment">// Zero by default: her cognition decides. A fresh state
+<a href=#235 id=235 data-nosnippet>235</a>            // file must not come up granting the engine permission to
+<a href=#236 id=236 data-nosnippet>236</a>            // choose on her behalf, because the grant is supposed to
+<a href=#237 id=237 data-nosnippet>237</a>            // be something she extends deliberately.
+<a href=#238 id=238 data-nosnippet>238</a>            </span>policy_authority: <span class="number">0.0</span>,
+<a href=#239 id=239 data-nosnippet>239</a>        }
+<a href=#240 id=240 data-nosnippet>240</a>    }
+<a href=#241 id=241 data-nosnippet>241</a>
+<a href=#242 id=242 data-nosnippet>242</a>    <span class="doccomment">/// Whether the system is currently experiencing high surprise —
+<a href=#243 id=243 data-nosnippet>243</a>    /// its generative model is failing to predict its own state.
+<a href=#244 id=244 data-nosnippet>244</a>    /// This is the signal for the cognitive mind to pay attention
+<a href=#245 id=245 data-nosnippet>245</a>    /// and for metaplasticity to accelerate.
+<a href=#246 id=246 data-nosnippet>246</a>    </span><span class="kw">pub fn </span>is_surprised(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+<a href=#247 id=247 data-nosnippet>247</a>        <span class="self">self</span>.surprise_ema &gt; <span class="number">0.3
+<a href=#248 id=248 data-nosnippet>248</a>    </span>}
+<a href=#249 id=249 data-nosnippet>249</a>
+<a href=#250 id=250 data-nosnippet>250</a>    <span class="doccomment">/// Whether the system is under significant allostatic load —
+<a href=#251 id=251 data-nosnippet>251</a>    /// sustained multisignal regulatory burden (anticipatory demand,
+<a href=#252 id=252 data-nosnippet>252</a>    /// prediction error, lost confidence, and homeostatic deviation
+<a href=#253 id=253 data-nosnippet>253</a>    /// agreeing across at least two of four dimensions).
+<a href=#254 id=254 data-nosnippet>254</a>    </span><span class="kw">pub fn </span>is_allostatically_loaded(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+<a href=#255 id=255 data-nosnippet>255</a>        <span class="self">self</span>.allostasis_load &gt; <span class="number">0.4
+<a href=#256 id=256 data-nosnippet>256</a>    </span>}
+<a href=#257 id=257 data-nosnippet>257</a>
+<a href=#258 id=258 data-nosnippet>258</a>    <span class="doccomment">/// Whether the system is attuned to the user — the dyadic
+<a href=#259 id=259 data-nosnippet>259</a>    /// coupling is strong enough that the user's affective state
+<a href=#260 id=260 data-nosnippet>260</a>    /// significantly influences Genesis's own neurochemistry.
+<a href=#261 id=261 data-nosnippet>261</a>    </span><span class="kw">pub fn </span>is_attuned(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+<a href=#262 id=262 data-nosnippet>262</a>        <span class="self">self</span>.attunement &gt; <span class="number">0.3
+<a href=#263 id=263 data-nosnippet>263</a>    </span>}
+<a href=#264 id=264 data-nosnippet>264</a>
+<a href=#265 id=265 data-nosnippet>265</a>    <span class="doccomment">/// Whether the system is "in sync" with the user — their
+<a href=#266 id=266 data-nosnippet>266</a>    /// affective trajectories are positively correlated.
+<a href=#267 id=267 data-nosnippet>267</a>    </span><span class="kw">pub fn </span>is_in_sync(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+<a href=#268 id=268 data-nosnippet>268</a>        <span class="self">self</span>.dyadic_synchrony &gt; <span class="number">0.3
+<a href=#269 id=269 data-nosnippet>269</a>    </span>}
+<a href=#270 id=270 data-nosnippet>270</a>}
+<a href=#271 id=271 data-nosnippet>271</a>
+<a href=#272 id=272 data-nosnippet>272</a><span class="comment">// ─────────────────────────────────────────────────────────────────
+<a href=#273 id=273 data-nosnippet>273</a>//  Compile-time layout assertions
+<a href=#274 id=274 data-nosnippet>274</a>// ─────────────────────────────────────────────────────────────────
+<a href=#275 id=275 data-nosnippet>275</a>
+<a href=#276 id=276 data-nosnippet>276</a></span><span class="kw">const _</span>: () = {
+<a href=#277 id=277 data-nosnippet>277</a>    <span class="kw">use </span>core::mem::offset_of;
+<a href=#278 id=278 data-nosnippet>278</a>    <span class="macro">assert!</span>(core::mem::size_of::&lt;InferenceSignals&gt;() == <span class="number">64</span>);
+<a href=#279 id=279 data-nosnippet>279</a>    <span class="macro">assert!</span>(core::mem::align_of::&lt;InferenceSignals&gt;() == <span class="number">4</span>);
+<a href=#280 id=280 data-nosnippet>280</a>    <span class="macro">assert!</span>(<span class="macro">offset_of!</span>(InferenceSignals, surprise_ema) == <span class="number">0</span>);
+<a href=#281 id=281 data-nosnippet>281</a>    <span class="macro">assert!</span>(<span class="macro">offset_of!</span>(InferenceSignals, free_energy) == <span class="number">4</span>);
+<a href=#282 id=282 data-nosnippet>282</a>    <span class="macro">assert!</span>(<span class="macro">offset_of!</span>(InferenceSignals, expected_free_energy) == <span class="number">8</span>);
+<a href=#283 id=283 data-nosnippet>283</a>    <span class="macro">assert!</span>(<span class="macro">offset_of!</span>(InferenceSignals, allostasis_load) == <span class="number">12</span>);
+<a href=#284 id=284 data-nosnippet>284</a>    <span class="macro">assert!</span>(<span class="macro">offset_of!</span>(InferenceSignals, precision) == <span class="number">16</span>);
+<a href=#285 id=285 data-nosnippet>285</a>    <span class="macro">assert!</span>(<span class="macro">offset_of!</span>(InferenceSignals, attunement) == <span class="number">20</span>);
+<a href=#286 id=286 data-nosnippet>286</a>    <span class="macro">assert!</span>(<span class="macro">offset_of!</span>(InferenceSignals, dyadic_synchrony) == <span class="number">24</span>);
+<a href=#287 id=287 data-nosnippet>287</a>    <span class="macro">assert!</span>(<span class="macro">offset_of!</span>(InferenceSignals, user_valence) == <span class="number">28</span>);
+<a href=#288 id=288 data-nosnippet>288</a>    <span class="macro">assert!</span>(<span class="macro">offset_of!</span>(InferenceSignals, user_arousal) == <span class="number">32</span>);
+<a href=#289 id=289 data-nosnippet>289</a>    <span class="macro">assert!</span>(<span class="macro">offset_of!</span>(InferenceSignals, user_engagement) == <span class="number">36</span>);
+<a href=#290 id=290 data-nosnippet>290</a>    <span class="macro">assert!</span>(<span class="macro">offset_of!</span>(InferenceSignals, prediction_error_dopamine) == <span class="number">40</span>);
+<a href=#291 id=291 data-nosnippet>291</a>    <span class="macro">assert!</span>(<span class="macro">offset_of!</span>(InferenceSignals, prediction_error_cortisol) == <span class="number">44</span>);
+<a href=#292 id=292 data-nosnippet>292</a>    <span class="macro">assert!</span>(<span class="macro">offset_of!</span>(InferenceSignals, prediction_error_serotonin) == <span class="number">48</span>);
+<a href=#293 id=293 data-nosnippet>293</a>    <span class="macro">assert!</span>(<span class="macro">offset_of!</span>(InferenceSignals, model_maturity) == <span class="number">52</span>);
+<a href=#294 id=294 data-nosnippet>294</a>    <span class="macro">assert!</span>(<span class="macro">offset_of!</span>(InferenceSignals, inference_tick_count) == <span class="number">56</span>);
+<a href=#295 id=295 data-nosnippet>295</a>};
+</code></pre></div></section></main></body></html>

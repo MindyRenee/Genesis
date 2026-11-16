@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: package Self_World.parietal_lobe.math</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.parietal_lobe.html" class="white">parietal_lobe</a>.math</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/parietal_lobe/math/__init__.py">/home/mindyrenee/GenAnd/Genesis/Self_World/parietal_lobe/math/__init__.py</a></td></tr></table>
+    <p><span class="code">Parietal&nbsp;math&nbsp;—&nbsp;number&nbsp;sense&nbsp;through&nbsp;calculus&nbsp;(IPS).<br>
+&nbsp;<br>
+Five&nbsp;layers,&nbsp;matching&nbsp;the&nbsp;anatomy&nbsp;of&nbsp;the&nbsp;intraparietal&nbsp;sulcus:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;number_sense.py&nbsp;&nbsp;&nbsp;—&nbsp;the&nbsp;approximate&nbsp;number&nbsp;system:&nbsp;subitizing,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Weber-Fechner&nbsp;magnitude&nbsp;comparison,&nbsp;estimation,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;plausibility&nbsp;checking.&nbsp;The&nbsp;intuition.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;arithmetic.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;—&nbsp;exact&nbsp;calculation:&nbsp;a&nbsp;safe&nbsp;recursive-descent<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;evaluator&nbsp;over&nbsp;digits,&nbsp;symbols,&nbsp;and<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;number/operator&nbsp;words.&nbsp;The&nbsp;procedure.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;algebra.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;—&nbsp;formal&nbsp;manipulation:&nbsp;expression&nbsp;trees&nbsp;that<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;simplify,&nbsp;expand,&nbsp;factor,&nbsp;and&nbsp;solve.&nbsp;The<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;unknown&nbsp;kept&nbsp;symbolic.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;calculus.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;—&nbsp;the&nbsp;mathematics&nbsp;of&nbsp;change:&nbsp;differentiation<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;and&nbsp;integration&nbsp;over&nbsp;the&nbsp;algebra&nbsp;trees.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;statistics.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;—&nbsp;descriptive&nbsp;statistics&nbsp;over&nbsp;collections:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;named&nbsp;means,&nbsp;dispersion,&nbsp;and&nbsp;moments.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;population&nbsp;picture.<br>
+&nbsp;<br>
+And&nbsp;the&nbsp;higher&nbsp;faculties&nbsp;—&nbsp;one&nbsp;file&nbsp;per&nbsp;domain,&nbsp;each&nbsp;mirrored&nbsp;by&nbsp;a<br>
+pure-machine&nbsp;twin&nbsp;under&nbsp;``src/math/``&nbsp;in&nbsp;the&nbsp;body:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;trig.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;—&nbsp;the&nbsp;circle's&nbsp;vocabulary:&nbsp;angles,&nbsp;ratios,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;triangles.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;linear_algebra.py&nbsp;&nbsp;&nbsp;—&nbsp;spaces&nbsp;and&nbsp;maps:&nbsp;matrices,&nbsp;determinants,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;systems.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;abstract_algebra.py&nbsp;—&nbsp;structure&nbsp;itself:&nbsp;permutations,&nbsp;cycles,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;orbits,&nbsp;groups.&nbsp;The&nbsp;cube's&nbsp;home.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;real_analysis.py&nbsp;&nbsp;&nbsp;&nbsp;—&nbsp;limits&nbsp;made&nbsp;honest:&nbsp;the&nbsp;epsilon-delta<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;game,&nbsp;graphs&nbsp;as&nbsp;(x,&nbsp;y)&nbsp;points.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;complex_analysis.py&nbsp;—&nbsp;the&nbsp;plane&nbsp;of&nbsp;numbers:&nbsp;polar&nbsp;form,&nbsp;roots<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;of&nbsp;unity,&nbsp;De&nbsp;Moivre.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;number_theory.py&nbsp;&nbsp;&nbsp;&nbsp;—&nbsp;the&nbsp;integers'&nbsp;inner&nbsp;life:&nbsp;primes,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;factors,&nbsp;congruences.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;topology.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;—&nbsp;shape&nbsp;without&nbsp;distance:&nbsp;opens,&nbsp;closure,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;Euler&nbsp;characteristic.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;geometry.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;—&nbsp;shape&nbsp;with&nbsp;distance:&nbsp;areas,&nbsp;hulls,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;point-in-polygon.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;discrete.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;—&nbsp;relations,&nbsp;sets,&nbsp;graphs&nbsp;—&nbsp;the&nbsp;decidable<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;finite.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;combinatorics.py&nbsp;&nbsp;&nbsp;&nbsp;—&nbsp;counting&nbsp;without&nbsp;listing:&nbsp;choose,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;arrange,&nbsp;derange.<br>
+&nbsp;<br>
+And&nbsp;the&nbsp;three&nbsp;pillars&nbsp;mathematical&nbsp;thinking&nbsp;stands&nbsp;on:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;axioms.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;—&nbsp;the&nbsp;ladder&nbsp;of&nbsp;laws:&nbsp;closure&nbsp;through<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;abelian&nbsp;group,&nbsp;each&nbsp;rung&nbsp;witnessed.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;proof.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;—&nbsp;valid&nbsp;inference:&nbsp;truth&nbsp;tables,&nbsp;entailment,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;named&nbsp;rules.<br>
+&nbsp;<br>
+``symbolic.py``&nbsp;sits&nbsp;beside&nbsp;them&nbsp;as&nbsp;the&nbsp;oracle&nbsp;—&nbsp;the&nbsp;sympy-backed<br>
+checker&nbsp;``frontal_lobe/research.py``&nbsp;verifies&nbsp;claims&nbsp;against.&nbsp;The<br>
+faculty&nbsp;here&nbsp;is&nbsp;endogenous:&nbsp;it&nbsp;manipulates&nbsp;structure&nbsp;itself,&nbsp;and<br>
+its&nbsp;results&nbsp;are&nbsp;verified,&nbsp;never&nbsp;asserted.<br>
+&nbsp;<br>
+``<a href="#ParietalMath">ParietalMath</a>``&nbsp;is&nbsp;the&nbsp;facade&nbsp;the&nbsp;rest&nbsp;of&nbsp;the&nbsp;mind&nbsp;talks&nbsp;to.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Package Contents</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="Self_World.parietal_lobe.math.abstract_algebra.html">abstract_algebra</a><br>
+<a href="Self_World.parietal_lobe.math.algebra.html">algebra</a><br>
+<a href="Self_World.parietal_lobe.math.arithmetic.html">arithmetic</a><br>
+<a href="Self_World.parietal_lobe.math.axioms.html">axioms</a><br>
+<a href="Self_World.parietal_lobe.math.calculus.html">calculus</a><br>
+</td><td class="multicolumn"><a href="Self_World.parietal_lobe.math.combinatorics.html">combinatorics</a><br>
+<a href="Self_World.parietal_lobe.math.complex_analysis.html">complex_analysis</a><br>
+<a href="Self_World.parietal_lobe.math.discrete.html">discrete</a><br>
+<a href="Self_World.parietal_lobe.math.geometry.html">geometry</a><br>
+<a href="Self_World.parietal_lobe.math.linear_algebra.html">linear_algebra</a><br>
+</td><td class="multicolumn"><a href="Self_World.parietal_lobe.math.number_sense.html">number_sense</a><br>
+<a href="Self_World.parietal_lobe.math.number_theory.html">number_theory</a><br>
+<a href="Self_World.parietal_lobe.math.proof.html">proof</a><br>
+<a href="Self_World.parietal_lobe.math.real_analysis.html">real_analysis</a><br>
+<a href="Self_World.parietal_lobe.math.statistics.html">statistics</a><br>
+</td><td class="multicolumn"><a href="Self_World.parietal_lobe.math.symbolic.html">symbolic</a><br>
+<a href="Self_World.parietal_lobe.math.topology.html">topology</a><br>
+<a href="Self_World.parietal_lobe.math.trig.html">trig</a><br>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.parietal_lobe.math.html#ParietalMath">ParietalMath</a>
+</dt><dt class="heading-text"><a href="Self_World.parietal_lobe.math.abstract_algebra.html#GroupResult">Self_World.parietal_lobe.math.abstract_algebra.GroupResult</a>
+</dt><dt class="heading-text"><a href="Self_World.parietal_lobe.math.algebra.html#AlgebraResult">Self_World.parietal_lobe.math.algebra.AlgebraResult</a>
+</dt><dt class="heading-text"><a href="Self_World.parietal_lobe.math.arithmetic.html#CalcResult">Self_World.parietal_lobe.math.arithmetic.CalcResult</a>
+</dt><dt class="heading-text"><a href="Self_World.parietal_lobe.math.axioms.html#AxiomResult">Self_World.parietal_lobe.math.axioms.AxiomResult</a>
+</dt><dt class="heading-text"><a href="Self_World.parietal_lobe.math.combinatorics.html#CountResult">Self_World.parietal_lobe.math.combinatorics.CountResult</a>
+</dt><dt class="heading-text"><a href="Self_World.parietal_lobe.math.complex_analysis.html#ComplexResult">Self_World.parietal_lobe.math.complex_analysis.ComplexResult</a>
+</dt><dt class="heading-text"><a href="Self_World.parietal_lobe.math.discrete.html#DiscreteResult">Self_World.parietal_lobe.math.discrete.DiscreteResult</a>
+</dt><dt class="heading-text"><a href="Self_World.parietal_lobe.math.geometry.html#GeoResult">Self_World.parietal_lobe.math.geometry.GeoResult</a>
+</dt><dt class="heading-text"><a href="Self_World.parietal_lobe.math.linear_algebra.html#LinearResult">Self_World.parietal_lobe.math.linear_algebra.LinearResult</a>
+</dt><dt class="heading-text"><a href="Self_World.parietal_lobe.math.number_sense.html#MagnitudeJudgment">Self_World.parietal_lobe.math.number_sense.MagnitudeJudgment</a>
+</dt><dt class="heading-text"><a href="Self_World.parietal_lobe.math.number_sense.html#NumberSense">Self_World.parietal_lobe.math.number_sense.NumberSense</a>
+</dt><dt class="heading-text"><a href="Self_World.parietal_lobe.math.number_theory.html#NumberResult">Self_World.parietal_lobe.math.number_theory.NumberResult</a>
+</dt><dt class="heading-text"><a href="Self_World.parietal_lobe.math.proof.html#ProofResult">Self_World.parietal_lobe.math.proof.ProofResult</a>
+</dt><dt class="heading-text"><a href="Self_World.parietal_lobe.math.real_analysis.html#AnalysisResult">Self_World.parietal_lobe.math.real_analysis.AnalysisResult</a>
+</dt><dt class="heading-text"><a href="Self_World.parietal_lobe.math.statistics.html#StatSummary">Self_World.parietal_lobe.math.statistics.StatSummary</a>
+</dt><dt class="heading-text"><a href="Self_World.parietal_lobe.math.topology.html#TopoResult">Self_World.parietal_lobe.math.topology.TopoResult</a>
+</dt><dt class="heading-text"><a href="Self_World.parietal_lobe.math.trig.html#TrigResult">Self_World.parietal_lobe.math.trig.TrigResult</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="AlgebraResult">class <strong>AlgebraResult</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#AlgebraResult">AlgebraResult</a>(operation:&nbsp;'str',&nbsp;input:&nbsp;'str',&nbsp;output:&nbsp;'str',&nbsp;ok:&nbsp;'bool',&nbsp;error:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;data:&nbsp;'dict[str,&nbsp;<a href="builtins.html#object">object</a>]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;outcome&nbsp;of&nbsp;a&nbsp;manipulation&nbsp;—&nbsp;the&nbsp;operation,&nbsp;the&nbsp;input&nbsp;as<br>
+given,&nbsp;the&nbsp;output&nbsp;rendered,&nbsp;the&nbsp;ok&nbsp;flag,&nbsp;and&nbsp;the&nbsp;failure&nbsp;wording<br>
+when&nbsp;ok&nbsp;is&nbsp;false.&nbsp;``data``&nbsp;carries&nbsp;structured&nbsp;extras&nbsp;(roots).<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="AlgebraResult-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="AlgebraResult-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="AlgebraResult-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="AlgebraResult-__init__"><strong>__init__</strong></a>(self, operation: 'str', input: 'str', output: 'str', ok: 'bool', error: 'str' = '', data: 'dict[str, object] | None' = None) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="AlgebraResult-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="AlgebraResult-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'data': 'dict[str, object] | None', 'error': 'str', 'input': 'str', 'ok': 'bool', 'operation': 'str', 'output': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'data': Field(name='data',type='dict[str, object] | None...appingproxy({}),kw_only=False,_field_type=_FIELD), 'error': Field(name='error',type='str',default='',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'input': Field(name='input',type='str',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD), 'ok': Field(name='ok',type='bool',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD), 'operation': Field(name='operation',type='str',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'output': Field(name='output',type='str',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('operation', 'input', 'output', 'ok', 'error', 'data')</dl>
+
+<dl><dt><strong>data</strong> = None</dl>
+
+<dl><dt><strong>error</strong> = ''</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="AnalysisResult">class <strong>AnalysisResult</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#AnalysisResult">AnalysisResult</a>(operation:&nbsp;'str',&nbsp;input:&nbsp;'str',&nbsp;output:&nbsp;'str',&nbsp;ok:&nbsp;'bool',&nbsp;error:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;data:&nbsp;'dict[str,&nbsp;Any]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;outcome&nbsp;of&nbsp;an&nbsp;analysis&nbsp;question&nbsp;—&nbsp;verified,&nbsp;refuted<br>
+(with&nbsp;the&nbsp;witness),&nbsp;or&nbsp;undecided.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="AnalysisResult-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="AnalysisResult-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="AnalysisResult-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="AnalysisResult-__init__"><strong>__init__</strong></a>(self, operation: 'str', input: 'str', output: 'str', ok: 'bool', error: 'str' = '', data: 'dict[str, Any]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="AnalysisResult-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="AnalysisResult-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'data': 'dict[str, Any]', 'error': 'str', 'input': 'str', 'ok': 'bool', 'operation': 'str', 'output': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'data': Field(name='data',type='dict[str, Any]',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'error': Field(name='error',type='str',default='',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'input': Field(name='input',type='str',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD), 'ok': Field(name='ok',type='bool',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD), 'operation': Field(name='operation',type='str',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'output': Field(name='output',type='str',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('operation', 'input', 'output', 'ok', 'error', 'data')</dl>
+
+<dl><dt><strong>error</strong> = ''</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="AxiomResult">class <strong>AxiomResult</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#AxiomResult">AxiomResult</a>(operation:&nbsp;'str',&nbsp;input:&nbsp;'str',&nbsp;output:&nbsp;'str',&nbsp;ok:&nbsp;'bool',&nbsp;error:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;data:&nbsp;'dict[str,&nbsp;Any]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;outcome&nbsp;of&nbsp;asking&nbsp;which&nbsp;axioms&nbsp;a&nbsp;structure&nbsp;satisfies.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="AxiomResult-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="AxiomResult-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="AxiomResult-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="AxiomResult-__init__"><strong>__init__</strong></a>(self, operation: 'str', input: 'str', output: 'str', ok: 'bool', error: 'str' = '', data: 'dict[str, Any]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="AxiomResult-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="AxiomResult-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'data': 'dict[str, Any]', 'error': 'str', 'input': 'str', 'ok': 'bool', 'operation': 'str', 'output': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'data': Field(name='data',type='dict[str, Any]',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'error': Field(name='error',type='str',default='',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'input': Field(name='input',type='str',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD), 'ok': Field(name='ok',type='bool',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD), 'operation': Field(name='operation',type='str',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'output': Field(name='output',type='str',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('operation', 'input', 'output', 'ok', 'error', 'data')</dl>
+
+<dl><dt><strong>error</strong> = ''</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="CalcResult">class <strong>CalcResult</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#CalcResult">CalcResult</a>(expression:&nbsp;'str',&nbsp;value:&nbsp;'float&nbsp;|&nbsp;int&nbsp;|&nbsp;None',&nbsp;ok:&nbsp;'bool',&nbsp;error:&nbsp;'str'&nbsp;=&nbsp;'')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;outcome&nbsp;of&nbsp;a&nbsp;calculation&nbsp;—&nbsp;expression&nbsp;text,&nbsp;value,&nbsp;the<br>
+ok&nbsp;flag,&nbsp;and&nbsp;the&nbsp;failure&nbsp;wording&nbsp;when&nbsp;ok&nbsp;is&nbsp;false.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="CalcResult-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="CalcResult-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="CalcResult-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="CalcResult-__init__"><strong>__init__</strong></a>(self, expression: 'str', value: 'float | int | None', ok: 'bool', error: 'str' = '') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="CalcResult-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="CalcResult-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'error': 'str', 'expression': 'str', 'ok': 'bool', 'value': 'float | int | None'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'error': Field(name='error',type='str',default='',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'expression': Field(name='expression',type='str',default=&lt;data...appingproxy({}),kw_only=False,_field_type=_FIELD), 'ok': Field(name='ok',type='bool',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD), 'value': Field(name='value',type='float | int | None',def...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('expression', 'value', 'ok', 'error')</dl>
+
+<dl><dt><strong>error</strong> = ''</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ComplexResult">class <strong>ComplexResult</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ComplexResult">ComplexResult</a>(operation:&nbsp;'str',&nbsp;input:&nbsp;'str',&nbsp;output:&nbsp;'str',&nbsp;ok:&nbsp;'bool',&nbsp;error:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;data:&nbsp;'dict[str,&nbsp;Any]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;outcome&nbsp;of&nbsp;a&nbsp;complex&nbsp;question.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ComplexResult-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="ComplexResult-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="ComplexResult-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="ComplexResult-__init__"><strong>__init__</strong></a>(self, operation: 'str', input: 'str', output: 'str', ok: 'bool', error: 'str' = '', data: 'dict[str, Any]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="ComplexResult-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="ComplexResult-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'data': 'dict[str, Any]', 'error': 'str', 'input': 'str', 'ok': 'bool', 'operation': 'str', 'output': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'data': Field(name='data',type='dict[str, Any]',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'error': Field(name='error',type='str',default='',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'input': Field(name='input',type='str',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD), 'ok': Field(name='ok',type='bool',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD), 'operation': Field(name='operation',type='str',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'output': Field(name='output',type='str',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('operation', 'input', 'output', 'ok', 'error', 'data')</dl>
+
+<dl><dt><strong>error</strong> = ''</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="CountResult">class <strong>CountResult</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#CountResult">CountResult</a>(operation:&nbsp;'str',&nbsp;input:&nbsp;'str',&nbsp;output:&nbsp;'str',&nbsp;ok:&nbsp;'bool',&nbsp;error:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;data:&nbsp;'dict[str,&nbsp;Any]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;outcome&nbsp;of&nbsp;a&nbsp;counting&nbsp;question&nbsp;—&nbsp;the&nbsp;number&nbsp;and&nbsp;the<br>
+principle&nbsp;that&nbsp;produced&nbsp;it.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="CountResult-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="CountResult-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="CountResult-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="CountResult-__init__"><strong>__init__</strong></a>(self, operation: 'str', input: 'str', output: 'str', ok: 'bool', error: 'str' = '', data: 'dict[str, Any]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="CountResult-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="CountResult-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'data': 'dict[str, Any]', 'error': 'str', 'input': 'str', 'ok': 'bool', 'operation': 'str', 'output': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'data': Field(name='data',type='dict[str, Any]',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'error': Field(name='error',type='str',default='',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'input': Field(name='input',type='str',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD), 'ok': Field(name='ok',type='bool',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD), 'operation': Field(name='operation',type='str',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'output': Field(name='output',type='str',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('operation', 'input', 'output', 'ok', 'error', 'data')</dl>
+
+<dl><dt><strong>error</strong> = ''</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="DiscreteResult">class <strong>DiscreteResult</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#DiscreteResult">DiscreteResult</a>(operation:&nbsp;'str',&nbsp;input:&nbsp;'str',&nbsp;output:&nbsp;'str',&nbsp;ok:&nbsp;'bool',&nbsp;error:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;data:&nbsp;'dict[str,&nbsp;Any]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;outcome&nbsp;of&nbsp;a&nbsp;discrete-structure&nbsp;question.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="DiscreteResult-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="DiscreteResult-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="DiscreteResult-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="DiscreteResult-__init__"><strong>__init__</strong></a>(self, operation: 'str', input: 'str', output: 'str', ok: 'bool', error: 'str' = '', data: 'dict[str, Any]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="DiscreteResult-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="DiscreteResult-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'data': 'dict[str, Any]', 'error': 'str', 'input': 'str', 'ok': 'bool', 'operation': 'str', 'output': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'data': Field(name='data',type='dict[str, Any]',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'error': Field(name='error',type='str',default='',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'input': Field(name='input',type='str',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD), 'ok': Field(name='ok',type='bool',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD), 'operation': Field(name='operation',type='str',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'output': Field(name='output',type='str',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('operation', 'input', 'output', 'ok', 'error', 'data')</dl>
+
+<dl><dt><strong>error</strong> = ''</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="GeoResult">class <strong>GeoResult</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#GeoResult">GeoResult</a>(operation:&nbsp;'str',&nbsp;input:&nbsp;'str',&nbsp;output:&nbsp;'str',&nbsp;ok:&nbsp;'bool',&nbsp;error:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;data:&nbsp;'dict[str,&nbsp;Any]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;outcome&nbsp;of&nbsp;a&nbsp;geometric&nbsp;question.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="GeoResult-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="GeoResult-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="GeoResult-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="GeoResult-__init__"><strong>__init__</strong></a>(self, operation: 'str', input: 'str', output: 'str', ok: 'bool', error: 'str' = '', data: 'dict[str, Any]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="GeoResult-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="GeoResult-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'data': 'dict[str, Any]', 'error': 'str', 'input': 'str', 'ok': 'bool', 'operation': 'str', 'output': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'data': Field(name='data',type='dict[str, Any]',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'error': Field(name='error',type='str',default='',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'input': Field(name='input',type='str',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD), 'ok': Field(name='ok',type='bool',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD), 'operation': Field(name='operation',type='str',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'output': Field(name='output',type='str',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('operation', 'input', 'output', 'ok', 'error', 'data')</dl>
+
+<dl><dt><strong>error</strong> = ''</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="GroupResult">class <strong>GroupResult</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#GroupResult">GroupResult</a>(operation:&nbsp;'str',&nbsp;input:&nbsp;'str',&nbsp;output:&nbsp;'str',&nbsp;ok:&nbsp;'bool',&nbsp;error:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;data:&nbsp;'dict[str,&nbsp;Any]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;outcome&nbsp;of&nbsp;a&nbsp;group-theoretic&nbsp;question.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="GroupResult-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="GroupResult-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="GroupResult-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="GroupResult-__init__"><strong>__init__</strong></a>(self, operation: 'str', input: 'str', output: 'str', ok: 'bool', error: 'str' = '', data: 'dict[str, Any]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="GroupResult-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="GroupResult-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'data': 'dict[str, Any]', 'error': 'str', 'input': 'str', 'ok': 'bool', 'operation': 'str', 'output': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'data': Field(name='data',type='dict[str, Any]',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'error': Field(name='error',type='str',default='',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'input': Field(name='input',type='str',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD), 'ok': Field(name='ok',type='bool',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD), 'operation': Field(name='operation',type='str',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'output': Field(name='output',type='str',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('operation', 'input', 'output', 'ok', 'error', 'data')</dl>
+
+<dl><dt><strong>error</strong> = ''</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="LinearResult">class <strong>LinearResult</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#LinearResult">LinearResult</a>(operation:&nbsp;'str',&nbsp;input:&nbsp;'str',&nbsp;output:&nbsp;'str',&nbsp;ok:&nbsp;'bool',&nbsp;error:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;data:&nbsp;'dict[str,&nbsp;Any]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;outcome&nbsp;of&nbsp;a&nbsp;linear-algebra&nbsp;question.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="LinearResult-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="LinearResult-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="LinearResult-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="LinearResult-__init__"><strong>__init__</strong></a>(self, operation: 'str', input: 'str', output: 'str', ok: 'bool', error: 'str' = '', data: 'dict[str, Any]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="LinearResult-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="LinearResult-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'data': 'dict[str, Any]', 'error': 'str', 'input': 'str', 'ok': 'bool', 'operation': 'str', 'output': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'data': Field(name='data',type='dict[str, Any]',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'error': Field(name='error',type='str',default='',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'input': Field(name='input',type='str',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD), 'ok': Field(name='ok',type='bool',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD), 'operation': Field(name='operation',type='str',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'output': Field(name='output',type='str',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('operation', 'input', 'output', 'ok', 'error', 'data')</dl>
+
+<dl><dt><strong>error</strong> = ''</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="MagnitudeJudgment">class <strong>MagnitudeJudgment</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#MagnitudeJudgment">MagnitudeJudgment</a>(a:&nbsp;'float',&nbsp;b:&nbsp;'float',&nbsp;relation:&nbsp;'str',&nbsp;confidence:&nbsp;'float',&nbsp;exact:&nbsp;'bool')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+An&nbsp;approximate&nbsp;comparison&nbsp;between&nbsp;two&nbsp;quantities.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="MagnitudeJudgment-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="MagnitudeJudgment-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="MagnitudeJudgment-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="MagnitudeJudgment-__init__"><strong>__init__</strong></a>(self, a: 'float', b: 'float', relation: 'str', confidence: 'float', exact: 'bool') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="MagnitudeJudgment-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="MagnitudeJudgment-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'a': 'float', 'b': 'float', 'confidence': 'float', 'exact': 'bool', 'relation': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'a': Field(name='a',type='float',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD), 'b': Field(name='b',type='float',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD), 'confidence': Field(name='confidence',type='float',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD), 'exact': Field(name='exact',type='bool',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD), 'relation': Field(name='relation',type='str',default=&lt;datacl...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('a', 'b', 'relation', 'confidence', 'exact')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="NumberResult">class <strong>NumberResult</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#NumberResult">NumberResult</a>(operation:&nbsp;'str',&nbsp;input:&nbsp;'str',&nbsp;output:&nbsp;'str',&nbsp;ok:&nbsp;'bool',&nbsp;error:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;data:&nbsp;'dict[str,&nbsp;Any]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;outcome&nbsp;of&nbsp;a&nbsp;number-theoretic&nbsp;question.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="NumberResult-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="NumberResult-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="NumberResult-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="NumberResult-__init__"><strong>__init__</strong></a>(self, operation: 'str', input: 'str', output: 'str', ok: 'bool', error: 'str' = '', data: 'dict[str, Any]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="NumberResult-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="NumberResult-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'data': 'dict[str, Any]', 'error': 'str', 'input': 'str', 'ok': 'bool', 'operation': 'str', 'output': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'data': Field(name='data',type='dict[str, Any]',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'error': Field(name='error',type='str',default='',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'input': Field(name='input',type='str',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD), 'ok': Field(name='ok',type='bool',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD), 'operation': Field(name='operation',type='str',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'output': Field(name='output',type='str',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('operation', 'input', 'output', 'ok', 'error', 'data')</dl>
+
+<dl><dt><strong>error</strong> = ''</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="NumberSense">class <strong>NumberSense</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code">Approximate&nbsp;quantity&nbsp;faculty&nbsp;—&nbsp;subitizing&nbsp;and&nbsp;the&nbsp;ANS.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="NumberSense-compare"><strong>compare</strong></a>(self, a: 'float', b: 'float') -&gt; 'MagnitudeJudgment'</dt><dd><span class="code">Judge&nbsp;which&nbsp;of&nbsp;two&nbsp;quantities&nbsp;is&nbsp;larger,&nbsp;approximately.<br>
+&nbsp;<br>
+Exact&nbsp;when&nbsp;both&nbsp;magnitudes&nbsp;are&nbsp;within&nbsp;the&nbsp;subitizing&nbsp;range.<br>
+Otherwise&nbsp;confidence&nbsp;falls&nbsp;off&nbsp;as&nbsp;the&nbsp;ratio&nbsp;approaches&nbsp;1<br>
+(the&nbsp;Weber&nbsp;law:&nbsp;discrimination&nbsp;depends&nbsp;on&nbsp;ratio,&nbsp;not<br>
+absolute&nbsp;difference).</span></dd></dl>
+
+<dl><dt><a name="NumberSense-estimate"><strong>estimate</strong></a>(self, n: 'float') -&gt; 'tuple[float, float]'</dt><dd><span class="code">Approximate&nbsp;magnitude&nbsp;and&nbsp;its&nbsp;noise&nbsp;(mean,&nbsp;spread).<br>
+&nbsp;<br>
+Estimation&nbsp;error&nbsp;grows&nbsp;with&nbsp;magnitude:&nbsp;the&nbsp;Gaussian&nbsp;noise<br>
+width&nbsp;is&nbsp;proportional&nbsp;to&nbsp;the&nbsp;true&nbsp;value&nbsp;(scalar&nbsp;variability,<br>
+Gibbon&nbsp;1977).&nbsp;Exact&nbsp;within&nbsp;the&nbsp;subitizing&nbsp;range.</span></dd></dl>
+
+<dl><dt><a name="NumberSense-plausible"><strong>plausible</strong></a>(self, claimed: 'float', expected: 'float') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;*claimed*&nbsp;is&nbsp;a&nbsp;believable&nbsp;value&nbsp;for&nbsp;*expected*.<br>
+&nbsp;<br>
+The&nbsp;sanity&nbsp;check&nbsp;arithmetic&nbsp;can't&nbsp;do&nbsp;for&nbsp;itself:&nbsp;an&nbsp;answer<br>
+off&nbsp;by&nbsp;an&nbsp;order&nbsp;of&nbsp;magnitude&nbsp;feels&nbsp;wrong&nbsp;even&nbsp;without<br>
+recomputing.&nbsp;Returns&nbsp;False&nbsp;when&nbsp;the&nbsp;claimed&nbsp;magnitude&nbsp;lies<br>
+outside&nbsp;the&nbsp;discriminable&nbsp;neighborhood&nbsp;of&nbsp;the&nbsp;expected&nbsp;one.</span></dd></dl>
+
+<dl><dt><a name="NumberSense-represent"><strong>represent</strong></a>(self, n: 'float') -&gt; 'float'</dt><dd><span class="code">Position&nbsp;on&nbsp;the&nbsp;mental&nbsp;number&nbsp;line&nbsp;(log-compressed).<br>
+&nbsp;<br>
+Perceived&nbsp;magnitude&nbsp;grows&nbsp;logarithmically&nbsp;—&nbsp;the&nbsp;ANS&nbsp;encodes<br>
+ln(n),&nbsp;which&nbsp;is&nbsp;why&nbsp;1→2&nbsp;feels&nbsp;like&nbsp;a&nbsp;bigger&nbsp;step&nbsp;than&nbsp;8→9.</span></dd></dl>
+
+<dl><dt><a name="NumberSense-subitizes"><strong>subitizes</strong></a>(self, n: 'float') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;*n*&nbsp;is&nbsp;recognized&nbsp;instantly,&nbsp;without&nbsp;counting.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ParietalMath">class <strong>ParietalMath</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ParietalMath">ParietalMath</a>()&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Her&nbsp;calculation&nbsp;faculty&nbsp;—&nbsp;the&nbsp;parietal&nbsp;lobe's&nbsp;number&nbsp;cortex.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ParietalMath-__init__"><strong>__init__</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;facade&nbsp;with&nbsp;an&nbsp;approximate&nbsp;number&nbsp;sense.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-arrange"><strong>arrange</strong></a>(self, n: 'int', k: 'int | None' = None) -&gt; 'CountResult'</dt><dd><span class="code">Orders:&nbsp;n!&nbsp;or&nbsp;P(n,k)&nbsp;—&nbsp;the&nbsp;multiplication&nbsp;rule.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-chinese_remainder"><strong>chinese_remainder</strong></a>(self, pairs: 'list[tuple[int, int]]') -&gt; 'NumberResult'</dt><dd><span class="code">CRT&nbsp;over&nbsp;(residue,&nbsp;modulus)&nbsp;pairs.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-choose"><strong>choose</strong></a>(self, n: 'int', k: 'int') -&gt; 'CountResult'</dt><dd><span class="code">C(n,k)&nbsp;—&nbsp;subsets,&nbsp;not&nbsp;orders.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-classify_structure"><strong>classify_structure</strong></a>(self, table: 'list[list[int]]') -&gt; 'AxiomResult'</dt><dd><span class="code">Which&nbsp;rung&nbsp;a&nbsp;Cayley&nbsp;table&nbsp;reaches,&nbsp;with&nbsp;the&nbsp;axiom&nbsp;it<br>
+fails&nbsp;and&nbsp;the&nbsp;witness.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-compare"><strong>compare</strong></a>(self, a: 'float', b: 'float') -&gt; 'MagnitudeJudgment'</dt><dd><span class="code">Approximate&nbsp;magnitude&nbsp;comparison&nbsp;(the&nbsp;ANS,&nbsp;not&nbsp;exact&nbsp;math).</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-complex_describe"><strong>complex_describe</strong></a>(self, text: 'str') -&gt; 'ComplexResult'</dt><dd><span class="code">Magnitude,&nbsp;argument,&nbsp;polar&nbsp;form&nbsp;—&nbsp;the&nbsp;number's&nbsp;portrait.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-complex_power"><strong>complex_power</strong></a>(self, text: 'str', n: 'int') -&gt; 'ComplexResult'</dt><dd><span class="code">A&nbsp;complex&nbsp;number&nbsp;raised&nbsp;to&nbsp;an&nbsp;integer&nbsp;power.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-complex_roots"><strong>complex_roots</strong></a>(self, text: 'str', n: 'int') -&gt; 'ComplexResult'</dt><dd><span class="code">All&nbsp;n&nbsp;nth&nbsp;roots&nbsp;of&nbsp;a&nbsp;complex&nbsp;number.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-convert_angle"><strong>convert_angle</strong></a>(self, text: 'str', to: 'str') -&gt; 'TrigResult'</dt><dd><span class="code">Degrees&nbsp;to&nbsp;radians&nbsp;or&nbsp;back.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-convex_hull"><strong>convex_hull</strong></a>(self, text: 'str') -&gt; 'GeoResult'</dt><dd><span class="code">The&nbsp;convex&nbsp;hull&nbsp;of&nbsp;a&nbsp;point&nbsp;list.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-derangements"><strong>derangements</strong></a>(self, n: 'int') -&gt; 'CountResult'</dt><dd><span class="code">!n&nbsp;—&nbsp;permutations&nbsp;leaving&nbsp;nothing&nbsp;home.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-determinant"><strong>determinant</strong></a>(self, text: 'str') -&gt; 'LinearResult'</dt><dd><span class="code">The&nbsp;determinant&nbsp;of&nbsp;a&nbsp;bracketed&nbsp;matrix&nbsp;—&nbsp;exact.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-differentiate"><strong>differentiate</strong></a>(self, text: 'str', var: 'str' = 'x') -&gt; 'AlgebraResult'</dt><dd><span class="code">The&nbsp;derivative&nbsp;of&nbsp;the&nbsp;expression&nbsp;in&nbsp;the&nbsp;text.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-distance"><strong>distance</strong></a>(self, text: 'str') -&gt; 'GeoResult'</dt><dd><span class="code">Distance&nbsp;between&nbsp;two&nbsp;"(x,&nbsp;y)"&nbsp;points.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-entails"><strong>entails</strong></a>(self, premises: 'list[tuple]', goal: 'tuple') -&gt; 'ProofResult'</dt><dd><span class="code">Whether&nbsp;premises&nbsp;force&nbsp;a&nbsp;goal&nbsp;—&nbsp;or&nbsp;the&nbsp;countermodel.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-euler_characteristic"><strong>euler_characteristic</strong></a>(self, v: 'int', e: 'int', f: 'int') -&gt; 'TopoResult'</dt><dd><span class="code">V&nbsp;−&nbsp;E&nbsp;+&nbsp;F&nbsp;—&nbsp;the&nbsp;count&nbsp;that&nbsp;knows&nbsp;the&nbsp;surface.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-evaluate"><strong>evaluate</strong></a>(self, text: 'str') -&gt; 'CalcResult'</dt><dd><span class="code">Compute&nbsp;the&nbsp;arithmetic&nbsp;in&nbsp;the&nbsp;text,&nbsp;if&nbsp;any.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-expand"><strong>expand</strong></a>(self, text: 'str') -&gt; 'AlgebraResult'</dt><dd><span class="code">Distribute&nbsp;the&nbsp;expression&nbsp;in&nbsp;the&nbsp;text&nbsp;fully.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-factor"><strong>factor</strong></a>(self, text: 'str') -&gt; 'AlgebraResult'</dt><dd><span class="code">Factor&nbsp;the&nbsp;polynomial&nbsp;in&nbsp;the&nbsp;text.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-factor_number"><strong>factor_number</strong></a>(self, n: 'int') -&gt; 'NumberResult'</dt><dd><span class="code">Prime&nbsp;factorization,&nbsp;with&nbsp;its&nbsp;check.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-gcd"><strong>gcd</strong></a>(self, a: 'int', b: 'int') -&gt; 'NumberResult'</dt><dd><span class="code">The&nbsp;greatest&nbsp;common&nbsp;divisor,&nbsp;with&nbsp;the&nbsp;Bezout&nbsp;witness.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-graph_connected"><strong>graph_connected</strong></a>(self, text: 'str') -&gt; 'DiscreteResult'</dt><dd><span class="code">Whether&nbsp;an&nbsp;edge&nbsp;list&nbsp;is&nbsp;one&nbsp;connected&nbsp;component.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-integrate"><strong>integrate</strong></a>(self, text: 'str', var: 'str' = 'x') -&gt; 'AlgebraResult'</dt><dd><span class="code">The&nbsp;antiderivative&nbsp;of&nbsp;the&nbsp;expression&nbsp;in&nbsp;the&nbsp;text.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-integrate_between"><strong>integrate_between</strong></a>(self, text: 'str', lo: 'float', hi: 'float', var: 'str' = 'x') -&gt; 'AlgebraResult'</dt><dd><span class="code">The&nbsp;definite&nbsp;integral&nbsp;—&nbsp;closed&nbsp;form,&nbsp;else&nbsp;Simpson.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-is_prime"><strong>is_prime</strong></a>(self, n: 'int') -&gt; 'NumberResult'</dt><dd><span class="code">Primality&nbsp;with&nbsp;the&nbsp;factorization&nbsp;when&nbsp;composite.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-is_satisfiable"><strong>is_satisfiable</strong></a>(self, prop: 'tuple', words: 'str' = '') -&gt; 'ProofResult'</dt><dd><span class="code">Whether&nbsp;some&nbsp;world&nbsp;makes&nbsp;a&nbsp;proposition&nbsp;true&nbsp;—&nbsp;with&nbsp;one.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-is_tautology"><strong>is_tautology</strong></a>(self, prop: 'tuple', words: 'str' = '') -&gt; 'ProofResult'</dt><dd><span class="code">Whether&nbsp;a&nbsp;proposition&nbsp;tree&nbsp;is&nbsp;true&nbsp;under&nbsp;every&nbsp;world.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-is_topology"><strong>is_topology</strong></a>(self, n: 'int', opens: 'list[list[int]]') -&gt; 'TopoResult'</dt><dd><span class="code">Whether&nbsp;a&nbsp;collection&nbsp;of&nbsp;subsets&nbsp;is&nbsp;a&nbsp;topology&nbsp;on&nbsp;n&nbsp;points.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-limit"><strong>limit</strong></a>(self, text: 'str', at: 'float') -&gt; 'AnalysisResult'</dt><dd><span class="code">The&nbsp;limit&nbsp;of&nbsp;an&nbsp;expression&nbsp;as&nbsp;x&nbsp;approaches&nbsp;a&nbsp;point.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-looks_like_algebra"><strong>looks_like_algebra</strong></a>(self, text: 'str') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;the&nbsp;text&nbsp;asks&nbsp;for&nbsp;symbolic&nbsp;manipulation.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-looks_like_analysis"><strong>looks_like_analysis</strong></a>(self, text: 'str') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;the&nbsp;text&nbsp;asks&nbsp;about&nbsp;limits&nbsp;or&nbsp;convergence.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-looks_like_axioms"><strong>looks_like_axioms</strong></a>(self, text: 'str') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;the&nbsp;text&nbsp;asks&nbsp;about&nbsp;algebraic&nbsp;structure.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-looks_like_calculus"><strong>looks_like_calculus</strong></a>(self, text: 'str') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;the&nbsp;text&nbsp;asks&nbsp;for&nbsp;the&nbsp;mathematics&nbsp;of&nbsp;change.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-looks_like_complex"><strong>looks_like_complex</strong></a>(self, text: 'str') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;the&nbsp;text&nbsp;asks&nbsp;about&nbsp;complex&nbsp;numbers.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-looks_like_counting"><strong>looks_like_counting</strong></a>(self, text: 'str') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;the&nbsp;text&nbsp;asks&nbsp;a&nbsp;counting&nbsp;question.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-looks_like_discrete"><strong>looks_like_discrete</strong></a>(self, text: 'str') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;the&nbsp;text&nbsp;asks&nbsp;about&nbsp;relations,&nbsp;sets,&nbsp;or&nbsp;graphs.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-looks_like_geometry"><strong>looks_like_geometry</strong></a>(self, text: 'str') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;the&nbsp;text&nbsp;asks&nbsp;about&nbsp;points,&nbsp;areas,&nbsp;hulls.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-looks_like_group"><strong>looks_like_group</strong></a>(self, text: 'str') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;the&nbsp;text&nbsp;asks&nbsp;about&nbsp;permutations&nbsp;or&nbsp;groups.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-looks_like_linear_algebra"><strong>looks_like_linear_algebra</strong></a>(self, text: 'str') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;the&nbsp;text&nbsp;asks&nbsp;a&nbsp;matrix&nbsp;question.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-looks_like_math"><strong>looks_like_math</strong></a>(self, text: 'str') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;the&nbsp;text&nbsp;asks&nbsp;for&nbsp;a&nbsp;computation.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-looks_like_number_theory"><strong>looks_like_number_theory</strong></a>(self, text: 'str') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;the&nbsp;text&nbsp;asks&nbsp;about&nbsp;primes,&nbsp;factors,&nbsp;congruences.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-looks_like_proof"><strong>looks_like_proof</strong></a>(self, text: 'str') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;the&nbsp;text&nbsp;asks&nbsp;about&nbsp;proof&nbsp;or&nbsp;validity.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-looks_like_statistics"><strong>looks_like_statistics</strong></a>(self, text: 'str') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;the&nbsp;text&nbsp;asks&nbsp;for&nbsp;a&nbsp;descriptive&nbsp;statistic.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-looks_like_topology"><strong>looks_like_topology</strong></a>(self, text: 'str') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;the&nbsp;text&nbsp;asks&nbsp;about&nbsp;opens,&nbsp;surfaces,&nbsp;connectedness.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-looks_like_trig"><strong>looks_like_trig</strong></a>(self, text: 'str') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;the&nbsp;text&nbsp;asks&nbsp;about&nbsp;angles,&nbsp;ratios,&nbsp;or&nbsp;triangles.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-matmul"><strong>matmul</strong></a>(self, a_text: 'str', b_text: 'str') -&gt; 'LinearResult'</dt><dd><span class="code">The&nbsp;product&nbsp;of&nbsp;two&nbsp;bracketed&nbsp;matrices.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-matrix_rank"><strong>matrix_rank</strong></a>(self, text: 'str') -&gt; 'LinearResult'</dt><dd><span class="code">The&nbsp;rank&nbsp;of&nbsp;a&nbsp;bracketed&nbsp;matrix.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-mean"><strong>mean</strong></a>(self, values: 'list[float]', kind: 'str' = 'arithmetic', p: 'float' = 1.0) -&gt; 'float'</dt><dd><span class="code">A&nbsp;named&nbsp;mean&nbsp;over&nbsp;a&nbsp;collection&nbsp;(see&nbsp;``statistics.MEAN_KINDS``).</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-numeric_integral"><strong>numeric_integral</strong></a>(self, text: 'str', lo: 'float', hi: 'float') -&gt; 'AnalysisResult'</dt><dd><span class="code">The&nbsp;definite&nbsp;integral&nbsp;by&nbsp;Simpson's&nbsp;quadrature.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-permutation_compose"><strong>permutation_compose</strong></a>(self, left: 'str', right: 'str') -&gt; 'GroupResult'</dt><dd><span class="code">Compose&nbsp;two&nbsp;permutations,&nbsp;left&nbsp;then&nbsp;right.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-permutation_describe"><strong>permutation_describe</strong></a>(self, text: 'str') -&gt; 'GroupResult'</dt><dd><span class="code">Cycles,&nbsp;order,&nbsp;parity&nbsp;—&nbsp;the&nbsp;move's&nbsp;portrait.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-permutation_order"><strong>permutation_order</strong></a>(self, text: 'str') -&gt; 'GroupResult'</dt><dd><span class="code">The&nbsp;order&nbsp;of&nbsp;a&nbsp;cycle-notation&nbsp;permutation.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-plausible"><strong>plausible</strong></a>(self, claimed: 'float', expected: 'float') -&gt; 'bool'</dt><dd><span class="code">Sanity&nbsp;check:&nbsp;is&nbsp;*claimed*&nbsp;a&nbsp;believable&nbsp;value&nbsp;for&nbsp;*expected*?</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-plot"><strong>plot</strong></a>(self, text: 'str', lo: 'float', hi: 'float', n: 'int' = 128) -&gt; 'AnalysisResult'</dt><dd><span class="code">The&nbsp;graph&nbsp;of&nbsp;an&nbsp;expression&nbsp;—&nbsp;its&nbsp;(x,&nbsp;y)&nbsp;points.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-point_inside"><strong>point_inside</strong></a>(self, point_text: 'str', poly_text: 'str') -&gt; 'GeoResult'</dt><dd><span class="code">Whether&nbsp;a&nbsp;point&nbsp;lies&nbsp;inside&nbsp;a&nbsp;polygon&nbsp;—&nbsp;ray&nbsp;casting.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-polygon_area"><strong>polygon_area</strong></a>(self, text: 'str') -&gt; 'GeoResult'</dt><dd><span class="code">Area&nbsp;of&nbsp;a&nbsp;point&nbsp;list&nbsp;—&nbsp;the&nbsp;shoelace.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-relation_properties"><strong>relation_properties</strong></a>(self, text: 'str', universe_text: 'str | None' = None) -&gt; 'DiscreteResult'</dt><dd><span class="code">Which&nbsp;relation&nbsp;properties&nbsp;hold&nbsp;—&nbsp;reflexive&nbsp;through<br>
+transitive,&nbsp;with&nbsp;the&nbsp;equivalence/order&nbsp;verdict.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-roots_of_unity"><strong>roots_of_unity</strong></a>(self, n: 'int') -&gt; 'ComplexResult'</dt><dd><span class="code">All&nbsp;n&nbsp;nth&nbsp;roots&nbsp;of&nbsp;unity.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-simplify"><strong>simplify</strong></a>(self, text: 'str') -&gt; 'AlgebraResult'</dt><dd><span class="code">Reduce&nbsp;the&nbsp;expression&nbsp;in&nbsp;the&nbsp;text&nbsp;to&nbsp;canonical&nbsp;form.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-slope_at"><strong>slope_at</strong></a>(self, text: 'str', at: 'float', var: 'str' = 'x') -&gt; 'AlgebraResult'</dt><dd><span class="code">The&nbsp;derivative&nbsp;evaluated&nbsp;at&nbsp;a&nbsp;point&nbsp;—&nbsp;the&nbsp;slope&nbsp;there.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-solve"><strong>solve</strong></a>(self, text: 'str') -&gt; 'AlgebraResult'</dt><dd><span class="code">Solve&nbsp;the&nbsp;equation&nbsp;in&nbsp;the&nbsp;text&nbsp;—&nbsp;closed&nbsp;forms&nbsp;first.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-solve_congruence"><strong>solve_congruence</strong></a>(self, a: 'int', b: 'int', m: 'int') -&gt; 'NumberResult'</dt><dd><span class="code">Solve&nbsp;ax&nbsp;≡&nbsp;b&nbsp;(mod&nbsp;m).</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-solve_system"><strong>solve_system</strong></a>(self, a_text: 'str', b_text: 'str') -&gt; 'LinearResult'</dt><dd><span class="code">Solve&nbsp;Ax&nbsp;=&nbsp;b&nbsp;—&nbsp;exact&nbsp;fractions.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-subitizes"><strong>subitizes</strong></a>(self, n: 'float') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;*n*&nbsp;is&nbsp;small&nbsp;enough&nbsp;to&nbsp;be&nbsp;perceived&nbsp;instantly.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-summarize"><strong>summarize</strong></a>(self, values: 'list[float]') -&gt; 'StatSummary'</dt><dd><span class="code">The&nbsp;full&nbsp;descriptive&nbsp;profile&nbsp;of&nbsp;a&nbsp;collection.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-taylor_series"><strong>taylor_series</strong></a>(self, text: 'str', at: 'float' = 0.0, order: 'int' = 5, var: 'str' = 'x') -&gt; 'AlgebraResult'</dt><dd><span class="code">The&nbsp;Taylor&nbsp;polynomial&nbsp;of&nbsp;the&nbsp;expression&nbsp;around&nbsp;``at``.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-triangle"><strong>triangle</strong></a>(self, sides: 'list[float]') -&gt; 'TrigResult'</dt><dd><span class="code">Solve&nbsp;a&nbsp;triangle&nbsp;from&nbsp;three&nbsp;sides.</span></dd></dl>
+
+<dl><dt><a name="ParietalMath-trig_ratio"><strong>trig_ratio</strong></a>(self, func: 'str', angle_text: 'str') -&gt; 'TrigResult'</dt><dd><span class="code">A&nbsp;ratio&nbsp;at&nbsp;an&nbsp;angle&nbsp;—&nbsp;exact&nbsp;names&nbsp;for&nbsp;the&nbsp;famous&nbsp;angles.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ProofResult">class <strong>ProofResult</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ProofResult">ProofResult</a>(operation:&nbsp;'str',&nbsp;input:&nbsp;'str',&nbsp;output:&nbsp;'str',&nbsp;ok:&nbsp;'bool',&nbsp;error:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;data:&nbsp;'dict[str,&nbsp;Any]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;outcome&nbsp;of&nbsp;a&nbsp;proof&nbsp;question&nbsp;—&nbsp;a&nbsp;verdict,&nbsp;the&nbsp;failing<br>
+step&nbsp;when&nbsp;there&nbsp;is&nbsp;one.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ProofResult-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="ProofResult-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="ProofResult-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="ProofResult-__init__"><strong>__init__</strong></a>(self, operation: 'str', input: 'str', output: 'str', ok: 'bool', error: 'str' = '', data: 'dict[str, Any]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="ProofResult-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="ProofResult-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'data': 'dict[str, Any]', 'error': 'str', 'input': 'str', 'ok': 'bool', 'operation': 'str', 'output': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'data': Field(name='data',type='dict[str, Any]',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'error': Field(name='error',type='str',default='',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'input': Field(name='input',type='str',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD), 'ok': Field(name='ok',type='bool',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD), 'operation': Field(name='operation',type='str',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'output': Field(name='output',type='str',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('operation', 'input', 'output', 'ok', 'error', 'data')</dl>
+
+<dl><dt><strong>error</strong> = ''</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="StatSummary">class <strong>StatSummary</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#StatSummary">StatSummary</a>(n:&nbsp;'int',&nbsp;minimum:&nbsp;'float',&nbsp;maximum:&nbsp;'float',&nbsp;arithmetic_mean:&nbsp;'float',&nbsp;median:&nbsp;'float',&nbsp;mode:&nbsp;'float',&nbsp;variance:&nbsp;'float',&nbsp;standard_deviation:&nbsp;'float',&nbsp;mean_absolute_deviation:&nbsp;'float',&nbsp;interquartile_range:&nbsp;'float',&nbsp;skewness:&nbsp;'float&nbsp;|&nbsp;None',&nbsp;kurtosis:&nbsp;'float&nbsp;|&nbsp;None',&nbsp;standard_error:&nbsp;'float')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;full&nbsp;descriptive&nbsp;profile&nbsp;of&nbsp;a&nbsp;sample.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="StatSummary-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="StatSummary-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="StatSummary-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="StatSummary-__init__"><strong>__init__</strong></a>(self, n: 'int', minimum: 'float', maximum: 'float', arithmetic_mean: 'float', median: 'float', mode: 'float', variance: 'float', standard_deviation: 'float', mean_absolute_deviation: 'float', interquartile_range: 'float', skewness: 'float | None', kurtosis: 'float | None', standard_error: 'float') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="StatSummary-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="StatSummary-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'arithmetic_mean': 'float', 'interquartile_range': 'float', 'kurtosis': 'float | None', 'maximum': 'float', 'mean_absolute_deviation': 'float', 'median': 'float', 'minimum': 'float', 'mode': 'float', 'n': 'int', 'skewness': 'float | None', ...}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'arithmetic_mean': Field(name='arithmetic_mean',type='float',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'interquartile_range': Field(name='interquartile_range',type='float',de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'kurtosis': Field(name='kurtosis',type='float | None',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'maximum': Field(name='maximum',type='float',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'mean_absolute_deviation': Field(name='mean_absolute_deviation',type='float...appingproxy({}),kw_only=False,_field_type=_FIELD), 'median': Field(name='median',type='float',default=&lt;datacl...appingproxy({}),kw_only=False,_field_type=_FIELD), 'minimum': Field(name='minimum',type='float',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'mode': Field(name='mode',type='float',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD), 'n': Field(name='n',type='int',default=&lt;dataclasses._...appingproxy({}),kw_only=False,_field_type=_FIELD), 'skewness': Field(name='skewness',type='float | None',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), ...}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('n', 'minimum', 'maximum', 'arithmetic_mean', 'median', 'mode', 'variance', 'standard_deviation', 'mean_absolute_deviation', 'interquartile_range', 'skewness', 'kurtosis', 'standard_error')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="TopoResult">class <strong>TopoResult</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#TopoResult">TopoResult</a>(operation:&nbsp;'str',&nbsp;input:&nbsp;'str',&nbsp;output:&nbsp;'str',&nbsp;ok:&nbsp;'bool',&nbsp;error:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;data:&nbsp;'dict[str,&nbsp;Any]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;outcome&nbsp;of&nbsp;a&nbsp;topological&nbsp;question.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="TopoResult-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="TopoResult-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="TopoResult-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="TopoResult-__init__"><strong>__init__</strong></a>(self, operation: 'str', input: 'str', output: 'str', ok: 'bool', error: 'str' = '', data: 'dict[str, Any]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="TopoResult-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="TopoResult-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'data': 'dict[str, Any]', 'error': 'str', 'input': 'str', 'ok': 'bool', 'operation': 'str', 'output': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'data': Field(name='data',type='dict[str, Any]',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'error': Field(name='error',type='str',default='',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'input': Field(name='input',type='str',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD), 'ok': Field(name='ok',type='bool',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD), 'operation': Field(name='operation',type='str',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'output': Field(name='output',type='str',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('operation', 'input', 'output', 'ok', 'error', 'data')</dl>
+
+<dl><dt><strong>error</strong> = ''</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="TrigResult">class <strong>TrigResult</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#TrigResult">TrigResult</a>(operation:&nbsp;'str',&nbsp;input:&nbsp;'str',&nbsp;output:&nbsp;'str',&nbsp;ok:&nbsp;'bool',&nbsp;error:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;data:&nbsp;'dict[str,&nbsp;Any]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;outcome&nbsp;of&nbsp;a&nbsp;trigonometric&nbsp;question&nbsp;—&nbsp;the&nbsp;operation,<br>
+the&nbsp;input&nbsp;as&nbsp;given,&nbsp;the&nbsp;output&nbsp;rendered,&nbsp;the&nbsp;ok&nbsp;flag,&nbsp;and&nbsp;the<br>
+failure&nbsp;wording&nbsp;when&nbsp;ok&nbsp;is&nbsp;false.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="TrigResult-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="TrigResult-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="TrigResult-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="TrigResult-__init__"><strong>__init__</strong></a>(self, operation: 'str', input: 'str', output: 'str', ok: 'bool', error: 'str' = '', data: 'dict[str, Any]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="TrigResult-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="TrigResult-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'data': 'dict[str, Any]', 'error': 'str', 'input': 'str', 'ok': 'bool', 'operation': 'str', 'output': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'data': Field(name='data',type='dict[str, Any]',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'error': Field(name='error',type='str',default='',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'input': Field(name='input',type='str',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD), 'ok': Field(name='ok',type='bool',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD), 'operation': Field(name='operation',type='str',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'output': Field(name='output',type='str',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('operation', 'input', 'output', 'ok', 'error', 'data')</dl>
+
+<dl><dt><strong>error</strong> = ''</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-euler_surface"><strong>euler_surface</strong></a>(v: 'int', e: 'int', f: 'int') -&gt; 'TopoResult'</dt><dd><span class="code">"V-E+F&nbsp;for&nbsp;8,&nbsp;12,&nbsp;6"&nbsp;-&gt;&nbsp;2&nbsp;—&nbsp;a&nbsp;sphere's&nbsp;signature.</span></dd></dl>
+ <dl><dt><a name="-looks_like_algebra"><strong>looks_like_algebra</strong></a>(text: 'str') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;the&nbsp;text&nbsp;asks&nbsp;for&nbsp;symbolic&nbsp;manipulation.<br>
+&nbsp;<br>
+True&nbsp;for&nbsp;"solve&nbsp;x^2&nbsp;-&nbsp;4&nbsp;=&nbsp;0",&nbsp;"expand&nbsp;(x+1)^3",&nbsp;"2x&nbsp;+&nbsp;3x"&nbsp;—<br>
+an&nbsp;unknown&nbsp;in&nbsp;play&nbsp;or&nbsp;an&nbsp;explicit&nbsp;manipulation&nbsp;verb.</span></dd></dl>
+ <dl><dt><a name="-looks_like_analysis"><strong>looks_like_analysis</strong></a>(text: 'str') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;the&nbsp;text&nbsp;asks&nbsp;about&nbsp;limits,&nbsp;convergence,&nbsp;or<br>
+continuity&nbsp;—&nbsp;the&nbsp;vocabulary&nbsp;of&nbsp;nearness&nbsp;made&nbsp;precise.</span></dd></dl>
+ <dl><dt><a name="-looks_like_axioms"><strong>looks_like_axioms</strong></a>(text: 'str') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;the&nbsp;text&nbsp;asks&nbsp;about&nbsp;algebraic&nbsp;structure&nbsp;—&nbsp;axioms,<br>
+tables,&nbsp;the&nbsp;ladder's&nbsp;rungs.</span></dd></dl>
+ <dl><dt><a name="-looks_like_calculus"><strong>looks_like_calculus</strong></a>(text: 'str') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;the&nbsp;text&nbsp;asks&nbsp;for&nbsp;the&nbsp;mathematics&nbsp;of&nbsp;change.</span></dd></dl>
+ <dl><dt><a name="-looks_like_complex"><strong>looks_like_complex</strong></a>(text: 'str') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;the&nbsp;text&nbsp;asks&nbsp;about&nbsp;complex&nbsp;numbers&nbsp;—&nbsp;'3+4i',<br>
+'roots&nbsp;of&nbsp;unity',&nbsp;'polar&nbsp;form'.</span></dd></dl>
+ <dl><dt><a name="-looks_like_counting"><strong>looks_like_counting</strong></a>(text: 'str') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;the&nbsp;text&nbsp;asks&nbsp;a&nbsp;counting&nbsp;question&nbsp;—&nbsp;ways,&nbsp;orders,<br>
+committees,&nbsp;arrangements.</span></dd></dl>
+ <dl><dt><a name="-looks_like_discrete"><strong>looks_like_discrete</strong></a>(text: 'str') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;the&nbsp;text&nbsp;asks&nbsp;about&nbsp;relations,&nbsp;sets,&nbsp;or&nbsp;graphs.</span></dd></dl>
+ <dl><dt><a name="-looks_like_geometry"><strong>looks_like_geometry</strong></a>(text: 'str') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;the&nbsp;text&nbsp;asks&nbsp;about&nbsp;points,&nbsp;areas,&nbsp;hulls&nbsp;—&nbsp;shape<br>
+with&nbsp;distance.</span></dd></dl>
+ <dl><dt><a name="-looks_like_group"><strong>looks_like_group</strong></a>(text: 'str') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;the&nbsp;text&nbsp;asks&nbsp;about&nbsp;permutations&nbsp;or&nbsp;groups.<br>
+&nbsp;<br>
+True&nbsp;for&nbsp;"order&nbsp;of&nbsp;(1&nbsp;2&nbsp;3)",&nbsp;"compose&nbsp;(1&nbsp;2)(3)&nbsp;with&nbsp;(2&nbsp;3)",<br>
+"sign&nbsp;of&nbsp;that&nbsp;permutation"&nbsp;—&nbsp;and&nbsp;bare&nbsp;cycle&nbsp;notation&nbsp;is<br>
+permutation-shaped&nbsp;on&nbsp;its&nbsp;own.</span></dd></dl>
+ <dl><dt><a name="-looks_like_linear_algebra"><strong>looks_like_linear_algebra</strong></a>(text: 'str') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;the&nbsp;text&nbsp;asks&nbsp;a&nbsp;matrix&nbsp;question.<br>
+&nbsp;<br>
+True&nbsp;for&nbsp;"determinant&nbsp;of&nbsp;[[1,2],[3,4]]",&nbsp;"rank&nbsp;of&nbsp;that<br>
+matrix",&nbsp;"solve&nbsp;the&nbsp;system"&nbsp;—&nbsp;the&nbsp;vocabulary&nbsp;of&nbsp;maps.</span></dd></dl>
+ <dl><dt><a name="-looks_like_math"><strong>looks_like_math</strong></a>(text: 'str') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;the&nbsp;text&nbsp;asks&nbsp;for&nbsp;a&nbsp;computation.<br>
+&nbsp;<br>
+True&nbsp;for&nbsp;"what&nbsp;is&nbsp;7&nbsp;+&nbsp;5",&nbsp;"nine&nbsp;times&nbsp;eight",&nbsp;"sqrt&nbsp;144"&nbsp;—<br>
+anything&nbsp;carrying&nbsp;an&nbsp;explicit&nbsp;operation.&nbsp;A&nbsp;bare&nbsp;number&nbsp;alone<br>
+("what&nbsp;is&nbsp;5")&nbsp;is&nbsp;not&nbsp;a&nbsp;computation&nbsp;request.</span></dd></dl>
+ <dl><dt><a name="-looks_like_number_theory"><strong>looks_like_number_theory</strong></a>(text: 'str') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;the&nbsp;text&nbsp;asks&nbsp;about&nbsp;primes,&nbsp;factors,&nbsp;divisors,<br>
+congruences&nbsp;—&nbsp;the&nbsp;integers'&nbsp;own&nbsp;vocabulary.</span></dd></dl>
+ <dl><dt><a name="-looks_like_proof"><strong>looks_like_proof</strong></a>(text: 'str') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;the&nbsp;text&nbsp;asks&nbsp;about&nbsp;proof,&nbsp;validity,&nbsp;or&nbsp;inference.</span></dd></dl>
+ <dl><dt><a name="-looks_like_statistics"><strong>looks_like_statistics</strong></a>(text: 'str') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;the&nbsp;text&nbsp;asks&nbsp;for&nbsp;a&nbsp;descriptive&nbsp;statistic.<br>
+&nbsp;<br>
+True&nbsp;for&nbsp;"what's&nbsp;the&nbsp;mean&nbsp;of&nbsp;these",&nbsp;"the&nbsp;variance&nbsp;of&nbsp;the<br>
+sample",&nbsp;"harmonic&nbsp;mean&nbsp;of&nbsp;4&nbsp;and&nbsp;6"&nbsp;—&nbsp;anything&nbsp;naming&nbsp;a<br>
+descriptive&nbsp;measure.</span></dd></dl>
+ <dl><dt><a name="-looks_like_topology"><strong>looks_like_topology</strong></a>(text: 'str') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;the&nbsp;text&nbsp;asks&nbsp;about&nbsp;opens,&nbsp;connectedness,&nbsp;surfaces&nbsp;—<br>
+shape&nbsp;without&nbsp;distance.</span></dd></dl>
+ <dl><dt><a name="-looks_like_trig"><strong>looks_like_trig</strong></a>(text: 'str') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;the&nbsp;text&nbsp;asks&nbsp;about&nbsp;angles,&nbsp;ratios,&nbsp;or&nbsp;triangles.<br>
+&nbsp;<br>
+True&nbsp;for&nbsp;"sin&nbsp;of&nbsp;pi/6",&nbsp;"30&nbsp;degrees&nbsp;in&nbsp;radians",&nbsp;"triangle<br>
+with&nbsp;sides&nbsp;3&nbsp;4&nbsp;5"&nbsp;—&nbsp;the&nbsp;circle's&nbsp;own&nbsp;vocabulary.</span></dd></dl>
+ <dl><dt><a name="-mean"><strong>mean</strong></a>(xs: 'Iterable[float]', kind: 'str' = 'arithmetic', p: 'float' = 1.0) -&gt; 'float'</dt><dd><span class="code">Compute&nbsp;a&nbsp;named&nbsp;mean&nbsp;over&nbsp;*xs*.<br>
+&nbsp;<br>
+``kind``&nbsp;is&nbsp;one&nbsp;of&nbsp;:data:`MEAN_KINDS`;&nbsp;``p``&nbsp;is&nbsp;the&nbsp;order&nbsp;for<br>
+``kind="power"``&nbsp;and&nbsp;ignored&nbsp;otherwise.</span></dd></dl>
+ <dl><dt><a name="-summarize"><strong>summarize</strong></a>(xs: 'Iterable[float]') -&gt; 'StatSummary'</dt><dd><span class="code">The&nbsp;whole&nbsp;picture&nbsp;at&nbsp;once&nbsp;—&nbsp;center,&nbsp;spread,&nbsp;and&nbsp;shape.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>MEAN_KINDS</strong> = ('arithmetic', 'geometric', 'harmonic', 'quadratic', 'cubic', 'contraharmonic', 'power', 'median', 'mode', 'midrange')<br>
+<strong>__all__</strong> = ['MEAN_KINDS', 'AlgebraResult', 'AnalysisResult', 'AxiomResult', 'CalcResult', 'ComplexResult', 'CountResult', 'DiscreteResult', 'GeoResult', 'GroupResult', 'LinearResult', 'MagnitudeJudgment', 'NumberResult', 'NumberSense', 'ParietalMath', 'ProofResult', 'StatSummary', 'TopoResult', 'TrigResult', 'euler_surface', ...]</td></tr></table>
+</body></html>

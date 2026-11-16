@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.frontal_lobe.response_styler</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.frontal_lobe.html" class="white">frontal_lobe</a>.response_styler</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/response_styler.py">/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/response_styler.py</a></td></tr></table>
+    <p><span class="code">Response&nbsp;styling&nbsp;—&nbsp;metacognitive&nbsp;tone&nbsp;adjustment&nbsp;and&nbsp;learning&nbsp;acknowledgment.<br>
+&nbsp;<br>
+Extracted&nbsp;from&nbsp;FrontalLobe&nbsp;as&nbsp;a&nbsp;focused&nbsp;subsystem.&nbsp;Applies&nbsp;the<br>
+active&nbsp;metacognitive&nbsp;strategy&nbsp;(assertive,&nbsp;hedging,&nbsp;questioning,&nbsp;varied,<br>
+neutral)&nbsp;to&nbsp;a&nbsp;response,&nbsp;and&nbsp;weaves&nbsp;learning&nbsp;acknowledgments&nbsp;into&nbsp;the<br>
+response&nbsp;when&nbsp;the&nbsp;self-directed&nbsp;learner&nbsp;extracted&nbsp;new&nbsp;facts.<br>
+&nbsp;<br>
+The&nbsp;modifications&nbsp;are&nbsp;conservative&nbsp;—&nbsp;they&nbsp;adjust&nbsp;tone,&nbsp;not&nbsp;content.<br>
+The&nbsp;underlying&nbsp;knowledge&nbsp;and&nbsp;reasoning&nbsp;remain&nbsp;unchanged.&nbsp;All&nbsp;phrasing<br>
+emerges&nbsp;from&nbsp;the&nbsp;language&nbsp;engine,&nbsp;never&nbsp;from&nbsp;hardcoded&nbsp;templates.<br>
+&nbsp;<br>
+Dependencies&nbsp;(passed&nbsp;to&nbsp;``__init__``):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;language:&nbsp;Language&nbsp;for&nbsp;composing&nbsp;ack&nbsp;phrases<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;composer:&nbsp;ThoughtComposer&nbsp;for&nbsp;composing&nbsp;about&nbsp;newly&nbsp;learned&nbsp;concepts<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;working_memory:&nbsp;WorkingMemory&nbsp;for&nbsp;current&nbsp;focus&nbsp;(anaphora&nbsp;resolution)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;rng:&nbsp;random&nbsp;number&nbsp;generator&nbsp;for&nbsp;variation<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;response_style_getter:&nbsp;callable&nbsp;returning&nbsp;the&nbsp;current&nbsp;style&nbsp;string</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="re.html">re</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.frontal_lobe.response_styler.html#ResponseStyler">ResponseStyler</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ResponseStyler">class <strong>ResponseStyler</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ResponseStyler">ResponseStyler</a>(language:&nbsp;'Language',&nbsp;composer:&nbsp;'ThoughtComposer',&nbsp;working_memory:&nbsp;'WorkingMemory',&nbsp;rng:&nbsp;'Any',&nbsp;response_style_getter:&nbsp;'Callable[[],&nbsp;str]',&nbsp;network:&nbsp;'Any'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Apply&nbsp;metacognitive&nbsp;tone&nbsp;adjustments&nbsp;and&nbsp;learning&nbsp;acknowledgments.<br>
+&nbsp;<br>
+All&nbsp;modifications&nbsp;are&nbsp;tone-level&nbsp;—&nbsp;the&nbsp;underlying&nbsp;knowledge&nbsp;and<br>
+reasoning&nbsp;remain&nbsp;unchanged.&nbsp;Phrasing&nbsp;emerges&nbsp;from&nbsp;the&nbsp;language<br>
+engine,&nbsp;never&nbsp;from&nbsp;hardcoded&nbsp;template&nbsp;strings.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ResponseStyler-__init__"><strong>__init__</strong></a>(self, language: 'Language', composer: 'ThoughtComposer', working_memory: 'WorkingMemory', rng: 'Any', response_style_getter: 'Callable[[], str]', network: 'Any' = None) -&gt; 'None'</dt><dd><span class="code">Wire&nbsp;the&nbsp;styler&nbsp;to&nbsp;its&nbsp;language&nbsp;engine,&nbsp;composer,&nbsp;and&nbsp;working&nbsp;memory.</span></dd></dl>
+
+<dl><dt><a name="ResponseStyler-acknowledge_learning"><strong>acknowledge_learning</strong></a>(self, response: 'str', learning_events: 'list', perception: 'Perception', emotion: 'EmotionalState') -&gt; 'str'</dt><dd><span class="code">Weave&nbsp;a&nbsp;brief&nbsp;learning&nbsp;acknowledgment&nbsp;into&nbsp;the&nbsp;response.<br>
+&nbsp;<br>
+The&nbsp;acknowledgment&nbsp;is&nbsp;composed&nbsp;from&nbsp;what&nbsp;it&nbsp;actually&nbsp;learned<br>
+—&nbsp;the&nbsp;concept&nbsp;and&nbsp;its&nbsp;relationships&nbsp;—&nbsp;not&nbsp;from&nbsp;hardcoded<br>
+templates.</span></dd></dl>
+
+<dl><dt><a name="ResponseStyler-apply_response_style"><strong>apply_response_style</strong></a>(self, response: 'str', thought: 'Thought') -&gt; 'str'</dt><dd><span class="code">Apply&nbsp;the&nbsp;active&nbsp;metacognitive&nbsp;strategy&nbsp;to&nbsp;the&nbsp;response.<br>
+&nbsp;<br>
+-&nbsp;**assertive**:&nbsp;trim&nbsp;hedging&nbsp;language,&nbsp;present&nbsp;knowledge&nbsp;directly<br>
+-&nbsp;**hedging**:&nbsp;add&nbsp;uncertainty&nbsp;markers&nbsp;when&nbsp;confidence&nbsp;is&nbsp;low<br>
+-&nbsp;**questioning**:&nbsp;no-op&nbsp;(questions&nbsp;are&nbsp;queued&nbsp;via&nbsp;/teach-questions)<br>
+-&nbsp;**varied**:&nbsp;rephrase&nbsp;to&nbsp;break&nbsp;repetitive&nbsp;patterns<br>
+-&nbsp;**neutral**:&nbsp;no&nbsp;modification</span></dd></dl>
+
+<dl><dt><a name="ResponseStyler-resolve_anaphora"><strong>resolve_anaphora</strong></a>(self, user_input: 'str') -&gt; 'str'</dt><dd><span class="code">Resolve&nbsp;bare&nbsp;pronouns&nbsp;to&nbsp;the&nbsp;current&nbsp;focus&nbsp;of&nbsp;conversation.<br>
+&nbsp;<br>
+"You"&nbsp;and&nbsp;"your"&nbsp;resolve&nbsp;to&nbsp;"Genesis"&nbsp;—&nbsp;the&nbsp;user&nbsp;is&nbsp;talking<br>
+to&nbsp;it&nbsp;—&nbsp;except&nbsp;inside&nbsp;zero-relative&nbsp;clauses&nbsp;where&nbsp;"you"&nbsp;is<br>
+generic&nbsp;("a&nbsp;pet&nbsp;you&nbsp;can&nbsp;keep").&nbsp;"it",&nbsp;"they",&nbsp;"them",&nbsp;"he",<br>
+"she"&nbsp;resolve&nbsp;to&nbsp;the&nbsp;current&nbsp;attentional&nbsp;focus.<br>
+&nbsp;<br>
+"this"/"that"&nbsp;resolve&nbsp;only&nbsp;as&nbsp;*demonstrative&nbsp;pronouns*&nbsp;in<br>
+argument&nbsp;position&nbsp;—&nbsp;sentence-initial&nbsp;("that&nbsp;is&nbsp;cool"),&nbsp;after<br>
+a&nbsp;verb&nbsp;or&nbsp;preposition&nbsp;("like&nbsp;that",&nbsp;"about&nbsp;that"),&nbsp;or&nbsp;final<br>
+("what&nbsp;is&nbsp;that?").&nbsp;They&nbsp;are&nbsp;left&nbsp;untouched&nbsp;as&nbsp;determiners<br>
+("that&nbsp;dog"),&nbsp;and&nbsp;"that"&nbsp;is&nbsp;left&nbsp;untouched&nbsp;as&nbsp;a&nbsp;relative<br>
+pronoun&nbsp;("a&nbsp;mammal&nbsp;that&nbsp;likes&nbsp;X")&nbsp;or&nbsp;complementizer&nbsp;("I<br>
+think&nbsp;that&nbsp;X").&nbsp;Rewriting&nbsp;those&nbsp;corrupts&nbsp;the&nbsp;sentence&nbsp;—<br>
+"a&nbsp;ferret&nbsp;is&nbsp;a&nbsp;small&nbsp;mammal&nbsp;that&nbsp;likes&nbsp;to&nbsp;steal"&nbsp;would&nbsp;be<br>
+learned&nbsp;verbatim&nbsp;as&nbsp;"…mammal&nbsp;&lt;focus&gt;&nbsp;likes&nbsp;to&nbsp;steal".<br>
+&nbsp;<br>
+"it"&nbsp;is&nbsp;skipped&nbsp;in&nbsp;expletive&nbsp;frames&nbsp;where&nbsp;it&nbsp;refers&nbsp;to<br>
+nothing&nbsp;("it&nbsp;seems",&nbsp;"it&nbsp;is&nbsp;raining",&nbsp;"it&nbsp;looks&nbsp;like&nbsp;…").</span></dd></dl>
+
+<dl><dt><a name="ResponseStyler-resolve_referents"><strong>resolve_referents</strong></a>(self, text: 'str') -&gt; 'str'</dt><dd><span class="code">Resolve&nbsp;discourse-referring&nbsp;pronouns&nbsp;inside&nbsp;a&nbsp;captured&nbsp;phrase.<br>
+&nbsp;<br>
+Unlike&nbsp;:meth:`resolve_anaphora`,&nbsp;which&nbsp;rewrites&nbsp;a&nbsp;whole<br>
+utterance&nbsp;(including&nbsp;"you"&nbsp;→&nbsp;the&nbsp;addressee),&nbsp;this&nbsp;substitutes<br>
+only&nbsp;third-person/demonstrative&nbsp;referents&nbsp;—&nbsp;"it",&nbsp;"this",<br>
+"that",&nbsp;"they",&nbsp;"them",&nbsp;"he",&nbsp;"she"&nbsp;—&nbsp;inside&nbsp;a&nbsp;short&nbsp;phrase<br>
+such&nbsp;as&nbsp;a&nbsp;routed&nbsp;question&nbsp;target&nbsp;("it"&nbsp;→&nbsp;"ferret").&nbsp;The<br>
+metacognitive&nbsp;router&nbsp;captures&nbsp;targets&nbsp;from&nbsp;the&nbsp;user's&nbsp;literal<br>
+words,&nbsp;so&nbsp;the&nbsp;referent&nbsp;that&nbsp;exists&nbsp;only&nbsp;in&nbsp;the&nbsp;resolved&nbsp;input<br>
+would&nbsp;otherwise&nbsp;never&nbsp;reach&nbsp;the&nbsp;composers.<br>
+&nbsp;<br>
+Returns&nbsp;the&nbsp;text&nbsp;unchanged&nbsp;when&nbsp;a&nbsp;pronoun&nbsp;has&nbsp;no&nbsp;referent&nbsp;or<br>
+sits&nbsp;in&nbsp;a&nbsp;non-anaphoric&nbsp;position&nbsp;(determiner&nbsp;"that&nbsp;dog",<br>
+expletive&nbsp;"it&nbsp;is&nbsp;raining").</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'_ANA_NON_REFERENTS': 'frozenset[str]', '_ANIMATE_HEADS': 'frozenset[str]'}</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['ResponseStyler']<br>
+<strong>__annotations__</strong> = {'_ANA_FUNC_WORDS': 'frozenset[str]', '_IT_EXPLETIVE_PREDS': 'frozenset[str]', '_IT_EXPLETIVE_VERBS': 'frozenset[str]', '_THAT_COMPLEMENTIZER_PRECEDERS': 'frozenset[str]', '_TRIVIAL_WORDS': 'frozenset[str]'}</td></tr></table>
+</body></html>

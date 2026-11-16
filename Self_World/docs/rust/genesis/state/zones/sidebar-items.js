@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["MAX_SUBCOGNITIVE_TASKS","TRACKED_STATES"],"enum":["CognitiveZone","MentalPhase"],"mod":["subcognitive_flag"],"struct":["ActiveZones","TransitionTally"]};

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.turn</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.turn</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/turn.py">/home/mindyrenee/GenAnd/Genesis/Self_World/turn.py</a></td></tr></table>
+    <p><span class="code">One&nbsp;cognitive&nbsp;turn,&nbsp;handed&nbsp;between&nbsp;regions.<br>
+&nbsp;<br>
+A&nbsp;turn&nbsp;used&nbsp;to&nbsp;be&nbsp;a&nbsp;method&nbsp;chain&nbsp;inside&nbsp;FrontalLobe:&nbsp;one&nbsp;class<br>
+perceived,&nbsp;felt,&nbsp;remembered,&nbsp;deliberated,&nbsp;and&nbsp;spoke.&nbsp;The&nbsp;regions<br>
+already&nbsp;own&nbsp;those&nbsp;functions.&nbsp;This&nbsp;module&nbsp;is&nbsp;the&nbsp;handoff&nbsp;—&nbsp;each&nbsp;stage<br>
+names&nbsp;the&nbsp;region&nbsp;that&nbsp;performs&nbsp;it&nbsp;and&nbsp;calls&nbsp;that&nbsp;region's&nbsp;method&nbsp;on<br>
+the&nbsp;engine.&nbsp;Adding&nbsp;a&nbsp;stage&nbsp;means&nbsp;adding&nbsp;a&nbsp;region&nbsp;call&nbsp;here,&nbsp;not<br>
+growing&nbsp;another&nbsp;method&nbsp;on&nbsp;the&nbsp;engine.<br>
+&nbsp;<br>
+It&nbsp;lives&nbsp;at&nbsp;the&nbsp;repository&nbsp;root&nbsp;beside&nbsp;``mind.py``&nbsp;and<br>
+``commitment.py``&nbsp;—&nbsp;the&nbsp;level&nbsp;of&nbsp;the&nbsp;whole&nbsp;organism,&nbsp;not&nbsp;inside<br>
+any&nbsp;region&nbsp;and&nbsp;not&nbsp;inside&nbsp;the&nbsp;composition&nbsp;entry&nbsp;(the&nbsp;regions&nbsp;can't<br>
+import&nbsp;``mind.py``&nbsp;without&nbsp;a&nbsp;cycle):&nbsp;the&nbsp;organism&nbsp;is&nbsp;the&nbsp;mind,&nbsp;and<br>
+one&nbsp;pass&nbsp;of&nbsp;input&nbsp;through&nbsp;its&nbsp;regions&nbsp;is&nbsp;orchestration&nbsp;of&nbsp;the<br>
+whole,&nbsp;not&nbsp;a&nbsp;part&nbsp;of&nbsp;it.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.turn.html#Turn">Turn</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Turn">class <strong>Turn</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Turn">Turn</a>(engine:&nbsp;'Any',&nbsp;user_input:&nbsp;'str')&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+A&nbsp;single&nbsp;pass&nbsp;of&nbsp;input&nbsp;through&nbsp;the&nbsp;regions&nbsp;that&nbsp;process&nbsp;it.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Turn-__init__"><strong>__init__</strong></a>(self, engine: 'Any', user_input: 'str') -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Turn-run"><strong>run</strong></a>(self) -&gt; 'tuple[str, Any]'</dt></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>logger</strong> = &lt;Logger Self_World.turn (WARNING)&gt;</td></tr></table>
+</body></html>

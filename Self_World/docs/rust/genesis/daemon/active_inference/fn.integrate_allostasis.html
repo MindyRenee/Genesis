@@ -1,0 +1,44 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Advance allostatic load by one step under the hysteresis band."><title>integrate_allostasis in genesis::daemon::active_inference - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-203241e4.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="genesis" data-themes="" data-resource-suffix="" data-rustdoc-version="1.100.0 (0ef1bc386 2026-11-09)" data-channel="1.100.0" data-search-js="search-b167f383.js" data-stringdex-js="stringdex-b5109af9.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../../static.files/main-1814ead3.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-9f56287d.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc fn"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">integrate_allostasis</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../genesis/index.html">genesis</a><span class="version">0.2.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">integrate_<wbr>allostasis</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#why-there-is-no-fixed-amplitude-threshold" title="Why there is no fixed amplitude threshold">Why there is no fixed amplitude threshold</a></li></ul></section><div id="rustdoc-modnav"><h2><a href="index.html">In genesis::<wbr>daemon::<wbr>active_<wbr>inference</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../index.html">genesis</a>::<wbr><a href="../index.html">daemon</a>::<wbr><a href="index.html">active_inference</a></div><h1>Function <span class="fn">integrate_<wbr>allostasis</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/genesis/daemon/active_inference.rs.html#560-584">Source</a> </span></div><pre class="rust item-decl"><code>fn integrate_allostasis(load: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>, burden: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>, rest: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>, dt_scale: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a>) -&gt; <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a></code></pre><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Advance allostatic load by one step under the hysteresis band.</p>
+<p>Pure function of the current load, the multisignal burden, and the
+time scale — extracted so the band behaviour is directly testable
+without driving the engine’s EMAs to a chosen burden (steps 5 and
+7 recompute those EMAs before step 8 reads them, so a test cannot
+simply pin them and observe the result).</p>
+<p>The result is always a finite value in [0, 1]. A non-finite <em>load</em>
+maps to 0.0 via <code>finite_clamp</code> — “no load”, the same convention as
+everywhere else in this file. A non-finite <em>burden</em> satisfies
+neither threshold comparison and therefore takes the band branch:
+an unknown burden holds the load roughly steady rather than
+clearing it (a false all-clear) or inflating it (a false alarm).
+Integrate allostatic load from the current burden.</p>
+<p>The functional form is the integral of a wear rate:</p>
+<div class="example-wrap"><pre class="language-text"><code>d(load)/dt = RATE * (burden - rest)      when burden &gt; rest
+d(load)/dt = -RECOVERY * rest_fraction    when burden &lt; rest</code></pre></div>
+<p>with <code>rest</code> being the measured resting burden, tracked as a slow
+baseline (see <code>RestBaseline</code>). This is what “cumulative wear”
+actually means: McEwen defines allostatic load as “the cost of
+chronic exposure to fluctuating or heightened neural or
+neuroendocrine response” — the cost is an integral over time of
+how far the response sits above its resting level, not a function
+of instantaneous amplitude.</p>
+<h3 id="why-there-is-no-fixed-amplitude-threshold"><a class="doc-anchor" href="#why-there-is-no-fixed-amplitude-threshold">§</a>Why there is no fixed amplitude threshold</h3>
+<p>This used to gate accumulation on <code>burden &gt; 0.30</code>, with a
+hysteresis band below. Measured consequences, on the real HPA
+cascade, were that one hour of chronic stress and six hours of it
+produced identical peak load (0.25011 both), and that a sustained
+elevation whose mean sat below the threshold was charged only
+during its oscillation peaks.</p>
+<p>The cause was structural. A hard threshold on a noisy signal
+rectifies it: the integrator then measures how often excursions
+cross a line, rather than how long the signal spends above its
+resting level. Since cortisol pulses and the catecholamines
+oscillate, most ticks landed in the band and the load never
+integrated at all — one hour and six hours of stress became
+indistinguishable, which is precisely the distinction the
+construct exists to draw.</p>
+<p>A small dead-band is still required, and it is kept, but it is
+expressed as a <em>fraction of the measured resting level</em> rather
+than a magic number: a burden within <code>REST_DEADBAND</code> of rest
+neither accrues nor drains, so ordinary physiological variation
+does not integrate without bound.</p>
+</div></details></section></div></main></body></html>

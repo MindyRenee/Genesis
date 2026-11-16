@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.basal_ganglia.action_feedback</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.basal_ganglia.html" class="white">basal_ganglia</a>.action_feedback</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/basal_ganglia/action_feedback.py">/home/mindyrenee/GenAnd/Genesis/Self_World/basal_ganglia/action_feedback.py</a></td></tr></table>
+    <p><span class="code">Action-feedback&nbsp;learning&nbsp;—&nbsp;action&nbsp;→&nbsp;prediction&nbsp;→&nbsp;observation&nbsp;→&nbsp;revision.<br>
+&nbsp;<br>
+This&nbsp;module&nbsp;implements&nbsp;the&nbsp;reusable&nbsp;loop&nbsp;the&nbsp;rest&nbsp;of&nbsp;the&nbsp;cognition&nbsp;stack<br>
+adapts&nbsp;to&nbsp;its&nbsp;own&nbsp;action&nbsp;domains:<br>
+&nbsp;<br>
+1.&nbsp;``begin``&nbsp;records&nbsp;an&nbsp;action&nbsp;and&nbsp;the&nbsp;state&nbsp;Genesis&nbsp;predicts&nbsp;it&nbsp;will<br>
+&nbsp;&nbsp;&nbsp;produce.&nbsp;The&nbsp;prediction&nbsp;may&nbsp;come&nbsp;from&nbsp;a&nbsp;domain&nbsp;policy,&nbsp;an&nbsp;explicit<br>
+&nbsp;&nbsp;&nbsp;expectation,&nbsp;and/or&nbsp;the&nbsp;learned&nbsp;action&nbsp;model.<br>
+2.&nbsp;``observe``&nbsp;records&nbsp;the&nbsp;independently&nbsp;observed&nbsp;post-action&nbsp;state&nbsp;—<br>
+&nbsp;&nbsp;&nbsp;never&nbsp;by&nbsp;copying&nbsp;the&nbsp;intended&nbsp;outcome&nbsp;—&nbsp;computes&nbsp;a&nbsp;structured<br>
+&nbsp;&nbsp;&nbsp;discrepancy,&nbsp;updates&nbsp;the&nbsp;learned&nbsp;action&nbsp;model,&nbsp;and&nbsp;diagnoses&nbsp;likely<br>
+&nbsp;&nbsp;&nbsp;causes.<br>
+3.&nbsp;``recommend``&nbsp;turns&nbsp;the&nbsp;diagnosis&nbsp;into&nbsp;a&nbsp;bounded&nbsp;revision:&nbsp;retry,<br>
+&nbsp;&nbsp;&nbsp;choose&nbsp;a&nbsp;different&nbsp;candidate&nbsp;action,&nbsp;diagnose&nbsp;further,&nbsp;wait,&nbsp;or&nbsp;stop.<br>
+4.&nbsp;``run_action``&nbsp;is&nbsp;a&nbsp;convenience&nbsp;wrapper&nbsp;for&nbsp;domains&nbsp;that&nbsp;can&nbsp;execute<br>
+&nbsp;&nbsp;&nbsp;a&nbsp;candidate&nbsp;action&nbsp;immediately.<br>
+&nbsp;<br>
+The&nbsp;learner&nbsp;intentionally&nbsp;separates&nbsp;three&nbsp;kinds&nbsp;of&nbsp;state:<br>
+&nbsp;<br>
+-&nbsp;**Attempt&nbsp;history**:&nbsp;what&nbsp;was&nbsp;tried,&nbsp;expected,&nbsp;observed,&nbsp;and&nbsp;inferred.<br>
+-&nbsp;**Action&nbsp;models**:&nbsp;durable&nbsp;learned&nbsp;statistics&nbsp;for&nbsp;a&nbsp;domain/action<br>
+&nbsp;&nbsp;signature&nbsp;(success&nbsp;probability,&nbsp;modal&nbsp;outcomes,&nbsp;numeric&nbsp;effects,<br>
+&nbsp;&nbsp;repeated&nbsp;failure&nbsp;causes).<br>
+-&nbsp;**Concept-network&nbsp;evidence**:&nbsp;observed&nbsp;action→outcome&nbsp;and<br>
+&nbsp;&nbsp;cause→outcome&nbsp;edges.&nbsp;These&nbsp;give&nbsp;the&nbsp;existing&nbsp;causal/abductive<br>
+&nbsp;&nbsp;machinery&nbsp;concrete&nbsp;evidence&nbsp;to&nbsp;reason&nbsp;over&nbsp;instead&nbsp;of&nbsp;keeping&nbsp;action<br>
+&nbsp;&nbsp;learning&nbsp;trapped&nbsp;in&nbsp;a&nbsp;private&nbsp;table.<br>
+&nbsp;<br>
+The&nbsp;engine&nbsp;does&nbsp;not&nbsp;invent&nbsp;explanations&nbsp;when&nbsp;evidence&nbsp;is&nbsp;absent.&nbsp;A<br>
+mismatch&nbsp;can&nbsp;produce&nbsp;an&nbsp;explicit&nbsp;``unknown_discrepancy``&nbsp;hypothesis;<br>
+known&nbsp;causes&nbsp;are&nbsp;ranked&nbsp;by&nbsp;observed&nbsp;frequency,&nbsp;network&nbsp;evidence,&nbsp;and&nbsp;any<br>
+domain-specific&nbsp;abducer&nbsp;supplied&nbsp;by&nbsp;the&nbsp;caller.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="json.html">json</a><br>
+</td><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="math.html">math</a><br>
+</td><td class="multicolumn"><a href="time.html">time</a><br>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.basal_ganglia.action_feedback.html#ActionAttempt">ActionAttempt</a>
+</dt><dt class="heading-text"><a href="Self_World.basal_ganglia.action_feedback.html#ActionFeedback">ActionFeedback</a>
+</dt><dt class="heading-text"><a href="Self_World.basal_ganglia.action_feedback.html#ActionPrediction">ActionPrediction</a>
+</dt><dt class="heading-text"><a href="Self_World.basal_ganglia.action_feedback.html#ActionRevision">ActionRevision</a>
+</dt><dt class="heading-text"><a href="Self_World.basal_ganglia.action_feedback.html#ActionSpec">ActionSpec</a>
+</dt><dt class="heading-text"><a href="Self_World.basal_ganglia.action_feedback.html#CausalHypothesis">CausalHypothesis</a>
+</dt><dt class="heading-text"><a href="Self_World.basal_ganglia.action_feedback.html#Discrepancy">Discrepancy</a>
+</dt><dt class="heading-text"><a href="Self_World.basal_ganglia.action_feedback.html#OutcomeState">OutcomeState</a>
+</dt></dl>
+</dd>
+<dt class="heading-text"><a href="enum.html#StrEnum">enum.StrEnum</a>(<a href="builtins.html#str">builtins.str</a>, <a href="enum.html#ReprEnum">enum.ReprEnum</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.basal_ganglia.action_feedback.html#RevisionKind">RevisionKind</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ActionAttempt">class <strong>ActionAttempt</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ActionAttempt">ActionAttempt</a>(attempt_id:&nbsp;'str',&nbsp;action:&nbsp;'<a href="#ActionSpec">ActionSpec</a>',&nbsp;prediction:&nbsp;'<a href="#ActionPrediction">ActionPrediction</a>',&nbsp;created_at:&nbsp;'float',&nbsp;actual:&nbsp;'<a href="#OutcomeState">OutcomeState</a>&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;discrepancy:&nbsp;'<a href="#Discrepancy">Discrepancy</a>&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;hypotheses:&nbsp;'list[<a href="#CausalHypothesis">CausalHypothesis</a>]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;revision:&nbsp;'<a href="#ActionRevision">ActionRevision</a>&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;completed_at:&nbsp;'float&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;retry_of:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;metadata:&nbsp;'dict[str,&nbsp;Any]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+One&nbsp;complete&nbsp;or&nbsp;pending&nbsp;action-feedback&nbsp;episode.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ActionAttempt-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="ActionAttempt-__init__"><strong>__init__</strong></a>(self, attempt_id: 'str', action: 'ActionSpec', prediction: 'ActionPrediction', created_at: 'float', actual: 'OutcomeState | None' = None, discrepancy: 'Discrepancy | None' = None, hypotheses: 'list[CausalHypothesis]' = &lt;factory&gt;, revision: 'ActionRevision | None' = None, completed_at: 'float | None' = None, retry_of: 'str' = '', metadata: 'dict[str, Any]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="ActionAttempt-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="ActionAttempt-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict[str, Any]'</dt><dd><span class="code">Serialize&nbsp;the&nbsp;attempt.</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="ActionAttempt-from_dict"><strong>from_dict</strong></a>(data: 'dict[str, Any]') -&gt; 'ActionAttempt'</dt><dd><span class="code">Restore&nbsp;an&nbsp;attempt.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>observed</strong></dt>
+<dd><span class="code">Whether&nbsp;a&nbsp;post-action&nbsp;state&nbsp;was&nbsp;supplied.</span></dd>
+</dl>
+<dl><dt><strong>succeeded</strong></dt>
+<dd><span class="code">Whether&nbsp;the&nbsp;observed&nbsp;outcome&nbsp;marked&nbsp;the&nbsp;action&nbsp;successful.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>action</strong></dt>
+</dl>
+<dl><dt><strong>actual</strong></dt>
+</dl>
+<dl><dt><strong>attempt_id</strong></dt>
+</dl>
+<dl><dt><strong>completed_at</strong></dt>
+</dl>
+<dl><dt><strong>created_at</strong></dt>
+</dl>
+<dl><dt><strong>discrepancy</strong></dt>
+</dl>
+<dl><dt><strong>hypotheses</strong></dt>
+</dl>
+<dl><dt><strong>metadata</strong></dt>
+</dl>
+<dl><dt><strong>prediction</strong></dt>
+</dl>
+<dl><dt><strong>retry_of</strong></dt>
+</dl>
+<dl><dt><strong>revision</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'action': 'ActionSpec', 'actual': 'OutcomeState | None', 'attempt_id': 'str', 'completed_at': 'float | None', 'created_at': 'float', 'discrepancy': 'Discrepancy | None', 'hypotheses': 'list[CausalHypothesis]', 'metadata': 'dict[str, Any]', 'prediction': 'ActionPrediction', 'retry_of': 'str', ...}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'action': Field(name='action',type='ActionSpec',default=&lt;d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'actual': Field(name='actual',type='OutcomeState | None',d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'attempt_id': Field(name='attempt_id',type='str',default=&lt;data...appingproxy({}),kw_only=False,_field_type=_FIELD), 'completed_at': Field(name='completed_at',type='float | None',de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'created_at': Field(name='created_at',type='float',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD), 'discrepancy': Field(name='discrepancy',type='Discrepancy | Non...appingproxy({}),kw_only=False,_field_type=_FIELD), 'hypotheses': Field(name='hypotheses',type='list[CausalHypothe...appingproxy({}),kw_only=False,_field_type=_FIELD), 'metadata': Field(name='metadata',type='dict[str, Any]',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'prediction': Field(name='prediction',type='ActionPrediction',...appingproxy({}),kw_only=False,_field_type=_FIELD), 'retry_of': Field(name='retry_of',type='str',default='',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), ...}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('attempt_id', 'action', 'prediction', 'created_at', 'actual', 'discrepancy', 'hypotheses', 'revision', 'completed_at', 'retry_of', 'metadata')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ActionFeedback">class <strong>ActionFeedback</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ActionFeedback">ActionFeedback</a>(network:&nbsp;'ConceptNetwork&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;*,&nbsp;probabilistic:&nbsp;'ProbabilisticReasoning&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;causal_infer:&nbsp;'Callable[[<a href="#ActionSpec">ActionSpec</a>,&nbsp;<a href="#Discrepancy">Discrepancy</a>,&nbsp;<a href="#OutcomeState">OutcomeState</a>],&nbsp;Iterable[<a href="#CausalHypothesis">CausalHypothesis</a>]]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;repair_suggester:&nbsp;'Callable[[<a href="#ActionSpec">ActionSpec</a>,&nbsp;list[<a href="#CausalHypothesis">CausalHypothesis</a>],&nbsp;<a href="#OutcomeState">OutcomeState</a>],&nbsp;<a href="#ActionSpec">ActionSpec</a>&nbsp;|&nbsp;None]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;attempt_listener:&nbsp;'Callable[[<a href="#ActionAttempt">ActionAttempt</a>,&nbsp;str],&nbsp;None]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;reward_learner:&nbsp;'Callable[[<a href="#ActionAttempt">ActionAttempt</a>,&nbsp;float],&nbsp;float&nbsp;|&nbsp;None]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;value_estimator:&nbsp;'Callable[[<a href="#ActionSpec">ActionSpec</a>],&nbsp;float&nbsp;|&nbsp;None]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Learn&nbsp;action&nbsp;consequences&nbsp;from&nbsp;prediction&nbsp;errors.<br>
+&nbsp;<br>
+The&nbsp;engine&nbsp;is&nbsp;deliberately&nbsp;domain-neutral.&nbsp;Execution&nbsp;adapters&nbsp;supply<br>
+the&nbsp;independently&nbsp;observed&nbsp;state;&nbsp;the&nbsp;learner&nbsp;owns&nbsp;comparison,<br>
+diagnosis,&nbsp;model&nbsp;update,&nbsp;revision&nbsp;selection,&nbsp;persistence,&nbsp;and<br>
+concept-network&nbsp;grounding.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ActionFeedback-__init__"><strong>__init__</strong></a>(self, network: 'ConceptNetwork | None' = None, *, probabilistic: 'ProbabilisticReasoning | None' = None, causal_infer: 'Callable[[ActionSpec, Discrepancy, OutcomeState], Iterable[CausalHypothesis]] | None' = None, repair_suggester: 'Callable[[ActionSpec, list[CausalHypothesis], OutcomeState], ActionSpec | None] | None' = None, attempt_listener: 'Callable[[ActionAttempt, str], None] | None' = None, reward_learner: 'Callable[[ActionAttempt, float], float | None] | None' = None, value_estimator: 'Callable[[ActionSpec], float | None] | None' = None) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;reusable&nbsp;feedback&nbsp;learner.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;network:&nbsp;Optional&nbsp;concept&nbsp;network&nbsp;used&nbsp;to&nbsp;ground&nbsp;observed<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;action→outcome&nbsp;and&nbsp;cause→outcome&nbsp;evidence.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;probabilistic:&nbsp;Optional&nbsp;Bayesian&nbsp;belief&nbsp;engine.&nbsp;Observed<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;outcomes&nbsp;become&nbsp;positive/negative&nbsp;evidence&nbsp;for&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;corresponding&nbsp;action→outcome&nbsp;relation.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;causal_infer:&nbsp;Optional&nbsp;domain-specific&nbsp;abducer&nbsp;returning<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;extra&nbsp;hypotheses.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;repair_suggester:&nbsp;Optional&nbsp;domain-specific&nbsp;adapter&nbsp;that&nbsp;maps<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;a&nbsp;diagnosis&nbsp;to&nbsp;a&nbsp;diagnostic/repair&nbsp;action.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;attempt_listener:&nbsp;Optional&nbsp;observer&nbsp;called&nbsp;as&nbsp;attempts&nbsp;move<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;through&nbsp;the&nbsp;loop.&nbsp;Phases&nbsp;are&nbsp;``"begin"``&nbsp;after&nbsp;a&nbsp;pending<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;action&nbsp;is&nbsp;registered&nbsp;and&nbsp;``"observed"``&nbsp;after&nbsp;its&nbsp;real<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;outcome&nbsp;has&nbsp;been&nbsp;evaluated&nbsp;and&nbsp;learned&nbsp;from.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;reward_learner:&nbsp;Optional&nbsp;scalar-reward&nbsp;sink&nbsp;(typically&nbsp;a&nbsp;TD<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;update).&nbsp;Called&nbsp;with&nbsp;the&nbsp;completed&nbsp;attempt&nbsp;and&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;utility&nbsp;reward&nbsp;computed&nbsp;from&nbsp;its&nbsp;independently&nbsp;observed<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;outcome;&nbsp;may&nbsp;return&nbsp;the&nbsp;resulting&nbsp;reward&nbsp;prediction<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;error,&nbsp;which&nbsp;is&nbsp;recorded&nbsp;on&nbsp;the&nbsp;attempt.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;value_estimator:&nbsp;Optional&nbsp;learned-value&nbsp;lookup&nbsp;for&nbsp;an&nbsp;action<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;candidate&nbsp;(typically&nbsp;TD&nbsp;value&nbsp;over&nbsp;the&nbsp;action's&nbsp;concept<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;state).&nbsp;Blended&nbsp;into&nbsp;``_action_score``&nbsp;so&nbsp;repeated<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;outcomes&nbsp;bias&nbsp;alternative&nbsp;selection.</span></dd></dl>
+
+<dl><dt><a name="ActionFeedback-begin"><strong>begin</strong></a>(self, action: 'ActionSpec', *, expected: 'OutcomeState | dict[str, Any] | None' = None, confidence: 'float | None' = None, retry_of: 'str' = '', metadata: 'dict[str, Any] | None' = None) -&gt; 'ActionAttempt'</dt><dd><span class="code">Record&nbsp;an&nbsp;action&nbsp;and&nbsp;its&nbsp;predicted&nbsp;post-action&nbsp;state.<br>
+&nbsp;<br>
+The&nbsp;returned&nbsp;attempt&nbsp;must&nbsp;later&nbsp;be&nbsp;closed&nbsp;with&nbsp;``observe``&nbsp;using<br>
+independently&nbsp;gathered&nbsp;outcome&nbsp;data.&nbsp;Until&nbsp;then&nbsp;it&nbsp;remains&nbsp;in&nbsp;the<br>
+pending&nbsp;set,&nbsp;so&nbsp;unobserved&nbsp;actions&nbsp;are&nbsp;explicit&nbsp;rather&nbsp;than&nbsp;being<br>
+silently&nbsp;treated&nbsp;as&nbsp;successful.</span></dd></dl>
+
+<dl><dt><a name="ActionFeedback-expected_numeric"><strong>expected_numeric</strong></a>(self, action: 'ActionSpec', field_name: 'str') -&gt; 'float | None'</dt><dd><span class="code">Return&nbsp;the&nbsp;learned&nbsp;numeric&nbsp;expectation&nbsp;for&nbsp;a&nbsp;field,&nbsp;if&nbsp;known.</span></dd></dl>
+
+<dl><dt><a name="ActionFeedback-model_for"><strong>model_for</strong></a>(self, action: 'ActionSpec') -&gt; 'dict[str, Any]'</dt><dd><span class="code">Return&nbsp;a&nbsp;read-only&nbsp;summary&nbsp;of&nbsp;the&nbsp;learned&nbsp;model,&nbsp;if&nbsp;any.</span></dd></dl>
+
+<dl><dt><a name="ActionFeedback-observe"><strong>observe</strong></a>(self, attempt_or_id: 'ActionAttempt | str', actual: 'OutcomeState | dict[str, Any]', *, alternatives: 'Iterable[ActionSpec] | None' = None, repair: 'bool' = True, metadata: 'dict[str, Any] | None' = None) -&gt; 'ActionAttempt'</dt><dd><span class="code">Close&nbsp;an&nbsp;attempt&nbsp;with&nbsp;the&nbsp;independently&nbsp;observed&nbsp;state.<br>
+&nbsp;<br>
+``actual``&nbsp;is&nbsp;mandatory&nbsp;and&nbsp;is&nbsp;never&nbsp;copied&nbsp;from&nbsp;the&nbsp;prediction.<br>
+A&nbsp;dict&nbsp;is&nbsp;treated&nbsp;as&nbsp;an&nbsp;observed&nbsp;``<a href="#OutcomeState">OutcomeState</a>``;&nbsp;callers&nbsp;that<br>
+could&nbsp;not&nbsp;observe&nbsp;the&nbsp;world&nbsp;should&nbsp;pass&nbsp;``observed=False``&nbsp;in&nbsp;an<br>
+``<a href="#OutcomeState">OutcomeState</a>``&nbsp;rather&nbsp;than&nbsp;fabricating&nbsp;a&nbsp;result.</span></dd></dl>
+
+<dl><dt><a name="ActionFeedback-recommend"><strong>recommend</strong></a>(self, attempt: 'ActionAttempt', *, alternatives: 'Iterable[ActionSpec] | None' = None, repair: 'bool' = True) -&gt; 'ActionRevision'</dt><dd><span class="code">Choose&nbsp;a&nbsp;bounded&nbsp;next&nbsp;action&nbsp;from&nbsp;feedback.<br>
+&nbsp;<br>
+The&nbsp;recommendation&nbsp;is&nbsp;intentionally&nbsp;conservative:&nbsp;unobserved<br>
+actions&nbsp;wait,&nbsp;terminal/unsafe&nbsp;causes&nbsp;stop,&nbsp;transient&nbsp;causes&nbsp;can<br>
+retry,&nbsp;alternatives&nbsp;are&nbsp;selected&nbsp;only&nbsp;when&nbsp;they&nbsp;have&nbsp;a&nbsp;better<br>
+learned&nbsp;or&nbsp;domain-supplied&nbsp;expected&nbsp;value,&nbsp;and&nbsp;repeated&nbsp;identical<br>
+failures&nbsp;are&nbsp;not&nbsp;blindly&nbsp;repeated.</span></dd></dl>
+
+<dl><dt><a name="ActionFeedback-restore_from_dict"><strong>restore_from_dict</strong></a>(self, data: 'dict[str, Any]') -&gt; 'None'</dt><dd><span class="code">Restore&nbsp;learned&nbsp;action&nbsp;models&nbsp;from&nbsp;persistence.</span></dd></dl>
+
+<dl><dt><a name="ActionFeedback-run_action"><strong>run_action</strong></a>(self, action: 'ActionSpec', *, execute: 'Callable[[ActionSpec, ActionAttempt], Any]', observe: 'Callable[[ActionSpec, Any, ActionAttempt], OutcomeState | dict[str, Any]]', expected: 'OutcomeState | dict[str, Any] | None' = None, alternatives: 'Iterable[ActionSpec] | None' = None, max_attempts: 'int' = 1) -&gt; 'list[ActionAttempt]'</dt><dd><span class="code">Execute&nbsp;an&nbsp;action-feedback&nbsp;loop&nbsp;with&nbsp;bounded&nbsp;revision.<br>
+&nbsp;<br>
+``execute``&nbsp;performs&nbsp;the&nbsp;action.&nbsp;``observe``&nbsp;must&nbsp;read&nbsp;the&nbsp;actual<br>
+post-action&nbsp;world/tool&nbsp;result&nbsp;and&nbsp;convert&nbsp;it&nbsp;to&nbsp;an&nbsp;<a href="#OutcomeState">OutcomeState</a>.<br>
+The&nbsp;learner&nbsp;does&nbsp;not&nbsp;assume&nbsp;success&nbsp;from&nbsp;the&nbsp;action&nbsp;request.</span></dd></dl>
+
+<dl><dt><a name="ActionFeedback-statistics"><strong>statistics</strong></a>(self) -&gt; 'dict[str, Any]'</dt><dd><span class="code">Return&nbsp;aggregate&nbsp;learning&nbsp;statistics.</span></dd></dl>
+
+<dl><dt><a name="ActionFeedback-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict[str, Any]'</dt><dd><span class="code">Serialize&nbsp;learned&nbsp;action&nbsp;models&nbsp;and&nbsp;bounded&nbsp;recent&nbsp;history.</span></dd></dl>
+
+<hr>
+Static methods defined here:<br>
+<dl><dt><a name="ActionFeedback-compare"><strong>compare</strong></a>(expected: 'OutcomeState', actual: 'OutcomeState') -&gt; 'Discrepancy'</dt><dd><span class="code">Compare&nbsp;predicted&nbsp;and&nbsp;observed&nbsp;state&nbsp;field-by-field.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>history</strong></dt>
+<dd><span class="code">Recent&nbsp;completed&nbsp;attempts&nbsp;(copy).</span></dd>
+</dl>
+<dl><dt><strong>model_count</strong></dt>
+<dd><span class="code">How&nbsp;many&nbsp;action/context&nbsp;models&nbsp;have&nbsp;been&nbsp;learned.</span></dd>
+</dl>
+<dl><dt><strong>pending_count</strong></dt>
+<dd><span class="code">How&nbsp;many&nbsp;begun&nbsp;actions&nbsp;are&nbsp;still&nbsp;awaiting&nbsp;observation.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ActionPrediction">class <strong>ActionPrediction</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ActionPrediction">ActionPrediction</a>(expected:&nbsp;'<a href="#OutcomeState">OutcomeState</a>',&nbsp;confidence:&nbsp;'float',&nbsp;basis:&nbsp;'str',&nbsp;expected_success:&nbsp;'float&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;model_key:&nbsp;'str'&nbsp;=&nbsp;'')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;pre-action&nbsp;prediction&nbsp;made&nbsp;by&nbsp;a&nbsp;domain&nbsp;policy&nbsp;plus&nbsp;the&nbsp;model.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ActionPrediction-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="ActionPrediction-__init__"><strong>__init__</strong></a>(self, expected: 'OutcomeState', confidence: 'float', basis: 'str', expected_success: 'float | None' = None, model_key: 'str' = '') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="ActionPrediction-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="ActionPrediction-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict[str, Any]'</dt><dd><span class="code">Serialize&nbsp;the&nbsp;prediction.</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="ActionPrediction-from_dict"><strong>from_dict</strong></a>(data: 'dict[str, Any]') -&gt; 'ActionPrediction'</dt><dd><span class="code">Restore&nbsp;a&nbsp;prediction.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>basis</strong></dt>
+</dl>
+<dl><dt><strong>confidence</strong></dt>
+</dl>
+<dl><dt><strong>expected</strong></dt>
+</dl>
+<dl><dt><strong>expected_success</strong></dt>
+</dl>
+<dl><dt><strong>model_key</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'basis': 'str', 'confidence': 'float', 'expected': 'OutcomeState', 'expected_success': 'float | None', 'model_key': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'basis': Field(name='basis',type='str',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD), 'confidence': Field(name='confidence',type='float',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD), 'expected': Field(name='expected',type='OutcomeState',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'expected_success': Field(name='expected_success',type='float | None...appingproxy({}),kw_only=False,_field_type=_FIELD), 'model_key': Field(name='model_key',type='str',default='',def...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('expected', 'confidence', 'basis', 'expected_success', 'model_key')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ActionRevision">class <strong>ActionRevision</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ActionRevision">ActionRevision</a>(kind:&nbsp;'<a href="#RevisionKind">RevisionKind</a>'&nbsp;=&nbsp;&amp;lt;<a href="#RevisionKind">RevisionKind</a>.NONE:&nbsp;'none'&amp;gt;,&nbsp;action:&nbsp;'<a href="#ActionSpec">ActionSpec</a>&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;reason:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;confidence:&nbsp;'float'&nbsp;=&nbsp;0.0)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;bounded&nbsp;recommendation&nbsp;for&nbsp;what&nbsp;to&nbsp;do&nbsp;after&nbsp;feedback.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ActionRevision-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="ActionRevision-__init__"><strong>__init__</strong></a>(self, kind: 'RevisionKind' = &lt;RevisionKind.NONE: 'none'&gt;, action: 'ActionSpec | None' = None, reason: 'str' = '', confidence: 'float' = 0.0) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="ActionRevision-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="ActionRevision-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict[str, Any]'</dt><dd><span class="code">Serialize&nbsp;the&nbsp;revision.</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="ActionRevision-from_dict"><strong>from_dict</strong></a>(data: 'dict[str, Any]') -&gt; 'ActionRevision'</dt><dd><span class="code">Restore&nbsp;a&nbsp;revision.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>action</strong></dt>
+</dl>
+<dl><dt><strong>confidence</strong></dt>
+</dl>
+<dl><dt><strong>kind</strong></dt>
+</dl>
+<dl><dt><strong>reason</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'action': 'ActionSpec | None', 'confidence': 'float', 'kind': 'RevisionKind', 'reason': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'action': Field(name='action',type='ActionSpec | None',def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'confidence': Field(name='confidence',type='float',default=0.0...appingproxy({}),kw_only=False,_field_type=_FIELD), 'kind': Field(name='kind',type='RevisionKind',default=&lt;R...appingproxy({}),kw_only=False,_field_type=_FIELD), 'reason': Field(name='reason',type='str',default='',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('kind', 'action', 'reason', 'confidence')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ActionSpec">class <strong>ActionSpec</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ActionSpec">ActionSpec</a>(domain:&nbsp;'str',&nbsp;name:&nbsp;'str',&nbsp;target:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;signature:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;parameters:&nbsp;'dict[str,&nbsp;Any]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;concrete&nbsp;action&nbsp;Genesis&nbsp;can&nbsp;perform.<br>
+&nbsp;<br>
+``domain``&nbsp;separates&nbsp;tool&nbsp;use,&nbsp;plan&nbsp;steps,&nbsp;body&nbsp;regulation,&nbsp;and&nbsp;other<br>
+environments.&nbsp;``signature``&nbsp;is&nbsp;the&nbsp;learned&nbsp;context&nbsp;bucket:&nbsp;adapters<br>
+can&nbsp;set&nbsp;it&nbsp;to&nbsp;a&nbsp;target&nbsp;type&nbsp;(for&nbsp;example&nbsp;``python_file``&nbsp;or&nbsp;a<br>
+chemical&nbsp;name)&nbsp;without&nbsp;making&nbsp;every&nbsp;individual&nbsp;target&nbsp;a&nbsp;separate<br>
+model.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ActionSpec-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="ActionSpec-__init__"><strong>__init__</strong></a>(self, domain: 'str', name: 'str', target: 'str' = '', signature: 'str' = '', parameters: 'dict[str, Any]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="ActionSpec-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="ActionSpec-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict[str, Any]'</dt><dd><span class="code">Serialize&nbsp;the&nbsp;action.</span></dd></dl>
+
+<dl><dt><a name="ActionSpec-with_parameters"><strong>with_parameters</strong></a>(self, **updates: 'Any') -&gt; 'ActionSpec'</dt><dd><span class="code">Return&nbsp;a&nbsp;revised&nbsp;action&nbsp;with&nbsp;selected&nbsp;parameters&nbsp;replaced.</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="ActionSpec-from_dict"><strong>from_dict</strong></a>(data: 'dict[str, Any]') -&gt; 'ActionSpec'</dt><dd><span class="code">Restore&nbsp;an&nbsp;action&nbsp;from&nbsp;serialized&nbsp;data.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>concept_id</strong></dt>
+<dd><span class="code">Concept-network&nbsp;identifier&nbsp;for&nbsp;this&nbsp;kind&nbsp;of&nbsp;action.</span></dd>
+</dl>
+<dl><dt><strong>model_key</strong></dt>
+<dd><span class="code">Stable&nbsp;key&nbsp;for&nbsp;the&nbsp;learned&nbsp;action&nbsp;model.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>domain</strong></dt>
+</dl>
+<dl><dt><strong>name</strong></dt>
+</dl>
+<dl><dt><strong>parameters</strong></dt>
+</dl>
+<dl><dt><strong>signature</strong></dt>
+</dl>
+<dl><dt><strong>target</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'domain': 'str', 'name': 'str', 'parameters': 'dict[str, Any]', 'signature': 'str', 'target': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'domain': Field(name='domain',type='str',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD), 'name': Field(name='name',type='str',default=&lt;dataclasse...appingproxy({}),kw_only=False,_field_type=_FIELD), 'parameters': Field(name='parameters',type='dict[str, Any]',de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'signature': Field(name='signature',type='str',default='',def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'target': Field(name='target',type='str',default='',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('domain', 'name', 'target', 'signature', 'parameters')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="CausalHypothesis">class <strong>CausalHypothesis</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#CausalHypothesis">CausalHypothesis</a>(cause:&nbsp;'str',&nbsp;confidence:&nbsp;'float',&nbsp;evidence:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;source:&nbsp;'str'&nbsp;=&nbsp;'observed')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;ranked&nbsp;possible&nbsp;cause&nbsp;for&nbsp;an&nbsp;observed&nbsp;discrepancy.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="CausalHypothesis-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="CausalHypothesis-__init__"><strong>__init__</strong></a>(self, cause: 'str', confidence: 'float', evidence: 'list[str]' = &lt;factory&gt;, source: 'str' = 'observed') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="CausalHypothesis-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="CausalHypothesis-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict[str, Any]'</dt><dd><span class="code">Serialize&nbsp;the&nbsp;hypothesis.</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="CausalHypothesis-from_dict"><strong>from_dict</strong></a>(data: 'dict[str, Any]') -&gt; 'CausalHypothesis'</dt><dd><span class="code">Restore&nbsp;a&nbsp;hypothesis.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>cause</strong></dt>
+</dl>
+<dl><dt><strong>confidence</strong></dt>
+</dl>
+<dl><dt><strong>evidence</strong></dt>
+</dl>
+<dl><dt><strong>source</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'cause': 'str', 'confidence': 'float', 'evidence': 'list[str]', 'source': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'cause': Field(name='cause',type='str',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD), 'confidence': Field(name='confidence',type='float',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD), 'evidence': Field(name='evidence',type='list[str]',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD), 'source': Field(name='source',type='str',default='observed...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('cause', 'confidence', 'evidence', 'source')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Discrepancy">class <strong>Discrepancy</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Discrepancy">Discrepancy</a>(mismatches:&nbsp;'dict[str,&nbsp;dict[str,&nbsp;Any]]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;missing:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;magnitude:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;compared_fields:&nbsp;'int'&nbsp;=&nbsp;0)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;computed&nbsp;difference&nbsp;between&nbsp;predicted&nbsp;and&nbsp;observed&nbsp;state.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Discrepancy-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="Discrepancy-__init__"><strong>__init__</strong></a>(self, mismatches: 'dict[str, dict[str, Any]]' = &lt;factory&gt;, missing: 'list[str]' = &lt;factory&gt;, magnitude: 'float' = 0.0, compared_fields: 'int' = 0) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Discrepancy-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="Discrepancy-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict[str, Any]'</dt><dd><span class="code">Serialize&nbsp;the&nbsp;discrepancy.</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="Discrepancy-from_dict"><strong>from_dict</strong></a>(data: 'dict[str, Any]') -&gt; 'Discrepancy'</dt><dd><span class="code">Restore&nbsp;a&nbsp;discrepancy.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>matched</strong></dt>
+<dd><span class="code">Whether&nbsp;every&nbsp;compared&nbsp;field&nbsp;matched.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>compared_fields</strong></dt>
+</dl>
+<dl><dt><strong>magnitude</strong></dt>
+</dl>
+<dl><dt><strong>mismatches</strong></dt>
+</dl>
+<dl><dt><strong>missing</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'compared_fields': 'int', 'magnitude': 'float', 'mismatches': 'dict[str, dict[str, Any]]', 'missing': 'list[str]'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'compared_fields': Field(name='compared_fields',type='int',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'magnitude': Field(name='magnitude',type='float',default=0.0,...appingproxy({}),kw_only=False,_field_type=_FIELD), 'mismatches': Field(name='mismatches',type='dict[str, dict[str...appingproxy({}),kw_only=False,_field_type=_FIELD), 'missing': Field(name='missing',type='list[str]',default=&lt;d...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('mismatches', 'missing', 'magnitude', 'compared_fields')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="OutcomeState">class <strong>OutcomeState</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#OutcomeState">OutcomeState</a>(fields:&nbsp;'dict[str,&nbsp;Any]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;observed:&nbsp;'bool'&nbsp;=&nbsp;False,&nbsp;summary:&nbsp;'str'&nbsp;=&nbsp;'')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;structured&nbsp;state&nbsp;estimate&nbsp;or&nbsp;observation.<br>
+&nbsp;<br>
+``observed=False``&nbsp;marks&nbsp;a&nbsp;prediction.&nbsp;``observed=True``&nbsp;marks&nbsp;a<br>
+real&nbsp;post-action&nbsp;observation&nbsp;supplied&nbsp;by&nbsp;an&nbsp;execution&nbsp;adapter.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="OutcomeState-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="OutcomeState-__init__"><strong>__init__</strong></a>(self, fields: 'dict[str, Any]' = &lt;factory&gt;, observed: 'bool' = False, summary: 'str' = '') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="OutcomeState-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="OutcomeState-get"><strong>get</strong></a>(self, field_name: 'str', default: 'Any' = None) -&gt; 'Any'</dt><dd><span class="code">Return&nbsp;a&nbsp;state&nbsp;field.</span></dd></dl>
+
+<dl><dt><a name="OutcomeState-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict[str, Any]'</dt><dd><span class="code">Serialize&nbsp;the&nbsp;state.</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="OutcomeState-from_dict"><strong>from_dict</strong></a>(data: 'dict[str, Any]') -&gt; 'OutcomeState'</dt><dd><span class="code">Restore&nbsp;a&nbsp;state&nbsp;from&nbsp;serialized&nbsp;data.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>fields</strong></dt>
+</dl>
+<dl><dt><strong>observed</strong></dt>
+</dl>
+<dl><dt><strong>summary</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'fields': 'dict[str, Any]', 'observed': 'bool', 'summary': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'fields': Field(name='fields',type='dict[str, Any]',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'observed': Field(name='observed',type='bool',default=False,...appingproxy({}),kw_only=False,_field_type=_FIELD), 'summary': Field(name='summary',type='str',default='',defau...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('fields', 'observed', 'summary')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="RevisionKind">class <strong>RevisionKind</strong></a>(<a href="enum.html#StrEnum">enum.StrEnum</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#RevisionKind">RevisionKind</a>(*values)<br>
+&nbsp;<br>
+The&nbsp;kind&nbsp;of&nbsp;revised&nbsp;action&nbsp;recommended&nbsp;after&nbsp;feedback.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.basal_ganglia.action_feedback.html#RevisionKind">RevisionKind</a></dd>
+<dd><a href="enum.html#StrEnum">enum.StrEnum</a></dd>
+<dd><a href="builtins.html#str">builtins.str</a></dd>
+<dd><a href="enum.html#ReprEnum">enum.ReprEnum</a></dd>
+<dd><a href="enum.html#Enum">enum.Enum</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="RevisionKind-__format__"><strong>__format__</strong></a>(self, format_spec, /)<span class="grey"><span class="heading-text"> from <a href="builtins.html#str">builtins.str</a></span></span></dt><dd><span class="code">Return&nbsp;a&nbsp;formatted&nbsp;version&nbsp;of&nbsp;the&nbsp;string&nbsp;as&nbsp;described&nbsp;by&nbsp;format_spec.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-__new__"><strong>__new__</strong></a>(cls, value)<span class="grey"><span class="heading-text"> from enum.Enum</span></span></dt><dd><span class="code">Create&nbsp;and&nbsp;return&nbsp;a&nbsp;new&nbsp;<a href="builtins.html#object">object</a>.&nbsp;&nbsp;See&nbsp;help(type)&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-__str__"><strong>__str__</strong></a>(self, /)<span class="grey"><span class="heading-text"> from <a href="builtins.html#str">builtins.str</a></span></span></dt><dd><span class="code">Return&nbsp;str(self).</span></dd></dl>
+
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>AVOID</strong> = &lt;RevisionKind.AVOID: 'avoid'&gt;</dl>
+
+<dl><dt><strong>CHOOSE</strong> = &lt;RevisionKind.CHOOSE: 'choose'&gt;</dl>
+
+<dl><dt><strong>DIAGNOSE</strong> = &lt;RevisionKind.DIAGNOSE: 'diagnose'&gt;</dl>
+
+<dl><dt><strong>NONE</strong> = &lt;RevisionKind.NONE: 'none'&gt;</dl>
+
+<dl><dt><strong>RETRY</strong> = &lt;RevisionKind.RETRY: 'retry'&gt;</dl>
+
+<dl><dt><strong>WAIT</strong> = &lt;RevisionKind.WAIT: 'wait'&gt;</dl>
+
+<hr>
+Methods inherited from <a href="enum.html#StrEnum">enum.StrEnum</a>:<br>
+<dl><dt><a name="RevisionKind-__repr__"><strong>__repr__</strong></a>(self)<span class="grey"><span class="heading-text"> from enum.Enum</span></span></dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Methods inherited from <a href="builtins.html#str">builtins.str</a>:<br>
+<dl><dt><a name="RevisionKind-__add__"><strong>__add__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self+value.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-__contains__"><strong>__contains__</strong></a>(self, key, /)</dt><dd><span class="code">Return&nbsp;bool(key&nbsp;in&nbsp;self).</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-__eq__"><strong>__eq__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-__ge__"><strong>__ge__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self&gt;=value.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-__getattribute__"><strong>__getattribute__</strong></a>(self, name, /)</dt><dd><span class="code">Return&nbsp;getattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-__getitem__"><strong>__getitem__</strong></a>(self, key, /)</dt><dd><span class="code">Return&nbsp;self[key].</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-__getnewargs__"><strong>__getnewargs__</strong></a>(...)</dt></dl>
+
+<dl><dt><a name="RevisionKind-__gt__"><strong>__gt__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self&gt;value.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-__hash__"><strong>__hash__</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-__iter__"><strong>__iter__</strong></a>(self, /)</dt><dd><span class="code">Implement&nbsp;iter(self).</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-__le__"><strong>__le__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self&lt;=value.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-__len__"><strong>__len__</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;len(self).</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-__lt__"><strong>__lt__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self&lt;value.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-__mod__"><strong>__mod__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self%value.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-__mul__"><strong>__mul__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self*value.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-__ne__"><strong>__ne__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self!=value.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-__rmod__"><strong>__rmod__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;value%self.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-__rmul__"><strong>__rmul__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;value*self.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-__sizeof__"><strong>__sizeof__</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;the&nbsp;size&nbsp;of&nbsp;the&nbsp;string&nbsp;in&nbsp;memory,&nbsp;in&nbsp;bytes.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-capitalize"><strong>capitalize</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;a&nbsp;capitalized&nbsp;version&nbsp;of&nbsp;the&nbsp;string.<br>
+&nbsp;<br>
+More&nbsp;specifically,&nbsp;make&nbsp;the&nbsp;first&nbsp;character&nbsp;have&nbsp;upper&nbsp;case&nbsp;and&nbsp;the&nbsp;rest&nbsp;lower<br>
+case.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-casefold"><strong>casefold</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;a&nbsp;version&nbsp;of&nbsp;the&nbsp;string&nbsp;suitable&nbsp;for&nbsp;caseless&nbsp;comparisons.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-center"><strong>center</strong></a>(self, width, fillchar=' ', /)</dt><dd><span class="code">Return&nbsp;a&nbsp;centered&nbsp;string&nbsp;of&nbsp;length&nbsp;width.<br>
+&nbsp;<br>
+Padding&nbsp;is&nbsp;done&nbsp;using&nbsp;the&nbsp;specified&nbsp;fill&nbsp;character&nbsp;(default&nbsp;is&nbsp;a&nbsp;space).</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-count"><strong>count</strong></a>(...)</dt><dd><span class="code">S.<a href="#RevisionKind-count">count</a>(sub[,&nbsp;start[,&nbsp;end]])&nbsp;-&gt;&nbsp;int<br>
+&nbsp;<br>
+Return&nbsp;the&nbsp;number&nbsp;of&nbsp;non-overlapping&nbsp;occurrences&nbsp;of&nbsp;substring&nbsp;sub&nbsp;in<br>
+string&nbsp;S[start:end].&nbsp;&nbsp;Optional&nbsp;arguments&nbsp;start&nbsp;and&nbsp;end&nbsp;are<br>
+interpreted&nbsp;as&nbsp;in&nbsp;slice&nbsp;notation.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-encode"><strong>encode</strong></a>(self, /, encoding='utf-8', errors='strict')</dt><dd><span class="code">Encode&nbsp;the&nbsp;string&nbsp;using&nbsp;the&nbsp;codec&nbsp;registered&nbsp;for&nbsp;encoding.<br>
+&nbsp;<br>
+encoding<br>
+&nbsp;&nbsp;The&nbsp;encoding&nbsp;in&nbsp;which&nbsp;to&nbsp;encode&nbsp;the&nbsp;string.<br>
+errors<br>
+&nbsp;&nbsp;The&nbsp;error&nbsp;handling&nbsp;scheme&nbsp;to&nbsp;use&nbsp;for&nbsp;encoding&nbsp;errors.<br>
+&nbsp;&nbsp;The&nbsp;default&nbsp;is&nbsp;'strict'&nbsp;meaning&nbsp;that&nbsp;encoding&nbsp;errors&nbsp;raise&nbsp;a<br>
+&nbsp;&nbsp;UnicodeEncodeError.&nbsp;&nbsp;Other&nbsp;possible&nbsp;values&nbsp;are&nbsp;'ignore',&nbsp;'replace'&nbsp;and<br>
+&nbsp;&nbsp;'xmlcharrefreplace'&nbsp;as&nbsp;well&nbsp;as&nbsp;any&nbsp;other&nbsp;name&nbsp;registered&nbsp;with<br>
+&nbsp;&nbsp;codecs.register_error&nbsp;that&nbsp;can&nbsp;handle&nbsp;UnicodeEncodeErrors.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-endswith"><strong>endswith</strong></a>(...)</dt><dd><span class="code">S.<a href="#RevisionKind-endswith">endswith</a>(suffix[,&nbsp;start[,&nbsp;end]])&nbsp;-&gt;&nbsp;bool<br>
+&nbsp;<br>
+Return&nbsp;True&nbsp;if&nbsp;S&nbsp;ends&nbsp;with&nbsp;the&nbsp;specified&nbsp;suffix,&nbsp;False&nbsp;otherwise.<br>
+With&nbsp;optional&nbsp;start,&nbsp;test&nbsp;S&nbsp;beginning&nbsp;at&nbsp;that&nbsp;position.<br>
+With&nbsp;optional&nbsp;end,&nbsp;stop&nbsp;comparing&nbsp;S&nbsp;at&nbsp;that&nbsp;position.<br>
+suffix&nbsp;can&nbsp;also&nbsp;be&nbsp;a&nbsp;tuple&nbsp;of&nbsp;strings&nbsp;to&nbsp;try.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-expandtabs"><strong>expandtabs</strong></a>(self, /, tabsize=8)</dt><dd><span class="code">Return&nbsp;a&nbsp;copy&nbsp;where&nbsp;all&nbsp;tab&nbsp;characters&nbsp;are&nbsp;expanded&nbsp;using&nbsp;spaces.<br>
+&nbsp;<br>
+If&nbsp;tabsize&nbsp;is&nbsp;not&nbsp;given,&nbsp;a&nbsp;tab&nbsp;size&nbsp;of&nbsp;8&nbsp;characters&nbsp;is&nbsp;assumed.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-find"><strong>find</strong></a>(...)</dt><dd><span class="code">S.<a href="#RevisionKind-find">find</a>(sub[,&nbsp;start[,&nbsp;end]])&nbsp;-&gt;&nbsp;int<br>
+&nbsp;<br>
+Return&nbsp;the&nbsp;lowest&nbsp;index&nbsp;in&nbsp;S&nbsp;where&nbsp;substring&nbsp;sub&nbsp;is&nbsp;found,<br>
+such&nbsp;that&nbsp;sub&nbsp;is&nbsp;contained&nbsp;within&nbsp;S[start:end].&nbsp;&nbsp;Optional<br>
+arguments&nbsp;start&nbsp;and&nbsp;end&nbsp;are&nbsp;interpreted&nbsp;as&nbsp;in&nbsp;slice&nbsp;notation.<br>
+&nbsp;<br>
+Return&nbsp;-1&nbsp;on&nbsp;failure.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-format"><strong>format</strong></a>(...)</dt><dd><span class="code">S.<a href="#RevisionKind-format">format</a>(*args,&nbsp;**kwargs)&nbsp;-&gt;&nbsp;str<br>
+&nbsp;<br>
+Return&nbsp;a&nbsp;formatted&nbsp;version&nbsp;of&nbsp;S,&nbsp;using&nbsp;substitutions&nbsp;from&nbsp;args&nbsp;and&nbsp;kwargs.<br>
+The&nbsp;substitutions&nbsp;are&nbsp;identified&nbsp;by&nbsp;braces&nbsp;('{'&nbsp;and&nbsp;'}').</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-format_map"><strong>format_map</strong></a>(...)</dt><dd><span class="code">S.<a href="#RevisionKind-format_map">format_map</a>(mapping)&nbsp;-&gt;&nbsp;str<br>
+&nbsp;<br>
+Return&nbsp;a&nbsp;formatted&nbsp;version&nbsp;of&nbsp;S,&nbsp;using&nbsp;substitutions&nbsp;from&nbsp;mapping.<br>
+The&nbsp;substitutions&nbsp;are&nbsp;identified&nbsp;by&nbsp;braces&nbsp;('{'&nbsp;and&nbsp;'}').</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-index"><strong>index</strong></a>(...)</dt><dd><span class="code">S.<a href="#RevisionKind-index">index</a>(sub[,&nbsp;start[,&nbsp;end]])&nbsp;-&gt;&nbsp;int<br>
+&nbsp;<br>
+Return&nbsp;the&nbsp;lowest&nbsp;index&nbsp;in&nbsp;S&nbsp;where&nbsp;substring&nbsp;sub&nbsp;is&nbsp;found,<br>
+such&nbsp;that&nbsp;sub&nbsp;is&nbsp;contained&nbsp;within&nbsp;S[start:end].&nbsp;&nbsp;Optional<br>
+arguments&nbsp;start&nbsp;and&nbsp;end&nbsp;are&nbsp;interpreted&nbsp;as&nbsp;in&nbsp;slice&nbsp;notation.<br>
+&nbsp;<br>
+Raises&nbsp;ValueError&nbsp;when&nbsp;the&nbsp;substring&nbsp;is&nbsp;not&nbsp;found.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-isalnum"><strong>isalnum</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;the&nbsp;string&nbsp;is&nbsp;an&nbsp;alpha-numeric&nbsp;string,&nbsp;False&nbsp;otherwise.<br>
+&nbsp;<br>
+A&nbsp;string&nbsp;is&nbsp;alpha-numeric&nbsp;if&nbsp;all&nbsp;characters&nbsp;in&nbsp;the&nbsp;string&nbsp;are&nbsp;alpha-numeric&nbsp;and<br>
+there&nbsp;is&nbsp;at&nbsp;least&nbsp;one&nbsp;character&nbsp;in&nbsp;the&nbsp;string.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-isalpha"><strong>isalpha</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;the&nbsp;string&nbsp;is&nbsp;an&nbsp;alphabetic&nbsp;string,&nbsp;False&nbsp;otherwise.<br>
+&nbsp;<br>
+A&nbsp;string&nbsp;is&nbsp;alphabetic&nbsp;if&nbsp;all&nbsp;characters&nbsp;in&nbsp;the&nbsp;string&nbsp;are&nbsp;alphabetic&nbsp;and&nbsp;there<br>
+is&nbsp;at&nbsp;least&nbsp;one&nbsp;character&nbsp;in&nbsp;the&nbsp;string.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-isascii"><strong>isascii</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;all&nbsp;characters&nbsp;in&nbsp;the&nbsp;string&nbsp;are&nbsp;ASCII,&nbsp;False&nbsp;otherwise.<br>
+&nbsp;<br>
+ASCII&nbsp;characters&nbsp;have&nbsp;code&nbsp;points&nbsp;in&nbsp;the&nbsp;range&nbsp;U+0000-U+007F.<br>
+Empty&nbsp;string&nbsp;is&nbsp;ASCII&nbsp;too.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-isdecimal"><strong>isdecimal</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;the&nbsp;string&nbsp;is&nbsp;a&nbsp;decimal&nbsp;string,&nbsp;False&nbsp;otherwise.<br>
+&nbsp;<br>
+A&nbsp;string&nbsp;is&nbsp;a&nbsp;decimal&nbsp;string&nbsp;if&nbsp;all&nbsp;characters&nbsp;in&nbsp;the&nbsp;string&nbsp;are&nbsp;decimal&nbsp;and<br>
+there&nbsp;is&nbsp;at&nbsp;least&nbsp;one&nbsp;character&nbsp;in&nbsp;the&nbsp;string.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-isdigit"><strong>isdigit</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;the&nbsp;string&nbsp;is&nbsp;a&nbsp;digit&nbsp;string,&nbsp;False&nbsp;otherwise.<br>
+&nbsp;<br>
+A&nbsp;string&nbsp;is&nbsp;a&nbsp;digit&nbsp;string&nbsp;if&nbsp;all&nbsp;characters&nbsp;in&nbsp;the&nbsp;string&nbsp;are&nbsp;digits&nbsp;and&nbsp;there<br>
+is&nbsp;at&nbsp;least&nbsp;one&nbsp;character&nbsp;in&nbsp;the&nbsp;string.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-isidentifier"><strong>isidentifier</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;the&nbsp;string&nbsp;is&nbsp;a&nbsp;valid&nbsp;Python&nbsp;identifier,&nbsp;False&nbsp;otherwise.<br>
+&nbsp;<br>
+Call&nbsp;keyword.iskeyword(s)&nbsp;to&nbsp;test&nbsp;whether&nbsp;string&nbsp;s&nbsp;is&nbsp;a&nbsp;reserved&nbsp;identifier,<br>
+such&nbsp;as&nbsp;"def"&nbsp;or&nbsp;"class".</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-islower"><strong>islower</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;the&nbsp;string&nbsp;is&nbsp;a&nbsp;lowercase&nbsp;string,&nbsp;False&nbsp;otherwise.<br>
+&nbsp;<br>
+A&nbsp;string&nbsp;is&nbsp;lowercase&nbsp;if&nbsp;all&nbsp;cased&nbsp;characters&nbsp;in&nbsp;the&nbsp;string&nbsp;are&nbsp;lowercase&nbsp;and<br>
+there&nbsp;is&nbsp;at&nbsp;least&nbsp;one&nbsp;cased&nbsp;character&nbsp;in&nbsp;the&nbsp;string.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-isnumeric"><strong>isnumeric</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;the&nbsp;string&nbsp;is&nbsp;a&nbsp;numeric&nbsp;string,&nbsp;False&nbsp;otherwise.<br>
+&nbsp;<br>
+A&nbsp;string&nbsp;is&nbsp;numeric&nbsp;if&nbsp;all&nbsp;characters&nbsp;in&nbsp;the&nbsp;string&nbsp;are&nbsp;numeric&nbsp;and&nbsp;there&nbsp;is&nbsp;at<br>
+least&nbsp;one&nbsp;character&nbsp;in&nbsp;the&nbsp;string.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-isprintable"><strong>isprintable</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;the&nbsp;string&nbsp;is&nbsp;printable,&nbsp;False&nbsp;otherwise.<br>
+&nbsp;<br>
+A&nbsp;string&nbsp;is&nbsp;printable&nbsp;if&nbsp;all&nbsp;of&nbsp;its&nbsp;characters&nbsp;are&nbsp;considered&nbsp;printable&nbsp;in<br>
+repr()&nbsp;or&nbsp;if&nbsp;it&nbsp;is&nbsp;empty.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-isspace"><strong>isspace</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;the&nbsp;string&nbsp;is&nbsp;a&nbsp;whitespace&nbsp;string,&nbsp;False&nbsp;otherwise.<br>
+&nbsp;<br>
+A&nbsp;string&nbsp;is&nbsp;whitespace&nbsp;if&nbsp;all&nbsp;characters&nbsp;in&nbsp;the&nbsp;string&nbsp;are&nbsp;whitespace&nbsp;and&nbsp;there<br>
+is&nbsp;at&nbsp;least&nbsp;one&nbsp;character&nbsp;in&nbsp;the&nbsp;string.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-istitle"><strong>istitle</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;the&nbsp;string&nbsp;is&nbsp;a&nbsp;title-cased&nbsp;string,&nbsp;False&nbsp;otherwise.<br>
+&nbsp;<br>
+In&nbsp;a&nbsp;title-cased&nbsp;string,&nbsp;upper-&nbsp;and&nbsp;title-case&nbsp;characters&nbsp;may&nbsp;only<br>
+follow&nbsp;uncased&nbsp;characters&nbsp;and&nbsp;lowercase&nbsp;characters&nbsp;only&nbsp;cased&nbsp;ones.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-isupper"><strong>isupper</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;the&nbsp;string&nbsp;is&nbsp;an&nbsp;uppercase&nbsp;string,&nbsp;False&nbsp;otherwise.<br>
+&nbsp;<br>
+A&nbsp;string&nbsp;is&nbsp;uppercase&nbsp;if&nbsp;all&nbsp;cased&nbsp;characters&nbsp;in&nbsp;the&nbsp;string&nbsp;are&nbsp;uppercase&nbsp;and<br>
+there&nbsp;is&nbsp;at&nbsp;least&nbsp;one&nbsp;cased&nbsp;character&nbsp;in&nbsp;the&nbsp;string.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-join"><strong>join</strong></a>(self, iterable, /)</dt><dd><span class="code">Concatenate&nbsp;any&nbsp;number&nbsp;of&nbsp;strings.<br>
+&nbsp;<br>
+The&nbsp;string&nbsp;whose&nbsp;method&nbsp;is&nbsp;called&nbsp;is&nbsp;inserted&nbsp;in&nbsp;between&nbsp;each&nbsp;given&nbsp;string.<br>
+The&nbsp;result&nbsp;is&nbsp;returned&nbsp;as&nbsp;a&nbsp;new&nbsp;string.<br>
+&nbsp;<br>
+Example:&nbsp;'.'.<a href="#RevisionKind-join">join</a>(['ab',&nbsp;'pq',&nbsp;'rs'])&nbsp;-&gt;&nbsp;'ab.pq.rs'</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-ljust"><strong>ljust</strong></a>(self, width, fillchar=' ', /)</dt><dd><span class="code">Return&nbsp;a&nbsp;left-justified&nbsp;string&nbsp;of&nbsp;length&nbsp;width.<br>
+&nbsp;<br>
+Padding&nbsp;is&nbsp;done&nbsp;using&nbsp;the&nbsp;specified&nbsp;fill&nbsp;character&nbsp;(default&nbsp;is&nbsp;a&nbsp;space).</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-lower"><strong>lower</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;a&nbsp;copy&nbsp;of&nbsp;the&nbsp;string&nbsp;converted&nbsp;to&nbsp;lowercase.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-lstrip"><strong>lstrip</strong></a>(self, chars=None, /)</dt><dd><span class="code">Return&nbsp;a&nbsp;copy&nbsp;of&nbsp;the&nbsp;string&nbsp;with&nbsp;leading&nbsp;whitespace&nbsp;removed.<br>
+&nbsp;<br>
+If&nbsp;chars&nbsp;is&nbsp;given&nbsp;and&nbsp;not&nbsp;None,&nbsp;remove&nbsp;characters&nbsp;in&nbsp;chars&nbsp;instead.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-partition"><strong>partition</strong></a>(self, sep, /)</dt><dd><span class="code">Partition&nbsp;the&nbsp;string&nbsp;into&nbsp;three&nbsp;parts&nbsp;using&nbsp;the&nbsp;given&nbsp;separator.<br>
+&nbsp;<br>
+This&nbsp;will&nbsp;search&nbsp;for&nbsp;the&nbsp;separator&nbsp;in&nbsp;the&nbsp;string.&nbsp;&nbsp;If&nbsp;the&nbsp;separator&nbsp;is&nbsp;found,<br>
+returns&nbsp;a&nbsp;3-tuple&nbsp;containing&nbsp;the&nbsp;part&nbsp;before&nbsp;the&nbsp;separator,&nbsp;the&nbsp;separator<br>
+itself,&nbsp;and&nbsp;the&nbsp;part&nbsp;after&nbsp;it.<br>
+&nbsp;<br>
+If&nbsp;the&nbsp;separator&nbsp;is&nbsp;not&nbsp;found,&nbsp;returns&nbsp;a&nbsp;3-tuple&nbsp;containing&nbsp;the&nbsp;original&nbsp;string<br>
+and&nbsp;two&nbsp;empty&nbsp;strings.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-removeprefix"><strong>removeprefix</strong></a>(self, prefix, /)</dt><dd><span class="code">Return&nbsp;a&nbsp;str&nbsp;with&nbsp;the&nbsp;given&nbsp;prefix&nbsp;string&nbsp;removed&nbsp;if&nbsp;present.<br>
+&nbsp;<br>
+If&nbsp;the&nbsp;string&nbsp;starts&nbsp;with&nbsp;the&nbsp;prefix&nbsp;string,&nbsp;return&nbsp;string[len(prefix):].<br>
+Otherwise,&nbsp;return&nbsp;a&nbsp;copy&nbsp;of&nbsp;the&nbsp;original&nbsp;string.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-removesuffix"><strong>removesuffix</strong></a>(self, suffix, /)</dt><dd><span class="code">Return&nbsp;a&nbsp;str&nbsp;with&nbsp;the&nbsp;given&nbsp;suffix&nbsp;string&nbsp;removed&nbsp;if&nbsp;present.<br>
+&nbsp;<br>
+If&nbsp;the&nbsp;string&nbsp;ends&nbsp;with&nbsp;the&nbsp;suffix&nbsp;string&nbsp;and&nbsp;that&nbsp;suffix&nbsp;is&nbsp;not&nbsp;empty,<br>
+return&nbsp;string[:-len(suffix)].&nbsp;Otherwise,&nbsp;return&nbsp;a&nbsp;copy&nbsp;of&nbsp;the&nbsp;original<br>
+string.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-replace"><strong>replace</strong></a>(self, old, new, count=-1, /)</dt><dd><span class="code">Return&nbsp;a&nbsp;copy&nbsp;with&nbsp;all&nbsp;occurrences&nbsp;of&nbsp;substring&nbsp;old&nbsp;replaced&nbsp;by&nbsp;new.<br>
+&nbsp;<br>
+&nbsp;&nbsp;count<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Maximum&nbsp;number&nbsp;of&nbsp;occurrences&nbsp;to&nbsp;replace.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-1&nbsp;(the&nbsp;default&nbsp;value)&nbsp;means&nbsp;replace&nbsp;all&nbsp;occurrences.<br>
+&nbsp;<br>
+If&nbsp;the&nbsp;optional&nbsp;argument&nbsp;count&nbsp;is&nbsp;given,&nbsp;only&nbsp;the&nbsp;first&nbsp;count&nbsp;occurrences&nbsp;are<br>
+replaced.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-rfind"><strong>rfind</strong></a>(...)</dt><dd><span class="code">S.<a href="#RevisionKind-rfind">rfind</a>(sub[,&nbsp;start[,&nbsp;end]])&nbsp;-&gt;&nbsp;int<br>
+&nbsp;<br>
+Return&nbsp;the&nbsp;highest&nbsp;index&nbsp;in&nbsp;S&nbsp;where&nbsp;substring&nbsp;sub&nbsp;is&nbsp;found,<br>
+such&nbsp;that&nbsp;sub&nbsp;is&nbsp;contained&nbsp;within&nbsp;S[start:end].&nbsp;&nbsp;Optional<br>
+arguments&nbsp;start&nbsp;and&nbsp;end&nbsp;are&nbsp;interpreted&nbsp;as&nbsp;in&nbsp;slice&nbsp;notation.<br>
+&nbsp;<br>
+Return&nbsp;-1&nbsp;on&nbsp;failure.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-rindex"><strong>rindex</strong></a>(...)</dt><dd><span class="code">S.<a href="#RevisionKind-rindex">rindex</a>(sub[,&nbsp;start[,&nbsp;end]])&nbsp;-&gt;&nbsp;int<br>
+&nbsp;<br>
+Return&nbsp;the&nbsp;highest&nbsp;index&nbsp;in&nbsp;S&nbsp;where&nbsp;substring&nbsp;sub&nbsp;is&nbsp;found,<br>
+such&nbsp;that&nbsp;sub&nbsp;is&nbsp;contained&nbsp;within&nbsp;S[start:end].&nbsp;&nbsp;Optional<br>
+arguments&nbsp;start&nbsp;and&nbsp;end&nbsp;are&nbsp;interpreted&nbsp;as&nbsp;in&nbsp;slice&nbsp;notation.<br>
+&nbsp;<br>
+Raises&nbsp;ValueError&nbsp;when&nbsp;the&nbsp;substring&nbsp;is&nbsp;not&nbsp;found.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-rjust"><strong>rjust</strong></a>(self, width, fillchar=' ', /)</dt><dd><span class="code">Return&nbsp;a&nbsp;right-justified&nbsp;string&nbsp;of&nbsp;length&nbsp;width.<br>
+&nbsp;<br>
+Padding&nbsp;is&nbsp;done&nbsp;using&nbsp;the&nbsp;specified&nbsp;fill&nbsp;character&nbsp;(default&nbsp;is&nbsp;a&nbsp;space).</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-rpartition"><strong>rpartition</strong></a>(self, sep, /)</dt><dd><span class="code">Partition&nbsp;the&nbsp;string&nbsp;into&nbsp;three&nbsp;parts&nbsp;using&nbsp;the&nbsp;given&nbsp;separator.<br>
+&nbsp;<br>
+This&nbsp;will&nbsp;search&nbsp;for&nbsp;the&nbsp;separator&nbsp;in&nbsp;the&nbsp;string,&nbsp;starting&nbsp;at&nbsp;the&nbsp;end.&nbsp;If<br>
+the&nbsp;separator&nbsp;is&nbsp;found,&nbsp;returns&nbsp;a&nbsp;3-tuple&nbsp;containing&nbsp;the&nbsp;part&nbsp;before&nbsp;the<br>
+separator,&nbsp;the&nbsp;separator&nbsp;itself,&nbsp;and&nbsp;the&nbsp;part&nbsp;after&nbsp;it.<br>
+&nbsp;<br>
+If&nbsp;the&nbsp;separator&nbsp;is&nbsp;not&nbsp;found,&nbsp;returns&nbsp;a&nbsp;3-tuple&nbsp;containing&nbsp;two&nbsp;empty&nbsp;strings<br>
+and&nbsp;the&nbsp;original&nbsp;string.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-rsplit"><strong>rsplit</strong></a>(self, /, sep=None, maxsplit=-1)</dt><dd><span class="code">Return&nbsp;a&nbsp;list&nbsp;of&nbsp;the&nbsp;substrings&nbsp;in&nbsp;the&nbsp;string,&nbsp;using&nbsp;sep&nbsp;as&nbsp;the&nbsp;separator&nbsp;string.<br>
+&nbsp;<br>
+&nbsp;&nbsp;sep<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;separator&nbsp;used&nbsp;to&nbsp;split&nbsp;the&nbsp;string.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;When&nbsp;set&nbsp;to&nbsp;None&nbsp;(the&nbsp;default&nbsp;value),&nbsp;will&nbsp;split&nbsp;on&nbsp;any&nbsp;whitespace<br>
+&nbsp;&nbsp;&nbsp;&nbsp;character&nbsp;(including&nbsp;\n&nbsp;\r&nbsp;\t&nbsp;\f&nbsp;and&nbsp;spaces)&nbsp;and&nbsp;will&nbsp;discard<br>
+&nbsp;&nbsp;&nbsp;&nbsp;empty&nbsp;strings&nbsp;from&nbsp;the&nbsp;result.<br>
+&nbsp;&nbsp;maxsplit<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Maximum&nbsp;number&nbsp;of&nbsp;splits.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-1&nbsp;(the&nbsp;default&nbsp;value)&nbsp;means&nbsp;no&nbsp;limit.<br>
+&nbsp;<br>
+Splitting&nbsp;starts&nbsp;at&nbsp;the&nbsp;end&nbsp;of&nbsp;the&nbsp;string&nbsp;and&nbsp;works&nbsp;to&nbsp;the&nbsp;front.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-rstrip"><strong>rstrip</strong></a>(self, chars=None, /)</dt><dd><span class="code">Return&nbsp;a&nbsp;copy&nbsp;of&nbsp;the&nbsp;string&nbsp;with&nbsp;trailing&nbsp;whitespace&nbsp;removed.<br>
+&nbsp;<br>
+If&nbsp;chars&nbsp;is&nbsp;given&nbsp;and&nbsp;not&nbsp;None,&nbsp;remove&nbsp;characters&nbsp;in&nbsp;chars&nbsp;instead.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-split"><strong>split</strong></a>(self, /, sep=None, maxsplit=-1)</dt><dd><span class="code">Return&nbsp;a&nbsp;list&nbsp;of&nbsp;the&nbsp;substrings&nbsp;in&nbsp;the&nbsp;string,&nbsp;using&nbsp;sep&nbsp;as&nbsp;the&nbsp;separator&nbsp;string.<br>
+&nbsp;<br>
+&nbsp;&nbsp;sep<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;separator&nbsp;used&nbsp;to&nbsp;split&nbsp;the&nbsp;string.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;When&nbsp;set&nbsp;to&nbsp;None&nbsp;(the&nbsp;default&nbsp;value),&nbsp;will&nbsp;split&nbsp;on&nbsp;any&nbsp;whitespace<br>
+&nbsp;&nbsp;&nbsp;&nbsp;character&nbsp;(including&nbsp;\n&nbsp;\r&nbsp;\t&nbsp;\f&nbsp;and&nbsp;spaces)&nbsp;and&nbsp;will&nbsp;discard<br>
+&nbsp;&nbsp;&nbsp;&nbsp;empty&nbsp;strings&nbsp;from&nbsp;the&nbsp;result.<br>
+&nbsp;&nbsp;maxsplit<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Maximum&nbsp;number&nbsp;of&nbsp;splits.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-1&nbsp;(the&nbsp;default&nbsp;value)&nbsp;means&nbsp;no&nbsp;limit.<br>
+&nbsp;<br>
+Splitting&nbsp;starts&nbsp;at&nbsp;the&nbsp;front&nbsp;of&nbsp;the&nbsp;string&nbsp;and&nbsp;works&nbsp;to&nbsp;the&nbsp;end.<br>
+&nbsp;<br>
+Note,&nbsp;str.<a href="#RevisionKind-split">split</a>()&nbsp;is&nbsp;mainly&nbsp;useful&nbsp;for&nbsp;data&nbsp;that&nbsp;has&nbsp;been&nbsp;intentionally<br>
+delimited.&nbsp;&nbsp;With&nbsp;natural&nbsp;text&nbsp;that&nbsp;includes&nbsp;punctuation,&nbsp;consider&nbsp;using<br>
+the&nbsp;regular&nbsp;expression&nbsp;module.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-splitlines"><strong>splitlines</strong></a>(self, /, keepends=False)</dt><dd><span class="code">Return&nbsp;a&nbsp;list&nbsp;of&nbsp;the&nbsp;lines&nbsp;in&nbsp;the&nbsp;string,&nbsp;breaking&nbsp;at&nbsp;line&nbsp;boundaries.<br>
+&nbsp;<br>
+Line&nbsp;breaks&nbsp;are&nbsp;not&nbsp;included&nbsp;in&nbsp;the&nbsp;resulting&nbsp;list&nbsp;unless&nbsp;keepends&nbsp;is&nbsp;given&nbsp;and<br>
+true.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-startswith"><strong>startswith</strong></a>(...)</dt><dd><span class="code">S.<a href="#RevisionKind-startswith">startswith</a>(prefix[,&nbsp;start[,&nbsp;end]])&nbsp;-&gt;&nbsp;bool<br>
+&nbsp;<br>
+Return&nbsp;True&nbsp;if&nbsp;S&nbsp;starts&nbsp;with&nbsp;the&nbsp;specified&nbsp;prefix,&nbsp;False&nbsp;otherwise.<br>
+With&nbsp;optional&nbsp;start,&nbsp;test&nbsp;S&nbsp;beginning&nbsp;at&nbsp;that&nbsp;position.<br>
+With&nbsp;optional&nbsp;end,&nbsp;stop&nbsp;comparing&nbsp;S&nbsp;at&nbsp;that&nbsp;position.<br>
+prefix&nbsp;can&nbsp;also&nbsp;be&nbsp;a&nbsp;tuple&nbsp;of&nbsp;strings&nbsp;to&nbsp;try.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-strip"><strong>strip</strong></a>(self, chars=None, /)</dt><dd><span class="code">Return&nbsp;a&nbsp;copy&nbsp;of&nbsp;the&nbsp;string&nbsp;with&nbsp;leading&nbsp;and&nbsp;trailing&nbsp;whitespace&nbsp;removed.<br>
+&nbsp;<br>
+If&nbsp;chars&nbsp;is&nbsp;given&nbsp;and&nbsp;not&nbsp;None,&nbsp;remove&nbsp;characters&nbsp;in&nbsp;chars&nbsp;instead.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-swapcase"><strong>swapcase</strong></a>(self, /)</dt><dd><span class="code">Convert&nbsp;uppercase&nbsp;characters&nbsp;to&nbsp;lowercase&nbsp;and&nbsp;lowercase&nbsp;characters&nbsp;to&nbsp;uppercase.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-title"><strong>title</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;a&nbsp;version&nbsp;of&nbsp;the&nbsp;string&nbsp;where&nbsp;each&nbsp;word&nbsp;is&nbsp;titlecased.<br>
+&nbsp;<br>
+More&nbsp;specifically,&nbsp;words&nbsp;start&nbsp;with&nbsp;uppercased&nbsp;characters&nbsp;and&nbsp;all&nbsp;remaining<br>
+cased&nbsp;characters&nbsp;have&nbsp;lower&nbsp;case.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-translate"><strong>translate</strong></a>(self, table, /)</dt><dd><span class="code">Replace&nbsp;each&nbsp;character&nbsp;in&nbsp;the&nbsp;string&nbsp;using&nbsp;the&nbsp;given&nbsp;translation&nbsp;table.<br>
+&nbsp;<br>
+&nbsp;&nbsp;table<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Translation&nbsp;table,&nbsp;which&nbsp;must&nbsp;be&nbsp;a&nbsp;mapping&nbsp;of&nbsp;Unicode&nbsp;ordinals&nbsp;to<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Unicode&nbsp;ordinals,&nbsp;strings,&nbsp;or&nbsp;None.<br>
+&nbsp;<br>
+The&nbsp;table&nbsp;must&nbsp;implement&nbsp;lookup/indexing&nbsp;via&nbsp;__getitem__,&nbsp;for&nbsp;instance&nbsp;a<br>
+dictionary&nbsp;or&nbsp;list.&nbsp;&nbsp;If&nbsp;this&nbsp;operation&nbsp;raises&nbsp;LookupError,&nbsp;the&nbsp;character&nbsp;is<br>
+left&nbsp;untouched.&nbsp;&nbsp;Characters&nbsp;mapped&nbsp;to&nbsp;None&nbsp;are&nbsp;deleted.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-upper"><strong>upper</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;a&nbsp;copy&nbsp;of&nbsp;the&nbsp;string&nbsp;converted&nbsp;to&nbsp;uppercase.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-zfill"><strong>zfill</strong></a>(self, width, /)</dt><dd><span class="code">Pad&nbsp;a&nbsp;numeric&nbsp;string&nbsp;with&nbsp;zeros&nbsp;on&nbsp;the&nbsp;left,&nbsp;to&nbsp;fill&nbsp;a&nbsp;field&nbsp;of&nbsp;the&nbsp;given&nbsp;width.<br>
+&nbsp;<br>
+The&nbsp;string&nbsp;is&nbsp;never&nbsp;truncated.</span></dd></dl>
+
+<hr>
+Static methods inherited from <a href="builtins.html#str">builtins.str</a>:<br>
+<dl><dt><a name="RevisionKind-maketrans"><strong>maketrans</strong></a>(...)</dt><dd><span class="code">Return&nbsp;a&nbsp;translation&nbsp;table&nbsp;usable&nbsp;for&nbsp;str.<a href="#RevisionKind-translate">translate</a>().<br>
+&nbsp;<br>
+If&nbsp;there&nbsp;is&nbsp;only&nbsp;one&nbsp;argument,&nbsp;it&nbsp;must&nbsp;be&nbsp;a&nbsp;dictionary&nbsp;mapping&nbsp;Unicode<br>
+ordinals&nbsp;(integers)&nbsp;or&nbsp;characters&nbsp;to&nbsp;Unicode&nbsp;ordinals,&nbsp;strings&nbsp;or&nbsp;None.<br>
+Character&nbsp;keys&nbsp;will&nbsp;be&nbsp;then&nbsp;converted&nbsp;to&nbsp;ordinals.<br>
+If&nbsp;there&nbsp;are&nbsp;two&nbsp;arguments,&nbsp;they&nbsp;must&nbsp;be&nbsp;strings&nbsp;of&nbsp;equal&nbsp;length,&nbsp;and<br>
+in&nbsp;the&nbsp;resulting&nbsp;dictionary,&nbsp;each&nbsp;character&nbsp;in&nbsp;x&nbsp;will&nbsp;be&nbsp;mapped&nbsp;to&nbsp;the<br>
+character&nbsp;at&nbsp;the&nbsp;same&nbsp;position&nbsp;in&nbsp;y.&nbsp;If&nbsp;there&nbsp;is&nbsp;a&nbsp;third&nbsp;argument,&nbsp;it<br>
+must&nbsp;be&nbsp;a&nbsp;string,&nbsp;whose&nbsp;characters&nbsp;will&nbsp;be&nbsp;mapped&nbsp;to&nbsp;None&nbsp;in&nbsp;the&nbsp;result.</span></dd></dl>
+
+<hr>
+Methods inherited from <a href="enum.html#Enum">enum.Enum</a>:<br>
+<dl><dt><a name="RevisionKind-__dir__"><strong>__dir__</strong></a>(self)</dt><dd><span class="code">Returns&nbsp;public&nbsp;methods&nbsp;and&nbsp;other&nbsp;interesting&nbsp;attributes.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-__init__"><strong>__init__</strong></a>(self, *args, **kwds)</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="RevisionKind-__reduce_ex__"><strong>__reduce_ex__</strong></a>(self, proto)</dt><dd><span class="code">Helper&nbsp;for&nbsp;pickle.</span></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="enum.html#Enum">enum.Enum</a>:<br>
+<dl><dt><strong>name</strong></dt>
+<dd><span class="code">The&nbsp;name&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<dl><dt><strong>value</strong></dt>
+<dd><span class="code">The&nbsp;value&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<hr>
+Readonly properties inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><strong>__members__</strong></dt>
+<dd><span class="code">Returns&nbsp;a&nbsp;mapping&nbsp;of&nbsp;member&nbsp;name-&gt;value.<br>
+&nbsp;<br>
+This&nbsp;mapping&nbsp;lists&nbsp;all&nbsp;enum&nbsp;members,&nbsp;including&nbsp;aliases.&nbsp;Note&nbsp;that&nbsp;this<br>
+is&nbsp;a&nbsp;read-only&nbsp;view&nbsp;of&nbsp;the&nbsp;internal&nbsp;mapping.</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['ActionAttempt', 'ActionFeedback', 'ActionPrediction', 'ActionRevision', 'ActionSpec', 'CausalHypothesis', 'Discrepancy', 'OutcomeState', 'RevisionKind']<br>
+<strong>__annotations__</strong> = {'_FIELD_WEIGHTS': 'dict[str, float]'}</td></tr></table>
+</body></html>

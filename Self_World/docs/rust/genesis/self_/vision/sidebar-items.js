@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["NUM_ORIENTATIONS"],"mod":["cortex","oculomotor","optics","retina","system"],"struct":["ConeOps","Eyelid","GaborCortex","GanglionImage","GazePlant","OcularState","Pupil","RadianceField","Retina","VisionOutput","VisionSystem"]};

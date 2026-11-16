@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["FILE_SIZE","MARKER_G07"],"enum":["StateFileError"],"fn":["local_phase_of_day","local_seconds_of_day","mapped_len"],"struct":["MmapState"]};

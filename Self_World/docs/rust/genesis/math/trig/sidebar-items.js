@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["FULL_TURN"],"fn":["angle_between","angle_from_sides","angle_sum_holds","area_heron","area_sas","deg","normalize","pythagorean_holds","rad","ratios","side_from_angle","side_law_of_sines","triangle_angles","unit_point"]};

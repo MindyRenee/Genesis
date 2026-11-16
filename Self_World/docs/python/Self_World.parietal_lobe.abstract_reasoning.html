@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.parietal_lobe.abstract_reasoning</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.parietal_lobe.html" class="white">parietal_lobe</a>.abstract_reasoning</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/parietal_lobe/abstract_reasoning.py">/home/mindyrenee/GenAnd/Genesis/Self_World/parietal_lobe/abstract_reasoning.py</a></td></tr></table>
+    <p><span class="code">Abstract&nbsp;reasoning&nbsp;—&nbsp;relational&nbsp;abstraction&nbsp;in&nbsp;the&nbsp;parietal&nbsp;cortex.<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+WHAT&nbsp;THIS&nbsp;IS<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+Abstract&nbsp;reasoning&nbsp;is&nbsp;the&nbsp;capacity&nbsp;to&nbsp;reason&nbsp;about&nbsp;*structure*<br>
+independent&nbsp;of&nbsp;*content*.&nbsp;"The&nbsp;atom&nbsp;is&nbsp;like&nbsp;the&nbsp;solar&nbsp;system"&nbsp;does<br>
+not&nbsp;require&nbsp;knowing&nbsp;what&nbsp;atoms&nbsp;or&nbsp;solar&nbsp;systems&nbsp;are&nbsp;made&nbsp;of&nbsp;—&nbsp;only<br>
+that&nbsp;both&nbsp;instantiate&nbsp;the&nbsp;same&nbsp;relational&nbsp;skeleton:&nbsp;a&nbsp;central&nbsp;body,<br>
+orbiting&nbsp;bodies,&nbsp;an&nbsp;attractive&nbsp;force.&nbsp;That&nbsp;skeleton&nbsp;is&nbsp;an<br>
+abstraction:&nbsp;surface&nbsp;features&nbsp;stripped&nbsp;away,&nbsp;relational&nbsp;structure<br>
+retained.<br>
+&nbsp;<br>
+This&nbsp;module&nbsp;implements&nbsp;that&nbsp;capacity&nbsp;over&nbsp;the&nbsp;concept&nbsp;network.&nbsp;It&nbsp;is<br>
+distinct&nbsp;from&nbsp;the&nbsp;neighboring&nbsp;systems&nbsp;it&nbsp;composes&nbsp;with:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Reasoner&nbsp;(reasoning/reasoner.py)&nbsp;traverses&nbsp;*concrete*<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;edges:&nbsp;given&nbsp;concept&nbsp;A,&nbsp;what&nbsp;can&nbsp;be&nbsp;concluded&nbsp;about&nbsp;A.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Content-bound&nbsp;inference.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Analogizer&nbsp;(reasoning/analogy.py)&nbsp;maps&nbsp;between&nbsp;*two*<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;concrete&nbsp;structures:&nbsp;given&nbsp;S&nbsp;and&nbsp;C,&nbsp;align&nbsp;them&nbsp;and&nbsp;project<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;inferences.&nbsp;Pairwise&nbsp;transfer.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;<a href="#AbstractReasoner">AbstractReasoner</a>&nbsp;(this&nbsp;file)&nbsp;produces&nbsp;the&nbsp;*content-free*<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;objects&nbsp;both&nbsp;of&nbsp;those&nbsp;depend&nbsp;on:&nbsp;relational&nbsp;skeletons<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(schemas),&nbsp;complexity&nbsp;measures,&nbsp;least-general&nbsp;generalizations<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;over&nbsp;multiple&nbsp;instances,&nbsp;and&nbsp;n-ary&nbsp;relational&nbsp;systems.&nbsp;It&nbsp;is<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;upstream&nbsp;of&nbsp;inference&nbsp;—&nbsp;it&nbsp;answers&nbsp;"what&nbsp;is&nbsp;the&nbsp;structure<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;here?"&nbsp;before&nbsp;anyone&nbsp;asks&nbsp;"what&nbsp;follows&nbsp;from&nbsp;it?".<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+ANATOMY<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+Abstract/relational&nbsp;reasoning&nbsp;is&nbsp;frontoparietal,&nbsp;with&nbsp;the&nbsp;parietal<br>
+contribution&nbsp;dominant&nbsp;for&nbsp;the&nbsp;representational&nbsp;core:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;The&nbsp;posterior&nbsp;parietal&nbsp;cortex,&nbsp;especially&nbsp;the&nbsp;intraparietal<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sulcus&nbsp;(IPS),&nbsp;encodes&nbsp;relational&nbsp;structure&nbsp;and&nbsp;scales&nbsp;its<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;activity&nbsp;with&nbsp;*relational&nbsp;complexity*&nbsp;—&nbsp;the&nbsp;number&nbsp;of&nbsp;entities<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;that&nbsp;must&nbsp;be&nbsp;bound&nbsp;simultaneously&nbsp;(Halford,&nbsp;Wilson&nbsp;&amp;&nbsp;Phillips,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1998;&nbsp;Vendetti&nbsp;&amp;&nbsp;Bunge,&nbsp;2014).&nbsp;Rostrolateral&nbsp;PFC&nbsp;contributes<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;second-order&nbsp;comparisons;&nbsp;the&nbsp;parietal&nbsp;cortex&nbsp;holds&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;bound&nbsp;representation&nbsp;itself.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Raven's&nbsp;Progressive&nbsp;Matrices&nbsp;—&nbsp;the&nbsp;standard&nbsp;psychometric&nbsp;for<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;abstract&nbsp;reasoning&nbsp;—&nbsp;recruit&nbsp;IPS&nbsp;and&nbsp;superior&nbsp;parietal&nbsp;lobule<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;most&nbsp;strongly,&nbsp;and&nbsp;difficulty&nbsp;tracks&nbsp;relational&nbsp;complexity<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(Christoff&nbsp;et&nbsp;al.,&nbsp;2001;&nbsp;Carpenter,&nbsp;Just&nbsp;&amp;&nbsp;Shell,&nbsp;1990).&nbsp;The<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;spatial&nbsp;solver&nbsp;(spatial/solver.py)&nbsp;is&nbsp;Genesis's&nbsp;RPM-style<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;machinery&nbsp;for&nbsp;visual&nbsp;matrices;&nbsp;this&nbsp;module&nbsp;is&nbsp;the&nbsp;same<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;capacity&nbsp;over&nbsp;her&nbsp;symbolic&nbsp;knowledge&nbsp;—&nbsp;the&nbsp;dorsal&nbsp;stream's<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;structural&nbsp;parsing&nbsp;applied&nbsp;to&nbsp;the&nbsp;concept&nbsp;network.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Multisensory&nbsp;integration&nbsp;in&nbsp;the&nbsp;superior&nbsp;parietal&nbsp;lobule&nbsp;is<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;what&nbsp;makes&nbsp;content-free&nbsp;structure&nbsp;possible:&nbsp;representations<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;arrive&nbsp;already&nbsp;partially&nbsp;abstracted&nbsp;from&nbsp;their&nbsp;modality&nbsp;of<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;origin.<br>
+&nbsp;<br>
+So&nbsp;the&nbsp;parietal&nbsp;lobe&nbsp;is&nbsp;where&nbsp;abstractions&nbsp;live;&nbsp;the&nbsp;frontal&nbsp;lobe<br>
+(reasoning/,&nbsp;executive.py)&nbsp;is&nbsp;where&nbsp;they&nbsp;get&nbsp;*used*&nbsp;for&nbsp;deduction,<br>
+planning,&nbsp;and&nbsp;problem-solving.<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+MATHEMATICAL&nbsp;FOUNDATION<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+1.&nbsp;Relational&nbsp;skeleton&nbsp;(abstraction&nbsp;proper)<br>
+-------------------------------------------<br>
+&nbsp;<br>
+For&nbsp;concept&nbsp;c,&nbsp;take&nbsp;its&nbsp;incident&nbsp;edges&nbsp;E(c)&nbsp;=&nbsp;{(s,&nbsp;r,&nbsp;t)}&nbsp;and&nbsp;replace<br>
+every&nbsp;endpoint&nbsp;with&nbsp;a&nbsp;variable,&nbsp;holding&nbsp;c's&nbsp;own&nbsp;position&nbsp;fixed:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;skeleton(c)&nbsp;=&nbsp;{&nbsp;(?c,&nbsp;r_i,&nbsp;?x_i)&nbsp;}&nbsp;&nbsp;∪&nbsp;&nbsp;{&nbsp;(?x_j,&nbsp;r_j,&nbsp;?c)&nbsp;}<br>
+&nbsp;<br>
+Two&nbsp;concepts&nbsp;with&nbsp;isomorphic&nbsp;skeletons&nbsp;share&nbsp;structure&nbsp;regardless&nbsp;of<br>
+what&nbsp;they&nbsp;are&nbsp;about.&nbsp;The&nbsp;skeleton&nbsp;is&nbsp;the&nbsp;abstraction.<br>
+&nbsp;<br>
+2.&nbsp;Relational&nbsp;complexity&nbsp;(Halford&nbsp;et&nbsp;al.,&nbsp;1998)<br>
+-----------------------------------------------<br>
+&nbsp;<br>
+A&nbsp;unary&nbsp;relation&nbsp;binds&nbsp;1&nbsp;entity,&nbsp;binary&nbsp;binds&nbsp;2,&nbsp;ternary&nbsp;3,<br>
+quaternary&nbsp;4.&nbsp;Processing&nbsp;load&nbsp;—&nbsp;and&nbsp;parietal&nbsp;activation&nbsp;—&nbsp;rises&nbsp;with<br>
+the&nbsp;largest&nbsp;relation&nbsp;that&nbsp;must&nbsp;be&nbsp;represented&nbsp;*jointly*.&nbsp;We&nbsp;compute<br>
+the&nbsp;complexity&nbsp;of&nbsp;a&nbsp;concept's&nbsp;local&nbsp;relational&nbsp;system&nbsp;as&nbsp;the&nbsp;number<br>
+of&nbsp;distinct&nbsp;entities&nbsp;bound&nbsp;into&nbsp;the&nbsp;largest&nbsp;connected&nbsp;relational<br>
+component,&nbsp;capped&nbsp;at&nbsp;QUATERNARY&nbsp;(humans&nbsp;cannot&nbsp;exceed&nbsp;it&nbsp;without<br>
+chunking;&nbsp;we&nbsp;report&nbsp;``saturated=True``&nbsp;when&nbsp;chunking&nbsp;would&nbsp;be<br>
+required).<br>
+&nbsp;<br>
+3.&nbsp;Anti-unification&nbsp;(least&nbsp;general&nbsp;generalization)<br>
+--------------------------------------------------<br>
+&nbsp;<br>
+Given&nbsp;several&nbsp;concrete&nbsp;instances,&nbsp;induction&nbsp;is&nbsp;the&nbsp;dual&nbsp;of<br>
+unification:&nbsp;find&nbsp;the&nbsp;*most&nbsp;specific*&nbsp;pattern&nbsp;that&nbsp;covers&nbsp;all&nbsp;of<br>
+them&nbsp;(Plotkin,&nbsp;1970).&nbsp;For&nbsp;each&nbsp;relation&nbsp;type&nbsp;shared&nbsp;across&nbsp;the<br>
+instance&nbsp;skeletons,&nbsp;align&nbsp;the&nbsp;atoms;&nbsp;where&nbsp;aligned&nbsp;endpoints&nbsp;agree,<br>
+keep&nbsp;the&nbsp;constant;&nbsp;where&nbsp;they&nbsp;differ,&nbsp;introduce&nbsp;a&nbsp;shared&nbsp;variable.<br>
+The&nbsp;result&nbsp;is&nbsp;the&nbsp;least&nbsp;general&nbsp;schema&nbsp;—&nbsp;the&nbsp;abstraction&nbsp;of&nbsp;the<br>
+instance&nbsp;set&nbsp;—&nbsp;with&nbsp;``coverage``&nbsp;measuring&nbsp;how&nbsp;much&nbsp;of&nbsp;the&nbsp;concrete<br>
+structure&nbsp;survived&nbsp;generalization.<br>
+&nbsp;<br>
+4.&nbsp;Structural&nbsp;isomorphism<br>
+-------------------------<br>
+&nbsp;<br>
+A&nbsp;schema&nbsp;matches&nbsp;a&nbsp;candidate&nbsp;concept&nbsp;when&nbsp;the&nbsp;candidate's&nbsp;skeleton<br>
+contains&nbsp;the&nbsp;schema's&nbsp;(relation,&nbsp;direction)&nbsp;pattern&nbsp;—&nbsp;surface<br>
+identity&nbsp;ignored.&nbsp;Matching&nbsp;across&nbsp;cortical&nbsp;columns&nbsp;is&nbsp;the<br>
+abstraction&nbsp;criterion:&nbsp;a&nbsp;schema&nbsp;induced&nbsp;in&nbsp;one&nbsp;domain&nbsp;that&nbsp;matches<br>
+concepts&nbsp;in&nbsp;another&nbsp;column&nbsp;is&nbsp;a&nbsp;genuine&nbsp;cross-domain&nbsp;abstraction,<br>
+not&nbsp;a&nbsp;similarity&nbsp;echo.<br>
+&nbsp;<br>
+5.&nbsp;Relational&nbsp;binding&nbsp;(n-ary&nbsp;systems)<br>
+-------------------------------------<br>
+&nbsp;<br>
+Reasoning&nbsp;about&nbsp;a&nbsp;*set*&nbsp;of&nbsp;concepts&nbsp;requires&nbsp;binding&nbsp;them&nbsp;into&nbsp;one<br>
+representation:&nbsp;every&nbsp;explicit&nbsp;edge&nbsp;among&nbsp;the&nbsp;set,&nbsp;plus&nbsp;shared<br>
+mediators&nbsp;(concepts&nbsp;adjacent&nbsp;to&nbsp;≥2&nbsp;members).&nbsp;The&nbsp;bound&nbsp;system&nbsp;is&nbsp;an<br>
+n-ary&nbsp;relation&nbsp;over&nbsp;the&nbsp;members&nbsp;—&nbsp;the&nbsp;<a href="builtins.html#object">object</a>&nbsp;frontoparietal&nbsp;circuits<br>
+actually&nbsp;reason&nbsp;over,&nbsp;and&nbsp;the&nbsp;input&nbsp;complexity&nbsp;is&nbsp;measured&nbsp;on.</span></p>
+<p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.parietal_lobe.abstract_reasoning.html#AbstractReasoner">AbstractReasoner</a>
+</dt><dt class="heading-text"><a href="Self_World.parietal_lobe.abstract_reasoning.html#RelationalSchema">RelationalSchema</a>
+</dt><dt class="heading-text"><a href="Self_World.parietal_lobe.abstract_reasoning.html#RelationalSystem">RelationalSystem</a>
+</dt><dt class="heading-text"><a href="Self_World.parietal_lobe.abstract_reasoning.html#SchemaAtom">SchemaAtom</a>
+</dt></dl>
+</dd>
+<dt class="heading-text"><a href="enum.html#Enum">enum.Enum</a>(<a href="builtins.html#object">builtins.object</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.parietal_lobe.abstract_reasoning.html#RelationalComplexity">RelationalComplexity</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="AbstractReasoner">class <strong>AbstractReasoner</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#AbstractReasoner">AbstractReasoner</a>(network:&nbsp;'ConceptNetwork')&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Relational&nbsp;abstraction&nbsp;over&nbsp;the&nbsp;concept&nbsp;network.<br>
+&nbsp;<br>
+Produces&nbsp;the&nbsp;content-free&nbsp;structural&nbsp;objects&nbsp;—&nbsp;skeletons,<br>
+schemas,&nbsp;complexity&nbsp;measures,&nbsp;bound&nbsp;systems&nbsp;—&nbsp;that&nbsp;the&nbsp;frontal<br>
+reasoning&nbsp;machinery&nbsp;consumes.&nbsp;All&nbsp;operations&nbsp;are&nbsp;pure&nbsp;graph<br>
+computation:&nbsp;no&nbsp;surface&nbsp;string&nbsp;matching,&nbsp;no&nbsp;templates.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="AbstractReasoner-__init__"><strong>__init__</strong></a>(self, network: 'ConceptNetwork') -&gt; 'None'</dt><dd><span class="code">Create&nbsp;a&nbsp;relational-abstraction&nbsp;reasoner&nbsp;over&nbsp;a&nbsp;concept&nbsp;network.</span></dd></dl>
+
+<dl><dt><a name="AbstractReasoner-bind"><strong>bind</strong></a>(self, concepts: 'list[str]') -&gt; 'RelationalSystem'</dt><dd><span class="code">Bind&nbsp;a&nbsp;set&nbsp;of&nbsp;concepts&nbsp;into&nbsp;one&nbsp;n-ary&nbsp;relational&nbsp;system.<br>
+&nbsp;<br>
+Collects&nbsp;every&nbsp;explicit&nbsp;structural&nbsp;edge&nbsp;among&nbsp;the&nbsp;members<br>
+plus&nbsp;edges&nbsp;through&nbsp;shared&nbsp;mediators&nbsp;(non-member&nbsp;concepts<br>
+adjacent&nbsp;to&nbsp;≥2&nbsp;members&nbsp;—&nbsp;the&nbsp;bridges&nbsp;that&nbsp;make&nbsp;the&nbsp;set&nbsp;a<br>
+*system*&nbsp;rather&nbsp;than&nbsp;a&nbsp;list).&nbsp;This&nbsp;is&nbsp;the&nbsp;bound&nbsp;representation<br>
+the&nbsp;frontoparietal&nbsp;network&nbsp;actually&nbsp;reasons&nbsp;over.</span></dd></dl>
+
+<dl><dt><a name="AbstractReasoner-find_isomorphs"><strong>find_isomorphs</strong></a>(self, schema: 'RelationalSchema', *, exclude_instances: 'bool' = True, column: 'str | None' = None, limit: 'int' = 20) -&gt; 'list[tuple[str, float]]'</dt><dd><span class="code">Find&nbsp;concepts&nbsp;whose&nbsp;skeletons&nbsp;instantiate&nbsp;a&nbsp;schema.<br>
+&nbsp;<br>
+Structure-only&nbsp;matching:&nbsp;a&nbsp;candidate&nbsp;matches&nbsp;atom<br>
+``(?a,&nbsp;R,&nbsp;?b)``&nbsp;when&nbsp;it&nbsp;has&nbsp;any&nbsp;incident&nbsp;edge&nbsp;with&nbsp;relation&nbsp;R<br>
+in&nbsp;the&nbsp;same&nbsp;direction&nbsp;relative&nbsp;to&nbsp;the&nbsp;anchor&nbsp;—&nbsp;regardless&nbsp;of<br>
+what&nbsp;the&nbsp;other&nbsp;endpoint&nbsp;is.&nbsp;Returns&nbsp;(concept_id,&nbsp;score)&nbsp;where<br>
+score&nbsp;is&nbsp;the&nbsp;fraction&nbsp;of&nbsp;schema&nbsp;atoms&nbsp;satisfied,&nbsp;sorted<br>
+descending.&nbsp;Full&nbsp;matches&nbsp;first.<br>
+&nbsp;<br>
+``column``&nbsp;restricts&nbsp;candidates&nbsp;to&nbsp;one&nbsp;cortical&nbsp;column&nbsp;—<br>
+passing&nbsp;a&nbsp;column&nbsp;different&nbsp;from&nbsp;the&nbsp;schema's&nbsp;origin&nbsp;column&nbsp;is<br>
+the&nbsp;cross-domain&nbsp;test:&nbsp;the&nbsp;abstraction&nbsp;is&nbsp;real&nbsp;only&nbsp;if&nbsp;it<br>
+re-instantiates&nbsp;under&nbsp;different&nbsp;surface&nbsp;content.</span></dd></dl>
+
+<dl><dt><a name="AbstractReasoner-induce"><strong>induce</strong></a>(self, instances: 'list[str]') -&gt; 'RelationalSchema | None'</dt><dd><span class="code">Least-general&nbsp;generalization&nbsp;over&nbsp;a&nbsp;set&nbsp;of&nbsp;instances.<br>
+&nbsp;<br>
+Anti-unifies&nbsp;the&nbsp;instances'&nbsp;skeletons:&nbsp;relations&nbsp;present&nbsp;in<br>
+*every*&nbsp;instance&nbsp;survive;&nbsp;endpoints&nbsp;that&nbsp;disagree&nbsp;across<br>
+instances&nbsp;generalize&nbsp;to&nbsp;shared&nbsp;variables;&nbsp;endpoints&nbsp;that&nbsp;agree<br>
+stay&nbsp;constant&nbsp;only&nbsp;when&nbsp;they&nbsp;refer&nbsp;to&nbsp;the&nbsp;same&nbsp;external<br>
+concept.&nbsp;The&nbsp;result&nbsp;is&nbsp;the&nbsp;abstract&nbsp;rule&nbsp;the&nbsp;instances<br>
+jointly&nbsp;instantiate&nbsp;—&nbsp;e.g.&nbsp;inducing&nbsp;over&nbsp;{fire,&nbsp;friction,<br>
+growth}&nbsp;when&nbsp;each&nbsp;``causes``&nbsp;something&nbsp;and&nbsp;``depends_on``<br>
+something&nbsp;yields&nbsp;``?x&nbsp;causes&nbsp;?y;&nbsp;?x&nbsp;depends_on&nbsp;?z``.</span></dd></dl>
+
+<dl><dt><a name="AbstractReasoner-relational_complexity"><strong>relational_complexity</strong></a>(self, concept: 'str') -&gt; 'tuple[RelationalComplexity, bool]'</dt><dd><span class="code">Halford&nbsp;complexity&nbsp;of&nbsp;a&nbsp;concept's&nbsp;bound&nbsp;relational&nbsp;system.<br>
+&nbsp;<br>
+Counts&nbsp;the&nbsp;distinct&nbsp;entities&nbsp;(self&nbsp;+&nbsp;structural&nbsp;neighbors)<br>
+that&nbsp;must&nbsp;be&nbsp;jointly&nbsp;represented&nbsp;to&nbsp;hold&nbsp;the&nbsp;concept's<br>
+relational&nbsp;structure.&nbsp;Returns&nbsp;(level,&nbsp;saturated)&nbsp;where<br>
+saturated&nbsp;means&nbsp;the&nbsp;true&nbsp;arity&nbsp;exceeds&nbsp;quaternary&nbsp;—&nbsp;the<br>
+system&nbsp;must&nbsp;be&nbsp;chunked&nbsp;before&nbsp;frontal&nbsp;reasoning&nbsp;can&nbsp;hold&nbsp;it.</span></dd></dl>
+
+<dl><dt><a name="AbstractReasoner-skeleton"><strong>skeleton</strong></a>(self, concept: 'str', anchor: 'str' = '?self') -&gt; 'RelationalSchema | None'</dt><dd><span class="code">Abstract&nbsp;a&nbsp;concept&nbsp;into&nbsp;its&nbsp;relational&nbsp;skeleton.<br>
+&nbsp;<br>
+Every&nbsp;incident&nbsp;structural&nbsp;edge&nbsp;becomes&nbsp;a&nbsp;schema&nbsp;atom&nbsp;with&nbsp;the<br>
+neighbor&nbsp;replaced&nbsp;by&nbsp;a&nbsp;variable;&nbsp;the&nbsp;concept's&nbsp;own&nbsp;position<br>
+stays&nbsp;fixed&nbsp;as&nbsp;``anchor``.&nbsp;Two&nbsp;concepts&nbsp;with&nbsp;equal&nbsp;skeleton<br>
+relations&nbsp;play&nbsp;the&nbsp;same&nbsp;structural&nbsp;role&nbsp;no&nbsp;matter&nbsp;what&nbsp;they<br>
+are&nbsp;about.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'_STRUCTURAL': 'ClassVar[set[RelationType]]'}</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="RelationalComplexity">class <strong>RelationalComplexity</strong></a>(<a href="enum.html#Enum">enum.Enum</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#RelationalComplexity">RelationalComplexity</a>(*values)<br>
+&nbsp;<br>
+Halford&nbsp;relational&nbsp;complexity&nbsp;levels.<br>
+&nbsp;<br>
+The&nbsp;number&nbsp;of&nbsp;entities&nbsp;that&nbsp;must&nbsp;be&nbsp;bound&nbsp;simultaneously&nbsp;into&nbsp;a<br>
+single&nbsp;relational&nbsp;representation.&nbsp;Human&nbsp;working&nbsp;capacity&nbsp;tops&nbsp;out<br>
+at&nbsp;quaternary;&nbsp;beyond&nbsp;that,&nbsp;systems&nbsp;must&nbsp;be&nbsp;chunked.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.parietal_lobe.abstract_reasoning.html#RelationalComplexity">RelationalComplexity</a></dd>
+<dd><a href="enum.html#Enum">enum.Enum</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>BINARY</strong> = &lt;RelationalComplexity.BINARY: 2&gt;</dl>
+
+<dl><dt><strong>QUATERNARY</strong> = &lt;RelationalComplexity.QUATERNARY: 4&gt;</dl>
+
+<dl><dt><strong>TERNARY</strong> = &lt;RelationalComplexity.TERNARY: 3&gt;</dl>
+
+<dl><dt><strong>UNARY</strong> = &lt;RelationalComplexity.UNARY: 1&gt;</dl>
+
+<hr>
+Data descriptors inherited from <a href="enum.html#Enum">enum.Enum</a>:<br>
+<dl><dt><strong>name</strong></dt>
+<dd><span class="code">The&nbsp;name&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<dl><dt><strong>value</strong></dt>
+<dd><span class="code">The&nbsp;value&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<hr>
+Static methods inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><a name="RelationalComplexity-__contains__"><strong>__contains__</strong></a>(value)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;`value`&nbsp;is&nbsp;in&nbsp;`cls`.<br>
+&nbsp;<br>
+`value`&nbsp;is&nbsp;in&nbsp;`cls`&nbsp;if:<br>
+1)&nbsp;`value`&nbsp;is&nbsp;a&nbsp;member&nbsp;of&nbsp;`cls`,&nbsp;or<br>
+2)&nbsp;`value`&nbsp;is&nbsp;the&nbsp;value&nbsp;of&nbsp;one&nbsp;of&nbsp;the&nbsp;`cls`'s&nbsp;members.</span></dd></dl>
+
+<dl><dt><a name="RelationalComplexity-__getitem__"><strong>__getitem__</strong></a>(name)</dt><dd><span class="code">Return&nbsp;the&nbsp;member&nbsp;matching&nbsp;`name`.</span></dd></dl>
+
+<dl><dt><a name="RelationalComplexity-__iter__"><strong>__iter__</strong></a>()</dt><dd><span class="code">Return&nbsp;members&nbsp;in&nbsp;definition&nbsp;order.</span></dd></dl>
+
+<dl><dt><a name="RelationalComplexity-__len__"><strong>__len__</strong></a>()</dt><dd><span class="code">Return&nbsp;the&nbsp;number&nbsp;of&nbsp;members&nbsp;(no&nbsp;aliases)</span></dd></dl>
+
+<hr>
+Readonly properties inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><strong>__members__</strong></dt>
+<dd><span class="code">Returns&nbsp;a&nbsp;mapping&nbsp;of&nbsp;member&nbsp;name-&gt;value.<br>
+&nbsp;<br>
+This&nbsp;mapping&nbsp;lists&nbsp;all&nbsp;enum&nbsp;members,&nbsp;including&nbsp;aliases.&nbsp;Note&nbsp;that&nbsp;this<br>
+is&nbsp;a&nbsp;read-only&nbsp;view&nbsp;of&nbsp;the&nbsp;internal&nbsp;mapping.</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="RelationalSchema">class <strong>RelationalSchema</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#RelationalSchema">RelationalSchema</a>(atoms:&nbsp;'list[<a href="#SchemaAtom">SchemaAtom</a>]',&nbsp;variables:&nbsp;'set[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;instances:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;coverage:&nbsp;'float'&nbsp;=&nbsp;1.0)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;content-light&nbsp;relational&nbsp;pattern&nbsp;abstracted&nbsp;from&nbsp;the&nbsp;graph.<br>
+&nbsp;<br>
+``atoms``&nbsp;are&nbsp;the&nbsp;schema's&nbsp;relational&nbsp;clauses.&nbsp;``variables``&nbsp;are<br>
+the&nbsp;open&nbsp;slots.&nbsp;``instances``&nbsp;records&nbsp;which&nbsp;concrete&nbsp;concepts&nbsp;the<br>
+schema&nbsp;was&nbsp;abstracted&nbsp;from.&nbsp;``coverage``&nbsp;(0..1)&nbsp;is&nbsp;the&nbsp;fraction&nbsp;of<br>
+instance&nbsp;structure&nbsp;the&nbsp;schema&nbsp;accounts&nbsp;for&nbsp;—&nbsp;low&nbsp;coverage&nbsp;means<br>
+the&nbsp;instances&nbsp;were&nbsp;structurally&nbsp;diverse&nbsp;and&nbsp;the&nbsp;common&nbsp;core&nbsp;is<br>
+thin.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="RelationalSchema-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="RelationalSchema-__init__"><strong>__init__</strong></a>(self, atoms: 'list[SchemaAtom]', variables: 'set[str]' = &lt;factory&gt;, instances: 'list[str]' = &lt;factory&gt;, coverage: 'float' = 1.0) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="RelationalSchema-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="RelationalSchema-describe"><strong>describe</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Render&nbsp;the&nbsp;schema's&nbsp;clauses&nbsp;and&nbsp;coverage.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>complexity</strong></dt>
+<dd><span class="code">Return&nbsp;the&nbsp;Halford&nbsp;complexity&nbsp;implied&nbsp;by&nbsp;the&nbsp;schema's&nbsp;bound&nbsp;entities.</span></dd>
+</dl>
+<dl><dt><strong>relations</strong></dt>
+<dd><span class="code">Return&nbsp;the&nbsp;relation&nbsp;types&nbsp;used&nbsp;by&nbsp;the&nbsp;schema.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>atoms</strong></dt>
+</dl>
+<dl><dt><strong>coverage</strong></dt>
+</dl>
+<dl><dt><strong>instances</strong></dt>
+</dl>
+<dl><dt><strong>variables</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'atoms': 'list[SchemaAtom]', 'coverage': 'float', 'instances': 'list[str]', 'variables': 'set[str]'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'atoms': Field(name='atoms',type='list[SchemaAtom]',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'coverage': Field(name='coverage',type='float',default=1.0,d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'instances': Field(name='instances',type='list[str]',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'variables': Field(name='variables',type='set[str]',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('atoms', 'variables', 'instances', 'coverage')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="RelationalSystem">class <strong>RelationalSystem</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#RelationalSystem">RelationalSystem</a>(members:&nbsp;'list[str]',&nbsp;atoms:&nbsp;'list[<a href="#SchemaAtom">SchemaAtom</a>]',&nbsp;mediators:&nbsp;'list[str]',&nbsp;complexity:&nbsp;'<a href="#RelationalComplexity">RelationalComplexity</a>',&nbsp;saturated:&nbsp;'bool',&nbsp;coherence:&nbsp;'float')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+An&nbsp;n-ary&nbsp;relational&nbsp;system&nbsp;binding&nbsp;a&nbsp;set&nbsp;of&nbsp;concepts.<br>
+&nbsp;<br>
+``members``&nbsp;are&nbsp;the&nbsp;bound&nbsp;concepts;&nbsp;``atoms``&nbsp;are&nbsp;the&nbsp;concrete<br>
+edges&nbsp;among&nbsp;them&nbsp;plus&nbsp;edges&nbsp;through&nbsp;shared&nbsp;mediators;&nbsp;``mediators``<br>
+are&nbsp;the&nbsp;bridging&nbsp;concepts.&nbsp;``complexity``&nbsp;is&nbsp;the&nbsp;Halford&nbsp;level&nbsp;of<br>
+the&nbsp;whole&nbsp;bound&nbsp;representation&nbsp;and&nbsp;``saturated``&nbsp;marks&nbsp;systems<br>
+that&nbsp;exceed&nbsp;quaternary&nbsp;capacity&nbsp;(chunking&nbsp;required).<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="RelationalSystem-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="RelationalSystem-__init__"><strong>__init__</strong></a>(self, members: 'list[str]', atoms: 'list[SchemaAtom]', mediators: 'list[str]', complexity: 'RelationalComplexity', saturated: 'bool', coherence: 'float') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="RelationalSystem-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="RelationalSystem-describe"><strong>describe</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Render&nbsp;the&nbsp;bound&nbsp;members,&nbsp;relation&nbsp;count,&nbsp;complexity,&nbsp;and&nbsp;coherence.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>atoms</strong></dt>
+</dl>
+<dl><dt><strong>coherence</strong></dt>
+</dl>
+<dl><dt><strong>complexity</strong></dt>
+</dl>
+<dl><dt><strong>mediators</strong></dt>
+</dl>
+<dl><dt><strong>members</strong></dt>
+</dl>
+<dl><dt><strong>saturated</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'atoms': 'list[SchemaAtom]', 'coherence': 'float', 'complexity': 'RelationalComplexity', 'mediators': 'list[str]', 'members': 'list[str]', 'saturated': 'bool'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'atoms': Field(name='atoms',type='list[SchemaAtom]',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'coherence': Field(name='coherence',type='float',default=&lt;dat...appingproxy({}),kw_only=False,_field_type=_FIELD), 'complexity': Field(name='complexity',type='RelationalComplexi...appingproxy({}),kw_only=False,_field_type=_FIELD), 'mediators': Field(name='mediators',type='list[str]',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'members': Field(name='members',type='list[str]',default=&lt;d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'saturated': Field(name='saturated',type='bool',default=&lt;data...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('members', 'atoms', 'mediators', 'complexity', 'saturated', 'coherence')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SchemaAtom">class <strong>SchemaAtom</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SchemaAtom">SchemaAtom</a>(source:&nbsp;'str',&nbsp;relation:&nbsp;'RelationType',&nbsp;target:&nbsp;'str')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+One&nbsp;atom&nbsp;of&nbsp;a&nbsp;relational&nbsp;schema:&nbsp;(subject,&nbsp;relation,&nbsp;<a href="builtins.html#object">object</a>).<br>
+&nbsp;<br>
+``source``&nbsp;and&nbsp;``target``&nbsp;are&nbsp;either&nbsp;concrete&nbsp;concept&nbsp;ids&nbsp;or<br>
+variables&nbsp;(prefixed&nbsp;``?``).&nbsp;A&nbsp;fully-variable&nbsp;atom&nbsp;is&nbsp;pure<br>
+structure&nbsp;—&nbsp;"something&nbsp;stands&nbsp;in&nbsp;relation&nbsp;R&nbsp;to&nbsp;something&nbsp;else".<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="SchemaAtom-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="SchemaAtom-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="SchemaAtom-__getstate__"><strong>__getstate__</strong></a> = _dataclass_getstate(self)<span class="grey"><span class="heading-text"> from <a href="dataclasses.html">dataclasses</a></span></span></dt><dd><span class="code">#&nbsp;_dataclass_getstate&nbsp;and&nbsp;_dataclass_setstate&nbsp;are&nbsp;needed&nbsp;for&nbsp;pickling&nbsp;frozen<br>
+#&nbsp;classes&nbsp;with&nbsp;slots.&nbsp;&nbsp;These&nbsp;could&nbsp;be&nbsp;slightly&nbsp;more&nbsp;performant&nbsp;if&nbsp;we&nbsp;generated<br>
+#&nbsp;the&nbsp;code&nbsp;instead&nbsp;of&nbsp;iterating&nbsp;over&nbsp;fields.&nbsp;&nbsp;But&nbsp;that&nbsp;can&nbsp;be&nbsp;a&nbsp;project&nbsp;for<br>
+#&nbsp;another&nbsp;day,&nbsp;if&nbsp;performance&nbsp;becomes&nbsp;an&nbsp;issue.</span></dd></dl>
+
+<dl><dt><a name="SchemaAtom-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="SchemaAtom-__init__"><strong>__init__</strong></a>(self, source: 'str', relation: 'RelationType', target: 'str') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="SchemaAtom-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="SchemaAtom-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<dl><dt><a name="SchemaAtom-__setstate__"><strong>__setstate__</strong></a> = _dataclass_setstate(self, state)<span class="grey"><span class="heading-text"> from <a href="dataclasses.html">dataclasses</a></span></span></dt></dl>
+
+<dl><dt><a name="SchemaAtom-describe"><strong>describe</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Render&nbsp;the&nbsp;atom&nbsp;as&nbsp;a&nbsp;compact&nbsp;source-relation-target&nbsp;clause.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>is_abstract</strong></dt>
+<dd><span class="code">Return&nbsp;whether&nbsp;either&nbsp;side&nbsp;of&nbsp;the&nbsp;atom&nbsp;is&nbsp;an&nbsp;open&nbsp;variable.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>relation</strong></dt>
+</dl>
+<dl><dt><strong>source</strong></dt>
+</dl>
+<dl><dt><strong>target</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'relation': 'RelationType', 'source': 'str', 'target': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'relation': Field(name='relation',type='RelationType',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'source': Field(name='source',type='str',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD), 'target': Field(name='target',type='str',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('source', 'relation', 'target')</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['AbstractReasoner', 'RelationalComplexity', 'RelationalSchema', 'RelationalSystem', 'SchemaAtom']</td></tr></table>
+</body></html>

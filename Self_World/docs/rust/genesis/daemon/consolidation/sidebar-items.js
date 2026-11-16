@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["compact_tag_from_12","compute_compact_tag","expand_emotional_tag"],"struct":["ConsolidationEngine","ConsolidationResult"]};

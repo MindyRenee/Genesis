@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Inner_World.memory.systems</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Inner_World.html" class="white">Inner_World</a>.<a href="Inner_World.memory.html" class="white">memory</a>.systems</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Inner_World/memory/systems.py">/home/mindyrenee/GenAnd/Genesis/Inner_World/memory/systems.py</a></td></tr></table>
+    <p><span class="code">Memory&nbsp;subsystems&nbsp;—&nbsp;biologically&nbsp;grounded&nbsp;memory&nbsp;processes.<br>
+&nbsp;<br>
+This&nbsp;module&nbsp;implements&nbsp;several&nbsp;memory&nbsp;subsystems&nbsp;that&nbsp;sit&nbsp;alongside&nbsp;the<br>
+main&nbsp;:class:`~memory.memory.MemorySystem`.&nbsp;Each<br>
+subsystem&nbsp;models&nbsp;a&nbsp;distinct&nbsp;facet&nbsp;of&nbsp;biological&nbsp;memory&nbsp;that&nbsp;the&nbsp;core<br>
+engine&nbsp;does&nbsp;not&nbsp;cover:<br>
+&nbsp;<br>
+-&nbsp;**Emotional&nbsp;memory**&nbsp;(amygdala-dependent):&nbsp;fear&nbsp;conditioning,<br>
+&nbsp;&nbsp;extinction&nbsp;learning,&nbsp;and&nbsp;emotion-prioritised&nbsp;retrieval.<br>
+-&nbsp;**Priming**&nbsp;(implicit&nbsp;memory):&nbsp;recent&nbsp;exposure&nbsp;to&nbsp;a&nbsp;concept&nbsp;speeds<br>
+&nbsp;&nbsp;subsequent&nbsp;processing&nbsp;of&nbsp;related&nbsp;concepts&nbsp;via&nbsp;spreading&nbsp;activation.<br>
+-&nbsp;**Attractor&nbsp;networks**:&nbsp;a&nbsp;Hopfield-style&nbsp;pattern-completion&nbsp;/<br>
+&nbsp;&nbsp;auto-association&nbsp;layer&nbsp;providing&nbsp;a&nbsp;biologically&nbsp;plausible<br>
+&nbsp;&nbsp;association&nbsp;mechanism&nbsp;on&nbsp;top&nbsp;of&nbsp;the&nbsp;Rust-side&nbsp;SimHash&nbsp;store.<br>
+-&nbsp;**Spreading&nbsp;activation**:&nbsp;graded,&nbsp;temporally-decaying&nbsp;activation<br>
+&nbsp;&nbsp;spreading&nbsp;over&nbsp;the&nbsp;concept&nbsp;network&nbsp;(Collins&nbsp;&amp;&nbsp;Loftus,&nbsp;1975).<br>
+&nbsp;<br>
+All&nbsp;classes&nbsp;follow&nbsp;the&nbsp;project&nbsp;conventions:&nbsp;``@dataclass(slots=True)``,<br>
+type&nbsp;hints,&nbsp;docstrings,&nbsp;and&nbsp;``from&nbsp;__future__&nbsp;import&nbsp;annotations``.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="math.html">math</a><br>
+</td><td class="multicolumn"><a href="time.html">time</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Inner_World.memory.systems.html#AttractorNetwork">AttractorNetwork</a>
+</dt><dt class="heading-text"><a href="Inner_World.memory.systems.html#AttractorPattern">AttractorPattern</a>
+</dt><dt class="heading-text"><a href="Inner_World.memory.systems.html#EmotionalMemory">EmotionalMemory</a>
+</dt><dt class="heading-text"><a href="Inner_World.memory.systems.html#EmotionalMemorySystem">EmotionalMemorySystem</a>
+</dt><dt class="heading-text"><a href="Inner_World.memory.systems.html#PrimingSystem">PrimingSystem</a>
+</dt><dt class="heading-text"><a href="Inner_World.memory.systems.html#SpreadingActivation">SpreadingActivation</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="AttractorNetwork">class <strong>AttractorNetwork</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#AttractorNetwork">AttractorNetwork</a>(size:&nbsp;'int'&nbsp;=&nbsp;64,&nbsp;max_patterns:&nbsp;'int'&nbsp;=&nbsp;512)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+A&nbsp;Hopfield&nbsp;network&nbsp;for&nbsp;pattern&nbsp;completion&nbsp;and&nbsp;auto-association.<br>
+&nbsp;<br>
+This&nbsp;provides&nbsp;a&nbsp;biologically&nbsp;plausible&nbsp;association&nbsp;mechanism&nbsp;on<br>
+top&nbsp;of&nbsp;the&nbsp;Rust-side&nbsp;SimHash&nbsp;store.&nbsp;The&nbsp;Hopfield&nbsp;network&nbsp;(Hopfield,<br>
+1982)&nbsp;stores&nbsp;patterns&nbsp;as&nbsp;attractor&nbsp;basins&nbsp;in&nbsp;a&nbsp;recurrent&nbsp;neural<br>
+space.&nbsp;Given&nbsp;a&nbsp;partial&nbsp;or&nbsp;noisy&nbsp;cue,&nbsp;the&nbsp;network&nbsp;settles&nbsp;into&nbsp;the<br>
+nearest&nbsp;stored&nbsp;pattern&nbsp;—&nbsp;*pattern&nbsp;completion*.<br>
+&nbsp;<br>
+The&nbsp;CA3&nbsp;region&nbsp;of&nbsp;the&nbsp;hippocampus&nbsp;is&nbsp;modelled&nbsp;as&nbsp;an&nbsp;auto-associative<br>
+network:&nbsp;it&nbsp;can&nbsp;retrieve&nbsp;a&nbsp;full&nbsp;memory&nbsp;from&nbsp;a&nbsp;partial&nbsp;cue,&nbsp;and<br>
+similar&nbsp;memories&nbsp;activate&nbsp;each&nbsp;other&nbsp;(Marr,&nbsp;1971;&nbsp;Rolls&nbsp;&amp;&nbsp;Treves,<br>
+1998).<br>
+&nbsp;<br>
+This&nbsp;implementation&nbsp;uses&nbsp;the&nbsp;classic&nbsp;Hopfield&nbsp;update&nbsp;rule&nbsp;with<br>
+asynchronous&nbsp;dynamics.&nbsp;Patterns&nbsp;are&nbsp;stored&nbsp;via&nbsp;Hebbian&nbsp;learning<br>
+(outer&nbsp;product&nbsp;of&nbsp;each&nbsp;pattern&nbsp;with&nbsp;itself,&nbsp;summed&nbsp;into&nbsp;the<br>
+weight&nbsp;matrix).&nbsp;Retrieval&nbsp;iterates&nbsp;the&nbsp;update&nbsp;rule&nbsp;until&nbsp;the&nbsp;state<br>
+stabilises&nbsp;(converges&nbsp;to&nbsp;an&nbsp;attractor).<br>
+&nbsp;<br>
+Capacity:&nbsp;~0.138&nbsp;*&nbsp;N&nbsp;patterns&nbsp;for&nbsp;N&nbsp;units&nbsp;(Amit&nbsp;et&nbsp;al.,&nbsp;1985).<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="AttractorNetwork-__init__"><strong>__init__</strong></a>(self, size: 'int' = 64, max_patterns: 'int' = 512) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;attractor&nbsp;network&nbsp;with&nbsp;a&nbsp;square&nbsp;weight&nbsp;matrix.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;size:&nbsp;Number&nbsp;of&nbsp;units&nbsp;(square&nbsp;weight&nbsp;matrix).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;max_patterns:&nbsp;Retention&nbsp;ceiling.&nbsp;See&nbsp;`_DEFAULT_MAX_PATTERNS`.</span></dd></dl>
+
+<dl><dt><a name="AttractorNetwork-auto_associate"><strong>auto_associate</strong></a>(self, cue_id: 'str', max_results: 'int' = 5) -&gt; 'list[str]'</dt><dd><span class="code">CA3&nbsp;auto-association:&nbsp;find&nbsp;patterns&nbsp;similar&nbsp;to&nbsp;a&nbsp;stored&nbsp;one.<br>
+&nbsp;<br>
+Similar&nbsp;memories&nbsp;activate&nbsp;each&nbsp;other&nbsp;in&nbsp;CA3.&nbsp;This&nbsp;returns&nbsp;the<br>
+IDs&nbsp;of&nbsp;stored&nbsp;patterns&nbsp;whose&nbsp;overlap&nbsp;with&nbsp;the&nbsp;given&nbsp;pattern<br>
+exceeds&nbsp;a&nbsp;threshold&nbsp;(excluding&nbsp;the&nbsp;query&nbsp;itself).<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;cue_id:&nbsp;The&nbsp;ID&nbsp;of&nbsp;a&nbsp;stored&nbsp;pattern&nbsp;to&nbsp;match&nbsp;against.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;max_results:&nbsp;Maximum&nbsp;number&nbsp;of&nbsp;similar&nbsp;patterns&nbsp;to&nbsp;return.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Without&nbsp;this&nbsp;cap,&nbsp;a&nbsp;low&nbsp;threshold&nbsp;returns&nbsp;hundreds&nbsp;of<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;patterns,&nbsp;each&nbsp;triggering&nbsp;an&nbsp;IPC&nbsp;episode&nbsp;fetch&nbsp;that<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;blocks&nbsp;the&nbsp;think()&nbsp;pipeline.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;List&nbsp;of&nbsp;similar&nbsp;pattern&nbsp;IDs&nbsp;(excluding&nbsp;``cue_id``),&nbsp;sorted<br>
+&nbsp;&nbsp;&nbsp;&nbsp;by&nbsp;similarity&nbsp;(most&nbsp;similar&nbsp;first).</span></dd></dl>
+
+<dl><dt><a name="AttractorNetwork-retrieve"><strong>retrieve</strong></a>(self, cue: 'list[float]', max_iterations: 'int' = 20) -&gt; 'tuple[list[float], str | None]'</dt><dd><span class="code">Pattern&nbsp;completion&nbsp;—&nbsp;retrieve&nbsp;the&nbsp;nearest&nbsp;stored&nbsp;pattern.<br>
+&nbsp;<br>
+Given&nbsp;a&nbsp;partial&nbsp;or&nbsp;noisy&nbsp;cue,&nbsp;iterate&nbsp;the&nbsp;Hopfield&nbsp;update&nbsp;rule<br>
+until&nbsp;the&nbsp;state&nbsp;converges&nbsp;to&nbsp;a&nbsp;stored&nbsp;attractor&nbsp;(or&nbsp;the<br>
+iteration&nbsp;limit&nbsp;is&nbsp;reached).<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;cue:&nbsp;Partial/noisy&nbsp;feature&nbsp;vector.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;max_iterations:&nbsp;Maximum&nbsp;update&nbsp;iterations.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;tuple&nbsp;of&nbsp;(converged_vector,&nbsp;matched_pattern_id).&nbsp;The<br>
+&nbsp;&nbsp;&nbsp;&nbsp;pattern&nbsp;id&nbsp;is&nbsp;``None``&nbsp;if&nbsp;no&nbsp;stored&nbsp;pattern&nbsp;matches.<br>
+&nbsp;<br>
+NOTE:&nbsp;once&nbsp;the&nbsp;set&nbsp;exceeds&nbsp;Hopfield&nbsp;capacity&nbsp;(~0.138&nbsp;*&nbsp;N,&nbsp;i.e.<br>
+8&nbsp;at&nbsp;the&nbsp;production&nbsp;size&nbsp;of&nbsp;64&nbsp;—&nbsp;which&nbsp;it&nbsp;does&nbsp;in&nbsp;normal<br>
+operation,&nbsp;see&nbsp;`store`)&nbsp;the&nbsp;update&nbsp;rule&nbsp;can&nbsp;converge&nbsp;to&nbsp;a<br>
+*spurious*&nbsp;attractor&nbsp;that&nbsp;matches&nbsp;no&nbsp;stored&nbsp;pattern.&nbsp;Check<br>
+`over_capacity`&nbsp;before&nbsp;treating&nbsp;a&nbsp;returned&nbsp;id&nbsp;as&nbsp;a&nbsp;confident<br>
+recall.&nbsp;This&nbsp;is&nbsp;a&nbsp;known,&nbsp;disclosed&nbsp;limitation&nbsp;rather&nbsp;than&nbsp;a<br>
+silent&nbsp;one.</span></dd></dl>
+
+<dl><dt><a name="AttractorNetwork-store"><strong>store</strong></a>(self, pattern_id: 'str', vector: 'list[float]') -&gt; 'None'</dt><dd><span class="code">Store&nbsp;a&nbsp;pattern&nbsp;using&nbsp;Hebbian&nbsp;learning&nbsp;(outer&nbsp;product&nbsp;rule).<br>
+&nbsp;<br>
+The&nbsp;pattern&nbsp;set&nbsp;is&nbsp;capped.&nbsp;Two&nbsp;distinct&nbsp;problems&nbsp;were&nbsp;being<br>
+solved&nbsp;by&nbsp;one&nbsp;unbounded&nbsp;structure,&nbsp;and&nbsp;they&nbsp;need&nbsp;different<br>
+answers.<br>
+&nbsp;<br>
+**Growth.**&nbsp;The&nbsp;set&nbsp;grew&nbsp;by&nbsp;one&nbsp;entry&nbsp;per&nbsp;stored&nbsp;memory&nbsp;with&nbsp;no<br>
+ceiling,&nbsp;and&nbsp;the&nbsp;whole&nbsp;thing&nbsp;is&nbsp;persisted.&nbsp;Both&nbsp;`_match_pattern`<br>
+and&nbsp;`auto_associate`&nbsp;scan&nbsp;it&nbsp;in&nbsp;full,&nbsp;on&nbsp;the&nbsp;retrieval&nbsp;hot<br>
+path,&nbsp;so&nbsp;at&nbsp;20k&nbsp;memories&nbsp;that&nbsp;is&nbsp;two&nbsp;1.28M-element&nbsp;scans&nbsp;per<br>
+turn.&nbsp;The&nbsp;ceiling&nbsp;below&nbsp;fixes&nbsp;that&nbsp;and&nbsp;makes&nbsp;the&nbsp;state&nbsp;file<br>
+bounded.&nbsp;Eviction&nbsp;is&nbsp;least-recently-retrieved&nbsp;first,&nbsp;falling<br>
+back&nbsp;to&nbsp;oldest,&nbsp;so&nbsp;a&nbsp;pattern&nbsp;still&nbsp;being&nbsp;recalled&nbsp;survives.<br>
+&nbsp;<br>
+**Fidelity.**&nbsp;A&nbsp;Hopfield&nbsp;network&nbsp;stores&nbsp;~``0.138&nbsp;*&nbsp;N``&nbsp;patterns<br>
+*reliably*;&nbsp;past&nbsp;that,&nbsp;`<a href="#AttractorNetwork-retrieve">retrieve</a>()`&nbsp;converges&nbsp;to&nbsp;*spurious*<br>
+attractors&nbsp;—&nbsp;stable&nbsp;states&nbsp;matching&nbsp;no&nbsp;stored&nbsp;pattern&nbsp;—&nbsp;which<br>
+are&nbsp;then&nbsp;surfaced&nbsp;as&nbsp;a&nbsp;confident&nbsp;completion.&nbsp;That&nbsp;is&nbsp;a&nbsp;real<br>
+correctness&nbsp;problem,&nbsp;and&nbsp;it&nbsp;is&nbsp;deliberately&nbsp;NOT&nbsp;solved&nbsp;by<br>
+capping&nbsp;the&nbsp;set&nbsp;at&nbsp;capacity.&nbsp;Production&nbsp;is&nbsp;`size=64`,&nbsp;so<br>
+capacity&nbsp;is&nbsp;8,&nbsp;and&nbsp;one&nbsp;pattern&nbsp;is&nbsp;stored&nbsp;per&nbsp;memory;&nbsp;an<br>
+8-pattern&nbsp;ceiling&nbsp;would&nbsp;disable&nbsp;the&nbsp;subsystem&nbsp;within&nbsp;a&nbsp;morning<br>
+and&nbsp;would&nbsp;also&nbsp;break&nbsp;the&nbsp;association&nbsp;path,&nbsp;which&nbsp;does<br>
+bit-exact&nbsp;similarity&nbsp;rather&nbsp;than&nbsp;attractor&nbsp;convergence&nbsp;and&nbsp;does<br>
+not&nbsp;care&nbsp;about&nbsp;Hopfield&nbsp;capacity&nbsp;at&nbsp;all.<br>
+&nbsp;<br>
+So&nbsp;the&nbsp;two&nbsp;are&nbsp;separated:&nbsp;the&nbsp;set&nbsp;is&nbsp;bounded&nbsp;generously,&nbsp;and<br>
+`over_capacity`&nbsp;reports&nbsp;when&nbsp;completions&nbsp;have&nbsp;become&nbsp;unreliable<br>
+so&nbsp;a&nbsp;caller&nbsp;can&nbsp;weigh&nbsp;them&nbsp;accordingly.&nbsp;The&nbsp;weight&nbsp;matrix&nbsp;is<br>
+also&nbsp;not&nbsp;un-learned&nbsp;on&nbsp;eviction&nbsp;(that&nbsp;needs&nbsp;the&nbsp;evicted<br>
+pattern's&nbsp;contribution&nbsp;removed;&nbsp;a&nbsp;decaying&nbsp;rebuild&nbsp;is&nbsp;simpler<br>
+and&nbsp;safer),&nbsp;which&nbsp;is&nbsp;a&nbsp;second&nbsp;reason&nbsp;completions&nbsp;drift&nbsp;over<br>
+time&nbsp;—&nbsp;see&nbsp;`over_capacity`.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;pattern_id:&nbsp;Identifier&nbsp;for&nbsp;the&nbsp;pattern.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;vector:&nbsp;Feature&nbsp;vector&nbsp;(values&nbsp;≥0.5&nbsp;map&nbsp;to&nbsp;+1,&nbsp;else&nbsp;-1).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Will&nbsp;be&nbsp;padded/truncated&nbsp;to&nbsp;the&nbsp;network&nbsp;size.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>capacity</strong></dt>
+<dd><span class="code">Theoretical&nbsp;storage&nbsp;capacity&nbsp;(~0.138&nbsp;*&nbsp;N).</span></dd>
+</dl>
+<dl><dt><strong>over_capacity</strong></dt>
+<dd><span class="code">Whether&nbsp;the&nbsp;set&nbsp;exceeds&nbsp;the&nbsp;network's&nbsp;reliable&nbsp;capacity.<br>
+&nbsp;<br>
+True&nbsp;means&nbsp;`retrieve()`'s&nbsp;pattern&nbsp;completions&nbsp;can&nbsp;converge&nbsp;to<br>
+spurious&nbsp;attractors,&nbsp;so&nbsp;a&nbsp;returned&nbsp;`matched_pattern_id`&nbsp;should<br>
+be&nbsp;treated&nbsp;as&nbsp;a&nbsp;suggestion&nbsp;rather&nbsp;than&nbsp;a&nbsp;confident&nbsp;recall.&nbsp;The<br>
+bit-exact&nbsp;`_match_pattern`&nbsp;and&nbsp;`auto_associate`&nbsp;paths&nbsp;are<br>
+unaffected&nbsp;—&nbsp;they&nbsp;do&nbsp;not&nbsp;iterate&nbsp;the&nbsp;update&nbsp;rule.</span></dd>
+</dl>
+<dl><dt><strong>pattern_count</strong></dt>
+<dd><span class="code">Number&nbsp;of&nbsp;stored&nbsp;patterns.</span></dd>
+</dl>
+<dl><dt><strong>retrieval_count</strong></dt>
+<dd><span class="code">Total&nbsp;number&nbsp;of&nbsp;successful&nbsp;pattern&nbsp;retrievals.</span></dd>
+</dl>
+<dl><dt><strong>size</strong></dt>
+<dd><span class="code">Number&nbsp;of&nbsp;units&nbsp;in&nbsp;the&nbsp;network.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="AttractorPattern">class <strong>AttractorPattern</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#AttractorPattern">AttractorPattern</a>(id:&nbsp;'str',&nbsp;vector:&nbsp;'list[float]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;timestamp:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;retrieval_count:&nbsp;'int'&nbsp;=&nbsp;0)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;stored&nbsp;pattern&nbsp;in&nbsp;an&nbsp;attractor&nbsp;network.<br>
+&nbsp;<br>
+Attributes:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;id:&nbsp;Human-readable&nbsp;identifier&nbsp;for&nbsp;the&nbsp;pattern.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;vector:&nbsp;Bipolar&nbsp;(+1/-1)&nbsp;or&nbsp;binary&nbsp;(0/1)&nbsp;feature&nbsp;vector.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;timestamp:&nbsp;When&nbsp;the&nbsp;pattern&nbsp;was&nbsp;stored&nbsp;(ms).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;retrieval_count:&nbsp;How&nbsp;many&nbsp;times&nbsp;the&nbsp;pattern&nbsp;was&nbsp;retrieved.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="AttractorPattern-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="AttractorPattern-__init__"><strong>__init__</strong></a>(self, id: 'str', vector: 'list[float]' = &lt;factory&gt;, timestamp: 'int' = 0, retrieval_count: 'int' = 0) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="AttractorPattern-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>id</strong></dt>
+</dl>
+<dl><dt><strong>retrieval_count</strong></dt>
+</dl>
+<dl><dt><strong>timestamp</strong></dt>
+</dl>
+<dl><dt><strong>vector</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'id': 'str', 'retrieval_count': 'int', 'timestamp': 'int', 'vector': 'list[float]'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'id': Field(name='id',type='str',default=&lt;dataclasses....appingproxy({}),kw_only=False,_field_type=_FIELD), 'retrieval_count': Field(name='retrieval_count',type='int',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'timestamp': Field(name='timestamp',type='int',default=0,defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'vector': Field(name='vector',type='list[float]',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('id', 'vector', 'timestamp', 'retrieval_count')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="EmotionalMemory">class <strong>EmotionalMemory</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#EmotionalMemory">EmotionalMemory</a>(stimulus:&nbsp;'str',&nbsp;emotional_tag:&nbsp;'list[float]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;association_strength:&nbsp;'float'&nbsp;=&nbsp;0.5,&nbsp;extinction_level:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;is_extinct:&nbsp;'bool'&nbsp;=&nbsp;False,&nbsp;timestamp:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;last_retrieved:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;retrieval_count:&nbsp;'int'&nbsp;=&nbsp;0)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+An&nbsp;amygdala-dependent&nbsp;emotional&nbsp;memory&nbsp;association.<br>
+&nbsp;<br>
+Emotional&nbsp;memories&nbsp;are&nbsp;encoded&nbsp;differently&nbsp;from&nbsp;declarative<br>
+memories&nbsp;—&nbsp;they&nbsp;are&nbsp;stronger,&nbsp;more&nbsp;vivid,&nbsp;and&nbsp;partially&nbsp;independent<br>
+of&nbsp;contextual&nbsp;(hippocampal)&nbsp;memory.&nbsp;The&nbsp;amygdala&nbsp;modulates<br>
+hippocampal&nbsp;encoding&nbsp;during&nbsp;emotional&nbsp;arousal&nbsp;(McGaugh,&nbsp;2004).<br>
+&nbsp;<br>
+This&nbsp;dataclass&nbsp;represents&nbsp;an&nbsp;association&nbsp;between&nbsp;a&nbsp;(formerly<br>
+neutral)&nbsp;stimulus&nbsp;and&nbsp;an&nbsp;emotional&nbsp;response,&nbsp;as&nbsp;formed&nbsp;through<br>
+fear&nbsp;conditioning&nbsp;or&nbsp;other&nbsp;emotional&nbsp;learning.<br>
+&nbsp;<br>
+Attributes:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;stimulus:&nbsp;The&nbsp;neutral&nbsp;stimulus&nbsp;that&nbsp;acquired&nbsp;emotional&nbsp;salience.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;emotional_tag:&nbsp;EMOTIONAL_TAG_SIZE-dimensional&nbsp;emotional&nbsp;snapshot&nbsp;at&nbsp;encoding<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(mirrors&nbsp;the&nbsp;neurochemical&nbsp;vector&nbsp;used&nbsp;by&nbsp;the&nbsp;daemon).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;association_strength:&nbsp;Strength&nbsp;of&nbsp;the&nbsp;stimulus→emotion&nbsp;link<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[0..1].&nbsp;Built&nbsp;up&nbsp;during&nbsp;conditioning,&nbsp;reduced&nbsp;during<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;extinction.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;extinction_level:&nbsp;How&nbsp;far&nbsp;extinction&nbsp;learning&nbsp;has&nbsp;progressed<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[0..1].&nbsp;When&nbsp;this&nbsp;reaches&nbsp;~1.0&nbsp;the&nbsp;memory&nbsp;is&nbsp;considered<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;extinguished&nbsp;(the&nbsp;association&nbsp;is&nbsp;suppressed,&nbsp;though&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;original&nbsp;trace&nbsp;persists&nbsp;—&nbsp;spontaneous&nbsp;recovery&nbsp;can&nbsp;occur).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;is_extinct:&nbsp;Whether&nbsp;the&nbsp;association&nbsp;has&nbsp;been&nbsp;extinguished.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;timestamp:&nbsp;When&nbsp;the&nbsp;association&nbsp;was&nbsp;first&nbsp;formed&nbsp;(ms).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;last_retrieved:&nbsp;When&nbsp;the&nbsp;memory&nbsp;was&nbsp;last&nbsp;recalled&nbsp;(ms).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;retrieval_count:&nbsp;How&nbsp;many&nbsp;times&nbsp;it&nbsp;has&nbsp;been&nbsp;retrieved.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="EmotionalMemory-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="EmotionalMemory-__init__"><strong>__init__</strong></a>(self, stimulus: 'str', emotional_tag: 'list[float]' = &lt;factory&gt;, association_strength: 'float' = 0.5, extinction_level: 'float' = 0.0, is_extinct: 'bool' = False, timestamp: 'int' = 0, last_retrieved: 'int' = 0, retrieval_count: 'int' = 0) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="EmotionalMemory-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>association_strength</strong></dt>
+</dl>
+<dl><dt><strong>emotional_tag</strong></dt>
+</dl>
+<dl><dt><strong>extinction_level</strong></dt>
+</dl>
+<dl><dt><strong>is_extinct</strong></dt>
+</dl>
+<dl><dt><strong>last_retrieved</strong></dt>
+</dl>
+<dl><dt><strong>retrieval_count</strong></dt>
+</dl>
+<dl><dt><strong>stimulus</strong></dt>
+</dl>
+<dl><dt><strong>timestamp</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'association_strength': 'float', 'emotional_tag': 'list[float]', 'extinction_level': 'float', 'is_extinct': 'bool', 'last_retrieved': 'int', 'retrieval_count': 'int', 'stimulus': 'str', 'timestamp': 'int'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'association_strength': Field(name='association_strength',type='float',d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'emotional_tag': Field(name='emotional_tag',type='list[float]',de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'extinction_level': Field(name='extinction_level',type='float',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'is_extinct': Field(name='is_extinct',type='bool',default=Fals...appingproxy({}),kw_only=False,_field_type=_FIELD), 'last_retrieved': Field(name='last_retrieved',type='int',default=0...appingproxy({}),kw_only=False,_field_type=_FIELD), 'retrieval_count': Field(name='retrieval_count',type='int',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'stimulus': Field(name='stimulus',type='str',default=&lt;datacl...appingproxy({}),kw_only=False,_field_type=_FIELD), 'timestamp': Field(name='timestamp',type='int',default=0,defa...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('stimulus', 'emotional_tag', 'association_strength', 'extinction_level', 'is_extinct', 'timestamp', 'last_retrieved', 'retrieval_count')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="EmotionalMemorySystem">class <strong>EmotionalMemorySystem</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#EmotionalMemorySystem">EmotionalMemorySystem</a>()&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Amygdala-dependent&nbsp;emotional&nbsp;memory&nbsp;system.<br>
+&nbsp;<br>
+Implements&nbsp;fear&nbsp;conditioning&nbsp;(neutral&nbsp;stimulus&nbsp;+&nbsp;negative&nbsp;emotion&nbsp;→<br>
+association),&nbsp;extinction&nbsp;learning&nbsp;(repeated&nbsp;exposure&nbsp;without&nbsp;the<br>
+negative&nbsp;outcome&nbsp;weakens&nbsp;the&nbsp;association),&nbsp;and&nbsp;emotion-prioritised<br>
+retrieval.<br>
+&nbsp;<br>
+Biological&nbsp;grounding:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;The&nbsp;amygdala&nbsp;stores&nbsp;emotional&nbsp;associations&nbsp;independently&nbsp;of<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;hippocampus&nbsp;(LaBar&nbsp;&amp;&nbsp;Cabeza,&nbsp;2006).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Fear&nbsp;conditioning&nbsp;is&nbsp;rapid&nbsp;(often&nbsp;a&nbsp;single&nbsp;trial)&nbsp;and&nbsp;robust.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Extinction&nbsp;is&nbsp;new&nbsp;inhibitory&nbsp;learning,&nbsp;not&nbsp;erasure&nbsp;—&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;original&nbsp;association&nbsp;persists&nbsp;and&nbsp;can&nbsp;show&nbsp;spontaneous<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;recovery&nbsp;(Bouton,&nbsp;2004).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Emotional&nbsp;memories&nbsp;have&nbsp;priority&nbsp;in&nbsp;retrieval&nbsp;during<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;matching&nbsp;emotional&nbsp;states&nbsp;(mood-congruent&nbsp;memory,&nbsp;Bower&nbsp;1981).<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="EmotionalMemorySystem-__init__"><strong>__init__</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;an&nbsp;empty&nbsp;emotional&nbsp;memory&nbsp;store&nbsp;with&nbsp;zeroed&nbsp;event&nbsp;counters.</span></dd></dl>
+
+<dl><dt><a name="EmotionalMemorySystem-extinction_learning"><strong>extinction_learning</strong></a>(self, stimulus: 'str', exposures: 'int' = 1) -&gt; 'EmotionalMemory | None'</dt><dd><span class="code">Weaken&nbsp;a&nbsp;conditioned&nbsp;association&nbsp;through&nbsp;repeated&nbsp;exposure.<br>
+&nbsp;<br>
+Extinction&nbsp;learning&nbsp;occurs&nbsp;when&nbsp;the&nbsp;conditioned&nbsp;stimulus&nbsp;is<br>
+presented&nbsp;repeatedly&nbsp;without&nbsp;the&nbsp;aversive&nbsp;outcome.&nbsp;The<br>
+association&nbsp;weakens.&nbsp;Extinction&nbsp;is&nbsp;*new&nbsp;inhibitory&nbsp;learning*<br>
+rather&nbsp;than&nbsp;erasure&nbsp;—&nbsp;the&nbsp;original&nbsp;trace&nbsp;persists&nbsp;and&nbsp;can<br>
+show&nbsp;spontaneous&nbsp;recovery&nbsp;(Bouton,&nbsp;2004).<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;stimulus:&nbsp;The&nbsp;conditioned&nbsp;stimulus&nbsp;to&nbsp;extinguish.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;exposures:&nbsp;Number&nbsp;of&nbsp;extinction&nbsp;exposures&nbsp;to&nbsp;apply.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;updated&nbsp;:class:`<a href="#EmotionalMemory">EmotionalMemory</a>`,&nbsp;or&nbsp;``None``&nbsp;if&nbsp;no<br>
+&nbsp;&nbsp;&nbsp;&nbsp;such&nbsp;memory&nbsp;exists.</span></dd></dl>
+
+<dl><dt><a name="EmotionalMemorySystem-fear_conditioning"><strong>fear_conditioning</strong></a>(self, neutral_stimulus: 'str', negative_emotion_strength: 'float', emotional_tag: 'list[float] | None' = None) -&gt; 'EmotionalMemory'</dt><dd><span class="code">Associate&nbsp;a&nbsp;neutral&nbsp;stimulus&nbsp;with&nbsp;a&nbsp;negative&nbsp;emotional&nbsp;response.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;fear&nbsp;conditioning&nbsp;(Pavlovian):&nbsp;a&nbsp;neutral&nbsp;stimulus&nbsp;is<br>
+paired&nbsp;with&nbsp;an&nbsp;aversive&nbsp;outcome,&nbsp;and&nbsp;the&nbsp;stimulus&nbsp;comes&nbsp;to<br>
+evoke&nbsp;the&nbsp;emotional&nbsp;response&nbsp;on&nbsp;its&nbsp;own.&nbsp;Conditioning&nbsp;is&nbsp;rapid<br>
+—&nbsp;a&nbsp;single&nbsp;strong&nbsp;pairing&nbsp;can&nbsp;establish&nbsp;a&nbsp;robust&nbsp;association.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;neutral_stimulus:&nbsp;The&nbsp;stimulus&nbsp;to&nbsp;be&nbsp;conditioned.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;negative_emotion_strength:&nbsp;Strength&nbsp;of&nbsp;the&nbsp;negative&nbsp;emotion<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[0..1].&nbsp;Higher&nbsp;values&nbsp;produce&nbsp;stronger&nbsp;associations.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;emotional_tag:&nbsp;Optional&nbsp;EMOTIONAL_TAG_SIZE-chemical&nbsp;emotional&nbsp;snapshot.&nbsp;If<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;omitted,&nbsp;a&nbsp;default&nbsp;negative-biased&nbsp;tag&nbsp;is&nbsp;used.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;created/updated&nbsp;:class:`<a href="#EmotionalMemory">EmotionalMemory</a>`.</span></dd></dl>
+
+<dl><dt><a name="EmotionalMemorySystem-get_all"><strong>get_all</strong></a>(self) -&gt; 'list[EmotionalMemory]'</dt><dd><span class="code">Return&nbsp;all&nbsp;emotional&nbsp;memories.</span></dd></dl>
+
+<dl><dt><a name="EmotionalMemorySystem-retrieve_emotional"><strong>retrieve_emotional</strong></a>(self, stimulus: 'str', current_emotion: 'list[float] | None' = None) -&gt; 'EmotionalMemory | None'</dt><dd><span class="code">Retrieve&nbsp;an&nbsp;emotional&nbsp;memory,&nbsp;with&nbsp;state-dependent&nbsp;priority.<br>
+&nbsp;<br>
+Emotional&nbsp;memories&nbsp;have&nbsp;priority&nbsp;in&nbsp;retrieval&nbsp;during&nbsp;matching<br>
+emotional&nbsp;states&nbsp;(mood-congruent&nbsp;memory,&nbsp;Bower&nbsp;1981).&nbsp;When&nbsp;the<br>
+current&nbsp;emotional&nbsp;state&nbsp;matches&nbsp;the&nbsp;memory's&nbsp;emotional&nbsp;tag,<br>
+the&nbsp;effective&nbsp;retrieval&nbsp;priority&nbsp;is&nbsp;boosted.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;stimulus:&nbsp;The&nbsp;stimulus&nbsp;to&nbsp;look&nbsp;up.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;current_emotion:&nbsp;Optional&nbsp;EMOTIONAL_TAG_SIZE-chemical&nbsp;current&nbsp;emotional<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;snapshot.&nbsp;If&nbsp;provided&nbsp;and&nbsp;it&nbsp;matches&nbsp;the&nbsp;memory's&nbsp;tag,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;retrieval&nbsp;priority&nbsp;is&nbsp;boosted.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;matching&nbsp;:class:`<a href="#EmotionalMemory">EmotionalMemory</a>`,&nbsp;or&nbsp;``None``.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>active_count</strong></dt>
+<dd><span class="code">Number&nbsp;of&nbsp;non-extinguished&nbsp;emotional&nbsp;memories.</span></dd>
+</dl>
+<dl><dt><strong>count</strong></dt>
+<dd><span class="code">Number&nbsp;of&nbsp;stored&nbsp;emotional&nbsp;memories.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="PrimingSystem">class <strong>PrimingSystem</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#PrimingSystem">PrimingSystem</a>(network:&nbsp;'ConceptNetwork&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;decay_rate:&nbsp;'float'&nbsp;=&nbsp;0.02,&nbsp;spread_depth:&nbsp;'int'&nbsp;=&nbsp;2,&nbsp;spread_decay:&nbsp;'float'&nbsp;=&nbsp;0.5)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Implicit&nbsp;memory&nbsp;priming&nbsp;via&nbsp;spreading&nbsp;activation.<br>
+&nbsp;<br>
+Recent&nbsp;exposure&nbsp;to&nbsp;a&nbsp;concept&nbsp;speeds&nbsp;subsequent&nbsp;processing&nbsp;of<br>
+related&nbsp;concepts.&nbsp;This&nbsp;is&nbsp;*semantic&nbsp;priming*&nbsp;—&nbsp;the&nbsp;classic<br>
+finding&nbsp;that&nbsp;hearing&nbsp;"doctor"&nbsp;speeds&nbsp;recognition&nbsp;of&nbsp;"nurse"<br>
+(Meyer&nbsp;&amp;&nbsp;Schvaneveldt,&nbsp;1971).&nbsp;Activation&nbsp;spreads&nbsp;from&nbsp;the&nbsp;primed<br>
+concept&nbsp;to&nbsp;its&nbsp;neighbours&nbsp;in&nbsp;the&nbsp;concept&nbsp;network,&nbsp;decaying&nbsp;with<br>
+distance&nbsp;(Collins&nbsp;&amp;&nbsp;Loftus,&nbsp;1975).<br>
+&nbsp;<br>
+Priming&nbsp;is&nbsp;implicit:&nbsp;it&nbsp;does&nbsp;not&nbsp;require&nbsp;cognitive&nbsp;recall&nbsp;and&nbsp;is<br>
+independent&nbsp;of&nbsp;declarative&nbsp;memory.&nbsp;It&nbsp;decays&nbsp;over&nbsp;time&nbsp;(typically<br>
+lasting&nbsp;seconds&nbsp;to&nbsp;minutes&nbsp;in&nbsp;humans).<br>
+&nbsp;<br>
+This&nbsp;system&nbsp;integrates&nbsp;with&nbsp;the&nbsp;existing<br>
+:class:`~concepts.ConceptNetwork`&nbsp;spreading<br>
+activation,&nbsp;using&nbsp;the&nbsp;network's&nbsp;``spread_activation``&nbsp;method&nbsp;to<br>
+propagate&nbsp;priming&nbsp;to&nbsp;neighbours.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="PrimingSystem-__init__"><strong>__init__</strong></a>(self, network: 'ConceptNetwork | None' = None, decay_rate: 'float' = 0.02, spread_depth: 'int' = 2, spread_decay: 'float' = 0.5) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;semantic&nbsp;priming&nbsp;system.</span></dd></dl>
+
+<dl><dt><a name="PrimingSystem-get_all_primed"><strong>get_all_primed</strong></a>(self, threshold: 'float' = 0.01) -&gt; 'dict[str, float]'</dt><dd><span class="code">Return&nbsp;all&nbsp;concepts&nbsp;currently&nbsp;above&nbsp;the&nbsp;priming&nbsp;threshold.</span></dd></dl>
+
+<dl><dt><a name="PrimingSystem-is_primed"><strong>is_primed</strong></a>(self, concept_name: 'str') -&gt; 'float'</dt><dd><span class="code">Return&nbsp;the&nbsp;current&nbsp;priming&nbsp;level&nbsp;for&nbsp;a&nbsp;concept&nbsp;[0..1].<br>
+&nbsp;<br>
+Returns&nbsp;0.0&nbsp;if&nbsp;the&nbsp;concept&nbsp;has&nbsp;not&nbsp;been&nbsp;primed&nbsp;or&nbsp;priming&nbsp;has<br>
+fully&nbsp;decayed.</span></dd></dl>
+
+<dl><dt><a name="PrimingSystem-prime"><strong>prime</strong></a>(self, concept_name: 'str', amount: 'float' = 1.0) -&gt; 'None'</dt><dd><span class="code">Prime&nbsp;a&nbsp;concept&nbsp;—&nbsp;recent&nbsp;exposure&nbsp;boosts&nbsp;its&nbsp;accessibility.<br>
+&nbsp;<br>
+If&nbsp;a&nbsp;concept&nbsp;network&nbsp;is&nbsp;attached,&nbsp;priming&nbsp;spreads&nbsp;to&nbsp;related<br>
+concepts&nbsp;via&nbsp;the&nbsp;network's&nbsp;spreading&nbsp;activation.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;concept_name:&nbsp;The&nbsp;concept&nbsp;to&nbsp;prime.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;amount:&nbsp;Priming&nbsp;strength&nbsp;[0..1].</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>primed_count</strong></dt>
+<dd><span class="code">Number&nbsp;of&nbsp;concepts&nbsp;currently&nbsp;primed&nbsp;above&nbsp;threshold.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SpreadingActivation">class <strong>SpreadingActivation</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SpreadingActivation">SpreadingActivation</a>(network:&nbsp;'ConceptNetwork&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;decay_rate:&nbsp;'float'&nbsp;=&nbsp;0.05,&nbsp;spread_decay:&nbsp;'float'&nbsp;=&nbsp;0.5,&nbsp;max_depth:&nbsp;'int'&nbsp;=&nbsp;3)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Graded&nbsp;spreading&nbsp;activation&nbsp;over&nbsp;a&nbsp;concept&nbsp;network.<br>
+&nbsp;<br>
+Implements&nbsp;the&nbsp;Collins&nbsp;&amp;&nbsp;Loftus&nbsp;(1975)&nbsp;semantic&nbsp;network&nbsp;model:<br>
+when&nbsp;a&nbsp;concept&nbsp;is&nbsp;activated,&nbsp;activation&nbsp;spreads&nbsp;to&nbsp;related<br>
+concepts&nbsp;with&nbsp;decay&nbsp;over&nbsp;distance.&nbsp;The&nbsp;amount&nbsp;of&nbsp;spread&nbsp;depends<br>
+on&nbsp;the&nbsp;relationship&nbsp;strength.&nbsp;Activation&nbsp;also&nbsp;decays&nbsp;over&nbsp;time.<br>
+&nbsp;<br>
+This&nbsp;class&nbsp;wraps&nbsp;the&nbsp;concept&nbsp;network's&nbsp;existing<br>
+``spread_activation``&nbsp;method,&nbsp;adding&nbsp;*temporal&nbsp;dynamics*&nbsp;—<br>
+activation&nbsp;levels&nbsp;persist&nbsp;and&nbsp;decay&nbsp;over&nbsp;real&nbsp;time,&nbsp;so&nbsp;recently<br>
+activated&nbsp;concepts&nbsp;remain&nbsp;partially&nbsp;primed.&nbsp;This&nbsp;models&nbsp;the<br>
+sustained&nbsp;activation&nbsp;seen&nbsp;in&nbsp;semantic&nbsp;processing&nbsp;(the&nbsp;N400<br>
+ERP&nbsp;component&nbsp;reflects&nbsp;residual&nbsp;activation).<br>
+&nbsp;<br>
+The&nbsp;activation&nbsp;map&nbsp;is&nbsp;keyed&nbsp;by&nbsp;concept&nbsp;ID&nbsp;and&nbsp;decays&nbsp;exponentially<br>
+between&nbsp;updates.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="SpreadingActivation-__init__"><strong>__init__</strong></a>(self, network: 'ConceptNetwork | None' = None, decay_rate: 'float' = 0.05, spread_decay: 'float' = 0.5, max_depth: 'int' = 3) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;spreading&nbsp;activation&nbsp;with&nbsp;decay&nbsp;and&nbsp;depth&nbsp;parameters.</span></dd></dl>
+
+<dl><dt><a name="SpreadingActivation-activate"><strong>activate</strong></a>(self, concept_name: 'str', amount: 'float' = 0.3) -&gt; 'dict[str, float]'</dt><dd><span class="code">Activate&nbsp;a&nbsp;concept&nbsp;and&nbsp;spread&nbsp;activation&nbsp;to&nbsp;its&nbsp;neighbours.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;concept_name:&nbsp;The&nbsp;concept&nbsp;to&nbsp;activate.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;amount:&nbsp;Initial&nbsp;activation&nbsp;strength&nbsp;[0..1].<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Dict&nbsp;of&nbsp;all&nbsp;activated&nbsp;concepts&nbsp;and&nbsp;their&nbsp;levels&nbsp;after<br>
+&nbsp;&nbsp;&nbsp;&nbsp;spreading.</span></dd></dl>
+
+<dl><dt><a name="SpreadingActivation-get_activation"><strong>get_activation</strong></a>(self, concept_name: 'str') -&gt; 'float'</dt><dd><span class="code">Return&nbsp;the&nbsp;current&nbsp;activation&nbsp;level&nbsp;for&nbsp;a&nbsp;concept&nbsp;[0..1].</span></dd></dl>
+
+<dl><dt><a name="SpreadingActivation-get_all"><strong>get_all</strong></a>(self, threshold: 'float' = 0.01) -&gt; 'dict[str, float]'</dt><dd><span class="code">Return&nbsp;all&nbsp;concepts&nbsp;currently&nbsp;above&nbsp;the&nbsp;activation&nbsp;threshold.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>active_count</strong></dt>
+<dd><span class="code">Number&nbsp;of&nbsp;concepts&nbsp;currently&nbsp;above&nbsp;the&nbsp;activation&nbsp;threshold.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['AttractorNetwork', 'AttractorPattern', 'EmotionalMemory', 'EmotionalMemorySystem', 'PrimingSystem', 'SpreadingActivation']</td></tr></table>
+</body></html>

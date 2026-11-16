@@ -1,0 +1,39 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="NaN / infinity sanitization primitives."><title>genesis::state::sanitize - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-203241e4.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="genesis" data-themes="" data-resource-suffix="" data-rustdoc-version="1.100.0 (0ef1bc386 2026-11-09)" data-channel="1.100.0" data-search-js="search-b167f383.js" data-stringdex-js="stringdex-b5109af9.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../../static.files/main-1814ead3.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-9f56287d.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module sanitize</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../genesis/index.html">genesis</a><span class="version">0.2.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module sanitize</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#why-this-module-exists" title="Why this module exists">Why this module exists</a></li></ul><h3><a href="#functions">Module Items</a></h3><ul class="block"><li><a href="#functions" title="Functions">Functions</a></li></ul></section><div id="rustdoc-modnav"><h2><a href="../index.html">In genesis::<wbr>state</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../index.html">genesis</a>::<wbr><a href="../index.html">state</a></div><h1>Module <span>sanitize</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/genesis/state/sanitize.rs.html#1-137">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>NaN / infinity sanitization primitives.</p>
+<h3 id="why-this-module-exists"><a class="doc-anchor" href="#why-this-module-exists">§</a>Why this module exists</h3>
+<p>Rust’s <code>f32::clamp(min, max)</code> returns <code>NaN</code> when <code>self</code> is <code>NaN</code>.
+This means every <code>.clamp()</code> call in the codebase — and there are
+hundreds — provides <strong>zero</strong> protection against NaN propagation.
+A single NaN in a neurochemical level propagates through the
+18×18 coupling matrix to all 18 chemicals within one tick, and
+is then persisted to the mmap’d state file. The system never
+recovers — the NaN is permanent.</p>
+<p>The entry points for NaN are:</p>
+<ul>
+<li><strong>IPC</strong>: <code>f32::from_le_bytes</code> on wire data from the cognitive
+mind. A bug in the Python layer (or a malicious client) can
+send NaN or ±inf as an impulse magnitude, user-affect field,
+or event salience.</li>
+<li><strong>Model file loading</strong>: <code>f32::from_le_bytes</code> on the active
+inference model file. A crash during <code>save()</code> can corrupt the
+file, injecting NaN into the transition matrix.</li>
+<li><strong>Computation</strong>: <code>subtype_effective_level</code> for dopamine can
+produce values up to ~6.0 (breaking the [0, 2] contract),
+and the Pearson correlation in the dyadic model can produce
+NaN when variance is zero.</li>
+</ul>
+<p>This module provides the atomic building blocks for a multi-layer
+defense:</p>
+<ol>
+<li><strong>Entry-point sanitization</strong>: reject NaN/inf at every IPC
+handler and file loader before the value enters the system.</li>
+<li><strong><code>apply_impulse</code> sanitization</strong>: the last line of defense
+before NaN enters a chemical’s level/velocity.</li>
+<li><strong>Tick-level circuit breaker</strong>: scan all chemicals at the
+start of each tick and reset any with non-finite fields.</li>
+<li><strong>Derived-value sanitization</strong>: sanitize arousal, valence,
+global_tone, and plasticity_gate after computation.</li>
+</ol>
+</div></details><h2 id="functions" class="section-header">Functions<a href="#functions" class="anchor">§</a></h2><dl class="item-table"><dt><a class="fn" href="fn.finite_clamp.html" title="fn genesis::state::sanitize::finite_clamp">finite_<wbr>clamp</a></dt><dd>Clamp <code>v</code> to <code>[min, max]</code> if it is finite; return <code>min</code> if it is
+NaN or ±inf.</dd><dt><a class="fn" href="fn.finite_or.html" title="fn genesis::state::sanitize::finite_or">finite_<wbr>or</a></dt><dd>Return <code>v</code> if it is finite (not NaN, not ±inf), else <code>default</code>.</dd><dt><a class="fn" href="fn.sanitize_array_f32.html" title="fn genesis::state::sanitize::sanitize_array_f32">sanitize_<wbr>array_<wbr>f32</a></dt><dd>Sanitize a 1D array in place: replace every non-finite element
+with <code>default</code>.</dd><dt><a class="fn" href="fn.sanitize_matrix_f32.html" title="fn genesis::state::sanitize::sanitize_matrix_f32">sanitize_<wbr>matrix_<wbr>f32</a></dt><dd>Sanitize a 2D array in place: replace every non-finite element
+with <code>default</code>.</dd></dl></section></div></main></body></html>

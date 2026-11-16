@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.frontal_lobe.reasoning.problem_solving</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.frontal_lobe.html" class="white">frontal_lobe</a>.<a href="Self_World.frontal_lobe.reasoning.html" class="white">reasoning</a>.problem_solving</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/reasoning/problem_solving.py">/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/reasoning/problem_solving.py</a></td></tr></table>
+    <p><span class="code"><a href="#Problem">Problem</a>-solving&nbsp;engine&nbsp;—&nbsp;means-ends&nbsp;analysis&nbsp;over&nbsp;the&nbsp;concept&nbsp;network.<br>
+&nbsp;<br>
+Genesis&nbsp;could&nbsp;reason&nbsp;about&nbsp;concepts&nbsp;(deductive,&nbsp;abductive,&nbsp;analogical,<br>
+causal)&nbsp;but&nbsp;it&nbsp;couldn't&nbsp;*solve&nbsp;problems*.&nbsp;The&nbsp;reasoning&nbsp;engine&nbsp;is<br>
+stimulus-driven&nbsp;—&nbsp;give&nbsp;it&nbsp;a&nbsp;concept&nbsp;and&nbsp;it&nbsp;reasons&nbsp;about&nbsp;that&nbsp;concept.<br>
+There&nbsp;was&nbsp;no&nbsp;goal-directed&nbsp;reasoning:&nbsp;given&nbsp;a&nbsp;desired&nbsp;state,&nbsp;work<br>
+backward&nbsp;to&nbsp;find&nbsp;what's&nbsp;needed&nbsp;to&nbsp;achieve&nbsp;it.<br>
+&nbsp;<br>
+This&nbsp;module&nbsp;closes&nbsp;that&nbsp;gap&nbsp;with&nbsp;a&nbsp;**means-ends&nbsp;analysis**&nbsp;engine.<br>
+Means-ends&nbsp;analysis&nbsp;is&nbsp;the&nbsp;classic&nbsp;problem-solving&nbsp;strategy&nbsp;(Newell&nbsp;&amp;<br>
+Simon,&nbsp;1972):&nbsp;compare&nbsp;the&nbsp;current&nbsp;state&nbsp;to&nbsp;the&nbsp;goal&nbsp;state,&nbsp;identify&nbsp;the<br>
+gap,&nbsp;select&nbsp;an&nbsp;operator&nbsp;that&nbsp;reduces&nbsp;the&nbsp;gap,&nbsp;apply&nbsp;it,&nbsp;and&nbsp;recurse&nbsp;on<br>
+any&nbsp;new&nbsp;subproblems.&nbsp;It's&nbsp;the&nbsp;cognitive&nbsp;process&nbsp;behind&nbsp;"to&nbsp;get&nbsp;to&nbsp;the<br>
+store,&nbsp;I&nbsp;need&nbsp;the&nbsp;car;&nbsp;to&nbsp;get&nbsp;the&nbsp;car,&nbsp;I&nbsp;need&nbsp;the&nbsp;keys;&nbsp;to&nbsp;get&nbsp;the<br>
+keys,&nbsp;I&nbsp;need&nbsp;to&nbsp;find&nbsp;my&nbsp;bag."<br>
+&nbsp;<br>
+##&nbsp;How&nbsp;it&nbsp;works<br>
+&nbsp;<br>
+The&nbsp;concept&nbsp;network&nbsp;IS&nbsp;the&nbsp;state&nbsp;space.&nbsp;Each&nbsp;concept&nbsp;is&nbsp;a&nbsp;state;&nbsp;each<br>
+typed&nbsp;edge&nbsp;is&nbsp;a&nbsp;transition.&nbsp;The&nbsp;"current&nbsp;state"&nbsp;is&nbsp;what&nbsp;Genesis&nbsp;already<br>
+understands&nbsp;(quality&nbsp;concepts&nbsp;with&nbsp;definitions&nbsp;and&nbsp;typed&nbsp;edges).&nbsp;The<br>
+"goal&nbsp;state"&nbsp;is&nbsp;the&nbsp;problem's&nbsp;target&nbsp;—&nbsp;a&nbsp;concept&nbsp;it&nbsp;wants&nbsp;to<br>
+understand,&nbsp;a&nbsp;state&nbsp;it&nbsp;wants&nbsp;to&nbsp;achieve,&nbsp;a&nbsp;contradiction&nbsp;it&nbsp;wants&nbsp;to<br>
+resolve.<br>
+&nbsp;<br>
+1.&nbsp;**<a href="#Problem">Problem</a>&nbsp;representation**:&nbsp;a&nbsp;``<a href="#Problem">Problem</a>``&nbsp;has&nbsp;a&nbsp;goal&nbsp;(concept&nbsp;name),<br>
+&nbsp;&nbsp;&nbsp;a&nbsp;goal&nbsp;type&nbsp;(understand&nbsp;/&nbsp;achieve&nbsp;/&nbsp;explain&nbsp;/&nbsp;resolve&nbsp;/&nbsp;compare),<br>
+&nbsp;&nbsp;&nbsp;and&nbsp;a&nbsp;reason.&nbsp;Subproblems&nbsp;are&nbsp;recursive&nbsp;—&nbsp;a&nbsp;<a href="#Problem">Problem</a>&nbsp;can&nbsp;decompose<br>
+&nbsp;&nbsp;&nbsp;into&nbsp;child&nbsp;Problems.<br>
+&nbsp;<br>
+2.&nbsp;**Decomposition**:&nbsp;the&nbsp;solver&nbsp;finds&nbsp;prerequisites&nbsp;—&nbsp;concepts&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;goal&nbsp;DEPENDS_ON&nbsp;or&nbsp;is&nbsp;ENABLED_BY.&nbsp;Each&nbsp;unsatisfied&nbsp;prerequisite<br>
+&nbsp;&nbsp;&nbsp;becomes&nbsp;a&nbsp;subproblem.&nbsp;For&nbsp;"achieve"&nbsp;goals,&nbsp;it&nbsp;also&nbsp;finds&nbsp;CAUSES&nbsp;and<br>
+&nbsp;&nbsp;&nbsp;LEADS_TO&nbsp;edges&nbsp;(the&nbsp;means&nbsp;to&nbsp;the&nbsp;goal).&nbsp;For&nbsp;"resolve"&nbsp;goals,&nbsp;it<br>
+&nbsp;&nbsp;&nbsp;finds&nbsp;the&nbsp;two&nbsp;contradicting&nbsp;concepts&nbsp;and&nbsp;weighs&nbsp;their&nbsp;support.<br>
+&nbsp;<br>
+3.&nbsp;**Operator&nbsp;application**:&nbsp;for&nbsp;each&nbsp;problem,&nbsp;the&nbsp;solver&nbsp;applies<br>
+&nbsp;&nbsp;&nbsp;operators&nbsp;—&nbsp;reasoning&nbsp;strategies&nbsp;from&nbsp;the&nbsp;Reasoner&nbsp;(deductive<br>
+&nbsp;&nbsp;&nbsp;chains,&nbsp;abductive&nbsp;inference,&nbsp;analogical&nbsp;transfer,&nbsp;causal&nbsp;chains,<br>
+&nbsp;&nbsp;&nbsp;hypothesis&nbsp;formation)&nbsp;and&nbsp;concept-network&nbsp;queries&nbsp;(find<br>
+&nbsp;&nbsp;&nbsp;prerequisites,&nbsp;find&nbsp;properties,&nbsp;find&nbsp;analogies).&nbsp;Each&nbsp;operator<br>
+&nbsp;&nbsp;&nbsp;produces&nbsp;a&nbsp;``<a href="#SolutionStep">SolutionStep</a>``&nbsp;with&nbsp;structured&nbsp;knowledge&nbsp;triples&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;language&nbsp;engine&nbsp;can&nbsp;compose&nbsp;from.<br>
+&nbsp;<br>
+4.&nbsp;**Verification**:&nbsp;after&nbsp;applying&nbsp;operators,&nbsp;the&nbsp;solver&nbsp;checks&nbsp;whether<br>
+&nbsp;&nbsp;&nbsp;the&nbsp;goal&nbsp;is&nbsp;now&nbsp;satisfied&nbsp;—&nbsp;does&nbsp;the&nbsp;concept&nbsp;have&nbsp;a&nbsp;definition&nbsp;and<br>
+&nbsp;&nbsp;&nbsp;typed&nbsp;edges?&nbsp;Was&nbsp;a&nbsp;causal&nbsp;chain&nbsp;found?&nbsp;Was&nbsp;the&nbsp;contradiction<br>
+&nbsp;&nbsp;&nbsp;resolved?&nbsp;Verification&nbsp;is&nbsp;goal-type-specific.<br>
+&nbsp;<br>
+5.&nbsp;**<a href="#Solution">Solution</a>&nbsp;composition**:&nbsp;the&nbsp;final&nbsp;``<a href="#Solution">Solution</a>``&nbsp;aggregates&nbsp;all<br>
+&nbsp;&nbsp;&nbsp;steps&nbsp;and&nbsp;subproblem&nbsp;solutions&nbsp;into&nbsp;a&nbsp;tree,&nbsp;with&nbsp;an&nbsp;overall<br>
+&nbsp;&nbsp;&nbsp;confidence&nbsp;and&nbsp;verification&nbsp;status.&nbsp;The&nbsp;``all_knowledge``&nbsp;property<br>
+&nbsp;&nbsp;&nbsp;flattens&nbsp;the&nbsp;tree&nbsp;into&nbsp;knowledge&nbsp;triples&nbsp;for&nbsp;the&nbsp;language&nbsp;engine.<br>
+&nbsp;<br>
+##&nbsp;Cycle&nbsp;safety<br>
+&nbsp;<br>
+The&nbsp;concept&nbsp;network&nbsp;can&nbsp;have&nbsp;cycles&nbsp;(A&nbsp;depends_on&nbsp;B,&nbsp;B&nbsp;depends_on&nbsp;A).<br>
+The&nbsp;solver&nbsp;tracks&nbsp;visited&nbsp;concepts&nbsp;per-solve&nbsp;and&nbsp;refuses&nbsp;to&nbsp;recurse<br>
+into&nbsp;an&nbsp;already-visited&nbsp;concept,&nbsp;returning&nbsp;a&nbsp;"blocked"&nbsp;solution&nbsp;instead.<br>
+A&nbsp;max-depth&nbsp;limit&nbsp;(default&nbsp;4)&nbsp;prevents&nbsp;runaway&nbsp;recursion&nbsp;on&nbsp;large<br>
+networks.<br>
+&nbsp;<br>
+##&nbsp;Integration<br>
+&nbsp;<br>
+The&nbsp;solver&nbsp;is&nbsp;wired&nbsp;into&nbsp;the&nbsp;frontal&nbsp;region&nbsp;as<br>
+``self.<strong>brain</strong>.frontal.problem_solver``&nbsp;and&nbsp;invoked&nbsp;during&nbsp;the&nbsp;reasoning<br>
+phase&nbsp;when&nbsp;standard&nbsp;topic&nbsp;reasoning&nbsp;produces&nbsp;no&nbsp;confident&nbsp;results&nbsp;—<br>
+i.e.,&nbsp;when&nbsp;Genesis&nbsp;encounters&nbsp;something&nbsp;it&nbsp;can't&nbsp;immediately&nbsp;answer,<br>
+it&nbsp;tries&nbsp;to&nbsp;*solve*&nbsp;it&nbsp;rather&nbsp;than&nbsp;falling&nbsp;back&nbsp;to&nbsp;"unsure."</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="time.html">time</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.problem_solving.html#Problem">Problem</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.problem_solving.html#ProblemSolver">ProblemSolver</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.problem_solving.html#Solution">Solution</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.problem_solving.html#SolutionStep">SolutionStep</a>
+</dt></dl>
+</dd>
+<dt class="heading-text"><a href="enum.html#Enum">enum.Enum</a>(<a href="builtins.html#object">builtins.object</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.problem_solving.html#GoalType">GoalType</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.problem_solving.html#ProblemStatus">ProblemStatus</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="GoalType">class <strong>GoalType</strong></a>(<a href="enum.html#Enum">enum.Enum</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#GoalType">GoalType</a>(*values)<br>
+&nbsp;<br>
+What&nbsp;kind&nbsp;of&nbsp;problem&nbsp;is&nbsp;being&nbsp;solved.<br>
+&nbsp;<br>
+The&nbsp;goal&nbsp;type&nbsp;determines&nbsp;how&nbsp;the&nbsp;problem&nbsp;is&nbsp;decomposed,&nbsp;which<br>
+operators&nbsp;are&nbsp;applied,&nbsp;and&nbsp;how&nbsp;the&nbsp;solution&nbsp;is&nbsp;verified.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.frontal_lobe.reasoning.problem_solving.html#GoalType">GoalType</a></dd>
+<dd><a href="enum.html#Enum">enum.Enum</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>ACHIEVE</strong> = &lt;GoalType.ACHIEVE: 'achieve'&gt;</dl>
+
+<dl><dt><strong>COMPARE</strong> = &lt;GoalType.COMPARE: 'compare'&gt;</dl>
+
+<dl><dt><strong>EXPLAIN</strong> = &lt;GoalType.EXPLAIN: 'explain'&gt;</dl>
+
+<dl><dt><strong>RESOLVE</strong> = &lt;GoalType.RESOLVE: 'resolve'&gt;</dl>
+
+<dl><dt><strong>UNDERSTAND</strong> = &lt;GoalType.UNDERSTAND: 'understand'&gt;</dl>
+
+<hr>
+Data descriptors inherited from <a href="enum.html#Enum">enum.Enum</a>:<br>
+<dl><dt><strong>name</strong></dt>
+<dd><span class="code">The&nbsp;name&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<dl><dt><strong>value</strong></dt>
+<dd><span class="code">The&nbsp;value&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<hr>
+Static methods inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><a name="GoalType-__contains__"><strong>__contains__</strong></a>(value)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;`value`&nbsp;is&nbsp;in&nbsp;`cls`.<br>
+&nbsp;<br>
+`value`&nbsp;is&nbsp;in&nbsp;`cls`&nbsp;if:<br>
+1)&nbsp;`value`&nbsp;is&nbsp;a&nbsp;member&nbsp;of&nbsp;`cls`,&nbsp;or<br>
+2)&nbsp;`value`&nbsp;is&nbsp;the&nbsp;value&nbsp;of&nbsp;one&nbsp;of&nbsp;the&nbsp;`cls`'s&nbsp;members.</span></dd></dl>
+
+<dl><dt><a name="GoalType-__getitem__"><strong>__getitem__</strong></a>(name)</dt><dd><span class="code">Return&nbsp;the&nbsp;member&nbsp;matching&nbsp;`name`.</span></dd></dl>
+
+<dl><dt><a name="GoalType-__iter__"><strong>__iter__</strong></a>()</dt><dd><span class="code">Return&nbsp;members&nbsp;in&nbsp;definition&nbsp;order.</span></dd></dl>
+
+<dl><dt><a name="GoalType-__len__"><strong>__len__</strong></a>()</dt><dd><span class="code">Return&nbsp;the&nbsp;number&nbsp;of&nbsp;members&nbsp;(no&nbsp;aliases)</span></dd></dl>
+
+<hr>
+Readonly properties inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><strong>__members__</strong></dt>
+<dd><span class="code">Returns&nbsp;a&nbsp;mapping&nbsp;of&nbsp;member&nbsp;name-&gt;value.<br>
+&nbsp;<br>
+This&nbsp;mapping&nbsp;lists&nbsp;all&nbsp;enum&nbsp;members,&nbsp;including&nbsp;aliases.&nbsp;Note&nbsp;that&nbsp;this<br>
+is&nbsp;a&nbsp;read-only&nbsp;view&nbsp;of&nbsp;the&nbsp;internal&nbsp;mapping.</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Problem">class <strong>Problem</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Problem">Problem</a>(goal:&nbsp;'str',&nbsp;goal_type:&nbsp;'<a href="#GoalType">GoalType</a>'&nbsp;=&nbsp;&amp;lt;<a href="#GoalType">GoalType</a>.UNDERSTAND:&nbsp;'understand'&amp;gt;,&nbsp;reason:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;secondary_goal:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;parent_goal:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;depth:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;status:&nbsp;'<a href="#ProblemStatus">ProblemStatus</a>'&nbsp;=&nbsp;&amp;lt;<a href="#ProblemStatus">ProblemStatus</a>.OPEN:&nbsp;'open'&amp;gt;,&nbsp;timestamp:&nbsp;'int'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;problem&nbsp;—&nbsp;a&nbsp;gap&nbsp;between&nbsp;what&nbsp;Genesis&nbsp;knows&nbsp;and&nbsp;what&nbsp;it&nbsp;wants&nbsp;to&nbsp;know.<br>
+&nbsp;<br>
+The&nbsp;goal&nbsp;is&nbsp;a&nbsp;concept&nbsp;name&nbsp;(or&nbsp;a&nbsp;pair&nbsp;for&nbsp;compare/resolve).&nbsp;The<br>
+goal_type&nbsp;determines&nbsp;the&nbsp;decomposition&nbsp;and&nbsp;verification&nbsp;strategy.<br>
+Subproblems&nbsp;are&nbsp;generated&nbsp;recursively&nbsp;during&nbsp;decomposition.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Problem-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="Problem-__init__"><strong>__init__</strong></a>(self, goal: 'str', goal_type: 'GoalType' = &lt;GoalType.UNDERSTAND: 'understand'&gt;, reason: 'str' = '', secondary_goal: 'str' = '', parent_goal: 'str' = '', depth: 'int' = 0, status: 'ProblemStatus' = &lt;ProblemStatus.OPEN: 'open'&gt;, timestamp: 'int' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Problem-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>key</strong></dt>
+<dd><span class="code">Unique&nbsp;key&nbsp;for&nbsp;deduplication&nbsp;(goal&nbsp;+&nbsp;type&nbsp;+&nbsp;secondary).</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>depth</strong></dt>
+</dl>
+<dl><dt><strong>goal</strong></dt>
+</dl>
+<dl><dt><strong>goal_type</strong></dt>
+</dl>
+<dl><dt><strong>parent_goal</strong></dt>
+</dl>
+<dl><dt><strong>reason</strong></dt>
+</dl>
+<dl><dt><strong>secondary_goal</strong></dt>
+</dl>
+<dl><dt><strong>status</strong></dt>
+</dl>
+<dl><dt><strong>timestamp</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'depth': 'int', 'goal': 'str', 'goal_type': 'GoalType', 'parent_goal': 'str', 'reason': 'str', 'secondary_goal': 'str', 'status': 'ProblemStatus', 'timestamp': 'int'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'depth': Field(name='depth',type='int',default=0,default_...appingproxy({}),kw_only=False,_field_type=_FIELD), 'goal': Field(name='goal',type='str',default=&lt;dataclasse...appingproxy({}),kw_only=False,_field_type=_FIELD), 'goal_type': Field(name='goal_type',type='GoalType',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD), 'parent_goal': Field(name='parent_goal',type='str',default='',d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'reason': Field(name='reason',type='str',default='',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'secondary_goal': Field(name='secondary_goal',type='str',default='...appingproxy({}),kw_only=False,_field_type=_FIELD), 'status': Field(name='status',type='ProblemStatus',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'timestamp': Field(name='timestamp',type='int',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('goal', 'goal_type', 'reason', 'secondary_goal', 'parent_goal', 'depth', 'status', 'timestamp')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ProblemSolver">class <strong>ProblemSolver</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ProblemSolver">ProblemSolver</a>(network:&nbsp;'ConceptNetwork',&nbsp;reasoning:&nbsp;'Reasoner&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;meta_reasoning:&nbsp;'MetaReasoning&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;probabilistic:&nbsp;'ProbabilisticReasoning&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;temporal:&nbsp;'TemporalReasoning&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;counterfactual:&nbsp;'CounterfactualReasoning&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Means-ends&nbsp;analysis&nbsp;engine&nbsp;over&nbsp;the&nbsp;concept&nbsp;network.<br>
+&nbsp;<br>
+Given&nbsp;a&nbsp;goal&nbsp;(concept&nbsp;+&nbsp;goal&nbsp;type),&nbsp;the&nbsp;solver&nbsp;decomposes&nbsp;it&nbsp;into<br>
+subproblems&nbsp;by&nbsp;finding&nbsp;prerequisites&nbsp;(DEPENDS_ON,&nbsp;ENABLES&nbsp;edges),<br>
+applies&nbsp;reasoning&nbsp;operators&nbsp;to&nbsp;fill&nbsp;knowledge&nbsp;gaps,&nbsp;and&nbsp;verifies<br>
+the&nbsp;solution&nbsp;against&nbsp;the&nbsp;goal.&nbsp;Subproblems&nbsp;are&nbsp;solved&nbsp;recursively,<br>
+producing&nbsp;a&nbsp;solution&nbsp;tree.<br>
+&nbsp;<br>
+Usage::<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;solver&nbsp;=&nbsp;<a href="#ProblemSolver">ProblemSolver</a>(network,&nbsp;reasoning)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;solution&nbsp;=&nbsp;solver.<a href="#ProblemSolver-solve">solve</a>("photosynthesis",&nbsp;<a href="#GoalType">GoalType</a>.UNDERSTAND)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;solution.verified:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;step&nbsp;in&nbsp;solution.all_steps:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;print(step.description)<br>
+&nbsp;<br>
+The&nbsp;solver&nbsp;is&nbsp;stateless&nbsp;across&nbsp;calls&nbsp;(it&nbsp;reads&nbsp;the&nbsp;network&nbsp;and<br>
+reasoning&nbsp;engine;&nbsp;it&nbsp;doesn't&nbsp;modify&nbsp;them).&nbsp;<a href="#Solution">Solution</a>&nbsp;history&nbsp;is<br>
+retained&nbsp;for&nbsp;introspection.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ProblemSolver-__init__"><strong>__init__</strong></a>(self, network: 'ConceptNetwork', reasoning: 'Reasoner | None' = None, meta_reasoning: 'MetaReasoning | None' = None, probabilistic: 'ProbabilisticReasoning | None' = None, temporal: 'TemporalReasoning | None' = None, counterfactual: 'CounterfactualReasoning | None' = None) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;with&nbsp;a&nbsp;concept&nbsp;network&nbsp;and&nbsp;optional&nbsp;reasoning&nbsp;engines.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;network:&nbsp;The&nbsp;concept&nbsp;network&nbsp;—&nbsp;the&nbsp;state&nbsp;space.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;reasoning:&nbsp;The&nbsp;reasoning&nbsp;engine&nbsp;—&nbsp;provides&nbsp;operators<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(deductive,&nbsp;abductive,&nbsp;analogical,&nbsp;causal,&nbsp;hypothesis).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;None,&nbsp;the&nbsp;solver&nbsp;uses&nbsp;concept-network&nbsp;queries&nbsp;only.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;meta_reasoning:&nbsp;Meta-reasoning&nbsp;engine&nbsp;—&nbsp;selects&nbsp;which<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;reasoning&nbsp;strategy&nbsp;to&nbsp;emphasize&nbsp;per&nbsp;step&nbsp;based&nbsp;on<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;problem&nbsp;type&nbsp;and&nbsp;learned&nbsp;effectiveness.&nbsp;If&nbsp;None,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;all&nbsp;applicable&nbsp;operators&nbsp;are&nbsp;applied&nbsp;uniformly.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;probabilistic:&nbsp;Probabilistic&nbsp;reasoning&nbsp;engine&nbsp;—&nbsp;provides<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;``probabilistic_infer``&nbsp;operator&nbsp;for&nbsp;uncertain<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;evidence.&nbsp;If&nbsp;None,&nbsp;probabilistic&nbsp;operator&nbsp;is&nbsp;skipped.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;temporal:&nbsp;Temporal&nbsp;reasoning&nbsp;engine&nbsp;—&nbsp;provides&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;``temporal_order``&nbsp;operator&nbsp;for&nbsp;before/after&nbsp;queries.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;None,&nbsp;temporal&nbsp;operator&nbsp;is&nbsp;skipped.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;counterfactual:&nbsp;Counterfactual&nbsp;reasoning&nbsp;engine&nbsp;—&nbsp;provides<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;``counterfactual``&nbsp;operator&nbsp;for&nbsp;what-if&nbsp;analysis.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;None,&nbsp;counterfactual&nbsp;operator&nbsp;is&nbsp;skipped.</span></dd></dl>
+
+<dl><dt><a name="ProblemSolver-restore_from_dict"><strong>restore_from_dict</strong></a>(self, data: 'dict[str, object]') -&gt; 'None'</dt><dd><span class="code">Restore&nbsp;state&nbsp;from&nbsp;persistence.</span></dd></dl>
+
+<dl><dt><a name="ProblemSolver-solve"><strong>solve</strong></a>(self, goal: 'str', goal_type: 'GoalType' = &lt;GoalType.UNDERSTAND: 'understand'&gt;, reason: 'str' = '', secondary_goal: 'str' = '') -&gt; 'Solution'</dt><dd><span class="code">Solve&nbsp;a&nbsp;problem&nbsp;and&nbsp;return&nbsp;the&nbsp;solution.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;main&nbsp;entry&nbsp;point.&nbsp;Given&nbsp;a&nbsp;goal&nbsp;concept&nbsp;and&nbsp;goal<br>
+type,&nbsp;the&nbsp;solver&nbsp;decomposes,&nbsp;applies&nbsp;operators,&nbsp;and&nbsp;verifies.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;goal:&nbsp;The&nbsp;concept&nbsp;to&nbsp;understand/achieve/explain.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;goal_type:&nbsp;What&nbsp;kind&nbsp;of&nbsp;problem&nbsp;this&nbsp;is.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;reason:&nbsp;Why&nbsp;this&nbsp;problem&nbsp;exists&nbsp;(for&nbsp;introspection).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;secondary_goal:&nbsp;Second&nbsp;concept&nbsp;(for&nbsp;compare/resolve).<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;<a href="#Solution">Solution</a>&nbsp;—&nbsp;a&nbsp;tree&nbsp;of&nbsp;steps&nbsp;and&nbsp;sub-solutions.</span></dd></dl>
+
+<dl><dt><a name="ProblemSolver-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict[str, object]'</dt><dd><span class="code">Serialize&nbsp;state&nbsp;for&nbsp;persistence.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>blocked_count</strong></dt>
+<dd><span class="code">Total&nbsp;problems&nbsp;blocked&nbsp;(unsolvable).</span></dd>
+</dl>
+<dl><dt><strong>solutions</strong></dt>
+<dd><span class="code">All&nbsp;solutions&nbsp;ever&nbsp;produced&nbsp;(copy).</span></dd>
+</dl>
+<dl><dt><strong>solved_count</strong></dt>
+<dd><span class="code">Total&nbsp;problems&nbsp;solved&nbsp;(verified).</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ProblemStatus">class <strong>ProblemStatus</strong></a>(<a href="enum.html#Enum">enum.Enum</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ProblemStatus">ProblemStatus</a>(*values)<br>
+&nbsp;<br>
+Lifecycle&nbsp;state&nbsp;of&nbsp;a&nbsp;problem.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.frontal_lobe.reasoning.problem_solving.html#ProblemStatus">ProblemStatus</a></dd>
+<dd><a href="enum.html#Enum">enum.Enum</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>BLOCKED</strong> = &lt;ProblemStatus.BLOCKED: 'blocked'&gt;</dl>
+
+<dl><dt><strong>IN_PROGRESS</strong> = &lt;ProblemStatus.IN_PROGRESS: 'in_progress'&gt;</dl>
+
+<dl><dt><strong>OPEN</strong> = &lt;ProblemStatus.OPEN: 'open'&gt;</dl>
+
+<dl><dt><strong>SOLVED</strong> = &lt;ProblemStatus.SOLVED: 'solved'&gt;</dl>
+
+<hr>
+Data descriptors inherited from <a href="enum.html#Enum">enum.Enum</a>:<br>
+<dl><dt><strong>name</strong></dt>
+<dd><span class="code">The&nbsp;name&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<dl><dt><strong>value</strong></dt>
+<dd><span class="code">The&nbsp;value&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<hr>
+Static methods inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><a name="ProblemStatus-__contains__"><strong>__contains__</strong></a>(value)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;`value`&nbsp;is&nbsp;in&nbsp;`cls`.<br>
+&nbsp;<br>
+`value`&nbsp;is&nbsp;in&nbsp;`cls`&nbsp;if:<br>
+1)&nbsp;`value`&nbsp;is&nbsp;a&nbsp;member&nbsp;of&nbsp;`cls`,&nbsp;or<br>
+2)&nbsp;`value`&nbsp;is&nbsp;the&nbsp;value&nbsp;of&nbsp;one&nbsp;of&nbsp;the&nbsp;`cls`'s&nbsp;members.</span></dd></dl>
+
+<dl><dt><a name="ProblemStatus-__getitem__"><strong>__getitem__</strong></a>(name)</dt><dd><span class="code">Return&nbsp;the&nbsp;member&nbsp;matching&nbsp;`name`.</span></dd></dl>
+
+<dl><dt><a name="ProblemStatus-__iter__"><strong>__iter__</strong></a>()</dt><dd><span class="code">Return&nbsp;members&nbsp;in&nbsp;definition&nbsp;order.</span></dd></dl>
+
+<dl><dt><a name="ProblemStatus-__len__"><strong>__len__</strong></a>()</dt><dd><span class="code">Return&nbsp;the&nbsp;number&nbsp;of&nbsp;members&nbsp;(no&nbsp;aliases)</span></dd></dl>
+
+<hr>
+Readonly properties inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><strong>__members__</strong></dt>
+<dd><span class="code">Returns&nbsp;a&nbsp;mapping&nbsp;of&nbsp;member&nbsp;name-&gt;value.<br>
+&nbsp;<br>
+This&nbsp;mapping&nbsp;lists&nbsp;all&nbsp;enum&nbsp;members,&nbsp;including&nbsp;aliases.&nbsp;Note&nbsp;that&nbsp;this<br>
+is&nbsp;a&nbsp;read-only&nbsp;view&nbsp;of&nbsp;the&nbsp;internal&nbsp;mapping.</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Solution">class <strong>Solution</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Solution">Solution</a>(problem:&nbsp;'<a href="#Problem">Problem</a>',&nbsp;steps:&nbsp;'list[<a href="#SolutionStep">SolutionStep</a>]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;sub_solutions:&nbsp;'list[<a href="#Solution">Solution</a>]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;verified:&nbsp;'bool'&nbsp;=&nbsp;False,&nbsp;confidence:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;blocked_reason:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;verification_basis:&nbsp;'str'&nbsp;=&nbsp;'')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;result&nbsp;of&nbsp;solving&nbsp;a&nbsp;problem&nbsp;—&nbsp;a&nbsp;tree&nbsp;of&nbsp;steps&nbsp;and&nbsp;sub-solutions.<br>
+&nbsp;<br>
+The&nbsp;solution&nbsp;is&nbsp;verified&nbsp;if&nbsp;the&nbsp;goal&nbsp;was&nbsp;achieved&nbsp;after&nbsp;applying<br>
+all&nbsp;steps&nbsp;and&nbsp;solving&nbsp;all&nbsp;subproblems.&nbsp;The&nbsp;``all_knowledge``<br>
+property&nbsp;flattens&nbsp;the&nbsp;entire&nbsp;solution&nbsp;tree&nbsp;into&nbsp;knowledge&nbsp;triples<br>
+for&nbsp;the&nbsp;language&nbsp;engine.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Solution-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="Solution-__init__"><strong>__init__</strong></a>(self, problem: 'Problem', steps: 'list[SolutionStep]' = &lt;factory&gt;, sub_solutions: 'list[Solution]' = &lt;factory&gt;, verified: 'bool' = False, confidence: 'float' = 0.0, blocked_reason: 'str' = '', verification_basis: 'str' = '') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Solution-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="Solution-describe"><strong>describe</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Human-readable&nbsp;summary&nbsp;of&nbsp;the&nbsp;solution&nbsp;(for&nbsp;introspection).</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>all_knowledge</strong></dt>
+<dd><span class="code">All&nbsp;knowledge&nbsp;triples&nbsp;from&nbsp;this&nbsp;solution&nbsp;and&nbsp;all&nbsp;sub-solutions.</span></dd>
+</dl>
+<dl><dt><strong>all_steps</strong></dt>
+<dd><span class="code">All&nbsp;steps&nbsp;in&nbsp;this&nbsp;solution&nbsp;and&nbsp;all&nbsp;sub-solutions&nbsp;(depth-first).</span></dd>
+</dl>
+<dl><dt><strong>is_blocked</strong></dt>
+<dd><span class="code">Whether&nbsp;this&nbsp;solution&nbsp;was&nbsp;blocked&nbsp;(cannot&nbsp;be&nbsp;solved).</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>blocked_reason</strong></dt>
+</dl>
+<dl><dt><strong>confidence</strong></dt>
+</dl>
+<dl><dt><strong>problem</strong></dt>
+</dl>
+<dl><dt><strong>steps</strong></dt>
+</dl>
+<dl><dt><strong>sub_solutions</strong></dt>
+</dl>
+<dl><dt><strong>verification_basis</strong></dt>
+</dl>
+<dl><dt><strong>verified</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'blocked_reason': 'str', 'confidence': 'float', 'problem': 'Problem', 'steps': 'list[SolutionStep]', 'sub_solutions': 'list[Solution]', 'verification_basis': 'str', 'verified': 'bool'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'blocked_reason': Field(name='blocked_reason',type='str',default='...appingproxy({}),kw_only=False,_field_type=_FIELD), 'confidence': Field(name='confidence',type='float',default=0.0...appingproxy({}),kw_only=False,_field_type=_FIELD), 'problem': Field(name='problem',type='Problem',default=&lt;dat...appingproxy({}),kw_only=False,_field_type=_FIELD), 'steps': Field(name='steps',type='list[SolutionStep]',def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'sub_solutions': Field(name='sub_solutions',type='list[Solution]'...appingproxy({}),kw_only=False,_field_type=_FIELD), 'verification_basis': Field(name='verification_basis',type='str',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'verified': Field(name='verified',type='bool',default=False,...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('problem', 'steps', 'sub_solutions', 'verified', 'confidence', 'blocked_reason', 'verification_basis')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SolutionStep">class <strong>SolutionStep</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SolutionStep">SolutionStep</a>(description:&nbsp;'str',&nbsp;operator:&nbsp;'str',&nbsp;result:&nbsp;'str',&nbsp;evidence:&nbsp;'list[str]',&nbsp;knowledge:&nbsp;'list[tuple[str,&nbsp;str,&nbsp;float]]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;confidence:&nbsp;'float'&nbsp;=&nbsp;0.5)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;single&nbsp;step&nbsp;in&nbsp;a&nbsp;solution&nbsp;—&nbsp;one&nbsp;operator&nbsp;application.<br>
+&nbsp;<br>
+The&nbsp;``knowledge``&nbsp;field&nbsp;carries&nbsp;structured&nbsp;(relation,&nbsp;target,<br>
+weight)&nbsp;triples&nbsp;that&nbsp;the&nbsp;language&nbsp;engine&nbsp;can&nbsp;compose&nbsp;from,&nbsp;so<br>
+Genesis&nbsp;expresses&nbsp;the&nbsp;solution&nbsp;in&nbsp;its&nbsp;own&nbsp;words&nbsp;rather&nbsp;than<br>
+reciting&nbsp;the&nbsp;``description``&nbsp;string.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="SolutionStep-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="SolutionStep-__init__"><strong>__init__</strong></a>(self, description: 'str', operator: 'str', result: 'str', evidence: 'list[str]', knowledge: 'list[tuple[str, str, float]]' = &lt;factory&gt;, confidence: 'float' = 0.5) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="SolutionStep-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>confidence</strong></dt>
+</dl>
+<dl><dt><strong>description</strong></dt>
+</dl>
+<dl><dt><strong>evidence</strong></dt>
+</dl>
+<dl><dt><strong>knowledge</strong></dt>
+</dl>
+<dl><dt><strong>operator</strong></dt>
+</dl>
+<dl><dt><strong>result</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'confidence': 'float', 'description': 'str', 'evidence': 'list[str]', 'knowledge': 'list[tuple[str, str, float]]', 'operator': 'str', 'result': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'confidence': Field(name='confidence',type='float',default=0.5...appingproxy({}),kw_only=False,_field_type=_FIELD), 'description': Field(name='description',type='str',default=&lt;dat...appingproxy({}),kw_only=False,_field_type=_FIELD), 'evidence': Field(name='evidence',type='list[str]',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD), 'knowledge': Field(name='knowledge',type='list[tuple[str, str...appingproxy({}),kw_only=False,_field_type=_FIELD), 'operator': Field(name='operator',type='str',default=&lt;datacl...appingproxy({}),kw_only=False,_field_type=_FIELD), 'result': Field(name='result',type='str',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('description', 'operator', 'result', 'evidence', 'knowledge', 'confidence')</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['GoalType', 'Problem', 'ProblemSolver', 'ProblemStatus', 'Solution', 'SolutionStep']</td></tr></table>
+</body></html>

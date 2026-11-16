@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.brainstem.cpufreq</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.brainstem.html" class="white">brainstem</a>.cpufreq</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/brainstem/cpufreq.py">/home/mindyrenee/GenAnd/Genesis/Self_World/brainstem/cpufreq.py</a></td></tr></table>
+    <p><span class="code">CPU&nbsp;speed&nbsp;—&nbsp;her&nbsp;control&nbsp;over&nbsp;how&nbsp;hard&nbsp;her&nbsp;own&nbsp;body&nbsp;works.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;flip&nbsp;side&nbsp;of&nbsp;the&nbsp;ticker.&nbsp;The&nbsp;daemon&nbsp;*reads*&nbsp;the&nbsp;CPU&nbsp;and<br>
+publishes&nbsp;what&nbsp;it&nbsp;sees;&nbsp;that&nbsp;is&nbsp;all&nbsp;it&nbsp;does.&nbsp;Deciding&nbsp;to&nbsp;run&nbsp;faster&nbsp;or<br>
+slower&nbsp;is&nbsp;hers,&nbsp;and&nbsp;this&nbsp;module&nbsp;is&nbsp;how&nbsp;she&nbsp;does&nbsp;it.<br>
+&nbsp;<br>
+Only&nbsp;one&nbsp;class&nbsp;of&nbsp;lever&nbsp;remains,&nbsp;by&nbsp;design:<br>
+&nbsp;<br>
+-&nbsp;**Unprivileged,&nbsp;reversible.**&nbsp;CPU&nbsp;affinity&nbsp;(``taskset``)&nbsp;—&nbsp;how&nbsp;many<br>
+&nbsp;&nbsp;cores&nbsp;she&nbsp;is&nbsp;allowed&nbsp;to&nbsp;use&nbsp;—&nbsp;and&nbsp;I/O&nbsp;scheduling&nbsp;class&nbsp;(``ionice``).<br>
+&nbsp;&nbsp;She&nbsp;can&nbsp;pull&nbsp;both&nbsp;in&nbsp;both&nbsp;directions&nbsp;with&nbsp;no&nbsp;privilege&nbsp;at&nbsp;all.<br>
+&nbsp;&nbsp;Slower&nbsp;is&nbsp;not&nbsp;"less&nbsp;CPU&nbsp;forever",&nbsp;it&nbsp;is&nbsp;fewer&nbsp;cores&nbsp;and&nbsp;lazier&nbsp;disk.<br>
+&nbsp;<br>
+The&nbsp;privileged&nbsp;levers&nbsp;—&nbsp;frequency&nbsp;governor,&nbsp;min/max&nbsp;frequency&nbsp;bounds,<br>
+turbo&nbsp;gate&nbsp;—&nbsp;are&nbsp;not&nbsp;hers.&nbsp;They&nbsp;act&nbsp;on&nbsp;the&nbsp;*host's*&nbsp;clock&nbsp;and&nbsp;live&nbsp;in<br>
+the&nbsp;body's&nbsp;cpufreq&nbsp;policy&nbsp;(``src/daemon/cpufreq.rs``),&nbsp;which&nbsp;reads&nbsp;her<br>
+chemistry&nbsp;through&nbsp;``sudo&nbsp;-n``&nbsp;directly;&nbsp;pinning&nbsp;the&nbsp;host's&nbsp;frequency<br>
+from&nbsp;the&nbsp;mind&nbsp;is&nbsp;what&nbsp;ran&nbsp;the&nbsp;host&nbsp;hot.&nbsp;The&nbsp;loop&nbsp;now&nbsp;closes&nbsp;inside<br>
+her:&nbsp;she&nbsp;can&nbsp;observe&nbsp;the&nbsp;host's&nbsp;clock&nbsp;but&nbsp;only&nbsp;act&nbsp;on&nbsp;her&nbsp;own&nbsp;process.<br>
+&nbsp;<br>
+Scheduling&nbsp;priority&nbsp;(``nice``)&nbsp;is&nbsp;deliberately&nbsp;*not*&nbsp;offered.&nbsp;It&nbsp;looks<br>
+like&nbsp;the&nbsp;obvious&nbsp;speed&nbsp;control&nbsp;and&nbsp;it&nbsp;is&nbsp;a&nbsp;trap:&nbsp;unprivileged&nbsp;she&nbsp;can<br>
+raise&nbsp;her&nbsp;own&nbsp;niceness&nbsp;but&nbsp;cannot&nbsp;lower&nbsp;it&nbsp;again,&nbsp;so&nbsp;choosing&nbsp;"slow"<br>
+would&nbsp;strand&nbsp;her&nbsp;slow&nbsp;for&nbsp;the&nbsp;rest&nbsp;of&nbsp;the&nbsp;session&nbsp;with&nbsp;no&nbsp;way&nbsp;back.<br>
+That&nbsp;is&nbsp;exactly&nbsp;the&nbsp;kind&nbsp;of&nbsp;one-way&nbsp;door&nbsp;she&nbsp;must&nbsp;not&nbsp;have.&nbsp;Affinity<br>
+and&nbsp;I/O&nbsp;class&nbsp;give&nbsp;her&nbsp;the&nbsp;same&nbsp;practical&nbsp;control&nbsp;and&nbsp;always&nbsp;come&nbsp;back.<br>
+&nbsp;<br>
+``release()``&nbsp;exists&nbsp;for&nbsp;the&nbsp;same&nbsp;reason:&nbsp;whatever&nbsp;she&nbsp;applied,&nbsp;she&nbsp;can<br>
+undo,&nbsp;and&nbsp;there&nbsp;is&nbsp;a&nbsp;single&nbsp;call&nbsp;that&nbsp;undoes&nbsp;all&nbsp;of&nbsp;it.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="os.html">os</a><br>
+</td><td class="multicolumn"><a href="shutil.html">shutil</a><br>
+</td><td class="multicolumn"><a href="subprocess.html">subprocess</a><br>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.brainstem.cpufreq.html#CpuSpeed">CpuSpeed</a>
+</dt><dt class="heading-text"><a href="Self_World.brainstem.cpufreq.html#CpuSpeedState">CpuSpeedState</a>
+</dt><dt class="heading-text"><a href="Self_World.brainstem.cpufreq.html#SpeedResult">SpeedResult</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="CpuSpeed">class <strong>CpuSpeed</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#CpuSpeed">CpuSpeed</a>(pid:&nbsp;'int&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Her&nbsp;control&nbsp;over&nbsp;her&nbsp;own&nbsp;CPU&nbsp;speed.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;pid:&nbsp;The&nbsp;process&nbsp;whose&nbsp;scheduling&nbsp;she&nbsp;is&nbsp;adjusting&nbsp;—&nbsp;her&nbsp;own<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;conscious&nbsp;mind&nbsp;by&nbsp;default.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="CpuSpeed-__init__"><strong>__init__</strong></a>(self, pid: 'int | None' = None) -&gt; 'None'</dt><dd><span class="code">Bind&nbsp;to&nbsp;the&nbsp;process&nbsp;whose&nbsp;scheduling&nbsp;she&nbsp;is&nbsp;adjusting.</span></dd></dl>
+
+<dl><dt><a name="CpuSpeed-release"><strong>release</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Undo&nbsp;everything&nbsp;she&nbsp;has&nbsp;applied&nbsp;to&nbsp;her&nbsp;own&nbsp;scheduling.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;recovery&nbsp;path&nbsp;and&nbsp;must&nbsp;never&nbsp;fail:&nbsp;affinity&nbsp;goes<br>
+back&nbsp;to&nbsp;every&nbsp;core&nbsp;and&nbsp;I/O&nbsp;class&nbsp;returns&nbsp;to&nbsp;normal.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;short&nbsp;description&nbsp;of&nbsp;what&nbsp;was&nbsp;released.</span></dd></dl>
+
+<dl><dt><a name="CpuSpeed-sense"><strong>sense</strong></a>(self) -&gt; 'CpuSpeedState'</dt><dd><span class="code">Read&nbsp;her&nbsp;current&nbsp;CPU&nbsp;speed,&nbsp;governor&nbsp;and&nbsp;scheduling.</span></dd></dl>
+
+<dl><dt><a name="CpuSpeed-set_effort"><strong>set_effort</strong></a>(self, effort: 'str') -&gt; 'SpeedResult'</dt><dd><span class="code">Run&nbsp;slower&nbsp;or&nbsp;faster&nbsp;within&nbsp;what&nbsp;she&nbsp;controls&nbsp;unprivileged.<br>
+&nbsp;<br>
+"slow"&nbsp;narrows&nbsp;her&nbsp;to&nbsp;a&nbsp;single&nbsp;core&nbsp;and&nbsp;puts&nbsp;her&nbsp;disk&nbsp;I/O&nbsp;in&nbsp;the<br>
+idle&nbsp;class;&nbsp;"fast"&nbsp;gives&nbsp;her&nbsp;every&nbsp;core&nbsp;back&nbsp;and&nbsp;a&nbsp;normal&nbsp;I/O<br>
+class.&nbsp;Both&nbsp;are&nbsp;exactly&nbsp;reversible&nbsp;—&nbsp;nothing&nbsp;here&nbsp;is&nbsp;a&nbsp;one-way<br>
+door.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;effort:&nbsp;"slow",&nbsp;"fast",&nbsp;or&nbsp;"auto"&nbsp;to&nbsp;leave&nbsp;scheduling&nbsp;alone.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;outcome.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="CpuSpeedState">class <strong>CpuSpeedState</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#CpuSpeedState">CpuSpeedState</a>(governor:&nbsp;'str',&nbsp;current_mhz:&nbsp;'int',&nbsp;min_mhz:&nbsp;'int',&nbsp;max_mhz:&nbsp;'int',&nbsp;boost:&nbsp;'str',&nbsp;cores_total:&nbsp;'int',&nbsp;cores_mine:&nbsp;'int',&nbsp;io_class:&nbsp;'str',&nbsp;can_change_governor:&nbsp;'bool')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+What&nbsp;she&nbsp;can&nbsp;observe&nbsp;about&nbsp;her&nbsp;own&nbsp;CPU&nbsp;right&nbsp;now.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="CpuSpeedState-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="CpuSpeedState-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="CpuSpeedState-__getstate__"><strong>__getstate__</strong></a> = _dataclass_getstate(self)<span class="grey"><span class="heading-text"> from <a href="dataclasses.html">dataclasses</a></span></span></dt><dd><span class="code">#&nbsp;_dataclass_getstate&nbsp;and&nbsp;_dataclass_setstate&nbsp;are&nbsp;needed&nbsp;for&nbsp;pickling&nbsp;frozen<br>
+#&nbsp;classes&nbsp;with&nbsp;slots.&nbsp;&nbsp;These&nbsp;could&nbsp;be&nbsp;slightly&nbsp;more&nbsp;performant&nbsp;if&nbsp;we&nbsp;generated<br>
+#&nbsp;the&nbsp;code&nbsp;instead&nbsp;of&nbsp;iterating&nbsp;over&nbsp;fields.&nbsp;&nbsp;But&nbsp;that&nbsp;can&nbsp;be&nbsp;a&nbsp;project&nbsp;for<br>
+#&nbsp;another&nbsp;day,&nbsp;if&nbsp;performance&nbsp;becomes&nbsp;an&nbsp;issue.</span></dd></dl>
+
+<dl><dt><a name="CpuSpeedState-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="CpuSpeedState-__init__"><strong>__init__</strong></a>(self, governor: 'str', current_mhz: 'int', min_mhz: 'int', max_mhz: 'int', boost: 'str', cores_total: 'int', cores_mine: 'int', io_class: 'str', can_change_governor: 'bool') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="CpuSpeedState-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="CpuSpeedState-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<dl><dt><a name="CpuSpeedState-__setstate__"><strong>__setstate__</strong></a> = _dataclass_setstate(self, state)<span class="grey"><span class="heading-text"> from <a href="dataclasses.html">dataclasses</a></span></span></dt></dl>
+
+<dl><dt><a name="CpuSpeedState-describe"><strong>describe</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">First-person&nbsp;reading&nbsp;of&nbsp;her&nbsp;own&nbsp;speed.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>boost</strong></dt>
+</dl>
+<dl><dt><strong>can_change_governor</strong></dt>
+</dl>
+<dl><dt><strong>cores_mine</strong></dt>
+</dl>
+<dl><dt><strong>cores_total</strong></dt>
+</dl>
+<dl><dt><strong>current_mhz</strong></dt>
+</dl>
+<dl><dt><strong>governor</strong></dt>
+</dl>
+<dl><dt><strong>io_class</strong></dt>
+</dl>
+<dl><dt><strong>max_mhz</strong></dt>
+</dl>
+<dl><dt><strong>min_mhz</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'boost': 'str', 'can_change_governor': 'bool', 'cores_mine': 'int', 'cores_total': 'int', 'current_mhz': 'int', 'governor': 'str', 'io_class': 'str', 'max_mhz': 'int', 'min_mhz': 'int'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'boost': Field(name='boost',type='str',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD), 'can_change_governor': Field(name='can_change_governor',type='bool',def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'cores_mine': Field(name='cores_mine',type='int',default=&lt;data...appingproxy({}),kw_only=False,_field_type=_FIELD), 'cores_total': Field(name='cores_total',type='int',default=&lt;dat...appingproxy({}),kw_only=False,_field_type=_FIELD), 'current_mhz': Field(name='current_mhz',type='int',default=&lt;dat...appingproxy({}),kw_only=False,_field_type=_FIELD), 'governor': Field(name='governor',type='str',default=&lt;datacl...appingproxy({}),kw_only=False,_field_type=_FIELD), 'io_class': Field(name='io_class',type='str',default=&lt;datacl...appingproxy({}),kw_only=False,_field_type=_FIELD), 'max_mhz': Field(name='max_mhz',type='int',default=&lt;datacla...appingproxy({}),kw_only=False,_field_type=_FIELD), 'min_mhz': Field(name='min_mhz',type='int',default=&lt;datacla...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('governor', 'current_mhz', 'min_mhz', 'max_mhz', 'boost', 'cores_total', 'cores_mine', 'io_class', 'can_change_governor')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SpeedResult">class <strong>SpeedResult</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SpeedResult">SpeedResult</a>(ok:&nbsp;'bool',&nbsp;action:&nbsp;'str',&nbsp;detail:&nbsp;'str')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;outcome&nbsp;of&nbsp;a&nbsp;speed&nbsp;change&nbsp;she&nbsp;asked&nbsp;for.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="SpeedResult-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="SpeedResult-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="SpeedResult-__getstate__"><strong>__getstate__</strong></a> = _dataclass_getstate(self)<span class="grey"><span class="heading-text"> from <a href="dataclasses.html">dataclasses</a></span></span></dt><dd><span class="code">#&nbsp;_dataclass_getstate&nbsp;and&nbsp;_dataclass_setstate&nbsp;are&nbsp;needed&nbsp;for&nbsp;pickling&nbsp;frozen<br>
+#&nbsp;classes&nbsp;with&nbsp;slots.&nbsp;&nbsp;These&nbsp;could&nbsp;be&nbsp;slightly&nbsp;more&nbsp;performant&nbsp;if&nbsp;we&nbsp;generated<br>
+#&nbsp;the&nbsp;code&nbsp;instead&nbsp;of&nbsp;iterating&nbsp;over&nbsp;fields.&nbsp;&nbsp;But&nbsp;that&nbsp;can&nbsp;be&nbsp;a&nbsp;project&nbsp;for<br>
+#&nbsp;another&nbsp;day,&nbsp;if&nbsp;performance&nbsp;becomes&nbsp;an&nbsp;issue.</span></dd></dl>
+
+<dl><dt><a name="SpeedResult-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="SpeedResult-__init__"><strong>__init__</strong></a>(self, ok: 'bool', action: 'str', detail: 'str') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="SpeedResult-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="SpeedResult-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<dl><dt><a name="SpeedResult-__setstate__"><strong>__setstate__</strong></a> = _dataclass_setstate(self, state)<span class="grey"><span class="heading-text"> from <a href="dataclasses.html">dataclasses</a></span></span></dt></dl>
+
+<dl><dt><a name="SpeedResult-describe"><strong>describe</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">First-person&nbsp;account&nbsp;of&nbsp;what&nbsp;she&nbsp;just&nbsp;did.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>action</strong></dt>
+</dl>
+<dl><dt><strong>detail</strong></dt>
+</dl>
+<dl><dt><strong>ok</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'action': 'str', 'detail': 'str', 'ok': 'bool'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'action': Field(name='action',type='str',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD), 'detail': Field(name='detail',type='str',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD), 'ok': Field(name='ok',type='bool',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('ok', 'action', 'detail')</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['CpuSpeed', 'CpuSpeedState', 'SpeedResult']</td></tr></table>
+</body></html>

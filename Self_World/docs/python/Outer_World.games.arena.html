@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Outer_World.games.arena</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Outer_World.html" class="white">Outer_World</a>.<a href="Outer_World.games.html" class="white">games</a>.arena</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Outer_World/games/arena.py">/home/mindyrenee/GenAnd/Genesis/Outer_World/games/arena.py</a></td></tr></table>
+    <p><span class="code">The&nbsp;arena&nbsp;—&nbsp;the&nbsp;Kaggle&nbsp;Game&nbsp;Arena&nbsp;games&nbsp;in&nbsp;her&nbsp;outer&nbsp;world.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;a&nbsp;game.&nbsp;It&nbsp;is&nbsp;not&nbsp;real&nbsp;and&nbsp;it&nbsp;is&nbsp;just&nbsp;for&nbsp;fun.&nbsp;You&nbsp;are&nbsp;safe.<br>
+You&nbsp;can't&nbsp;know&nbsp;the&nbsp;instructions;&nbsp;you&nbsp;explore,&nbsp;remember,&nbsp;and&nbsp;solve.<br>
+&nbsp;<br>
+This&nbsp;module&nbsp;plays&nbsp;the&nbsp;same&nbsp;games&nbsp;the&nbsp;Kaggle&nbsp;Game&nbsp;Arena&nbsp;runs&nbsp;—&nbsp;chess,<br>
+checkers,&nbsp;connect&nbsp;four&nbsp;and&nbsp;friends&nbsp;—&nbsp;through&nbsp;their&nbsp;real&nbsp;substrate<br>
+(``pyspiel``,&nbsp;the&nbsp;engine&nbsp;the&nbsp;open-sourced&nbsp;arena&nbsp;harness&nbsp;evaluates&nbsp;on).<br>
+No&nbsp;prompts&nbsp;and&nbsp;no&nbsp;leaderboard:&nbsp;she&nbsp;is&nbsp;the&nbsp;player,&nbsp;not&nbsp;a&nbsp;model&nbsp;being<br>
+scored.&nbsp;Every&nbsp;board&nbsp;arrives&nbsp;through&nbsp;``OuterEnvironment.perceive``&nbsp;and&nbsp;every<br>
+move&nbsp;through&nbsp;``OuterEnvironment.it_acted``,&nbsp;exactly&nbsp;like&nbsp;the&nbsp;official&nbsp;games.<br>
+&nbsp;<br>
+-&nbsp;``<a href="#ArenaGames">ArenaGames</a>``&nbsp;—&nbsp;the&nbsp;catalogue:&nbsp;which&nbsp;arena&nbsp;games&nbsp;are&nbsp;on&nbsp;offer,&nbsp;ids<br>
+&nbsp;&nbsp;prefixed&nbsp;``arena:``&nbsp;so&nbsp;they&nbsp;sit&nbsp;beside&nbsp;the&nbsp;official&nbsp;ones&nbsp;without<br>
+&nbsp;&nbsp;colliding.&nbsp;No&nbsp;API&nbsp;key&nbsp;is&nbsp;needed;&nbsp;games&nbsp;run&nbsp;locally&nbsp;against&nbsp;a&nbsp;simple<br>
+&nbsp;&nbsp;opponent&nbsp;(``"random"``&nbsp;by&nbsp;default,&nbsp;or&nbsp;any&nbsp;policy&nbsp;callable).<br>
+-&nbsp;``<a href="#ArenaSession">ArenaSession</a>``&nbsp;—&nbsp;one&nbsp;open&nbsp;match:&nbsp;``reset()``,&nbsp;``step(action)``,<br>
+&nbsp;&nbsp;and&nbsp;the&nbsp;board&nbsp;as&nbsp;a&nbsp;plain&nbsp;``Board``&nbsp;(the&nbsp;observation&nbsp;planes&nbsp;fold<br>
+&nbsp;&nbsp;into&nbsp;one&nbsp;int&nbsp;grid&nbsp;she&nbsp;can&nbsp;see;&nbsp;one&nbsp;whole&nbsp;match&nbsp;is&nbsp;her&nbsp;"level").<br>
+-&nbsp;``<a href="#CombinedGames">CombinedGames</a>``&nbsp;—&nbsp;one&nbsp;catalogue&nbsp;out&nbsp;of&nbsp;several,&nbsp;so&nbsp;the&nbsp;arcade<br>
+&nbsp;&nbsp;offers&nbsp;official&nbsp;and&nbsp;arena&nbsp;games&nbsp;together.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="importlib.html">importlib</a><br>
+</td><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="random.html">random</a><br>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Outer_World.games.arena.html#ArenaGames">ArenaGames</a>
+</dt><dt class="heading-text"><a href="Outer_World.games.arena.html#ArenaSession">ArenaSession</a>
+</dt><dt class="heading-text"><a href="Outer_World.games.arena.html#CombinedGames">CombinedGames</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ArenaGames">class <strong>ArenaGames</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ArenaGames">ArenaGames</a>(opponent:&nbsp;'Any'&nbsp;=&nbsp;'random',&nbsp;*,&nbsp;games:&nbsp;'dict[str,&nbsp;str]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;rng:&nbsp;'random.Random&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+The&nbsp;arena&nbsp;catalogue&nbsp;—&nbsp;local&nbsp;games,&nbsp;no&nbsp;key,&nbsp;lazy&nbsp;engine&nbsp;load.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;opponent:&nbsp;``"random"``&nbsp;or&nbsp;a&nbsp;``(state,&nbsp;player,&nbsp;rng)&nbsp;-&gt;&nbsp;action``<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;policy&nbsp;the&nbsp;other&nbsp;seat&nbsp;plays&nbsp;by.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;games:&nbsp;Offer&nbsp;table&nbsp;override&nbsp;(``{pyspiel_name:&nbsp;title}``).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;rng:&nbsp;Randomness&nbsp;for&nbsp;the&nbsp;opponent&nbsp;and&nbsp;chance&nbsp;nodes.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ArenaGames-__init__"><strong>__init__</strong></a>(self, opponent: 'Any' = 'random', *, games: 'dict[str, str] | None' = None, rng: 'random.Random | None' = None) -&gt; 'None'</dt><dd><span class="code">Remember&nbsp;the&nbsp;opponent;&nbsp;nothing&nbsp;loads&nbsp;until&nbsp;she&nbsp;asks.</span></dd></dl>
+
+<dl><dt><a name="ArenaGames-close"><strong>close</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Nothing&nbsp;to&nbsp;close&nbsp;—&nbsp;local&nbsp;games&nbsp;keep&nbsp;no&nbsp;scorecard.</span></dd></dl>
+
+<dl><dt><a name="ArenaGames-offers"><strong>offers</strong></a>(self) -&gt; 'list[GameOffer]'</dt><dd><span class="code">List&nbsp;the&nbsp;arena&nbsp;games,&nbsp;proving&nbsp;the&nbsp;engine&nbsp;imports.</span></dd></dl>
+
+<dl><dt><a name="ArenaGames-open"><strong>open</strong></a>(self, game_id: 'str') -&gt; 'ArenaSession'</dt><dd><span class="code">Open&nbsp;one&nbsp;arena&nbsp;game&nbsp;on&nbsp;the&nbsp;local&nbsp;engine.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>keyed</strong> = True</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ArenaSession">class <strong>ArenaSession</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ArenaSession">ArenaSession</a>(game_id:&nbsp;'str',&nbsp;game:&nbsp;'Any',&nbsp;opponent:&nbsp;'Any',&nbsp;rng:&nbsp;'random.Random')&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+One&nbsp;open&nbsp;arena&nbsp;match.&nbsp;Moves&nbsp;go&nbsp;straight&nbsp;to&nbsp;the&nbsp;engine.<br>
+&nbsp;<br>
+After&nbsp;her&nbsp;move&nbsp;the&nbsp;opponent&nbsp;answers:&nbsp;the&nbsp;builtin&nbsp;``"random"``<br>
+policy&nbsp;picks&nbsp;any&nbsp;legal&nbsp;action,&nbsp;or&nbsp;a&nbsp;callable<br>
+``(state,&nbsp;player,&nbsp;rng)&nbsp;-&gt;&nbsp;action``&nbsp;can&nbsp;stand&nbsp;in&nbsp;for&nbsp;a&nbsp;stronger<br>
+mind.&nbsp;Chance&nbsp;nodes&nbsp;(dice)&nbsp;resolve&nbsp;by&nbsp;sampling&nbsp;their&nbsp;outcomes.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ArenaSession-__init__"><strong>__init__</strong></a>(self, game_id: 'str', game: 'Any', opponent: 'Any', rng: 'random.Random') -&gt; 'None'</dt><dd><span class="code">Hold&nbsp;the&nbsp;engine&nbsp;state&nbsp;for&nbsp;``game_id``.</span></dd></dl>
+
+<dl><dt><a name="ArenaSession-reset"><strong>reset</strong></a>(self) -&gt; 'Board'</dt><dd><span class="code">Deal&nbsp;a&nbsp;fresh&nbsp;match&nbsp;and&nbsp;return&nbsp;the&nbsp;first&nbsp;board.</span></dd></dl>
+
+<dl><dt><a name="ArenaSession-step"><strong>step</strong></a>(self, action: 'str', x: 'int | None' = None, y: 'int | None' = None, reasoning: 'dict[str, Any] | None' = None) -&gt; 'Board'</dt><dd><span class="code">Make&nbsp;one&nbsp;move:&nbsp;her&nbsp;action,&nbsp;then&nbsp;every&nbsp;reply&nbsp;until&nbsp;her&nbsp;turn.<br>
+&nbsp;<br>
+``reasoning``&nbsp;is&nbsp;accepted&nbsp;for&nbsp;parity&nbsp;with&nbsp;the&nbsp;official&nbsp;session&nbsp;—<br>
+arena&nbsp;games&nbsp;keep&nbsp;no&nbsp;recordings,&nbsp;so&nbsp;it&nbsp;is&nbsp;simply&nbsp;unused.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="CombinedGames">class <strong>CombinedGames</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#CombinedGames">CombinedGames</a>(*catalogues:&nbsp;'Any')&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Several&nbsp;catalogues&nbsp;as&nbsp;one:&nbsp;official&nbsp;games&nbsp;plus&nbsp;arena&nbsp;games.<br>
+&nbsp;<br>
+``arena:``-prefixed&nbsp;ids&nbsp;route&nbsp;to&nbsp;the&nbsp;arena&nbsp;catalogue,&nbsp;everything<br>
+else&nbsp;to&nbsp;the&nbsp;official&nbsp;one,&nbsp;so&nbsp;one&nbsp;arcade&nbsp;can&nbsp;offer&nbsp;both&nbsp;shelves.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="CombinedGames-__init__"><strong>__init__</strong></a>(self, *catalogues: 'Any') -&gt; 'None'</dt><dd><span class="code">Hold&nbsp;the&nbsp;catalogues&nbsp;in&nbsp;offer&nbsp;order.</span></dd></dl>
+
+<dl><dt><a name="CombinedGames-close"><strong>close</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Close&nbsp;every&nbsp;catalogue's&nbsp;open&nbsp;session,&nbsp;if&nbsp;it&nbsp;keeps&nbsp;one.</span></dd></dl>
+
+<dl><dt><a name="CombinedGames-offers"><strong>offers</strong></a>(self) -&gt; 'list[GameOffer]'</dt><dd><span class="code">Every&nbsp;catalogue's&nbsp;offers;&nbsp;a&nbsp;closed&nbsp;shelf&nbsp;doesn't&nbsp;hide&nbsp;the&nbsp;rest.</span></dd></dl>
+
+<dl><dt><a name="CombinedGames-open"><strong>open</strong></a>(self, game_id: 'str') -&gt; 'Any'</dt><dd><span class="code">Route&nbsp;the&nbsp;id&nbsp;to&nbsp;its&nbsp;catalogue&nbsp;by&nbsp;prefix.</span></dd></dl>
+
+<dl><dt><a name="CombinedGames-scorecard"><strong>scorecard</strong></a>(self) -&gt; 'Any'</dt><dd><span class="code">The&nbsp;first&nbsp;catalogue's&nbsp;scorecard&nbsp;standing&nbsp;—&nbsp;the&nbsp;arena&nbsp;keeps&nbsp;none.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>keyed</strong></dt>
+<dd><span class="code">The&nbsp;official&nbsp;catalogue's&nbsp;key&nbsp;status&nbsp;—&nbsp;the&nbsp;only&nbsp;one&nbsp;that&nbsp;needs&nbsp;one.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-default_games"><strong>default_games</strong></a>(**official_kwargs: 'Any') -&gt; 'CombinedGames'</dt><dd><span class="code">The&nbsp;arcade's&nbsp;whole&nbsp;shelf:&nbsp;official&nbsp;games&nbsp;plus&nbsp;the&nbsp;arena.<br>
+&nbsp;<br>
+Keyword&nbsp;arguments&nbsp;pass&nbsp;through&nbsp;to&nbsp;``OfficialGames``&nbsp;(mode,<br>
+environments_dir,&nbsp;recordings_dir).</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>ARENA_PREFIX</strong> = 'arena:'<br>
+<strong>GAMES</strong> = {'breakthrough': 'Breakthrough', 'checkers': 'Checkers', 'chess': 'Chess', 'connect_four': 'Connect Four', 'othello': 'Othello', 'tic_tac_toe': 'Tic Tac Toe'}<br>
+<strong>HER_SEAT</strong> = 0<br>
+<strong>WIN_LEVELS</strong> = 1<br>
+<strong>logger</strong> = &lt;Logger Outer_World.games.arena (WARNING)&gt;</td></tr></table>
+</body></html>

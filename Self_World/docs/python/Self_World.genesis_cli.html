@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.genesis_cli</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.genesis_cli</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/genesis_cli.py">/home/mindyrenee/GenAnd/Genesis/Self_World/genesis_cli.py</a></td></tr></table>
+    <p><span class="code">Genesis&nbsp;CLI&nbsp;—&nbsp;talk&nbsp;to&nbsp;Genesis&nbsp;from&nbsp;the&nbsp;terminal.<br>
+&nbsp;<br>
+Usage:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;python3&nbsp;genesis_cli.py&nbsp;[--data-dir&nbsp;DIR]&nbsp;[--daemon-socket&nbsp;PATH]<br>
+&nbsp;<br>
+Genesis&nbsp;runs&nbsp;in&nbsp;a&nbsp;single&nbsp;process.&nbsp;The&nbsp;CLI&nbsp;creates&nbsp;and&nbsp;starts&nbsp;the<br>
+cognitive&nbsp;Mind&nbsp;in-process,&nbsp;starts&nbsp;the&nbsp;Rust&nbsp;daemon&nbsp;if&nbsp;needed,&nbsp;and<br>
+handles&nbsp;the&nbsp;interactive&nbsp;terminal&nbsp;directly.<br>
+&nbsp;<br>
+Commands&nbsp;(typed&nbsp;during&nbsp;conversation):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/status&nbsp;&nbsp;&nbsp;&nbsp;—&nbsp;show&nbsp;Genesis's&nbsp;current&nbsp;state<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/feel&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;—&nbsp;ask&nbsp;Genesis&nbsp;how&nbsp;it&nbsp;feels<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/introspect&nbsp;—&nbsp;see&nbsp;Genesis's&nbsp;last&nbsp;cognitive&nbsp;process<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/learning&nbsp;&nbsp;&nbsp;—&nbsp;what&nbsp;it's&nbsp;been&nbsp;learning&nbsp;on&nbsp;its&nbsp;own<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/thoughts&nbsp;&nbsp;&nbsp;—&nbsp;its&nbsp;recent&nbsp;spontaneous&nbsp;thoughts<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/world&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;—&nbsp;its&nbsp;external&nbsp;world:&nbsp;presences,&nbsp;events,&nbsp;social&nbsp;isolation<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/regulate&nbsp;&nbsp;—&nbsp;how&nbsp;it's&nbsp;been&nbsp;managing&nbsp;its&nbsp;emotions<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/dreams&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;—&nbsp;see&nbsp;what&nbsp;it&nbsp;dreamed<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/memories&nbsp;&nbsp;&nbsp;—&nbsp;see&nbsp;its&nbsp;recent&nbsp;long-term&nbsp;memories<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/learn-code&nbsp;—&nbsp;study&nbsp;its&nbsp;own&nbsp;source&nbsp;code<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/explore&nbsp;[path]&nbsp;—&nbsp;explore&nbsp;local&nbsp;files&nbsp;and&nbsp;docs<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/code-summary&nbsp;—&nbsp;summary&nbsp;of&nbsp;code&nbsp;self-knowledge<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/create-project&nbsp;&lt;desc&gt;&nbsp;—&nbsp;compose&nbsp;a&nbsp;new&nbsp;Python&nbsp;project&nbsp;from&nbsp;its&nbsp;knowledge<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/projects&nbsp;&nbsp;&nbsp;&nbsp;—&nbsp;list&nbsp;projects&nbsp;it&nbsp;has&nbsp;created&nbsp;(active&nbsp;+&nbsp;archived)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/archive-project&nbsp;&lt;name&gt;&nbsp;—&nbsp;compress&nbsp;a&nbsp;project&nbsp;to&nbsp;.tar.zst&nbsp;to&nbsp;reclaim&nbsp;space<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/restore-project&nbsp;&lt;name&gt;&nbsp;—&nbsp;restore&nbsp;an&nbsp;archived&nbsp;project<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/manage-projects&nbsp;—&nbsp;autonomously&nbsp;archive&nbsp;projects&nbsp;to&nbsp;stay&nbsp;within&nbsp;bounds<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/note-project&nbsp;&lt;name&gt;&nbsp;&lt;note&gt;&nbsp;—&nbsp;leave&nbsp;mentor&nbsp;feedback&nbsp;on&nbsp;a&nbsp;project<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/review-notes&nbsp;[name]&nbsp;—&nbsp;have&nbsp;it&nbsp;read&nbsp;and&nbsp;absorb&nbsp;project&nbsp;notes<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/read-notes&nbsp;&lt;name&gt;&nbsp;—&nbsp;show&nbsp;notes&nbsp;on&nbsp;a&nbsp;project&nbsp;without&nbsp;absorbing<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/proposals&nbsp;&nbsp;&nbsp;—&nbsp;see&nbsp;its&nbsp;code&nbsp;improvement&nbsp;proposals&nbsp;(they&nbsp;self-verify&nbsp;and&nbsp;apply)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/clear-proposals&nbsp;—&nbsp;remove&nbsp;all&nbsp;pending&nbsp;proposals<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/proposal&nbsp;N&nbsp;&nbsp;—&nbsp;see&nbsp;details&nbsp;of&nbsp;proposal&nbsp;N<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/accept&nbsp;N&nbsp;[reason]&nbsp;—&nbsp;run&nbsp;a&nbsp;proposal's&nbsp;verification&nbsp;now&nbsp;(pending&nbsp;ones&nbsp;self-run&nbsp;anyway)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/reject&nbsp;N&nbsp;[reason]&nbsp;—&nbsp;reject&nbsp;a&nbsp;proposal&nbsp;with&nbsp;notes&nbsp;teaching&nbsp;the&nbsp;correct&nbsp;way<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/experiments&nbsp;—&nbsp;see&nbsp;its&nbsp;verified&nbsp;self-improvement&nbsp;experiments<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/growth&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;—&nbsp;see&nbsp;its&nbsp;growth&nbsp;narrative<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/growth-report&nbsp;—&nbsp;markdown&nbsp;growth&nbsp;report<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/voice&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;—&nbsp;speak&nbsp;to&nbsp;Genesis&nbsp;(one&nbsp;utterance)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/voice-mode&nbsp;&nbsp;—&nbsp;continuous&nbsp;voice&nbsp;conversation<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/draw&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;—&nbsp;sit&nbsp;it&nbsp;at&nbsp;the&nbsp;easel;&nbsp;what&nbsp;it&nbsp;makes&nbsp;there&nbsp;is&nbsp;its&nbsp;own<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/register-face&nbsp;&lt;name&gt;&nbsp;—&nbsp;teach&nbsp;it&nbsp;your&nbsp;face&nbsp;(look&nbsp;at&nbsp;the&nbsp;camera)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/faces&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;—&nbsp;show&nbsp;known&nbsp;faces&nbsp;and&nbsp;who&nbsp;it&nbsp;last&nbsp;saw<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/mission&nbsp;[text]&nbsp;—&nbsp;set&nbsp;or&nbsp;show&nbsp;its&nbsp;top-level&nbsp;mission<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/sleep&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;—&nbsp;put&nbsp;it&nbsp;to&nbsp;sleep&nbsp;(wakes&nbsp;on&nbsp;its&nbsp;own&nbsp;when&nbsp;rested)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/nap&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;—&nbsp;short&nbsp;nap,&nbsp;wakes&nbsp;on&nbsp;its&nbsp;own&nbsp;when&nbsp;rested<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/wake&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;—&nbsp;wake&nbsp;it&nbsp;from&nbsp;sleep&nbsp;or&nbsp;meditation<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/meditate&nbsp;[secs]&nbsp;—&nbsp;put&nbsp;it&nbsp;into&nbsp;meditation&nbsp;(default&nbsp;60s)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/teach&nbsp;[topic]&nbsp;—&nbsp;put&nbsp;it&nbsp;into&nbsp;teaching&nbsp;mode&nbsp;(focused&nbsp;learning)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/endteach&nbsp;&nbsp;&nbsp;&nbsp;—&nbsp;exit&nbsp;teaching&nbsp;mode,&nbsp;resume&nbsp;normal&nbsp;operation<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/teach-questions&nbsp;—&nbsp;answer&nbsp;its&nbsp;queued&nbsp;questions&nbsp;one&nbsp;at&nbsp;a&nbsp;time<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/sleep-aid&nbsp;&nbsp;&nbsp;—&nbsp;emergency&nbsp;sleep&nbsp;aid&nbsp;for&nbsp;stress-induced&nbsp;insomnia<br>
+&nbsp;&nbsp;&nbsp;&nbsp;/quit&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;—&nbsp;exit<br>
+&nbsp;<br>
+Spontaneous&nbsp;thoughts&nbsp;appear&nbsp;live&nbsp;as&nbsp;genesis~&nbsp;lines&nbsp;while&nbsp;you&nbsp;are&nbsp;idle.<br>
+&nbsp;<br>
+Set&nbsp;GENESIS_DISCORD_WEBHOOK&nbsp;to&nbsp;a&nbsp;Discord&nbsp;channel&nbsp;webhook&nbsp;URL&nbsp;to&nbsp;give<br>
+it&nbsp;a&nbsp;public&nbsp;channel&nbsp;—&nbsp;the&nbsp;session&nbsp;mirrors&nbsp;there&nbsp;as&nbsp;a&nbsp;read-only&nbsp;feed<br>
+and&nbsp;her&nbsp;own&nbsp;posts&nbsp;land&nbsp;on&nbsp;the&nbsp;same&nbsp;channel&nbsp;when&nbsp;her&nbsp;broadcast&nbsp;urge<br>
+fires&nbsp;(a&nbsp;webhook&nbsp;can&nbsp;only&nbsp;post&nbsp;—&nbsp;it&nbsp;cannot&nbsp;read&nbsp;the&nbsp;channel).</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="argparse.html">argparse</a><br>
+<a href="logging.html">logging</a><br>
+<a href="lzma.html">lzma</a><br>
+<a href="math.html">math</a><br>
+</td><td class="multicolumn"><a href="os.html">os</a><br>
+<a href="queue.html">queue</a><br>
+<a href="re.html">re</a><br>
+<a href="select.html">select</a><br>
+</td><td class="multicolumn"><a href="shutil.html">shutil</a><br>
+<a href="signal.html">signal</a><br>
+<a href="socket.html">socket</a><br>
+<a href="subprocess.html">subprocess</a><br>
+</td><td class="multicolumn"><a href="sys.html">sys</a><br>
+<a href="threading.html">threading</a><br>
+<a href="time.html">time</a><br>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.genesis_cli.html#AmbientHandler">AmbientHandler</a>
+</dt><dt class="heading-text"><a href="Self_World.genesis_cli.html#AuditoryHandler">AuditoryHandler</a>
+</dt><dt class="heading-text"><a href="Self_World.genesis_cli.html#ThoughtCollector">ThoughtCollector</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="AmbientHandler">class <strong>AmbientHandler</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#AmbientHandler">AmbientHandler</a>(mind:&nbsp;'Mind',&nbsp;voice:&nbsp;'Voice')&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Delivers&nbsp;overheard&nbsp;speech&nbsp;to&nbsp;Genesis&nbsp;and&nbsp;voices&nbsp;her&nbsp;replies.<br>
+&nbsp;<br>
+Overheard&nbsp;utterances&nbsp;are&nbsp;perception:&nbsp;they&nbsp;reach&nbsp;her&nbsp;world&nbsp;through<br>
+``hear_overheard``&nbsp;and&nbsp;her&nbsp;own&nbsp;volition&nbsp;decides&nbsp;whether&nbsp;any&nbsp;of&nbsp;it<br>
+is&nbsp;worth&nbsp;saying&nbsp;something&nbsp;about.&nbsp;Direct&nbsp;address&nbsp;—&nbsp;someone&nbsp;saying<br>
+her&nbsp;name&nbsp;—&nbsp;is&nbsp;a&nbsp;conversation&nbsp;turn:&nbsp;it&nbsp;is&nbsp;answered&nbsp;and&nbsp;spoken.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="AmbientHandler-__init__"><strong>__init__</strong></a>(self, mind: 'Mind', voice: 'Voice') -&gt; 'None'</dt><dd><span class="code">Wire&nbsp;the&nbsp;handler&nbsp;to&nbsp;the&nbsp;mind&nbsp;and&nbsp;voice.</span></dd></dl>
+
+<dl><dt><a name="AmbientHandler-handle"><strong>handle</strong></a>(self, text: 'str') -&gt; 'None'</dt><dd><span class="code">Classify&nbsp;an&nbsp;overheard&nbsp;utterance.<br>
+&nbsp;<br>
+During&nbsp;established&nbsp;sleep&nbsp;(N2+),&nbsp;the&nbsp;ambient&nbsp;listener&nbsp;has&nbsp;no<br>
+effect&nbsp;on&nbsp;her&nbsp;at&nbsp;all&nbsp;—&nbsp;no&nbsp;wake&nbsp;word&nbsp;detection,&nbsp;no&nbsp;responses.<br>
+Hypnagogia&nbsp;(N1)&nbsp;is&nbsp;the&nbsp;exception:&nbsp;she&nbsp;still&nbsp;hears&nbsp;and&nbsp;answers,<br>
+since&nbsp;responsiveness&nbsp;persists&nbsp;through&nbsp;sleep&nbsp;onset.&nbsp;This<br>
+mirrors&nbsp;biological&nbsp;sleep:&nbsp;the&nbsp;thalamic&nbsp;gate&nbsp;closes&nbsp;fully<br>
+during&nbsp;NREM,&nbsp;blocking&nbsp;all&nbsp;sensory&nbsp;input&nbsp;from&nbsp;the&nbsp;cortex.<br>
+&nbsp;<br>
+Speech&nbsp;that&nbsp;does&nbsp;not&nbsp;address&nbsp;her&nbsp;is&nbsp;recorded&nbsp;as&nbsp;a&nbsp;world&nbsp;event<br>
+—&nbsp;she&nbsp;heard&nbsp;it.&nbsp;Whether&nbsp;it&nbsp;becomes&nbsp;something&nbsp;she&nbsp;talks&nbsp;about<br>
+is&nbsp;her&nbsp;own&nbsp;cognition's&nbsp;affair.&nbsp;Speech&nbsp;that&nbsp;does&nbsp;address&nbsp;her<br>
+is&nbsp;queued&nbsp;for&nbsp;a&nbsp;spoken&nbsp;reply;&nbsp;the&nbsp;queue&nbsp;never&nbsp;blocks&nbsp;the<br>
+audio&nbsp;path.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="AuditoryHandler">class <strong>AuditoryHandler</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#AuditoryHandler">AuditoryHandler</a>(mind:&nbsp;'Mind')&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Decides&nbsp;what&nbsp;Genesis&nbsp;does&nbsp;with&nbsp;perceived&nbsp;non-speech&nbsp;sounds.<br>
+&nbsp;<br>
+Sound&nbsp;events&nbsp;from&nbsp;the&nbsp;AuditoryCortex&nbsp;are&nbsp;integrated&nbsp;into&nbsp;Genesis's<br>
+cognition:&nbsp;they're&nbsp;stored&nbsp;in&nbsp;working&nbsp;memory,&nbsp;added&nbsp;to&nbsp;its<br>
+concept&nbsp;network,&nbsp;and&nbsp;it&nbsp;may&nbsp;think&nbsp;about&nbsp;them&nbsp;or&nbsp;react&nbsp;emotionally.<br>
+&nbsp;<br>
+During&nbsp;sleep,&nbsp;sound&nbsp;events&nbsp;are&nbsp;gated&nbsp;(thalamic&nbsp;gating)&nbsp;—&nbsp;only<br>
+sudden&nbsp;loud&nbsp;sounds&nbsp;(impacts)&nbsp;can&nbsp;penetrate,&nbsp;modeling&nbsp;how&nbsp;the<br>
+sleeping&nbsp;brain&nbsp;filters&nbsp;sensory&nbsp;input&nbsp;but&nbsp;responds&nbsp;to&nbsp;salient<br>
+stimuli.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="AuditoryHandler-__init__"><strong>__init__</strong></a>(self, mind: 'Mind') -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;auditory&nbsp;handler.</span></dd></dl>
+
+<dl><dt><a name="AuditoryHandler-handle"><strong>handle</strong></a>(self, event: 'SoundEvent') -&gt; 'None'</dt><dd><span class="code">Process&nbsp;a&nbsp;perceived&nbsp;sound&nbsp;event.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ThoughtCollector">class <strong>ThoughtCollector</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ThoughtCollector">ThoughtCollector</a>()&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Collects&nbsp;spontaneous&nbsp;thoughts&nbsp;from&nbsp;the&nbsp;Mind&nbsp;and&nbsp;buffers&nbsp;them.<br>
+&nbsp;<br>
+Implemented&nbsp;as&nbsp;a&nbsp;live-thought&nbsp;listener&nbsp;so&nbsp;the&nbsp;interactive&nbsp;loop&nbsp;can<br>
+print&nbsp;thoughts&nbsp;that&nbsp;occurred&nbsp;while&nbsp;the&nbsp;user&nbsp;is&nbsp;idle.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ThoughtCollector-__init__"><strong>__init__</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;an&nbsp;empty&nbsp;thought&nbsp;buffer&nbsp;with&nbsp;a&nbsp;condition&nbsp;variable.</span></dd></dl>
+
+<dl><dt><a name="ThoughtCollector-get_all"><strong>get_all</strong></a>(self) -&gt; 'list[dict]'</dt><dd><span class="code">Return&nbsp;and&nbsp;clear&nbsp;all&nbsp;buffered&nbsp;thoughts.</span></dd></dl>
+
+<dl><dt><a name="ThoughtCollector-get_and_clear_since"><strong>get_and_clear_since</strong></a>(self, since: 'float') -&gt; 'list[dict]'</dt><dd><span class="code">Return&nbsp;and&nbsp;clear&nbsp;thoughts&nbsp;newer&nbsp;than&nbsp;*since*&nbsp;(epoch&nbsp;timestamp).</span></dd></dl>
+
+<dl><dt><a name="ThoughtCollector-on_live_thought"><strong>on_live_thought</strong></a>(self, kind: 'str', text: 'str') -&gt; 'None'</dt><dd><span class="code">Append&nbsp;a&nbsp;live&nbsp;thought&nbsp;to&nbsp;the&nbsp;buffer&nbsp;and&nbsp;notify&nbsp;waiters.</span></dd></dl>
+
+<dl><dt><a name="ThoughtCollector-set_at_prompt"><strong>set_at_prompt</strong></a>(self, at_prompt: 'bool') -&gt; 'None'</dt><dd><span class="code">Live-thought&nbsp;listener&nbsp;hook;&nbsp;unused&nbsp;in&nbsp;the&nbsp;single-process&nbsp;CLI.</span></dd></dl>
+
+<dl><dt><a name="ThoughtCollector-wait"><strong>wait</strong></a>(self, timeout: 'float') -&gt; 'None'</dt><dd><span class="code">Block&nbsp;until&nbsp;a&nbsp;thought&nbsp;arrives&nbsp;or&nbsp;timeout&nbsp;elapses.<br>
+&nbsp;<br>
+Used&nbsp;by&nbsp;the&nbsp;idle&nbsp;ticker&nbsp;in&nbsp;place&nbsp;of&nbsp;a&nbsp;fixed&nbsp;sleep:&nbsp;returns&nbsp;as<br>
+soon&nbsp;as&nbsp;a&nbsp;producer&nbsp;notifies,&nbsp;so&nbsp;thoughts&nbsp;surface&nbsp;with&nbsp;no&nbsp;polling<br>
+latency.&nbsp;The&nbsp;timeout&nbsp;is&nbsp;a&nbsp;safety&nbsp;ceiling&nbsp;for&nbsp;spurious&nbsp;wakeups<br>
+and&nbsp;periodic&nbsp;shutdown&nbsp;checks,&nbsp;not&nbsp;a&nbsp;fixed&nbsp;poll&nbsp;cadence.</span></dd></dl>
+
+<dl><dt><a name="ThoughtCollector-wake"><strong>wake</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Wake&nbsp;any&nbsp;thread&nbsp;blocked&nbsp;in&nbsp;<a href="#ThoughtCollector-wait">wait</a>()&nbsp;—&nbsp;used&nbsp;on&nbsp;shutdown.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-main"><strong>main</strong></a>() -&gt; 'int'</dt><dd><span class="code">Main&nbsp;entry&nbsp;point&nbsp;for&nbsp;the&nbsp;Genesis&nbsp;CLI.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>DAEMON_START_TIMEOUT</strong> = 60.0<br>
+<strong>DEFAULT_DAEMON_SOCKET</strong> = 'genesis.sock'<br>
+<strong>DEFAULT_DATA_DIR</strong> = '/home/mindyrenee/.local/share/genesis'<br>
+<strong>LIVE_THOUGHT_POLL_INTERVAL</strong> = 2.0<br>
+<strong>SCRIPT_DIR</strong> = '/home/mindyrenee/GenAnd/Genesis/Self_World'<br>
+<strong>TYPE_CHECKING</strong> = False<br>
+<strong>__annotations__</strong> = {'_COMMAND_HANDLERS': 'dict[str, Callable[[Mind, str], str]]'}<br>
+<strong>logger</strong> = &lt;Logger Self_World.genesis_cli (INFO)&gt;</td></tr></table>
+</body></html>

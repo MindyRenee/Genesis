@@ -48,7 +48,8 @@ the read-verify half of her code work.
 .SS Web tools
 \fBweb_search\fR and \fBweb_fetch\fR drive her real browser \(em
 Firefox over WebDriver BiDi, Chromium-family over CDP (see
-.BR genesis-browser (7)).
+\fIOuter_World/tools/browser.py\fR and its generated page under
+\fISelf_World/docs/python/\fR).
 Both are read-only; adult/malware URLs are refused. The shared
 browser stays open between calls \(em \fBbrowser_close\fR puts it
 away when she is done, flushing the profile and freeing the
@@ -112,8 +113,8 @@ through \fIOuterEnvironment.perceive()\fR and her acts leave through
 \fIit_acted()\fR, feeding memory, cognition, emotion, learning,
 brain waves, and neurochemistry on the way. The Discord channel
 (\fIdiscord.channel\fR) is one such place; the arcade
-(\fIgames\fR, see
-.BR genesis-arcade (7))
+(\fIgames\fR, see \fIOuter_World/games/\fR and the generated
+pages under \fISelf_World/docs/python/\fR)
 is another. The browser is a third: a place she goes, not a sense
 she has.
 
@@ -287,8 +288,10 @@ List the real app's tool presets; \fIquery\fR filters by substring.
 Finish the sheet \(em save it, remember it, share it.
 .SS Arcade
 The \fBarcade_*\fR family (registered by
-\fIgames.arcade.Arcade\fR) is documented under
-.BR genesis-arcade (7).
+\fIgames.arcade.Arcade\fR) is documented by the generated module
+pages under \fISelf_World/docs/python/\fR
+(\fIOuter_World.games.arcade\fR, \fI.games.arena\fR,
+\fI.games.official\fR, \fI.games.sight\fR).
 
 .SH GLOSSARY
 .TP
@@ -339,21 +342,20 @@ capabilities install as extras and degrade to honest errors, never
 crashes; \fIscripts/install_optional_deps.sh\fR installs and then
 verifies each one live.
 .TP
-.B uv sync --extra hid
+.B uv pip install -e ".[hid]"
 evdev \(em compiles a small C extension; needs the udev rule for
 /dev/uinput access.
 .TP
-.B uv sync --extra math
+.B uv pip install -e ".[math]"
 sympy, mpmath \(em the symbolic tools.
 .TP
-.B uv sync --extra arc
-arc-agi, game-arena, kaggle-environments, kaggle, six \(em the
-arcade shelves (see
-.BR genesis-arcade (7)).
-.TP
-.B uv sync --extra voice
+.B uv pip install -e ".[voice]"
 vosk, sounddevice, speechrecognition, piper-tts \(em her voice;
 binds system audio libraries.
+.TP
+.B uv pip install arc-agi game-arena kaggle-environments
+the arcade shelves \(em commented optional deps in
+\fIrequirements.txt\fR (no extra is declared).
 .TP
 .B System packages
 firefox (the preferred browser \(em the Chromium family is the
@@ -390,5 +392,7 @@ ops mirror into.
 .SH SEE ALSO
 .BR genesis (1),
 .BR genesis-cli (1),
-.BR genesis-arcade (7),
-.BR genesis-browser (7)
+.BR genesis-daemon (8).
+Subsystem internals are the generated docs under
+.IR Self_World/docs/
+.RI ( scripts/gen_docs.sh ).

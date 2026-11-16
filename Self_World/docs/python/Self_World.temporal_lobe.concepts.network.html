@@ -1,0 +1,1252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.temporal_lobe.concepts.network</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.temporal_lobe.html" class="white">temporal_lobe</a>.<a href="Self_World.temporal_lobe.concepts.html" class="white">concepts</a>.network</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/concepts/network.py">/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/concepts/network.py</a></td></tr></table>
+    <p><span class="code">Concept&nbsp;network&nbsp;—&nbsp;the&nbsp;symbolic&nbsp;knowledge&nbsp;graph&nbsp;core.<br>
+&nbsp;<br>
+``<a href="#ConceptNetwork">ConceptNetwork</a>``&nbsp;holds&nbsp;the&nbsp;graph's&nbsp;concepts,&nbsp;edges,&nbsp;indices,&nbsp;and<br>
+CRUD/query&nbsp;operations.&nbsp;Behavior&nbsp;is&nbsp;split&nbsp;across&nbsp;mixin&nbsp;modules&nbsp;in<br>
+this&nbsp;package:&nbsp;``extraction``&nbsp;(text&nbsp;parsing/learning),&nbsp;``dynamics``<br>
+(spreading&nbsp;activation,&nbsp;cortical&nbsp;ticks),&nbsp;``consolidation``&nbsp;(sleep<br>
+processing,&nbsp;bridge&nbsp;creation,&nbsp;review),&nbsp;and&nbsp;``archive``&nbsp;(long-term<br>
+cold&nbsp;storage).&nbsp;Types&nbsp;live&nbsp;in&nbsp;``types``;&nbsp;classification/detection<br>
+in&nbsp;``classify``.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+<a href="math.html">math</a><br>
+</td><td class="multicolumn"><a href="random.html">random</a><br>
+<a href="re.html">re</a><br>
+</td><td class="multicolumn"><a href="sqlite3.html">sqlite3</a><br>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.concepts.archival.html#ArchivalMixin">Self_World.temporal_lobe.concepts.archival.ArchivalMixin</a>(<a href="builtins.html#object">builtins.object</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.concepts.network.html#ConceptNetwork">ConceptNetwork</a>(<a href="Self_World.temporal_lobe.concepts.archival.html#ArchivalMixin">Self_World.temporal_lobe.concepts.archival.ArchivalMixin</a>, <a href="Self_World.temporal_lobe.concepts.consolidation.html#ConsolidationMixin">Self_World.temporal_lobe.concepts.consolidation.ConsolidationMixin</a>, <a href="Self_World.temporal_lobe.concepts.dynamics.html#DynamicsMixin">Self_World.temporal_lobe.concepts.dynamics.DynamicsMixin</a>, <a href="Self_World.temporal_lobe.concepts.extraction.html#ExtractionMixin">Self_World.temporal_lobe.concepts.extraction.ExtractionMixin</a>)
+</dt></dl>
+</dd>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.concepts.consolidation.html#ConsolidationMixin">Self_World.temporal_lobe.concepts.consolidation.ConsolidationMixin</a>(<a href="builtins.html#object">builtins.object</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.concepts.network.html#ConceptNetwork">ConceptNetwork</a>(<a href="Self_World.temporal_lobe.concepts.archival.html#ArchivalMixin">Self_World.temporal_lobe.concepts.archival.ArchivalMixin</a>, <a href="Self_World.temporal_lobe.concepts.consolidation.html#ConsolidationMixin">Self_World.temporal_lobe.concepts.consolidation.ConsolidationMixin</a>, <a href="Self_World.temporal_lobe.concepts.dynamics.html#DynamicsMixin">Self_World.temporal_lobe.concepts.dynamics.DynamicsMixin</a>, <a href="Self_World.temporal_lobe.concepts.extraction.html#ExtractionMixin">Self_World.temporal_lobe.concepts.extraction.ExtractionMixin</a>)
+</dt></dl>
+</dd>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.concepts.dynamics.html#DynamicsMixin">Self_World.temporal_lobe.concepts.dynamics.DynamicsMixin</a>(<a href="builtins.html#object">builtins.object</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.concepts.network.html#ConceptNetwork">ConceptNetwork</a>(<a href="Self_World.temporal_lobe.concepts.archival.html#ArchivalMixin">Self_World.temporal_lobe.concepts.archival.ArchivalMixin</a>, <a href="Self_World.temporal_lobe.concepts.consolidation.html#ConsolidationMixin">Self_World.temporal_lobe.concepts.consolidation.ConsolidationMixin</a>, <a href="Self_World.temporal_lobe.concepts.dynamics.html#DynamicsMixin">Self_World.temporal_lobe.concepts.dynamics.DynamicsMixin</a>, <a href="Self_World.temporal_lobe.concepts.extraction.html#ExtractionMixin">Self_World.temporal_lobe.concepts.extraction.ExtractionMixin</a>)
+</dt></dl>
+</dd>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.concepts.extraction.html#ExtractionMixin">Self_World.temporal_lobe.concepts.extraction.ExtractionMixin</a>(<a href="builtins.html#object">builtins.object</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.concepts.network.html#ConceptNetwork">ConceptNetwork</a>(<a href="Self_World.temporal_lobe.concepts.archival.html#ArchivalMixin">Self_World.temporal_lobe.concepts.archival.ArchivalMixin</a>, <a href="Self_World.temporal_lobe.concepts.consolidation.html#ConsolidationMixin">Self_World.temporal_lobe.concepts.consolidation.ConsolidationMixin</a>, <a href="Self_World.temporal_lobe.concepts.dynamics.html#DynamicsMixin">Self_World.temporal_lobe.concepts.dynamics.DynamicsMixin</a>, <a href="Self_World.temporal_lobe.concepts.extraction.html#ExtractionMixin">Self_World.temporal_lobe.concepts.extraction.ExtractionMixin</a>)
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ConceptNetwork">class <strong>ConceptNetwork</strong></a>(<a href="Self_World.temporal_lobe.concepts.archival.html#ArchivalMixin">Self_World.temporal_lobe.concepts.archival.ArchivalMixin</a>, <a href="Self_World.temporal_lobe.concepts.consolidation.html#ConsolidationMixin">Self_World.temporal_lobe.concepts.consolidation.ConsolidationMixin</a>, <a href="Self_World.temporal_lobe.concepts.dynamics.html#DynamicsMixin">Self_World.temporal_lobe.concepts.dynamics.DynamicsMixin</a>, <a href="Self_World.temporal_lobe.concepts.extraction.html#ExtractionMixin">Self_World.temporal_lobe.concepts.extraction.ExtractionMixin</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ConceptNetwork">ConceptNetwork</a>()&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+A&nbsp;semantic&nbsp;graph&nbsp;of&nbsp;concepts&nbsp;and&nbsp;their&nbsp;relationships.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;Genesis's&nbsp;understanding&nbsp;of&nbsp;the&nbsp;world.&nbsp;It's&nbsp;built&nbsp;from<br>
+conversation,&nbsp;reasoning,&nbsp;and&nbsp;experience.&nbsp;The&nbsp;reasoning&nbsp;engine<br>
+traverses&nbsp;this&nbsp;graph&nbsp;to&nbsp;draw&nbsp;conclusions.<br>
+&nbsp;<br>
+The&nbsp;network&nbsp;is&nbsp;not&nbsp;static&nbsp;—&nbsp;concepts&nbsp;can&nbsp;be&nbsp;added,&nbsp;merged,&nbsp;split,<br>
+and&nbsp;reweighted.&nbsp;Activation&nbsp;spreads&nbsp;through&nbsp;the&nbsp;network&nbsp;(spreading<br>
+activation),&nbsp;so&nbsp;using&nbsp;one&nbsp;concept&nbsp;primes&nbsp;related&nbsp;ones.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.temporal_lobe.concepts.network.html#ConceptNetwork">ConceptNetwork</a></dd>
+<dd><a href="Self_World.temporal_lobe.concepts.archival.html#ArchivalMixin">Self_World.temporal_lobe.concepts.archival.ArchivalMixin</a></dd>
+<dd><a href="Self_World.temporal_lobe.concepts.consolidation.html#ConsolidationMixin">Self_World.temporal_lobe.concepts.consolidation.ConsolidationMixin</a></dd>
+<dd><a href="Self_World.temporal_lobe.concepts.dynamics.html#DynamicsMixin">Self_World.temporal_lobe.concepts.dynamics.DynamicsMixin</a></dd>
+<dd><a href="Self_World.temporal_lobe.concepts.extraction.html#ExtractionMixin">Self_World.temporal_lobe.concepts.extraction.ExtractionMixin</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="ConceptNetwork-__init__"><strong>__init__</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;an&nbsp;empty&nbsp;concept&nbsp;network.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-add_concept"><strong>add_concept</strong></a>(self, name: 'str', aliases: 'set[str] | None' = None, confidence: 'float' = 0.5, origin: 'str' = 'conversation', properties: 'dict[str, Any] | None' = None) -&gt; 'Concept'</dt><dd><span class="code">Add&nbsp;a&nbsp;concept&nbsp;to&nbsp;the&nbsp;network,&nbsp;or&nbsp;return&nbsp;existing&nbsp;one.<br>
+&nbsp;<br>
+If&nbsp;the&nbsp;concept&nbsp;(or&nbsp;an&nbsp;alias)&nbsp;already&nbsp;exists,&nbsp;it's&nbsp;returned<br>
+and&nbsp;its&nbsp;activation&nbsp;is&nbsp;boosted.&nbsp;If&nbsp;it's&nbsp;new,&nbsp;it's&nbsp;created.<br>
+&nbsp;<br>
+When&nbsp;a&nbsp;concept&nbsp;is&nbsp;referenced&nbsp;from&nbsp;a&nbsp;different&nbsp;cortical&nbsp;column<br>
+than&nbsp;its&nbsp;original,&nbsp;the&nbsp;new&nbsp;column&nbsp;is&nbsp;added&nbsp;to&nbsp;its&nbsp;`columns`<br>
+set.&nbsp;This&nbsp;tracks&nbsp;multi-column&nbsp;membership&nbsp;(e.g.,&nbsp;"cognition"<br>
+belongs&nbsp;to&nbsp;both&nbsp;dictionary&nbsp;and&nbsp;identity&nbsp;columns).<br>
+&nbsp;<br>
+**Polysemy&nbsp;handling**:&nbsp;If&nbsp;the&nbsp;name&nbsp;already&nbsp;exists&nbsp;but&nbsp;the&nbsp;new<br>
+concept&nbsp;has&nbsp;a&nbsp;different&nbsp;definition&nbsp;(from&nbsp;a&nbsp;different&nbsp;sense&nbsp;of<br>
+the&nbsp;word),&nbsp;a&nbsp;separate&nbsp;concept&nbsp;is&nbsp;created&nbsp;with&nbsp;a&nbsp;disambiguated<br>
+ID&nbsp;(e.g.,&nbsp;"i#2").&nbsp;The&nbsp;sense_rank&nbsp;property&nbsp;determines&nbsp;which<br>
+sense&nbsp;is&nbsp;retrieved&nbsp;by&nbsp;_resolve()&nbsp;—&nbsp;lower&nbsp;rank&nbsp;=&nbsp;more&nbsp;common.<br>
+&nbsp;<br>
+The&nbsp;concept&nbsp;name&nbsp;is&nbsp;syntactically&nbsp;normalized&nbsp;(lowercased,<br>
+hyphens→spaces,&nbsp;whitespace&nbsp;collapsed)&nbsp;before&nbsp;use&nbsp;as&nbsp;an&nbsp;ID.<br>
+This&nbsp;ensures&nbsp;"micro-animal"&nbsp;and&nbsp;"micro&nbsp;animal"&nbsp;resolve&nbsp;to&nbsp;the<br>
+same&nbsp;concept.&nbsp;Semantic&nbsp;normalization&nbsp;(plural→singular,&nbsp;article<br>
+stripping)&nbsp;is&nbsp;the&nbsp;caller's&nbsp;responsibility.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-add_edge"><strong>add_edge</strong></a>(self, source: 'str', target: 'str', relation: 'RelationType', weight: 'float' = 0.5, origin: 'str' = 'stated') -&gt; 'Edge | None'</dt><dd><span class="code">Add&nbsp;a&nbsp;relationship&nbsp;between&nbsp;two&nbsp;concepts.<br>
+&nbsp;<br>
+Both&nbsp;concepts&nbsp;must&nbsp;exist&nbsp;(or&nbsp;are&nbsp;created&nbsp;automatically).<br>
+If&nbsp;the&nbsp;same&nbsp;edge&nbsp;already&nbsp;exists,&nbsp;its&nbsp;weight&nbsp;is&nbsp;increased.<br>
+&nbsp;<br>
+When&nbsp;auto-creating&nbsp;missing&nbsp;concepts,&nbsp;the&nbsp;origin&nbsp;is&nbsp;inferred<br>
+from&nbsp;the&nbsp;concept&nbsp;ID&nbsp;prefix&nbsp;(python:/rust:&nbsp;→&nbsp;"code")&nbsp;rather<br>
+than&nbsp;defaulting&nbsp;to&nbsp;"conversation".&nbsp;This&nbsp;ensures&nbsp;code&nbsp;concepts<br>
+created&nbsp;as&nbsp;edge&nbsp;endpoints&nbsp;are&nbsp;correctly&nbsp;labeled.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-attach_edge_log"><strong>attach_edge_log</strong></a>(self, log: 'Any') -&gt; 'None'</dt><dd><span class="code">Attach&nbsp;the&nbsp;canonical&nbsp;edge&nbsp;log&nbsp;—&nbsp;the&nbsp;single&nbsp;source&nbsp;of&nbsp;truth.<br>
+&nbsp;<br>
+If&nbsp;the&nbsp;log&nbsp;file&nbsp;already&nbsp;exists,&nbsp;its&nbsp;fold&nbsp;replaces&nbsp;the&nbsp;in-memory<br>
+edge&nbsp;list&nbsp;immediately&nbsp;(the&nbsp;log&nbsp;is&nbsp;authoritative;&nbsp;``_edges``&nbsp;is<br>
+its&nbsp;materialized&nbsp;view).&nbsp;If&nbsp;no&nbsp;log&nbsp;exists&nbsp;yet,&nbsp;the&nbsp;current<br>
+canonical&nbsp;edges&nbsp;are&nbsp;snapshotted&nbsp;in&nbsp;as&nbsp;the&nbsp;seed.<br>
+&nbsp;<br>
+Once&nbsp;attached,&nbsp;derivable&nbsp;edges&nbsp;—&nbsp;pipeline-generated&nbsp;geometry<br>
+that&nbsp;the&nbsp;embedding&nbsp;field&nbsp;can&nbsp;recompute&nbsp;—&nbsp;are&nbsp;never<br>
+materialized:&nbsp;rejected&nbsp;at&nbsp;``add_edge``,&nbsp;stripped&nbsp;from<br>
+``replace_edges``,&nbsp;absent&nbsp;from&nbsp;the&nbsp;fold.&nbsp;Their&nbsp;function&nbsp;is<br>
+served&nbsp;by&nbsp;the&nbsp;similarity&nbsp;provider&nbsp;at&nbsp;query&nbsp;time.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-attach_holographic_graph"><strong>attach_holographic_graph</strong></a>(self, hgraph: 'Any') -&gt; 'None'</dt><dd><span class="code">Attach&nbsp;a&nbsp;holographic&nbsp;associative&nbsp;graph&nbsp;to&nbsp;this&nbsp;network.<br>
+&nbsp;<br>
+Once&nbsp;attached,&nbsp;``get_neighbors``&nbsp;and&nbsp;``spread_activation``<br>
+also&nbsp;query&nbsp;the&nbsp;holographic&nbsp;graph&nbsp;for&nbsp;associations.&nbsp;This&nbsp;keeps<br>
+bridge&nbsp;edges&nbsp;and&nbsp;LTM-extracted&nbsp;associations&nbsp;accessible&nbsp;after<br>
+sleep&nbsp;compression&nbsp;migrates&nbsp;them&nbsp;out&nbsp;of&nbsp;the&nbsp;explicit&nbsp;edge&nbsp;list.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;hgraph:&nbsp;A&nbsp;``HolographicGraph``&nbsp;instance.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-attach_similarity_provider"><strong>attach_similarity_provider</strong></a>(self, provider: 'Any') -&gt; 'None'</dt><dd><span class="code">Attach&nbsp;the&nbsp;virtual&nbsp;similarity&nbsp;layer&nbsp;for&nbsp;derivable&nbsp;associations.<br>
+&nbsp;<br>
+``provider``&nbsp;is&nbsp;a&nbsp;callable&nbsp;``(concept_id)&nbsp;-&gt;&nbsp;list[(id,&nbsp;score)]``<br>
+—&nbsp;typically&nbsp;bound&nbsp;to&nbsp;the&nbsp;embedding&nbsp;store's<br>
+``find_similar_concepts``.&nbsp;It&nbsp;is&nbsp;queried&nbsp;lazily&nbsp;by<br>
+:meth:`get_associations`&nbsp;only,&nbsp;never&nbsp;on&nbsp;the&nbsp;hot&nbsp;paths<br>
+(``spread_activation``,&nbsp;``has_neighbors``,&nbsp;``get_neighbors``).</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-categorize_all"><strong>categorize_all</strong></a>(self) -&gt; 'dict[str, int]'</dt><dd><span class="code">Run&nbsp;detect_category&nbsp;on&nbsp;all&nbsp;uncategorized&nbsp;concepts.<br>
+&nbsp;<br>
+This&nbsp;populates&nbsp;the&nbsp;`category`&nbsp;field&nbsp;for&nbsp;every&nbsp;concept&nbsp;that&nbsp;is<br>
+still&nbsp;UNKNOWN&nbsp;(either&nbsp;because&nbsp;it&nbsp;was&nbsp;loaded&nbsp;from&nbsp;an&nbsp;older<br>
+persistence&nbsp;format,&nbsp;or&nbsp;because&nbsp;it&nbsp;was&nbsp;added&nbsp;before<br>
+categorization&nbsp;was&nbsp;available).&nbsp;Concepts&nbsp;that&nbsp;already&nbsp;have&nbsp;a<br>
+detected&nbsp;category&nbsp;are&nbsp;left&nbsp;untouched.<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;dict&nbsp;with&nbsp;counts&nbsp;of&nbsp;how&nbsp;many&nbsp;concepts&nbsp;were&nbsp;assigned<br>
+to&nbsp;each&nbsp;category.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-classify_modalities"><strong>classify_modalities</strong></a>(self) -&gt; 'dict[str, int]'</dt><dd><span class="code">Run&nbsp;detect_modality&nbsp;on&nbsp;all&nbsp;unclassified&nbsp;concepts.<br>
+&nbsp;<br>
+This&nbsp;populates&nbsp;the&nbsp;`modality`&nbsp;field&nbsp;for&nbsp;every&nbsp;concept&nbsp;that&nbsp;is<br>
+still&nbsp;UNKNOWN.&nbsp;Concepts&nbsp;that&nbsp;already&nbsp;have&nbsp;a&nbsp;detected&nbsp;modality<br>
+are&nbsp;left&nbsp;untouched.<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;dict&nbsp;with&nbsp;counts&nbsp;of&nbsp;how&nbsp;many&nbsp;concepts&nbsp;were&nbsp;assigned<br>
+to&nbsp;each&nbsp;modality.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-clean_noise"><strong>clean_noise</strong></a>(self, min_confidence: 'float' = 0.5, min_edges: 'int' = 1) -&gt; 'list[str]'</dt><dd><span class="code">Remove&nbsp;noise&nbsp;concepts&nbsp;from&nbsp;the&nbsp;network.<br>
+&nbsp;<br>
+A&nbsp;concept&nbsp;is&nbsp;considered&nbsp;noise&nbsp;if:<br>
+-&nbsp;Its&nbsp;confidence&nbsp;is&nbsp;below&nbsp;min_confidence&nbsp;(likely&nbsp;extracted<br>
+&nbsp;&nbsp;as&nbsp;a&nbsp;fragment,&nbsp;not&nbsp;a&nbsp;real&nbsp;concept)<br>
+-&nbsp;AND&nbsp;it&nbsp;has&nbsp;fewer&nbsp;than&nbsp;min_edges&nbsp;connections&nbsp;(isolated)<br>
+&nbsp;<br>
+This&nbsp;preserves&nbsp;low-confidence&nbsp;concepts&nbsp;that&nbsp;have&nbsp;been<br>
+connected&nbsp;to&nbsp;other&nbsp;concepts&nbsp;(they&nbsp;may&nbsp;be&nbsp;real&nbsp;but&nbsp;uncertain).<br>
+&nbsp;<br>
+When&nbsp;an&nbsp;archive&nbsp;is&nbsp;attached,&nbsp;"remove"&nbsp;means&nbsp;*archive*,&nbsp;not<br>
+*delete*.&nbsp;Sleep&nbsp;is&nbsp;where&nbsp;this&nbsp;runs,&nbsp;unattended,&nbsp;and&nbsp;it&nbsp;used&nbsp;to<br>
+delete&nbsp;unconditionally&nbsp;—&nbsp;which&nbsp;is&nbsp;how&nbsp;~7.5k&nbsp;concepts<br>
+disappeared&nbsp;in&nbsp;a&nbsp;single&nbsp;N3&nbsp;pass&nbsp;with&nbsp;the&nbsp;archive&nbsp;sitting&nbsp;empty&nbsp;at<br>
+zero.&nbsp;Two&nbsp;things&nbsp;followed&nbsp;from&nbsp;that:<br>
+&nbsp;<br>
+-&nbsp;Deleting&nbsp;ran&nbsp;*before*&nbsp;``spill_dormant``&nbsp;in&nbsp;the&nbsp;same&nbsp;pass,&nbsp;so<br>
+&nbsp;&nbsp;the&nbsp;destructive&nbsp;step&nbsp;could&nbsp;drop&nbsp;the&nbsp;network&nbsp;under&nbsp;the&nbsp;cap&nbsp;and<br>
+&nbsp;&nbsp;thereby&nbsp;stop&nbsp;the&nbsp;non-destructive&nbsp;one&nbsp;from&nbsp;ever&nbsp;engaging.&nbsp;The<br>
+&nbsp;&nbsp;mechanism&nbsp;meant&nbsp;to&nbsp;preserve&nbsp;knowledge&nbsp;was&nbsp;silencing&nbsp;the<br>
+&nbsp;&nbsp;mechanism&nbsp;that&nbsp;preserves&nbsp;it.<br>
+-&nbsp;Nothing&nbsp;reported&nbsp;the&nbsp;loss&nbsp;as&nbsp;a&nbsp;loss.&nbsp;It&nbsp;appeared&nbsp;as&nbsp;one&nbsp;number<br>
+&nbsp;&nbsp;in&nbsp;a&nbsp;journal&nbsp;line.<br>
+&nbsp;<br>
+So&nbsp;deletion&nbsp;is&nbsp;now&nbsp;reachable&nbsp;only&nbsp;when&nbsp;there&nbsp;is&nbsp;no&nbsp;archive,&nbsp;which<br>
+matches&nbsp;the&nbsp;rest&nbsp;of&nbsp;the&nbsp;design&nbsp;(``spill_dormant``&nbsp;also&nbsp;no-ops<br>
+without&nbsp;one,&nbsp;and&nbsp;the&nbsp;destructive&nbsp;prune&nbsp;is&nbsp;its&nbsp;documented<br>
+fallback).&nbsp;If&nbsp;the&nbsp;archive&nbsp;write&nbsp;fails,&nbsp;the&nbsp;concepts&nbsp;stay&nbsp;in<br>
+working&nbsp;memory:&nbsp;unbounded&nbsp;growth&nbsp;is&nbsp;recoverable,&nbsp;deleted<br>
+knowledge&nbsp;is&nbsp;not.<br>
+&nbsp;<br>
+Returns&nbsp;the&nbsp;list&nbsp;of&nbsp;removed&nbsp;concept&nbsp;names.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-concept_quality"><strong>concept_quality</strong></a>(self, concept_id: 'str') -&gt; 'float'</dt><dd><span class="code">Structural&nbsp;quality&nbsp;score&nbsp;for&nbsp;a&nbsp;concept&nbsp;(0.0&nbsp;to&nbsp;1.0).<br>
+&nbsp;<br>
+Unlike&nbsp;:func:`is_world_concept`&nbsp;(which&nbsp;is&nbsp;purely&nbsp;syntactic),<br>
+this&nbsp;measures&nbsp;the&nbsp;concept's&nbsp;*knowledge&nbsp;content*&nbsp;—&nbsp;how&nbsp;well-<br>
+formed&nbsp;and&nbsp;integrated&nbsp;it&nbsp;is&nbsp;in&nbsp;the&nbsp;network.<br>
+&nbsp;<br>
+Score&nbsp;components:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;0.30&nbsp;×&nbsp;has_definition<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Does&nbsp;it&nbsp;have&nbsp;a&nbsp;dictionary&nbsp;definition?&nbsp;A&nbsp;concept&nbsp;with<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;a&nbsp;definition&nbsp;is&nbsp;real&nbsp;knowledge,&nbsp;not&nbsp;just&nbsp;a&nbsp;name.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;0.20&nbsp;×&nbsp;edge_density<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;How&nbsp;well-connected&nbsp;is&nbsp;it?&nbsp;Saturates&nbsp;at<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;``_QUALITY_EDGE_SATURATION``&nbsp;edges&nbsp;(both&nbsp;directions).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;0.30&nbsp;×&nbsp;typed_edge_density<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;How&nbsp;many&nbsp;*typed*&nbsp;(non-RELATED_TO,&nbsp;non-BRIDGES)&nbsp;edges<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;does&nbsp;it&nbsp;have?&nbsp;Typed&nbsp;edges&nbsp;(CAUSES,&nbsp;ENABLES,&nbsp;IS_A,&nbsp;etc.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;carry&nbsp;semantic&nbsp;meaning.&nbsp;Saturates&nbsp;at<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;``_QUALITY_TYPED_EDGE_SATURATION``.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;0.20&nbsp;×&nbsp;confidence<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;concept's&nbsp;own&nbsp;confidence&nbsp;value&nbsp;(0..1).<br>
+&nbsp;<br>
+Returns&nbsp;0.0&nbsp;for&nbsp;unknown&nbsp;concepts.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-detect_semantic_hubs"><strong>detect_semantic_hubs</strong></a>(self, top_percent: 'float' = 0.05) -&gt; 'list[str]'</dt><dd><span class="code">Detect&nbsp;semantic&nbsp;hubs&nbsp;using&nbsp;betweenness&nbsp;centrality.<br>
+&nbsp;<br>
+Semantic&nbsp;hubs&nbsp;are&nbsp;convergence&nbsp;zones&nbsp;(Damasio,&nbsp;1989)&nbsp;—&nbsp;concepts<br>
+that&nbsp;sit&nbsp;at&nbsp;the&nbsp;intersection&nbsp;of&nbsp;many&nbsp;pathways.&nbsp;They&nbsp;integrate<br>
+information&nbsp;from&nbsp;diverse&nbsp;sources&nbsp;and&nbsp;are&nbsp;critical&nbsp;for<br>
+semantic&nbsp;memory&nbsp;retrieval.<br>
+&nbsp;<br>
+NOT&nbsp;WIRED:&nbsp;this&nbsp;has&nbsp;no&nbsp;callers,&nbsp;so&nbsp;`Concept.is_semantic_hub`<br>
+is&nbsp;never&nbsp;set&nbsp;and&nbsp;the&nbsp;dynamics&nbsp;multipliers&nbsp;that&nbsp;read&nbsp;it&nbsp;do&nbsp;not<br>
+apply.&nbsp;Kept&nbsp;for&nbsp;the&nbsp;day&nbsp;the&nbsp;hub&nbsp;machinery&nbsp;is&nbsp;connected&nbsp;up.<br>
+&nbsp;<br>
+This&nbsp;method&nbsp;computes&nbsp;betweenness&nbsp;centrality&nbsp;for&nbsp;all&nbsp;concepts<br>
+(using&nbsp;a&nbsp;sampled&nbsp;approximation&nbsp;for&nbsp;large&nbsp;networks)&nbsp;and&nbsp;marks<br>
+the&nbsp;top&nbsp;5%&nbsp;as&nbsp;semantic&nbsp;hubs.&nbsp;Hub&nbsp;concepts&nbsp;get:<br>
+-&nbsp;1.3x&nbsp;spread&nbsp;multiplier&nbsp;in&nbsp;spreading&nbsp;activation<br>
+-&nbsp;0.7x&nbsp;decay&nbsp;rate&nbsp;(slower&nbsp;activation&nbsp;decay)<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;top_percent:&nbsp;Fraction&nbsp;of&nbsp;concepts&nbsp;to&nbsp;designate&nbsp;as&nbsp;hubs<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(default&nbsp;0.05&nbsp;=&nbsp;top&nbsp;5%).<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;list&nbsp;of&nbsp;concept&nbsp;IDs&nbsp;that&nbsp;were&nbsp;marked&nbsp;as&nbsp;semantic&nbsp;hubs.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-find_alertness_words"><strong>find_alertness_words</strong></a>(self, state: 'str') -&gt; 'list[str]'</dt><dd><span class="code">Find&nbsp;words&nbsp;associated&nbsp;with&nbsp;an&nbsp;alertness&nbsp;state.<br>
+&nbsp;<br>
+Traverses&nbsp;EXPRESSES&nbsp;edges&nbsp;from&nbsp;the&nbsp;``_cat:alertness:&lt;state&gt;``<br>
+hub&nbsp;concept.&nbsp;Falls&nbsp;back&nbsp;to&nbsp;property&nbsp;scan&nbsp;for&nbsp;backward<br>
+compatibility.&nbsp;If&nbsp;Genesis&nbsp;has&nbsp;not&nbsp;learned&nbsp;any&nbsp;words&nbsp;for&nbsp;this<br>
+alertness&nbsp;state,&nbsp;returns&nbsp;an&nbsp;empty&nbsp;list&nbsp;—&nbsp;it&nbsp;cannot&nbsp;describe<br>
+that&nbsp;state&nbsp;in&nbsp;words&nbsp;yet.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-find_cause_words"><strong>find_cause_words</strong></a>(self, cause_category: 'str') -&gt; 'list[str]'</dt><dd><span class="code">Find&nbsp;words&nbsp;associated&nbsp;with&nbsp;a&nbsp;cause&nbsp;category.<br>
+&nbsp;<br>
+Traverses&nbsp;EXPRESSES&nbsp;edges&nbsp;from&nbsp;the&nbsp;``_cat:cause:&lt;category&gt;``<br>
+hub&nbsp;concept.&nbsp;Falls&nbsp;back&nbsp;to&nbsp;property&nbsp;scan&nbsp;for&nbsp;backward<br>
+compatibility.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-find_cognitive_mode_words"><strong>find_cognitive_mode_words</strong></a>(self, mode: 'str') -&gt; 'list[str]'</dt><dd><span class="code">Find&nbsp;words&nbsp;associated&nbsp;with&nbsp;a&nbsp;cognitive&nbsp;mode.<br>
+&nbsp;<br>
+Traverses&nbsp;EXPRESSES&nbsp;edges&nbsp;from&nbsp;the&nbsp;``_cat:mode:&lt;mode&gt;``&nbsp;hub<br>
+concept.&nbsp;Falls&nbsp;back&nbsp;to&nbsp;property&nbsp;scan&nbsp;for&nbsp;backward&nbsp;compatibility.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-find_concepts_by_origin"><strong>find_concepts_by_origin</strong></a>(self, origin: 'str', limit: 'int' = 100) -&gt; 'list[str]'</dt><dd><span class="code">Find&nbsp;all&nbsp;concept&nbsp;IDs&nbsp;with&nbsp;a&nbsp;given&nbsp;origin.<br>
+&nbsp;<br>
+Used&nbsp;for&nbsp;context-aware&nbsp;resolution:&nbsp;when&nbsp;the&nbsp;conversation&nbsp;is<br>
+about&nbsp;code,&nbsp;we&nbsp;want&nbsp;to&nbsp;find&nbsp;code-origin&nbsp;concepts,&nbsp;not&nbsp;dictionary<br>
+concepts&nbsp;that&nbsp;happen&nbsp;to&nbsp;share&nbsp;a&nbsp;word.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-find_concepts_by_property"><strong>find_concepts_by_property</strong></a>(self, key: 'str', value: 'str', limit: 'int' = 100) -&gt; 'list[Concept]'</dt><dd><span class="code">Find&nbsp;all&nbsp;concepts&nbsp;that&nbsp;have&nbsp;a&nbsp;specific&nbsp;property&nbsp;key=value&nbsp;pair.<br>
+&nbsp;<br>
+Used&nbsp;for&nbsp;structural&nbsp;lookups&nbsp;like&nbsp;emotion-word&nbsp;associations:<br>
+concepts&nbsp;with&nbsp;``properties["emotion_category"]&nbsp;=&nbsp;"stressed"``<br>
+are&nbsp;words&nbsp;Genesis&nbsp;has&nbsp;learned&nbsp;to&nbsp;associate&nbsp;with&nbsp;that&nbsp;emotional<br>
+category.&nbsp;Returns&nbsp;concepts&nbsp;sorted&nbsp;by&nbsp;activation&nbsp;(highest&nbsp;first),<br>
+so&nbsp;the&nbsp;most&nbsp;recently&nbsp;used&nbsp;words&nbsp;come&nbsp;first.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-find_emotion_words"><strong>find_emotion_words</strong></a>(self, category: 'str') -&gt; 'list[str]'</dt><dd><span class="code">Find&nbsp;words&nbsp;associated&nbsp;with&nbsp;an&nbsp;emotion&nbsp;category.<br>
+&nbsp;<br>
+Traverses&nbsp;EXPRESSES&nbsp;edges&nbsp;from&nbsp;the&nbsp;``_cat:emotion:&lt;category&gt;``<br>
+hub&nbsp;concept.&nbsp;Falls&nbsp;back&nbsp;to&nbsp;property&nbsp;scan&nbsp;for&nbsp;backward<br>
+compatibility.&nbsp;If&nbsp;Genesis&nbsp;has&nbsp;not&nbsp;learned&nbsp;any&nbsp;words&nbsp;for&nbsp;this<br>
+category,&nbsp;returns&nbsp;an&nbsp;empty&nbsp;list&nbsp;—&nbsp;it&nbsp;cannot&nbsp;describe&nbsp;that<br>
+emotion&nbsp;in&nbsp;words&nbsp;yet.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-find_path"><strong>find_path</strong></a>(self, source: 'str', target: 'str', max_depth: 'int' = 5) -&gt; 'list[Edge] | None'</dt><dd><span class="code">Find&nbsp;a&nbsp;path&nbsp;between&nbsp;two&nbsp;concepts&nbsp;using&nbsp;BFS.<br>
+&nbsp;<br>
+Returns&nbsp;the&nbsp;list&nbsp;of&nbsp;edges&nbsp;forming&nbsp;the&nbsp;path,&nbsp;or&nbsp;None&nbsp;if&nbsp;no<br>
+path&nbsp;exists&nbsp;within&nbsp;max_depth.<br>
+&nbsp;<br>
+The&nbsp;search&nbsp;is&nbsp;**undirected**:&nbsp;it&nbsp;follows&nbsp;both&nbsp;outgoing&nbsp;and<br>
+incoming&nbsp;edges.&nbsp;Semantic&nbsp;relations&nbsp;like&nbsp;``is_a``,&nbsp;``related_to``,<br>
+``part_of``&nbsp;and&nbsp;``similar_to``&nbsp;are&nbsp;effectively&nbsp;bidirectional&nbsp;in<br>
+meaning,&nbsp;and&nbsp;a&nbsp;query&nbsp;like&nbsp;"how&nbsp;are&nbsp;A&nbsp;and&nbsp;B&nbsp;related?"&nbsp;should&nbsp;not<br>
+fail&nbsp;just&nbsp;because&nbsp;the&nbsp;stored&nbsp;edge&nbsp;points&nbsp;the&nbsp;other&nbsp;way&nbsp;(e.g.<br>
+``alice&nbsp;creates&nbsp;genesis``&nbsp;should&nbsp;explain&nbsp;``genesis``&nbsp;↔&nbsp;``alice``,<br>
+not&nbsp;require&nbsp;a&nbsp;separate&nbsp;``genesis``&nbsp;→&nbsp;``alice``&nbsp;edge).<br>
+&nbsp;<br>
+Returned&nbsp;edges&nbsp;are&nbsp;**oriented&nbsp;along&nbsp;the&nbsp;traversal&nbsp;direction**:<br>
+``path[0].source``&nbsp;is&nbsp;always&nbsp;the&nbsp;resolved&nbsp;source&nbsp;concept&nbsp;and<br>
+``path[-1].target``&nbsp;is&nbsp;always&nbsp;the&nbsp;resolved&nbsp;target.&nbsp;When&nbsp;an&nbsp;edge<br>
+is&nbsp;traversed&nbsp;backward&nbsp;(against&nbsp;its&nbsp;stored&nbsp;direction),&nbsp;a&nbsp;copy<br>
+with&nbsp;source/target&nbsp;swapped&nbsp;is&nbsp;returned.&nbsp;The&nbsp;``relation``&nbsp;field<br>
+is&nbsp;preserved&nbsp;as-stored&nbsp;—&nbsp;most&nbsp;path&nbsp;relations&nbsp;(``related_to``,<br>
+``is_a``,&nbsp;``similar_to``)&nbsp;are&nbsp;symmetric,&nbsp;and&nbsp;for&nbsp;asymmetric&nbsp;ones<br>
+the&nbsp;caller&nbsp;can&nbsp;compare&nbsp;``edge.source``/``edge.target``&nbsp;to&nbsp;the<br>
+stored&nbsp;edge&nbsp;if&nbsp;needed.<br>
+&nbsp;<br>
+Implementation&nbsp;uses&nbsp;predecessor&nbsp;tracking&nbsp;(no&nbsp;per-step&nbsp;path<br>
+copying),&nbsp;so&nbsp;it&nbsp;is&nbsp;O(V+E)&nbsp;in&nbsp;the&nbsp;reachable&nbsp;subgraph&nbsp;instead&nbsp;of<br>
+O(b^d&nbsp;·&nbsp;d)&nbsp;for&nbsp;the&nbsp;previous&nbsp;copy-on-expand&nbsp;BFS.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-find_plasticity_words"><strong>find_plasticity_words</strong></a>(self, state: 'str') -&gt; 'list[str]'</dt><dd><span class="code">Find&nbsp;words&nbsp;associated&nbsp;with&nbsp;a&nbsp;plasticity&nbsp;state.<br>
+&nbsp;<br>
+Traverses&nbsp;EXPRESSES&nbsp;edges&nbsp;from&nbsp;the&nbsp;``_cat:plasticity:&lt;state&gt;``<br>
+hub&nbsp;concept.&nbsp;Falls&nbsp;back&nbsp;to&nbsp;property&nbsp;scan&nbsp;for&nbsp;backward<br>
+compatibility.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-find_relation_phrases"><strong>find_relation_phrases</strong></a>(self, relation: 'RelationType') -&gt; 'list[str]'</dt><dd><span class="code">Find&nbsp;phrasing&nbsp;templates&nbsp;for&nbsp;a&nbsp;relation&nbsp;type.<br>
+&nbsp;<br>
+Traverses&nbsp;EXPRESSES&nbsp;edges&nbsp;from&nbsp;the<br>
+``_cat:relation_phrase:&lt;relation&gt;``&nbsp;hub.&nbsp;Returns&nbsp;phrasing<br>
+templates&nbsp;with&nbsp;``{target}``&nbsp;placeholders,&nbsp;converted&nbsp;back&nbsp;to<br>
+display&nbsp;form.&nbsp;Returns&nbsp;an&nbsp;empty&nbsp;list&nbsp;if&nbsp;no&nbsp;phrases&nbsp;are&nbsp;found.<br>
+Uses&nbsp;the&nbsp;``template``&nbsp;property&nbsp;when&nbsp;available&nbsp;(seeded&nbsp;phrases<br>
+store&nbsp;their&nbsp;verbatim&nbsp;template&nbsp;there).</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-find_relation_phrases_with_provenance"><strong>find_relation_phrases_with_provenance</strong></a>(self, relation: 'RelationType') -&gt; 'list[Provenance]'</dt><dd><span class="code">Find&nbsp;relation&nbsp;phrase&nbsp;templates,&nbsp;with&nbsp;seed/learned&nbsp;provenance.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-find_relation_verbs"><strong>find_relation_verbs</strong></a>(self, relation: 'RelationType') -&gt; 'list[str]'</dt><dd><span class="code">Find&nbsp;verb&nbsp;phrases&nbsp;for&nbsp;a&nbsp;relation&nbsp;type.<br>
+&nbsp;<br>
+Traverses&nbsp;EXPRESSES&nbsp;edges&nbsp;from&nbsp;the<br>
+``_cat:relation_verb:&lt;relation&gt;``&nbsp;hub.&nbsp;Returns&nbsp;verb&nbsp;phrases<br>
+converted&nbsp;back&nbsp;to&nbsp;display&nbsp;form,&nbsp;using&nbsp;the&nbsp;``template``&nbsp;property<br>
+when&nbsp;available&nbsp;(seeded&nbsp;verbs&nbsp;store&nbsp;their&nbsp;display&nbsp;form&nbsp;there).</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-find_relation_verbs_with_provenance"><strong>find_relation_verbs_with_provenance</strong></a>(self, relation: 'RelationType') -&gt; 'list[Provenance]'</dt><dd><span class="code">Find&nbsp;relation&nbsp;verb&nbsp;phrases,&nbsp;with&nbsp;seed/learned&nbsp;provenance.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-find_situation_verbs"><strong>find_situation_verbs</strong></a>(self, kind: 'str') -&gt; 'list[str]'</dt><dd><span class="code">Find&nbsp;phrasing&nbsp;templates&nbsp;for&nbsp;a&nbsp;situation-model&nbsp;answer&nbsp;kind.<br>
+&nbsp;<br>
+Traverses&nbsp;EXPRESSES&nbsp;edges&nbsp;from&nbsp;the&nbsp;``_cat:situation_verb:&lt;kind&gt;``<br>
+hub&nbsp;and&nbsp;returns&nbsp;the&nbsp;stored&nbsp;templates&nbsp;verbatim.&nbsp;Empty&nbsp;when&nbsp;the<br>
+hub&nbsp;has&nbsp;not&nbsp;been&nbsp;seeded.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-find_utterance_words_with_provenance"><strong>find_utterance_words_with_provenance</strong></a>(self, slot_name: 'str') -&gt; 'list[Provenance]'</dt><dd><span class="code">Find&nbsp;utterance&nbsp;words&nbsp;for&nbsp;a&nbsp;slot,&nbsp;with&nbsp;seed/learned&nbsp;provenance.<br>
+&nbsp;<br>
+Like&nbsp;``_utterance_words``&nbsp;but&nbsp;returns&nbsp;``Provenance``&nbsp;items.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-find_valence_words"><strong>find_valence_words</strong></a>(self, state: 'str') -&gt; 'list[str]'</dt><dd><span class="code">Find&nbsp;words&nbsp;associated&nbsp;with&nbsp;a&nbsp;valence&nbsp;state.<br>
+&nbsp;<br>
+Traverses&nbsp;EXPRESSES&nbsp;edges&nbsp;from&nbsp;the&nbsp;``_cat:valence:&lt;state&gt;``<br>
+hub&nbsp;concept.&nbsp;Falls&nbsp;back&nbsp;to&nbsp;property&nbsp;scan&nbsp;for&nbsp;backward<br>
+compatibility.&nbsp;If&nbsp;Genesis&nbsp;has&nbsp;not&nbsp;learned&nbsp;any&nbsp;words&nbsp;for&nbsp;this<br>
+valence&nbsp;state,&nbsp;returns&nbsp;an&nbsp;empty&nbsp;list&nbsp;—&nbsp;it&nbsp;cannot&nbsp;describe<br>
+that&nbsp;state&nbsp;in&nbsp;words&nbsp;yet.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-get_associations"><strong>get_associations</strong></a>(self, concept: 'str', relation: 'RelationType | None' = None, k_virtual: 'int' = 8) -&gt; 'list[Neighbor]'</dt><dd><span class="code">Return&nbsp;provenance-tagged&nbsp;associations&nbsp;for&nbsp;a&nbsp;concept.<br>
+&nbsp;<br>
+Unlike&nbsp;:meth:`get_neighbors`&nbsp;—&nbsp;which&nbsp;returns&nbsp;untyped&nbsp;tuples<br>
+mixing&nbsp;exact&nbsp;edges&nbsp;and&nbsp;holographic&nbsp;similarity&nbsp;scores&nbsp;—&nbsp;this<br>
+returns&nbsp;:class:`Neighbor`&nbsp;records&nbsp;carrying&nbsp;the&nbsp;tier&nbsp;each<br>
+association&nbsp;came&nbsp;from:<br>
+&nbsp;<br>
+-&nbsp;``exact``&nbsp;—&nbsp;canonical&nbsp;logged&nbsp;edges&nbsp;(earned&nbsp;facts)<br>
+-&nbsp;``holographic``&nbsp;—&nbsp;cold-tier&nbsp;compressed&nbsp;typed&nbsp;associations<br>
+&nbsp;&nbsp;(lossy;&nbsp;score&nbsp;is&nbsp;a&nbsp;similarity,&nbsp;not&nbsp;an&nbsp;edge&nbsp;weight)<br>
+-&nbsp;``embedding``&nbsp;—&nbsp;virtual&nbsp;neighbors&nbsp;computed&nbsp;live&nbsp;from&nbsp;the<br>
+&nbsp;&nbsp;similarity&nbsp;field&nbsp;(relation&nbsp;``None``;&nbsp;never&nbsp;persisted)<br>
+&nbsp;<br>
+Callers&nbsp;that&nbsp;reason&nbsp;about&nbsp;knowledge&nbsp;should&nbsp;price&nbsp;by<br>
+provenance&nbsp;instead&nbsp;of&nbsp;consuming&nbsp;a&nbsp;blended&nbsp;weight&nbsp;blind.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-get_by_category"><strong>get_by_category</strong></a>(self, category: 'ConceptCategory') -&gt; 'list[Concept]'</dt><dd><span class="code">Get&nbsp;all&nbsp;concepts&nbsp;in&nbsp;a&nbsp;given&nbsp;category.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;category:&nbsp;The&nbsp;ConceptCategory&nbsp;to&nbsp;filter&nbsp;by.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;list&nbsp;of&nbsp;Concept&nbsp;objects&nbsp;in&nbsp;that&nbsp;category.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-get_by_modality"><strong>get_by_modality</strong></a>(self, modality: 'ConceptModality') -&gt; 'list[Concept]'</dt><dd><span class="code">Get&nbsp;all&nbsp;concepts&nbsp;in&nbsp;a&nbsp;given&nbsp;modality.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;modality:&nbsp;The&nbsp;ConceptModality&nbsp;to&nbsp;filter&nbsp;by.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;list&nbsp;of&nbsp;Concept&nbsp;objects&nbsp;in&nbsp;that&nbsp;modality.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-get_column"><strong>get_column</strong></a>(self, concept_id: 'str') -&gt; 'str'</dt><dd><span class="code">Get&nbsp;the&nbsp;primary&nbsp;cortical&nbsp;column&nbsp;a&nbsp;concept&nbsp;belongs&nbsp;to.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-get_column_activation"><strong>get_column_activation</strong></a>(self, column: 'str') -&gt; 'float'</dt><dd><span class="code">Get&nbsp;the&nbsp;mean&nbsp;activation&nbsp;level&nbsp;of&nbsp;a&nbsp;column.<br>
+&nbsp;<br>
+Uses&nbsp;MEAN&nbsp;activation,&nbsp;not&nbsp;sum.&nbsp;This&nbsp;is&nbsp;critical:&nbsp;a&nbsp;column&nbsp;with<br>
+122K&nbsp;concepts&nbsp;at&nbsp;activation&nbsp;0.01&nbsp;(mean=0.01)&nbsp;should&nbsp;NOT&nbsp;dominate<br>
+a&nbsp;column&nbsp;with&nbsp;10&nbsp;concepts&nbsp;at&nbsp;activation&nbsp;0.5&nbsp;(mean=0.5).&nbsp;Sum-based<br>
+activation&nbsp;would&nbsp;make&nbsp;larger&nbsp;columns&nbsp;always&nbsp;win,&nbsp;which&nbsp;is<br>
+biologically&nbsp;wrong&nbsp;—&nbsp;cortical&nbsp;columns&nbsp;compete&nbsp;on&nbsp;population<br>
+firing&nbsp;rate&nbsp;(mean),&nbsp;not&nbsp;total&nbsp;activity&nbsp;(sum).<br>
+&nbsp;<br>
+Additionally,&nbsp;each&nbsp;concept's&nbsp;contribution&nbsp;is&nbsp;weighted&nbsp;by&nbsp;its<br>
+laminar&nbsp;role:&nbsp;output-projecting&nbsp;concepts&nbsp;(L5-like)&nbsp;count&nbsp;more,<br>
+input-receiving&nbsp;concepts&nbsp;(L4-like)&nbsp;count&nbsp;less.<br>
+&nbsp;<br>
+Uses&nbsp;the&nbsp;``_column_index``&nbsp;for&nbsp;O(members)&nbsp;lookup&nbsp;instead&nbsp;of<br>
+scanning&nbsp;the&nbsp;entire&nbsp;concept&nbsp;network.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-get_column_concepts"><strong>get_column_concepts</strong></a>(self, column: 'str') -&gt; 'list[str]'</dt><dd><span class="code">Get&nbsp;all&nbsp;concept&nbsp;IDs&nbsp;in&nbsp;a&nbsp;given&nbsp;column.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-get_column_layers"><strong>get_column_layers</strong></a>(self, column: 'str') -&gt; 'dict[str, int]'</dt><dd><span class="code">Get&nbsp;the&nbsp;layer&nbsp;distribution&nbsp;for&nbsp;a&nbsp;given&nbsp;column.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-get_columns"><strong>get_columns</strong></a>(self) -&gt; 'dict[str, int]'</dt><dd><span class="code">Get&nbsp;all&nbsp;columns&nbsp;and&nbsp;their&nbsp;sizes.<br>
+&nbsp;<br>
+Uses&nbsp;the&nbsp;``_column_index``&nbsp;for&nbsp;O(columns)&nbsp;lookup&nbsp;instead&nbsp;of<br>
+scanning&nbsp;the&nbsp;entire&nbsp;concept&nbsp;network.&nbsp;Both&nbsp;levels&nbsp;are<br>
+snapshotted:&nbsp;a&nbsp;concurrent&nbsp;``add_concept``&nbsp;can&nbsp;add&nbsp;a&nbsp;column&nbsp;key<br>
+and&nbsp;grow&nbsp;a&nbsp;membership&nbsp;set&nbsp;while&nbsp;this&nbsp;walks&nbsp;them.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-get_columns_for"><strong>get_columns_for</strong></a>(self, concept_id: 'str') -&gt; 'set[str]'</dt><dd><span class="code">Get&nbsp;all&nbsp;columns&nbsp;a&nbsp;concept&nbsp;belongs&nbsp;to&nbsp;(multi-column&nbsp;membership).</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-get_concept"><strong>get_concept</strong></a>(self, name: 'str') -&gt; 'Concept | None'</dt><dd><span class="code">Get&nbsp;a&nbsp;concept&nbsp;by&nbsp;name&nbsp;or&nbsp;alias.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-get_edges"><strong>get_edges</strong></a>(self, concept: 'str', direction: 'str' = 'out') -&gt; 'list[Edge]'</dt><dd><span class="code">Get&nbsp;edges&nbsp;connected&nbsp;to&nbsp;a&nbsp;concept.<br>
+&nbsp;<br>
+direction:&nbsp;"out"&nbsp;(from&nbsp;this&nbsp;concept),&nbsp;"in"&nbsp;(to&nbsp;this&nbsp;concept),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;or&nbsp;"both".</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-get_exact_neighbors"><strong>get_exact_neighbors</strong></a>(self, concept: 'str', relation: 'RelationType | None' = None) -&gt; 'list[tuple[str, RelationType, float]]'</dt><dd><span class="code">Canonical-edge&nbsp;neighbors&nbsp;only&nbsp;—&nbsp;no&nbsp;holographic,&nbsp;no&nbsp;embedding.<br>
+&nbsp;<br>
+For&nbsp;sites&nbsp;that&nbsp;*assert*&nbsp;or&nbsp;*write*&nbsp;knowledge&nbsp;(verbalized&nbsp;facts,<br>
+self-descriptions,&nbsp;bound&nbsp;relational&nbsp;systems,&nbsp;gap&nbsp;detection):<br>
+fuzzy&nbsp;associations&nbsp;are&nbsp;legitimate&nbsp;for&nbsp;*selection*&nbsp;—&nbsp;deciding<br>
+what&nbsp;to&nbsp;think&nbsp;about&nbsp;—&nbsp;but&nbsp;never&nbsp;for&nbsp;*assertion*&nbsp;—&nbsp;deciding<br>
+what&nbsp;is&nbsp;claimed&nbsp;true.&nbsp;Cheap:&nbsp;reads&nbsp;the&nbsp;explicit&nbsp;edge&nbsp;index,<br>
+never&nbsp;touches&nbsp;the&nbsp;FFT&nbsp;path.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-get_layer"><strong>get_layer</strong></a>(self, concept_id: 'str') -&gt; 'CorticalLayer'</dt><dd><span class="code">Infer&nbsp;the&nbsp;cortical&nbsp;layer&nbsp;of&nbsp;a&nbsp;concept&nbsp;from&nbsp;its&nbsp;graph&nbsp;topology.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;a&nbsp;data-driven&nbsp;assignment,&nbsp;not&nbsp;a&nbsp;hard-coded&nbsp;list.&nbsp;The<br>
+relative&nbsp;in-degree&nbsp;and&nbsp;out-degree&nbsp;of&nbsp;a&nbsp;concept&nbsp;in&nbsp;the&nbsp;network<br>
+decide&nbsp;whether&nbsp;it&nbsp;functions&nbsp;as&nbsp;input&nbsp;(L4),&nbsp;association&nbsp;(L2_3),<br>
+output&nbsp;(L5),&nbsp;or&nbsp;context&nbsp;(L6)&nbsp;within&nbsp;its&nbsp;column.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-get_layer_distribution"><strong>get_layer_distribution</strong></a>(self) -&gt; 'dict[str, int]'</dt><dd><span class="code">Get&nbsp;the&nbsp;global&nbsp;layer&nbsp;distribution&nbsp;across&nbsp;all&nbsp;columns.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-get_neighbors"><strong>get_neighbors</strong></a>(self, concept: 'str', relation: 'RelationType | None' = None) -&gt; 'list[tuple[str, RelationType, float]]'</dt><dd><span class="code">Deprecated:&nbsp;use&nbsp;:meth:`get_associations`&nbsp;and&nbsp;price&nbsp;by&nbsp;provenance.<br>
+&nbsp;<br>
+Returns&nbsp;list&nbsp;of&nbsp;(neighbor_id,&nbsp;relation,&nbsp;weight)&nbsp;tuples&nbsp;blending<br>
+canonical&nbsp;edges&nbsp;with&nbsp;holographic&nbsp;similarity&nbsp;scores&nbsp;*without*<br>
+saying&nbsp;which&nbsp;is&nbsp;which&nbsp;—&nbsp;the&nbsp;ambiguity&nbsp;that&nbsp;once&nbsp;let&nbsp;fuzzy<br>
+recall&nbsp;be&nbsp;asserted&nbsp;as&nbsp;earned&nbsp;fact.&nbsp;Retained&nbsp;only&nbsp;for&nbsp;call<br>
+sites&nbsp;that&nbsp;want&nbsp;undifferentiated&nbsp;adjacency&nbsp;(topic&nbsp;selection,<br>
+world-adjacency&nbsp;checks);&nbsp;anything&nbsp;that&nbsp;reasons&nbsp;about&nbsp;knowledge<br>
+must&nbsp;use&nbsp;``get_associations``.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-has_concept"><strong>has_concept</strong></a>(self, cid: 'str') -&gt; 'bool'</dt><dd><span class="code">Check&nbsp;if&nbsp;a&nbsp;concept&nbsp;ID&nbsp;exists&nbsp;in&nbsp;the&nbsp;network.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;public&nbsp;accessor&nbsp;for&nbsp;``cid&nbsp;in&nbsp;network._concepts``.<br>
+Unlike&nbsp;``get_concept``,&nbsp;it&nbsp;takes&nbsp;an&nbsp;exact&nbsp;concept&nbsp;ID&nbsp;(not&nbsp;a<br>
+name&nbsp;or&nbsp;alias)&nbsp;and&nbsp;does&nbsp;not&nbsp;resolve.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-has_learned_utterances"><strong>has_learned_utterances</strong></a>(self, slot_name: 'str') -&gt; 'bool'</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;any&nbsp;non-seed&nbsp;utterance&nbsp;words&nbsp;exist&nbsp;for&nbsp;this&nbsp;slot.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-has_neighbors"><strong>has_neighbors</strong></a>(self, concept: 'str') -&gt; 'bool'</dt><dd><span class="code">Check&nbsp;if&nbsp;a&nbsp;concept&nbsp;has&nbsp;any&nbsp;explicit&nbsp;edges&nbsp;(no&nbsp;holographic&nbsp;query).<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;a&nbsp;fast&nbsp;existence&nbsp;check&nbsp;that&nbsp;only&nbsp;examines&nbsp;the&nbsp;explicit<br>
+edge&nbsp;index&nbsp;—&nbsp;it&nbsp;does&nbsp;NOT&nbsp;query&nbsp;the&nbsp;holographic&nbsp;graph.&nbsp;Use&nbsp;this<br>
+instead&nbsp;of&nbsp;``bool(<a href="#ConceptNetwork-get_neighbors">get_neighbors</a>(c))``&nbsp;when&nbsp;you&nbsp;only&nbsp;need&nbsp;to&nbsp;know<br>
+*if*&nbsp;relationships&nbsp;exist,&nbsp;not&nbsp;what&nbsp;they&nbsp;are.&nbsp;The&nbsp;holographic<br>
+query&nbsp;is&nbsp;expensive&nbsp;(FFT&nbsp;+&nbsp;dot&nbsp;products&nbsp;against&nbsp;~3000&nbsp;concepts)<br>
+and&nbsp;should&nbsp;not&nbsp;be&nbsp;triggered&nbsp;for&nbsp;simple&nbsp;existence&nbsp;checks.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-iter_concept_names"><strong>iter_concept_names</strong></a>(self) -&gt; 'list[str]'</dt><dd><span class="code">Return&nbsp;the&nbsp;names&nbsp;of&nbsp;all&nbsp;concepts&nbsp;currently&nbsp;in&nbsp;working&nbsp;memory.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;public&nbsp;accessor&nbsp;for&nbsp;the&nbsp;concept&nbsp;name&nbsp;set&nbsp;—&nbsp;use<br>
+this&nbsp;instead&nbsp;of&nbsp;accessing&nbsp;``_concepts``&nbsp;directly&nbsp;from&nbsp;outside<br>
+the&nbsp;class.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-iter_concepts"><strong>iter_concepts</strong></a>(self) -&gt; 'list[tuple[str, Concept]]'</dt><dd><span class="code">Return&nbsp;``(name,&nbsp;concept)``&nbsp;pairs&nbsp;for&nbsp;all&nbsp;in-memory&nbsp;concepts.<br>
+&nbsp;<br>
+A&nbsp;snapshot&nbsp;copy&nbsp;—&nbsp;safe&nbsp;to&nbsp;iterate&nbsp;even&nbsp;if&nbsp;the&nbsp;autonomous&nbsp;learner<br>
+adds&nbsp;concepts&nbsp;concurrently.&nbsp;Use&nbsp;this&nbsp;instead&nbsp;of&nbsp;accessing<br>
+``_concepts``&nbsp;directly&nbsp;from&nbsp;outside&nbsp;the&nbsp;class.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-remove_concept"><strong>remove_concept</strong></a>(self, name: 'str') -&gt; 'bool'</dt><dd><span class="code">Remove&nbsp;a&nbsp;concept&nbsp;and&nbsp;all&nbsp;its&nbsp;edges.<br>
+&nbsp;<br>
+Returns&nbsp;True&nbsp;if&nbsp;the&nbsp;concept&nbsp;was&nbsp;found&nbsp;and&nbsp;removed.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-remove_concepts_batch"><strong>remove_concepts_batch</strong></a>(self, cids: 'set[str]', *, preserve_archived_edges: 'bool' = False) -&gt; 'int'</dt><dd><span class="code">Remove&nbsp;multiple&nbsp;concepts&nbsp;and&nbsp;their&nbsp;edges&nbsp;in&nbsp;a&nbsp;single&nbsp;pass.<br>
+&nbsp;<br>
+Unlike&nbsp;calling&nbsp;remove_concept&nbsp;in&nbsp;a&nbsp;loop&nbsp;(which&nbsp;rebuilds&nbsp;all<br>
+edge&nbsp;indices&nbsp;on&nbsp;every&nbsp;call&nbsp;—&nbsp;O(N×E)),&nbsp;this&nbsp;filters&nbsp;edges&nbsp;once<br>
+and&nbsp;rebuilds&nbsp;indices&nbsp;once&nbsp;—&nbsp;O(E&nbsp;+&nbsp;N).<br>
+&nbsp;<br>
+Returns&nbsp;the&nbsp;number&nbsp;of&nbsp;concepts&nbsp;actually&nbsp;removed.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-remove_edge"><strong>remove_edge</strong></a>(self, source: 'str', target: 'str', relation: 'RelationType') -&gt; 'bool'</dt><dd><span class="code">Remove&nbsp;a&nbsp;specific&nbsp;edge&nbsp;from&nbsp;the&nbsp;network.<br>
+&nbsp;<br>
+Returns&nbsp;True&nbsp;if&nbsp;the&nbsp;edge&nbsp;was&nbsp;found&nbsp;and&nbsp;removed.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-replace_contents"><strong>replace_contents</strong></a>(self, other: 'ConceptNetwork') -&gt; 'None'</dt><dd><span class="code">Adopt&nbsp;another&nbsp;network's&nbsp;content&nbsp;while&nbsp;keeping&nbsp;this&nbsp;object's&nbsp;identity.<br>
+&nbsp;<br>
+State&nbsp;restore&nbsp;builds&nbsp;the&nbsp;restored&nbsp;network&nbsp;in&nbsp;a&nbsp;scratch&nbsp;object<br>
+(so&nbsp;a&nbsp;corrupt&nbsp;save&nbsp;can't&nbsp;half-mutate&nbsp;the&nbsp;live&nbsp;graph),&nbsp;then&nbsp;must<br>
+move&nbsp;that&nbsp;content&nbsp;into&nbsp;the&nbsp;shared&nbsp;network&nbsp;that&nbsp;~30&nbsp;subsystems<br>
+captured&nbsp;references&nbsp;to&nbsp;at&nbsp;construction&nbsp;time&nbsp;—&nbsp;attention,<br>
+semantic&nbsp;memory,&nbsp;curiosity,&nbsp;the&nbsp;reasoning&nbsp;family,&nbsp;spatial,<br>
+priming,&nbsp;spreading&nbsp;activation,&nbsp;the&nbsp;composers&nbsp;and&nbsp;handlers,&nbsp;the<br>
+learner's&nbsp;internal&nbsp;learners,&nbsp;and&nbsp;the&nbsp;dream&nbsp;engine.&nbsp;Replacing<br>
+the&nbsp;object&nbsp;orphans&nbsp;all&nbsp;of&nbsp;them;&nbsp;transplanting&nbsp;keeps&nbsp;every<br>
+reference&nbsp;valid.<br>
+&nbsp;<br>
+Content&nbsp;fields&nbsp;(concepts,&nbsp;edges,&nbsp;indices,&nbsp;alias&nbsp;map)&nbsp;are&nbsp;taken<br>
+from&nbsp;``other``.&nbsp;Attachments&nbsp;(``_archive``,&nbsp;``_holographic_graph``)<br>
+belong&nbsp;to&nbsp;the&nbsp;wiring&nbsp;layer,&nbsp;not&nbsp;the&nbsp;data&nbsp;—&nbsp;they&nbsp;stay&nbsp;with<br>
+``self``.&nbsp;All&nbsp;derived&nbsp;caches&nbsp;are&nbsp;invalidated.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-replace_edges"><strong>replace_edges</strong></a>(self, edges: 'list[Edge]') -&gt; 'None'</dt><dd><span class="code">Replace&nbsp;the&nbsp;entire&nbsp;edge&nbsp;list&nbsp;and&nbsp;rebuild&nbsp;indices.<br>
+&nbsp;<br>
+Used&nbsp;by&nbsp;sleep&nbsp;compression&nbsp;to&nbsp;remove&nbsp;bridge&nbsp;edges&nbsp;after&nbsp;migrating<br>
+them&nbsp;to&nbsp;the&nbsp;holographic&nbsp;graph,&nbsp;and&nbsp;by&nbsp;synaptic&nbsp;homeostasis&nbsp;to<br>
+remove&nbsp;pruned&nbsp;edges.&nbsp;This&nbsp;is&nbsp;the&nbsp;public&nbsp;accessor&nbsp;for&nbsp;what&nbsp;was<br>
+previously&nbsp;direct&nbsp;assignment&nbsp;to&nbsp;``_edges``&nbsp;followed&nbsp;by<br>
+``_rebuild_edge_indices()``.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-resolve_in_context"><strong>resolve_in_context</strong></a>(self, name: 'str', context: 'str') -&gt; 'str | None'</dt><dd><span class="code">Resolve&nbsp;a&nbsp;polysemous&nbsp;name&nbsp;using&nbsp;definition&nbsp;and&nbsp;neighbor&nbsp;overlap.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-search_concepts"><strong>search_concepts</strong></a>(self, query: 'str', origins: 'set[str] | None' = None, limit: 'int' = 5, min_score: 'float' = 0.0) -&gt; 'list[str]'</dt><dd><span class="code">Search&nbsp;for&nbsp;concepts&nbsp;matching&nbsp;a&nbsp;query,&nbsp;optionally&nbsp;filtered&nbsp;by&nbsp;origin.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;context-aware&nbsp;concept&nbsp;resolution&nbsp;mechanism.&nbsp;When<br>
+the&nbsp;conversation&nbsp;is&nbsp;self-referential&nbsp;("your&nbsp;code",&nbsp;"your&nbsp;daemon"),<br>
+the&nbsp;perception&nbsp;layer&nbsp;calls&nbsp;this&nbsp;with&nbsp;origins={"code",&nbsp;"identity"}<br>
+to&nbsp;find&nbsp;self-relevant&nbsp;concepts&nbsp;instead&nbsp;of&nbsp;dictionary&nbsp;definitions.<br>
+&nbsp;<br>
+Matching&nbsp;handles:<br>
+-&nbsp;Direct&nbsp;substring&nbsp;matching&nbsp;("daemon"&nbsp;→&nbsp;"start_daemon")<br>
+-&nbsp;Multi-word&nbsp;queries&nbsp;against&nbsp;camelCase&nbsp;("cognition&nbsp;engine"&nbsp;→<br>
+&nbsp;&nbsp;"FrontalLobe")<br>
+-&nbsp;Word-level&nbsp;matching&nbsp;within&nbsp;compound&nbsp;names&nbsp;("cognition"&nbsp;→<br>
+&nbsp;&nbsp;"FrontalLobe")<br>
+&nbsp;<br>
+When&nbsp;origins&nbsp;is&nbsp;None,&nbsp;all&nbsp;concepts&nbsp;are&nbsp;searched.<br>
+&nbsp;<br>
+Uses&nbsp;a&nbsp;trigram&nbsp;inverted&nbsp;index&nbsp;for&nbsp;O(candidates)&nbsp;lookups&nbsp;instead<br>
+of&nbsp;scanning&nbsp;all&nbsp;concepts.&nbsp;The&nbsp;index&nbsp;is&nbsp;built&nbsp;lazily&nbsp;on&nbsp;first<br>
+call&nbsp;and&nbsp;invalidated&nbsp;on&nbsp;concept/alias&nbsp;mutations.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-seed_relation_phrases"><strong>seed_relation_phrases</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Seed&nbsp;relation-phrase&nbsp;templates&nbsp;into&nbsp;the&nbsp;concept&nbsp;network.<br>
+&nbsp;<br>
+For&nbsp;each&nbsp;RelationType&nbsp;in&nbsp;``_RELATION_PHRASE_SEEDS``,&nbsp;creates<br>
+a&nbsp;hub&nbsp;concept&nbsp;``_cat:relation_phrase:&lt;relation&gt;``&nbsp;and&nbsp;connects<br>
+each&nbsp;phrasing&nbsp;template&nbsp;to&nbsp;it&nbsp;via&nbsp;an&nbsp;EXPRESSES&nbsp;edge.&nbsp;The<br>
+phrasings&nbsp;contain&nbsp;``{target}``&nbsp;placeholders&nbsp;that&nbsp;are&nbsp;filled<br>
+in&nbsp;at&nbsp;runtime.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-seed_relation_verbs"><strong>seed_relation_verbs</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Seed&nbsp;relation-verb&nbsp;phrases&nbsp;into&nbsp;the&nbsp;concept&nbsp;network.<br>
+&nbsp;<br>
+For&nbsp;each&nbsp;RelationType&nbsp;in&nbsp;``_RELATION_VERB_SEEDS``,&nbsp;creates&nbsp;a<br>
+hub&nbsp;concept&nbsp;``_cat:relation_verb:&lt;relation&gt;``&nbsp;and&nbsp;connects<br>
+each&nbsp;verb&nbsp;phrase&nbsp;to&nbsp;it&nbsp;via&nbsp;an&nbsp;EXPRESSES&nbsp;edge.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-seed_situation_verbs"><strong>seed_situation_verbs</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Seed&nbsp;situation-model&nbsp;phrasings&nbsp;into&nbsp;the&nbsp;concept&nbsp;network.<br>
+&nbsp;<br>
+The&nbsp;discourse&nbsp;situation&nbsp;model&nbsp;answers&nbsp;"who&nbsp;is&nbsp;where"&nbsp;and&nbsp;"who<br>
+is&nbsp;holding&nbsp;what",&nbsp;and&nbsp;those&nbsp;answers&nbsp;need&nbsp;surface&nbsp;form.&nbsp;Each<br>
+phrasing&nbsp;here&nbsp;is&nbsp;a&nbsp;*template*&nbsp;with&nbsp;``{subject}``/``{place}``/<br>
+``{objects}``/``{who}``/``{be}``&nbsp;slots;&nbsp;the&nbsp;language&nbsp;layer&nbsp;picks<br>
+one&nbsp;from&nbsp;the&nbsp;graph&nbsp;and&nbsp;fills&nbsp;it&nbsp;with&nbsp;the&nbsp;entity&nbsp;and&nbsp;place&nbsp;the<br>
+user&nbsp;actually&nbsp;described.<br>
+&nbsp;<br>
+Seeds,&nbsp;not&nbsp;responses:&nbsp;she&nbsp;chooses&nbsp;among&nbsp;these&nbsp;and&nbsp;fills&nbsp;them<br>
+at&nbsp;composition&nbsp;time,&nbsp;and&nbsp;nothing&nbsp;here&nbsp;says&nbsp;what&nbsp;she&nbsp;says&nbsp;about<br>
+any&nbsp;particular&nbsp;situation.&nbsp;Learned&nbsp;phrasings&nbsp;join&nbsp;the&nbsp;same&nbsp;hub<br>
+through&nbsp;``EXPRESSES``,&nbsp;so&nbsp;the&nbsp;graph&nbsp;is&nbsp;where&nbsp;both&nbsp;live.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-set_edge_weight"><strong>set_edge_weight</strong></a>(self, source: 'str', target: 'str', relation: 'RelationType', weight: 'float') -&gt; 'Edge | None'</dt><dd><span class="code">Set&nbsp;an&nbsp;existing&nbsp;edge's&nbsp;weight,&nbsp;writing&nbsp;through&nbsp;to&nbsp;the&nbsp;log.<br>
+&nbsp;<br>
+Takes&nbsp;and&nbsp;returns&nbsp;concept&nbsp;IDs,&nbsp;not&nbsp;names,&nbsp;so&nbsp;callers&nbsp;that<br>
+already&nbsp;hold&nbsp;an&nbsp;`Edge`&nbsp;do&nbsp;not&nbsp;have&nbsp;to&nbsp;re-resolve.<br>
+&nbsp;<br>
+The&nbsp;edge&nbsp;log&nbsp;is&nbsp;the&nbsp;canonical&nbsp;source&nbsp;of&nbsp;truth&nbsp;for<br>
+relationships,&nbsp;so&nbsp;a&nbsp;weight&nbsp;change&nbsp;is&nbsp;only&nbsp;real&nbsp;once&nbsp;it&nbsp;reaches<br>
+it.&nbsp;Mutating&nbsp;`edge.weight`&nbsp;in&nbsp;place&nbsp;updates&nbsp;the&nbsp;in-memory&nbsp;fold<br>
+only:&nbsp;`fold()`&nbsp;keeps&nbsp;reporting&nbsp;the&nbsp;old&nbsp;weight,&nbsp;and&nbsp;the&nbsp;change<br>
+is&nbsp;lost&nbsp;outright&nbsp;if&nbsp;the&nbsp;process&nbsp;exits&nbsp;before&nbsp;the&nbsp;next&nbsp;save.<br>
+Every&nbsp;weight&nbsp;change&nbsp;goes&nbsp;through&nbsp;here&nbsp;so&nbsp;that&nbsp;invariant&nbsp;holds<br>
+in&nbsp;exactly&nbsp;one&nbsp;place.<br>
+&nbsp;<br>
+Returns&nbsp;the&nbsp;edge,&nbsp;or&nbsp;None&nbsp;if&nbsp;it&nbsp;does&nbsp;not&nbsp;exist.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-set_memory_mode"><strong>set_memory_mode</strong></a>(self, encoding: 'float' = 0.5, consolidation: 'float' = 0.5, retrieval: 'float' = 0.5) -&gt; 'None'</dt><dd><span class="code">Set&nbsp;the&nbsp;neuromodulatory&nbsp;mode&nbsp;of&nbsp;the&nbsp;whole&nbsp;network.<br>
+&nbsp;<br>
+The&nbsp;body's&nbsp;memory&nbsp;weights&nbsp;are&nbsp;in&nbsp;[0,1]&nbsp;with&nbsp;0.5&nbsp;the&nbsp;neutral<br>
+drive&nbsp;(derived&nbsp;in&nbsp;Rust&nbsp;from&nbsp;dopamine&nbsp;+&nbsp;norepinephrine&nbsp;+<br>
+acetylcholine&nbsp;for&nbsp;encoding,&nbsp;ACh&nbsp;+&nbsp;serotonin&nbsp;−&nbsp;cortisol&nbsp;for<br>
+retrieval,&nbsp;cortisol&nbsp;+&nbsp;ACh&nbsp;for&nbsp;consolidation&nbsp;—&nbsp;Hasselmo's<br>
+ACh&nbsp;encode/retrieve&nbsp;switch&nbsp;is&nbsp;embedded&nbsp;in&nbsp;those&nbsp;drives).&nbsp;The<br>
+gate&nbsp;is&nbsp;the&nbsp;weight&nbsp;relative&nbsp;to&nbsp;baseline:&nbsp;g&nbsp;=&nbsp;w/0.5,&nbsp;so&nbsp;0.5&nbsp;→<br>
+1.0&nbsp;(open),&nbsp;1.0&nbsp;→&nbsp;2.0&nbsp;(amplified),&nbsp;0&nbsp;→&nbsp;0&nbsp;(suppressed).<br>
+&nbsp;<br>
+High&nbsp;encoding&nbsp;gain&nbsp;writes&nbsp;fast;&nbsp;high&nbsp;retrieval&nbsp;gain&nbsp;releases<br>
+the&nbsp;recurrent&nbsp;spread;&nbsp;suppression&nbsp;of&nbsp;either&nbsp;is&nbsp;interference<br>
+control,&nbsp;not&nbsp;malfunction.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-sync_edge_log"><strong>sync_edge_log</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Snapshot&nbsp;the&nbsp;current&nbsp;canonical&nbsp;edges&nbsp;into&nbsp;the&nbsp;log&nbsp;(save&nbsp;point).<br>
+&nbsp;<br>
+Called&nbsp;from&nbsp;persistence&nbsp;during&nbsp;save_state.&nbsp;Write-through&nbsp;keeps<br>
+the&nbsp;log&nbsp;current&nbsp;between&nbsp;saves;&nbsp;this&nbsp;snapshot&nbsp;is&nbsp;the<br>
+reconciliation&nbsp;point&nbsp;for&nbsp;bulk&nbsp;mutations,&nbsp;and&nbsp;compacts&nbsp;the&nbsp;log<br>
+when&nbsp;it&nbsp;grows&nbsp;past&nbsp;the&nbsp;size&nbsp;ceiling.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>archive_size</strong></dt>
+<dd><span class="code">Number&nbsp;of&nbsp;concepts&nbsp;in&nbsp;the&nbsp;long-term&nbsp;archive&nbsp;(0&nbsp;if&nbsp;no&nbsp;archive).</span></dd>
+</dl>
+<dl><dt><strong>concept_ids</strong></dt>
+<dd><span class="code">List&nbsp;of&nbsp;all&nbsp;concept&nbsp;IDs&nbsp;(cached,&nbsp;invalidated&nbsp;on&nbsp;add/remove).</span></dd>
+</dl>
+<dl><dt><strong>consolidation_gain</strong></dt>
+<dd><span class="code">The&nbsp;consolidation-mode&nbsp;multiplier&nbsp;—&nbsp;STM→LTM&nbsp;promotion&nbsp;drive.</span></dd>
+</dl>
+<dl><dt><strong>dream_concept_ids</strong></dt>
+<dd><span class="code">Concept&nbsp;IDs&nbsp;for&nbsp;dream/thought&nbsp;generation.<br>
+&nbsp;<br>
+Returns&nbsp;:attr:`quality_concept_ids`&nbsp;if&nbsp;there&nbsp;are&nbsp;at&nbsp;least&nbsp;10<br>
+high-quality&nbsp;concepts&nbsp;—&nbsp;dreams&nbsp;should&nbsp;be&nbsp;about&nbsp;things&nbsp;it<br>
+actually&nbsp;knows.&nbsp;Falls&nbsp;back&nbsp;to&nbsp;:attr:`world_concept_ids`&nbsp;if<br>
+the&nbsp;quality&nbsp;set&nbsp;is&nbsp;too&nbsp;small&nbsp;(early&nbsp;in&nbsp;development&nbsp;or&nbsp;after<br>
+aggressive&nbsp;pruning).</span></dd>
+</dl>
+<dl><dt><strong>edge_count</strong></dt>
+<dd><span class="code">Number&nbsp;of&nbsp;relationships&nbsp;in&nbsp;the&nbsp;network.</span></dd>
+</dl>
+<dl><dt><strong>edges</strong></dt>
+<dd><span class="code">All&nbsp;edges&nbsp;in&nbsp;the&nbsp;network&nbsp;(read-only&nbsp;view&nbsp;of&nbsp;the&nbsp;internal&nbsp;list).<br>
+&nbsp;<br>
+Used&nbsp;by&nbsp;sleep-stage&nbsp;mechanisms&nbsp;(e.g.&nbsp;synaptic&nbsp;downscaling&nbsp;during<br>
+N3&nbsp;/&nbsp;SHY&nbsp;hypothesis)&nbsp;that&nbsp;need&nbsp;to&nbsp;iterate&nbsp;and&nbsp;renormalise&nbsp;every<br>
+connection&nbsp;weight.&nbsp;The&nbsp;returned&nbsp;list&nbsp;is&nbsp;the&nbsp;internal&nbsp;storage&nbsp;—<br>
+callers&nbsp;may&nbsp;read&nbsp;or&nbsp;adjust&nbsp;``edge.weight``&nbsp;in&nbsp;place&nbsp;but&nbsp;should<br>
+not&nbsp;add/remove&nbsp;elements.</span></dd>
+</dl>
+<dl><dt><strong>encoding_gain</strong></dt>
+<dd><span class="code">The&nbsp;encode-mode&nbsp;multiplier&nbsp;—&nbsp;afferent&nbsp;write&nbsp;drive.</span></dd>
+</dl>
+<dl><dt><strong>mean_concept_confidence</strong></dt>
+<dd><span class="code">Mean&nbsp;confidence&nbsp;of&nbsp;all&nbsp;concepts&nbsp;(0&nbsp;if&nbsp;the&nbsp;network&nbsp;is&nbsp;empty).<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;a&nbsp;non-monotonic&nbsp;quality&nbsp;metric:&nbsp;it&nbsp;can&nbsp;decrease&nbsp;when<br>
+low-confidence&nbsp;concepts&nbsp;are&nbsp;added&nbsp;or&nbsp;confidence&nbsp;decays&nbsp;on<br>
+existing&nbsp;concepts.&nbsp;It&nbsp;measures&nbsp;how&nbsp;well-formed&nbsp;the&nbsp;network's<br>
+nodes&nbsp;are.</span></dd>
+</dl>
+<dl><dt><strong>mean_edge_weight</strong></dt>
+<dd><span class="code">Mean&nbsp;weight&nbsp;of&nbsp;all&nbsp;edges&nbsp;(0&nbsp;if&nbsp;the&nbsp;network&nbsp;has&nbsp;no&nbsp;edges).<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;a&nbsp;non-monotonic&nbsp;quality&nbsp;metric:&nbsp;it&nbsp;can&nbsp;decrease&nbsp;when<br>
+low-weight&nbsp;or&nbsp;speculative&nbsp;edges&nbsp;are&nbsp;added,&nbsp;or&nbsp;when&nbsp;pruning<br>
+removes&nbsp;a&nbsp;high-weight&nbsp;edge.&nbsp;It&nbsp;measures&nbsp;the&nbsp;average&nbsp;confidence<br>
+of&nbsp;the&nbsp;network's&nbsp;relationships.</span></dd>
+</dl>
+<dl><dt><strong>network_density</strong></dt>
+<dd><span class="code">Edge&nbsp;density&nbsp;of&nbsp;the&nbsp;network&nbsp;(edges&nbsp;/&nbsp;possible&nbsp;directed&nbsp;edges).<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;a&nbsp;non-monotonic&nbsp;quality&nbsp;metric:&nbsp;it&nbsp;can&nbsp;decrease&nbsp;when<br>
+the&nbsp;network&nbsp;grows&nbsp;many&nbsp;new&nbsp;concepts&nbsp;without&nbsp;yet&nbsp;forming&nbsp;many<br>
+relationships.&nbsp;A&nbsp;fully&nbsp;connected&nbsp;directed&nbsp;network&nbsp;has&nbsp;density&nbsp;1.</span></dd>
+</dl>
+<dl><dt><strong>quality_concept_ids</strong></dt>
+<dd><span class="code">World&nbsp;concepts&nbsp;with&nbsp;quality&nbsp;≥&nbsp;``QUALITY_THRESHOLD``.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;premier&nbsp;concept&nbsp;selection&nbsp;list&nbsp;—&nbsp;concepts&nbsp;that&nbsp;are<br>
+both&nbsp;syntactically&nbsp;valid&nbsp;(pass&nbsp;``is_world_concept``)&nbsp;and<br>
+structurally&nbsp;well-formed&nbsp;(have&nbsp;definitions,&nbsp;typed&nbsp;edges,&nbsp;or<br>
+high&nbsp;confidence).&nbsp;Use&nbsp;this&nbsp;for&nbsp;curiosity,&nbsp;dreams,&nbsp;and<br>
+autonomous&nbsp;learning&nbsp;where&nbsp;you&nbsp;want&nbsp;the&nbsp;highest-quality&nbsp;concepts.<br>
+&nbsp;<br>
+The&nbsp;list&nbsp;is&nbsp;cached&nbsp;and&nbsp;invalidated&nbsp;on&nbsp;add/remove.</span></dd>
+</dl>
+<dl><dt><strong>retrieval_gain</strong></dt>
+<dd><span class="code">The&nbsp;retrieval-mode&nbsp;multiplier&nbsp;—&nbsp;recurrent-spread&nbsp;drive.</span></dd>
+</dl>
+<dl><dt><strong>semantic_hubs</strong></dt>
+<dd><span class="code">List&nbsp;of&nbsp;all&nbsp;concepts&nbsp;currently&nbsp;marked&nbsp;as&nbsp;semantic&nbsp;hubs.</span></dd>
+</dl>
+<dl><dt><strong>size</strong></dt>
+<dd><span class="code">Number&nbsp;of&nbsp;concepts&nbsp;in&nbsp;the&nbsp;network.</span></dd>
+</dl>
+<dl><dt><strong>total_concept_count</strong></dt>
+<dd><span class="code">Total&nbsp;concepts&nbsp;across&nbsp;working&nbsp;memory&nbsp;+&nbsp;long-term&nbsp;archive.</span></dd>
+</dl>
+<dl><dt><strong>world_concept_ids</strong></dt>
+<dd><span class="code">Concept&nbsp;IDs&nbsp;filtered&nbsp;to&nbsp;genuine&nbsp;world&nbsp;knowledge.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;subset&nbsp;of&nbsp;:attr:`concept_ids`&nbsp;that&nbsp;passes<br>
+:func:`is_world_concept`.&nbsp;Use&nbsp;this&nbsp;instead&nbsp;of&nbsp;``concept_ids``<br>
+when&nbsp;selecting&nbsp;concepts&nbsp;for&nbsp;dreams,&nbsp;thoughts,&nbsp;curiosity,&nbsp;or<br>
+any&nbsp;other&nbsp;generative&nbsp;process&nbsp;that&nbsp;should&nbsp;operate&nbsp;on&nbsp;world<br>
+knowledge&nbsp;rather&nbsp;than&nbsp;code&nbsp;symbols&nbsp;or&nbsp;conversation&nbsp;fragments.<br>
+&nbsp;<br>
+The&nbsp;list&nbsp;is&nbsp;cached&nbsp;alongside&nbsp;``concept_ids``&nbsp;and&nbsp;invalidated<br>
+on&nbsp;the&nbsp;same&nbsp;add/remove&nbsp;operations.</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'_COMPILED_RELATION_PATTERNS': 'ClassVar[list[tuple[re.Pattern, RelationType, tuple[int, int, int]]]]', '_RELATION_PATTERNS': 'ClassVar[list[tuple[str, RelationType, tuple[int, int, int]]]]', '_RELATION_PHRASE_SEEDS': 'ClassVar[dict[str, list[str]]]', '_RELATION_VERB_SEEDS': 'ClassVar[dict[str, list[str]]]', '_REVIEW_INTERVALS_MS': 'ClassVar[list[int]]', '_SITUATION_VERB_SEEDS': 'ClassVar[dict[str, list[str]]]'}</dl>
+
+<hr>
+Methods inherited from <a href="Self_World.temporal_lobe.concepts.archival.html#ArchivalMixin">Self_World.temporal_lobe.concepts.archival.ArchivalMixin</a>:<br>
+<dl><dt><a name="ConceptNetwork-attach_archive"><strong>attach_archive</strong></a>(self, archive: 'Any') -&gt; 'None'</dt><dd><span class="code">Attach&nbsp;a&nbsp;long-term&nbsp;memory&nbsp;archive&nbsp;to&nbsp;this&nbsp;network.<br>
+&nbsp;<br>
+Once&nbsp;attached,&nbsp;dormant&nbsp;concepts&nbsp;are&nbsp;spilled&nbsp;to&nbsp;the&nbsp;archive<br>
+instead&nbsp;of&nbsp;being&nbsp;pruned.&nbsp;Spilled&nbsp;concepts&nbsp;can&nbsp;be&nbsp;recalled<br>
+transparently&nbsp;via&nbsp;``_resolve``&nbsp;/&nbsp;``get_concept``.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;archive:&nbsp;A&nbsp;``ConceptArchive``&nbsp;instance.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-dedupe_archive"><strong>dedupe_archive</strong></a>(self) -&gt; 'int'</dt><dd><span class="code">Drop&nbsp;archive&nbsp;rows&nbsp;for&nbsp;concepts&nbsp;present&nbsp;in&nbsp;working&nbsp;memory.<br>
+&nbsp;<br>
+The&nbsp;archive's&nbsp;invariant&nbsp;is&nbsp;"dormant&nbsp;concepts&nbsp;live&nbsp;here&nbsp;instead<br>
+of&nbsp;working&nbsp;memory."&nbsp;That&nbsp;invariant&nbsp;breaks&nbsp;when&nbsp;a&nbsp;save&nbsp;file<br>
+written&nbsp;before&nbsp;a&nbsp;spill&nbsp;(autosave&nbsp;cadence,&nbsp;or&nbsp;a&nbsp;SIGKILL&nbsp;between<br>
+spill&nbsp;and&nbsp;save)&nbsp;is&nbsp;restored:&nbsp;the&nbsp;concept&nbsp;re-enters&nbsp;working<br>
+memory&nbsp;via&nbsp;the&nbsp;scratch-network&nbsp;transplant,&nbsp;which&nbsp;bypasses<br>
+``add_concept``'s&nbsp;archive&nbsp;check,&nbsp;and&nbsp;the&nbsp;stale&nbsp;archive&nbsp;row&nbsp;is<br>
+never&nbsp;cleaned&nbsp;because&nbsp;every&nbsp;lookup&nbsp;finds&nbsp;the&nbsp;hot&nbsp;concept&nbsp;first.<br>
+&nbsp;<br>
+Call&nbsp;after&nbsp;state&nbsp;restore.&nbsp;Working&nbsp;memory&nbsp;always&nbsp;wins&nbsp;—&nbsp;the<br>
+archived&nbsp;copy&nbsp;is&nbsp;by&nbsp;definition&nbsp;older.&nbsp;Returns&nbsp;the&nbsp;number&nbsp;of<br>
+stale&nbsp;rows&nbsp;removed.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-has_concept_anywhere"><strong>has_concept_anywhere</strong></a>(self, cid: 'str') -&gt; 'bool'</dt><dd><span class="code">Check&nbsp;if&nbsp;a&nbsp;concept&nbsp;ID&nbsp;exists&nbsp;in&nbsp;working&nbsp;memory&nbsp;OR&nbsp;the&nbsp;archive.<br>
+&nbsp;<br>
+Unlike&nbsp;:meth:`has_concept`&nbsp;(which&nbsp;only&nbsp;checks&nbsp;working&nbsp;memory),<br>
+this&nbsp;also&nbsp;checks&nbsp;the&nbsp;long-term&nbsp;archive&nbsp;—&nbsp;but&nbsp;WITHOUT&nbsp;recalling<br>
+the&nbsp;concept.&nbsp;Use&nbsp;this&nbsp;when&nbsp;you&nbsp;need&nbsp;to&nbsp;know&nbsp;if&nbsp;a&nbsp;concept&nbsp;is<br>
+known&nbsp;anywhere&nbsp;in&nbsp;the&nbsp;system&nbsp;without&nbsp;the&nbsp;side&nbsp;effect&nbsp;of<br>
+pulling&nbsp;it&nbsp;back&nbsp;into&nbsp;working&nbsp;memory.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-merge_concepts"><strong>merge_concepts</strong></a>(self, winner: 'str', loser: 'str') -&gt; 'bool'</dt><dd><span class="code">Merge&nbsp;two&nbsp;concepts&nbsp;into&nbsp;one,&nbsp;preserving&nbsp;everything&nbsp;learned.<br>
+&nbsp;<br>
+Near-duplicate&nbsp;concepts&nbsp;—&nbsp;one&nbsp;idea&nbsp;learned&nbsp;under&nbsp;two&nbsp;surface<br>
+forms&nbsp;("rust&nbsp;language"&nbsp;/&nbsp;"rust&nbsp;lang")&nbsp;—&nbsp;split&nbsp;each&nbsp;other's<br>
+neighborhood:&nbsp;edges&nbsp;accumulate&nbsp;on&nbsp;both,&nbsp;embeddings&nbsp;dilute,&nbsp;and<br>
+every&nbsp;sweep&nbsp;treats&nbsp;them&nbsp;as&nbsp;distinct.&nbsp;This&nbsp;consolidates&nbsp;the<br>
+loser&nbsp;into&nbsp;the&nbsp;winner:<br>
+&nbsp;<br>
+1.&nbsp;The&nbsp;loser&nbsp;and&nbsp;its&nbsp;edges&nbsp;are&nbsp;archived&nbsp;first&nbsp;—&nbsp;archive-backed<br>
+&nbsp;&nbsp;&nbsp;forgetting,&nbsp;never&nbsp;deletion.<br>
+2.&nbsp;Its&nbsp;edges&nbsp;retarget&nbsp;onto&nbsp;the&nbsp;winner;&nbsp;winner↔loser&nbsp;edges<br>
+&nbsp;&nbsp;&nbsp;become&nbsp;self-loops&nbsp;and&nbsp;drop;&nbsp;genuine&nbsp;overlaps&nbsp;strengthen<br>
+&nbsp;&nbsp;&nbsp;through&nbsp;``add_edge``'s&nbsp;dedup.<br>
+3.&nbsp;The&nbsp;loser's&nbsp;names&nbsp;(its&nbsp;canonical&nbsp;id&nbsp;and&nbsp;aliases)&nbsp;absorb<br>
+&nbsp;&nbsp;&nbsp;into&nbsp;the&nbsp;winner&nbsp;so&nbsp;every&nbsp;learned&nbsp;surface&nbsp;form&nbsp;still<br>
+&nbsp;&nbsp;&nbsp;resolves.<br>
+4.&nbsp;Confidence&nbsp;takes&nbsp;the&nbsp;max;&nbsp;missing&nbsp;winner&nbsp;properties&nbsp;fill<br>
+&nbsp;&nbsp;&nbsp;from&nbsp;the&nbsp;loser.<br>
+&nbsp;<br>
+Returns&nbsp;False&nbsp;when&nbsp;either&nbsp;name&nbsp;fails&nbsp;to&nbsp;resolve&nbsp;to&nbsp;a&nbsp;live<br>
+concept,&nbsp;when&nbsp;both&nbsp;resolve&nbsp;to&nbsp;the&nbsp;same&nbsp;node,&nbsp;or&nbsp;when&nbsp;no<br>
+archive&nbsp;is&nbsp;attached&nbsp;—&nbsp;merging&nbsp;without&nbsp;one&nbsp;would&nbsp;be&nbsp;outright<br>
+deletion,&nbsp;and&nbsp;this&nbsp;system&nbsp;archives,&nbsp;it&nbsp;never&nbsp;silently&nbsp;drops<br>
+knowledge.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-purge_archived_concepts"><strong>purge_archived_concepts</strong></a>(self, concept_ids: 'list[str]') -&gt; 'int'</dt><dd><span class="code">Permanently&nbsp;remove&nbsp;selected&nbsp;concepts&nbsp;from&nbsp;long-term&nbsp;archive.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-restore_archive_to_working_memory"><strong>restore_archive_to_working_memory</strong></a>(self) -&gt; 'int'</dt><dd><span class="code">Recall&nbsp;ALL&nbsp;archived&nbsp;concepts&nbsp;back&nbsp;into&nbsp;working&nbsp;memory.<br>
+&nbsp;<br>
+Migrates&nbsp;every&nbsp;concept&nbsp;from&nbsp;the&nbsp;long-term&nbsp;archive&nbsp;back&nbsp;into<br>
+the&nbsp;in-memory&nbsp;network.&nbsp;This&nbsp;is&nbsp;the&nbsp;inverse&nbsp;of<br>
+:meth:`spill_dormant`&nbsp;—&nbsp;it&nbsp;loads&nbsp;the&nbsp;entire&nbsp;archive&nbsp;into&nbsp;RAM.<br>
+&nbsp;<br>
+Use&nbsp;this&nbsp;when&nbsp;you&nbsp;need&nbsp;the&nbsp;full&nbsp;concept&nbsp;network&nbsp;in&nbsp;working<br>
+memory&nbsp;(e.g.,&nbsp;before&nbsp;a&nbsp;bulk&nbsp;analysis&nbsp;pass,&nbsp;or&nbsp;to&nbsp;reset&nbsp;the<br>
+working/archive&nbsp;split).&nbsp;After&nbsp;this&nbsp;call,&nbsp;the&nbsp;archive&nbsp;will&nbsp;be<br>
+empty&nbsp;and&nbsp;all&nbsp;concepts&nbsp;will&nbsp;be&nbsp;in&nbsp;working&nbsp;memory.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;number&nbsp;of&nbsp;concepts&nbsp;recalled&nbsp;from&nbsp;the&nbsp;archive.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-spill_dormant"><strong>spill_dormant</strong></a>(self, activation_threshold: 'float' = 0.01, protected_origins: 'frozenset[str] | None' = None, max_in_memory: 'int' = 15000) -&gt; 'int'</dt><dd><span class="code">Spill&nbsp;dormant&nbsp;concepts&nbsp;from&nbsp;working&nbsp;memory&nbsp;to&nbsp;the&nbsp;long-term&nbsp;archive.<br>
+&nbsp;<br>
+A&nbsp;concept&nbsp;is&nbsp;spillable&nbsp;if&nbsp;ALL&nbsp;of:<br>
+-&nbsp;activation&nbsp;&lt;&nbsp;``activation_threshold``&nbsp;(dormant&nbsp;—&nbsp;not&nbsp;recently&nbsp;used)<br>
+-&nbsp;origin&nbsp;not&nbsp;in&nbsp;``protected_origins``&nbsp;(structural&nbsp;seeds&nbsp;are&nbsp;kept)<br>
+-&nbsp;review_count&nbsp;==&nbsp;0&nbsp;(never&nbsp;reviewed&nbsp;via&nbsp;spaced&nbsp;repetition)<br>
+&nbsp;<br>
+Concepts&nbsp;are&nbsp;spilled&nbsp;in&nbsp;ascending&nbsp;order&nbsp;of&nbsp;activation&nbsp;(most<br>
+dormant&nbsp;first)&nbsp;until&nbsp;the&nbsp;in-memory&nbsp;network&nbsp;is&nbsp;at&nbsp;or&nbsp;below<br>
+``max_in_memory``&nbsp;concepts.<br>
+&nbsp;<br>
+Edges&nbsp;involving&nbsp;spilled&nbsp;concepts&nbsp;are&nbsp;also&nbsp;archived&nbsp;in&nbsp;the<br>
+``archived_edges``&nbsp;table.&nbsp;They&nbsp;stay&nbsp;in&nbsp;working&nbsp;memory&nbsp;too<br>
+(for&nbsp;fast&nbsp;traversal&nbsp;by&nbsp;hot&nbsp;concepts),&nbsp;but&nbsp;the&nbsp;archive&nbsp;copy<br>
+survives&nbsp;if&nbsp;the&nbsp;working-memory&nbsp;edge&nbsp;is&nbsp;later&nbsp;pruned&nbsp;during<br>
+sleep&nbsp;consolidation&nbsp;or&nbsp;edge&nbsp;cleanup.<br>
+&nbsp;<br>
+Returns&nbsp;the&nbsp;number&nbsp;of&nbsp;concepts&nbsp;spilled.&nbsp;Returns&nbsp;0&nbsp;if&nbsp;no<br>
+archive&nbsp;is&nbsp;attached,&nbsp;or&nbsp;if&nbsp;working&nbsp;memory&nbsp;is&nbsp;already&nbsp;within<br>
+budget.<br>
+&nbsp;<br>
+"Under&nbsp;budget"&nbsp;and&nbsp;"nothing&nbsp;was&nbsp;dormant"&nbsp;both&nbsp;return&nbsp;0,&nbsp;so&nbsp;this<br>
+logs&nbsp;which&nbsp;one&nbsp;applied&nbsp;at&nbsp;DEBUG.&nbsp;Without&nbsp;that,&nbsp;a&nbsp;caller&nbsp;reading<br>
+only&nbsp;the&nbsp;return&nbsp;value&nbsp;cannot&nbsp;distinguish&nbsp;healthy&nbsp;idleness&nbsp;from&nbsp;a<br>
+spill&nbsp;that&nbsp;silently&nbsp;does&nbsp;nothing&nbsp;—&nbsp;which&nbsp;is&nbsp;how&nbsp;"archived&nbsp;is<br>
+zero"&nbsp;read&nbsp;as&nbsp;a&nbsp;fact&nbsp;about&nbsp;the&nbsp;system&nbsp;rather&nbsp;than&nbsp;a&nbsp;symptom.</span></dd></dl>
+
+<hr>
+Readonly properties inherited from <a href="Self_World.temporal_lobe.concepts.archival.html#ArchivalMixin">Self_World.temporal_lobe.concepts.archival.ArchivalMixin</a>:<br>
+<dl><dt><strong>all_concept_ids</strong></dt>
+<dd><span class="code">All&nbsp;concept&nbsp;IDs&nbsp;across&nbsp;working&nbsp;memory&nbsp;AND&nbsp;the&nbsp;archive.<br>
+&nbsp;<br>
+Unlike&nbsp;:attr:`concept_ids`&nbsp;(working&nbsp;memory&nbsp;only),&nbsp;this<br>
+includes&nbsp;dormant&nbsp;concepts&nbsp;spilled&nbsp;to&nbsp;the&nbsp;long-term&nbsp;archive.<br>
+Useful&nbsp;for&nbsp;diagnostics,&nbsp;deduplication&nbsp;checks,&nbsp;and&nbsp;any&nbsp;code<br>
+that&nbsp;needs&nbsp;the&nbsp;complete&nbsp;set&nbsp;of&nbsp;known&nbsp;concepts.</span></dd>
+</dl>
+<hr>
+Data descriptors inherited from <a href="Self_World.temporal_lobe.concepts.archival.html#ArchivalMixin">Self_World.temporal_lobe.concepts.archival.ArchivalMixin</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Methods inherited from <a href="Self_World.temporal_lobe.concepts.consolidation.html#ConsolidationMixin">Self_World.temporal_lobe.concepts.consolidation.ConsolidationMixin</a>:<br>
+<dl><dt><a name="ConceptNetwork-backfill_columns"><strong>backfill_columns</strong></a>(self) -&gt; 'dict[str, int]'</dt><dd><span class="code">Backfill&nbsp;column&nbsp;membership&nbsp;for&nbsp;all&nbsp;existing&nbsp;concepts.<br>
+&nbsp;<br>
+Concepts&nbsp;loaded&nbsp;from&nbsp;persistence&nbsp;(before&nbsp;the&nbsp;`columns`&nbsp;field<br>
+existed)&nbsp;have&nbsp;empty&nbsp;column&nbsp;sets.&nbsp;This&nbsp;method&nbsp;populates&nbsp;each<br>
+concept's&nbsp;`columns`&nbsp;set&nbsp;based&nbsp;on&nbsp;its&nbsp;origin&nbsp;and&nbsp;ID&nbsp;prefix.<br>
+&nbsp;<br>
+Also&nbsp;creates&nbsp;pioneer&nbsp;bridges&nbsp;between&nbsp;concepts&nbsp;that&nbsp;share&nbsp;the<br>
+same&nbsp;base&nbsp;name&nbsp;but&nbsp;live&nbsp;in&nbsp;different&nbsp;columns&nbsp;(e.g.,&nbsp;"mind"&nbsp;in<br>
+dictionary&nbsp;vs&nbsp;"python:Mind"&nbsp;in&nbsp;code).<br>
+&nbsp;<br>
+**Bridge&nbsp;creation&nbsp;only&nbsp;runs&nbsp;for&nbsp;concepts&nbsp;that&nbsp;were&nbsp;actually<br>
+backfilled**&nbsp;(had&nbsp;empty&nbsp;`columns`).&nbsp;If&nbsp;no&nbsp;backfilling&nbsp;was<br>
+needed,&nbsp;bridges&nbsp;are&nbsp;not&nbsp;recreated&nbsp;—&nbsp;they&nbsp;either&nbsp;already&nbsp;exist<br>
+or&nbsp;were&nbsp;shed&nbsp;to&nbsp;a&nbsp;compressed&nbsp;store&nbsp;during&nbsp;sleep&nbsp;consolidation.<br>
+Recreating&nbsp;them&nbsp;every&nbsp;startup&nbsp;would&nbsp;undo&nbsp;that&nbsp;migration&nbsp;and<br>
+cause&nbsp;unbounded&nbsp;edge&nbsp;growth&nbsp;(13K&nbsp;bridges&nbsp;per&nbsp;startup).<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;dict&nbsp;with&nbsp;backfill&nbsp;statistics.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-connect_all_orphans"><strong>connect_all_orphans</strong></a>(self) -&gt; 'int'</dt><dd><span class="code">One-shot:&nbsp;connect&nbsp;EVERY&nbsp;weakly-connected&nbsp;concept&nbsp;to&nbsp;super&nbsp;hubs.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;nuclear&nbsp;option&nbsp;—&nbsp;after&nbsp;all&nbsp;learning&nbsp;is&nbsp;done,<br>
+run&nbsp;this&nbsp;to&nbsp;guarantee&nbsp;every&nbsp;concept&nbsp;is&nbsp;within&nbsp;2-3&nbsp;hops<br>
+of&nbsp;the&nbsp;network&nbsp;core.&nbsp;No&nbsp;caps,&nbsp;no&nbsp;limits.<br>
+&nbsp;<br>
+Connects&nbsp;concepts&nbsp;with&nbsp;≤5&nbsp;edges&nbsp;to&nbsp;3&nbsp;super&nbsp;hubs&nbsp;each.<br>
+Under&nbsp;the&nbsp;canonical&nbsp;edge&nbsp;log&nbsp;this&nbsp;is&nbsp;a&nbsp;no-op:&nbsp;super-hub<br>
+attachment&nbsp;edges&nbsp;are&nbsp;pipeline&nbsp;geometry&nbsp;(origin<br>
+``global_connect``&nbsp;→&nbsp;derivable),&nbsp;and&nbsp;reachability&nbsp;is&nbsp;served<br>
+by&nbsp;the&nbsp;similarity&nbsp;provider&nbsp;instead&nbsp;of&nbsp;materialized&nbsp;edges.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-consolidate_during_sleep"><strong>consolidate_during_sleep</strong></a>(self, max_in_memory: 'int | None' = None, policy: 'Any' = None) -&gt; 'dict[str, int]'</dt><dd><span class="code">Consolidate&nbsp;the&nbsp;concept&nbsp;network&nbsp;during&nbsp;sleep.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;concept-network&nbsp;analogue&nbsp;of&nbsp;the&nbsp;Rust&nbsp;daemon's<br>
+dreaming&nbsp;pass,&nbsp;modelled&nbsp;on&nbsp;what&nbsp;sleep&nbsp;actually&nbsp;does&nbsp;to&nbsp;a<br>
+brain&nbsp;(Diekelmann&nbsp;&amp;&nbsp;Born,&nbsp;2010).&nbsp;During&nbsp;sleep,&nbsp;the&nbsp;network:<br>
+&nbsp;<br>
+1.&nbsp;**Strengthens**&nbsp;edges&nbsp;whose&nbsp;endpoints&nbsp;were&nbsp;co-active&nbsp;—<br>
+&nbsp;&nbsp;&nbsp;replay-driven&nbsp;potentiation&nbsp;(Hebbian&nbsp;LTP),&nbsp;plus&nbsp;established<br>
+&nbsp;&nbsp;&nbsp;traces&nbsp;(w&nbsp;&gt;&nbsp;0.4)&nbsp;modelling&nbsp;spontaneous&nbsp;replay.&nbsp;There&nbsp;is&nbsp;no<br>
+&nbsp;&nbsp;&nbsp;deletion&nbsp;pass:&nbsp;human&nbsp;forgetting&nbsp;is&nbsp;decay,&nbsp;interference,<br>
+&nbsp;&nbsp;&nbsp;and&nbsp;demotion,&nbsp;not&nbsp;a&nbsp;threshold&nbsp;sweep.<br>
+2.&nbsp;**Boosts**&nbsp;confidence&nbsp;of&nbsp;well-connected&nbsp;concepts.&nbsp;Concepts<br>
+&nbsp;&nbsp;&nbsp;with&nbsp;many&nbsp;connections&nbsp;are&nbsp;probably&nbsp;real&nbsp;and&nbsp;important.<br>
+3.&nbsp;**Decays**&nbsp;activation&nbsp;of&nbsp;all&nbsp;concepts.&nbsp;Sleep&nbsp;clears<br>
+&nbsp;&nbsp;&nbsp;short-term&nbsp;activation,&nbsp;preparing&nbsp;for&nbsp;a&nbsp;fresh&nbsp;day.<br>
+4.&nbsp;**Bridges**&nbsp;—&nbsp;REM-style&nbsp;associative&nbsp;recombination:&nbsp;links<br>
+&nbsp;&nbsp;&nbsp;concepts&nbsp;that&nbsp;share&nbsp;neighbors&nbsp;and&nbsp;attaches&nbsp;orphans&nbsp;to<br>
+&nbsp;&nbsp;&nbsp;hubs&nbsp;(schema&nbsp;assimilation;&nbsp;Lewis&nbsp;&amp;&nbsp;Durrant,&nbsp;2011).<br>
+5.&nbsp;**Removes**&nbsp;isolated&nbsp;low-confidence&nbsp;concepts&nbsp;(calls<br>
+&nbsp;&nbsp;&nbsp;clean_noise,&nbsp;which&nbsp;archives&nbsp;them&nbsp;first).&nbsp;Sleep&nbsp;is&nbsp;when<br>
+&nbsp;&nbsp;&nbsp;the&nbsp;brain&nbsp;takes&nbsp;out&nbsp;the&nbsp;trash&nbsp;—&nbsp;into&nbsp;long-term&nbsp;storage.<br>
+6.&nbsp;**Spills**&nbsp;dormant&nbsp;concepts&nbsp;to&nbsp;the&nbsp;long-term&nbsp;archive&nbsp;(if<br>
+&nbsp;&nbsp;&nbsp;attached).&nbsp;Instead&nbsp;of&nbsp;deleting&nbsp;dormant&nbsp;knowledge,&nbsp;it&nbsp;moves<br>
+&nbsp;&nbsp;&nbsp;to&nbsp;disk&nbsp;where&nbsp;it&nbsp;can&nbsp;be&nbsp;recalled&nbsp;on&nbsp;demand.&nbsp;This&nbsp;is&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;brain's&nbsp;consolidation&nbsp;of&nbsp;short-term&nbsp;to&nbsp;long-term&nbsp;memory.<br>
+7.&nbsp;**Vacuums**&nbsp;the&nbsp;archive&nbsp;(if&nbsp;attached&nbsp;and&nbsp;modified&nbsp;this<br>
+&nbsp;&nbsp;&nbsp;cycle)&nbsp;to&nbsp;reclaim&nbsp;disk&nbsp;space&nbsp;from&nbsp;recalled&nbsp;or&nbsp;deleted&nbsp;rows.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;max_in_memory:&nbsp;Maximum&nbsp;concepts&nbsp;to&nbsp;keep&nbsp;in&nbsp;working&nbsp;memory.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;the&nbsp;network&nbsp;exceeds&nbsp;this,&nbsp;dormant&nbsp;concepts&nbsp;are<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;spilled&nbsp;to&nbsp;the&nbsp;archive.&nbsp;``None``&nbsp;uses&nbsp;the&nbsp;policy's<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;``max_in_memory``.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;policy:&nbsp;A&nbsp;``MaintenancePolicy``&nbsp;—&nbsp;her&nbsp;own&nbsp;upkeep&nbsp;knobs<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(``infrastructure/maintenance_policy.py``).&nbsp;``None``<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;uses&nbsp;the&nbsp;defaults.<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;dict&nbsp;with&nbsp;counts:<br>
+-&nbsp;'strengthened':&nbsp;number&nbsp;of&nbsp;edges&nbsp;strengthened<br>
+-&nbsp;'boosted':&nbsp;number&nbsp;of&nbsp;concepts&nbsp;boosted<br>
+-&nbsp;'decay_cleared':&nbsp;number&nbsp;of&nbsp;concepts&nbsp;decayed<br>
+-&nbsp;'noise_removed':&nbsp;number&nbsp;of&nbsp;noise&nbsp;concepts&nbsp;removed<br>
+-&nbsp;'bridges_created':&nbsp;number&nbsp;of&nbsp;associative&nbsp;+&nbsp;hub&nbsp;bridges&nbsp;created<br>
+-&nbsp;'spilled':&nbsp;number&nbsp;of&nbsp;concepts&nbsp;moved&nbsp;to&nbsp;long-term&nbsp;archive</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-consolidate_during_sleep_steps"><strong>consolidate_during_sleep_steps</strong></a>(self, max_in_memory: 'int | None' = None, policy: 'Any' = None) -&gt; 'Iterator[tuple[str, dict[str, int]]]'</dt><dd><span class="code">The&nbsp;same&nbsp;consolidation&nbsp;as&nbsp;self-limiting&nbsp;physiology.<br>
+&nbsp;<br>
+Yields&nbsp;``(phase,&nbsp;stats)``&nbsp;after&nbsp;each&nbsp;committed&nbsp;micro-phase,&nbsp;so<br>
+a&nbsp;sleep&nbsp;loop&nbsp;can&nbsp;advance&nbsp;it&nbsp;gradually&nbsp;—&nbsp;one&nbsp;phase&nbsp;per&nbsp;credit&nbsp;—<br>
+and&nbsp;drop&nbsp;it&nbsp;mid-yield&nbsp;when&nbsp;the&nbsp;stage&nbsp;ends.&nbsp;Human&nbsp;N3&nbsp;has&nbsp;no<br>
+"pass&nbsp;that&nbsp;must&nbsp;finish":&nbsp;each&nbsp;slice&nbsp;here&nbsp;is&nbsp;safe&nbsp;on&nbsp;its&nbsp;own,<br>
+and&nbsp;whatever&nbsp;remains&nbsp;unrun&nbsp;is&nbsp;simply&nbsp;consolidation&nbsp;that&nbsp;did<br>
+not&nbsp;happen&nbsp;tonight.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-create_bridge"><strong>create_bridge</strong></a>(self, concept_a: 'str', concept_b: 'str', weight: 'float' = 0.3) -&gt; 'Edge | None'</dt><dd><span class="code">Create&nbsp;a&nbsp;pioneer&nbsp;bridge&nbsp;between&nbsp;two&nbsp;concepts&nbsp;in&nbsp;different&nbsp;columns.<br>
+&nbsp;<br>
+Bridges&nbsp;are&nbsp;inter-column&nbsp;connections&nbsp;(like&nbsp;cortical&nbsp;association<br>
+fibers).&nbsp;They&nbsp;connect&nbsp;the&nbsp;same&nbsp;concept&nbsp;across&nbsp;different&nbsp;domains<br>
+(e.g.,&nbsp;"cognition"&nbsp;in&nbsp;dictionary&nbsp;↔&nbsp;"cognition"&nbsp;in&nbsp;identity).<br>
+&nbsp;<br>
+Bridge&nbsp;weight&nbsp;starts&nbsp;low&nbsp;(0.3)&nbsp;and&nbsp;strengthens&nbsp;through&nbsp;Hebbian<br>
+co-activation&nbsp;during&nbsp;conversations.&nbsp;This&nbsp;mirrors&nbsp;how&nbsp;pioneer<br>
+neurons&nbsp;create&nbsp;initial&nbsp;pathways&nbsp;that&nbsp;are&nbsp;later&nbsp;refined&nbsp;by<br>
+experience.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-get_bridges"><strong>get_bridges</strong></a>(self, concept_id: 'str') -&gt; 'list[Edge]'</dt><dd><span class="code">Get&nbsp;all&nbsp;bridge&nbsp;edges&nbsp;connected&nbsp;to&nbsp;a&nbsp;concept&nbsp;(deduplicated).</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-get_review_queue"><strong>get_review_queue</strong></a>(self, now_ms: 'int | None' = None, max_items: 'int' = 10) -&gt; 'list[str]'</dt><dd><span class="code">Get&nbsp;concepts&nbsp;due&nbsp;for&nbsp;review&nbsp;(spaced&nbsp;repetition).<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;list&nbsp;of&nbsp;concept&nbsp;IDs&nbsp;that&nbsp;are&nbsp;due&nbsp;for&nbsp;review,<br>
+sorted&nbsp;by&nbsp;urgency&nbsp;(most&nbsp;overdue&nbsp;first).<br>
+&nbsp;<br>
+A&nbsp;concept&nbsp;is&nbsp;due&nbsp;for&nbsp;review&nbsp;if:<br>
+-&nbsp;It&nbsp;has&nbsp;been&nbsp;reviewed&nbsp;before&nbsp;and&nbsp;enough&nbsp;time&nbsp;has&nbsp;passed<br>
+&nbsp;&nbsp;since&nbsp;the&nbsp;last&nbsp;review&nbsp;based&nbsp;on&nbsp;the&nbsp;spaced&nbsp;repetition&nbsp;schedule<br>
+-&nbsp;OR&nbsp;it&nbsp;has&nbsp;never&nbsp;been&nbsp;reviewed&nbsp;(review_count&nbsp;==&nbsp;0)&nbsp;and&nbsp;was<br>
+&nbsp;&nbsp;created&nbsp;more&nbsp;than&nbsp;1&nbsp;minute&nbsp;ago<br>
+&nbsp;<br>
+Concepts&nbsp;with&nbsp;high&nbsp;confidence&nbsp;are&nbsp;reviewed&nbsp;less&nbsp;frequently.<br>
+Concepts&nbsp;with&nbsp;low&nbsp;confidence&nbsp;are&nbsp;reviewed&nbsp;more&nbsp;frequently.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-review_concept"><strong>review_concept</strong></a>(self, concept_id: 'str', success: 'bool' = True, now_ms: 'int | None' = None) -&gt; 'None'</dt><dd><span class="code">Mark&nbsp;a&nbsp;concept&nbsp;as&nbsp;reviewed.<br>
+&nbsp;<br>
+If&nbsp;success=True,&nbsp;increment&nbsp;the&nbsp;review&nbsp;count&nbsp;(which&nbsp;extends<br>
+the&nbsp;next&nbsp;review&nbsp;interval).&nbsp;If&nbsp;success=False,&nbsp;reset&nbsp;the<br>
+review&nbsp;count&nbsp;(which&nbsp;shortens&nbsp;the&nbsp;next&nbsp;review&nbsp;interval)&nbsp;and<br>
+slightly&nbsp;lower&nbsp;confidence.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;called&nbsp;when&nbsp;Genesis&nbsp;actively&nbsp;thinks&nbsp;about&nbsp;or&nbsp;uses<br>
+a&nbsp;concept&nbsp;—&nbsp;confirming&nbsp;it&nbsp;still&nbsp;"knows"&nbsp;it.</span></dd></dl>
+
+<hr>
+Methods inherited from <a href="Self_World.temporal_lobe.concepts.dynamics.html#DynamicsMixin">Self_World.temporal_lobe.concepts.dynamics.DynamicsMixin</a>:<br>
+<dl><dt><a name="ConceptNetwork-apply_lateral_inhibition"><strong>apply_lateral_inhibition</strong></a>(self, context_columns: 'set[str] | None' = None, inhibition_strength: 'float' = 0.4) -&gt; 'dict[str, float]'</dt><dd><span class="code">Apply&nbsp;lateral&nbsp;inhibition&nbsp;between&nbsp;cortical&nbsp;columns&nbsp;(SOM&nbsp;interneurons).<br>
+&nbsp;<br>
+When&nbsp;one&nbsp;column&nbsp;is&nbsp;highly&nbsp;active,&nbsp;other&nbsp;columns&nbsp;are&nbsp;suppressed.<br>
+This&nbsp;is&nbsp;the&nbsp;mechanism&nbsp;that&nbsp;makes&nbsp;columns&nbsp;functionally&nbsp;separate&nbsp;—<br>
+the&nbsp;dictionary&nbsp;column&nbsp;doesn't&nbsp;compete&nbsp;with&nbsp;the&nbsp;code&nbsp;column&nbsp;because<br>
+the&nbsp;code&nbsp;column&nbsp;actively&nbsp;inhibits&nbsp;it.<br>
+&nbsp;<br>
+The&nbsp;inhibition&nbsp;is&nbsp;MULTIPLICATIVE,&nbsp;not&nbsp;additive.&nbsp;Each&nbsp;concept&nbsp;in&nbsp;a<br>
+non-dominant&nbsp;column&nbsp;has&nbsp;its&nbsp;activation&nbsp;scaled&nbsp;by:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(1&nbsp;-&nbsp;inhibition_strength&nbsp;*&nbsp;dominance_ratio)<br>
+where&nbsp;dominance_ratio&nbsp;=&nbsp;dominant_mean_activation&nbsp;/&nbsp;concept_activation.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;biologically&nbsp;grounded:&nbsp;inhibitory&nbsp;interneurons&nbsp;reduce<br>
+firing&nbsp;rate&nbsp;proportionally,&nbsp;not&nbsp;by&nbsp;a&nbsp;fixed&nbsp;amount.&nbsp;A&nbsp;concept&nbsp;at<br>
+activation&nbsp;0.8&nbsp;in&nbsp;a&nbsp;suppressed&nbsp;column&nbsp;loses&nbsp;more&nbsp;absolute<br>
+activation&nbsp;than&nbsp;one&nbsp;at&nbsp;0.1,&nbsp;but&nbsp;the&nbsp;relative&nbsp;reduction&nbsp;is&nbsp;the<br>
+same&nbsp;—&nbsp;mirroring&nbsp;how&nbsp;inhibition&nbsp;scales&nbsp;with&nbsp;excitatory&nbsp;input.<br>
+&nbsp;<br>
+Context&nbsp;disinhibition&nbsp;(VIP):&nbsp;columns&nbsp;in&nbsp;context_columns&nbsp;receive<br>
+reduced&nbsp;inhibition&nbsp;(multiplied&nbsp;by&nbsp;0.2,&nbsp;an&nbsp;80%&nbsp;reduction).&nbsp;This<br>
+is&nbsp;the&nbsp;top-down&nbsp;attention&nbsp;signal&nbsp;—&nbsp;the&nbsp;prefrontal&nbsp;cortex&nbsp;sends<br>
+a&nbsp;signal&nbsp;that&nbsp;disinhibits&nbsp;the&nbsp;relevant&nbsp;column,&nbsp;allowing&nbsp;it&nbsp;to<br>
+win&nbsp;the&nbsp;competition&nbsp;even&nbsp;against&nbsp;a&nbsp;larger,&nbsp;more&nbsp;active&nbsp;column.<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;dict&nbsp;of&nbsp;{column:&nbsp;mean_activation}&nbsp;for&nbsp;all&nbsp;columns<br>
+(measured&nbsp;BEFORE&nbsp;inhibition&nbsp;is&nbsp;applied).</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-apply_winner_take_all"><strong>apply_winner_take_all</strong></a>(self, column: 'str', top_k: 'int' = 3, suppression: 'float' = 0.5) -&gt; 'None'</dt><dd><span class="code">Apply&nbsp;winner-take-all&nbsp;dynamics&nbsp;within&nbsp;a&nbsp;column&nbsp;(PV&nbsp;interneurons).<br>
+&nbsp;<br>
+Within&nbsp;a&nbsp;cortical&nbsp;column,&nbsp;the&nbsp;most&nbsp;activated&nbsp;concepts&nbsp;suppress<br>
+less-activated&nbsp;competitors.&nbsp;This&nbsp;sharpens&nbsp;the&nbsp;response&nbsp;—&nbsp;instead<br>
+of&nbsp;many&nbsp;weakly-activated&nbsp;concepts,&nbsp;you&nbsp;get&nbsp;a&nbsp;few&nbsp;strongly-activated<br>
+ones.&nbsp;This&nbsp;is&nbsp;what&nbsp;makes&nbsp;a&nbsp;column's&nbsp;output&nbsp;coherent&nbsp;rather&nbsp;than<br>
+diffuse.<br>
+&nbsp;<br>
+Distance-dependent&nbsp;suppression:&nbsp;instead&nbsp;of&nbsp;a&nbsp;flat&nbsp;suppression&nbsp;for<br>
+all&nbsp;concepts&nbsp;below&nbsp;top_k,&nbsp;each&nbsp;concept&nbsp;is&nbsp;suppressed&nbsp;proportional<br>
+to&nbsp;its&nbsp;distance&nbsp;from&nbsp;the&nbsp;winner's&nbsp;activation&nbsp;level.&nbsp;Concepts&nbsp;close<br>
+to&nbsp;the&nbsp;winner&nbsp;are&nbsp;lightly&nbsp;suppressed;&nbsp;concepts&nbsp;far&nbsp;below&nbsp;are<br>
+heavily&nbsp;suppressed.&nbsp;This&nbsp;mirrors&nbsp;how&nbsp;PV&nbsp;interneurons&nbsp;create&nbsp;a<br>
+suppression&nbsp;gradient&nbsp;—&nbsp;the&nbsp;winner's&nbsp;inhibitory&nbsp;output&nbsp;scales&nbsp;with<br>
+its&nbsp;own&nbsp;activation,&nbsp;so&nbsp;nearby&nbsp;competitors&nbsp;receive&nbsp;more&nbsp;inhibition<br>
+than&nbsp;distant&nbsp;ones.<br>
+&nbsp;<br>
+Formula&nbsp;for&nbsp;concept&nbsp;at&nbsp;rank&nbsp;i&nbsp;(0-indexed,&nbsp;sorted&nbsp;by&nbsp;activation):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;i&nbsp;&lt;&nbsp;top_k:&nbsp;preserved&nbsp;at&nbsp;full&nbsp;activation<br>
+&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;i&nbsp;&gt;=&nbsp;top_k:&nbsp;activation&nbsp;*=&nbsp;(1&nbsp;-&nbsp;suppression&nbsp;*&nbsp;gap_ratio)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;where&nbsp;gap_ratio&nbsp;=&nbsp;(winner_activation&nbsp;-&nbsp;concept_activation)&nbsp;/&nbsp;winner_activation<br>
+&nbsp;<br>
+gap_ratio&nbsp;∈&nbsp;[0,&nbsp;1]:&nbsp;0&nbsp;means&nbsp;the&nbsp;concept&nbsp;is&nbsp;as&nbsp;active&nbsp;as&nbsp;the<br>
+winner&nbsp;(minimal&nbsp;suppression),&nbsp;1&nbsp;means&nbsp;it's&nbsp;at&nbsp;zero&nbsp;(maximal<br>
+suppression).&nbsp;This&nbsp;is&nbsp;the&nbsp;standard&nbsp;winner-take-all&nbsp;circuit&nbsp;from<br>
+computational&nbsp;neuroscience&nbsp;(Douglas&nbsp;&amp;&nbsp;Martin,&nbsp;2004).</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-context_reset"><strong>context_reset</strong></a>(self, strength: 'float' = 0.5) -&gt; 'None'</dt><dd><span class="code">Attenuate&nbsp;the&nbsp;persistent&nbsp;activation&nbsp;field&nbsp;—&nbsp;a&nbsp;context&nbsp;reset.<br>
+&nbsp;<br>
+Yu&nbsp;&amp;&nbsp;Dayan&nbsp;(2005):&nbsp;phasic&nbsp;noradrenaline&nbsp;reports&nbsp;*unexpected*<br>
+uncertainty&nbsp;—&nbsp;a&nbsp;prediction&nbsp;error&nbsp;too&nbsp;large&nbsp;to&nbsp;explain&nbsp;by&nbsp;the<br>
+current&nbsp;context's&nbsp;known&nbsp;unreliability.&nbsp;The&nbsp;appropriate<br>
+response&nbsp;is&nbsp;to&nbsp;reset&nbsp;the&nbsp;context&nbsp;model:&nbsp;the&nbsp;lingering<br>
+activation&nbsp;field&nbsp;that&nbsp;biases&nbsp;processing&nbsp;toward&nbsp;the&nbsp;old<br>
+interpretation&nbsp;is&nbsp;attenuated&nbsp;so&nbsp;incoming&nbsp;evidence&nbsp;can&nbsp;form&nbsp;a<br>
+new&nbsp;context.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;a&nbsp;soft&nbsp;reset&nbsp;—&nbsp;activation&nbsp;is&nbsp;scaled&nbsp;by<br>
+``(1&nbsp;-&nbsp;strength)``,&nbsp;not&nbsp;zeroed.&nbsp;NE&nbsp;phasic&nbsp;signals&nbsp;doubt&nbsp;about<br>
+the&nbsp;current&nbsp;frame,&nbsp;not&nbsp;amnesia&nbsp;for&nbsp;the&nbsp;content:&nbsp;concepts&nbsp;that<br>
+were&nbsp;genuinely&nbsp;strong&nbsp;retain&nbsp;proportional&nbsp;activation&nbsp;and&nbsp;can<br>
+re-enter&nbsp;the&nbsp;new&nbsp;context&nbsp;through&nbsp;the&nbsp;normal&nbsp;spread&nbsp;path.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;strength:&nbsp;Attenuation&nbsp;fraction&nbsp;in&nbsp;[0,&nbsp;1].&nbsp;0&nbsp;=&nbsp;no-op,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1&nbsp;=&nbsp;full&nbsp;collapse&nbsp;of&nbsp;the&nbsp;field.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-cortical_tick"><strong>cortical_tick</strong></a>(self, arousal: 'float' = 0.5, gaba: 'float' = 0.3, ach: 'float' = 0.3, serotonin: 'float' = 0.4, noise: 'float' = 0.01, spark_rate: 'float | None' = None) -&gt; 'dict[str, float]'</dt><dd><span class="code">Evolve&nbsp;the&nbsp;network's&nbsp;activation&nbsp;state&nbsp;by&nbsp;one&nbsp;tick.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;cortical&nbsp;tick&nbsp;—&nbsp;the&nbsp;continuous&nbsp;dynamics&nbsp;that&nbsp;make<br>
+the&nbsp;concept&nbsp;network&nbsp;a&nbsp;living&nbsp;system&nbsp;rather&nbsp;than&nbsp;an&nbsp;inert&nbsp;data<br>
+structure.&nbsp;Every&nbsp;call&nbsp;advances&nbsp;activation&nbsp;by&nbsp;one&nbsp;step:<br>
+&nbsp;<br>
+1.&nbsp;**Spreading**:&nbsp;Each&nbsp;concept&nbsp;with&nbsp;activation&nbsp;above&nbsp;a<br>
+&nbsp;&nbsp;&nbsp;threshold&nbsp;spreads&nbsp;a&nbsp;fraction&nbsp;of&nbsp;its&nbsp;activation&nbsp;to<br>
+&nbsp;&nbsp;&nbsp;neighbors,&nbsp;proportional&nbsp;to&nbsp;edge&nbsp;weight&nbsp;with&nbsp;fan-out<br>
+&nbsp;&nbsp;&nbsp;normalization.&nbsp;This&nbsp;is&nbsp;the&nbsp;same&nbsp;principle&nbsp;as<br>
+&nbsp;&nbsp;&nbsp;``spread_activation``&nbsp;but&nbsp;applied&nbsp;continuously&nbsp;to&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;stored&nbsp;activations,&nbsp;not&nbsp;as&nbsp;a&nbsp;one-shot&nbsp;BFS.<br>
+&nbsp;<br>
+2.&nbsp;**Decay**:&nbsp;All&nbsp;activations&nbsp;decay&nbsp;exponentially.&nbsp;The&nbsp;decay<br>
+&nbsp;&nbsp;&nbsp;rate&nbsp;is&nbsp;modulated&nbsp;by&nbsp;GABA&nbsp;(more&nbsp;GABA&nbsp;→&nbsp;faster&nbsp;decay,&nbsp;it's<br>
+&nbsp;&nbsp;&nbsp;calming&nbsp;down)&nbsp;and&nbsp;arousal&nbsp;(more&nbsp;arousal&nbsp;→&nbsp;slower&nbsp;decay,<br>
+&nbsp;&nbsp;&nbsp;it's&nbsp;alert&nbsp;and&nbsp;things&nbsp;stay&nbsp;in&nbsp;mind).<br>
+&nbsp;<br>
+3.&nbsp;**Noise**:&nbsp;Two&nbsp;channels.&nbsp;Graded&nbsp;perturbation&nbsp;applies&nbsp;to&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;*active*&nbsp;field&nbsp;(fluctuation&nbsp;of&nbsp;live&nbsp;representations).&nbsp;The<br>
+&nbsp;&nbsp;&nbsp;dormant&nbsp;field&nbsp;ignites&nbsp;sparsely&nbsp;via&nbsp;Poisson&nbsp;events&nbsp;scaled<br>
+&nbsp;&nbsp;&nbsp;by&nbsp;the&nbsp;same&nbsp;noise&nbsp;amplitude&nbsp;—&nbsp;spontaneous&nbsp;activation<br>
+&nbsp;&nbsp;&nbsp;arrives&nbsp;as&nbsp;discrete&nbsp;sparks,&nbsp;not&nbsp;analog&nbsp;static&nbsp;on&nbsp;the&nbsp;whole<br>
+&nbsp;&nbsp;&nbsp;network.&nbsp;Serotonin&nbsp;modulates&nbsp;both&nbsp;(low&nbsp;serotonin&nbsp;→<br>
+&nbsp;&nbsp;&nbsp;noisier,&nbsp;more&nbsp;ruminative).<br>
+&nbsp;<br>
+4.&nbsp;**Re-digitization**:&nbsp;Activation&nbsp;below<br>
+&nbsp;&nbsp;&nbsp;``ACTIVATION_NOISE_FLOOR``&nbsp;snaps&nbsp;to&nbsp;zero&nbsp;each&nbsp;tick&nbsp;—&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;sub-noise&nbsp;tail&nbsp;cannot&nbsp;accumulate.&nbsp;Every<br>
+&nbsp;&nbsp;&nbsp;``SWEEP_INTERVAL_TICKS``&nbsp;the&nbsp;whole&nbsp;field&nbsp;is&nbsp;rescanned&nbsp;and<br>
+&nbsp;&nbsp;&nbsp;the&nbsp;active&nbsp;set&nbsp;rebuilt.<br>
+&nbsp;<br>
+5.&nbsp;**Neurochemical&nbsp;modulation**:<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;**Arousal**&nbsp;(NE&nbsp;+&nbsp;DA):&nbsp;scales&nbsp;the&nbsp;spread&nbsp;rate.&nbsp;High<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;arousal&nbsp;→&nbsp;activation&nbsp;spreads&nbsp;faster&nbsp;and&nbsp;further.<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;**GABA**:&nbsp;scales&nbsp;the&nbsp;decay&nbsp;rate.&nbsp;High&nbsp;GABA&nbsp;→&nbsp;faster<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;decay,&nbsp;the&nbsp;mind&nbsp;quiets&nbsp;down.<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;**ACh**&nbsp;(acetylcholine):&nbsp;focuses&nbsp;activation.&nbsp;High&nbsp;ACh<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sharpens&nbsp;the&nbsp;winner-take-all&nbsp;dynamics&nbsp;—&nbsp;the&nbsp;most&nbsp;active<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;concepts&nbsp;get&nbsp;a&nbsp;boost,&nbsp;the&nbsp;rest&nbsp;get&nbsp;suppressed.&nbsp;This<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;models&nbsp;the&nbsp;cholinergic&nbsp;attention&nbsp;signal&nbsp;from&nbsp;the&nbsp;basal<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;forebrain.<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;**Serotonin**:&nbsp;modulates&nbsp;noise.&nbsp;Low&nbsp;serotonin&nbsp;→&nbsp;more<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;noise&nbsp;(noisy,&nbsp;ruminative).&nbsp;High&nbsp;serotonin&nbsp;→&nbsp;less&nbsp;noise<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(stable,&nbsp;calm).<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;dict&nbsp;of&nbsp;{concept_id:&nbsp;activation}&nbsp;for&nbsp;concepts&nbsp;that<br>
+are&nbsp;currently&nbsp;above&nbsp;the&nbsp;activation&nbsp;threshold&nbsp;(0.1).&nbsp;This&nbsp;lets<br>
+the&nbsp;caller&nbsp;know&nbsp;what's&nbsp;"on&nbsp;its&nbsp;mind"&nbsp;right&nbsp;now.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-decay_activation"><strong>decay_activation</strong></a>(self, rate: 'float' = 0.05) -&gt; 'None'</dt><dd><span class="code">Decay&nbsp;all&nbsp;concept&nbsp;activations&nbsp;using&nbsp;exponential&nbsp;decay.<br>
+&nbsp;<br>
+Exponential&nbsp;decay:&nbsp;a(t+1)&nbsp;=&nbsp;a(t)&nbsp;*&nbsp;(1&nbsp;-&nbsp;rate)<br>
+This&nbsp;is&nbsp;biologically&nbsp;plausible&nbsp;—&nbsp;neural&nbsp;activation&nbsp;decays<br>
+proportionally&nbsp;to&nbsp;its&nbsp;current&nbsp;level,&nbsp;not&nbsp;by&nbsp;a&nbsp;fixed&nbsp;amount.<br>
+A&nbsp;concept&nbsp;at&nbsp;activation&nbsp;1.0&nbsp;loses&nbsp;0.05,&nbsp;but&nbsp;a&nbsp;concept&nbsp;at&nbsp;0.1<br>
+loses&nbsp;only&nbsp;0.005.&nbsp;This&nbsp;preserves&nbsp;recently-activated&nbsp;concepts<br>
+longer&nbsp;than&nbsp;ones&nbsp;that&nbsp;were&nbsp;barely&nbsp;activated.<br>
+&nbsp;<br>
+Semantic&nbsp;hubs&nbsp;decay&nbsp;more&nbsp;slowly&nbsp;(0.7x&nbsp;decay&nbsp;rate)&nbsp;—&nbsp;they&nbsp;are<br>
+convergence&nbsp;zones&nbsp;that&nbsp;maintain&nbsp;activation&nbsp;longer&nbsp;to&nbsp;integrate<br>
+information&nbsp;across&nbsp;the&nbsp;network&nbsp;(Damasio,&nbsp;1989).<br>
+&nbsp;<br>
+Motor&nbsp;concepts&nbsp;have&nbsp;shorter&nbsp;decay&nbsp;(1.3x&nbsp;decay&nbsp;rate)&nbsp;—&nbsp;motor<br>
+representations&nbsp;are&nbsp;transient,&nbsp;activating&nbsp;briefly&nbsp;for&nbsp;action<br>
+execution&nbsp;then&nbsp;fading&nbsp;quickly&nbsp;(motor&nbsp;cortex&nbsp;shows&nbsp;rapid<br>
+onset-offset&nbsp;dynamics).</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-ground_activation"><strong>ground_activation</strong></a>(self, boost: 'float' = 0.05) -&gt; 'dict[str, float]'</dt><dd><span class="code">Apply&nbsp;modality-specific&nbsp;activation&nbsp;boosts&nbsp;(sensorimotor&nbsp;grounding).<br>
+&nbsp;<br>
+When&nbsp;concepts&nbsp;in&nbsp;a&nbsp;given&nbsp;modality&nbsp;are&nbsp;active,&nbsp;other&nbsp;concepts&nbsp;in<br>
+the&nbsp;same&nbsp;modality&nbsp;receive&nbsp;a&nbsp;small&nbsp;activation&nbsp;boost.&nbsp;This&nbsp;models<br>
+within-modality&nbsp;priming&nbsp;—&nbsp;the&nbsp;sensorimotor&nbsp;grounding&nbsp;of&nbsp;concepts<br>
+means&nbsp;that&nbsp;activating&nbsp;one&nbsp;visual&nbsp;concept&nbsp;slightly&nbsp;primes&nbsp;other<br>
+visual&nbsp;concepts,&nbsp;one&nbsp;motor&nbsp;concept&nbsp;primes&nbsp;other&nbsp;motor&nbsp;concepts,&nbsp;etc.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;mechanism&nbsp;by&nbsp;which&nbsp;action&nbsp;concepts&nbsp;get&nbsp;sensorimotor<br>
+grounding:&nbsp;when&nbsp;a&nbsp;MOTOR&nbsp;concept&nbsp;activates,&nbsp;it&nbsp;slightly&nbsp;activates<br>
+other&nbsp;MOTOR&nbsp;concepts&nbsp;(within-modality&nbsp;spreading),&nbsp;simulating&nbsp;the<br>
+weak&nbsp;activation&nbsp;of&nbsp;related&nbsp;motor&nbsp;representations.<br>
+&nbsp;<br>
+Only&nbsp;concepts&nbsp;with&nbsp;activation&nbsp;above&nbsp;a&nbsp;threshold&nbsp;(0.1)&nbsp;contribute<br>
+to&nbsp;the&nbsp;priming.&nbsp;The&nbsp;boost&nbsp;is&nbsp;proportional&nbsp;to&nbsp;the&nbsp;mean&nbsp;activation<br>
+of&nbsp;active&nbsp;concepts&nbsp;in&nbsp;that&nbsp;modality.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;boost:&nbsp;Maximum&nbsp;boost&nbsp;amount&nbsp;per&nbsp;modality&nbsp;(default&nbsp;0.05).<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;dict&nbsp;mapping&nbsp;modality&nbsp;names&nbsp;to&nbsp;the&nbsp;boost&nbsp;applied.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-most_activated"><strong>most_activated</strong></a>(self, n: 'int' = 10) -&gt; 'list[tuple[str, float]]'</dt><dd><span class="code">Return&nbsp;the&nbsp;N&nbsp;most&nbsp;activated&nbsp;concepts.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-spread_activation"><strong>spread_activation</strong></a>(self, concepts: 'list[str]', amount: 'float' = 0.2, depth: 'int' = 2, column_context: 'set[str] | None' = None) -&gt; 'dict[str, float]'</dt><dd><span class="code">Spread&nbsp;activation&nbsp;from&nbsp;given&nbsp;concepts&nbsp;through&nbsp;the&nbsp;network.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;spreading&nbsp;activation&nbsp;—&nbsp;a&nbsp;classic&nbsp;cognitive&nbsp;science<br>
+model&nbsp;where&nbsp;activating&nbsp;one&nbsp;concept&nbsp;primes&nbsp;related&nbsp;concepts.<br>
+Used&nbsp;to&nbsp;find&nbsp;what's&nbsp;relevant&nbsp;to&nbsp;the&nbsp;current&nbsp;conversation.<br>
+&nbsp;<br>
+Column-aware&nbsp;spreading&nbsp;(cortical&nbsp;column&nbsp;model):<br>
+-&nbsp;Activation&nbsp;spreads&nbsp;densely&nbsp;within&nbsp;the&nbsp;same&nbsp;column&nbsp;(full&nbsp;strength)<br>
+-&nbsp;Activation&nbsp;crosses&nbsp;bridge&nbsp;edges&nbsp;to&nbsp;other&nbsp;columns&nbsp;at&nbsp;reduced<br>
+&nbsp;&nbsp;strength&nbsp;(BRIDGE_ATTENUATION&nbsp;=&nbsp;0.3),&nbsp;mirroring&nbsp;how&nbsp;cortical<br>
+&nbsp;&nbsp;association&nbsp;fibers&nbsp;are&nbsp;weaker&nbsp;than&nbsp;intra-column&nbsp;connections<br>
+-&nbsp;When&nbsp;column_context&nbsp;is&nbsp;provided&nbsp;(the&nbsp;VIP&nbsp;disinhibition&nbsp;signal),<br>
+&nbsp;&nbsp;concepts&nbsp;in&nbsp;context&nbsp;columns&nbsp;receive&nbsp;full&nbsp;activation&nbsp;while<br>
+&nbsp;&nbsp;concepts&nbsp;in&nbsp;non-context&nbsp;columns&nbsp;receive&nbsp;attenuated&nbsp;activation<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;dict&nbsp;of&nbsp;{concept_id:&nbsp;activation_level}&nbsp;for&nbsp;all<br>
+activated&nbsp;concepts.</span></dd></dl>
+
+<hr>
+Methods inherited from <a href="Self_World.temporal_lobe.concepts.extraction.html#ExtractionMixin">Self_World.temporal_lobe.concepts.extraction.ExtractionMixin</a>:<br>
+<dl><dt><a name="ConceptNetwork-extract_from_text"><strong>extract_from_text</strong></a>(self, text: 'str') -&gt; 'list[str]'</dt><dd><span class="code">Extract&nbsp;potential&nbsp;concepts&nbsp;(noun&nbsp;phrases)&nbsp;from&nbsp;text.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;a&nbsp;heuristic&nbsp;noun-phrase&nbsp;extractor.&nbsp;Without&nbsp;a&nbsp;POS&nbsp;tagger<br>
+or&nbsp;dependency&nbsp;parser,&nbsp;we&nbsp;use&nbsp;patterns:<br>
+&nbsp;<br>
+1.&nbsp;Capitalized&nbsp;sequences:&nbsp;"United&nbsp;States",&nbsp;"Supreme&nbsp;Court"<br>
+2.&nbsp;"of"&nbsp;phrases:&nbsp;"bill&nbsp;of&nbsp;rights",&nbsp;"court&nbsp;of&nbsp;appeals"<br>
+3.&nbsp;Noun-noun&nbsp;compounds:&nbsp;"case&nbsp;law",&nbsp;"property&nbsp;tax"&nbsp;(lowercase<br>
+&nbsp;&nbsp;&nbsp;words&nbsp;&gt;&nbsp;3&nbsp;chars&nbsp;adjacent&nbsp;to&nbsp;each&nbsp;other)<br>
+4.&nbsp;Single&nbsp;long&nbsp;words:&nbsp;"cognition",&nbsp;"neurochemistry"<br>
+5.&nbsp;Adjective&nbsp;+&nbsp;noun:&nbsp;"neural&nbsp;activity",&nbsp;"emotional&nbsp;state"<br>
+&nbsp;<br>
+Single&nbsp;short&nbsp;words&nbsp;(&lt;&nbsp;4&nbsp;chars),&nbsp;verbs,&nbsp;and&nbsp;function&nbsp;words&nbsp;are<br>
+excluded.&nbsp;This&nbsp;prevents&nbsp;the&nbsp;noise&nbsp;that&nbsp;plagued&nbsp;the&nbsp;old&nbsp;extractor<br>
+(e.g.&nbsp;"United"&nbsp;and&nbsp;"States"&nbsp;as&nbsp;separate&nbsp;concepts).<br>
+&nbsp;<br>
+Returns&nbsp;concept&nbsp;names&nbsp;only.&nbsp;Use&nbsp;:meth:`extract_from_text_typed`<br>
+to&nbsp;also&nbsp;get&nbsp;the&nbsp;learned&nbsp;proper-noun&nbsp;flag&nbsp;for&nbsp;each&nbsp;concept.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-extract_from_text_typed"><strong>extract_from_text_typed</strong></a>(self, text: 'str') -&gt; 'list[tuple[str, bool]]'</dt><dd><span class="code">Extract&nbsp;concepts&nbsp;with&nbsp;a&nbsp;learned&nbsp;proper-noun&nbsp;flag.<br>
+&nbsp;<br>
+Like&nbsp;:meth:`extract_from_text`&nbsp;but&nbsp;returns&nbsp;``(name,&nbsp;is_proper)``<br>
+tuples.&nbsp;``is_proper``&nbsp;is&nbsp;True&nbsp;when&nbsp;the&nbsp;concept&nbsp;was&nbsp;extracted&nbsp;from<br>
+a&nbsp;non-sentence-initial&nbsp;capitalized&nbsp;token&nbsp;—&nbsp;the&nbsp;unambiguous<br>
+proper-noun&nbsp;signal.&nbsp;The&nbsp;language&nbsp;engine&nbsp;uses&nbsp;this&nbsp;to&nbsp;capitalize<br>
+learned&nbsp;proper&nbsp;nouns&nbsp;mid-sentence&nbsp;while&nbsp;keeping&nbsp;common&nbsp;nouns<br>
+lowercase.<br>
+&nbsp;<br>
+The&nbsp;flag&nbsp;is&nbsp;ORed&nbsp;across&nbsp;occurrences:&nbsp;if&nbsp;a&nbsp;concept&nbsp;appears&nbsp;both<br>
+sentence-initial&nbsp;(ambiguous)&nbsp;and&nbsp;mid-sentence&nbsp;capitalized,&nbsp;the<br>
+mid-sentence&nbsp;occurrence&nbsp;confirms&nbsp;it&nbsp;as&nbsp;proper.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-learn_from_statement"><strong>learn_from_statement</strong></a>(self, subject: 'str', relation: 'str', obj: 'str') -&gt; 'Edge | None'</dt><dd><span class="code">Learn&nbsp;a&nbsp;relationship&nbsp;from&nbsp;a&nbsp;parsed&nbsp;statement.<br>
+&nbsp;<br>
+Attempts&nbsp;to&nbsp;map&nbsp;a&nbsp;natural&nbsp;language&nbsp;relation&nbsp;to&nbsp;a&nbsp;RelationType<br>
+and&nbsp;add&nbsp;it&nbsp;to&nbsp;the&nbsp;network.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-learn_from_text"><strong>learn_from_text</strong></a>(self, text: 'str') -&gt; 'list[Edge]'</dt><dd><span class="code">Extract&nbsp;and&nbsp;learn&nbsp;both&nbsp;concepts&nbsp;and&nbsp;relationships&nbsp;from&nbsp;text.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;main&nbsp;entry&nbsp;point&nbsp;for&nbsp;learning&nbsp;from&nbsp;a&nbsp;natural&nbsp;language<br>
+statement.&nbsp;It:<br>
+1.&nbsp;Extracts&nbsp;noun&nbsp;phrases&nbsp;as&nbsp;concepts<br>
+2.&nbsp;Parses&nbsp;relationships&nbsp;between&nbsp;concepts<br>
+3.&nbsp;Adds&nbsp;everything&nbsp;to&nbsp;the&nbsp;network<br>
+&nbsp;<br>
+Concepts&nbsp;extracted&nbsp;from&nbsp;a&nbsp;non-sentence-initial&nbsp;capitalized<br>
+token&nbsp;are&nbsp;marked&nbsp;as&nbsp;proper&nbsp;nouns&nbsp;(``properties["proper_noun"]``),<br>
+so&nbsp;the&nbsp;language&nbsp;engine&nbsp;capitalizes&nbsp;them&nbsp;mid-sentence&nbsp;while<br>
+keeping&nbsp;common&nbsp;nouns&nbsp;lowercase.<br>
+&nbsp;<br>
+Returns&nbsp;the&nbsp;list&nbsp;of&nbsp;edges&nbsp;created&nbsp;(may&nbsp;be&nbsp;empty).</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-parse_relationships"><strong>parse_relationships</strong></a>(self, text: 'str') -&gt; 'list[tuple[str, RelationType, str]]'</dt><dd><span class="code">Parse&nbsp;relationships&nbsp;from&nbsp;a&nbsp;natural&nbsp;language&nbsp;statement.<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;list&nbsp;of&nbsp;(subject,&nbsp;relation_type,&nbsp;object)&nbsp;tuples.<br>
+A&nbsp;single&nbsp;sentence&nbsp;may&nbsp;yield&nbsp;multiple&nbsp;relationships&nbsp;if&nbsp;it<br>
+contains&nbsp;multiple&nbsp;clauses&nbsp;or&nbsp;compound&nbsp;subjects/objects.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;pattern-based,&nbsp;not&nbsp;dependency-parsed.&nbsp;It&nbsp;handles<br>
+common&nbsp;declarative&nbsp;statements&nbsp;like&nbsp;"X&nbsp;is&nbsp;a&nbsp;Y",&nbsp;"X&nbsp;causes&nbsp;Y",<br>
+"X&nbsp;depends&nbsp;on&nbsp;Y",&nbsp;etc.<br>
+&nbsp;<br>
+Improvements&nbsp;over&nbsp;the&nbsp;original&nbsp;single-match&nbsp;parser:<br>
+-&nbsp;Splits&nbsp;sentences&nbsp;on&nbsp;clause&nbsp;boundaries&nbsp;(";",&nbsp;"&nbsp;and&nbsp;",&nbsp;"&nbsp;but&nbsp;")<br>
+&nbsp;&nbsp;so&nbsp;"X&nbsp;causes&nbsp;Y&nbsp;and&nbsp;Z&nbsp;enables&nbsp;W"&nbsp;yields&nbsp;two&nbsp;relationships.<br>
+-&nbsp;Expands&nbsp;gapping:&nbsp;"X&nbsp;verb&nbsp;A,&nbsp;verb&nbsp;B,&nbsp;and&nbsp;verb&nbsp;C"&nbsp;→<br>
+&nbsp;&nbsp;X&nbsp;verb&nbsp;A,&nbsp;X&nbsp;verb&nbsp;B,&nbsp;X&nbsp;verb&nbsp;C.<br>
+-&nbsp;Splits&nbsp;compound&nbsp;subjects/objects&nbsp;on&nbsp;","&nbsp;/&nbsp;"&nbsp;and&nbsp;"&nbsp;so<br>
+&nbsp;&nbsp;"X,&nbsp;Y,&nbsp;and&nbsp;Z&nbsp;are&nbsp;W"&nbsp;yields&nbsp;is_a(X,W),&nbsp;is_a(Y,W),&nbsp;is_a(Z,W).<br>
+-&nbsp;Strips&nbsp;leading&nbsp;articles&nbsp;and&nbsp;skips&nbsp;embedded&nbsp;clauses<br>
+&nbsp;&nbsp;("which&nbsp;...",&nbsp;"that&nbsp;...").<br>
+-&nbsp;Once&nbsp;a&nbsp;pattern&nbsp;matches&nbsp;a&nbsp;clause,&nbsp;it&nbsp;takes&nbsp;the&nbsp;most&nbsp;specific<br>
+&nbsp;&nbsp;match&nbsp;and&nbsp;breaks;&nbsp;compound&nbsp;items&nbsp;are&nbsp;then&nbsp;expanded.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-summarize"><strong>summarize</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Human-readable&nbsp;summary&nbsp;of&nbsp;the&nbsp;concept&nbsp;network.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-teach"><strong>teach</strong></a>(self, subject: 'str', relation: 'RelationType', obj: 'str', confidence: 'float' = 0.8, origin: 'str' = 'taught') -&gt; 'Edge | None'</dt><dd><span class="code">Directly&nbsp;teach&nbsp;a&nbsp;relationship&nbsp;with&nbsp;high&nbsp;confidence.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;programmatic&nbsp;teaching&nbsp;interface.&nbsp;Unlike<br>
+learn_from_statement&nbsp;(which&nbsp;maps&nbsp;natural&nbsp;language),&nbsp;this<br>
+takes&nbsp;a&nbsp;RelationType&nbsp;directly&nbsp;and&nbsp;adds&nbsp;it&nbsp;with&nbsp;higher<br>
+confidence&nbsp;than&nbsp;conversation-derived&nbsp;knowledge.<br>
+&nbsp;<br>
+Both&nbsp;concepts&nbsp;are&nbsp;created&nbsp;if&nbsp;they&nbsp;don't&nbsp;exist,&nbsp;with&nbsp;the<br>
+given&nbsp;confidence&nbsp;level.</span></dd></dl>
+
+<dl><dt><a name="ConceptNetwork-teach_concept"><strong>teach_concept</strong></a>(self, name: 'str', confidence: 'float' = 0.8, aliases: 'set[str] | None' = None, origin: 'str' = 'taught') -&gt; 'Concept'</dt><dd><span class="code">Directly&nbsp;teach&nbsp;a&nbsp;concept&nbsp;with&nbsp;high&nbsp;confidence.<br>
+&nbsp;<br>
+Unlike&nbsp;conversation-derived&nbsp;concepts&nbsp;(confidence&nbsp;0.4),<br>
+taught&nbsp;concepts&nbsp;start&nbsp;with&nbsp;high&nbsp;confidence.</span></dd></dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>ClassVar</strong> = typing.ClassVar<br>
+<strong>QUALITY_THRESHOLD</strong> = 0.15<br>
+<strong>logger</strong> = &lt;Logger Self_World.temporal_lobe.concepts.network (WARNING)&gt;</td></tr></table>
+</body></html>

@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.frontal_lobe.reasoning.planning</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.frontal_lobe.html" class="white">frontal_lobe</a>.<a href="Self_World.frontal_lobe.reasoning.html" class="white">reasoning</a>.planning</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/reasoning/planning.py">/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/reasoning/planning.py</a></td></tr></table>
+    <p><span class="code">Planning&nbsp;—&nbsp;generating,&nbsp;executing,&nbsp;and&nbsp;revising&nbsp;multi-step&nbsp;plans<br>
+to&nbsp;achieve&nbsp;goals&nbsp;over&nbsp;multiple&nbsp;turns.<br>
+&nbsp;<br>
+Genesis&nbsp;had&nbsp;scaffolding&nbsp;for&nbsp;planning&nbsp;but&nbsp;no&nbsp;genuine&nbsp;planning<br>
+process.&nbsp;The&nbsp;``ExecutiveFunction.plan()``&nbsp;was&nbsp;a&nbsp;greedy&nbsp;keyword-<br>
+overlap&nbsp;heuristic&nbsp;whose&nbsp;output&nbsp;only&nbsp;nudged&nbsp;confidence&nbsp;by&nbsp;±0.1.&nbsp;The<br>
+``ProblemSolver``&nbsp;planned&nbsp;*reasoning&nbsp;steps*&nbsp;(which&nbsp;knowledge-gathering<br>
+operators&nbsp;to&nbsp;apply),&nbsp;not&nbsp;*actions*&nbsp;(what&nbsp;to&nbsp;do).&nbsp;Goals&nbsp;persisted<br>
+across&nbsp;turns&nbsp;but&nbsp;had&nbsp;no&nbsp;plan&nbsp;structure&nbsp;—&nbsp;they&nbsp;were&nbsp;tried&nbsp;reactively<br>
+each&nbsp;turn,&nbsp;not&nbsp;pursued&nbsp;via&nbsp;a&nbsp;multi-step&nbsp;plan.&nbsp;No&nbsp;plan&nbsp;persistence,<br>
+no&nbsp;plan&nbsp;execution,&nbsp;no&nbsp;plan&nbsp;evaluation,&nbsp;no&nbsp;plan&nbsp;revision.<br>
+&nbsp;<br>
+This&nbsp;module&nbsp;closes&nbsp;that&nbsp;gap&nbsp;with&nbsp;a&nbsp;**planning&nbsp;engine**&nbsp;that:<br>
+&nbsp;<br>
+1.&nbsp;**Decomposes&nbsp;a&nbsp;goal&nbsp;into&nbsp;ordered&nbsp;steps**&nbsp;—&nbsp;uses&nbsp;the&nbsp;concept<br>
+&nbsp;&nbsp;&nbsp;network's&nbsp;typed&nbsp;edges&nbsp;(DEPENDS_ON,&nbsp;ENABLES,&nbsp;CAUSES,&nbsp;LEADS_TO)&nbsp;to<br>
+&nbsp;&nbsp;&nbsp;identify&nbsp;prerequisites&nbsp;and&nbsp;causal&nbsp;chains,&nbsp;producing&nbsp;an&nbsp;ordered<br>
+&nbsp;&nbsp;&nbsp;sequence&nbsp;of&nbsp;steps&nbsp;that,&nbsp;if&nbsp;executed,&nbsp;achieve&nbsp;the&nbsp;goal.<br>
+&nbsp;<br>
+2.&nbsp;**Evaluates&nbsp;plans&nbsp;for&nbsp;feasibility**&nbsp;—&nbsp;each&nbsp;step&nbsp;is&nbsp;checked&nbsp;against<br>
+&nbsp;&nbsp;&nbsp;the&nbsp;concept&nbsp;network:&nbsp;does&nbsp;the&nbsp;prerequisite&nbsp;concept&nbsp;exist?&nbsp;Is<br>
+&nbsp;&nbsp;&nbsp;there&nbsp;a&nbsp;known&nbsp;path&nbsp;to&nbsp;it?&nbsp;Steps&nbsp;that&nbsp;can't&nbsp;be&nbsp;accomplished&nbsp;are<br>
+&nbsp;&nbsp;&nbsp;flagged,&nbsp;and&nbsp;the&nbsp;plan's&nbsp;overall&nbsp;feasibility&nbsp;score&nbsp;reflects&nbsp;this.<br>
+&nbsp;<br>
+3.&nbsp;**Persists&nbsp;plans&nbsp;across&nbsp;turns**&nbsp;—&nbsp;plans&nbsp;are&nbsp;stored&nbsp;in&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;planning&nbsp;engine&nbsp;and&nbsp;survive&nbsp;across&nbsp;turns.&nbsp;Each&nbsp;turn,&nbsp;the&nbsp;engine<br>
+&nbsp;&nbsp;&nbsp;advances&nbsp;the&nbsp;plan&nbsp;by&nbsp;one&nbsp;step.<br>
+&nbsp;<br>
+4.&nbsp;**Executes&nbsp;one&nbsp;step&nbsp;per&nbsp;turn**&nbsp;—&nbsp;the&nbsp;current&nbsp;step&nbsp;is&nbsp;returned&nbsp;to<br>
+&nbsp;&nbsp;&nbsp;the&nbsp;cognition&nbsp;engine,&nbsp;which&nbsp;uses&nbsp;the&nbsp;ProblemSolver&nbsp;and<br>
+&nbsp;&nbsp;&nbsp;DecisionMaker&nbsp;to&nbsp;accomplish&nbsp;it.<br>
+&nbsp;<br>
+5.&nbsp;**Tracks&nbsp;progress**&nbsp;—&nbsp;each&nbsp;step&nbsp;has&nbsp;a&nbsp;status&nbsp;(pending,&nbsp;in_progress,<br>
+&nbsp;&nbsp;&nbsp;completed,&nbsp;failed).&nbsp;The&nbsp;engine&nbsp;tracks&nbsp;which&nbsp;step&nbsp;is&nbsp;current&nbsp;and<br>
+&nbsp;&nbsp;&nbsp;how&nbsp;many&nbsp;remain.<br>
+&nbsp;<br>
+6.&nbsp;**Revises&nbsp;on&nbsp;failure**&nbsp;—&nbsp;when&nbsp;a&nbsp;step&nbsp;fails,&nbsp;the&nbsp;engine&nbsp;can<br>
+&nbsp;&nbsp;&nbsp;replan:&nbsp;find&nbsp;an&nbsp;alternative&nbsp;path,&nbsp;insert&nbsp;new&nbsp;prerequisites,&nbsp;or<br>
+&nbsp;&nbsp;&nbsp;mark&nbsp;the&nbsp;goal&nbsp;as&nbsp;blocked&nbsp;if&nbsp;no&nbsp;path&nbsp;exists.<br>
+&nbsp;<br>
+##&nbsp;Integration<br>
+&nbsp;<br>
+The&nbsp;engine&nbsp;is&nbsp;wired&nbsp;into&nbsp;the&nbsp;cognition&nbsp;engine&nbsp;as<br>
+``self.<strong>planning_engine</strong>``&nbsp;and&nbsp;called&nbsp;from&nbsp;``_pursue_unresolved_goals``.<br>
+Instead&nbsp;of&nbsp;reactively&nbsp;trying&nbsp;to&nbsp;solve&nbsp;each&nbsp;goal&nbsp;in&nbsp;one&nbsp;shot,&nbsp;the<br>
+engine&nbsp;creates&nbsp;a&nbsp;plan&nbsp;for&nbsp;each&nbsp;goal&nbsp;and&nbsp;executes&nbsp;it&nbsp;step&nbsp;by&nbsp;step<br>
+across&nbsp;turns.&nbsp;This&nbsp;replaces&nbsp;the&nbsp;reactive&nbsp;goal&nbsp;pursuit&nbsp;with&nbsp;planned<br>
+goal&nbsp;achievement.<br>
+&nbsp;<br>
+The&nbsp;engine&nbsp;also&nbsp;uses&nbsp;``CounterfactualReasoning``&nbsp;for&nbsp;plan<br>
+evaluation&nbsp;—&nbsp;simulating&nbsp;"what&nbsp;if&nbsp;this&nbsp;step&nbsp;were&nbsp;skipped?"&nbsp;to&nbsp;assess<br>
+each&nbsp;step's&nbsp;necessity&nbsp;—&nbsp;and&nbsp;the&nbsp;``ProblemSolver``&nbsp;for&nbsp;step<br>
+execution.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.planning.html#Plan">Plan</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.planning.html#PlanStep">PlanStep</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.planning.html#Planner">Planner</a>
+</dt></dl>
+</dd>
+<dt class="heading-text"><a href="enum.html#Enum">enum.Enum</a>(<a href="builtins.html#object">builtins.object</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.planning.html#PlanStatus">PlanStatus</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.planning.html#PlanStepStatus">PlanStepStatus</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Plan">class <strong>Plan</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Plan">Plan</a>(goal:&nbsp;'str',&nbsp;goal_type:&nbsp;'str',&nbsp;steps:&nbsp;'list[<a href="#PlanStep">PlanStep</a>]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;status:&nbsp;'<a href="#PlanStatus">PlanStatus</a>'&nbsp;=&nbsp;&amp;lt;<a href="#PlanStatus">PlanStatus</a>.DRAFT:&nbsp;'draft'&amp;gt;,&nbsp;current_step_index:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;created_at:&nbsp;'int'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;updated_at:&nbsp;'int'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;feasibility_score:&nbsp;'float'&nbsp;=&nbsp;0.5,&nbsp;revision_count:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;failure_reason:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;task_context:&nbsp;'Any'&nbsp;=&nbsp;None,&nbsp;prior_skill_id:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;episode_recorded:&nbsp;'bool'&nbsp;=&nbsp;False)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;multi-step&nbsp;plan&nbsp;to&nbsp;achieve&nbsp;a&nbsp;goal.<br>
+&nbsp;<br>
+A&nbsp;plan&nbsp;is&nbsp;an&nbsp;ordered&nbsp;sequence&nbsp;of&nbsp;steps.&nbsp;Each&nbsp;turn,&nbsp;the&nbsp;planning<br>
+engine&nbsp;advances&nbsp;the&nbsp;plan&nbsp;by&nbsp;one&nbsp;step.&nbsp;The&nbsp;plan&nbsp;persists&nbsp;across<br>
+turns&nbsp;until&nbsp;completed,&nbsp;blocked,&nbsp;or&nbsp;abandoned.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Plan-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="Plan-__init__"><strong>__init__</strong></a>(self, goal: 'str', goal_type: 'str', steps: 'list[PlanStep]' = &lt;factory&gt;, status: 'PlanStatus' = &lt;PlanStatus.DRAFT: 'draft'&gt;, current_step_index: 'int' = 0, created_at: 'int' = &lt;factory&gt;, updated_at: 'int' = &lt;factory&gt;, feasibility_score: 'float' = 0.5, revision_count: 'int' = 0, failure_reason: 'str' = '', task_context: 'Any' = None, prior_skill_id: 'str' = '', episode_recorded: 'bool' = False) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Plan-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="Plan-describe"><strong>describe</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Human-readable&nbsp;plan&nbsp;summary.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>current_step</strong></dt>
+<dd><span class="code">The&nbsp;step&nbsp;currently&nbsp;being&nbsp;executed,&nbsp;if&nbsp;any.</span></dd>
+</dl>
+<dl><dt><strong>is_complete</strong></dt>
+<dd><span class="code">Whether&nbsp;all&nbsp;steps&nbsp;are&nbsp;completed.</span></dd>
+</dl>
+<dl><dt><strong>progress</strong></dt>
+<dd><span class="code">Fraction&nbsp;of&nbsp;steps&nbsp;completed&nbsp;(0..1).</span></dd>
+</dl>
+<dl><dt><strong>remaining_steps</strong></dt>
+<dd><span class="code">How&nbsp;many&nbsp;steps&nbsp;remain&nbsp;to&nbsp;be&nbsp;executed.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>created_at</strong></dt>
+</dl>
+<dl><dt><strong>current_step_index</strong></dt>
+</dl>
+<dl><dt><strong>episode_recorded</strong></dt>
+</dl>
+<dl><dt><strong>failure_reason</strong></dt>
+</dl>
+<dl><dt><strong>feasibility_score</strong></dt>
+</dl>
+<dl><dt><strong>goal</strong></dt>
+</dl>
+<dl><dt><strong>goal_type</strong></dt>
+</dl>
+<dl><dt><strong>prior_skill_id</strong></dt>
+</dl>
+<dl><dt><strong>revision_count</strong></dt>
+</dl>
+<dl><dt><strong>status</strong></dt>
+</dl>
+<dl><dt><strong>steps</strong></dt>
+</dl>
+<dl><dt><strong>task_context</strong></dt>
+</dl>
+<dl><dt><strong>updated_at</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'created_at': 'int', 'current_step_index': 'int', 'episode_recorded': 'bool', 'failure_reason': 'str', 'feasibility_score': 'float', 'goal': 'str', 'goal_type': 'str', 'prior_skill_id': 'str', 'revision_count': 'int', 'status': 'PlanStatus', ...}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'created_at': Field(name='created_at',type='int',default=&lt;data...appingproxy({}),kw_only=False,_field_type=_FIELD), 'current_step_index': Field(name='current_step_index',type='int',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'episode_recorded': Field(name='episode_recorded',type='bool',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'failure_reason': Field(name='failure_reason',type='str',default='...appingproxy({}),kw_only=False,_field_type=_FIELD), 'feasibility_score': Field(name='feasibility_score',type='float',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'goal': Field(name='goal',type='str',default=&lt;dataclasse...appingproxy({}),kw_only=False,_field_type=_FIELD), 'goal_type': Field(name='goal_type',type='str',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'prior_skill_id': Field(name='prior_skill_id',type='str',default='...appingproxy({}),kw_only=False,_field_type=_FIELD), 'revision_count': Field(name='revision_count',type='int',default=0...appingproxy({}),kw_only=False,_field_type=_FIELD), 'status': Field(name='status',type='PlanStatus',default=&lt;P...appingproxy({}),kw_only=False,_field_type=_FIELD), ...}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('goal', 'goal_type', 'steps', 'status', 'current_step_index', 'created_at', 'updated_at', 'feasibility_score', 'revision_count', 'failure_reason', 'task_context', 'prior_skill_id', 'episode_recorded')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="PlanStatus">class <strong>PlanStatus</strong></a>(<a href="enum.html#Enum">enum.Enum</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#PlanStatus">PlanStatus</a>(*values)<br>
+&nbsp;<br>
+Lifecycle&nbsp;state&nbsp;of&nbsp;an&nbsp;overall&nbsp;plan.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.frontal_lobe.reasoning.planning.html#PlanStatus">PlanStatus</a></dd>
+<dd><a href="enum.html#Enum">enum.Enum</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>ABANDONED</strong> = &lt;PlanStatus.ABANDONED: 'abandoned'&gt;</dl>
+
+<dl><dt><strong>ACTIVE</strong> = &lt;PlanStatus.ACTIVE: 'active'&gt;</dl>
+
+<dl><dt><strong>BLOCKED</strong> = &lt;PlanStatus.BLOCKED: 'blocked'&gt;</dl>
+
+<dl><dt><strong>COMPLETED</strong> = &lt;PlanStatus.COMPLETED: 'completed'&gt;</dl>
+
+<dl><dt><strong>DRAFT</strong> = &lt;PlanStatus.DRAFT: 'draft'&gt;</dl>
+
+<hr>
+Data descriptors inherited from <a href="enum.html#Enum">enum.Enum</a>:<br>
+<dl><dt><strong>name</strong></dt>
+<dd><span class="code">The&nbsp;name&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<dl><dt><strong>value</strong></dt>
+<dd><span class="code">The&nbsp;value&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<hr>
+Static methods inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><a name="PlanStatus-__contains__"><strong>__contains__</strong></a>(value)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;`value`&nbsp;is&nbsp;in&nbsp;`cls`.<br>
+&nbsp;<br>
+`value`&nbsp;is&nbsp;in&nbsp;`cls`&nbsp;if:<br>
+1)&nbsp;`value`&nbsp;is&nbsp;a&nbsp;member&nbsp;of&nbsp;`cls`,&nbsp;or<br>
+2)&nbsp;`value`&nbsp;is&nbsp;the&nbsp;value&nbsp;of&nbsp;one&nbsp;of&nbsp;the&nbsp;`cls`'s&nbsp;members.</span></dd></dl>
+
+<dl><dt><a name="PlanStatus-__getitem__"><strong>__getitem__</strong></a>(name)</dt><dd><span class="code">Return&nbsp;the&nbsp;member&nbsp;matching&nbsp;`name`.</span></dd></dl>
+
+<dl><dt><a name="PlanStatus-__iter__"><strong>__iter__</strong></a>()</dt><dd><span class="code">Return&nbsp;members&nbsp;in&nbsp;definition&nbsp;order.</span></dd></dl>
+
+<dl><dt><a name="PlanStatus-__len__"><strong>__len__</strong></a>()</dt><dd><span class="code">Return&nbsp;the&nbsp;number&nbsp;of&nbsp;members&nbsp;(no&nbsp;aliases)</span></dd></dl>
+
+<hr>
+Readonly properties inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><strong>__members__</strong></dt>
+<dd><span class="code">Returns&nbsp;a&nbsp;mapping&nbsp;of&nbsp;member&nbsp;name-&gt;value.<br>
+&nbsp;<br>
+This&nbsp;mapping&nbsp;lists&nbsp;all&nbsp;enum&nbsp;members,&nbsp;including&nbsp;aliases.&nbsp;Note&nbsp;that&nbsp;this<br>
+is&nbsp;a&nbsp;read-only&nbsp;view&nbsp;of&nbsp;the&nbsp;internal&nbsp;mapping.</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="PlanStep">class <strong>PlanStep</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#PlanStep">PlanStep</a>(description:&nbsp;'str',&nbsp;target_concept:&nbsp;'str',&nbsp;step_type:&nbsp;'str',&nbsp;prerequisites:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;status:&nbsp;'<a href="#PlanStepStatus">PlanStepStatus</a>'&nbsp;=&nbsp;&amp;lt;<a href="#PlanStepStatus">PlanStepStatus</a>.PENDING:&nbsp;'pending'&amp;gt;,&nbsp;attempt_count:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;max_attempts:&nbsp;'int'&nbsp;=&nbsp;3,&nbsp;result_summary:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;confidence:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;verification:&nbsp;'str'&nbsp;=&nbsp;'')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;single&nbsp;step&nbsp;in&nbsp;a&nbsp;plan.<br>
+&nbsp;<br>
+Each&nbsp;step&nbsp;represents&nbsp;one&nbsp;subgoal&nbsp;that&nbsp;must&nbsp;be&nbsp;accomplished&nbsp;to<br>
+advance&nbsp;the&nbsp;plan.&nbsp;Steps&nbsp;are&nbsp;ordered&nbsp;by&nbsp;dependency:&nbsp;prerequisites<br>
+come&nbsp;before&nbsp;the&nbsp;things&nbsp;that&nbsp;depend&nbsp;on&nbsp;them.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="PlanStep-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="PlanStep-__init__"><strong>__init__</strong></a>(self, description: 'str', target_concept: 'str', step_type: 'str', prerequisites: 'list[str]' = &lt;factory&gt;, status: 'PlanStepStatus' = &lt;PlanStepStatus.PENDING: 'pending'&gt;, attempt_count: 'int' = 0, max_attempts: 'int' = 3, result_summary: 'str' = '', confidence: 'float' = 0.0, verification: 'str' = '') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="PlanStep-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>attempt_count</strong></dt>
+</dl>
+<dl><dt><strong>confidence</strong></dt>
+</dl>
+<dl><dt><strong>description</strong></dt>
+</dl>
+<dl><dt><strong>max_attempts</strong></dt>
+</dl>
+<dl><dt><strong>prerequisites</strong></dt>
+</dl>
+<dl><dt><strong>result_summary</strong></dt>
+</dl>
+<dl><dt><strong>status</strong></dt>
+</dl>
+<dl><dt><strong>step_type</strong></dt>
+</dl>
+<dl><dt><strong>target_concept</strong></dt>
+</dl>
+<dl><dt><strong>verification</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'attempt_count': 'int', 'confidence': 'float', 'description': 'str', 'max_attempts': 'int', 'prerequisites': 'list[str]', 'result_summary': 'str', 'status': 'PlanStepStatus', 'step_type': 'str', 'target_concept': 'str', 'verification': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'attempt_count': Field(name='attempt_count',type='int',default=0,...appingproxy({}),kw_only=False,_field_type=_FIELD), 'confidence': Field(name='confidence',type='float',default=0.0...appingproxy({}),kw_only=False,_field_type=_FIELD), 'description': Field(name='description',type='str',default=&lt;dat...appingproxy({}),kw_only=False,_field_type=_FIELD), 'max_attempts': Field(name='max_attempts',type='int',default=3,d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'prerequisites': Field(name='prerequisites',type='list[str]',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'result_summary': Field(name='result_summary',type='str',default='...appingproxy({}),kw_only=False,_field_type=_FIELD), 'status': Field(name='status',type='PlanStepStatus',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'step_type': Field(name='step_type',type='str',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'target_concept': Field(name='target_concept',type='str',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD), 'verification': Field(name='verification',type='str',default='',...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('description', 'target_concept', 'step_type', 'prerequisites', 'status', 'attempt_count', 'max_attempts', 'result_summary', 'confidence', 'verification')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="PlanStepStatus">class <strong>PlanStepStatus</strong></a>(<a href="enum.html#Enum">enum.Enum</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#PlanStepStatus">PlanStepStatus</a>(*values)<br>
+&nbsp;<br>
+Lifecycle&nbsp;state&nbsp;of&nbsp;a&nbsp;plan&nbsp;step.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.frontal_lobe.reasoning.planning.html#PlanStepStatus">PlanStepStatus</a></dd>
+<dd><a href="enum.html#Enum">enum.Enum</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>COMPLETED</strong> = &lt;PlanStepStatus.COMPLETED: 'completed'&gt;</dl>
+
+<dl><dt><strong>FAILED</strong> = &lt;PlanStepStatus.FAILED: 'failed'&gt;</dl>
+
+<dl><dt><strong>IN_PROGRESS</strong> = &lt;PlanStepStatus.IN_PROGRESS: 'in_progress'&gt;</dl>
+
+<dl><dt><strong>PENDING</strong> = &lt;PlanStepStatus.PENDING: 'pending'&gt;</dl>
+
+<dl><dt><strong>SKIPPED</strong> = &lt;PlanStepStatus.SKIPPED: 'skipped'&gt;</dl>
+
+<hr>
+Data descriptors inherited from <a href="enum.html#Enum">enum.Enum</a>:<br>
+<dl><dt><strong>name</strong></dt>
+<dd><span class="code">The&nbsp;name&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<dl><dt><strong>value</strong></dt>
+<dd><span class="code">The&nbsp;value&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<hr>
+Static methods inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><a name="PlanStepStatus-__contains__"><strong>__contains__</strong></a>(value)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;`value`&nbsp;is&nbsp;in&nbsp;`cls`.<br>
+&nbsp;<br>
+`value`&nbsp;is&nbsp;in&nbsp;`cls`&nbsp;if:<br>
+1)&nbsp;`value`&nbsp;is&nbsp;a&nbsp;member&nbsp;of&nbsp;`cls`,&nbsp;or<br>
+2)&nbsp;`value`&nbsp;is&nbsp;the&nbsp;value&nbsp;of&nbsp;one&nbsp;of&nbsp;the&nbsp;`cls`'s&nbsp;members.</span></dd></dl>
+
+<dl><dt><a name="PlanStepStatus-__getitem__"><strong>__getitem__</strong></a>(name)</dt><dd><span class="code">Return&nbsp;the&nbsp;member&nbsp;matching&nbsp;`name`.</span></dd></dl>
+
+<dl><dt><a name="PlanStepStatus-__iter__"><strong>__iter__</strong></a>()</dt><dd><span class="code">Return&nbsp;members&nbsp;in&nbsp;definition&nbsp;order.</span></dd></dl>
+
+<dl><dt><a name="PlanStepStatus-__len__"><strong>__len__</strong></a>()</dt><dd><span class="code">Return&nbsp;the&nbsp;number&nbsp;of&nbsp;members&nbsp;(no&nbsp;aliases)</span></dd></dl>
+
+<hr>
+Readonly properties inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><strong>__members__</strong></dt>
+<dd><span class="code">Returns&nbsp;a&nbsp;mapping&nbsp;of&nbsp;member&nbsp;name-&gt;value.<br>
+&nbsp;<br>
+This&nbsp;mapping&nbsp;lists&nbsp;all&nbsp;enum&nbsp;members,&nbsp;including&nbsp;aliases.&nbsp;Note&nbsp;that&nbsp;this<br>
+is&nbsp;a&nbsp;read-only&nbsp;view&nbsp;of&nbsp;the&nbsp;internal&nbsp;mapping.</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Planner">class <strong>Planner</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Planner">Planner</a>(network:&nbsp;'ConceptNetwork',&nbsp;task_competence:&nbsp;'TaskCompetence&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Generates,&nbsp;executes,&nbsp;and&nbsp;revises&nbsp;multi-step&nbsp;plans&nbsp;for&nbsp;goals.<br>
+&nbsp;<br>
+Given&nbsp;a&nbsp;goal,&nbsp;the&nbsp;engine:<br>
+&nbsp;<br>
+1.&nbsp;Decomposes&nbsp;it&nbsp;into&nbsp;ordered&nbsp;steps&nbsp;using&nbsp;the&nbsp;concept&nbsp;network's<br>
+&nbsp;&nbsp;&nbsp;typed&nbsp;edges&nbsp;(prerequisites&nbsp;via&nbsp;DEPENDS_ON/ENABLES,&nbsp;causal<br>
+&nbsp;&nbsp;&nbsp;chains&nbsp;via&nbsp;CAUSES/LEADS_TO).<br>
+2.&nbsp;Evaluates&nbsp;the&nbsp;plan's&nbsp;feasibility&nbsp;by&nbsp;checking&nbsp;whether&nbsp;each<br>
+&nbsp;&nbsp;&nbsp;step's&nbsp;target&nbsp;concept&nbsp;exists&nbsp;or&nbsp;has&nbsp;a&nbsp;discoverable&nbsp;path.<br>
+3.&nbsp;Persists&nbsp;the&nbsp;plan&nbsp;across&nbsp;turns.<br>
+4.&nbsp;Advances&nbsp;one&nbsp;step&nbsp;per&nbsp;turn,&nbsp;returning&nbsp;the&nbsp;current&nbsp;step&nbsp;to<br>
+&nbsp;&nbsp;&nbsp;the&nbsp;cognition&nbsp;engine&nbsp;for&nbsp;execution.<br>
+5.&nbsp;Tracks&nbsp;progress&nbsp;and&nbsp;marks&nbsp;steps&nbsp;as&nbsp;completed&nbsp;or&nbsp;failed.<br>
+6.&nbsp;Revises&nbsp;the&nbsp;plan&nbsp;on&nbsp;failure&nbsp;—&nbsp;finding&nbsp;alternative&nbsp;paths&nbsp;or<br>
+&nbsp;&nbsp;&nbsp;marking&nbsp;the&nbsp;goal&nbsp;as&nbsp;blocked.<br>
+&nbsp;<br>
+Usage::<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;planner&nbsp;=&nbsp;<a href="#Planner">Planner</a>(network)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;plan&nbsp;=&nbsp;planner.<a href="#Planner-create_plan">create_plan</a>("understand&nbsp;fire",&nbsp;"understand")<br>
+&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;plan.feasibility_score&nbsp;&gt;&nbsp;0.3:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;step&nbsp;=&nbsp;planner.<a href="#Planner-advance">advance</a>(plan)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;step:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;Execute&nbsp;the&nbsp;step&nbsp;using&nbsp;ProblemSolver,&nbsp;DecisionMaker,&nbsp;etc.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;...<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;planner.<a href="#Planner-mark_step">mark_step</a>(plan,&nbsp;step,&nbsp;success=True)<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Planner-__init__"><strong>__init__</strong></a>(self, network: 'ConceptNetwork', task_competence: 'TaskCompetence | None' = None) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;planning&nbsp;engine.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;network:&nbsp;The&nbsp;concept&nbsp;network&nbsp;—&nbsp;used&nbsp;for&nbsp;goal&nbsp;decomposition<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;and&nbsp;feasibility&nbsp;evaluation.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;task_competence:&nbsp;shared&nbsp;task/skill&nbsp;substrate.&nbsp;When&nbsp;provided,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;each&nbsp;goal&nbsp;is&nbsp;recognized&nbsp;as&nbsp;a&nbsp;task&nbsp;schema,&nbsp;step&nbsp;outcomes<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;feed&nbsp;the&nbsp;shared&nbsp;affordance&nbsp;model,&nbsp;and&nbsp;verified-complete<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;plans&nbsp;consolidate&nbsp;as&nbsp;reusable&nbsp;procedures&nbsp;whose&nbsp;success<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;record&nbsp;biases&nbsp;feasibility&nbsp;on&nbsp;structurally&nbsp;similar&nbsp;goals.</span></dd></dl>
+
+<dl><dt><a name="Planner-advance"><strong>advance</strong></a>(self, plan: 'Plan') -&gt; 'PlanStep | None'</dt><dd><span class="code">Advance&nbsp;the&nbsp;plan&nbsp;by&nbsp;one&nbsp;step.<br>
+&nbsp;<br>
+Returns&nbsp;the&nbsp;current&nbsp;step&nbsp;to&nbsp;be&nbsp;executed,&nbsp;or&nbsp;None&nbsp;if&nbsp;the&nbsp;plan<br>
+is&nbsp;complete&nbsp;or&nbsp;blocked.&nbsp;The&nbsp;caller&nbsp;is&nbsp;responsible&nbsp;for<br>
+executing&nbsp;the&nbsp;step&nbsp;and&nbsp;calling&nbsp;``mark_step``&nbsp;with&nbsp;the&nbsp;result.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;plan:&nbsp;The&nbsp;plan&nbsp;to&nbsp;advance.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;step&nbsp;to&nbsp;execute,&nbsp;or&nbsp;None&nbsp;if&nbsp;the&nbsp;plan&nbsp;is&nbsp;done.</span></dd></dl>
+
+<dl><dt><a name="Planner-create_plan"><strong>create_plan</strong></a>(self, goal: 'str', goal_type: 'str' = 'understand', max_depth: 'int' = 4) -&gt; 'Plan'</dt><dd><span class="code">Create&nbsp;a&nbsp;multi-step&nbsp;plan&nbsp;to&nbsp;achieve&nbsp;a&nbsp;goal.<br>
+&nbsp;<br>
+Decomposes&nbsp;the&nbsp;goal&nbsp;into&nbsp;ordered&nbsp;steps&nbsp;using&nbsp;the&nbsp;concept<br>
+network's&nbsp;typed&nbsp;edges.&nbsp;Prerequisites&nbsp;(DEPENDS_ON,&nbsp;ENABLES)<br>
+come&nbsp;before&nbsp;the&nbsp;goal&nbsp;concept.&nbsp;Causal&nbsp;chains&nbsp;(CAUSES,<br>
+LEADS_TO)&nbsp;provide&nbsp;steps&nbsp;for&nbsp;ACHIEVE&nbsp;goals.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;goal:&nbsp;The&nbsp;goal&nbsp;to&nbsp;plan&nbsp;for&nbsp;(typically&nbsp;a&nbsp;concept&nbsp;name).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;goal_type:&nbsp;The&nbsp;type&nbsp;of&nbsp;goal&nbsp;(understand,&nbsp;achieve,&nbsp;explain,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;resolve,&nbsp;compare).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;max_depth:&nbsp;Maximum&nbsp;decomposition&nbsp;depth&nbsp;for&nbsp;prerequisites.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;<a href="#Plan">Plan</a>&nbsp;with&nbsp;ordered&nbsp;steps.</span></dd></dl>
+
+<dl><dt><a name="Planner-get_active_plan_for_goal"><strong>get_active_plan_for_goal</strong></a>(self, goal: 'str') -&gt; 'Plan | None'</dt><dd><span class="code">Get&nbsp;the&nbsp;active&nbsp;plan&nbsp;for&nbsp;a&nbsp;goal,&nbsp;if&nbsp;one&nbsp;exists.</span></dd></dl>
+
+<dl><dt><a name="Planner-get_plan_for_goal"><strong>get_plan_for_goal</strong></a>(self, goal: 'str') -&gt; 'Plan | None'</dt><dd><span class="code">Get&nbsp;the&nbsp;plan&nbsp;for&nbsp;a&nbsp;goal,&nbsp;if&nbsp;one&nbsp;exists.</span></dd></dl>
+
+<dl><dt><a name="Planner-mark_step"><strong>mark_step</strong></a>(self, plan: 'Plan', step: 'PlanStep', success: 'bool', result_summary: 'str' = '', confidence: 'float' = 0.0, verification: 'str' = 'reported') -&gt; 'None'</dt><dd><span class="code">Mark&nbsp;a&nbsp;step&nbsp;as&nbsp;completed&nbsp;or&nbsp;failed.<br>
+&nbsp;<br>
+If&nbsp;the&nbsp;step&nbsp;fails&nbsp;and&nbsp;has&nbsp;remaining&nbsp;attempts,&nbsp;it&nbsp;stays<br>
+IN_PROGRESS&nbsp;for&nbsp;retry.&nbsp;If&nbsp;it&nbsp;exceeds&nbsp;max_attempts,&nbsp;it's<br>
+marked&nbsp;FAILED&nbsp;and&nbsp;the&nbsp;plan&nbsp;may&nbsp;be&nbsp;revised.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;plan:&nbsp;The&nbsp;plan&nbsp;the&nbsp;step&nbsp;belongs&nbsp;to.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;step:&nbsp;The&nbsp;step&nbsp;to&nbsp;mark.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;success:&nbsp;Whether&nbsp;the&nbsp;step&nbsp;succeeded.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;result_summary:&nbsp;What&nbsp;happened&nbsp;during&nbsp;execution.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;confidence:&nbsp;Confidence&nbsp;in&nbsp;the&nbsp;step's&nbsp;outcome.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;verification:&nbsp;How&nbsp;success&nbsp;was&nbsp;established&nbsp;—&nbsp;"reported"<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(the&nbsp;caller&nbsp;asserts&nbsp;it),&nbsp;"solver"&nbsp;(an&nbsp;epistemic<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;verifier&nbsp;confirmed&nbsp;it),&nbsp;or&nbsp;"external"&nbsp;(a&nbsp;world-state<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;check&nbsp;observed&nbsp;it).&nbsp;Recorded&nbsp;so&nbsp;a&nbsp;consolidated<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;procedure&nbsp;never&nbsp;claims&nbsp;stronger&nbsp;evidence&nbsp;than&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;weakest&nbsp;step&nbsp;that&nbsp;produced&nbsp;it.</span></dd></dl>
+
+<dl><dt><a name="Planner-restore_from_dict"><strong>restore_from_dict</strong></a>(self, data: 'dict[str, object]') -&gt; 'None'</dt><dd><span class="code">Restore&nbsp;state&nbsp;from&nbsp;persistence.</span></dd></dl>
+
+<dl><dt><a name="Planner-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict[str, object]'</dt><dd><span class="code">Serialize&nbsp;state&nbsp;for&nbsp;persistence.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>active_plans</strong></dt>
+<dd><span class="code">All&nbsp;currently&nbsp;active&nbsp;plans.</span></dd>
+</dl>
+<dl><dt><strong>blocked_count</strong></dt>
+<dd><span class="code">Number&nbsp;of&nbsp;plans&nbsp;blocked.</span></dd>
+</dl>
+<dl><dt><strong>completed_count</strong></dt>
+<dd><span class="code">Number&nbsp;of&nbsp;plans&nbsp;completed.</span></dd>
+</dl>
+<dl><dt><strong>revised_count</strong></dt>
+<dd><span class="code">Number&nbsp;of&nbsp;plan&nbsp;revisions.</span></dd>
+</dl>
+<dl><dt><strong>steps_executed</strong></dt>
+<dd><span class="code">Total&nbsp;steps&nbsp;executed&nbsp;across&nbsp;all&nbsp;plans.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['Plan', 'PlanStatus', 'PlanStep', 'PlanStepStatus', 'Planner']</td></tr></table>
+</body></html>

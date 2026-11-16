@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["MAX_POW_ABS"],"enum":["ArithOp"],"fn":["apply_op","real_sqrt"]};

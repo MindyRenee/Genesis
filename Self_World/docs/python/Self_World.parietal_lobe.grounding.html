@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.parietal_lobe.grounding</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.parietal_lobe.html" class="white">parietal_lobe</a>.grounding</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/parietal_lobe/grounding.py">/home/mindyrenee/GenAnd/Genesis/Self_World/parietal_lobe/grounding.py</a></td></tr></table>
+    <p><span class="code">Grounding&nbsp;—&nbsp;injecting&nbsp;perceived&nbsp;scenes&nbsp;into&nbsp;the&nbsp;concept&nbsp;network.<br>
+&nbsp;<br>
+Perception&nbsp;produces&nbsp;a&nbsp;``Scene``:&nbsp;objects&nbsp;with&nbsp;properties&nbsp;and&nbsp;typed<br>
+spatial&nbsp;relations.&nbsp;Grounding&nbsp;writes&nbsp;that&nbsp;structure&nbsp;into&nbsp;the&nbsp;concept<br>
+network&nbsp;so&nbsp;the&nbsp;*semantic*&nbsp;machinery&nbsp;—&nbsp;spreading&nbsp;activation,&nbsp;the<br>
+reasoning&nbsp;engine,&nbsp;analogy,&nbsp;the&nbsp;language&nbsp;engine&nbsp;—&nbsp;can&nbsp;operate&nbsp;on&nbsp;it.<br>
+This&nbsp;is&nbsp;the&nbsp;bridge&nbsp;between&nbsp;the&nbsp;perceptual-symbolic&nbsp;layer&nbsp;and&nbsp;the<br>
+semantic&nbsp;layer:&nbsp;a&nbsp;red&nbsp;square&nbsp;above&nbsp;a&nbsp;blue&nbsp;circle&nbsp;becomes&nbsp;real&nbsp;edges<br>
+(``scene:obj:0&nbsp;--spatial_relation(above)--&gt;&nbsp;scene:obj:1``),&nbsp;not&nbsp;an<br>
+opaque&nbsp;bitmap.<br>
+&nbsp;<br>
+Concept&nbsp;names&nbsp;are&nbsp;namespaced&nbsp;per&nbsp;scene&nbsp;(``&lt;ns&gt;:obj:&lt;i&gt;``)&nbsp;so&nbsp;objects<br>
+from&nbsp;different&nbsp;scenes&nbsp;don't&nbsp;collide,&nbsp;and&nbsp;so&nbsp;a&nbsp;scene's&nbsp;contribution<br>
+can&nbsp;be&nbsp;recognized&nbsp;later&nbsp;(all&nbsp;names&nbsp;share&nbsp;the&nbsp;``&lt;ns&gt;:``&nbsp;prefix).<br>
+&nbsp;<br>
+The&nbsp;grounding&nbsp;layer&nbsp;emits&nbsp;*structure*,&nbsp;not&nbsp;sentences.&nbsp;What&nbsp;Genesis<br>
+says&nbsp;about&nbsp;a&nbsp;scene&nbsp;is&nbsp;composed&nbsp;by&nbsp;its&nbsp;language&nbsp;engine&nbsp;from&nbsp;these<br>
+edges&nbsp;—&nbsp;nothing&nbsp;here&nbsp;writes&nbsp;words&nbsp;for&nbsp;it.</span></p>
+<p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-ground_scene"><strong>ground_scene</strong></a>(network: 'Any', scene: 'Scene', ns: 'str' = 'scene') -&gt; 'list[str]'</dt><dd><span class="code">Write&nbsp;a&nbsp;scene's&nbsp;objects&nbsp;and&nbsp;relations&nbsp;into&nbsp;the&nbsp;concept&nbsp;network.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;network:&nbsp;a&nbsp;``ConceptNetwork``.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;scene:&nbsp;the&nbsp;perceived&nbsp;scene&nbsp;to&nbsp;ground.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ns:&nbsp;namespace&nbsp;prefix&nbsp;for&nbsp;this&nbsp;scene's&nbsp;concepts.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;list&nbsp;of&nbsp;concept&nbsp;names&nbsp;created,&nbsp;for&nbsp;callers&nbsp;that&nbsp;want&nbsp;to<br>
+&nbsp;&nbsp;&nbsp;&nbsp;activate&nbsp;or&nbsp;reference&nbsp;them&nbsp;afterward.</span></dd></dl>
+ <dl><dt><a name="-scene_facts"><strong>scene_facts</strong></a>(scene: 'Scene', ns: 'str' = 'scene') -&gt; 'list[tuple[str, str, str]]'</dt><dd><span class="code">The&nbsp;scene&nbsp;as&nbsp;symbolic&nbsp;triples:&nbsp;(subject,&nbsp;relation,&nbsp;object).<br>
+&nbsp;<br>
+These&nbsp;are&nbsp;the&nbsp;raw&nbsp;material&nbsp;for&nbsp;the&nbsp;language&nbsp;engine&nbsp;or&nbsp;the&nbsp;reasoning<br>
+engine&nbsp;—&nbsp;structured&nbsp;facts,&nbsp;not&nbsp;composed&nbsp;utterances.</span></dd></dl>
+ <dl><dt><a name="-scene_relations_for"><strong>scene_relations_for</strong></a>(scene: 'Scene', obj_index: 'int', ns: 'str' = 'scene') -&gt; 'list[ObjectRelation]'</dt><dd><span class="code">All&nbsp;relations&nbsp;where&nbsp;the&nbsp;given&nbsp;object&nbsp;is&nbsp;the&nbsp;subject.</span></dd></dl>
+</td></tr></table>
+</body></html>

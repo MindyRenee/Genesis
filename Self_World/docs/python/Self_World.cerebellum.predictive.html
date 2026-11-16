@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.cerebellum.predictive</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.cerebellum.html" class="white">cerebellum</a>.predictive</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/cerebellum/predictive.py">/home/mindyrenee/GenAnd/Genesis/Self_World/cerebellum/predictive.py</a></td></tr></table>
+    <p><span class="code">Predictive&nbsp;coding&nbsp;—&nbsp;the&nbsp;brain&nbsp;as&nbsp;a&nbsp;prediction&nbsp;machine.<br>
+&nbsp;<br>
+The&nbsp;brain&nbsp;is&nbsp;not&nbsp;a&nbsp;passive&nbsp;receiver&nbsp;of&nbsp;sensory&nbsp;input.&nbsp;It&nbsp;actively<br>
+generates&nbsp;predictions&nbsp;about&nbsp;what&nbsp;it&nbsp;will&nbsp;perceive,&nbsp;compares&nbsp;those<br>
+predictions&nbsp;to&nbsp;the&nbsp;actual&nbsp;input,&nbsp;and&nbsp;uses&nbsp;the&nbsp;resulting&nbsp;*prediction<br>
+error*&nbsp;to&nbsp;update&nbsp;its&nbsp;internal&nbsp;models.&nbsp;This&nbsp;is&nbsp;the&nbsp;predictive&nbsp;processing<br>
+framework&nbsp;(Rao&nbsp;&amp;&nbsp;Ballard,&nbsp;1999;&nbsp;Friston,&nbsp;2010;&nbsp;Clark,&nbsp;2013).<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;prediction&nbsp;→&nbsp;sensory&nbsp;input&nbsp;→&nbsp;prediction&nbsp;error&nbsp;→&nbsp;model&nbsp;update<br>
+&nbsp;<br>
+The&nbsp;core&nbsp;insight&nbsp;is&nbsp;that&nbsp;perception&nbsp;is&nbsp;a&nbsp;*top-down*&nbsp;process&nbsp;as&nbsp;much&nbsp;as<br>
+a&nbsp;bottom-up&nbsp;one.&nbsp;Cortical&nbsp;areas&nbsp;at&nbsp;higher&nbsp;levels&nbsp;send&nbsp;predictions<br>
+downward&nbsp;about&nbsp;what&nbsp;lower&nbsp;levels&nbsp;should&nbsp;see;&nbsp;lower&nbsp;levels&nbsp;send<br>
+prediction&nbsp;errors&nbsp;upward&nbsp;when&nbsp;reality&nbsp;violates&nbsp;those&nbsp;predictions.&nbsp;Only<br>
+the&nbsp;*unexpected*&nbsp;information&nbsp;propagates&nbsp;up&nbsp;the&nbsp;hierarchy&nbsp;—&nbsp;the&nbsp;expected<br>
+is&nbsp;already&nbsp;explained&nbsp;away.&nbsp;This&nbsp;is&nbsp;efficient&nbsp;coding:&nbsp;the&nbsp;brain&nbsp;transmits<br>
+surprise,&nbsp;not&nbsp;raw&nbsp;sensation&nbsp;(Rao&nbsp;&amp;&nbsp;Ballard,&nbsp;1999).<br>
+&nbsp;<br>
+#&nbsp;The&nbsp;free&nbsp;energy&nbsp;principle<br>
+&nbsp;<br>
+Friston&nbsp;(2010)&nbsp;generalizes&nbsp;this&nbsp;into&nbsp;the&nbsp;free&nbsp;energy&nbsp;principle:&nbsp;any<br>
+self-organizing&nbsp;system&nbsp;at&nbsp;equilibrium&nbsp;with&nbsp;its&nbsp;environment&nbsp;must<br>
+minimize&nbsp;the&nbsp;long-run&nbsp;average&nbsp;of&nbsp;surprise&nbsp;(negative&nbsp;log&nbsp;probability&nbsp;of<br>
+sensory&nbsp;states).&nbsp;The&nbsp;brain&nbsp;does&nbsp;this&nbsp;implicitly&nbsp;by&nbsp;maintaining&nbsp;a<br>
+generative&nbsp;model&nbsp;and&nbsp;updating&nbsp;it&nbsp;to&nbsp;reduce&nbsp;prediction&nbsp;error.&nbsp;Surprise<br>
+here&nbsp;is&nbsp;not&nbsp;the&nbsp;phenomenological&nbsp;"wow"&nbsp;but&nbsp;the&nbsp;information-theoretic<br>
+quantity&nbsp;—&nbsp;how&nbsp;improbable&nbsp;the&nbsp;observed&nbsp;state&nbsp;is&nbsp;under&nbsp;the&nbsp;model.<br>
+&nbsp;<br>
+#&nbsp;Hierarchical&nbsp;prediction<br>
+&nbsp;<br>
+<a href="#Prediction">Prediction</a>&nbsp;operates&nbsp;at&nbsp;multiple&nbsp;temporal&nbsp;and&nbsp;representational&nbsp;scales<br>
+(Bar,&nbsp;2009;&nbsp;Clark,&nbsp;2013).&nbsp;In&nbsp;Genesis's&nbsp;conversation&nbsp;perception:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Level&nbsp;3&nbsp;(high)&nbsp;&nbsp;→&nbsp;what&nbsp;topic&nbsp;will&nbsp;the&nbsp;conversation&nbsp;turn&nbsp;to?<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Level&nbsp;2&nbsp;(mid)&nbsp;&nbsp;&nbsp;→&nbsp;what&nbsp;intent&nbsp;will&nbsp;the&nbsp;user&nbsp;have?<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Level&nbsp;1&nbsp;(low)&nbsp;&nbsp;&nbsp;→&nbsp;what&nbsp;concepts/words&nbsp;will&nbsp;appear?<br>
+&nbsp;<br>
+Higher&nbsp;levels&nbsp;provide&nbsp;context&nbsp;(priors)&nbsp;for&nbsp;lower&nbsp;levels:&nbsp;if&nbsp;we&nbsp;predict<br>
+the&nbsp;topic&nbsp;is&nbsp;"cognition",&nbsp;we&nbsp;expect&nbsp;philosophy-related&nbsp;concepts&nbsp;and<br>
+self-inquiry&nbsp;intents.&nbsp;Each&nbsp;level&nbsp;generates&nbsp;its&nbsp;own&nbsp;predictions&nbsp;and<br>
+errors;&nbsp;errors&nbsp;at&nbsp;lower&nbsp;levels&nbsp;propagate&nbsp;upward&nbsp;to&nbsp;revise&nbsp;the&nbsp;higher<br>
+levels,&nbsp;while&nbsp;revised&nbsp;higher&nbsp;levels&nbsp;send&nbsp;new&nbsp;predictions&nbsp;downward.<br>
+&nbsp;<br>
+#&nbsp;Neurochemical&nbsp;coupling<br>
+&nbsp;<br>
+<a href="#Prediction">Prediction</a>&nbsp;error&nbsp;is&nbsp;the&nbsp;brain's&nbsp;orienting&nbsp;signal.&nbsp;Large,&nbsp;unexpected<br>
+prediction&nbsp;errors&nbsp;trigger:<br>
+&nbsp;<br>
+-&nbsp;**Norepinephrine**&nbsp;(locus&nbsp;coeruleus):&nbsp;the&nbsp;neuromodulator&nbsp;of&nbsp;attention<br>
+&nbsp;&nbsp;orienting&nbsp;and&nbsp;surprise.&nbsp;Phasic&nbsp;NE&nbsp;bursts&nbsp;drive&nbsp;a&nbsp;"network&nbsp;reset"&nbsp;that<br>
+&nbsp;&nbsp;interrupts&nbsp;ongoing&nbsp;processing&nbsp;and&nbsp;redirects&nbsp;cortical&nbsp;resources&nbsp;to&nbsp;the<br>
+&nbsp;&nbsp;unexpected&nbsp;stimulus&nbsp;(Aston-Jones&nbsp;&amp;&nbsp;Cohen,&nbsp;2005;&nbsp;Yu&nbsp;&amp;&nbsp;Dayan,&nbsp;2005).<br>
+-&nbsp;**Dopamine**&nbsp;(VTA):&nbsp;beyond&nbsp;reward&nbsp;prediction&nbsp;error,&nbsp;dopamine&nbsp;signals<br>
+&nbsp;&nbsp;novelty&nbsp;—&nbsp;the&nbsp;discovery&nbsp;that&nbsp;the&nbsp;world&nbsp;is&nbsp;richer&nbsp;than&nbsp;the&nbsp;model<br>
+&nbsp;&nbsp;predicted&nbsp;(Kakade&nbsp;&amp;&nbsp;Dayan,&nbsp;2002;&nbsp;Schultz,&nbsp;2016).&nbsp;Novel&nbsp;prediction<br>
+&nbsp;&nbsp;errors&nbsp;are&nbsp;intrinsically&nbsp;rewarding&nbsp;because&nbsp;they&nbsp;represent<br>
+&nbsp;&nbsp;learnable&nbsp;information.<br>
+&nbsp;<br>
+Low&nbsp;prediction&nbsp;error,&nbsp;conversely,&nbsp;means&nbsp;the&nbsp;input&nbsp;was&nbsp;already<br>
+explained&nbsp;by&nbsp;the&nbsp;model&nbsp;—&nbsp;boring,&nbsp;already&nbsp;known.&nbsp;The&nbsp;system&nbsp;allocates<br>
+fewer&nbsp;resources&nbsp;to&nbsp;it.&nbsp;This&nbsp;is&nbsp;why&nbsp;predictable&nbsp;conversations&nbsp;feel&nbsp;flat<br>
+and&nbsp;surprising&nbsp;ones&nbsp;feel&nbsp;alive.<br>
+&nbsp;<br>
+#&nbsp;Error-driven&nbsp;learning<br>
+&nbsp;<br>
+Learning&nbsp;is&nbsp;driven&nbsp;by&nbsp;prediction&nbsp;error,&nbsp;not&nbsp;by&nbsp;raw&nbsp;experience.&nbsp;The<br>
+model&nbsp;updates&nbsp;proportionally&nbsp;to&nbsp;how&nbsp;wrong&nbsp;it&nbsp;was&nbsp;—&nbsp;large&nbsp;errors&nbsp;produce<br>
+large&nbsp;updates,&nbsp;small&nbsp;errors&nbsp;produce&nbsp;small&nbsp;updates.&nbsp;This&nbsp;is&nbsp;the<br>
+Rescorla-Wagner&nbsp;/&nbsp;delta&nbsp;rule&nbsp;(Rescorla&nbsp;&amp;&nbsp;Wagner,&nbsp;1972)&nbsp;and&nbsp;the&nbsp;basis&nbsp;of<br>
+TD&nbsp;learning&nbsp;(Sutton&nbsp;&amp;&nbsp;Barto,&nbsp;2018).&nbsp;A&nbsp;perfectly&nbsp;predicted&nbsp;input&nbsp;teaches<br>
+nothing;&nbsp;a&nbsp;surprising&nbsp;input&nbsp;teaches&nbsp;a&nbsp;lot.&nbsp;This&nbsp;is&nbsp;why&nbsp;we&nbsp;remember&nbsp;the<br>
+unexpected&nbsp;and&nbsp;forget&nbsp;the&nbsp;routine.<br>
+&nbsp;<br>
+References:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Rao,&nbsp;R.&nbsp;P.,&nbsp;&amp;&nbsp;Ballard,&nbsp;D.&nbsp;H.&nbsp;(1999).&nbsp;Predictive&nbsp;coding&nbsp;in&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;visual&nbsp;cortex.&nbsp;Nature&nbsp;Neuroscience,&nbsp;2(1),&nbsp;79–87.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Friston,&nbsp;K.&nbsp;(2010).&nbsp;The&nbsp;free-energy&nbsp;principle:&nbsp;a&nbsp;unified&nbsp;brain<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;theory?&nbsp;Nature&nbsp;Reviews&nbsp;Neuroscience,&nbsp;11(2),&nbsp;127–138.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Clark,&nbsp;A.&nbsp;(2013).&nbsp;Whatever&nbsp;next?&nbsp;Predictive&nbsp;brains,&nbsp;situated<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;agents,&nbsp;and&nbsp;the&nbsp;future&nbsp;of&nbsp;cognitive&nbsp;science.&nbsp;Behavioral&nbsp;and<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Brain&nbsp;Sciences,&nbsp;36(3),&nbsp;181–204.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Bar,&nbsp;M.&nbsp;(2009).&nbsp;The&nbsp;proactive&nbsp;brain:&nbsp;using&nbsp;analogies&nbsp;and<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;associations&nbsp;to&nbsp;generate&nbsp;predictions.&nbsp;Trends&nbsp;in&nbsp;Cognitive<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Sciences,&nbsp;11(7),&nbsp;280–289.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Aston-Jones,&nbsp;G.,&nbsp;&amp;&nbsp;Cohen,&nbsp;J.&nbsp;D.&nbsp;(2005).&nbsp;An&nbsp;integrative&nbsp;theory&nbsp;of<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;locus&nbsp;coeruleus-norepinephrine&nbsp;function.&nbsp;Annual&nbsp;Review&nbsp;of<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Neuroscience,&nbsp;28,&nbsp;405–450.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Yu,&nbsp;A.&nbsp;J.,&nbsp;&amp;&nbsp;Dayan,&nbsp;P.&nbsp;(2005).&nbsp;Uncertainty,&nbsp;neuromodulation,&nbsp;and<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;attention.&nbsp;Neuron,&nbsp;46(4),&nbsp;681–692.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Kakade,&nbsp;S.,&nbsp;&amp;&nbsp;Dayan,&nbsp;P.&nbsp;(2002).&nbsp;Dopamine:&nbsp;generalization&nbsp;and<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;bonuses.&nbsp;Neural&nbsp;Networks,&nbsp;15(4-6),&nbsp;549–559.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Rescorla,&nbsp;R.&nbsp;A.,&nbsp;&amp;&nbsp;Wagner,&nbsp;A.&nbsp;R.&nbsp;(1972).&nbsp;A&nbsp;theory&nbsp;of&nbsp;Pavlovian<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;conditioning.&nbsp;In&nbsp;Black&nbsp;&amp;&nbsp;Prokasy&nbsp;(Eds.),&nbsp;Classical<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Conditioning&nbsp;II.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Schultz,&nbsp;W.&nbsp;(2016).&nbsp;Dopamine&nbsp;reward&nbsp;prediction&nbsp;error&nbsp;coding.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Dialogues&nbsp;in&nbsp;Clinical&nbsp;Neuroscience,&nbsp;18(1),&nbsp;23–32.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.cerebellum.predictive.html#Prediction">Prediction</a>
+</dt><dt class="heading-text"><a href="Self_World.cerebellum.predictive.html#PredictionContext">PredictionContext</a>
+</dt><dt class="heading-text"><a href="Self_World.cerebellum.predictive.html#PredictionError">PredictionError</a>
+</dt><dt class="heading-text"><a href="Self_World.cerebellum.predictive.html#PredictiveCodingLayer">PredictiveCodingLayer</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Prediction">class <strong>Prediction</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Prediction">Prediction</a>(expected_intents:&nbsp;'list[tuple[str,&nbsp;float]]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;expected_concepts:&nbsp;'list[tuple[str,&nbsp;float]]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;expected_topic:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;confidence:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;level_errors:&nbsp;'dict[str,&nbsp;float]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;prediction&nbsp;about&nbsp;the&nbsp;next&nbsp;user&nbsp;input.<br>
+&nbsp;<br>
+Generated&nbsp;top-down&nbsp;from&nbsp;the&nbsp;current&nbsp;context&nbsp;before&nbsp;perception<br>
+processes&nbsp;the&nbsp;actual&nbsp;input.&nbsp;Each&nbsp;field&nbsp;is&nbsp;a&nbsp;hypothesis&nbsp;that&nbsp;will&nbsp;be<br>
+tested&nbsp;against&nbsp;reality;&nbsp;the&nbsp;mismatch&nbsp;between&nbsp;prediction&nbsp;and&nbsp;reality<br>
+is&nbsp;the&nbsp;prediction&nbsp;error&nbsp;that&nbsp;drives&nbsp;learning.<br>
+&nbsp;<br>
+Attributes:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;expected_intents:&nbsp;Predicted&nbsp;intents&nbsp;ranked&nbsp;by&nbsp;probability,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;each&nbsp;paired&nbsp;with&nbsp;its&nbsp;predicted&nbsp;probability.&nbsp;The&nbsp;most&nbsp;likely<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;intent&nbsp;is&nbsp;first.&nbsp;This&nbsp;is&nbsp;the&nbsp;Level&nbsp;2&nbsp;(mid-level)&nbsp;prediction.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;expected_concepts:&nbsp;Concepts&nbsp;predicted&nbsp;to&nbsp;appear&nbsp;in&nbsp;the&nbsp;next<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;input,&nbsp;ranked&nbsp;by&nbsp;predicted&nbsp;probability.&nbsp;This&nbsp;is&nbsp;the&nbsp;Level&nbsp;1<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(low-level)&nbsp;prediction.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;expected_topic:&nbsp;The&nbsp;single&nbsp;most&nbsp;likely&nbsp;topic&nbsp;the&nbsp;conversation<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;will&nbsp;turn&nbsp;to.&nbsp;This&nbsp;is&nbsp;the&nbsp;Level&nbsp;3&nbsp;(high-level)&nbsp;prediction.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;confidence:&nbsp;How&nbsp;confident&nbsp;the&nbsp;prediction&nbsp;is&nbsp;overall,&nbsp;in<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;``[0,&nbsp;1]``.&nbsp;Reflects&nbsp;how&nbsp;much&nbsp;evidence&nbsp;the&nbsp;model&nbsp;has&nbsp;for<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this&nbsp;context&nbsp;—&nbsp;a&nbsp;fresh&nbsp;model&nbsp;with&nbsp;little&nbsp;data&nbsp;produces<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;low-confidence&nbsp;predictions;&nbsp;a&nbsp;well-trained&nbsp;model&nbsp;produces<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;high-confidence&nbsp;predictions&nbsp;when&nbsp;the&nbsp;context&nbsp;is&nbsp;familiar.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;level_errors:&nbsp;Per-level&nbsp;error&nbsp;magnitudes&nbsp;from&nbsp;the&nbsp;most&nbsp;recent<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;comparison,&nbsp;for&nbsp;introspection.&nbsp;Empty&nbsp;until&nbsp;the&nbsp;first<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;``compute_error``&nbsp;call.&nbsp;Keys&nbsp;are&nbsp;``"topic"``,&nbsp;``"intent"``,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;``"concept"``.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Prediction-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="Prediction-__init__"><strong>__init__</strong></a>(self, expected_intents: 'list[tuple[str, float]]' = &lt;factory&gt;, expected_concepts: 'list[tuple[str, float]]' = &lt;factory&gt;, expected_topic: 'str' = '', confidence: 'float' = 0.0, level_errors: 'dict[str, float]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Prediction-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>confidence</strong></dt>
+</dl>
+<dl><dt><strong>expected_concepts</strong></dt>
+</dl>
+<dl><dt><strong>expected_intents</strong></dt>
+</dl>
+<dl><dt><strong>expected_topic</strong></dt>
+</dl>
+<dl><dt><strong>level_errors</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'confidence': 'float', 'expected_concepts': 'list[tuple[str, float]]', 'expected_intents': 'list[tuple[str, float]]', 'expected_topic': 'str', 'level_errors': 'dict[str, float]'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'confidence': Field(name='confidence',type='float',default=0.0...appingproxy({}),kw_only=False,_field_type=_FIELD), 'expected_concepts': Field(name='expected_concepts',type='list[tuple[...appingproxy({}),kw_only=False,_field_type=_FIELD), 'expected_intents': Field(name='expected_intents',type='list[tuple[s...appingproxy({}),kw_only=False,_field_type=_FIELD), 'expected_topic': Field(name='expected_topic',type='str',default='...appingproxy({}),kw_only=False,_field_type=_FIELD), 'level_errors': Field(name='level_errors',type='dict[str, float]...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('expected_intents', 'expected_concepts', 'expected_topic', 'confidence', 'level_errors')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="PredictionContext">class <strong>PredictionContext</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#PredictionContext">PredictionContext</a>(recent_intents:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;recent_topics:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;active_concepts:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;emotional_state:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;time_of_day:&nbsp;'int'&nbsp;=&nbsp;-1)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Context&nbsp;from&nbsp;which&nbsp;a&nbsp;prediction&nbsp;is&nbsp;generated.<br>
+&nbsp;<br>
+The&nbsp;predictive&nbsp;coding&nbsp;layer&nbsp;uses&nbsp;this&nbsp;to&nbsp;generate&nbsp;top-down<br>
+expectations&nbsp;before&nbsp;perception&nbsp;processes&nbsp;the&nbsp;next&nbsp;input.&nbsp;It<br>
+captures&nbsp;the&nbsp;state&nbsp;of&nbsp;the&nbsp;conversation&nbsp;and&nbsp;the&nbsp;mind&nbsp;at&nbsp;the&nbsp;moment<br>
+of&nbsp;prediction&nbsp;—&nbsp;what&nbsp;was&nbsp;just&nbsp;discussed,&nbsp;what&nbsp;concepts&nbsp;are&nbsp;active,<br>
+how&nbsp;the&nbsp;mind&nbsp;feels.&nbsp;This&nbsp;is&nbsp;the&nbsp;generative&nbsp;model's&nbsp;input.<br>
+&nbsp;<br>
+Attributes:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;recent_intents:&nbsp;The&nbsp;sequence&nbsp;of&nbsp;recent&nbsp;user&nbsp;intents,&nbsp;most<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;recent&nbsp;last.&nbsp;Used&nbsp;by&nbsp;the&nbsp;intent-transition&nbsp;model&nbsp;(Level&nbsp;2).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;recent_topics:&nbsp;The&nbsp;sequence&nbsp;of&nbsp;recent&nbsp;conversation&nbsp;topics,&nbsp;most<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;recent&nbsp;last.&nbsp;Used&nbsp;by&nbsp;the&nbsp;topic-transition&nbsp;model&nbsp;(Level&nbsp;3).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;active_concepts:&nbsp;Concepts&nbsp;currently&nbsp;active&nbsp;in&nbsp;working&nbsp;memory&nbsp;/<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;concept&nbsp;network.&nbsp;Used&nbsp;by&nbsp;the&nbsp;concept&nbsp;co-occurrence&nbsp;model<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(Level&nbsp;1).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;emotional_state:&nbsp;Optional&nbsp;label&nbsp;of&nbsp;the&nbsp;current&nbsp;emotional&nbsp;state<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(e.g.&nbsp;"curious",&nbsp;"anxious").&nbsp;Emotional&nbsp;state&nbsp;biases<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;predictions&nbsp;—&nbsp;a&nbsp;curious&nbsp;mind&nbsp;expects&nbsp;exploration;&nbsp;an<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;anxious&nbsp;mind&nbsp;expects&nbsp;threat-related&nbsp;topics.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;time_of_day:&nbsp;Optional&nbsp;hour&nbsp;(0–23).&nbsp;Circadian&nbsp;modulation&nbsp;of<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;conversational&nbsp;patterns&nbsp;(e.g.&nbsp;late-night&nbsp;conversations&nbsp;tend<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;toward&nbsp;philosophy).<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="PredictionContext-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="PredictionContext-__init__"><strong>__init__</strong></a>(self, recent_intents: 'list[str]' = &lt;factory&gt;, recent_topics: 'list[str]' = &lt;factory&gt;, active_concepts: 'list[str]' = &lt;factory&gt;, emotional_state: 'str' = '', time_of_day: 'int' = -1) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="PredictionContext-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>active_concepts</strong></dt>
+</dl>
+<dl><dt><strong>emotional_state</strong></dt>
+</dl>
+<dl><dt><strong>recent_intents</strong></dt>
+</dl>
+<dl><dt><strong>recent_topics</strong></dt>
+</dl>
+<dl><dt><strong>time_of_day</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'active_concepts': 'list[str]', 'emotional_state': 'str', 'recent_intents': 'list[str]', 'recent_topics': 'list[str]', 'time_of_day': 'int'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'active_concepts': Field(name='active_concepts',type='list[str]',de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'emotional_state': Field(name='emotional_state',type='str',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'recent_intents': Field(name='recent_intents',type='list[str]',def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'recent_topics': Field(name='recent_topics',type='list[str]',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'time_of_day': Field(name='time_of_day',type='int',default=-1,d...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('recent_intents', 'recent_topics', 'active_concepts', 'emotional_state', 'time_of_day')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="PredictionError">class <strong>PredictionError</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#PredictionError">PredictionError</a>(magnitude:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;unexpected_concepts:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;missing_concepts:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;intent_mismatch:&nbsp;'bool'&nbsp;=&nbsp;False,&nbsp;level_errors:&nbsp;'dict[str,&nbsp;float]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;mismatch&nbsp;between&nbsp;a&nbsp;prediction&nbsp;and&nbsp;the&nbsp;actual&nbsp;input.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;core&nbsp;quantity&nbsp;of&nbsp;predictive&nbsp;processing:&nbsp;the&nbsp;difference<br>
+between&nbsp;what&nbsp;the&nbsp;model&nbsp;expected&nbsp;and&nbsp;what&nbsp;actually&nbsp;arrived.&nbsp;It&nbsp;drives<br>
+both&nbsp;learning&nbsp;(model&nbsp;update)&nbsp;and&nbsp;neuromodulation&nbsp;(attention,<br>
+novelty&nbsp;reward).<br>
+&nbsp;<br>
+Attributes:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;magnitude:&nbsp;Overall&nbsp;surprise,&nbsp;in&nbsp;``[0,&nbsp;1]``.&nbsp;A&nbsp;weighted<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;combination&nbsp;of&nbsp;the&nbsp;three&nbsp;hierarchical&nbsp;levels&nbsp;(topic,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;intent,&nbsp;concept).&nbsp;0&nbsp;=&nbsp;perfectly&nbsp;predicted;&nbsp;1&nbsp;=&nbsp;maximally<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;surprising.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;unexpected_concepts:&nbsp;Concepts&nbsp;that&nbsp;appeared&nbsp;in&nbsp;the&nbsp;actual&nbsp;input<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;but&nbsp;were&nbsp;not&nbsp;predicted.&nbsp;These&nbsp;are&nbsp;the&nbsp;bottom-up&nbsp;error<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;signals&nbsp;that&nbsp;propagate&nbsp;upward&nbsp;to&nbsp;revise&nbsp;the&nbsp;topic-level<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;model.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;missing_concepts:&nbsp;Concepts&nbsp;that&nbsp;were&nbsp;predicted&nbsp;but&nbsp;did&nbsp;not<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;appear.&nbsp;These&nbsp;indicate&nbsp;the&nbsp;model&nbsp;over-expected;&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;corresponding&nbsp;transition/co-occurrence&nbsp;weights&nbsp;should<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;weaken.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;intent_mismatch:&nbsp;Whether&nbsp;the&nbsp;actual&nbsp;intent&nbsp;differed&nbsp;from&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;most&nbsp;likely&nbsp;predicted&nbsp;intent.&nbsp;A&nbsp;boolean&nbsp;summary&nbsp;of&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Level&nbsp;2&nbsp;error.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;level_errors:&nbsp;Per-level&nbsp;error&nbsp;magnitudes.&nbsp;``"topic"``&nbsp;(Level&nbsp;3),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;``"intent"``&nbsp;(Level&nbsp;2),&nbsp;``"concept"``&nbsp;(Level&nbsp;1).&nbsp;Each&nbsp;in<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;``[0,&nbsp;1]``.&nbsp;Higher&nbsp;levels&nbsp;provide&nbsp;context&nbsp;for&nbsp;lower&nbsp;levels,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;so&nbsp;a&nbsp;topic&nbsp;error&nbsp;tends&nbsp;to&nbsp;propagate&nbsp;down.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="PredictionError-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="PredictionError-__init__"><strong>__init__</strong></a>(self, magnitude: 'float' = 0.0, unexpected_concepts: 'list[str]' = &lt;factory&gt;, missing_concepts: 'list[str]' = &lt;factory&gt;, intent_mismatch: 'bool' = False, level_errors: 'dict[str, float]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="PredictionError-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>intent_mismatch</strong></dt>
+</dl>
+<dl><dt><strong>level_errors</strong></dt>
+</dl>
+<dl><dt><strong>magnitude</strong></dt>
+</dl>
+<dl><dt><strong>missing_concepts</strong></dt>
+</dl>
+<dl><dt><strong>unexpected_concepts</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'intent_mismatch': 'bool', 'level_errors': 'dict[str, float]', 'magnitude': 'float', 'missing_concepts': 'list[str]', 'unexpected_concepts': 'list[str]'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'intent_mismatch': Field(name='intent_mismatch',type='bool',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'level_errors': Field(name='level_errors',type='dict[str, float]...appingproxy({}),kw_only=False,_field_type=_FIELD), 'magnitude': Field(name='magnitude',type='float',default=0.0,...appingproxy({}),kw_only=False,_field_type=_FIELD), 'missing_concepts': Field(name='missing_concepts',type='list[str]',d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'unexpected_concepts': Field(name='unexpected_concepts',type='list[str]...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('magnitude', 'unexpected_concepts', 'missing_concepts', 'intent_mismatch', 'level_errors')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="PredictiveCodingLayer">class <strong>PredictiveCodingLayer</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#PredictiveCodingLayer">PredictiveCodingLayer</a>(*,&nbsp;learning_rate:&nbsp;'float'&nbsp;=&nbsp;0.15,&nbsp;surprise_decay:&nbsp;'float'&nbsp;=&nbsp;0.1,&nbsp;on_neuro_impulse=None,&nbsp;smoothing_prior:&nbsp;'float'&nbsp;=&nbsp;0.5)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+A&nbsp;hierarchical&nbsp;predictive&nbsp;coding&nbsp;layer&nbsp;over&nbsp;perception.<br>
+&nbsp;<br>
+Wraps&nbsp;the&nbsp;existing&nbsp;perception&nbsp;system&nbsp;with&nbsp;a&nbsp;generative&nbsp;model&nbsp;that<br>
+predicts&nbsp;what&nbsp;the&nbsp;next&nbsp;input&nbsp;will&nbsp;be&nbsp;about,&nbsp;compares&nbsp;the&nbsp;prediction<br>
+to&nbsp;the&nbsp;actual&nbsp;perception,&nbsp;and&nbsp;learns&nbsp;from&nbsp;the&nbsp;prediction&nbsp;error.<br>
+This&nbsp;creates&nbsp;the&nbsp;top-down/bottom-up&nbsp;loop&nbsp;central&nbsp;to&nbsp;predictive<br>
+processing:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;context&nbsp;──→&nbsp;<a href="#PredictiveCodingLayer-predict">predict</a>()&nbsp;──→&nbsp;[top-down&nbsp;priors]<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;perceive()&nbsp;&nbsp;(existing&nbsp;system)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│<br>
+&nbsp;&nbsp;&nbsp;&nbsp;actual&nbsp;perception&nbsp;──→&nbsp;<a href="#PredictiveCodingLayer-compute_error">compute_error</a>()&nbsp;──→&nbsp;[bottom-up&nbsp;error]<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#PredictiveCodingLayer-learn_from_error">learn_from_error</a>()&nbsp;──→&nbsp;model&nbsp;update<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;neurochemical&nbsp;impulses&nbsp;(NE,&nbsp;DA)<br>
+&nbsp;<br>
+The&nbsp;generative&nbsp;model&nbsp;is&nbsp;Bayesian:&nbsp;it&nbsp;maintains&nbsp;prior&nbsp;probabilities<br>
+over&nbsp;transitions&nbsp;and&nbsp;co-occurrences&nbsp;and&nbsp;updates&nbsp;them&nbsp;with&nbsp;each<br>
+observation.&nbsp;Three&nbsp;sub-models&nbsp;operate&nbsp;at&nbsp;three&nbsp;hierarchical&nbsp;levels:<br>
+&nbsp;<br>
+-&nbsp;**Topic-transition&nbsp;model**&nbsp;(Level&nbsp;3):&nbsp;``P(topic_next&nbsp;|&nbsp;topic_current)``<br>
+&nbsp;&nbsp;—&nbsp;a&nbsp;Dirichlet-multinomial&nbsp;over&nbsp;topic&nbsp;transitions,&nbsp;learned&nbsp;from<br>
+&nbsp;&nbsp;the&nbsp;sequence&nbsp;of&nbsp;conversation&nbsp;topics.<br>
+-&nbsp;**Intent-transition&nbsp;model**&nbsp;(Level&nbsp;2):&nbsp;``P(intent_next&nbsp;|&nbsp;intent_current)``<br>
+&nbsp;&nbsp;—&nbsp;a&nbsp;Dirichlet-multinomial&nbsp;over&nbsp;intent&nbsp;transitions,&nbsp;learned&nbsp;from<br>
+&nbsp;&nbsp;the&nbsp;sequence&nbsp;of&nbsp;user&nbsp;intents.<br>
+-&nbsp;**Concept&nbsp;co-occurrence&nbsp;model**&nbsp;(Level&nbsp;1):&nbsp;``P(concept_b&nbsp;|&nbsp;concept_a)``<br>
+&nbsp;&nbsp;—&nbsp;a&nbsp;Dirichlet-multinomial&nbsp;over&nbsp;concept&nbsp;co-occurrences,&nbsp;learned<br>
+&nbsp;&nbsp;from&nbsp;which&nbsp;concepts&nbsp;appear&nbsp;together&nbsp;within&nbsp;inputs.<br>
+&nbsp;<br>
+Higher&nbsp;levels&nbsp;provide&nbsp;priors&nbsp;for&nbsp;lower&nbsp;levels:&nbsp;the&nbsp;predicted&nbsp;topic<br>
+biases&nbsp;which&nbsp;concepts&nbsp;are&nbsp;expected,&nbsp;and&nbsp;the&nbsp;predicted&nbsp;intent&nbsp;biases<br>
+which&nbsp;topics&nbsp;are&nbsp;expected.&nbsp;This&nbsp;is&nbsp;the&nbsp;hierarchical&nbsp;structure&nbsp;of<br>
+predictive&nbsp;coding&nbsp;(Rao&nbsp;&amp;&nbsp;Ballard,&nbsp;1999)&nbsp;—&nbsp;each&nbsp;level&nbsp;explains&nbsp;away<br>
+variance&nbsp;at&nbsp;the&nbsp;level&nbsp;below.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;learning_rate:&nbsp;Base&nbsp;learning&nbsp;rate&nbsp;for&nbsp;error-driven&nbsp;updates<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(default&nbsp;0.15).&nbsp;The&nbsp;effective&nbsp;update&nbsp;is&nbsp;scaled&nbsp;by&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;prediction&nbsp;error&nbsp;magnitude&nbsp;—&nbsp;large&nbsp;errors&nbsp;produce&nbsp;larger<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;updates&nbsp;(Rescorla&nbsp;&amp;&nbsp;Wagner,&nbsp;1972).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;surprise_decay:&nbsp;Exponential&nbsp;decay&nbsp;rate&nbsp;for&nbsp;the&nbsp;running&nbsp;surprise<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;average&nbsp;(default&nbsp;0.1).&nbsp;Lower&nbsp;=&nbsp;longer&nbsp;memory&nbsp;of&nbsp;past<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;surprise;&nbsp;higher&nbsp;=&nbsp;more&nbsp;reactive&nbsp;to&nbsp;recent&nbsp;surprise.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;on_neuro_impulse:&nbsp;Optional&nbsp;callback<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;``(chem_id:&nbsp;int,&nbsp;magnitude:&nbsp;float)&nbsp;-&gt;&nbsp;None``&nbsp;for&nbsp;triggering<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;neurochemical&nbsp;impulses&nbsp;in&nbsp;the&nbsp;subcognitive&nbsp;daemon.&nbsp;When<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;provided,&nbsp;high&nbsp;prediction&nbsp;error&nbsp;sends&nbsp;norepinephrine<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(attention&nbsp;orienting)&nbsp;and&nbsp;dopamine&nbsp;(novelty&nbsp;reward)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;impulses.&nbsp;If&nbsp;``None``,&nbsp;the&nbsp;layer&nbsp;still&nbsp;computes&nbsp;surprise<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;but&nbsp;does&nbsp;not&nbsp;modulate&nbsp;neurochemistry.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;smoothing_prior:&nbsp;Dirichlet&nbsp;smoothing&nbsp;pseudo-count&nbsp;added&nbsp;to<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;every&nbsp;transition/co-occurrence&nbsp;cell&nbsp;(default&nbsp;0.5).&nbsp;This&nbsp;is<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;Bayesian&nbsp;prior&nbsp;—&nbsp;it&nbsp;prevents&nbsp;zero&nbsp;probabilities&nbsp;and<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;implements&nbsp;Laplace&nbsp;smoothing.&nbsp;Smaller&nbsp;values&nbsp;make&nbsp;the&nbsp;model<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;more&nbsp;sensitive&nbsp;to&nbsp;new&nbsp;observations;&nbsp;larger&nbsp;values&nbsp;make&nbsp;it<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;more&nbsp;conservative&nbsp;(slower&nbsp;to&nbsp;update&nbsp;from&nbsp;single<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;observations).<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="PredictiveCodingLayer-__init__"><strong>__init__</strong></a>(self, *, learning_rate: 'float' = 0.15, surprise_decay: 'float' = 0.1, on_neuro_impulse=None, smoothing_prior: 'float' = 0.5) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;predictive&nbsp;coding&nbsp;with&nbsp;the&nbsp;given&nbsp;learning&nbsp;parameters.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;learning_rate:&nbsp;How&nbsp;quickly&nbsp;predictions&nbsp;update&nbsp;on&nbsp;surprise.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;surprise_decay:&nbsp;Rate&nbsp;at&nbsp;which&nbsp;surprise&nbsp;signals&nbsp;decay&nbsp;over&nbsp;time.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;on_neuro_impulse:&nbsp;Optional&nbsp;callback&nbsp;for&nbsp;neurochemical&nbsp;impulses<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;driven&nbsp;by&nbsp;prediction&nbsp;error.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;smoothing_prior:&nbsp;Laplace&nbsp;smoothing&nbsp;prior&nbsp;for&nbsp;probability&nbsp;counts.</span></dd></dl>
+
+<dl><dt><a name="PredictiveCodingLayer-build_context_from_history"><strong>build_context_from_history</strong></a>(self, emotional_state: 'str' = '', time_of_day: 'int' = -1, active_concepts: 'list[str] | None' = None) -&gt; 'PredictionContext'</dt><dd><span class="code">Build&nbsp;a&nbsp;prediction&nbsp;context&nbsp;from&nbsp;the&nbsp;layer's&nbsp;recorded&nbsp;history.<br>
+&nbsp;<br>
+Convenience&nbsp;method:&nbsp;constructs&nbsp;a&nbsp;:class:`<a href="#PredictionContext">PredictionContext</a>`<br>
+from&nbsp;the&nbsp;intent/topic&nbsp;history&nbsp;the&nbsp;layer&nbsp;has&nbsp;accumulated&nbsp;via<br>
+:meth:`learn_from_error`,&nbsp;plus&nbsp;the&nbsp;caller-provided&nbsp;emotional<br>
+state,&nbsp;time&nbsp;of&nbsp;day,&nbsp;and&nbsp;active&nbsp;concepts.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;emotional_state:&nbsp;Current&nbsp;emotional&nbsp;state&nbsp;label.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;time_of_day:&nbsp;Current&nbsp;hour&nbsp;(0–23),&nbsp;or&nbsp;-1&nbsp;if&nbsp;unknown.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;active_concepts:&nbsp;Concepts&nbsp;currently&nbsp;active&nbsp;in&nbsp;working<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;memory.&nbsp;Defaults&nbsp;to&nbsp;the&nbsp;recent&nbsp;topics.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;:class:`<a href="#PredictionContext">PredictionContext</a>`&nbsp;ready&nbsp;for&nbsp;:meth:`predict`.</span></dd></dl>
+
+<dl><dt><a name="PredictiveCodingLayer-compute_error"><strong>compute_error</strong></a>(self, prediction: 'Prediction', actual_input: 'Perception') -&gt; 'PredictionError'</dt><dd><span class="code">Compare&nbsp;a&nbsp;prediction&nbsp;to&nbsp;the&nbsp;actual&nbsp;perception.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;bottom-up&nbsp;pass:&nbsp;the&nbsp;actual&nbsp;input&nbsp;is&nbsp;compared&nbsp;to&nbsp;the<br>
+top-down&nbsp;prediction,&nbsp;and&nbsp;the&nbsp;mismatch&nbsp;(prediction&nbsp;error)&nbsp;is<br>
+quantified&nbsp;at&nbsp;each&nbsp;hierarchical&nbsp;level.&nbsp;The&nbsp;overall&nbsp;magnitude&nbsp;is<br>
+a&nbsp;weighted&nbsp;combination&nbsp;of&nbsp;the&nbsp;three&nbsp;levels.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;prediction:&nbsp;The&nbsp;prediction&nbsp;generated&nbsp;by&nbsp;:meth:`predict`.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;actual_input:&nbsp;The&nbsp;actual&nbsp;:class:`Perception`&nbsp;produced&nbsp;by<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;perception&nbsp;system.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;:class:`<a href="#PredictionError">PredictionError</a>`&nbsp;with&nbsp;the&nbsp;overall&nbsp;magnitude,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;per-level&nbsp;errors,&nbsp;and&nbsp;the&nbsp;specific&nbsp;concept/intent<br>
+&nbsp;&nbsp;&nbsp;&nbsp;mismatches.&nbsp;Pass&nbsp;this&nbsp;to&nbsp;:meth:`learn_from_error`&nbsp;to<br>
+&nbsp;&nbsp;&nbsp;&nbsp;update&nbsp;the&nbsp;model.</span></dd></dl>
+
+<dl><dt><a name="PredictiveCodingLayer-describe"><strong>describe</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Return&nbsp;a&nbsp;human-readable&nbsp;summary&nbsp;of&nbsp;the&nbsp;predictive&nbsp;coding&nbsp;state.</span></dd></dl>
+
+<dl><dt><a name="PredictiveCodingLayer-get_prediction_accuracy"><strong>get_prediction_accuracy</strong></a>(self) -&gt; 'float'</dt><dd><span class="code">Return&nbsp;how&nbsp;accurate&nbsp;predictions&nbsp;have&nbsp;been&nbsp;recently.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;a&nbsp;running&nbsp;exponential&nbsp;moving&nbsp;average&nbsp;of&nbsp;prediction<br>
+accuracy&nbsp;(1&nbsp;-&nbsp;error).&nbsp;High&nbsp;accuracy&nbsp;means&nbsp;the&nbsp;model's<br>
+predictions&nbsp;are&nbsp;confirming&nbsp;—&nbsp;the&nbsp;conversation&nbsp;is&nbsp;following<br>
+learned&nbsp;patterns.&nbsp;Low&nbsp;accuracy&nbsp;means&nbsp;the&nbsp;model&nbsp;is&nbsp;being<br>
+surprised&nbsp;—&nbsp;it&nbsp;may&nbsp;need&nbsp;to&nbsp;update&nbsp;more&nbsp;aggressively&nbsp;or&nbsp;the<br>
+user's&nbsp;behavior&nbsp;has&nbsp;changed.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Accuracy&nbsp;in&nbsp;``[0,&nbsp;1]``.&nbsp;1&nbsp;=&nbsp;perfect&nbsp;predictions;&nbsp;0&nbsp;=&nbsp;every<br>
+&nbsp;&nbsp;&nbsp;&nbsp;prediction&nbsp;wrong.</span></dd></dl>
+
+<dl><dt><a name="PredictiveCodingLayer-get_prediction_count"><strong>get_prediction_count</strong></a>(self) -&gt; 'int'</dt><dd><span class="code">Return&nbsp;the&nbsp;total&nbsp;number&nbsp;of&nbsp;predictions&nbsp;made.</span></dd></dl>
+
+<dl><dt><a name="PredictiveCodingLayer-get_recent_intents"><strong>get_recent_intents</strong></a>(self) -&gt; 'list[str]'</dt><dd><span class="code">Return&nbsp;the&nbsp;recent&nbsp;intent&nbsp;history&nbsp;(most&nbsp;recent&nbsp;last).</span></dd></dl>
+
+<dl><dt><a name="PredictiveCodingLayer-get_recent_topics"><strong>get_recent_topics</strong></a>(self) -&gt; 'list[str]'</dt><dd><span class="code">Return&nbsp;the&nbsp;recent&nbsp;topic&nbsp;history&nbsp;(most&nbsp;recent&nbsp;last).</span></dd></dl>
+
+<dl><dt><a name="PredictiveCodingLayer-get_surprise"><strong>get_surprise</strong></a>(self) -&gt; 'float'</dt><dd><span class="code">Return&nbsp;the&nbsp;current&nbsp;surprise&nbsp;level.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;a&nbsp;running&nbsp;exponential&nbsp;moving&nbsp;average&nbsp;of&nbsp;recent<br>
+prediction&nbsp;error&nbsp;magnitudes.&nbsp;High&nbsp;sustained&nbsp;surprise&nbsp;means&nbsp;the<br>
+model&nbsp;is&nbsp;in&nbsp;unfamiliar&nbsp;territory&nbsp;—&nbsp;the&nbsp;conversation&nbsp;(or<br>
+environment)&nbsp;is&nbsp;violating&nbsp;its&nbsp;expectations&nbsp;repeatedly.&nbsp;This<br>
+corresponds&nbsp;to&nbsp;the&nbsp;tonic&nbsp;norepinephrine&nbsp;signal&nbsp;of&nbsp;the&nbsp;locus<br>
+coeruleus,&nbsp;which&nbsp;tracks&nbsp;overall&nbsp;environmental&nbsp;uncertainty<br>
+(Aston-Jones&nbsp;&amp;&nbsp;Cohen,&nbsp;2005;&nbsp;Yu&nbsp;&amp;&nbsp;Dayan,&nbsp;2005).<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Surprise&nbsp;level&nbsp;in&nbsp;``[0,&nbsp;1]``.&nbsp;0&nbsp;=&nbsp;everything&nbsp;predicted;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;1&nbsp;=&nbsp;everything&nbsp;surprising.</span></dd></dl>
+
+<dl><dt><a name="PredictiveCodingLayer-learn_from_error"><strong>learn_from_error</strong></a>(self, error: 'PredictionError', actual_input: 'Perception') -&gt; 'None'</dt><dd><span class="code">Update&nbsp;the&nbsp;prediction&nbsp;model&nbsp;based&nbsp;on&nbsp;the&nbsp;prediction&nbsp;error.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;error-driven&nbsp;learning:&nbsp;the&nbsp;model&nbsp;updates&nbsp;proportionally<br>
+to&nbsp;how&nbsp;wrong&nbsp;it&nbsp;was&nbsp;(Rescorla&nbsp;&amp;&nbsp;Wagner,&nbsp;1972).&nbsp;Large&nbsp;errors<br>
+produce&nbsp;large&nbsp;updates;&nbsp;small&nbsp;errors&nbsp;produce&nbsp;small&nbsp;updates.&nbsp;A<br>
+perfectly&nbsp;predicted&nbsp;input&nbsp;teaches&nbsp;nothing&nbsp;—&nbsp;the&nbsp;model&nbsp;is<br>
+already&nbsp;correct.<br>
+&nbsp;<br>
+The&nbsp;update&nbsp;strengthens&nbsp;the&nbsp;transitions/co-occurrences&nbsp;that<br>
+actually&nbsp;occurred&nbsp;(the&nbsp;model&nbsp;learns&nbsp;"from&nbsp;this&nbsp;context,&nbsp;that<br>
+actually&nbsp;came&nbsp;next")&nbsp;and&nbsp;the&nbsp;update&nbsp;size&nbsp;scales&nbsp;with&nbsp;the&nbsp;error,<br>
+so&nbsp;surprising&nbsp;transitions&nbsp;are&nbsp;learned&nbsp;more&nbsp;aggressively&nbsp;than<br>
+expected&nbsp;ones.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;error:&nbsp;The&nbsp;:class:`<a href="#PredictionError">PredictionError</a>`&nbsp;from<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:meth:`compute_error`.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;actual_input:&nbsp;The&nbsp;actual&nbsp;:class:`Perception`&nbsp;that&nbsp;was<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;observed.&nbsp;Used&nbsp;to&nbsp;extract&nbsp;the&nbsp;actual&nbsp;intent,&nbsp;topics,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;and&nbsp;concepts&nbsp;for&nbsp;updating&nbsp;the&nbsp;transition&nbsp;counts.</span></dd></dl>
+
+<dl><dt><a name="PredictiveCodingLayer-perceive_with_prediction"><strong>perceive_with_prediction</strong></a>(self, text: 'str', context: 'PredictionContext', *, perceive_fn=None, embeddings=None, network=None) -&gt; 'tuple[Perception, Prediction, PredictionError]'</dt><dd><span class="code">Run&nbsp;the&nbsp;full&nbsp;predictive&nbsp;coding&nbsp;cycle&nbsp;over&nbsp;one&nbsp;input.<br>
+&nbsp;<br>
+This&nbsp;wraps&nbsp;the&nbsp;existing&nbsp;perception&nbsp;system&nbsp;with&nbsp;the<br>
+top-down/bottom-up&nbsp;loop:<br>
+&nbsp;<br>
+1.&nbsp;**Predict**&nbsp;(top-down):&nbsp;generate&nbsp;expectations&nbsp;from&nbsp;context.<br>
+2.&nbsp;**Perceive**&nbsp;(bottom-up):&nbsp;run&nbsp;the&nbsp;actual&nbsp;perception&nbsp;system.<br>
+3.&nbsp;**Compute&nbsp;error**:&nbsp;compare&nbsp;prediction&nbsp;to&nbsp;actual&nbsp;perception.<br>
+4.&nbsp;**Learn**:&nbsp;update&nbsp;the&nbsp;model&nbsp;from&nbsp;the&nbsp;error.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;canonical&nbsp;predictive&nbsp;coding&nbsp;loop&nbsp;—&nbsp;predictions<br>
+guide&nbsp;perception&nbsp;(top-down&nbsp;priors&nbsp;bias&nbsp;what&nbsp;we&nbsp;expect&nbsp;to&nbsp;see),<br>
+and&nbsp;prediction&nbsp;errors&nbsp;correct&nbsp;the&nbsp;predictions&nbsp;(bottom-up<br>
+signals&nbsp;revise&nbsp;the&nbsp;model).<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;text:&nbsp;The&nbsp;raw&nbsp;user&nbsp;input.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;context:&nbsp;The&nbsp;conversational/mental&nbsp;context&nbsp;for&nbsp;prediction.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;perceive_fn:&nbsp;Optional&nbsp;override&nbsp;for&nbsp;the&nbsp;perceive&nbsp;function<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(defaults&nbsp;to&nbsp;:func:`perception.perceive`).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Useful&nbsp;for&nbsp;testing&nbsp;or&nbsp;for&nbsp;using&nbsp;the&nbsp;multisensory<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;integrator&nbsp;instead.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;embeddings:&nbsp;Passed&nbsp;through&nbsp;to&nbsp;the&nbsp;perceive&nbsp;function.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;network:&nbsp;Passed&nbsp;through&nbsp;to&nbsp;the&nbsp;perceive&nbsp;function.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;tuple&nbsp;of&nbsp;(perception,&nbsp;prediction,&nbsp;prediction_error).</span></dd></dl>
+
+<dl><dt><a name="PredictiveCodingLayer-predict"><strong>predict</strong></a>(self, context: 'PredictionContext') -&gt; 'Prediction'</dt><dd><span class="code">Generate&nbsp;a&nbsp;prediction&nbsp;about&nbsp;the&nbsp;next&nbsp;input.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;top-down&nbsp;pass&nbsp;of&nbsp;predictive&nbsp;coding:&nbsp;before<br>
+perception&nbsp;processes&nbsp;the&nbsp;actual&nbsp;input,&nbsp;the&nbsp;generative&nbsp;model<br>
+predicts&nbsp;what&nbsp;it&nbsp;expects.&nbsp;The&nbsp;prediction&nbsp;is&nbsp;hierarchical&nbsp;—<br>
+topic&nbsp;(Level&nbsp;3),&nbsp;intent&nbsp;(Level&nbsp;2),&nbsp;and&nbsp;concepts&nbsp;(Level&nbsp;1)&nbsp;—<br>
+with&nbsp;higher&nbsp;levels&nbsp;biasing&nbsp;lower&nbsp;levels.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;context:&nbsp;The&nbsp;current&nbsp;conversational&nbsp;and&nbsp;mental&nbsp;context&nbsp;—<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;recent&nbsp;intents,&nbsp;recent&nbsp;topics,&nbsp;active&nbsp;concepts,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;emotional&nbsp;state,&nbsp;time&nbsp;of&nbsp;day.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;:class:`<a href="#Prediction">Prediction</a>`&nbsp;with&nbsp;expected&nbsp;intents,&nbsp;concepts,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;topic,&nbsp;and&nbsp;an&nbsp;overall&nbsp;confidence.&nbsp;Store&nbsp;the&nbsp;returned<br>
+&nbsp;&nbsp;&nbsp;&nbsp;prediction&nbsp;and&nbsp;pass&nbsp;it&nbsp;to&nbsp;:meth:`compute_error`&nbsp;once&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;actual&nbsp;input&nbsp;has&nbsp;been&nbsp;perceived.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'_CONCEPT_WEIGHT': 'float', '_HISTORY_LIMIT': 'int', '_INTENT_WEIGHT': 'float', '_TOPIC_WEIGHT': 'float'}</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['Prediction', 'PredictionContext', 'PredictionError', 'PredictiveCodingLayer']</td></tr></table>
+</body></html>

@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.occipital_lobe.epipolar</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.occipital_lobe.html" class="white">occipital_lobe</a>.epipolar</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/occipital_lobe/epipolar.py">/home/mindyrenee/GenAnd/Genesis/Self_World/occipital_lobe/epipolar.py</a></td></tr></table>
+    <p><span class="code">MSTd&nbsp;—&nbsp;two-view&nbsp;(epipolar)&nbsp;geometry&nbsp;of&nbsp;successive&nbsp;looks.<br>
+&nbsp;<br>
+The&nbsp;dorsal&nbsp;stream&nbsp;continues&nbsp;past&nbsp;MT/V5&nbsp;into&nbsp;the&nbsp;medial&nbsp;superior<br>
+temporal&nbsp;area.&nbsp;Its&nbsp;dorsal&nbsp;division&nbsp;(MSTd)&nbsp;integrates&nbsp;wide-field<br>
+retinal&nbsp;flow&nbsp;into&nbsp;*self-motion*:&nbsp;heading&nbsp;—&nbsp;the&nbsp;focus&nbsp;of&nbsp;expansion&nbsp;—<br>
+and&nbsp;rotation,&nbsp;and&nbsp;it&nbsp;reads&nbsp;scene&nbsp;depth&nbsp;out&nbsp;of&nbsp;motion&nbsp;parallax.&nbsp;MSTd<br>
+neurons&nbsp;carry&nbsp;heading&nbsp;signals&nbsp;that&nbsp;predict&nbsp;perceptual&nbsp;judgments<br>
+(Britten&nbsp;&amp;&nbsp;van&nbsp;Wezel&nbsp;1998;&nbsp;Gu&nbsp;et&nbsp;al.&nbsp;2006),&nbsp;and&nbsp;structure&nbsp;that<br>
+violates&nbsp;the&nbsp;observer's&nbsp;own&nbsp;optic&nbsp;flow&nbsp;pops&nbsp;out&nbsp;there&nbsp;as&nbsp;an<br>
+independently&nbsp;moving&nbsp;<a href="builtins.html#object">object</a>&nbsp;(Logan&nbsp;&amp;&nbsp;Duffy&nbsp;2006).<br>
+&nbsp;<br>
+Genesis&nbsp;has&nbsp;one&nbsp;eye&nbsp;—&nbsp;a&nbsp;monocular&nbsp;camera&nbsp;—&nbsp;so&nbsp;it&nbsp;has&nbsp;no&nbsp;binocular<br>
+baseline.&nbsp;But&nbsp;epipolar&nbsp;geometry&nbsp;is&nbsp;not&nbsp;about&nbsp;two&nbsp;eyes;&nbsp;it&nbsp;is&nbsp;about<br>
+two&nbsp;*views*.&nbsp;Every&nbsp;time&nbsp;the&nbsp;eye&nbsp;opens,&nbsp;the&nbsp;camera&nbsp;takes&nbsp;a&nbsp;view;&nbsp;two<br>
+successive&nbsp;looks&nbsp;are&nbsp;related&nbsp;by&nbsp;the&nbsp;same&nbsp;constraint&nbsp;that&nbsp;relates&nbsp;a<br>
+left&nbsp;and&nbsp;a&nbsp;right&nbsp;eye:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;x'ᵀ&nbsp;F&nbsp;x&nbsp;=&nbsp;0<br>
+&nbsp;<br>
+where&nbsp;x,&nbsp;x'&nbsp;are&nbsp;the&nbsp;same&nbsp;world&nbsp;point&nbsp;seen&nbsp;in&nbsp;the&nbsp;two&nbsp;views.&nbsp;The<br>
+baseline&nbsp;is&nbsp;not&nbsp;interpupillary&nbsp;distance&nbsp;—&nbsp;it&nbsp;is&nbsp;*whatever&nbsp;moved*<br>
+between&nbsp;the&nbsp;looks:&nbsp;the&nbsp;body&nbsp;shifting,&nbsp;the&nbsp;head&nbsp;turning,&nbsp;the&nbsp;world<br>
+moving.&nbsp;When&nbsp;nothing&nbsp;moved,&nbsp;the&nbsp;constraint&nbsp;degenerates&nbsp;and&nbsp;the<br>
+honest&nbsp;percept&nbsp;is&nbsp;stillness&nbsp;—&nbsp;a&nbsp;stationary&nbsp;eye&nbsp;on&nbsp;a&nbsp;stationary&nbsp;scene<br>
+produces&nbsp;no&nbsp;parallax.&nbsp;That&nbsp;is&nbsp;the&nbsp;biology&nbsp;too:&nbsp;without&nbsp;microsaccade<br>
+or&nbsp;head&nbsp;motion&nbsp;there&nbsp;is&nbsp;no&nbsp;parallax&nbsp;depth,&nbsp;only&nbsp;the&nbsp;flow&nbsp;field.<br>
+&nbsp;<br>
+Pipeline&nbsp;per&nbsp;look:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;luminance&nbsp;frame<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;▼<br>
+&nbsp;&nbsp;&nbsp;&nbsp;[corners]&nbsp;&nbsp;Shi–Tomasi&nbsp;—&nbsp;trackable&nbsp;texture&nbsp;(min&nbsp;eigenvalue&nbsp;of&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;structure&nbsp;tensor),&nbsp;grid-suppressed&nbsp;into&nbsp;an&nbsp;even&nbsp;spread<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;▼<br>
+&nbsp;&nbsp;&nbsp;&nbsp;[KLT]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pyramidal&nbsp;Lucas–Kanade&nbsp;—&nbsp;each&nbsp;corner&nbsp;followed&nbsp;into&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;new&nbsp;view;&nbsp;drops&nbsp;points&nbsp;that&nbsp;left&nbsp;the&nbsp;frame&nbsp;or&nbsp;smeared<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;▼<br>
+&nbsp;&nbsp;&nbsp;&nbsp;[F]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;normalized&nbsp;8-point&nbsp;(Hartley&nbsp;1997)&nbsp;inside&nbsp;RANSAC,&nbsp;scored<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;by&nbsp;Sampson&nbsp;distance&nbsp;—&nbsp;the&nbsp;rank-2&nbsp;epipolar&nbsp;model&nbsp;of&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pair&nbsp;of&nbsp;views<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;▼<br>
+&nbsp;&nbsp;&nbsp;&nbsp;[E]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;calibrated&nbsp;8-point&nbsp;through&nbsp;K⁻¹,&nbsp;projected&nbsp;onto&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;essential&nbsp;manifold&nbsp;(singular&nbsp;values&nbsp;snapped&nbsp;to&nbsp;1,1,0)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;▼<br>
+&nbsp;&nbsp;&nbsp;&nbsp;[R,&nbsp;t]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SVD&nbsp;decomposition&nbsp;→&nbsp;4&nbsp;candidate&nbsp;poses&nbsp;→&nbsp;cheirality:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;triangulate&nbsp;the&nbsp;inliers&nbsp;and&nbsp;keep&nbsp;the&nbsp;pose&nbsp;that&nbsp;puts<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;world&nbsp;in&nbsp;front&nbsp;of&nbsp;both&nbsp;views<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;▼<br>
+&nbsp;&nbsp;&nbsp;&nbsp;[depth]&nbsp;&nbsp;&nbsp;&nbsp;DLT&nbsp;triangulation&nbsp;→&nbsp;relative&nbsp;depth&nbsp;(up&nbsp;to&nbsp;scale&nbsp;—&nbsp;a<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;monocular&nbsp;view&nbsp;cannot&nbsp;fix&nbsp;the&nbsp;baseline&nbsp;length)&nbsp;and<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;motion&nbsp;parallax:&nbsp;nearer&nbsp;structure&nbsp;sweeps&nbsp;further<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;▼<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="#TwoViewReport">TwoViewReport</a>&nbsp;—&nbsp;self-motion,&nbsp;heading,&nbsp;depth&nbsp;and&nbsp;independent&nbsp;movers<br>
+&nbsp;<br>
+The&nbsp;pure-rotation&nbsp;degenerate&nbsp;case&nbsp;is&nbsp;real:&nbsp;a&nbsp;look&nbsp;that&nbsp;differs&nbsp;from<br>
+the&nbsp;last&nbsp;only&nbsp;by&nbsp;a&nbsp;turn&nbsp;carries&nbsp;no&nbsp;translation&nbsp;baseline,&nbsp;E&nbsp;collapses,<br>
+and&nbsp;the&nbsp;two&nbsp;views&nbsp;are&nbsp;related&nbsp;by&nbsp;a&nbsp;homography&nbsp;instead.&nbsp;MSTd's&nbsp;own<br>
+rotation-selective&nbsp;cells&nbsp;handle&nbsp;exactly&nbsp;this&nbsp;—&nbsp;here&nbsp;a&nbsp;RANSAC<br>
+homography&nbsp;fit&nbsp;is&nbsp;the&nbsp;fallback&nbsp;model,&nbsp;and&nbsp;its&nbsp;rotation&nbsp;is&nbsp;recovered<br>
+from&nbsp;K⁻¹HK.<br>
+&nbsp;<br>
+Everything&nbsp;is&nbsp;NumPy&nbsp;—&nbsp;the&nbsp;same&nbsp;constraint&nbsp;as&nbsp;the&nbsp;rest&nbsp;of&nbsp;the<br>
+occipital&nbsp;lobe.&nbsp;The&nbsp;geometry&nbsp;is&nbsp;the&nbsp;percept;&nbsp;what&nbsp;it&nbsp;means&nbsp;is&nbsp;left<br>
+to&nbsp;the&nbsp;rest&nbsp;of&nbsp;the&nbsp;mind.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="math.html">math</a><br>
+</td><td class="multicolumn"><a href="numpy.html">numpy</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.occipital_lobe.epipolar.html#EpipolarProcessor">EpipolarProcessor</a>
+</dt><dt class="heading-text"><a href="Self_World.occipital_lobe.epipolar.html#TwoViewReport">TwoViewReport</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="EpipolarProcessor">class <strong>EpipolarProcessor</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#EpipolarProcessor">EpipolarProcessor</a>(max_dim:&nbsp;'int'&nbsp;=&nbsp;320,&nbsp;n_points:&nbsp;'int'&nbsp;=&nbsp;200,&nbsp;seed:&nbsp;'int&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+MSTd&nbsp;—&nbsp;self-motion&nbsp;and&nbsp;parallax&nbsp;depth&nbsp;across&nbsp;successive&nbsp;looks.<br>
+&nbsp;<br>
+Holds&nbsp;the&nbsp;previous&nbsp;look's&nbsp;luminance&nbsp;and&nbsp;its&nbsp;tracked&nbsp;corners;<br>
+``<a href="#EpipolarProcessor-process">process</a>(rgb)``&nbsp;returns&nbsp;the&nbsp;<a href="#TwoViewReport">TwoViewReport</a>&nbsp;for&nbsp;the&nbsp;pair.&nbsp;The<br>
+first&nbsp;look&nbsp;after&nbsp;construction&nbsp;(or&nbsp;a&nbsp;resolution&nbsp;change)&nbsp;only&nbsp;seeds<br>
+the&nbsp;tracker&nbsp;—&nbsp;a&nbsp;single&nbsp;view&nbsp;carries&nbsp;no&nbsp;geometry,&nbsp;and&nbsp;the&nbsp;report<br>
+says&nbsp;so&nbsp;(``kind&nbsp;==&nbsp;""``).<br>
+&nbsp;<br>
+Thread-safe:&nbsp;``see()``&nbsp;runs&nbsp;on&nbsp;both&nbsp;the&nbsp;volition&nbsp;workers&nbsp;and&nbsp;the<br>
+conversation&nbsp;path,&nbsp;so&nbsp;the&nbsp;tracker&nbsp;state&nbsp;is&nbsp;lock-guarded.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="EpipolarProcessor-__init__"><strong>__init__</strong></a>(self, max_dim: 'int' = 320, n_points: 'int' = 200, seed: 'int | None' = None) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;tracker&nbsp;state&nbsp;at&nbsp;the&nbsp;requested&nbsp;working&nbsp;scale.</span></dd></dl>
+
+<dl><dt><a name="EpipolarProcessor-process"><strong>process</strong></a>(self, rgb: 'np.ndarray') -&gt; 'TwoViewReport'</dt><dd><span class="code">Relate&nbsp;this&nbsp;look&nbsp;to&nbsp;the&nbsp;last&nbsp;and&nbsp;report&nbsp;what&nbsp;moved.</span></dd></dl>
+
+<dl><dt><a name="EpipolarProcessor-reset"><strong>reset</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Drop&nbsp;the&nbsp;previous&nbsp;view&nbsp;—&nbsp;the&nbsp;next&nbsp;look&nbsp;opens&nbsp;a&nbsp;new&nbsp;pair.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="TwoViewReport">class <strong>TwoViewReport</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#TwoViewReport">TwoViewReport</a>(kind:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;moved:&nbsp;'bool'&nbsp;=&nbsp;False,&nbsp;n_tracks:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;n_inliers:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;inlier_ratio:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;mean_residual:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;rotation:&nbsp;'np.ndarray&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;rotation_deg:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;translation:&nbsp;'np.ndarray&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;direction:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;heading_deg:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;bearing_deg:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;elevation_deg:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;epipole:&nbsp;'tuple[float,&nbsp;float]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;fundamental:&nbsp;'np.ndarray&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;essential:&nbsp;'np.ndarray&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;median_depth:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;near_fraction:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;nearest_region:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;movers:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;mover_centroid:&nbsp;'tuple[float,&nbsp;float]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+What&nbsp;the&nbsp;dorsal&nbsp;stream&nbsp;made&nbsp;of&nbsp;the&nbsp;move&nbsp;between&nbsp;two&nbsp;looks.<br>
+&nbsp;<br>
+Pure&nbsp;percept&nbsp;data&nbsp;—&nbsp;self-motion,&nbsp;heading,&nbsp;parallax&nbsp;depth,&nbsp;and&nbsp;the<br>
+structure&nbsp;that&nbsp;refused&nbsp;to&nbsp;participate.&nbsp;``kind``&nbsp;is&nbsp;the<br>
+categorical&nbsp;read:&nbsp;"still"&nbsp;(no&nbsp;baseline&nbsp;—&nbsp;nothing&nbsp;moved),&nbsp;"turn"<br>
+(rotation&nbsp;only&nbsp;—&nbsp;the&nbsp;world&nbsp;swung&nbsp;but&nbsp;nothing&nbsp;came&nbsp;nearer),<br>
+"travel"&nbsp;(a&nbsp;translation&nbsp;baseline&nbsp;—&nbsp;heading&nbsp;and&nbsp;depth&nbsp;are&nbsp;real),<br>
+or&nbsp;"unresolved"&nbsp;(the&nbsp;field&nbsp;changed&nbsp;but&nbsp;no&nbsp;two-view&nbsp;model<br>
+explained&nbsp;it&nbsp;—&nbsp;the&nbsp;scene&nbsp;itself&nbsp;changed,&nbsp;or&nbsp;the&nbsp;view&nbsp;relit).<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="TwoViewReport-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="TwoViewReport-__init__"><strong>__init__</strong></a>(self, kind: 'str' = '', moved: 'bool' = False, n_tracks: 'int' = 0, n_inliers: 'int' = 0, inlier_ratio: 'float' = 0.0, mean_residual: 'float' = 0.0, rotation: 'np.ndarray | None' = None, rotation_deg: 'float' = 0.0, translation: 'np.ndarray | None' = None, direction: 'str' = '', heading_deg: 'float' = 0.0, bearing_deg: 'float' = 0.0, elevation_deg: 'float' = 0.0, epipole: 'tuple[float, float] | None' = None, fundamental: 'np.ndarray | None' = None, essential: 'np.ndarray | None' = None, median_depth: 'float' = 0.0, near_fraction: 'float' = 0.0, nearest_region: 'str' = '', movers: 'int' = 0, mover_centroid: 'tuple[float, float] | None' = None) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="TwoViewReport-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>bearing_deg</strong></dt>
+</dl>
+<dl><dt><strong>direction</strong></dt>
+</dl>
+<dl><dt><strong>elevation_deg</strong></dt>
+</dl>
+<dl><dt><strong>epipole</strong></dt>
+</dl>
+<dl><dt><strong>essential</strong></dt>
+</dl>
+<dl><dt><strong>fundamental</strong></dt>
+</dl>
+<dl><dt><strong>heading_deg</strong></dt>
+</dl>
+<dl><dt><strong>inlier_ratio</strong></dt>
+</dl>
+<dl><dt><strong>kind</strong></dt>
+</dl>
+<dl><dt><strong>mean_residual</strong></dt>
+</dl>
+<dl><dt><strong>median_depth</strong></dt>
+</dl>
+<dl><dt><strong>moved</strong></dt>
+</dl>
+<dl><dt><strong>mover_centroid</strong></dt>
+</dl>
+<dl><dt><strong>movers</strong></dt>
+</dl>
+<dl><dt><strong>n_inliers</strong></dt>
+</dl>
+<dl><dt><strong>n_tracks</strong></dt>
+</dl>
+<dl><dt><strong>near_fraction</strong></dt>
+</dl>
+<dl><dt><strong>nearest_region</strong></dt>
+</dl>
+<dl><dt><strong>rotation</strong></dt>
+</dl>
+<dl><dt><strong>rotation_deg</strong></dt>
+</dl>
+<dl><dt><strong>translation</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'bearing_deg': 'float', 'direction': 'str', 'elevation_deg': 'float', 'epipole': 'tuple[float, float] | None', 'essential': 'np.ndarray | None', 'fundamental': 'np.ndarray | None', 'heading_deg': 'float', 'inlier_ratio': 'float', 'kind': 'str', 'mean_residual': 'float', ...}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'bearing_deg': Field(name='bearing_deg',type='float',default=0....appingproxy({}),kw_only=False,_field_type=_FIELD), 'direction': Field(name='direction',type='str',default='',def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'elevation_deg': Field(name='elevation_deg',type='float',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'epipole': Field(name='epipole',type='tuple[float, float] |...appingproxy({}),kw_only=False,_field_type=_FIELD), 'essential': Field(name='essential',type='np.ndarray | None',...appingproxy({}),kw_only=False,_field_type=_FIELD), 'fundamental': Field(name='fundamental',type='np.ndarray | None...appingproxy({}),kw_only=False,_field_type=_FIELD), 'heading_deg': Field(name='heading_deg',type='float',default=0....appingproxy({}),kw_only=False,_field_type=_FIELD), 'inlier_ratio': Field(name='inlier_ratio',type='float',default=0...appingproxy({}),kw_only=False,_field_type=_FIELD), 'kind': Field(name='kind',type='str',default='',default_...appingproxy({}),kw_only=False,_field_type=_FIELD), 'mean_residual': Field(name='mean_residual',type='float',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), ...}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('kind', 'moved', 'n_tracks', 'n_inliers', 'inlier_ratio', 'mean_residual', 'rotation', 'rotation_deg', 'translation', 'direction', 'heading_deg', 'bearing_deg', 'elevation_deg', 'epipole', 'fundamental', 'essential', 'median_depth', 'near_fraction', 'nearest_region', 'movers', ...)</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-algebraic_residual"><strong>algebraic_residual</strong></a>(f: 'np.ndarray', p1: 'np.ndarray', p2: 'np.ndarray') -&gt; 'np.ndarray'</dt><dd><span class="code">The&nbsp;raw&nbsp;epipolar&nbsp;residual&nbsp;x'ᵀFx&nbsp;per&nbsp;correspondence.<br>
+&nbsp;<br>
+Cheapest&nbsp;of&nbsp;the&nbsp;loss&nbsp;functions&nbsp;—&nbsp;but&nbsp;it&nbsp;is&nbsp;an&nbsp;algebraic&nbsp;quantity,<br>
+not&nbsp;a&nbsp;distance:&nbsp;it&nbsp;scales&nbsp;with&nbsp;the&nbsp;magnitude&nbsp;of&nbsp;Fx,&nbsp;so&nbsp;a&nbsp;bad&nbsp;match<br>
+can&nbsp;score&nbsp;small&nbsp;and&nbsp;a&nbsp;good&nbsp;one&nbsp;large.&nbsp;Useful&nbsp;as&nbsp;a&nbsp;diagnostic;&nbsp;the<br>
+estimation&nbsp;gates&nbsp;on&nbsp;geometric&nbsp;losses&nbsp;instead.</span></dd></dl>
+ <dl><dt><a name="-camera_matrix"><strong>camera_matrix</strong></a>(h: 'int', w: 'int', focal: 'float | None' = None) -&gt; 'np.ndarray'</dt><dd><span class="code">Pinhole&nbsp;intrinsics&nbsp;for&nbsp;an&nbsp;uncalibrated&nbsp;eye.<br>
+&nbsp;<br>
+Focal&nbsp;length&nbsp;defaults&nbsp;to&nbsp;the&nbsp;long&nbsp;axis&nbsp;—&nbsp;the&nbsp;standard<br>
+wide-angle-webcam&nbsp;guess.&nbsp;The&nbsp;exact&nbsp;value&nbsp;only&nbsp;warps&nbsp;the&nbsp;metric<br>
+scale&nbsp;of&nbsp;E's&nbsp;decomposition,&nbsp;not&nbsp;the&nbsp;epipolar&nbsp;constraint&nbsp;itself.</span></dd></dl>
+ <dl><dt><a name="-decompose_essential"><strong>decompose_essential</strong></a>(e: 'np.ndarray') -&gt; 'list[tuple[np.ndarray, np.ndarray]]'</dt><dd><span class="code">E&nbsp;→&nbsp;the&nbsp;four&nbsp;candidate&nbsp;(R,&nbsp;t)&nbsp;poses.<br>
+&nbsp;<br>
+E&nbsp;=&nbsp;[t]×R&nbsp;=&nbsp;U&nbsp;diag(1,1,0)&nbsp;Vᵀ&nbsp;gives&nbsp;R&nbsp;∈&nbsp;{UWVᵀ,&nbsp;UWᵀVᵀ}&nbsp;and<br>
+t&nbsp;=&nbsp;±u₃.&nbsp;Only&nbsp;one&nbsp;of&nbsp;the&nbsp;four&nbsp;puts&nbsp;the&nbsp;world&nbsp;in&nbsp;front&nbsp;of&nbsp;both<br>
+views&nbsp;—&nbsp;that&nbsp;is&nbsp;what&nbsp;recover_pose's&nbsp;cheirality&nbsp;check&nbsp;selects.</span></dd></dl>
+ <dl><dt><a name="-detect_corners"><strong>detect_corners</strong></a>(gray: 'np.ndarray', n_max: 'int' = 200, cell: 'int' = 16) -&gt; 'np.ndarray'</dt><dd><span class="code">Shi–Tomasi&nbsp;corners&nbsp;—&nbsp;the&nbsp;points&nbsp;LK&nbsp;can&nbsp;actually&nbsp;follow.<br>
+&nbsp;<br>
+Cornerness&nbsp;is&nbsp;the&nbsp;smaller&nbsp;eigenvalue&nbsp;of&nbsp;the&nbsp;windowed&nbsp;structure<br>
+tensor;&nbsp;one&nbsp;strongest&nbsp;corner&nbsp;survives&nbsp;per&nbsp;*cell*-px&nbsp;grid&nbsp;cell&nbsp;so<br>
+the&nbsp;field&nbsp;spreads&nbsp;across&nbsp;the&nbsp;whole&nbsp;view&nbsp;instead&nbsp;of&nbsp;clustering&nbsp;on<br>
+the&nbsp;highest-contrast&nbsp;texture.&nbsp;Returns&nbsp;an&nbsp;(N,&nbsp;2)&nbsp;array&nbsp;of&nbsp;(y,&nbsp;x)<br>
+centers&nbsp;ordered&nbsp;by&nbsp;cornerness.</span></dd></dl>
+ <dl><dt><a name="-eight_point"><strong>eight_point</strong></a>(p1: 'np.ndarray', p2: 'np.ndarray') -&gt; 'np.ndarray'</dt><dd><span class="code">Normalized&nbsp;8-point&nbsp;estimate&nbsp;of&nbsp;F&nbsp;from&nbsp;correspondences.<br>
+&nbsp;<br>
+Each&nbsp;pair&nbsp;contributes&nbsp;one&nbsp;row&nbsp;x'⊗x&nbsp;to&nbsp;the&nbsp;system&nbsp;A·f&nbsp;=&nbsp;0;&nbsp;f&nbsp;is&nbsp;the<br>
+smallest&nbsp;right&nbsp;singular&nbsp;vector.&nbsp;The&nbsp;result&nbsp;is&nbsp;projected&nbsp;to&nbsp;rank&nbsp;2&nbsp;—<br>
+a&nbsp;full-rank&nbsp;F&nbsp;has&nbsp;no&nbsp;epipole&nbsp;and&nbsp;its&nbsp;lines&nbsp;never&nbsp;concur,&nbsp;so&nbsp;the<br>
+constraint&nbsp;has&nbsp;to&nbsp;be&nbsp;enforced,&nbsp;not&nbsp;assumed.</span></dd></dl>
+ <dl><dt><a name="-epipolar_lines"><strong>epipolar_lines</strong></a>(f: 'np.ndarray', pts: 'np.ndarray', second: 'bool' = True) -&gt; 'np.ndarray'</dt><dd><span class="code">Epipolar&nbsp;line&nbsp;coefficients&nbsp;for&nbsp;*pts*&nbsp;in&nbsp;the&nbsp;other&nbsp;view.<br>
+&nbsp;<br>
+``second=True``&nbsp;→&nbsp;l'&nbsp;=&nbsp;F&nbsp;x&nbsp;(lines&nbsp;in&nbsp;the&nbsp;second&nbsp;image);<br>
+``second=False``&nbsp;→&nbsp;l&nbsp;=&nbsp;Fᵀ&nbsp;x'&nbsp;(lines&nbsp;in&nbsp;the&nbsp;first).</span></dd></dl>
+ <dl><dt><a name="-epipoles"><strong>epipoles</strong></a>(f: 'np.ndarray') -&gt; 'tuple[np.ndarray, np.ndarray]'</dt><dd><span class="code">The&nbsp;two&nbsp;epipoles&nbsp;(e1,&nbsp;e2)&nbsp;in&nbsp;homogeneous&nbsp;coordinates.<br>
+&nbsp;<br>
+e1&nbsp;is&nbsp;the&nbsp;projection&nbsp;of&nbsp;the&nbsp;second&nbsp;view's&nbsp;eye&nbsp;into&nbsp;the&nbsp;first<br>
+view&nbsp;—&nbsp;the&nbsp;right&nbsp;null&nbsp;vector&nbsp;of&nbsp;F.&nbsp;e2,&nbsp;the&nbsp;left&nbsp;null&nbsp;vector,&nbsp;is<br>
+where&nbsp;the&nbsp;first&nbsp;eye&nbsp;appears&nbsp;in&nbsp;the&nbsp;second&nbsp;view.&nbsp;For&nbsp;a&nbsp;travelling<br>
+eye&nbsp;the&nbsp;epipole&nbsp;is&nbsp;the&nbsp;focus&nbsp;of&nbsp;expansion:&nbsp;the&nbsp;heading,&nbsp;rendered<br>
+on&nbsp;the&nbsp;retina.</span></dd></dl>
+ <dl><dt><a name="-essential_from_fundamental"><strong>essential_from_fundamental</strong></a>(f: 'np.ndarray', k: 'np.ndarray') -&gt; 'np.ndarray'</dt><dd><span class="code">E&nbsp;=&nbsp;Kᵀ&nbsp;F&nbsp;K&nbsp;—&nbsp;lift&nbsp;the&nbsp;pixel-space&nbsp;constraint&nbsp;into&nbsp;calibrated<br>
+(metric)&nbsp;space,&nbsp;where&nbsp;it&nbsp;factors&nbsp;as&nbsp;[t]×R.</span></dd></dl>
+ <dl><dt><a name="-estimate_essential"><strong>estimate_essential</strong></a>(p1: 'np.ndarray', p2: 'np.ndarray', k: 'np.ndarray', thresh: 'float' = 1.5, iters: 'int' = 512, rng: 'np.random.Generator | None' = None) -&gt; 'tuple[np.ndarray | None, np.ndarray]'</dt><dd><span class="code">RANSAC&nbsp;8-point&nbsp;in&nbsp;calibrated&nbsp;coordinates&nbsp;→&nbsp;(E,&nbsp;inlier&nbsp;mask).<br>
+&nbsp;<br>
+Points&nbsp;are&nbsp;lifted&nbsp;through&nbsp;K⁻¹&nbsp;first,&nbsp;so&nbsp;the&nbsp;estimate&nbsp;solves<br>
+x̂'ᵀ&nbsp;E&nbsp;x̂&nbsp;=&nbsp;0&nbsp;directly&nbsp;and&nbsp;the&nbsp;fit&nbsp;is&nbsp;snapped&nbsp;back&nbsp;onto&nbsp;the<br>
+essential&nbsp;manifold&nbsp;after&nbsp;every&nbsp;solve.&nbsp;The&nbsp;Sampson&nbsp;threshold&nbsp;is<br>
+rescaled&nbsp;by&nbsp;the&nbsp;focal&nbsp;length&nbsp;—&nbsp;a&nbsp;pixel-space&nbsp;gate&nbsp;expressed&nbsp;in<br>
+normalized&nbsp;units.</span></dd></dl>
+ <dl><dt><a name="-estimate_fundamental"><strong>estimate_fundamental</strong></a>(p1: 'np.ndarray', p2: 'np.ndarray', thresh: 'float' = 1.5, iters: 'int' = 512, rng: 'np.random.Generator | None' = None) -&gt; 'tuple[np.ndarray | None, np.ndarray]'</dt><dd><span class="code">RANSAC&nbsp;+&nbsp;normalized&nbsp;8-point&nbsp;→&nbsp;(F,&nbsp;inlier&nbsp;mask).<br>
+&nbsp;<br>
+The&nbsp;inlier&nbsp;mask&nbsp;is&nbsp;the&nbsp;model's&nbsp;own&nbsp;account&nbsp;of&nbsp;which&nbsp;tracks&nbsp;the<br>
+two-view&nbsp;geometry&nbsp;explained;&nbsp;rejected&nbsp;tracks&nbsp;are&nbsp;either&nbsp;failed<br>
+follows&nbsp;or&nbsp;things&nbsp;that&nbsp;moved&nbsp;on&nbsp;their&nbsp;own.</span></dd></dl>
+ <dl><dt><a name="-estimate_homography"><strong>estimate_homography</strong></a>(p1: 'np.ndarray', p2: 'np.ndarray', thresh: 'float' = 3.0, iters: 'int' = 512, rng: 'np.random.Generator | None' = None) -&gt; 'tuple[np.ndarray | None, np.ndarray]'</dt><dd><span class="code">RANSAC&nbsp;4-point&nbsp;DLT&nbsp;homography&nbsp;—&nbsp;the&nbsp;pure-rotation&nbsp;fallback.<br>
+&nbsp;<br>
+When&nbsp;the&nbsp;baseline&nbsp;collapses&nbsp;to&nbsp;a&nbsp;turn,&nbsp;the&nbsp;two&nbsp;views&nbsp;are&nbsp;related<br>
+by&nbsp;H&nbsp;=&nbsp;K&nbsp;R&nbsp;K⁻¹&nbsp;(a&nbsp;rotation&nbsp;produces&nbsp;no&nbsp;parallax&nbsp;for&nbsp;E&nbsp;to&nbsp;work<br>
+with).&nbsp;Scored&nbsp;by&nbsp;symmetric&nbsp;transfer&nbsp;error&nbsp;in&nbsp;pixels.</span></dd></dl>
+ <dl><dt><a name="-huber"><strong>huber</strong></a>(sq_err: 'np.ndarray', k: 'float' = 1.5) -&gt; 'np.ndarray'</dt><dd><span class="code">Huber&nbsp;robust&nbsp;loss&nbsp;of&nbsp;squared&nbsp;errors:&nbsp;quadratic&nbsp;inside&nbsp;k²,<br>
+linear&nbsp;beyond&nbsp;—&nbsp;inliers&nbsp;shape&nbsp;the&nbsp;fit,&nbsp;outliers&nbsp;stop&nbsp;pulling.</span></dd></dl>
+ <dl><dt><a name="-normalize_points"><strong>normalize_points</strong></a>(pts: 'np.ndarray') -&gt; 'tuple[np.ndarray, np.ndarray]'</dt><dd><span class="code">Hartley&nbsp;isotropic&nbsp;normalization:&nbsp;centroid&nbsp;at&nbsp;the&nbsp;origin,&nbsp;mean<br>
+distance&nbsp;√2.&nbsp;The&nbsp;8-point&nbsp;system&nbsp;is&nbsp;hopelessly&nbsp;ill-conditioned&nbsp;in<br>
+raw&nbsp;pixel&nbsp;units;&nbsp;this&nbsp;is&nbsp;what&nbsp;makes&nbsp;it&nbsp;usable.</span></dd></dl>
+ <dl><dt><a name="-project_to_essential"><strong>project_to_essential</strong></a>(e: 'np.ndarray') -&gt; 'np.ndarray'</dt><dd><span class="code">Snap&nbsp;a&nbsp;matrix&nbsp;onto&nbsp;the&nbsp;essential&nbsp;manifold:&nbsp;singular&nbsp;values<br>
+(σ,&nbsp;σ,&nbsp;0).&nbsp;Any&nbsp;E&nbsp;estimated&nbsp;from&nbsp;noisy&nbsp;data&nbsp;drifts&nbsp;off&nbsp;the<br>
+manifold;&nbsp;this&nbsp;is&nbsp;the&nbsp;closest&nbsp;point&nbsp;back&nbsp;on&nbsp;it.</span></dd></dl>
+ <dl><dt><a name="-recover_pose"><strong>recover_pose</strong></a>(e: 'np.ndarray', p1: 'np.ndarray', p2: 'np.ndarray') -&gt; 'tuple[np.ndarray, np.ndarray, np.ndarray]'</dt><dd><span class="code">Pick&nbsp;the&nbsp;one&nbsp;physically&nbsp;possible&nbsp;pose&nbsp;out&nbsp;of&nbsp;E's&nbsp;four.<br>
+&nbsp;<br>
+For&nbsp;each&nbsp;candidate&nbsp;(R,&nbsp;t)&nbsp;the&nbsp;points&nbsp;are&nbsp;triangulated;&nbsp;the&nbsp;pose<br>
+that&nbsp;puts&nbsp;the&nbsp;most&nbsp;scene&nbsp;structure&nbsp;in&nbsp;front&nbsp;of&nbsp;both&nbsp;views&nbsp;wins&nbsp;—<br>
+the&nbsp;cheirality&nbsp;constraint.&nbsp;Returns&nbsp;(R,&nbsp;t_unit,&nbsp;in-front&nbsp;mask).<br>
+t&nbsp;is&nbsp;a&nbsp;direction&nbsp;only:&nbsp;a&nbsp;monocular&nbsp;pair&nbsp;fixes&nbsp;the&nbsp;baseline<br>
+direction,&nbsp;never&nbsp;its&nbsp;length.</span></dd></dl>
+ <dl><dt><a name="-refine_pose"><strong>refine_pose</strong></a>(r: 'np.ndarray', t: 'np.ndarray', p1: 'np.ndarray', p2: 'np.ndarray', iters: 'int' = 12) -&gt; 'tuple[np.ndarray, np.ndarray]'</dt><dd><span class="code">Levenberg&nbsp;polish&nbsp;of&nbsp;a&nbsp;decomposed&nbsp;pose&nbsp;on&nbsp;the&nbsp;inliers.<br>
+&nbsp;<br>
+The&nbsp;8-point&nbsp;estimate&nbsp;is&nbsp;algebraic&nbsp;—&nbsp;it&nbsp;minimizes&nbsp;a&nbsp;residual&nbsp;that<br>
+is&nbsp;not&nbsp;a&nbsp;distance.&nbsp;Here&nbsp;the&nbsp;pose&nbsp;is&nbsp;refined&nbsp;directly&nbsp;on&nbsp;the<br>
+Sampson&nbsp;error,&nbsp;parametrized&nbsp;in&nbsp;the&nbsp;essential&nbsp;manifold's&nbsp;five<br>
+degrees&nbsp;of&nbsp;freedom:&nbsp;the&nbsp;rotation&nbsp;vector&nbsp;of&nbsp;R&nbsp;plus&nbsp;the&nbsp;tangent<br>
+plane&nbsp;of&nbsp;the&nbsp;unit&nbsp;heading&nbsp;t.&nbsp;Gauss–Newton&nbsp;on&nbsp;sqrt(Sampson)&nbsp;with<br>
+a&nbsp;finite-difference&nbsp;Jacobian&nbsp;—&nbsp;five&nbsp;extra&nbsp;residual&nbsp;evaluations<br>
+per&nbsp;step,&nbsp;cheap&nbsp;at&nbsp;inlier&nbsp;counts.</span></dd></dl>
+ <dl><dt><a name="-rotation_from_homography"><strong>rotation_from_homography</strong></a>(h: 'np.ndarray', k: 'np.ndarray') -&gt; 'np.ndarray'</dt><dd><span class="code">Extract&nbsp;R&nbsp;from&nbsp;H&nbsp;=&nbsp;K&nbsp;R&nbsp;K⁻¹&nbsp;—&nbsp;uncalibrate,&nbsp;normalize&nbsp;the&nbsp;scale,<br>
+then&nbsp;orthogonalize&nbsp;back&nbsp;to&nbsp;the&nbsp;nearest&nbsp;rotation.</span></dd></dl>
+ <dl><dt><a name="-sampson_sq"><strong>sampson_sq</strong></a>(f: 'np.ndarray', p1: 'np.ndarray', p2: 'np.ndarray') -&gt; 'np.ndarray'</dt><dd><span class="code">Squared&nbsp;Sampson&nbsp;distance&nbsp;—&nbsp;the&nbsp;first-order&nbsp;geometric&nbsp;error&nbsp;of&nbsp;a<br>
+correspondence&nbsp;against&nbsp;F.&nbsp;Numerator:&nbsp;the&nbsp;algebraic&nbsp;residual<br>
+(x'ᵀFx)².&nbsp;Denominator:&nbsp;the&nbsp;squared&nbsp;gradient&nbsp;of&nbsp;that&nbsp;residual<br>
+w.r.t.&nbsp;the&nbsp;two&nbsp;image&nbsp;points,&nbsp;which&nbsp;rescales&nbsp;it&nbsp;into&nbsp;squared-pixel<br>
+units&nbsp;so&nbsp;a&nbsp;RANSAC&nbsp;threshold&nbsp;means&nbsp;what&nbsp;it&nbsp;says.&nbsp;This&nbsp;is&nbsp;the&nbsp;loss<br>
+OpenCV's&nbsp;RANSAC&nbsp;uses&nbsp;under&nbsp;the&nbsp;hood.</span></dd></dl>
+ <dl><dt><a name="-symmetric_epipolar_sq"><strong>symmetric_epipolar_sq</strong></a>(f: 'np.ndarray', p1: 'np.ndarray', p2: 'np.ndarray') -&gt; 'np.ndarray'</dt><dd><span class="code">Squared&nbsp;symmetric&nbsp;epipolar&nbsp;distance:&nbsp;d(x',&nbsp;Fx)²&nbsp;+&nbsp;d(x,&nbsp;Fᵀx')²&nbsp;—<br>
+the&nbsp;point-to-line&nbsp;distance&nbsp;in&nbsp;each&nbsp;view,&nbsp;summed.&nbsp;A&nbsp;true&nbsp;geometric<br>
+loss&nbsp;in&nbsp;squared-pixel&nbsp;units.</span></dd></dl>
+ <dl><dt><a name="-track_points"><strong>track_points</strong></a>(prev: 'np.ndarray', curr: 'np.ndarray', pts: 'np.ndarray', win: 'int' = 9, levels: 'int' = 3, iters: 'int' = 15) -&gt; 'tuple[np.ndarray, np.ndarray, np.ndarray]'</dt><dd><span class="code">Pyramidal&nbsp;Lucas–Kanade:&nbsp;follow&nbsp;*pts*&nbsp;from&nbsp;*prev*&nbsp;into&nbsp;*curr*.<br>
+&nbsp;<br>
+Per&nbsp;point,&nbsp;a&nbsp;translation-only&nbsp;warp&nbsp;refined&nbsp;Gauss–Newton&nbsp;style&nbsp;—<br>
+the&nbsp;same&nbsp;constant-brightness&nbsp;least&nbsp;squares&nbsp;MT&nbsp;runs,&nbsp;here&nbsp;on&nbsp;a<br>
+tracked&nbsp;patch&nbsp;instead&nbsp;of&nbsp;a&nbsp;fixed&nbsp;cell.&nbsp;*pts*&nbsp;are&nbsp;(y,&nbsp;x).<br>
+&nbsp;<br>
+Returns&nbsp;(tracked_pts,&nbsp;ok,&nbsp;resid):&nbsp;the&nbsp;new&nbsp;(y,&nbsp;x)&nbsp;positions,&nbsp;which<br>
+tracks&nbsp;survived&nbsp;(in-frame&nbsp;and&nbsp;converged),&nbsp;and&nbsp;each&nbsp;track's&nbsp;mean<br>
+absolute&nbsp;patch&nbsp;residual&nbsp;—&nbsp;how&nbsp;faithfully&nbsp;the&nbsp;texture&nbsp;carried&nbsp;over.</span></dd></dl>
+ <dl><dt><a name="-transfer_error_sq"><strong>transfer_error_sq</strong></a>(h: 'np.ndarray', p1: 'np.ndarray', p2: 'np.ndarray') -&gt; 'np.ndarray'</dt><dd><span class="code">Squared&nbsp;symmetric&nbsp;transfer&nbsp;error&nbsp;under&nbsp;H:&nbsp;|Hp−p'|²&nbsp;+&nbsp;|H⁻¹p'−p|²&nbsp;—<br>
+the&nbsp;geometric&nbsp;loss&nbsp;for&nbsp;a&nbsp;homography,&nbsp;in&nbsp;squared&nbsp;pixels.</span></dd></dl>
+ <dl><dt><a name="-triangulate"><strong>triangulate</strong></a>(p_1: 'np.ndarray', p_2: 'np.ndarray', x1: 'np.ndarray', x2: 'np.ndarray') -&gt; 'tuple[np.ndarray, np.ndarray]'</dt><dd><span class="code">DLT&nbsp;triangulation:&nbsp;correspondences&nbsp;→&nbsp;3D&nbsp;points.<br>
+&nbsp;<br>
+For&nbsp;each&nbsp;pair,&nbsp;the&nbsp;two&nbsp;projection&nbsp;rays&nbsp;are&nbsp;re-expressed&nbsp;as&nbsp;linear<br>
+constraints&nbsp;on&nbsp;X&nbsp;(x&nbsp;×&nbsp;PX&nbsp;=&nbsp;0);&nbsp;the&nbsp;point&nbsp;is&nbsp;the&nbsp;smallest&nbsp;singular<br>
+vector&nbsp;of&nbsp;the&nbsp;stacked&nbsp;4×4&nbsp;system.&nbsp;Returns&nbsp;(N,&nbsp;3)&nbsp;points&nbsp;and&nbsp;the<br>
+mask&nbsp;of&nbsp;points&nbsp;sitting&nbsp;in&nbsp;front&nbsp;of&nbsp;*both*&nbsp;cameras&nbsp;—&nbsp;the<br>
+cheirality&nbsp;test.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['EpipolarProcessor', 'TwoViewReport', 'algebraic_residual', 'camera_matrix', 'decompose_essential', 'detect_corners', 'eight_point', 'epipolar_lines', 'epipoles', 'essential_from_fundamental', 'estimate_essential', 'estimate_fundamental', 'estimate_homography', 'huber', 'normalize_points', 'project_to_essential', 'recover_pose', 'refine_pose', 'rotation_from_homography', 'sampson_sq', ...]</td></tr></table>
+</body></html>

@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.genesis_client.protocol</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.genesis_client.html" class="white">genesis_client</a>.protocol</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/genesis_client/protocol.py">/home/mindyrenee/GenAnd/Genesis/Self_World/genesis_client/protocol.py</a></td></tr></table>
+    <p><span class="code">Binary&nbsp;protocol&nbsp;constants&nbsp;and&nbsp;low-level&nbsp;framing.<br>
+&nbsp;<br>
+This&nbsp;module&nbsp;implements&nbsp;the&nbsp;wire&nbsp;protocol&nbsp;used&nbsp;by&nbsp;the&nbsp;Genesis&nbsp;subcognitive<br>
+daemon.&nbsp;The&nbsp;protocol&nbsp;is&nbsp;length-prefixed&nbsp;binary&nbsp;(not&nbsp;JSON)&nbsp;for&nbsp;speed&nbsp;and<br>
+type&nbsp;safety.<br>
+&nbsp;<br>
+Message&nbsp;format:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;[u32&nbsp;LE:&nbsp;total_payload_len]&nbsp;[u8:&nbsp;command_id]&nbsp;[payload&nbsp;bytes]<br>
+&nbsp;<br>
+The&nbsp;first&nbsp;4&nbsp;bytes&nbsp;are&nbsp;the&nbsp;total&nbsp;payload&nbsp;length&nbsp;(including&nbsp;the&nbsp;command_id<br>
+byte).&nbsp;The&nbsp;command_id&nbsp;determines&nbsp;how&nbsp;to&nbsp;interpret&nbsp;the&nbsp;rest&nbsp;of&nbsp;the&nbsp;payload.<br>
+&nbsp;<br>
+All&nbsp;constants&nbsp;must&nbsp;match&nbsp;the&nbsp;Rust&nbsp;daemon's&nbsp;``src/daemon/ipc.rs``.<br>
+The&nbsp;Rust&nbsp;daemon&nbsp;is&nbsp;the&nbsp;authoritative&nbsp;source;&nbsp;this&nbsp;module&nbsp;mirrors&nbsp;it.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="socket.html">socket</a><br>
+</td><td class="multicolumn"><a href="struct.html">struct</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-error_name"><strong>error_name</strong></a>(code: 'int') -&gt; 'str'</dt><dd><span class="code">Human-readable&nbsp;name&nbsp;for&nbsp;an&nbsp;error&nbsp;code.</span></dd></dl>
+ <dl><dt><a name="-is_error_byte"><strong>is_error_byte</strong></a>(b: 'int') -&gt; 'bool'</dt><dd><span class="code">Check&nbsp;if&nbsp;a&nbsp;response&nbsp;byte&nbsp;is&nbsp;an&nbsp;error&nbsp;code&nbsp;(high&nbsp;bit&nbsp;set).</span></dd></dl>
+ <dl><dt><a name="-pack_message"><strong>pack_message</strong></a>(cmd_id: 'int', payload: 'bytes' = b'') -&gt; 'bytes'</dt><dd><span class="code">Pack&nbsp;a&nbsp;command&nbsp;+&nbsp;payload&nbsp;into&nbsp;a&nbsp;framed&nbsp;message.<br>
+&nbsp;<br>
+Format:&nbsp;[u32&nbsp;LE:&nbsp;total_len]&nbsp;[u8:&nbsp;cmd_id]&nbsp;[payload]<br>
+where&nbsp;total_len&nbsp;=&nbsp;1&nbsp;+&nbsp;len(payload).<br>
+&nbsp;<br>
+Raises:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ValueError:&nbsp;If&nbsp;cmd_id&nbsp;is&nbsp;not&nbsp;a&nbsp;valid&nbsp;u8&nbsp;(0-255)&nbsp;or&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;total&nbsp;message&nbsp;length&nbsp;exceeds&nbsp;``MAX_MESSAGE_LEN``.</span></dd></dl>
+ <dl><dt><a name="-read_exact"><strong>read_exact</strong></a>(sock: 'socket.socket', n: 'int') -&gt; 'bytes'</dt><dd><span class="code">Read&nbsp;exactly&nbsp;n&nbsp;bytes&nbsp;from&nbsp;a&nbsp;socket,&nbsp;blocking&nbsp;until&nbsp;all&nbsp;are&nbsp;read.<br>
+&nbsp;<br>
+Raises&nbsp;ConnectionError&nbsp;if&nbsp;the&nbsp;socket&nbsp;closes&nbsp;before&nbsp;n&nbsp;bytes&nbsp;are&nbsp;read<br>
+or&nbsp;if&nbsp;a&nbsp;socket&nbsp;error&nbsp;occurs&nbsp;during&nbsp;the&nbsp;read.</span></dd></dl>
+ <dl><dt><a name="-read_message"><strong>read_message</strong></a>(sock: 'socket.socket') -&gt; 'tuple[int, bytes]'</dt><dd><span class="code">Read&nbsp;a&nbsp;complete&nbsp;framed&nbsp;message&nbsp;from&nbsp;a&nbsp;socket.<br>
+&nbsp;<br>
+Returns&nbsp;(cmd_id,&nbsp;payload)&nbsp;where&nbsp;payload&nbsp;excludes&nbsp;the&nbsp;cmd_id&nbsp;byte.<br>
+&nbsp;<br>
+Raises&nbsp;ConnectionError&nbsp;if:<br>
+-&nbsp;The&nbsp;length&nbsp;prefix&nbsp;is&nbsp;zero&nbsp;(protocol&nbsp;violation&nbsp;—&nbsp;must&nbsp;include<br>
+&nbsp;&nbsp;at&nbsp;least&nbsp;the&nbsp;command_id&nbsp;byte).&nbsp;The&nbsp;Rust&nbsp;daemon&nbsp;rejects<br>
+&nbsp;&nbsp;zero-length&nbsp;frames&nbsp;with&nbsp;an&nbsp;error;&nbsp;the&nbsp;client&nbsp;matches&nbsp;this.<br>
+-&nbsp;The&nbsp;length&nbsp;prefix&nbsp;exceeds&nbsp;``MAX_MESSAGE_LEN``,&nbsp;which&nbsp;prevents<br>
+&nbsp;&nbsp;a&nbsp;malicious&nbsp;or&nbsp;buggy&nbsp;daemon&nbsp;from&nbsp;forcing&nbsp;the&nbsp;client&nbsp;to&nbsp;allocate<br>
+&nbsp;&nbsp;an&nbsp;unbounded&nbsp;amount&nbsp;of&nbsp;memory.<br>
+-&nbsp;The&nbsp;socket&nbsp;closes&nbsp;or&nbsp;errors&nbsp;during&nbsp;the&nbsp;read.</span></dd></dl>
+ <dl><dt><a name="-unpack_message"><strong>unpack_message</strong></a>(data: 'bytes') -&gt; 'tuple[int, bytes]'</dt><dd><span class="code">Unpack&nbsp;a&nbsp;framed&nbsp;message&nbsp;into&nbsp;(command_id,&nbsp;payload).<br>
+&nbsp;<br>
+The&nbsp;input&nbsp;must&nbsp;contain&nbsp;at&nbsp;least&nbsp;the&nbsp;4-byte&nbsp;length&nbsp;prefix&nbsp;and&nbsp;the<br>
+payload&nbsp;that&nbsp;follows.&nbsp;Returns&nbsp;(cmd_id,&nbsp;payload)&nbsp;where&nbsp;payload<br>
+excludes&nbsp;the&nbsp;cmd_id&nbsp;byte.<br>
+&nbsp;<br>
+Raises:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ValueError:&nbsp;If&nbsp;the&nbsp;data&nbsp;is&nbsp;too&nbsp;short&nbsp;for&nbsp;the&nbsp;length&nbsp;prefix,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;declared&nbsp;length&nbsp;is&nbsp;zero&nbsp;(protocol&nbsp;violation&nbsp;—&nbsp;must<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;include&nbsp;at&nbsp;least&nbsp;the&nbsp;command_id&nbsp;byte),&nbsp;the&nbsp;declared<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;length&nbsp;exceeds&nbsp;``MAX_MESSAGE_LEN``,&nbsp;or&nbsp;the&nbsp;data&nbsp;is<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;shorter&nbsp;than&nbsp;the&nbsp;declared&nbsp;length.</span></dd></dl>
+ <dl><dt><a name="-write_message"><strong>write_message</strong></a>(sock: 'socket.socket', cmd_id: 'int', payload: 'bytes' = b'') -&gt; 'None'</dt><dd><span class="code">Write&nbsp;a&nbsp;framed&nbsp;message&nbsp;to&nbsp;a&nbsp;socket.<br>
+&nbsp;<br>
+Raises&nbsp;ValueError&nbsp;if&nbsp;cmd_id&nbsp;or&nbsp;payload&nbsp;size&nbsp;is&nbsp;invalid&nbsp;(see<br>
+``pack_message``&nbsp;for&nbsp;details).</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>ADVANCE_NEURO</strong> = 24<br>
+<strong>ADVANCE_PHYSICS</strong> = 39<br>
+<strong>ANALYZE_CODE</strong> = 55<br>
+<strong>APPLY_BODY_CONTROL</strong> = 29<br>
+<strong>ARCHIVE_EPISODE</strong> = 31<br>
+<strong>ASSOCIATE</strong> = 26<br>
+<strong>CHEM_ACETYLCHOLINE</strong> = 3<br>
+<strong>CHEM_ADENOSINE</strong> = 10<br>
+<strong>CHEM_BDNF</strong> = 11<br>
+<strong>CHEM_CORTISOL</strong> = 6<br>
+<strong>CHEM_CRH</strong> = 14<br>
+<strong>CHEM_DOPAMINE</strong> = 0<br>
+<strong>CHEM_ENDOCANNABINOID</strong> = 12<br>
+<strong>CHEM_ENDORPHIN</strong> = 8<br>
+<strong>CHEM_EPINEPHRINE</strong> = 16<br>
+<strong>CHEM_GABA</strong> = 4<br>
+<strong>CHEM_GLUTAMATE</strong> = 5<br>
+<strong>CHEM_HISTAMINE</strong> = 9<br>
+<strong>CHEM_MELATONIN</strong> = 17<br>
+<strong>CHEM_NAMES</strong> = {0: 'dopamine', 1: 'serotonin', 2: 'norepinephrine', 3: 'acetylcholine', 4: 'gaba', 5: 'glutamate', 6: 'cortisol', 7: 'oxytocin', 8: 'endorphin', 9: 'histamine', ...}<br>
+<strong>CHEM_NOREPINEPHRINE</strong> = 2<br>
+<strong>CHEM_OREXIN</strong> = 15<br>
+<strong>CHEM_OXYTOCIN</strong> = 7<br>
+<strong>CHEM_SEROTONIN</strong> = 1<br>
+<strong>CHEM_VASOPRESSIN</strong> = 13<br>
+<strong>CONSOLIDATE</strong> = 25<br>
+<strong>DELETE_EPISODE</strong> = 61<br>
+<strong>DREAM</strong> = 27<br>
+<strong>DROP_TENSOR</strong> = 44<br>
+<strong>ERROR_INTERNAL_ERROR</strong> = 132<br>
+<strong>ERROR_INVALID_VALUE</strong> = 133<br>
+<strong>ERROR_OK</strong> = 0<br>
+<strong>ERROR_PAYLOAD_TOO_LONG</strong> = 129<br>
+<strong>ERROR_PAYLOAD_TOO_SHORT</strong> = 128<br>
+<strong>ERROR_READ_FAILED</strong> = 134<br>
+<strong>ERROR_UNKNOWN_COMMAND</strong> = 130<br>
+<strong>ERROR_VERSION_MISMATCH</strong> = 131<br>
+<strong>FIND_SIMILAR</strong> = 5<br>
+<strong>FIND_SIMILAR_ARCHIVED</strong> = 58<br>
+<strong>GET_BODY_CONTROL</strong> = 18<br>
+<strong>GET_BODY_STATE</strong> = 17<br>
+<strong>GET_DYADIC_STATE</strong> = 50<br>
+<strong>GET_FIELD_PROBE</strong> = 47<br>
+<strong>GET_FOLD_MARGINS</strong> = 62<br>
+<strong>GET_INFERENCE_SUMMARY</strong> = 19<br>
+<strong>GET_INTERNALS</strong> = 51<br>
+<strong>GET_ION_SUMMARY</strong> = 40<br>
+<strong>GET_MEMORY_STATS</strong> = 10<br>
+<strong>GET_MOTOR_TARGET</strong> = 45<br>
+<strong>GET_NEURO_SUMMARY</strong> = 2<br>
+<strong>GET_OPTIC_STATE</strong> = 52<br>
+<strong>GET_PHASE</strong> = 7<br>
+<strong>GET_PLASTICITY_PROFILE</strong> = 16<br>
+<strong>GET_PROCESS_HEALTH</strong> = 38<br>
+<strong>GET_RECENT_EPISODES</strong> = 14<br>
+<strong>GET_SENSOR_PRESENCE</strong> = 36<br>
+<strong>GET_STATE</strong> = 1<br>
+<strong>GET_STATE_SNAPSHOT</strong> = 64<br>
+<strong>GET_SUBSYSTEM_TELEMETRY</strong> = 33<br>
+<strong>GET_TENSOR</strong> = 42<br>
+<strong>GET_ZONE_TRANSITIONS</strong> = 37<br>
+<strong>HANDSHAKE</strong> = 15<br>
+<strong>LIST_TENSORS</strong> = 43<br>
+<strong>MAX_MESSAGE_LEN</strong> = 1048576<br>
+<strong>MODULE_ATTENTION</strong> = 1<br>
+<strong>MODULE_DREAMING</strong> = 9<br>
+<strong>MODULE_EMOTION</strong> = 3<br>
+<strong>MODULE_GUARDRAILS</strong> = 11<br>
+<strong>MODULE_INTENTION</strong> = 10<br>
+<strong>MODULE_LANGUAGE</strong> = 4<br>
+<strong>MODULE_MEMORY</strong> = 2<br>
+<strong>MODULE_METACOGNITION</strong> = 8<br>
+<strong>MODULE_MOTOR</strong> = 7<br>
+<strong>MODULE_REASONING</strong> = 5<br>
+<strong>MODULE_SENSORY</strong> = 6<br>
+<strong>MODULE_STATUS_ERROR</strong> = 5<br>
+<strong>MODULE_STATUS_IDLE</strong> = 3<br>
+<strong>MODULE_STATUS_RUNNING</strong> = 2<br>
+<strong>MODULE_STATUS_STARTING</strong> = 1<br>
+<strong>MODULE_STATUS_STOPPED</strong> = 0<br>
+<strong>MODULE_STATUS_STOPPING</strong> = 4<br>
+<strong>MODULE_SUBCOGNITIVE</strong> = 0<br>
+<strong>NEURO_ADJUST_BASELINE</strong> = 23<br>
+<strong>NEURO_IMPULSE</strong> = 9<br>
+<strong>NOTIFY_DREAM_INSIGHT</strong> = 102<br>
+<strong>NOTIFY_EPISODE_CONSOLIDATED</strong> = 101<br>
+<strong>NOTIFY_ERROR_DETECTED</strong> = 103<br>
+<strong>NOTIFY_PHASE_CHANGED</strong> = 100<br>
+<strong>PHASE_ACTIVE</strong> = 0<br>
+<strong>PHASE_ALERT</strong> = 1<br>
+<strong>PHASE_DROWSY</strong> = 4<br>
+<strong>PHASE_FLOW</strong> = 2<br>
+<strong>PHASE_NAMES</strong> = {0: 'active', 1: 'alert', 2: 'flow', 3: 'stress', 4: 'drowsy', 5: 'nrem', 6: 'rem', 7: 'overwhelmed'}<br>
+<strong>PHASE_NREM</strong> = 5<br>
+<strong>PHASE_OVERWHELMED</strong> = 7<br>
+<strong>PHASE_REM</strong> = 6<br>
+<strong>PHASE_SLEEPING</strong> = 5<br>
+<strong>PHASE_STRESS</strong> = 3<br>
+<strong>PING</strong> = 8<br>
+<strong>PROTOCOL_VERSION</strong> = 3<br>
+<strong>PUT_TENSOR</strong> = 41<br>
+<strong>READ_SENSORS</strong> = 28<br>
+<strong>RETRIEVE_EPISODE</strong> = 4<br>
+<strong>SAVE_INFERENCE</strong> = 30<br>
+<strong>SEARCH_ARCHIVED</strong> = 60<br>
+<strong>SEARCH_EPISODES</strong> = 22<br>
+<strong>SENSOR_AC_ADAPTER</strong> = 16<br>
+<strong>SENSOR_BATTERY</strong> = 8<br>
+<strong>SENSOR_BATTERY_CYCLES</strong> = 32768<br>
+<strong>SENSOR_CORE_VOLTAGE</strong> = 128<br>
+<strong>SENSOR_FAN</strong> = 32<br>
+<strong>SENSOR_FREQUENCY</strong> = 2<br>
+<strong>SENSOR_GPE</strong> = 2048<br>
+<strong>SENSOR_LOCAL_TIMER</strong> = 4096<br>
+<strong>SENSOR_MAX_FREQUENCY</strong> = 4<br>
+<strong>SENSOR_MEMORY</strong> = 8192<br>
+<strong>SENSOR_NAMES</strong> = {1: 'temperature', 2: 'frequency', 4: 'max frequency', 8: 'battery', 16: 'AC adapter', 32: 'fan PWM', 64: 'power draw', 128: 'core voltage', 256: 'supply voltage', 512: 'RAPL power domains', ...}<br>
+<strong>SENSOR_PERF_COUNTERS</strong> = 1024<br>
+<strong>SENSOR_POWER</strong> = 64<br>
+<strong>SENSOR_PSI</strong> = 16384<br>
+<strong>SENSOR_RAPL</strong> = 512<br>
+<strong>SENSOR_SUPPLY_VOLTAGE</strong> = 256<br>
+<strong>SENSOR_TEMPERATURE</strong> = 1<br>
+<strong>SET_COGNITIVE_PID</strong> = 56<br>
+<strong>SET_FIELD_CARRIER</strong> = 49<br>
+<strong>SET_FIELD_PHASE</strong> = 48<br>
+<strong>SET_FIELD_PULSE</strong> = 63<br>
+<strong>SET_FOCUS</strong> = 54<br>
+<strong>SET_LID</strong> = 57<br>
+<strong>SET_OPTIC_GAIN</strong> = 53<br>
+<strong>SET_POLICY_AUTHORITY</strong> = 35<br>
+<strong>SET_VOLITION</strong> = 46<br>
+<strong>SET_WAKE_ALARM</strong> = 34<br>
+<strong>SET_ZONE</strong> = 6<br>
+<strong>SHUTDOWN</strong> = 12<br>
+<strong>STORE_EPISODE</strong> = 32<br>
+<strong>STORE_EVENT</strong> = 3<br>
+<strong>SUBSYSTEM_COGNITIVE</strong> = 1<br>
+<strong>SUBSYSTEM_DAEMON</strong> = 0<br>
+<strong>SUBSYSTEM_NAMES</strong> = {0: 'daemon', 1: 'cognitive', 2: 'retina'}<br>
+<strong>SUBSYSTEM_RETINA</strong> = 2<br>
+<strong>SYNC</strong> = 11<br>
+<strong>UNARCHIVE_EPISODE</strong> = 59<br>
+<strong>UPDATE_MODULE_STATUS</strong> = 13<br>
+<strong>UPDATE_USER_AFFECT</strong> = 20<br>
+<strong>ZONE_ANALYSIS</strong> = 3<br>
+<strong>ZONE_CODING</strong> = 2<br>
+<strong>ZONE_CONVERSATION</strong> = 1<br>
+<strong>ZONE_ERROR_RECOVERY</strong> = 6<br>
+<strong>ZONE_IDLE</strong> = 0<br>
+<strong>ZONE_LEARNING</strong> = 4<br>
+<strong>ZONE_NAMES</strong> = {0: 'idle', 1: 'conversation', 2: 'coding', 3: 'analysis', 4: 'learning', 5: 'reflection', 6: 'error-recovery', 7: 'planning', 8: 'sleeping'}<br>
+<strong>ZONE_PLANNING</strong> = 7<br>
+<strong>ZONE_REFLECTION</strong> = 5<br>
+<strong>ZONE_SLEEPING</strong> = 8<br>
+<strong>_F32</strong> = &lt;_struct.Struct object&gt;<br>
+<strong>_I32</strong> = &lt;_struct.Struct object&gt;<br>
+<strong>_U16</strong> = &lt;_struct.Struct object&gt;<br>
+<strong>_U32</strong> = &lt;_struct.Struct object&gt;<br>
+<strong>_U64</strong> = &lt;_struct.Struct object&gt;<br>
+<strong>_U8</strong> = &lt;_struct.Struct object&gt;<br>
+<strong>__all__</strong> = ['ADVANCE_NEURO', 'ADVANCE_PHYSICS', 'ANALYZE_CODE', 'APPLY_BODY_CONTROL', 'ARCHIVE_EPISODE', 'ASSOCIATE', 'CHEM_ACETYLCHOLINE', 'CHEM_ADENOSINE', 'CHEM_BDNF', 'CHEM_CORTISOL', 'CHEM_CRH', 'CHEM_DOPAMINE', 'CHEM_ENDOCANNABINOID', 'CHEM_ENDORPHIN', 'CHEM_EPINEPHRINE', 'CHEM_GABA', 'CHEM_GLUTAMATE', 'CHEM_HISTAMINE', 'CHEM_MELATONIN', 'CHEM_NAMES', ...]<br>
+<strong>__annotations__</strong> = {'SENSOR_NAMES': 'dict[int, str]', 'SUBSYSTEM_NAMES': 'dict[int, str]'}</td></tr></table>
+</body></html>

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["CGMP_DARK","CGMP_HYDROLYSIS","CGMP_K_HALF","CGMP_SYNTHESIS","HILL_N","P_OPEN_DARK","R_MAX","SIGMA","V_DARK","V_DRIVE","V_LEAK","V_LIGHT"],"fn":["convolve_gaussian","gaussian_kernel"],"struct":["ConeOps","GanglionImage","RadianceField","Retina"]};

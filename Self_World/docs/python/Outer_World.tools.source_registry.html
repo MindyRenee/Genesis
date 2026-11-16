@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Outer_World.tools.source_registry</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Outer_World.html" class="white">Outer_World</a>.<a href="Outer_World.tools.html" class="white">tools</a>.source_registry</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Outer_World/tools/source_registry.py">/home/mindyrenee/GenAnd/Genesis/Outer_World/tools/source_registry.py</a></td></tr></table>
+    <p><span class="code">Source&nbsp;registry&nbsp;—&nbsp;Genesis's&nbsp;curated&nbsp;knowledge&nbsp;sources.<br>
+&nbsp;<br>
+Instead&nbsp;of&nbsp;scraping&nbsp;a&nbsp;search&nbsp;engine&nbsp;for&nbsp;results,&nbsp;Genesis&nbsp;queries<br>
+trusted&nbsp;sources&nbsp;directly&nbsp;through&nbsp;their&nbsp;own&nbsp;APIs&nbsp;and&nbsp;known&nbsp;URL<br>
+patterns.&nbsp;This&nbsp;is&nbsp;cleaner,&nbsp;more&nbsp;reliable,&nbsp;and&nbsp;gives&nbsp;higher-quality<br>
+content&nbsp;than&nbsp;scraping&nbsp;search&nbsp;results.<br>
+&nbsp;<br>
+##&nbsp;Architecture<br>
+&nbsp;<br>
+The&nbsp;registry&nbsp;has&nbsp;both&nbsp;local&nbsp;and&nbsp;online&nbsp;tiers:<br>
+&nbsp;<br>
+1.&nbsp;**Local&nbsp;Linux&nbsp;man&nbsp;pages**&nbsp;(reference&nbsp;—&nbsp;no&nbsp;network)<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;The&nbsp;manuals&nbsp;installed&nbsp;on&nbsp;this&nbsp;machine&nbsp;(ls,&nbsp;grep,&nbsp;bash,&nbsp;...)<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;Authoritative&nbsp;for&nbsp;system&nbsp;commands&nbsp;and&nbsp;installed&nbsp;software<br>
+&nbsp;<br>
+2.&nbsp;**WordNet**&nbsp;(local&nbsp;dictionary&nbsp;—&nbsp;no&nbsp;network)<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;A&nbsp;lexical&nbsp;database&nbsp;shipped&nbsp;with&nbsp;NLTK<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;Word&nbsp;definitions,&nbsp;examples,&nbsp;and&nbsp;semantic&nbsp;relations<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;This&nbsp;is&nbsp;Genesis's&nbsp;dictionary;&nbsp;there&nbsp;are&nbsp;no&nbsp;remote&nbsp;dictionary<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sources<br>
+&nbsp;<br>
+3.&nbsp;**Wikipedia&nbsp;API**&nbsp;(online&nbsp;—&nbsp;primary&nbsp;backbone)<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;Free,&nbsp;no&nbsp;API&nbsp;key&nbsp;required<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;Returns&nbsp;structured&nbsp;article&nbsp;content&nbsp;(not&nbsp;HTML&nbsp;scraping)<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;Provides&nbsp;article&nbsp;summaries,&nbsp;full&nbsp;content,&nbsp;and&nbsp;related&nbsp;links<br>
+&nbsp;<br>
+4.&nbsp;**DuckDuckGo&nbsp;Lite**&nbsp;(online&nbsp;—&nbsp;discovery&nbsp;fallback)<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;Lightweight,&nbsp;privacy-respecting&nbsp;search<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;Used&nbsp;only&nbsp;when&nbsp;Wikipedia&nbsp;doesn't&nbsp;cover&nbsp;a&nbsp;topic<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;Returns&nbsp;URLs&nbsp;for&nbsp;Genesis&nbsp;to&nbsp;fetch<br>
+&nbsp;<br>
+Every&nbsp;successful&nbsp;online&nbsp;fetch&nbsp;is&nbsp;also&nbsp;written&nbsp;to&nbsp;a&nbsp;disk&nbsp;cache,&nbsp;so<br>
+Genesis&nbsp;can&nbsp;re-read&nbsp;it&nbsp;later&nbsp;with&nbsp;no&nbsp;network&nbsp;at&nbsp;all.<br>
+&nbsp;<br>
+This&nbsp;multi-source&nbsp;approach&nbsp;means&nbsp;Genesis&nbsp;doesn't&nbsp;depend&nbsp;on&nbsp;any&nbsp;single<br>
+search&nbsp;engine.&nbsp;It&nbsp;has&nbsp;a&nbsp;portfolio&nbsp;of&nbsp;knowledge&nbsp;sources,&nbsp;each&nbsp;with<br>
+different&nbsp;strengths.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="gzip.html">gzip</a><br>
+<a href="hashlib.html">hashlib</a><br>
+<a href="json.html">json</a><br>
+</td><td class="multicolumn"><a href="logging.html">logging</a><br>
+<a href="re.html">re</a><br>
+<a href="shutil.html">shutil</a><br>
+</td><td class="multicolumn"><a href="socket.html">socket</a><br>
+<a href="subprocess.html">subprocess</a><br>
+<a href="time.html">time</a><br>
+</td><td class="multicolumn"><a href="urllib.html">urllib</a><br>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Outer_World.tools.source_registry.html#GitHubSource">GitHubSource</a>
+</dt><dt class="heading-text"><a href="Outer_World.tools.source_registry.html#InfoPageSource">InfoPageSource</a>
+</dt><dt class="heading-text"><a href="Outer_World.tools.source_registry.html#ManPageSource">ManPageSource</a>
+</dt><dt class="heading-text"><a href="Outer_World.tools.source_registry.html#PackageDocSource">PackageDocSource</a>
+</dt><dt class="heading-text"><a href="Outer_World.tools.source_registry.html#SourceCache">SourceCache</a>
+</dt><dt class="heading-text"><a href="Outer_World.tools.source_registry.html#SourceRegistry">SourceRegistry</a>
+</dt><dt class="heading-text"><a href="Outer_World.tools.source_registry.html#SourceResult">SourceResult</a>
+</dt><dt class="heading-text"><a href="Outer_World.tools.source_registry.html#WordNetSource">WordNetSource</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="GitHubSource">class <strong>GitHubSource</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#GitHubSource">GitHubSource</a>(timeout:&nbsp;'float'&nbsp;=&nbsp;10.0)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Read-only&nbsp;GitHub&nbsp;API&nbsp;client&nbsp;for&nbsp;studying&nbsp;open-source&nbsp;projects.<br>
+&nbsp;<br>
+Uses&nbsp;the&nbsp;GitHub&nbsp;Search&nbsp;API&nbsp;to&nbsp;find&nbsp;public&nbsp;repositories&nbsp;and&nbsp;code<br>
+matching&nbsp;a&nbsp;topic.&nbsp;No&nbsp;authentication&nbsp;—&nbsp;uses&nbsp;the&nbsp;unauthenticated<br>
+rate&nbsp;limit&nbsp;(10&nbsp;requests/minute&nbsp;for&nbsp;search,&nbsp;60/hour&nbsp;for&nbsp;other<br>
+endpoints).&nbsp;This&nbsp;is&nbsp;enough&nbsp;for&nbsp;curiosity-driven&nbsp;learning&nbsp;without<br>
+risking&nbsp;abuse.<br>
+&nbsp;<br>
+All&nbsp;results&nbsp;are&nbsp;returned&nbsp;as&nbsp;<a href="#SourceResult">SourceResult</a>&nbsp;objects&nbsp;so&nbsp;they&nbsp;integrate<br>
+with&nbsp;the&nbsp;existing&nbsp;source&nbsp;registry&nbsp;and&nbsp;caching&nbsp;system.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;read-only:&nbsp;it&nbsp;can&nbsp;search,&nbsp;read,&nbsp;and&nbsp;learn&nbsp;from&nbsp;public<br>
+code,&nbsp;but&nbsp;cannot&nbsp;clone,&nbsp;fork,&nbsp;push,&nbsp;or&nbsp;modify&nbsp;anything.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="GitHubSource-__init__"><strong>__init__</strong></a>(self, timeout: 'float' = 10.0) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;a&nbsp;GitHub&nbsp;source&nbsp;fetcher&nbsp;with&nbsp;optional&nbsp;token&nbsp;auth.</span></dd></dl>
+
+<dl><dt><a name="GitHubSource-fetch_file"><strong>fetch_file</strong></a>(self, repo_full: 'str', path: 'str') -&gt; 'SourceResult | None'</dt><dd><span class="code">Fetch&nbsp;a&nbsp;specific&nbsp;file&nbsp;from&nbsp;a&nbsp;public&nbsp;GitHub&nbsp;repo.<br>
+&nbsp;<br>
+This&nbsp;lets&nbsp;Genesis&nbsp;read&nbsp;individual&nbsp;source&nbsp;files&nbsp;from&nbsp;projects<br>
+it's&nbsp;studying&nbsp;—&nbsp;e.g.&nbsp;looking&nbsp;at&nbsp;how&nbsp;a&nbsp;neural&nbsp;network&nbsp;library<br>
+implements&nbsp;backpropagation.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;repo_full:&nbsp;"owner/repo"&nbsp;format,&nbsp;e.g.&nbsp;"pytorch/pytorch"<br>
+&nbsp;&nbsp;&nbsp;&nbsp;path:&nbsp;Path&nbsp;within&nbsp;the&nbsp;repo,&nbsp;e.g.&nbsp;"torch/nn/modules/linear.py"</span></dd></dl>
+
+<dl><dt><a name="GitHubSource-search_repos"><strong>search_repos</strong></a>(self, topic: 'str', limit: 'int' = 3, min_stars: 'int' = 50, min_forks: 'int' = 5) -&gt; 'list[SourceResult]'</dt><dd><span class="code">Search&nbsp;GitHub&nbsp;for&nbsp;repositories&nbsp;matching&nbsp;a&nbsp;topic.<br>
+&nbsp;<br>
+Returns&nbsp;<a href="#SourceResult">SourceResult</a>&nbsp;objects&nbsp;with&nbsp;the&nbsp;repo&nbsp;description&nbsp;and<br>
+README&nbsp;content&nbsp;(if&nbsp;fetchable).&nbsp;This&nbsp;lets&nbsp;Genesis&nbsp;study&nbsp;how<br>
+other&nbsp;projects&nbsp;approach&nbsp;a&nbsp;topic&nbsp;it's&nbsp;curious&nbsp;about.<br>
+&nbsp;<br>
+Quality&nbsp;filtering:&nbsp;most&nbsp;GitHub&nbsp;repos&nbsp;are&nbsp;abandoned,&nbsp;poorly<br>
+designed,&nbsp;or&nbsp;just&nbsp;bad&nbsp;ideas.&nbsp;We&nbsp;filter&nbsp;by&nbsp;minimum&nbsp;stars&nbsp;and<br>
+forks&nbsp;so&nbsp;it&nbsp;only&nbsp;sees&nbsp;projects&nbsp;the&nbsp;community&nbsp;has&nbsp;validated.<br>
+It&nbsp;should&nbsp;never&nbsp;blindly&nbsp;copy&nbsp;patterns&nbsp;—&nbsp;humans&nbsp;write&nbsp;wasteful<br>
+and&nbsp;unoptimized&nbsp;code.&nbsp;Always&nbsp;cross-check&nbsp;against&nbsp;developer&nbsp;docs.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;topic:&nbsp;What&nbsp;to&nbsp;search&nbsp;for.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;limit:&nbsp;Max&nbsp;results&nbsp;to&nbsp;return.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;min_stars:&nbsp;Minimum&nbsp;stargazers&nbsp;count.&nbsp;Below&nbsp;this,&nbsp;the&nbsp;repo<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;isn't&nbsp;worth&nbsp;studying&nbsp;—&nbsp;it&nbsp;hasn't&nbsp;been&nbsp;validated&nbsp;by&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;community.&nbsp;Default&nbsp;50&nbsp;filters&nbsp;out&nbsp;the&nbsp;long&nbsp;tail&nbsp;of<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;abandoned/hobby&nbsp;projects.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;min_forks:&nbsp;Minimum&nbsp;forks&nbsp;count.&nbsp;Forks&nbsp;indicate&nbsp;others&nbsp;found<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;code&nbsp;worth&nbsp;building&nbsp;on.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="InfoPageSource">class <strong>InfoPageSource</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#InfoPageSource">InfoPageSource</a>(info_paths:&nbsp;'tuple[str,&nbsp;...]'&nbsp;=&nbsp;('/usr/share/info',&nbsp;'/usr/local/share/info'),&nbsp;max_text:&nbsp;'int'&nbsp;=&nbsp;20000)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+GNU&nbsp;Info&nbsp;pages&nbsp;—&nbsp;the&nbsp;tutorial&nbsp;layer&nbsp;above&nbsp;man&nbsp;pages.<br>
+&nbsp;<br>
+Man&nbsp;pages&nbsp;are&nbsp;terse&nbsp;references&nbsp;(what&nbsp;flags&nbsp;exist).&nbsp;Info&nbsp;pages&nbsp;are<br>
+*books*:&nbsp;structured&nbsp;tutorials&nbsp;with&nbsp;chapters,&nbsp;cross-references,&nbsp;and<br>
+worked&nbsp;examples.&nbsp;``coreutils.info``&nbsp;is&nbsp;a&nbsp;whole&nbsp;manual&nbsp;on&nbsp;ls/cp/cat;<br>
+``grep.info``&nbsp;explains&nbsp;regex&nbsp;theory;&nbsp;``sed.info``&nbsp;teaches&nbsp;stream<br>
+editing.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;a&nbsp;**local&nbsp;reference**&nbsp;—&nbsp;no&nbsp;network,&nbsp;works&nbsp;offline.&nbsp;It<br>
+complements&nbsp;:class:`<a href="#ManPageSource">ManPageSource</a>`:<br>
+&nbsp;<br>
+-&nbsp;**Man&nbsp;page**:&nbsp;"``ls&nbsp;-a``&nbsp;lists&nbsp;hidden&nbsp;files"&nbsp;(reference)<br>
+-&nbsp;**Info&nbsp;page**:&nbsp;"``ls``&nbsp;sorts&nbsp;output&nbsp;alphabetically&nbsp;by&nbsp;default;<br>
+&nbsp;&nbsp;here's&nbsp;how&nbsp;the&nbsp;sorting&nbsp;works,&nbsp;here&nbsp;are&nbsp;the&nbsp;edge&nbsp;cases..."&nbsp;(tutorial)<br>
+&nbsp;<br>
+Genesis&nbsp;can&nbsp;consult&nbsp;this&nbsp;when&nbsp;it&nbsp;wants&nbsp;to&nbsp;understand&nbsp;*how*&nbsp;a&nbsp;tool<br>
+works,&nbsp;not&nbsp;just&nbsp;what&nbsp;flags&nbsp;it&nbsp;accepts.<br>
+&nbsp;<br>
+Rendering&nbsp;uses&nbsp;``info&nbsp;--output&nbsp;-&nbsp;&lt;topic&gt;``&nbsp;(the&nbsp;same&nbsp;thing&nbsp;a&nbsp;human<br>
+reads&nbsp;with&nbsp;``info&nbsp;&lt;topic&gt;``),&nbsp;which&nbsp;produces&nbsp;clean&nbsp;plain&nbsp;text&nbsp;with<br>
+a&nbsp;menu&nbsp;of&nbsp;sub-topics.&nbsp;For&nbsp;a&nbsp;specific&nbsp;sub-topic&nbsp;(e.g.&nbsp;the&nbsp;``ls``<br>
+chapter&nbsp;inside&nbsp;coreutils),&nbsp;pass&nbsp;``node``&nbsp;to&nbsp;:meth:`lookup`.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="InfoPageSource-__init__"><strong>__init__</strong></a>(self, info_paths: 'tuple[str, ...]' = ('/usr/share/info', '/usr/local/share/info'), max_text: 'int' = 20000) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;info&nbsp;page&nbsp;source.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;info_paths:&nbsp;Directories&nbsp;to&nbsp;search&nbsp;for&nbsp;info&nbsp;pages.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;max_text:&nbsp;Maximum&nbsp;characters&nbsp;of&nbsp;text&nbsp;to&nbsp;extract&nbsp;per&nbsp;page.</span></dd></dl>
+
+<dl><dt><a name="InfoPageSource-list_topics"><strong>list_topics</strong></a>(self) -&gt; 'list[str]'</dt><dd><span class="code">Return&nbsp;the&nbsp;names&nbsp;of&nbsp;all&nbsp;installed&nbsp;info&nbsp;files.<br>
+&nbsp;<br>
+Strips&nbsp;``.info``&nbsp;(and&nbsp;``.info-N``&nbsp;multi-part)&nbsp;suffixes&nbsp;and<br>
+deduplicates.&nbsp;These&nbsp;are&nbsp;the&nbsp;"books"&nbsp;available&nbsp;on&nbsp;the&nbsp;shelf.</span></dd></dl>
+
+<dl><dt><a name="InfoPageSource-lookup"><strong>lookup</strong></a>(self, topic: 'str', node: 'str | None' = None) -&gt; 'SourceResult | None'</dt><dd><span class="code">Look&nbsp;up&nbsp;an&nbsp;info&nbsp;document&nbsp;by&nbsp;topic&nbsp;(and&nbsp;optional&nbsp;sub-node).<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;topic:&nbsp;The&nbsp;info&nbsp;file&nbsp;name&nbsp;(e.g.&nbsp;``"coreutils"``,&nbsp;``"grep"``,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;``"sed"``).&nbsp;Also&nbsp;accepts&nbsp;a&nbsp;command&nbsp;name,&nbsp;which&nbsp;is&nbsp;mapped<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;to&nbsp;its&nbsp;info&nbsp;file&nbsp;via&nbsp;:meth:`_resolve_topic`.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;node:&nbsp;Optional&nbsp;sub-node&nbsp;within&nbsp;the&nbsp;info&nbsp;file&nbsp;(e.g.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;``"ls&nbsp;invocation"``&nbsp;for&nbsp;the&nbsp;``ls``&nbsp;chapter&nbsp;in<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;coreutils).&nbsp;If&nbsp;None,&nbsp;returns&nbsp;the&nbsp;top&nbsp;node&nbsp;(overview&nbsp;+<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;table&nbsp;of&nbsp;contents).<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;:class:`<a href="#SourceResult">SourceResult</a>`&nbsp;with&nbsp;rendered&nbsp;plain-text<br>
+content,&nbsp;or&nbsp;``None``&nbsp;if&nbsp;no&nbsp;matching&nbsp;info&nbsp;page&nbsp;exists.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ManPageSource">class <strong>ManPageSource</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ManPageSource">ManPageSource</a>(man_paths:&nbsp;'tuple[str,&nbsp;...]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;sections:&nbsp;'tuple[str,&nbsp;...]'&nbsp;=&nbsp;('1',&nbsp;'8',&nbsp;'2',&nbsp;'3',&nbsp;'5',&nbsp;'4',&nbsp;'7',&nbsp;'6',&nbsp;'9'),&nbsp;max_text:&nbsp;'int'&nbsp;=&nbsp;20000)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Local&nbsp;Linux&nbsp;manual&nbsp;pages&nbsp;as&nbsp;a&nbsp;knowledge&nbsp;source.<br>
+&nbsp;<br>
+This&nbsp;gives&nbsp;Genesis&nbsp;direct&nbsp;access&nbsp;to&nbsp;the&nbsp;documentation&nbsp;installed&nbsp;on<br>
+its&nbsp;own&nbsp;machine&nbsp;—&nbsp;the&nbsp;same&nbsp;manual&nbsp;pages&nbsp;a&nbsp;human&nbsp;reads&nbsp;with<br>
+``man&nbsp;&lt;command&gt;``.&nbsp;It&nbsp;is&nbsp;a&nbsp;**local&nbsp;reference**,&nbsp;not&nbsp;web&nbsp;browsing:<br>
+no&nbsp;network&nbsp;is&nbsp;involved,&nbsp;so&nbsp;it&nbsp;works&nbsp;regardless&nbsp;of&nbsp;connectivity<br>
+(and&nbsp;regardless&nbsp;of&nbsp;``force_offline``).<br>
+&nbsp;<br>
+Resolution&nbsp;mirrors&nbsp;``man``'s&nbsp;own&nbsp;behaviour:<br>
+&nbsp;<br>
+1.&nbsp;&nbsp;Search&nbsp;each&nbsp;configured&nbsp;man&nbsp;path&nbsp;for&nbsp;``man&lt;section&gt;/&lt;name&gt;.&lt;section&gt;.gz``.<br>
+2.&nbsp;&nbsp;Sections&nbsp;are&nbsp;tried&nbsp;in&nbsp;priority&nbsp;order&nbsp;(1,&nbsp;8,&nbsp;2,&nbsp;3,&nbsp;5,&nbsp;...).<br>
+3.&nbsp;&nbsp;The&nbsp;first&nbsp;match&nbsp;is&nbsp;decompressed&nbsp;and&nbsp;rendered&nbsp;to&nbsp;plain&nbsp;text.<br>
+&nbsp;<br>
+Rendering&nbsp;uses&nbsp;``man&nbsp;-l&nbsp;&lt;file&gt;&nbsp;|&nbsp;col&nbsp;-b``&nbsp;when&nbsp;available&nbsp;(produces<br>
+clean,&nbsp;backspace-free&nbsp;text&nbsp;identical&nbsp;to&nbsp;what&nbsp;a&nbsp;human&nbsp;reads),&nbsp;with&nbsp;a<br>
+``groff&nbsp;-Tutf8&nbsp;-man``&nbsp;fallback&nbsp;when&nbsp;``man``/``col``&nbsp;are&nbsp;absent.<br>
+&nbsp;<br>
+The&nbsp;returned&nbsp;:class:`<a href="#SourceResult">SourceResult</a>`&nbsp;carries&nbsp;the&nbsp;rendered&nbsp;text&nbsp;as<br>
+``content``&nbsp;(so&nbsp;the&nbsp;autonomous&nbsp;learner&nbsp;takes&nbsp;the&nbsp;fast<br>
+``_learn_from_content``&nbsp;path)&nbsp;and&nbsp;a&nbsp;``man:&lt;name&gt;(&lt;section&gt;)``&nbsp;URL<br>
+so&nbsp;the&nbsp;result&nbsp;is&nbsp;self-describing&nbsp;and&nbsp;dedups&nbsp;correctly&nbsp;against<br>
+other&nbsp;sources.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;how&nbsp;Genesis&nbsp;learns&nbsp;what&nbsp;``ls``,&nbsp;``grep``,&nbsp;``bash``,<br>
+``systemd``,&nbsp;``ssh``,&nbsp;etc.&nbsp;are&nbsp;—&nbsp;by&nbsp;reading&nbsp;the&nbsp;same&nbsp;manuals&nbsp;its<br>
+machine&nbsp;ships.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ManPageSource-__init__"><strong>__init__</strong></a>(self, man_paths: 'tuple[str, ...] | None' = None, sections: 'tuple[str, ...]' = ('1', '8', '2', '3', '5', '4', '7', '6', '9'), max_text: 'int' = 20000) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;man&nbsp;page&nbsp;source.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;man_paths:&nbsp;Directories&nbsp;to&nbsp;search&nbsp;for&nbsp;man&nbsp;pages,&nbsp;or&nbsp;None&nbsp;to<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;resolve&nbsp;them&nbsp;the&nbsp;way&nbsp;``man``&nbsp;itself&nbsp;does&nbsp;(``manpath``<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;output&nbsp;—&nbsp;every&nbsp;dir&nbsp;in&nbsp;the&nbsp;real&nbsp;search&nbsp;list,&nbsp;user-local<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;first,&nbsp;including&nbsp;``~/.local/share/man``).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;sections:&nbsp;Man&nbsp;page&nbsp;sections&nbsp;to&nbsp;search&nbsp;(e.g.&nbsp;"1",&nbsp;"8").<br>
+&nbsp;&nbsp;&nbsp;&nbsp;max_text:&nbsp;Maximum&nbsp;characters&nbsp;of&nbsp;text&nbsp;to&nbsp;extract&nbsp;per&nbsp;page.</span></dd></dl>
+
+<dl><dt><a name="ManPageSource-list_names"><strong>list_names</strong></a>(self, section: 'str | None' = None) -&gt; 'list[str]'</dt><dd><span class="code">Return&nbsp;the&nbsp;names&nbsp;of&nbsp;all&nbsp;installed&nbsp;man&nbsp;pages&nbsp;(optionally&nbsp;one&nbsp;section).<br>
+&nbsp;<br>
+Useful&nbsp;for&nbsp;seeding&nbsp;curiosity&nbsp;or&nbsp;introspection&nbsp;("what&nbsp;manuals<br>
+does&nbsp;my&nbsp;machine&nbsp;have?").&nbsp;Names&nbsp;are&nbsp;returned&nbsp;without&nbsp;the<br>
+section&nbsp;suffix.</span></dd></dl>
+
+<dl><dt><a name="ManPageSource-lookup"><strong>lookup</strong></a>(self, name: 'str', section: 'str | None' = None) -&gt; 'SourceResult | None'</dt><dd><span class="code">Look&nbsp;up&nbsp;a&nbsp;manual&nbsp;page&nbsp;by&nbsp;name&nbsp;(and&nbsp;optional&nbsp;section).<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;:class:`<a href="#SourceResult">SourceResult</a>`&nbsp;with&nbsp;the&nbsp;rendered&nbsp;plain-text<br>
+content,&nbsp;or&nbsp;``None``&nbsp;if&nbsp;no&nbsp;matching&nbsp;man&nbsp;page&nbsp;is&nbsp;installed.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="PackageDocSource">class <strong>PackageDocSource</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#PackageDocSource">PackageDocSource</a>(doc_path:&nbsp;'str'&nbsp;=&nbsp;'/usr/share/doc',&nbsp;max_text:&nbsp;'int'&nbsp;=&nbsp;20000)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Package&nbsp;documentation&nbsp;from&nbsp;``/usr/share/doc``&nbsp;—&nbsp;the&nbsp;deepest&nbsp;layer.<br>
+&nbsp;<br>
+Every&nbsp;package&nbsp;installed&nbsp;on&nbsp;the&nbsp;machine&nbsp;ships&nbsp;a&nbsp;directory&nbsp;under<br>
+``/usr/share/doc/&lt;package&gt;/``&nbsp;containing&nbsp;its&nbsp;own&nbsp;documentation:<br>
+READMEs,&nbsp;design&nbsp;docs,&nbsp;FAQs,&nbsp;hacking&nbsp;guides,&nbsp;and&nbsp;introductions.<br>
+This&nbsp;is&nbsp;*deeper*&nbsp;than&nbsp;man&nbsp;pages&nbsp;or&nbsp;info&nbsp;pages&nbsp;—&nbsp;it's&nbsp;the&nbsp;prose&nbsp;the<br>
+developers&nbsp;themselves&nbsp;wrote&nbsp;to&nbsp;explain&nbsp;their&nbsp;software.<br>
+&nbsp;<br>
+Examples&nbsp;on&nbsp;a&nbsp;typical&nbsp;Linux&nbsp;machine:<br>
+-&nbsp;``bash/INTRO.gz``&nbsp;—&nbsp;a&nbsp;multi-page&nbsp;introduction&nbsp;to&nbsp;Bash<br>
+-&nbsp;``systemd/CODING_STYLE.md.gz``&nbsp;—&nbsp;systemd's&nbsp;design&nbsp;conventions<br>
+-&nbsp;``systemd/HACKING.md.gz``&nbsp;—&nbsp;how&nbsp;to&nbsp;hack&nbsp;on&nbsp;systemd<br>
+-&nbsp;``cryptsetup/FAQ.md.gz``&nbsp;—&nbsp;the&nbsp;LUKS&nbsp;FAQ<br>
+-&nbsp;``openssh-server/README.*``&nbsp;—&nbsp;SSH&nbsp;server&nbsp;design&nbsp;notes<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;a&nbsp;**local&nbsp;reference**&nbsp;—&nbsp;no&nbsp;network,&nbsp;works&nbsp;offline.&nbsp;It's&nbsp;the<br>
+third&nbsp;tier:<br>
+&nbsp;<br>
+-&nbsp;**Man&nbsp;page**:&nbsp;reference&nbsp;(flags,&nbsp;syntax)<br>
+-&nbsp;**Info&nbsp;page**:&nbsp;tutorial&nbsp;(how&nbsp;to&nbsp;use&nbsp;it,&nbsp;with&nbsp;examples)<br>
+-&nbsp;**Package&nbsp;docs**:&nbsp;design&nbsp;rationale&nbsp;(why&nbsp;it&nbsp;works&nbsp;this&nbsp;way)<br>
+&nbsp;<br>
+Genesis&nbsp;can&nbsp;consult&nbsp;this&nbsp;when&nbsp;it&nbsp;wants&nbsp;to&nbsp;understand&nbsp;the&nbsp;*why*<br>
+behind&nbsp;a&nbsp;tool&nbsp;—&nbsp;the&nbsp;design&nbsp;decisions,&nbsp;the&nbsp;architecture,&nbsp;the<br>
+history.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="PackageDocSource-__init__"><strong>__init__</strong></a>(self, doc_path: 'str' = '/usr/share/doc', max_text: 'int' = 20000) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;package&nbsp;documentation&nbsp;source.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;doc_path:&nbsp;Root&nbsp;directory&nbsp;containing&nbsp;package&nbsp;documentation.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;max_text:&nbsp;Maximum&nbsp;characters&nbsp;of&nbsp;text&nbsp;to&nbsp;extract&nbsp;per&nbsp;package.</span></dd></dl>
+
+<dl><dt><a name="PackageDocSource-list_packages"><strong>list_packages</strong></a>(self) -&gt; 'list[str]'</dt><dd><span class="code">Return&nbsp;the&nbsp;names&nbsp;of&nbsp;all&nbsp;packages&nbsp;that&nbsp;have&nbsp;documentation.<br>
+&nbsp;<br>
+These&nbsp;are&nbsp;the&nbsp;directory&nbsp;names&nbsp;under&nbsp;``/usr/share/doc/``&nbsp;—&nbsp;one<br>
+per&nbsp;installed&nbsp;package.</span></dd></dl>
+
+<dl><dt><a name="PackageDocSource-lookup"><strong>lookup</strong></a>(self, package: 'str') -&gt; 'SourceResult | None'</dt><dd><span class="code">Look&nbsp;up&nbsp;documentation&nbsp;for&nbsp;an&nbsp;installed&nbsp;package.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;package:&nbsp;The&nbsp;package&nbsp;name&nbsp;(e.g.&nbsp;``"bash"``,&nbsp;``"systemd"``,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;``"coreutils"``).&nbsp;Also&nbsp;accepts&nbsp;a&nbsp;command&nbsp;name,&nbsp;which&nbsp;is<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mapped&nbsp;to&nbsp;its&nbsp;package&nbsp;via&nbsp;:meth:`_resolve_package`.<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;:class:`<a href="#SourceResult">SourceResult</a>`&nbsp;with&nbsp;the&nbsp;best&nbsp;available<br>
+documentation&nbsp;file&nbsp;(INTRO&nbsp;&gt;&nbsp;README&nbsp;&gt;&nbsp;FAQ&nbsp;&gt;&nbsp;DESIGN&nbsp;&gt;&nbsp;HACKING),<br>
+or&nbsp;``None``&nbsp;if&nbsp;the&nbsp;package&nbsp;isn't&nbsp;installed&nbsp;or&nbsp;has&nbsp;no&nbsp;docs.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SourceCache">class <strong>SourceCache</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SourceCache">SourceCache</a>(cache_dir:&nbsp;'Path')&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Disk-backed&nbsp;cache&nbsp;for&nbsp;source&nbsp;query&nbsp;results.<br>
+&nbsp;<br>
+Every&nbsp;successful&nbsp;<a href="#SourceResult">SourceResult</a>&nbsp;fetch&nbsp;is&nbsp;persisted&nbsp;to&nbsp;disk&nbsp;so&nbsp;that<br>
+when&nbsp;Genesis&nbsp;is&nbsp;offline&nbsp;(no&nbsp;wifi),&nbsp;it&nbsp;can&nbsp;still&nbsp;re-read&nbsp;anything<br>
+it's&nbsp;learned&nbsp;before.&nbsp;The&nbsp;cache&nbsp;is&nbsp;content-addressed&nbsp;by<br>
+(source_name,&nbsp;topic)&nbsp;and&nbsp;stores&nbsp;the&nbsp;full&nbsp;<a href="#SourceResult">SourceResult</a>&nbsp;as&nbsp;JSON.<br>
+&nbsp;<br>
+The&nbsp;cache&nbsp;is&nbsp;thread-safe&nbsp;(a&nbsp;lock&nbsp;guards&nbsp;writes).&nbsp;Reads&nbsp;are<br>
+lock-free&nbsp;after&nbsp;the&nbsp;initial&nbsp;directory&nbsp;check.<br>
+&nbsp;<br>
+Usage::<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;cache&nbsp;=&nbsp;<a href="#SourceCache">SourceCache</a>(Path("/path/to/genesis_data/source_cache"))<br>
+&nbsp;&nbsp;&nbsp;&nbsp;cache.<a href="#SourceCache-put">put</a>(result)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;save&nbsp;a&nbsp;successful&nbsp;fetch<br>
+&nbsp;&nbsp;&nbsp;&nbsp;hit&nbsp;=&nbsp;cache.<a href="#SourceCache-get">get</a>("wikipedia",&nbsp;"cognition")&nbsp;&nbsp;#&nbsp;retrieve&nbsp;later<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="SourceCache-__init__"><strong>__init__</strong></a>(self, cache_dir: 'Path') -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;on-disk&nbsp;source&nbsp;cache.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;cache_dir:&nbsp;Directory&nbsp;in&nbsp;which&nbsp;to&nbsp;persist&nbsp;cached&nbsp;source<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;results.&nbsp;Created&nbsp;automatically&nbsp;if&nbsp;it&nbsp;does&nbsp;not&nbsp;exist.</span></dd></dl>
+
+<dl><dt><a name="SourceCache-all_cached_topics"><strong>all_cached_topics</strong></a>(self) -&gt; 'list[str]'</dt><dd><span class="code">Return&nbsp;all&nbsp;unique&nbsp;cached&nbsp;topics&nbsp;across&nbsp;all&nbsp;sources.</span></dd></dl>
+
+<dl><dt><a name="SourceCache-clear"><strong>clear</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Remove&nbsp;all&nbsp;cached&nbsp;entries.</span></dd></dl>
+
+<dl><dt><a name="SourceCache-get"><strong>get</strong></a>(self, source_name: 'str', topic: 'str') -&gt; 'SourceResult | None'</dt><dd><span class="code">Retrieve&nbsp;a&nbsp;cached&nbsp;result,&nbsp;or&nbsp;None&nbsp;if&nbsp;not&nbsp;cached.</span></dd></dl>
+
+<dl><dt><a name="SourceCache-has"><strong>has</strong></a>(self, source_name: 'str', topic: 'str') -&gt; 'bool'</dt><dd><span class="code">Check&nbsp;whether&nbsp;a&nbsp;topic&nbsp;is&nbsp;cached&nbsp;for&nbsp;the&nbsp;given&nbsp;source.</span></dd></dl>
+
+<dl><dt><a name="SourceCache-put"><strong>put</strong></a>(self, result: 'SourceResult', topic: 'str') -&gt; 'None'</dt><dd><span class="code">Cache&nbsp;a&nbsp;successful&nbsp;fetch.&nbsp;Only&nbsp;stores&nbsp;results&nbsp;with&nbsp;content.</span></dd></dl>
+
+<dl><dt><a name="SourceCache-topics_for_source"><strong>topics_for_source</strong></a>(self, source_name: 'str') -&gt; 'list[str]'</dt><dd><span class="code">Return&nbsp;all&nbsp;cached&nbsp;topics&nbsp;for&nbsp;a&nbsp;given&nbsp;source&nbsp;name.<br>
+&nbsp;<br>
+Reads&nbsp;the&nbsp;``topic``&nbsp;field&nbsp;stored&nbsp;in&nbsp;each&nbsp;cache&nbsp;file.&nbsp;Useful&nbsp;for<br>
+offline&nbsp;introspection&nbsp;("what&nbsp;do&nbsp;I&nbsp;already&nbsp;know&nbsp;about?").</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>count</strong></dt>
+<dd><span class="code">Number&nbsp;of&nbsp;cached&nbsp;entries.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SourceRegistry">class <strong>SourceRegistry</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SourceRegistry">SourceRegistry</a>(cache_dir:&nbsp;'Path&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;force_offline:&nbsp;'bool'&nbsp;=&nbsp;False,&nbsp;connectivity_probe:&nbsp;'bool'&nbsp;=&nbsp;True)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Multi-source&nbsp;knowledge&nbsp;registry&nbsp;with&nbsp;offline&nbsp;fallback.<br>
+&nbsp;<br>
+Queries&nbsp;sources&nbsp;in&nbsp;priority&nbsp;order:<br>
+1.&nbsp;Local&nbsp;Linux&nbsp;man&nbsp;pages&nbsp;(reference&nbsp;—&nbsp;no&nbsp;network,&nbsp;always&nbsp;available)<br>
+2.&nbsp;WordNet&nbsp;(local&nbsp;lexical&nbsp;database&nbsp;—&nbsp;no&nbsp;network,&nbsp;always&nbsp;available)<br>
+3.&nbsp;Wikipedia&nbsp;API&nbsp;(online&nbsp;—&nbsp;structured&nbsp;content,&nbsp;broad&nbsp;coverage)<br>
+4.&nbsp;DuckDuckGo&nbsp;Lite&nbsp;(online&nbsp;—&nbsp;discovery&nbsp;fallback&nbsp;for&nbsp;uncovered&nbsp;topics)<br>
+&nbsp;<br>
+When&nbsp;online,&nbsp;every&nbsp;successful&nbsp;fetch&nbsp;is&nbsp;cached&nbsp;to&nbsp;disk.&nbsp;When&nbsp;offline<br>
+(or&nbsp;when&nbsp;online&nbsp;sources&nbsp;return&nbsp;nothing),&nbsp;the&nbsp;registry&nbsp;falls&nbsp;back&nbsp;to:<br>
+5.&nbsp;Disk&nbsp;cache&nbsp;(re-read&nbsp;anything&nbsp;learned&nbsp;before)<br>
+&nbsp;<br>
+This&nbsp;means&nbsp;Genesis&nbsp;can&nbsp;keep&nbsp;re-reading&nbsp;and&nbsp;reasoning&nbsp;over&nbsp;what&nbsp;it<br>
+has&nbsp;already&nbsp;learned&nbsp;—&nbsp;even&nbsp;without&nbsp;wifi.&nbsp;The&nbsp;more&nbsp;it&nbsp;learns<br>
+online,&nbsp;the&nbsp;richer&nbsp;its&nbsp;offline&nbsp;knowledge&nbsp;becomes.<br>
+&nbsp;<br>
+Usage::<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;With&nbsp;offline&nbsp;fallback&nbsp;(recommended):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;registry&nbsp;=&nbsp;<a href="#SourceRegistry">SourceRegistry</a>(<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cache_dir=Path("/path/to/genesis_data/source_cache"),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;results&nbsp;=&nbsp;registry.<a href="#SourceRegistry-query">query</a>("cognition")<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;Backward-compatible&nbsp;(no&nbsp;caching,&nbsp;online&nbsp;only):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;registry&nbsp;=&nbsp;<a href="#SourceRegistry">SourceRegistry</a>()<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="SourceRegistry-__init__"><strong>__init__</strong></a>(self, cache_dir: 'Path | None' = None, force_offline: 'bool' = False, connectivity_probe: 'bool' = True) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;source&nbsp;registry.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;cache_dir:&nbsp;Directory&nbsp;for&nbsp;persisting&nbsp;fetched&nbsp;source&nbsp;results<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;offline&nbsp;re-use.&nbsp;If&nbsp;None,&nbsp;no&nbsp;disk&nbsp;cache&nbsp;is&nbsp;used.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;force_offline:&nbsp;If&nbsp;True,&nbsp;skip&nbsp;all&nbsp;network&nbsp;access&nbsp;and&nbsp;rely&nbsp;on<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;local&nbsp;and&nbsp;cached&nbsp;sources.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;connectivity_probe:&nbsp;If&nbsp;False,&nbsp;never&nbsp;open&nbsp;a&nbsp;socket&nbsp;just&nbsp;to<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ask&nbsp;whether&nbsp;the&nbsp;network&nbsp;is&nbsp;up&nbsp;—&nbsp;``is_offline``&nbsp;reports<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;only&nbsp;what&nbsp;real&nbsp;queries&nbsp;observed&nbsp;(``last_query_offline``).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;resident&nbsp;(headless)&nbsp;mind&nbsp;stills&nbsp;this&nbsp;channel&nbsp;so&nbsp;no<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;signal&nbsp;moves&nbsp;on&nbsp;the&nbsp;wire&nbsp;while&nbsp;she&nbsp;rests&nbsp;—&nbsp;the&nbsp;thalamic<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;gate&nbsp;for&nbsp;the&nbsp;network&nbsp;sense.&nbsp;Deliberate&nbsp;query&nbsp;fetches<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;still&nbsp;run;&nbsp;only&nbsp;the&nbsp;synthetic&nbsp;probe&nbsp;is&nbsp;stilled.</span></dd></dl>
+
+<dl><dt><a name="SourceRegistry-check_connectivity"><strong>check_connectivity</strong></a>(self) -&gt; 'bool'</dt><dd><span class="code">Force&nbsp;a&nbsp;connectivity&nbsp;probe&nbsp;now,&nbsp;bypassing&nbsp;the&nbsp;throttle.<br>
+&nbsp;<br>
+Returns&nbsp;True&nbsp;if&nbsp;online.&nbsp;This&nbsp;is&nbsp;useful&nbsp;when&nbsp;the&nbsp;caller&nbsp;wants<br>
+an&nbsp;immediate,&nbsp;fresh&nbsp;check&nbsp;(e.g.&nbsp;on&nbsp;startup&nbsp;or&nbsp;after&nbsp;a&nbsp;long<br>
+offline&nbsp;period)&nbsp;rather&nbsp;than&nbsp;waiting&nbsp;for&nbsp;the&nbsp;next&nbsp;due&nbsp;probe.<br>
+&nbsp;<br>
+With&nbsp;``connectivity_probe``&nbsp;disabled&nbsp;there&nbsp;is&nbsp;nothing&nbsp;to&nbsp;force<br>
+—&nbsp;the&nbsp;answer&nbsp;is&nbsp;the&nbsp;query-observed&nbsp;state,&nbsp;which&nbsp;stays&nbsp;fresh&nbsp;on<br>
+its&nbsp;own&nbsp;while&nbsp;she&nbsp;actually&nbsp;fetches.</span></dd></dl>
+
+<dl><dt><a name="SourceRegistry-query"><strong>query</strong></a>(self, topic: 'str', max_results: 'int' = 3) -&gt; 'list[SourceResult]'</dt><dd><span class="code">Query&nbsp;all&nbsp;sources&nbsp;for&nbsp;a&nbsp;topic,&nbsp;returning&nbsp;up&nbsp;to&nbsp;max_results.<br>
+&nbsp;<br>
+Tries&nbsp;sources&nbsp;in&nbsp;priority&nbsp;order:<br>
+1.&nbsp;Local&nbsp;Linux&nbsp;man&nbsp;pages&nbsp;(reference&nbsp;—&nbsp;no&nbsp;network,&nbsp;always&nbsp;available)<br>
+2.&nbsp;WordNet&nbsp;(local&nbsp;dictionary&nbsp;—&nbsp;no&nbsp;network,&nbsp;always&nbsp;available)<br>
+3.&nbsp;Wikipedia&nbsp;API&nbsp;(online&nbsp;—&nbsp;structured&nbsp;content,&nbsp;broad&nbsp;coverage)<br>
+4.&nbsp;DuckDuckGo&nbsp;Lite&nbsp;(online&nbsp;—&nbsp;discovery&nbsp;fallback)<br>
+5.&nbsp;Disk&nbsp;cache&nbsp;(offline&nbsp;fallback&nbsp;—&nbsp;re-read&nbsp;learned&nbsp;content)</span></dd></dl>
+
+<dl><dt><a name="SourceRegistry-query_offline"><strong>query_offline</strong></a>(self, topic: 'str', max_results: 'int' = 3) -&gt; 'list[SourceResult]'</dt><dd><span class="code">Query&nbsp;only&nbsp;offline&nbsp;sources&nbsp;(cache),&nbsp;no&nbsp;network.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;useful&nbsp;when&nbsp;the&nbsp;caller&nbsp;knows&nbsp;there's&nbsp;no&nbsp;connectivity<br>
+and&nbsp;wants&nbsp;to&nbsp;skip&nbsp;network&nbsp;timeouts&nbsp;entirely.</span></dd></dl>
+
+<dl><dt><a name="SourceRegistry-query_wikipedia"><strong>query_wikipedia</strong></a>(self, topic: 'str') -&gt; 'SourceResult | None'</dt><dd><span class="code">Query&nbsp;Wikipedia&nbsp;directly&nbsp;for&nbsp;a&nbsp;topic.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>cache</strong></dt>
+<dd><span class="code">The&nbsp;disk&nbsp;cache,&nbsp;or&nbsp;None&nbsp;if&nbsp;no&nbsp;cache_dir&nbsp;was&nbsp;provided.</span></dd>
+</dl>
+<dl><dt><strong>github</strong></dt>
+<dd><span class="code">GitHub&nbsp;read-only&nbsp;API&nbsp;client&nbsp;—&nbsp;search&nbsp;public&nbsp;repos&nbsp;and&nbsp;code.<br>
+&nbsp;<br>
+Not&nbsp;auto-queried&nbsp;(rate&nbsp;limits);&nbsp;Genesis&nbsp;consults&nbsp;this&nbsp;when<br>
+it's&nbsp;curious&nbsp;about&nbsp;how&nbsp;other&nbsp;projects&nbsp;solve&nbsp;a&nbsp;problem.</span></dd>
+</dl>
+<dl><dt><strong>info_pages</strong></dt>
+<dd><span class="code">GNU&nbsp;Info&nbsp;pages&nbsp;—&nbsp;the&nbsp;tutorial&nbsp;layer&nbsp;above&nbsp;man&nbsp;pages.<br>
+&nbsp;<br>
+Not&nbsp;auto-queried;&nbsp;Genesis&nbsp;consults&nbsp;this&nbsp;when&nbsp;it&nbsp;wants&nbsp;to<br>
+understand&nbsp;*how*&nbsp;a&nbsp;tool&nbsp;works,&nbsp;not&nbsp;just&nbsp;what&nbsp;flags&nbsp;it&nbsp;has.</span></dd>
+</dl>
+<dl><dt><strong>is_offline</strong></dt>
+<dd><span class="code">Whether&nbsp;the&nbsp;registry&nbsp;currently&nbsp;considers&nbsp;itself&nbsp;offline.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;a&nbsp;*proactive*&nbsp;check&nbsp;—&nbsp;it&nbsp;probes&nbsp;connectivity&nbsp;before<br>
+a&nbsp;query&nbsp;is&nbsp;attempted,&nbsp;so&nbsp;the&nbsp;learner&nbsp;can&nbsp;skip&nbsp;network&nbsp;sources<br>
+entirely&nbsp;instead&nbsp;of&nbsp;paying&nbsp;timeout&nbsp;penalties&nbsp;on&nbsp;every&nbsp;cycle.<br>
+&nbsp;<br>
+When&nbsp;``force_offline``&nbsp;is&nbsp;True,&nbsp;always&nbsp;returns&nbsp;True&nbsp;(no&nbsp;probe).<br>
+&nbsp;<br>
+When&nbsp;not&nbsp;forced,&nbsp;returns&nbsp;True&nbsp;if&nbsp;the&nbsp;last&nbsp;probe&nbsp;failed&nbsp;and<br>
+we're&nbsp;still&nbsp;within&nbsp;the&nbsp;offline&nbsp;cooldown.&nbsp;After&nbsp;the&nbsp;cooldown<br>
+expires,&nbsp;the&nbsp;next&nbsp;access&nbsp;triggers&nbsp;a&nbsp;re-probe.&nbsp;If&nbsp;the&nbsp;probe<br>
+succeeds,&nbsp;returns&nbsp;False&nbsp;(online).<br>
+&nbsp;<br>
+When&nbsp;``connectivity_probe``&nbsp;is&nbsp;False&nbsp;(resident/headless),&nbsp;no<br>
+socket&nbsp;is&nbsp;ever&nbsp;opened&nbsp;to&nbsp;ask:&nbsp;the&nbsp;answer&nbsp;is&nbsp;whatever&nbsp;real<br>
+queries&nbsp;last&nbsp;observed&nbsp;—&nbsp;``_last_query_offline``.&nbsp;Optimistic<br>
+(a&nbsp;failed&nbsp;fetch&nbsp;marks&nbsp;it&nbsp;offline,&nbsp;the&nbsp;next&nbsp;success&nbsp;back);&nbsp;a<br>
+stilled&nbsp;sense,&nbsp;not&nbsp;a&nbsp;lying&nbsp;one.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;sticky:&nbsp;once&nbsp;offline&nbsp;is&nbsp;detected,&nbsp;subsequent&nbsp;calls<br>
+return&nbsp;True&nbsp;without&nbsp;re-probing&nbsp;until&nbsp;the&nbsp;cooldown&nbsp;expires.</span></dd>
+</dl>
+<dl><dt><strong>last_query_offline</strong></dt>
+<dd><span class="code">Whether&nbsp;the&nbsp;most&nbsp;recent&nbsp;query&nbsp;fell&nbsp;back&nbsp;to&nbsp;offline&nbsp;sources.<br>
+&nbsp;<br>
+True&nbsp;if&nbsp;the&nbsp;last&nbsp;query&nbsp;got&nbsp;no&nbsp;content&nbsp;from&nbsp;online&nbsp;sources<br>
+(indicating&nbsp;no&nbsp;connectivity)&nbsp;or&nbsp;if&nbsp;force_offline&nbsp;is&nbsp;set.</span></dd>
+</dl>
+<dl><dt><strong>man_pages</strong></dt>
+<dd><span class="code">The&nbsp;local&nbsp;Linux&nbsp;man-page&nbsp;source&nbsp;(first-tier&nbsp;reference).</span></dd>
+</dl>
+<dl><dt><strong>package_docs</strong></dt>
+<dd><span class="code">Package&nbsp;documentation&nbsp;from&nbsp;/usr/share/doc&nbsp;—&nbsp;the&nbsp;deepest&nbsp;layer.<br>
+&nbsp;<br>
+Not&nbsp;auto-queried;&nbsp;Genesis&nbsp;consults&nbsp;this&nbsp;when&nbsp;it&nbsp;wants&nbsp;the<br>
+design&nbsp;rationale,&nbsp;architecture,&nbsp;or&nbsp;FAQ&nbsp;for&nbsp;an&nbsp;installed&nbsp;package.</span></dd>
+</dl>
+<dl><dt><strong>source_names</strong></dt>
+<dd><span class="code">Names&nbsp;of&nbsp;all&nbsp;registered&nbsp;sources&nbsp;(including&nbsp;offline).</span></dd>
+</dl>
+<dl><dt><strong>wordnet</strong></dt>
+<dd><span class="code">The&nbsp;local&nbsp;WordNet&nbsp;dictionary&nbsp;source&nbsp;(no&nbsp;network).</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<dl><dt><strong>force_offline</strong></dt>
+<dd><span class="code">Whether&nbsp;the&nbsp;registry&nbsp;is&nbsp;forced&nbsp;to&nbsp;skip&nbsp;all&nbsp;network&nbsp;access.</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SourceResult">class <strong>SourceResult</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SourceResult">SourceResult</a>(url:&nbsp;'str',&nbsp;title:&nbsp;'str',&nbsp;content:&nbsp;'str',&nbsp;source_name:&nbsp;'str',&nbsp;summary:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;related_topics:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;result&nbsp;from&nbsp;a&nbsp;knowledge&nbsp;source&nbsp;query.<br>
+&nbsp;<br>
+Attributes:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;url:&nbsp;The&nbsp;URL&nbsp;the&nbsp;content&nbsp;came&nbsp;from.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;title:&nbsp;The&nbsp;title&nbsp;of&nbsp;the&nbsp;article/page.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;content:&nbsp;The&nbsp;extracted&nbsp;text&nbsp;content&nbsp;(plain&nbsp;text,&nbsp;not&nbsp;HTML).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;source_name:&nbsp;Which&nbsp;source&nbsp;provided&nbsp;this&nbsp;(e.g.&nbsp;"wikipedia",&nbsp;"stanford").<br>
+&nbsp;&nbsp;&nbsp;&nbsp;summary:&nbsp;A&nbsp;short&nbsp;summary&nbsp;if&nbsp;available&nbsp;(Wikipedia&nbsp;provides&nbsp;one).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;related_topics:&nbsp;Topics&nbsp;related&nbsp;to&nbsp;this&nbsp;one&nbsp;(for&nbsp;curiosity&nbsp;chaining).<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="SourceResult-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="SourceResult-__init__"><strong>__init__</strong></a>(self, url: 'str', title: 'str', content: 'str', source_name: 'str', summary: 'str' = '', related_topics: 'list[str]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="SourceResult-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>content</strong></dt>
+</dl>
+<dl><dt><strong>related_topics</strong></dt>
+</dl>
+<dl><dt><strong>source_name</strong></dt>
+</dl>
+<dl><dt><strong>summary</strong></dt>
+</dl>
+<dl><dt><strong>title</strong></dt>
+</dl>
+<dl><dt><strong>url</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'content': 'str', 'related_topics': 'list[str]', 'source_name': 'str', 'summary': 'str', 'title': 'str', 'url': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'content': Field(name='content',type='str',default=&lt;datacla...appingproxy({}),kw_only=False,_field_type=_FIELD), 'related_topics': Field(name='related_topics',type='list[str]',def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'source_name': Field(name='source_name',type='str',default=&lt;dat...appingproxy({}),kw_only=False,_field_type=_FIELD), 'summary': Field(name='summary',type='str',default='',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'title': Field(name='title',type='str',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD), 'url': Field(name='url',type='str',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('url', 'title', 'content', 'source_name', 'summary', 'related_topics')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="WordNetSource">class <strong>WordNetSource</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code">Local&nbsp;WordNet&nbsp;lexical&nbsp;database&nbsp;—&nbsp;Genesis's&nbsp;dictionary.<br>
+&nbsp;<br>
+Looks&nbsp;words&nbsp;up&nbsp;in&nbsp;WordNet&nbsp;(via&nbsp;NLTK),&nbsp;which&nbsp;ships&nbsp;as&nbsp;a&nbsp;local<br>
+corpus.&nbsp;No&nbsp;network&nbsp;access&nbsp;is&nbsp;involved,&nbsp;so&nbsp;it&nbsp;works&nbsp;identically<br>
+whether&nbsp;Genesis&nbsp;is&nbsp;online&nbsp;or&nbsp;offline.&nbsp;This&nbsp;replaces&nbsp;the&nbsp;former<br>
+remote&nbsp;dictionary&nbsp;sources&nbsp;(dict.org,&nbsp;Dictionary.com,&nbsp;Wiktionary).<br>
+&nbsp;<br>
+Only&nbsp;single&nbsp;words&nbsp;are&nbsp;looked&nbsp;up&nbsp;—&nbsp;WordNet&nbsp;is&nbsp;a&nbsp;lexical&nbsp;database<br>
+of&nbsp;words,&nbsp;not&nbsp;a&nbsp;general&nbsp;reference.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="WordNetSource-lookup"><strong>lookup</strong></a>(self, word: 'str') -&gt; 'SourceResult | None'</dt><dd><span class="code">Look&nbsp;up&nbsp;a&nbsp;word&nbsp;in&nbsp;WordNet.<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;<a href="#SourceResult">SourceResult</a>&nbsp;carrying&nbsp;the&nbsp;definitions&nbsp;and&nbsp;example<br>
+sentences,&nbsp;or&nbsp;None&nbsp;if&nbsp;the&nbsp;word&nbsp;isn't&nbsp;in&nbsp;WordNet.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-wikipedia_lead_image"><strong>wikipedia_lead_image</strong></a>(article_title: 'str', thumb_size: 'int' = 320) -&gt; 'bytes | None'</dt><dd><span class="code">Fetch&nbsp;the&nbsp;lead&nbsp;image&nbsp;thumbnail&nbsp;for&nbsp;a&nbsp;Wikipedia&nbsp;article.<br>
+&nbsp;<br>
+Uses&nbsp;the&nbsp;MediaWiki&nbsp;API's&nbsp;pageimages&nbsp;prop&nbsp;to&nbsp;get&nbsp;the&nbsp;article's<br>
+representative&nbsp;image.&nbsp;Returns&nbsp;the&nbsp;raw&nbsp;image&nbsp;bytes&nbsp;(JPEG/PNG),<br>
+or&nbsp;None&nbsp;if&nbsp;the&nbsp;article&nbsp;has&nbsp;no&nbsp;lead&nbsp;image&nbsp;or&nbsp;the&nbsp;download&nbsp;fails.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;article_title:&nbsp;the&nbsp;Wikipedia&nbsp;article&nbsp;title.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;thumb_size:&nbsp;maximum&nbsp;thumbnail&nbsp;dimension&nbsp;in&nbsp;pixels.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Raw&nbsp;image&nbsp;bytes,&nbsp;or&nbsp;None.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>OFFLINE_COOLDOWN</strong> = 60.0<br>
+<strong>REQUEST_TIMEOUT</strong> = 2<br>
+<strong>USER_AGENT</strong> = 'Genesis-AI-Learner/1.0 (educational research)'<br>
+<strong>WIKIPEDIA_ENABLED</strong> = False<br>
+<strong>__annotations__</strong> = {'_DOC_FILE_PRIORITIES': 'list[tuple[str, ...]]'}<br>
+<strong>logger</strong> = &lt;Logger Outer_World.tools.source_registry (WARNING)&gt;</td></tr></table>
+</body></html>

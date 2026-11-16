@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.frontal_lobe.dlpfc</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.frontal_lobe.html" class="white">frontal_lobe</a>.dlpfc</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/dlpfc.py">/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/dlpfc.py</a></td></tr></table>
+    <p><span class="code">Dorsolateral&nbsp;prefrontal&nbsp;cortex&nbsp;—&nbsp;rule&nbsp;induction&nbsp;from&nbsp;examples.<br>
+&nbsp;<br>
+Mid-DLPFC&nbsp;is&nbsp;the&nbsp;brain's&nbsp;hypothesis&nbsp;generator:&nbsp;it&nbsp;is&nbsp;active&nbsp;during<br>
+rule&nbsp;*search*&nbsp;and&nbsp;*acquisition*&nbsp;and&nbsp;disengages&nbsp;once&nbsp;the&nbsp;rule&nbsp;is<br>
+learned,&nbsp;when&nbsp;control&nbsp;passes&nbsp;to&nbsp;temporal&nbsp;and&nbsp;motor&nbsp;systems<br>
+(Crescentini&nbsp;et&nbsp;al.,&nbsp;2011).&nbsp;What&nbsp;it&nbsp;computes&nbsp;during&nbsp;acquisition&nbsp;is&nbsp;a<br>
+posterior&nbsp;over&nbsp;compositional&nbsp;rules&nbsp;—&nbsp;the&nbsp;rational&nbsp;analysis&nbsp;of<br>
+rule-based&nbsp;concept&nbsp;learning&nbsp;(Goodman,&nbsp;Tenenbaum,&nbsp;Feldman&nbsp;&amp;<br>
+Griffiths,&nbsp;2008):<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;P(h&nbsp;|&nbsp;E)&nbsp;∝&nbsp;P(h&nbsp;|&nbsp;G)&nbsp;·&nbsp;P(E&nbsp;|&nbsp;h)<br>
+&nbsp;<br>
+#&nbsp;Hypothesis&nbsp;space&nbsp;—&nbsp;a&nbsp;DNF&nbsp;grammar<br>
+&nbsp;<br>
+Rules&nbsp;are&nbsp;formulae&nbsp;in&nbsp;disjunctive&nbsp;normal&nbsp;form&nbsp;over&nbsp;signed&nbsp;feature<br>
+literals:&nbsp;each&nbsp;formula&nbsp;is&nbsp;a&nbsp;definition,&nbsp;a&nbsp;disjunction&nbsp;of&nbsp;conjunctive<br>
+"senses"&nbsp;—<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;∀x&nbsp;&nbsp;ℓ(x)&nbsp;⇔&nbsp;(f1&nbsp;∧&nbsp;¬f3)&nbsp;∨&nbsp;(f2&nbsp;∧&nbsp;f4)<br>
+&nbsp;<br>
+Grammar&nbsp;productions&nbsp;(D&nbsp;→&nbsp;C&nbsp;|&nbsp;D∨C&nbsp;;&nbsp;C&nbsp;→&nbsp;P&nbsp;|&nbsp;C∧P&nbsp;;&nbsp;P&nbsp;→&nbsp;±fᵢ)&nbsp;give<br>
+every&nbsp;canonical&nbsp;formula&nbsp;exactly&nbsp;one&nbsp;derivation.<br>
+&nbsp;<br>
+#&nbsp;Prior&nbsp;—&nbsp;production&nbsp;reuse,&nbsp;Dirichlet-marginalized<br>
+&nbsp;<br>
+Production&nbsp;probabilities&nbsp;are&nbsp;integrated&nbsp;over&nbsp;a&nbsp;symmetric<br>
+Dirichlet(α=1),&nbsp;so&nbsp;a&nbsp;formula's&nbsp;prior&nbsp;is&nbsp;the&nbsp;Dirichlet–multinomial<br>
+marginal&nbsp;of&nbsp;its&nbsp;derivation&nbsp;counts&nbsp;(Goodman&nbsp;et&nbsp;al.,&nbsp;eq.&nbsp;4):<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;P(h)&nbsp;=&nbsp;∏_X&nbsp;[&nbsp;Γ(k_X)&nbsp;/&nbsp;Γ(k_X&nbsp;+&nbsp;n_X)&nbsp;·&nbsp;∏_j&nbsp;n_{X,j}!&nbsp;]<br>
+&nbsp;<br>
+for&nbsp;non-terminal&nbsp;X&nbsp;with&nbsp;k_X&nbsp;productions&nbsp;used&nbsp;n_X&nbsp;=&nbsp;Σⱼ&nbsp;n_{X,j}&nbsp;times.<br>
+Short&nbsp;derivations&nbsp;win,&nbsp;and&nbsp;reusing&nbsp;a&nbsp;literal&nbsp;across&nbsp;senses&nbsp;is<br>
+cheaper&nbsp;than&nbsp;introducing&nbsp;a&nbsp;new&nbsp;one&nbsp;—&nbsp;a&nbsp;Bayesian&nbsp;Occam&nbsp;bias&nbsp;over<br>
+syntax&nbsp;rather&nbsp;than&nbsp;extension.<br>
+&nbsp;<br>
+#&nbsp;Likelihood&nbsp;—&nbsp;outliers,&nbsp;not&nbsp;exact&nbsp;match<br>
+&nbsp;<br>
+Labels&nbsp;need&nbsp;not&nbsp;all&nbsp;be&nbsp;explainable:&nbsp;any&nbsp;example&nbsp;may&nbsp;be&nbsp;an&nbsp;outlier,<br>
+so&nbsp;the&nbsp;likelihood&nbsp;falls&nbsp;off&nbsp;exponentially&nbsp;with&nbsp;Q(h,E),&nbsp;the&nbsp;number<br>
+of&nbsp;examples&nbsp;the&nbsp;formula&nbsp;misclassifies&nbsp;(Goodman&nbsp;et&nbsp;al.,&nbsp;eq.&nbsp;5):<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;P(E&nbsp;|&nbsp;h)&nbsp;∝&nbsp;exp(−b&nbsp;·&nbsp;Q(h,&nbsp;E))<br>
+&nbsp;<br>
+The&nbsp;b→∞&nbsp;limit&nbsp;is&nbsp;exact-match&nbsp;verification;&nbsp;finite&nbsp;b&nbsp;tolerates&nbsp;a<br>
+mislabeled&nbsp;example&nbsp;rather&nbsp;than&nbsp;abandoning&nbsp;the&nbsp;rule.<br>
+&nbsp;<br>
+#&nbsp;Inference<br>
+&nbsp;<br>
+The&nbsp;hypothesis&nbsp;space&nbsp;is&nbsp;enumerated&nbsp;up&nbsp;to&nbsp;a&nbsp;complexity&nbsp;bound&nbsp;—&nbsp;the<br>
+posterior&nbsp;is&nbsp;exact&nbsp;within&nbsp;it,&nbsp;the&nbsp;way&nbsp;working&nbsp;memory&nbsp;is&nbsp;finite.<br>
+Predictions&nbsp;are&nbsp;posterior-weighted&nbsp;votes,&nbsp;P(ℓ(x))&nbsp;=&nbsp;Σ_h&nbsp;P(h|E)·h(x).<br>
+Confidence&nbsp;is&nbsp;the&nbsp;posterior&nbsp;mass&nbsp;on&nbsp;the&nbsp;MAP&nbsp;formula;&nbsp;when&nbsp;it&nbsp;crosses<br>
+the&nbsp;acquisition&nbsp;threshold&nbsp;the&nbsp;rule&nbsp;is&nbsp;treated&nbsp;as&nbsp;learned&nbsp;—&nbsp;the<br>
+mid-DLPFC&nbsp;disengagement&nbsp;signal&nbsp;of&nbsp;Crescentini&nbsp;et&nbsp;al.<br>
+&nbsp;<br>
+References:<br>
+-&nbsp;Goodman,&nbsp;N.&nbsp;D.,&nbsp;Tenenbaum,&nbsp;J.&nbsp;B.,&nbsp;Feldman,&nbsp;J.,&nbsp;&amp;&nbsp;Griffiths,&nbsp;T.&nbsp;L.<br>
+&nbsp;&nbsp;(2008).&nbsp;A&nbsp;rational&nbsp;analysis&nbsp;of&nbsp;rule-based&nbsp;concept&nbsp;learning.<br>
+&nbsp;&nbsp;Cognitive&nbsp;Science,&nbsp;32(1),&nbsp;108–154.<br>
+-&nbsp;Crescentini,&nbsp;C.,&nbsp;Seyed-Allaei,&nbsp;S.,&nbsp;De&nbsp;Pisapia,&nbsp;N.,&nbsp;Jovicich,&nbsp;J.,<br>
+&nbsp;&nbsp;Amati,&nbsp;D.,&nbsp;&amp;&nbsp;Shallice,&nbsp;T.&nbsp;(2011).&nbsp;Mechanisms&nbsp;of&nbsp;rule&nbsp;acquisition<br>
+&nbsp;&nbsp;and&nbsp;rule&nbsp;following&nbsp;in&nbsp;inductive&nbsp;reasoning.&nbsp;Journal&nbsp;of<br>
+&nbsp;&nbsp;Neuroscience,&nbsp;31(21),&nbsp;7763–7774.<br>
+-&nbsp;Wallis,&nbsp;J.&nbsp;D.,&nbsp;Anderson,&nbsp;K.&nbsp;C.,&nbsp;&amp;&nbsp;Miller,&nbsp;E.&nbsp;K.&nbsp;(2001).&nbsp;Single<br>
+&nbsp;&nbsp;neurons&nbsp;in&nbsp;prefrontal&nbsp;cortex&nbsp;encode&nbsp;abstract&nbsp;rules.&nbsp;Nature,<br>
+&nbsp;&nbsp;411,&nbsp;953–956.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="math.html">math</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.frontal_lobe.dlpfc.html#DorsolateralPFC">DorsolateralPFC</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.dlpfc.html#InducedRule">InducedRule</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.dlpfc.html#InductionResult">InductionResult</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.dlpfc.html#Literal">Literal</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="DorsolateralPFC">class <strong>DorsolateralPFC</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#DorsolateralPFC">DorsolateralPFC</a>(*,&nbsp;exception_cost:&nbsp;'float'&nbsp;=&nbsp;4.0,&nbsp;max_senses:&nbsp;'int'&nbsp;=&nbsp;3,&nbsp;max_literals:&nbsp;'int'&nbsp;=&nbsp;3,&nbsp;acquire_threshold:&nbsp;'float'&nbsp;=&nbsp;0.9)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Bayesian&nbsp;rule&nbsp;induction&nbsp;over&nbsp;a&nbsp;bounded&nbsp;DNF&nbsp;hypothesis&nbsp;space.<br>
+&nbsp;<br>
+``<a href="#DorsolateralPFC-observe">observe</a>(features,&nbsp;label)``&nbsp;adds&nbsp;a&nbsp;labeled&nbsp;example;&nbsp;``<a href="#DorsolateralPFC-induce">induce</a>()``<br>
+recomputes&nbsp;the&nbsp;posterior&nbsp;lazily;&nbsp;``<a href="#DorsolateralPFC-predict">predict</a>(features)``&nbsp;returns&nbsp;the<br>
+posterior-weighted&nbsp;probability&nbsp;that&nbsp;an&nbsp;unlabeled&nbsp;item&nbsp;belongs.<br>
+&nbsp;<br>
+The&nbsp;hypothesis&nbsp;space&nbsp;is&nbsp;all&nbsp;satisfiable&nbsp;DNF&nbsp;formulae&nbsp;of&nbsp;at&nbsp;most<br>
+``max_senses``&nbsp;senses&nbsp;of&nbsp;at&nbsp;most&nbsp;``max_literals``&nbsp;literals&nbsp;over&nbsp;the<br>
+vocabulary&nbsp;of&nbsp;features&nbsp;seen&nbsp;so&nbsp;far&nbsp;(both&nbsp;polarities).&nbsp;When&nbsp;the&nbsp;space<br>
+would&nbsp;exceed&nbsp;``_MAX_HYPOTHESES``,&nbsp;complexity&nbsp;bounds&nbsp;are&nbsp;lowered&nbsp;in<br>
+the&nbsp;order&nbsp;that&nbsp;truncates&nbsp;the&nbsp;lowest-prior&nbsp;tail&nbsp;first.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="DorsolateralPFC-__init__"><strong>__init__</strong></a>(self, *, exception_cost: 'float' = 4.0, max_senses: 'int' = 3, max_literals: 'int' = 3, acquire_threshold: 'float' = 0.9) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="DorsolateralPFC-best_rule"><strong>best_rule</strong></a>(self) -&gt; 'InducedRule | None'</dt><dd><span class="code">The&nbsp;MAP&nbsp;rule&nbsp;—&nbsp;the&nbsp;current&nbsp;hypothesis.</span></dd></dl>
+
+<dl><dt><a name="DorsolateralPFC-induce"><strong>induce</strong></a>(self) -&gt; 'InductionResult'</dt><dd><span class="code">The&nbsp;posterior&nbsp;summary:&nbsp;MAP&nbsp;rule,&nbsp;confidence,&nbsp;entropy.</span></dd></dl>
+
+<dl><dt><a name="DorsolateralPFC-observe"><strong>observe</strong></a>(self, features: 'Iterable[str]', label: 'bool', *, key: 'Any' = None) -&gt; 'None'</dt><dd><span class="code">Add&nbsp;a&nbsp;labeled&nbsp;example&nbsp;and&nbsp;invalidate&nbsp;the&nbsp;cached&nbsp;posterior.</span></dd></dl>
+
+<dl><dt><a name="DorsolateralPFC-posterior"><strong>posterior</strong></a>(self) -&gt; 'list[tuple[InducedRule, float]]'</dt><dd><span class="code">The&nbsp;full&nbsp;normalized&nbsp;distribution&nbsp;over&nbsp;the&nbsp;bounded&nbsp;space.</span></dd></dl>
+
+<dl><dt><a name="DorsolateralPFC-predict"><strong>predict</strong></a>(self, features: 'Iterable[str]') -&gt; 'float'</dt><dd><span class="code">Posterior-predictive&nbsp;P(ℓ(x)&nbsp;=&nbsp;+)&nbsp;—&nbsp;a&nbsp;weighted&nbsp;vote.</span></dd></dl>
+
+<dl><dt><a name="DorsolateralPFC-reset"><strong>reset</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Drop&nbsp;all&nbsp;evidence&nbsp;—&nbsp;a&nbsp;fresh&nbsp;induction&nbsp;episode.</span></dd></dl>
+
+<dl><dt><a name="DorsolateralPFC-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict[str, Any]'</dt></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="DorsolateralPFC-from_dict"><strong>from_dict</strong></a>(data: 'dict[str, Any]') -&gt; 'DorsolateralPFC'</dt><dd><span class="code">Reconstruct&nbsp;from&nbsp;a&nbsp;serialized&nbsp;dict,&nbsp;replaying&nbsp;stored&nbsp;examples.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>example_count</strong></dt>
+</dl>
+<dl><dt><strong>has_examples</strong></dt>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="InducedRule">class <strong>InducedRule</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#InducedRule">InducedRule</a>(senses:&nbsp;'tuple[frozenset[<a href="#Literal">Literal</a>],&nbsp;...]')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;DNF&nbsp;formula:&nbsp;a&nbsp;disjunction&nbsp;of&nbsp;conjunctive&nbsp;senses.<br>
+&nbsp;<br>
+``senses``&nbsp;is&nbsp;canonically&nbsp;ordered&nbsp;so&nbsp;syntactically&nbsp;identical<br>
+formulae&nbsp;are&nbsp;the&nbsp;same&nbsp;<a href="builtins.html#object">object</a>&nbsp;—&nbsp;the&nbsp;DNF&nbsp;grammar&nbsp;gives&nbsp;each<br>
+formula&nbsp;a&nbsp;single&nbsp;derivation.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="InducedRule-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="InducedRule-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="InducedRule-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="InducedRule-__init__"><strong>__init__</strong></a>(self, senses: 'tuple[frozenset[Literal], ...]') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="InducedRule-__post_init__"><strong>__post_init__</strong></a>(self) -&gt; 'None'</dt></dl>
+
+<dl><dt><a name="InducedRule-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="InducedRule-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<dl><dt><a name="InducedRule-describe"><strong>describe</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Formal&nbsp;notation&nbsp;—&nbsp;the&nbsp;rule&nbsp;itself,&nbsp;not&nbsp;prose&nbsp;about&nbsp;it.</span></dd></dl>
+
+<dl><dt><a name="InducedRule-holds"><strong>holds</strong></a>(self, features: 'Collection[str]') -&gt; 'bool'</dt><dd><span class="code">The&nbsp;formula's&nbsp;extension:&nbsp;any&nbsp;sense&nbsp;fully&nbsp;satisfied.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>n_literals</strong></dt>
+</dl>
+<dl><dt><strong>n_senses</strong></dt>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'senses': 'tuple[frozenset[Literal], ...]'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'senses': Field(name='senses',type='tuple[frozenset[Litera...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('senses',)</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="InductionResult">class <strong>InductionResult</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#InductionResult">InductionResult</a>(posterior:&nbsp;'list[tuple[<a href="#InducedRule">InducedRule</a>,&nbsp;float]]',&nbsp;map_rule:&nbsp;'<a href="#InducedRule">InducedRule</a>&nbsp;|&nbsp;None',&nbsp;confidence:&nbsp;'float',&nbsp;entropy:&nbsp;'float',&nbsp;acquired:&nbsp;'bool',&nbsp;enumerated:&nbsp;'int')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;induced&nbsp;posterior&nbsp;over&nbsp;rules.<br>
+&nbsp;<br>
+``confidence``&nbsp;is&nbsp;the&nbsp;mass&nbsp;on&nbsp;the&nbsp;MAP&nbsp;rule;&nbsp;``acquired``&nbsp;is&nbsp;the<br>
+mid-DLPFC&nbsp;disengagement&nbsp;signal&nbsp;—&nbsp;the&nbsp;rule&nbsp;has&nbsp;been&nbsp;learned&nbsp;and<br>
+hypothesis&nbsp;search&nbsp;may&nbsp;stop.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="InductionResult-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="InductionResult-__init__"><strong>__init__</strong></a>(self, posterior: 'list[tuple[InducedRule, float]]', map_rule: 'InducedRule | None', confidence: 'float', entropy: 'float', acquired: 'bool', enumerated: 'int') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="InductionResult-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'acquired': 'bool', 'confidence': 'float', 'entropy': 'float', 'enumerated': 'int', 'map_rule': 'InducedRule | None', 'posterior': 'list[tuple[InducedRule, float]]'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'acquired': Field(name='acquired',type='bool',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'confidence': Field(name='confidence',type='float',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD), 'entropy': Field(name='entropy',type='float',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'enumerated': Field(name='enumerated',type='int',default=&lt;data...appingproxy({}),kw_only=False,_field_type=_FIELD), 'map_rule': Field(name='map_rule',type='InducedRule | None',...appingproxy({}),kw_only=False,_field_type=_FIELD), 'posterior': Field(name='posterior',type='list[tuple[InducedR...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('posterior', 'map_rule', 'confidence', 'entropy', 'acquired', 'enumerated')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Literal">class <strong>Literal</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Literal">Literal</a>(feature:&nbsp;'str',&nbsp;present:&nbsp;'bool'&nbsp;=&nbsp;True)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+One&nbsp;signed&nbsp;predicate:&nbsp;a&nbsp;feature&nbsp;that&nbsp;is&nbsp;present&nbsp;or&nbsp;absent.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Literal-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="Literal-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="Literal-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="Literal-__init__"><strong>__init__</strong></a>(self, feature: 'str', present: 'bool' = True) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Literal-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="Literal-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<dl><dt><a name="Literal-describe"><strong>describe</strong></a>(self) -&gt; 'str'</dt></dl>
+
+<dl><dt><a name="Literal-holds"><strong>holds</strong></a>(self, features: 'Collection[str]') -&gt; 'bool'</dt></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'feature': 'str', 'present': 'bool'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'feature': Field(name='feature',type='str',default=&lt;datacla...appingproxy({}),kw_only=False,_field_type=_FIELD), 'present': Field(name='present',type='bool',default=True,de...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('feature', 'present')</dl>
+
+<dl><dt><strong>present</strong> = True</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['DorsolateralPFC', 'InducedRule', 'InductionResult', 'Literal']</td></tr></table>
+</body></html>

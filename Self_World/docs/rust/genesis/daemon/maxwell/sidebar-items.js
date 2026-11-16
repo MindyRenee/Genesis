@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["C","MU0"],"fn":["b_quasistatic_axial_t","dipole_moment","e_induction_vm","quasi_static_ok","radiated_power_w"]};

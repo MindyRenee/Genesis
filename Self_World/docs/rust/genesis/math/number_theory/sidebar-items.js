@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["continued_fraction","crt","divisors","extended_gcd","factorize","gcd","is_prime","is_prime_mr","lcm","legendre","mod_inverse","mod_pow","solve_diophantine","totient"]};

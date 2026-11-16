@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.frontal_lobe.projects</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.frontal_lobe.html" class="white">frontal_lobe</a>.projects</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/projects.py">/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/projects.py</a></td></tr></table>
+    <p><span class="code">Mind&nbsp;projects&nbsp;—&nbsp;project&nbsp;creation,&nbsp;management,&nbsp;and&nbsp;notes.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.frontal_lobe.projects.html#ProjectsMixin">ProjectsMixin</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ProjectsMixin">class <strong>ProjectsMixin</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code">Mixin&nbsp;for&nbsp;:class:`Mind`&nbsp;—&nbsp;see&nbsp;module&nbsp;docstring.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ProjectsMixin-absorb_project_notes"><strong>absorb_project_notes</strong></a>(self, project_name: 'str | None' = None) -&gt; 'str'</dt><dd><span class="code">Read&nbsp;and&nbsp;absorb&nbsp;mentor&nbsp;notes&nbsp;from&nbsp;project(s).<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;how&nbsp;Genesis&nbsp;learns&nbsp;from&nbsp;feedback&nbsp;on&nbsp;its&nbsp;creative&nbsp;work.<br>
+It&nbsp;reads&nbsp;the&nbsp;NOTES.md&nbsp;file(s)&nbsp;from&nbsp;its&nbsp;projects,&nbsp;stores&nbsp;each<br>
+note&nbsp;as&nbsp;a&nbsp;long-term&nbsp;memory,&nbsp;adds&nbsp;what&nbsp;it&nbsp;learned&nbsp;to&nbsp;its<br>
+concept&nbsp;network,&nbsp;and&nbsp;emits&nbsp;a&nbsp;thought&nbsp;about&nbsp;what&nbsp;it&nbsp;learned.<br>
+The&nbsp;notes&nbsp;are&nbsp;cleared&nbsp;after&nbsp;absorption&nbsp;so&nbsp;it&nbsp;doesn't&nbsp;re-read<br>
+the&nbsp;same&nbsp;feedback.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;project_name:&nbsp;If&nbsp;given,&nbsp;absorb&nbsp;notes&nbsp;from&nbsp;just&nbsp;that&nbsp;project.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;None,&nbsp;absorb&nbsp;notes&nbsp;from&nbsp;all&nbsp;projects&nbsp;that&nbsp;have&nbsp;them.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;summary&nbsp;of&nbsp;what&nbsp;it&nbsp;absorbed,&nbsp;rendered&nbsp;through&nbsp;its<br>
+&nbsp;&nbsp;&nbsp;&nbsp;language&nbsp;engine.</span></dd></dl>
+
+<dl><dt><a name="ProjectsMixin-archive_project"><strong>archive_project</strong></a>(self, name: 'str') -&gt; 'bool'</dt><dd><span class="code">Archive&nbsp;a&nbsp;project&nbsp;to&nbsp;``.tar.zst``&nbsp;and&nbsp;reclaim&nbsp;its&nbsp;space.<br>
+&nbsp;<br>
+It&nbsp;has&nbsp;full&nbsp;autonomy&nbsp;over&nbsp;its&nbsp;project&nbsp;lifecycle.&nbsp;This<br>
+compresses&nbsp;the&nbsp;project&nbsp;into&nbsp;the&nbsp;archive&nbsp;directory&nbsp;and&nbsp;removes<br>
+the&nbsp;expanded&nbsp;files.</span></dd></dl>
+
+<dl><dt><a name="ProjectsMixin-create_project"><strong>create_project</strong></a>(self, description: 'str')</dt><dd><span class="code">Create&nbsp;a&nbsp;Python&nbsp;project&nbsp;from&nbsp;a&nbsp;description.<br>
+&nbsp;<br>
+Composes&nbsp;a&nbsp;real,&nbsp;queryable&nbsp;knowledge-base&nbsp;module&nbsp;from&nbsp;its<br>
+concept&nbsp;network&nbsp;—&nbsp;not&nbsp;a&nbsp;``print()``&nbsp;scaffold.&nbsp;It&nbsp;gathers<br>
+what&nbsp;it&nbsp;knows&nbsp;about&nbsp;the&nbsp;topic&nbsp;(concepts,&nbsp;definitions,&nbsp;typed<br>
+edges)&nbsp;and&nbsp;composes&nbsp;a&nbsp;working&nbsp;Python&nbsp;module&nbsp;that&nbsp;encodes&nbsp;that<br>
+knowledge,&nbsp;with&nbsp;matching&nbsp;tests.&nbsp;Falls&nbsp;back&nbsp;to&nbsp;a&nbsp;minimal<br>
+scaffold&nbsp;if&nbsp;it&nbsp;doesn't&nbsp;know&nbsp;enough&nbsp;about&nbsp;the&nbsp;topic.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;description:&nbsp;A&nbsp;natural-language&nbsp;description&nbsp;/&nbsp;topic.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;ProjectResult&nbsp;describing&nbsp;what&nbsp;was&nbsp;created.</span></dd></dl>
+
+<dl><dt><a name="ProjectsMixin-list_projects"><strong>list_projects</strong></a>(self) -&gt; 'list[dict]'</dt><dd><span class="code">List&nbsp;all&nbsp;projects&nbsp;Genesis&nbsp;has&nbsp;created.<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;list&nbsp;of&nbsp;dicts&nbsp;with&nbsp;name,&nbsp;path,&nbsp;file&nbsp;count,&nbsp;size&nbsp;in<br>
+bytes,&nbsp;and&nbsp;status&nbsp;("active"&nbsp;or&nbsp;"archived")&nbsp;for&nbsp;each&nbsp;project.<br>
+Active&nbsp;projects&nbsp;are&nbsp;expanded&nbsp;directories;&nbsp;archived&nbsp;projects<br>
+are&nbsp;compressed&nbsp;``.tar.zst``&nbsp;files.</span></dd></dl>
+
+<dl><dt><a name="ProjectsMixin-manage_projects"><strong>manage_projects</strong></a>(self) -&gt; 'list[str]'</dt><dd><span class="code">Autonomously&nbsp;manage&nbsp;project&nbsp;storage&nbsp;to&nbsp;stay&nbsp;within&nbsp;bounds.<br>
+&nbsp;<br>
+It&nbsp;reviews&nbsp;its&nbsp;own&nbsp;projects&nbsp;and&nbsp;archives&nbsp;ones&nbsp;that&nbsp;are&nbsp;too<br>
+large&nbsp;or&nbsp;too&nbsp;numerous.&nbsp;Returns&nbsp;the&nbsp;list&nbsp;of&nbsp;project&nbsp;names&nbsp;it<br>
+archived.</span></dd></dl>
+
+<dl><dt><a name="ProjectsMixin-note_project"><strong>note_project</strong></a>(self, project_name: 'str', note: 'str') -&gt; 'bool'</dt><dd><span class="code">Leave&nbsp;a&nbsp;mentor's&nbsp;note&nbsp;on&nbsp;one&nbsp;of&nbsp;Genesis's&nbsp;projects.<br>
+&nbsp;<br>
+The&nbsp;note&nbsp;is&nbsp;appended&nbsp;to&nbsp;``NOTES.md``&nbsp;in&nbsp;the&nbsp;project&nbsp;directory.<br>
+Genesis&nbsp;absorbs&nbsp;notes&nbsp;via&nbsp;``<a href="#ProjectsMixin-absorb_project_notes">absorb_project_notes</a>()``&nbsp;—&nbsp;it<br>
+reads&nbsp;them,&nbsp;stores&nbsp;them&nbsp;as&nbsp;long-term&nbsp;memory,&nbsp;and&nbsp;adds&nbsp;what&nbsp;it<br>
+learned&nbsp;to&nbsp;its&nbsp;concept&nbsp;network.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;project_name:&nbsp;The&nbsp;project&nbsp;to&nbsp;leave&nbsp;a&nbsp;note&nbsp;on.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;note:&nbsp;The&nbsp;feedback/explanation&nbsp;text.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;True&nbsp;if&nbsp;the&nbsp;note&nbsp;was&nbsp;written,&nbsp;False&nbsp;if&nbsp;the&nbsp;project&nbsp;doesn't&nbsp;exist.</span></dd></dl>
+
+<dl><dt><a name="ProjectsMixin-read_project_notes"><strong>read_project_notes</strong></a>(self, project_name: 'str') -&gt; 'str | None'</dt><dd><span class="code">Read&nbsp;the&nbsp;notes&nbsp;left&nbsp;on&nbsp;a&nbsp;project.<br>
+&nbsp;<br>
+Returns&nbsp;the&nbsp;raw&nbsp;notes&nbsp;text,&nbsp;or&nbsp;None&nbsp;if&nbsp;there&nbsp;are&nbsp;no&nbsp;notes.</span></dd></dl>
+
+<dl><dt><a name="ProjectsMixin-restore_project"><strong>restore_project</strong></a>(self, name: 'str') -&gt; 'bool'</dt><dd><span class="code">Restore&nbsp;an&nbsp;archived&nbsp;project&nbsp;from&nbsp;its&nbsp;``.tar.zst``&nbsp;archive.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>CHEM_NAMES</strong> = {0: 'dopamine', 1: 'serotonin', 2: 'norepinephrine', 3: 'acetylcholine', 4: 'gaba', 5: 'glutamate', 6: 'cortisol', 7: 'oxytocin', 8: 'endorphin', 9: 'histamine', ...}<br>
+<strong>EMOTIONAL_TAG_SIZE</strong> = 12<br>
+<strong>TYPE_CHECKING</strong> = False<br>
+<strong>logger</strong> = &lt;Logger Self_World.frontal_lobe.projects (WARNING)&gt;</td></tr></table>
+</body></html>

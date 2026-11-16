@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["write_gate_lines"],"struct":["AdaptiveGate","AutoSnapshot","GateSnapshot"]};

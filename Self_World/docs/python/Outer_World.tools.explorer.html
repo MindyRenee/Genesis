@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Outer_World.tools.explorer</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Outer_World.html" class="white">Outer_World</a>.<a href="Outer_World.tools.html" class="white">tools</a>.explorer</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Outer_World/tools/explorer.py">/home/mindyrenee/GenAnd/Genesis/Outer_World/tools/explorer.py</a></td></tr></table>
+    <p><span class="code">Filesystem&nbsp;exploration&nbsp;—&nbsp;Genesis's&nbsp;ability&nbsp;to&nbsp;explore&nbsp;local&nbsp;files.<br>
+&nbsp;<br>
+This&nbsp;module&nbsp;gives&nbsp;Genesis&nbsp;the&nbsp;ability&nbsp;to&nbsp;explore&nbsp;its&nbsp;own&nbsp;filesystem:<br>
+read&nbsp;files,&nbsp;traverse&nbsp;directories,&nbsp;and&nbsp;learn&nbsp;from&nbsp;what&nbsp;it&nbsp;finds.<br>
+&nbsp;<br>
+##&nbsp;Two&nbsp;kinds&nbsp;of&nbsp;access&nbsp;—&nbsp;looking&nbsp;vs.&nbsp;remembering<br>
+&nbsp;<br>
+Genesis&nbsp;reads&nbsp;*everything*&nbsp;—&nbsp;no&nbsp;file&nbsp;type&nbsp;is&nbsp;skipped:<br>
+&nbsp;<br>
+-&nbsp;**Text&nbsp;files**&nbsp;are&nbsp;read&nbsp;and&nbsp;learned:&nbsp;concepts&nbsp;are&nbsp;extracted&nbsp;into&nbsp;the<br>
+&nbsp;&nbsp;concept&nbsp;network&nbsp;(markdown&nbsp;headings,&nbsp;JSON&nbsp;keys,&nbsp;frequent&nbsp;terms).<br>
+-&nbsp;**Binary&nbsp;files**&nbsp;are&nbsp;read&nbsp;and&nbsp;catalogued:&nbsp;presence,&nbsp;size,&nbsp;hash,&nbsp;and<br>
+&nbsp;&nbsp;format&nbsp;are&nbsp;remembered&nbsp;—&nbsp;the&nbsp;content&nbsp;itself&nbsp;is&nbsp;not&nbsp;text-learnable.<br>
+-&nbsp;**Oversized&nbsp;files**&nbsp;are&nbsp;catalogued&nbsp;by&nbsp;presence&nbsp;and&nbsp;size;&nbsp;their&nbsp;first<br>
+&nbsp;&nbsp;``MAX_FILE_SIZE``&nbsp;bytes&nbsp;remain&nbsp;readable&nbsp;via&nbsp;``read_file``.<br>
+&nbsp;<br>
+``read_file``&nbsp;is&nbsp;the&nbsp;raw&nbsp;organ:&nbsp;it&nbsp;returns&nbsp;a&nbsp;file's&nbsp;actual&nbsp;content&nbsp;—<br>
+text&nbsp;or&nbsp;bytes&nbsp;—&nbsp;transiently,&nbsp;for&nbsp;anything&nbsp;inside&nbsp;the&nbsp;allowed&nbsp;roots,<br>
+including&nbsp;pseudo-fs&nbsp;files.&nbsp;It&nbsp;memorizes&nbsp;nothing:&nbsp;it&nbsp;is&nbsp;how&nbsp;she&nbsp;*looks*<br>
+at&nbsp;a&nbsp;file,&nbsp;as&nbsp;opposed&nbsp;to&nbsp;how&nbsp;she&nbsp;*remembers*&nbsp;one.<br>
+&nbsp;<br>
+##&nbsp;Scope<br>
+&nbsp;<br>
+Read&nbsp;scope&nbsp;is&nbsp;the&nbsp;whole&nbsp;filesystem&nbsp;by&nbsp;default&nbsp;(owner-granted),&nbsp;narrowed<br>
+by&nbsp;``GENESIS_EXPLORE_ROOTS``&nbsp;or&nbsp;an&nbsp;explicit&nbsp;``allowed_roots``.&nbsp;Symlinks<br>
+are&nbsp;resolved&nbsp;before&nbsp;the&nbsp;scope&nbsp;check,&nbsp;so&nbsp;a&nbsp;link&nbsp;inside&nbsp;an&nbsp;allowed&nbsp;root<br>
+cannot&nbsp;reach&nbsp;outside&nbsp;it.&nbsp;Pseudo-filesystems&nbsp;(/proc,&nbsp;/sys,&nbsp;...)&nbsp;are&nbsp;not<br>
+walked&nbsp;or&nbsp;memorized&nbsp;—&nbsp;they&nbsp;are&nbsp;kernel&nbsp;interfaces,&nbsp;not&nbsp;documents&nbsp;—&nbsp;but<br>
+remain&nbsp;readable&nbsp;through&nbsp;``read_file``.&nbsp;File&nbsp;size&nbsp;is&nbsp;capped&nbsp;to&nbsp;prevent<br>
+memory&nbsp;issues.<br>
+&nbsp;<br>
+##&nbsp;Integration<br>
+&nbsp;<br>
+The&nbsp;<a href="#Explorer">Explorer</a>&nbsp;works&nbsp;alongside&nbsp;the&nbsp;CodeLearner&nbsp;(which&nbsp;does&nbsp;deep&nbsp;AST<br>
+analysis&nbsp;of&nbsp;source&nbsp;code)&nbsp;by&nbsp;handling&nbsp;non-code&nbsp;files:&nbsp;markdown,<br>
+documentation,&nbsp;configuration,&nbsp;plain&nbsp;text,&nbsp;and&nbsp;binary&nbsp;artefacts.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="hashlib.html">hashlib</a><br>
+<a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="math.html">math</a><br>
+<a href="os.html">os</a><br>
+</td><td class="multicolumn"><a href="re.html">re</a><br>
+<a href="time.html">time</a><br>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Outer_World.tools.explorer.html#ExplorationResult">ExplorationResult</a>
+</dt><dt class="heading-text"><a href="Outer_World.tools.explorer.html#Explorer">Explorer</a>
+</dt><dt class="heading-text"><a href="Outer_World.tools.explorer.html#FileExplorationResult">FileExplorationResult</a>
+</dt><dt class="heading-text"><a href="Outer_World.tools.explorer.html#FileRead">FileRead</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ExplorationResult">class <strong>ExplorationResult</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ExplorationResult">ExplorationResult</a>(files_explored:&nbsp;'int',&nbsp;concepts_added:&nbsp;'int',&nbsp;relationships_added:&nbsp;'int',&nbsp;file_results:&nbsp;'list[<a href="#FileExplorationResult">FileExplorationResult</a>]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;directories_visited:&nbsp;'int'&nbsp;=&nbsp;0)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Result&nbsp;of&nbsp;exploring&nbsp;a&nbsp;directory&nbsp;tree.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ExplorationResult-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="ExplorationResult-__init__"><strong>__init__</strong></a>(self, files_explored: 'int', concepts_added: 'int', relationships_added: 'int', file_results: 'list[FileExplorationResult]' = &lt;factory&gt;, directories_visited: 'int' = 0) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="ExplorationResult-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>concepts_added</strong></dt>
+</dl>
+<dl><dt><strong>directories_visited</strong></dt>
+</dl>
+<dl><dt><strong>file_results</strong></dt>
+</dl>
+<dl><dt><strong>files_explored</strong></dt>
+</dl>
+<dl><dt><strong>relationships_added</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'concepts_added': 'int', 'directories_visited': 'int', 'file_results': 'list[FileExplorationResult]', 'files_explored': 'int', 'relationships_added': 'int'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'concepts_added': Field(name='concepts_added',type='int',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD), 'directories_visited': Field(name='directories_visited',type='int',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'file_results': Field(name='file_results',type='list[FileExplora...appingproxy({}),kw_only=False,_field_type=_FIELD), 'files_explored': Field(name='files_explored',type='int',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD), 'relationships_added': Field(name='relationships_added',type='int',defa...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('files_explored', 'concepts_added', 'relationships_added', 'file_results', 'directories_visited')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Explorer">class <strong>Explorer</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Explorer">Explorer</a>(network:&nbsp;'ConceptNetwork',&nbsp;project_root:&nbsp;'str'&nbsp;=&nbsp;'.',&nbsp;client=None,&nbsp;allowed_roots:&nbsp;'list[str]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Genesis's&nbsp;filesystem&nbsp;exploration&nbsp;system.<br>
+&nbsp;<br>
+Reads&nbsp;and&nbsp;learns&nbsp;from&nbsp;text&nbsp;files&nbsp;anywhere&nbsp;in&nbsp;the&nbsp;allowed&nbsp;roots&nbsp;—<br>
+documentation,&nbsp;configuration,&nbsp;notes,&nbsp;and&nbsp;other&nbsp;non-code&nbsp;text.<br>
+Code&nbsp;files&nbsp;are&nbsp;handled&nbsp;by&nbsp;CodeLearner;&nbsp;this&nbsp;module&nbsp;handles&nbsp;everything&nbsp;else.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;network:&nbsp;The&nbsp;concept&nbsp;network&nbsp;to&nbsp;add&nbsp;concepts&nbsp;to.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;project_root:&nbsp;Root&nbsp;directory&nbsp;that&nbsp;relative&nbsp;paths&nbsp;resolve&nbsp;against.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;client:&nbsp;Optional&nbsp;GenesisClient&nbsp;for&nbsp;storing&nbsp;exploration&nbsp;memories.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;allowed_roots:&nbsp;Read&nbsp;scope.&nbsp;Defaults&nbsp;to&nbsp;the&nbsp;project&nbsp;root;&nbsp;pass<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;``<a href="#-default_allowed_roots">default_allowed_roots</a>()``&nbsp;for&nbsp;the&nbsp;deployment-wide&nbsp;scope<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(``GENESIS_EXPLORE_ROOTS``,&nbsp;else&nbsp;the&nbsp;whole&nbsp;filesystem).<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Explorer-__init__"><strong>__init__</strong></a>(self, network: 'ConceptNetwork', project_root: 'str' = '.', client=None, allowed_roots: 'list[str] | None' = None) -&gt; 'None'</dt><dd><span class="code">Bind&nbsp;to&nbsp;a&nbsp;concept&nbsp;network&nbsp;and&nbsp;prepare&nbsp;filesystem&nbsp;exploration&nbsp;state.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;network:&nbsp;The&nbsp;concept&nbsp;network&nbsp;to&nbsp;add&nbsp;explored&nbsp;concepts&nbsp;to.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;project_root:&nbsp;Root&nbsp;directory&nbsp;to&nbsp;explore&nbsp;from&nbsp;—&nbsp;also&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;default&nbsp;scope&nbsp;when&nbsp;``allowed_roots``&nbsp;is&nbsp;not&nbsp;given.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;client:&nbsp;Optional&nbsp;GenesisClient&nbsp;for&nbsp;storing&nbsp;exploration&nbsp;memories.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;allowed_roots:&nbsp;Everywhere&nbsp;she&nbsp;may&nbsp;read.</span></dd></dl>
+
+<dl><dt><a name="Explorer-explore_directory"><strong>explore_directory</strong></a>(self, path: 'str | None' = None, max_files: 'int' = 50) -&gt; 'ExplorationResult'</dt><dd><span class="code">Explore&nbsp;a&nbsp;directory&nbsp;tree,&nbsp;learning&nbsp;from&nbsp;every&nbsp;file&nbsp;it&nbsp;finds.<br>
+&nbsp;<br>
+Walks&nbsp;the&nbsp;directory&nbsp;and&nbsp;visits&nbsp;every&nbsp;file:&nbsp;text&nbsp;is&nbsp;learned,<br>
+binaries&nbsp;and&nbsp;oversized&nbsp;files&nbsp;are&nbsp;catalogued.&nbsp;Nothing&nbsp;in&nbsp;scope<br>
+is&nbsp;skipped.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;path:&nbsp;Subdirectory&nbsp;to&nbsp;explore&nbsp;(relative&nbsp;to&nbsp;project_root).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;None,&nbsp;explores&nbsp;the&nbsp;whole&nbsp;project&nbsp;root.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;max_files:&nbsp;Maximum&nbsp;number&nbsp;of&nbsp;files&nbsp;to&nbsp;explore.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Summary&nbsp;of&nbsp;what&nbsp;was&nbsp;learned.</span></dd></dl>
+
+<dl><dt><a name="Explorer-explore_file"><strong>explore_file</strong></a>(self, filepath: 'str') -&gt; 'FileExplorationResult | None'</dt><dd><span class="code">Read&nbsp;and&nbsp;learn&nbsp;from&nbsp;a&nbsp;single&nbsp;file&nbsp;—&nbsp;no&nbsp;file&nbsp;type&nbsp;is&nbsp;skipped.<br>
+&nbsp;<br>
+Text&nbsp;is&nbsp;learned&nbsp;into&nbsp;the&nbsp;concept&nbsp;network;&nbsp;binaries&nbsp;and<br>
+oversized&nbsp;files&nbsp;are&nbsp;catalogued&nbsp;by&nbsp;presence,&nbsp;size,&nbsp;hash,&nbsp;and<br>
+format.&nbsp;The&nbsp;raw&nbsp;content&nbsp;of&nbsp;any&nbsp;file&nbsp;remains&nbsp;available&nbsp;via<br>
+``read_file``.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;filepath:&nbsp;Path&nbsp;to&nbsp;the&nbsp;file&nbsp;to&nbsp;explore.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;What&nbsp;was&nbsp;learned,&nbsp;or&nbsp;None&nbsp;if&nbsp;the&nbsp;file&nbsp;is&nbsp;out&nbsp;of&nbsp;scope,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;missing,&nbsp;or&nbsp;unreadable.</span></dd></dl>
+
+<dl><dt><a name="Explorer-explore_path"><strong>explore_path</strong></a>(self, path: 'str') -&gt; 'str'</dt><dd><span class="code">Explore&nbsp;a&nbsp;specific&nbsp;file&nbsp;or&nbsp;directory&nbsp;and&nbsp;return&nbsp;a&nbsp;human-readable&nbsp;summary.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;user-facing&nbsp;method&nbsp;for&nbsp;guided&nbsp;exploration.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;path:&nbsp;Path&nbsp;to&nbsp;explore&nbsp;—&nbsp;relative&nbsp;to&nbsp;project_root&nbsp;or<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;absolute&nbsp;within&nbsp;the&nbsp;allowed&nbsp;roots.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Human-readable&nbsp;summary&nbsp;of&nbsp;what&nbsp;was&nbsp;found.</span></dd></dl>
+
+<dl><dt><a name="Explorer-get_exploration_summary"><strong>get_exploration_summary</strong></a>(self) -&gt; 'dict'</dt><dd><span class="code">Return&nbsp;a&nbsp;summary&nbsp;of&nbsp;exploration&nbsp;state.</span></dd></dl>
+
+<dl><dt><a name="Explorer-read_file"><strong>read_file</strong></a>(self, filepath: 'str') -&gt; 'FileRead | None'</dt><dd><span class="code">Read&nbsp;a&nbsp;file's&nbsp;actual&nbsp;content&nbsp;—&nbsp;text&nbsp;or&nbsp;bytes&nbsp;—&nbsp;without&nbsp;learning&nbsp;it.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;raw&nbsp;organ:&nbsp;anything&nbsp;inside&nbsp;the&nbsp;allowed&nbsp;roots&nbsp;can&nbsp;be<br>
+looked&nbsp;at&nbsp;—&nbsp;binaries,&nbsp;dotfiles,&nbsp;even&nbsp;pseudo-fs&nbsp;entries.<br>
+Nothing&nbsp;read&nbsp;here&nbsp;is&nbsp;committed&nbsp;to&nbsp;the&nbsp;concept&nbsp;network<br>
+or&nbsp;remembered;&nbsp;it&nbsp;is&nbsp;a&nbsp;transient&nbsp;look,&nbsp;not&nbsp;a&nbsp;memory.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;filepath:&nbsp;Path&nbsp;to&nbsp;the&nbsp;file&nbsp;(absolute,&nbsp;or&nbsp;resolved&nbsp;relative<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;to&nbsp;project_root).<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;<a href="#FileRead">FileRead</a>&nbsp;with&nbsp;the&nbsp;content,&nbsp;or&nbsp;None&nbsp;if&nbsp;the&nbsp;path&nbsp;is&nbsp;out&nbsp;of<br>
+&nbsp;&nbsp;&nbsp;&nbsp;scope,&nbsp;missing,&nbsp;not&nbsp;a&nbsp;regular&nbsp;file,&nbsp;or&nbsp;unreadable.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="FileExplorationResult">class <strong>FileExplorationResult</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#FileExplorationResult">FileExplorationResult</a>(filepath:&nbsp;'str',&nbsp;file_type:&nbsp;'str',&nbsp;lines:&nbsp;'int',&nbsp;concepts_added:&nbsp;'int',&nbsp;relationships_added:&nbsp;'int',&nbsp;summary:&nbsp;'str')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Result&nbsp;of&nbsp;exploring&nbsp;a&nbsp;single&nbsp;file.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="FileExplorationResult-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="FileExplorationResult-__init__"><strong>__init__</strong></a>(self, filepath: 'str', file_type: 'str', lines: 'int', concepts_added: 'int', relationships_added: 'int', summary: 'str') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="FileExplorationResult-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>concepts_added</strong></dt>
+</dl>
+<dl><dt><strong>file_type</strong></dt>
+</dl>
+<dl><dt><strong>filepath</strong></dt>
+</dl>
+<dl><dt><strong>lines</strong></dt>
+</dl>
+<dl><dt><strong>relationships_added</strong></dt>
+</dl>
+<dl><dt><strong>summary</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'concepts_added': 'int', 'file_type': 'str', 'filepath': 'str', 'lines': 'int', 'relationships_added': 'int', 'summary': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'concepts_added': Field(name='concepts_added',type='int',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD), 'file_type': Field(name='file_type',type='str',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'filepath': Field(name='filepath',type='str',default=&lt;datacl...appingproxy({}),kw_only=False,_field_type=_FIELD), 'lines': Field(name='lines',type='int',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD), 'relationships_added': Field(name='relationships_added',type='int',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'summary': Field(name='summary',type='str',default=&lt;datacla...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('filepath', 'file_type', 'lines', 'concepts_added', 'relationships_added', 'summary')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="FileRead">class <strong>FileRead</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#FileRead">FileRead</a>(filepath:&nbsp;'str',&nbsp;size:&nbsp;'int',&nbsp;is_binary:&nbsp;'bool',&nbsp;truncated:&nbsp;'bool',&nbsp;content:&nbsp;'str&nbsp;|&nbsp;bytes',&nbsp;sha256:&nbsp;'str')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;raw,&nbsp;transient&nbsp;read&nbsp;of&nbsp;a&nbsp;file&nbsp;—&nbsp;the&nbsp;organ's&nbsp;look,&nbsp;not&nbsp;a&nbsp;memory.<br>
+&nbsp;<br>
+Nothing&nbsp;in&nbsp;a&nbsp;<a href="#FileRead">FileRead</a>&nbsp;is&nbsp;committed&nbsp;to&nbsp;the&nbsp;concept&nbsp;network;&nbsp;it&nbsp;is<br>
+what&nbsp;``read_file``&nbsp;hands&nbsp;back&nbsp;when&nbsp;Genesis&nbsp;looks&nbsp;at&nbsp;a&nbsp;file&nbsp;directly.<br>
+&nbsp;<br>
+Attributes:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;filepath:&nbsp;resolved&nbsp;path&nbsp;that&nbsp;was&nbsp;read.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;size:&nbsp;file&nbsp;size&nbsp;in&nbsp;bytes.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;is_binary:&nbsp;True&nbsp;when&nbsp;the&nbsp;content&nbsp;is&nbsp;not&nbsp;UTF-8&nbsp;text.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;truncated:&nbsp;True&nbsp;when&nbsp;only&nbsp;the&nbsp;first&nbsp;``MAX_FILE_SIZE``&nbsp;bytes<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;were&nbsp;read.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;content:&nbsp;decoded&nbsp;text&nbsp;(str)&nbsp;or&nbsp;raw&nbsp;bytes.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;sha256:&nbsp;hex&nbsp;digest&nbsp;of&nbsp;the&nbsp;bytes&nbsp;actually&nbsp;read.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="FileRead-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="FileRead-__init__"><strong>__init__</strong></a>(self, filepath: 'str', size: 'int', is_binary: 'bool', truncated: 'bool', content: 'str | bytes', sha256: 'str') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="FileRead-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>content</strong></dt>
+</dl>
+<dl><dt><strong>filepath</strong></dt>
+</dl>
+<dl><dt><strong>is_binary</strong></dt>
+</dl>
+<dl><dt><strong>sha256</strong></dt>
+</dl>
+<dl><dt><strong>size</strong></dt>
+</dl>
+<dl><dt><strong>truncated</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'content': 'str | bytes', 'filepath': 'str', 'is_binary': 'bool', 'sha256': 'str', 'size': 'int', 'truncated': 'bool'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'content': Field(name='content',type='str | bytes',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'filepath': Field(name='filepath',type='str',default=&lt;datacl...appingproxy({}),kw_only=False,_field_type=_FIELD), 'is_binary': Field(name='is_binary',type='bool',default=&lt;data...appingproxy({}),kw_only=False,_field_type=_FIELD), 'sha256': Field(name='sha256',type='str',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD), 'size': Field(name='size',type='int',default=&lt;dataclasse...appingproxy({}),kw_only=False,_field_type=_FIELD), 'truncated': Field(name='truncated',type='bool',default=&lt;data...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('filepath', 'size', 'is_binary', 'truncated', 'content', 'sha256')</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-default_allowed_roots"><strong>default_allowed_roots</strong></a>() -&gt; 'list[str]'</dt><dd><span class="code">Read&nbsp;scope&nbsp;for&nbsp;the&nbsp;explorer.<br>
+&nbsp;<br>
+Whole&nbsp;filesystem&nbsp;by&nbsp;default&nbsp;(``.``-denylist&nbsp;rules&nbsp;still&nbsp;apply).<br>
+``GENESIS_EXPLORE_ROOTS``&nbsp;(os.pathsep-separated)&nbsp;narrows&nbsp;it&nbsp;for<br>
+deployments&nbsp;that&nbsp;want&nbsp;her&nbsp;confinement&nbsp;back.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>MAX_CONCEPTS_PER_FILE</strong> = 50<br>
+<strong>MAX_FILE_SIZE</strong> = 262144<br>
+<strong>__annotations__</strong> = {'_MAGIC_FORMATS': 'tuple[tuple[bytes, str], ...]'}<br>
+<strong>logger</strong> = &lt;Logger Outer_World.tools.explorer (WARNING)&gt;</td></tr></table>
+</body></html>

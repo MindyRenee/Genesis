@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.temporal_lobe.concepts.archival</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.temporal_lobe.html" class="white">temporal_lobe</a>.<a href="Self_World.temporal_lobe.concepts.html" class="white">concepts</a>.archival</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/concepts/archival.py">/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/concepts/archival.py</a></td></tr></table>
+    <p><span class="code">Concept&nbsp;archive&nbsp;—&nbsp;long-term&nbsp;spill/recall&nbsp;to&nbsp;cold&nbsp;storage.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="sqlite3.html">sqlite3</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.concepts.archival.html#ArchivalMixin">ArchivalMixin</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ArchivalMixin">class <strong>ArchivalMixin</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code">Mixin&nbsp;for&nbsp;:class:`ConceptNetwork`&nbsp;—&nbsp;see&nbsp;module&nbsp;docstring.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ArchivalMixin-attach_archive"><strong>attach_archive</strong></a>(self, archive: 'Any') -&gt; 'None'</dt><dd><span class="code">Attach&nbsp;a&nbsp;long-term&nbsp;memory&nbsp;archive&nbsp;to&nbsp;this&nbsp;network.<br>
+&nbsp;<br>
+Once&nbsp;attached,&nbsp;dormant&nbsp;concepts&nbsp;are&nbsp;spilled&nbsp;to&nbsp;the&nbsp;archive<br>
+instead&nbsp;of&nbsp;being&nbsp;pruned.&nbsp;Spilled&nbsp;concepts&nbsp;can&nbsp;be&nbsp;recalled<br>
+transparently&nbsp;via&nbsp;``_resolve``&nbsp;/&nbsp;``get_concept``.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;archive:&nbsp;A&nbsp;``ConceptArchive``&nbsp;instance.</span></dd></dl>
+
+<dl><dt><a name="ArchivalMixin-dedupe_archive"><strong>dedupe_archive</strong></a>(self) -&gt; 'int'</dt><dd><span class="code">Drop&nbsp;archive&nbsp;rows&nbsp;for&nbsp;concepts&nbsp;present&nbsp;in&nbsp;working&nbsp;memory.<br>
+&nbsp;<br>
+The&nbsp;archive's&nbsp;invariant&nbsp;is&nbsp;"dormant&nbsp;concepts&nbsp;live&nbsp;here&nbsp;instead<br>
+of&nbsp;working&nbsp;memory."&nbsp;That&nbsp;invariant&nbsp;breaks&nbsp;when&nbsp;a&nbsp;save&nbsp;file<br>
+written&nbsp;before&nbsp;a&nbsp;spill&nbsp;(autosave&nbsp;cadence,&nbsp;or&nbsp;a&nbsp;SIGKILL&nbsp;between<br>
+spill&nbsp;and&nbsp;save)&nbsp;is&nbsp;restored:&nbsp;the&nbsp;concept&nbsp;re-enters&nbsp;working<br>
+memory&nbsp;via&nbsp;the&nbsp;scratch-network&nbsp;transplant,&nbsp;which&nbsp;bypasses<br>
+``add_concept``'s&nbsp;archive&nbsp;check,&nbsp;and&nbsp;the&nbsp;stale&nbsp;archive&nbsp;row&nbsp;is<br>
+never&nbsp;cleaned&nbsp;because&nbsp;every&nbsp;lookup&nbsp;finds&nbsp;the&nbsp;hot&nbsp;concept&nbsp;first.<br>
+&nbsp;<br>
+Call&nbsp;after&nbsp;state&nbsp;restore.&nbsp;Working&nbsp;memory&nbsp;always&nbsp;wins&nbsp;—&nbsp;the<br>
+archived&nbsp;copy&nbsp;is&nbsp;by&nbsp;definition&nbsp;older.&nbsp;Returns&nbsp;the&nbsp;number&nbsp;of<br>
+stale&nbsp;rows&nbsp;removed.</span></dd></dl>
+
+<dl><dt><a name="ArchivalMixin-has_concept_anywhere"><strong>has_concept_anywhere</strong></a>(self, cid: 'str') -&gt; 'bool'</dt><dd><span class="code">Check&nbsp;if&nbsp;a&nbsp;concept&nbsp;ID&nbsp;exists&nbsp;in&nbsp;working&nbsp;memory&nbsp;OR&nbsp;the&nbsp;archive.<br>
+&nbsp;<br>
+Unlike&nbsp;:meth:`has_concept`&nbsp;(which&nbsp;only&nbsp;checks&nbsp;working&nbsp;memory),<br>
+this&nbsp;also&nbsp;checks&nbsp;the&nbsp;long-term&nbsp;archive&nbsp;—&nbsp;but&nbsp;WITHOUT&nbsp;recalling<br>
+the&nbsp;concept.&nbsp;Use&nbsp;this&nbsp;when&nbsp;you&nbsp;need&nbsp;to&nbsp;know&nbsp;if&nbsp;a&nbsp;concept&nbsp;is<br>
+known&nbsp;anywhere&nbsp;in&nbsp;the&nbsp;system&nbsp;without&nbsp;the&nbsp;side&nbsp;effect&nbsp;of<br>
+pulling&nbsp;it&nbsp;back&nbsp;into&nbsp;working&nbsp;memory.</span></dd></dl>
+
+<dl><dt><a name="ArchivalMixin-merge_concepts"><strong>merge_concepts</strong></a>(self, winner: 'str', loser: 'str') -&gt; 'bool'</dt><dd><span class="code">Merge&nbsp;two&nbsp;concepts&nbsp;into&nbsp;one,&nbsp;preserving&nbsp;everything&nbsp;learned.<br>
+&nbsp;<br>
+Near-duplicate&nbsp;concepts&nbsp;—&nbsp;one&nbsp;idea&nbsp;learned&nbsp;under&nbsp;two&nbsp;surface<br>
+forms&nbsp;("rust&nbsp;language"&nbsp;/&nbsp;"rust&nbsp;lang")&nbsp;—&nbsp;split&nbsp;each&nbsp;other's<br>
+neighborhood:&nbsp;edges&nbsp;accumulate&nbsp;on&nbsp;both,&nbsp;embeddings&nbsp;dilute,&nbsp;and<br>
+every&nbsp;sweep&nbsp;treats&nbsp;them&nbsp;as&nbsp;distinct.&nbsp;This&nbsp;consolidates&nbsp;the<br>
+loser&nbsp;into&nbsp;the&nbsp;winner:<br>
+&nbsp;<br>
+1.&nbsp;The&nbsp;loser&nbsp;and&nbsp;its&nbsp;edges&nbsp;are&nbsp;archived&nbsp;first&nbsp;—&nbsp;archive-backed<br>
+&nbsp;&nbsp;&nbsp;forgetting,&nbsp;never&nbsp;deletion.<br>
+2.&nbsp;Its&nbsp;edges&nbsp;retarget&nbsp;onto&nbsp;the&nbsp;winner;&nbsp;winner↔loser&nbsp;edges<br>
+&nbsp;&nbsp;&nbsp;become&nbsp;self-loops&nbsp;and&nbsp;drop;&nbsp;genuine&nbsp;overlaps&nbsp;strengthen<br>
+&nbsp;&nbsp;&nbsp;through&nbsp;``add_edge``'s&nbsp;dedup.<br>
+3.&nbsp;The&nbsp;loser's&nbsp;names&nbsp;(its&nbsp;canonical&nbsp;id&nbsp;and&nbsp;aliases)&nbsp;absorb<br>
+&nbsp;&nbsp;&nbsp;into&nbsp;the&nbsp;winner&nbsp;so&nbsp;every&nbsp;learned&nbsp;surface&nbsp;form&nbsp;still<br>
+&nbsp;&nbsp;&nbsp;resolves.<br>
+4.&nbsp;Confidence&nbsp;takes&nbsp;the&nbsp;max;&nbsp;missing&nbsp;winner&nbsp;properties&nbsp;fill<br>
+&nbsp;&nbsp;&nbsp;from&nbsp;the&nbsp;loser.<br>
+&nbsp;<br>
+Returns&nbsp;False&nbsp;when&nbsp;either&nbsp;name&nbsp;fails&nbsp;to&nbsp;resolve&nbsp;to&nbsp;a&nbsp;live<br>
+concept,&nbsp;when&nbsp;both&nbsp;resolve&nbsp;to&nbsp;the&nbsp;same&nbsp;node,&nbsp;or&nbsp;when&nbsp;no<br>
+archive&nbsp;is&nbsp;attached&nbsp;—&nbsp;merging&nbsp;without&nbsp;one&nbsp;would&nbsp;be&nbsp;outright<br>
+deletion,&nbsp;and&nbsp;this&nbsp;system&nbsp;archives,&nbsp;it&nbsp;never&nbsp;silently&nbsp;drops<br>
+knowledge.</span></dd></dl>
+
+<dl><dt><a name="ArchivalMixin-purge_archived_concepts"><strong>purge_archived_concepts</strong></a>(self, concept_ids: 'list[str]') -&gt; 'int'</dt><dd><span class="code">Permanently&nbsp;remove&nbsp;selected&nbsp;concepts&nbsp;from&nbsp;long-term&nbsp;archive.</span></dd></dl>
+
+<dl><dt><a name="ArchivalMixin-restore_archive_to_working_memory"><strong>restore_archive_to_working_memory</strong></a>(self) -&gt; 'int'</dt><dd><span class="code">Recall&nbsp;ALL&nbsp;archived&nbsp;concepts&nbsp;back&nbsp;into&nbsp;working&nbsp;memory.<br>
+&nbsp;<br>
+Migrates&nbsp;every&nbsp;concept&nbsp;from&nbsp;the&nbsp;long-term&nbsp;archive&nbsp;back&nbsp;into<br>
+the&nbsp;in-memory&nbsp;network.&nbsp;This&nbsp;is&nbsp;the&nbsp;inverse&nbsp;of<br>
+:meth:`spill_dormant`&nbsp;—&nbsp;it&nbsp;loads&nbsp;the&nbsp;entire&nbsp;archive&nbsp;into&nbsp;RAM.<br>
+&nbsp;<br>
+Use&nbsp;this&nbsp;when&nbsp;you&nbsp;need&nbsp;the&nbsp;full&nbsp;concept&nbsp;network&nbsp;in&nbsp;working<br>
+memory&nbsp;(e.g.,&nbsp;before&nbsp;a&nbsp;bulk&nbsp;analysis&nbsp;pass,&nbsp;or&nbsp;to&nbsp;reset&nbsp;the<br>
+working/archive&nbsp;split).&nbsp;After&nbsp;this&nbsp;call,&nbsp;the&nbsp;archive&nbsp;will&nbsp;be<br>
+empty&nbsp;and&nbsp;all&nbsp;concepts&nbsp;will&nbsp;be&nbsp;in&nbsp;working&nbsp;memory.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;number&nbsp;of&nbsp;concepts&nbsp;recalled&nbsp;from&nbsp;the&nbsp;archive.</span></dd></dl>
+
+<dl><dt><a name="ArchivalMixin-spill_dormant"><strong>spill_dormant</strong></a>(self, activation_threshold: 'float' = 0.01, protected_origins: 'frozenset[str] | None' = None, max_in_memory: 'int' = 15000) -&gt; 'int'</dt><dd><span class="code">Spill&nbsp;dormant&nbsp;concepts&nbsp;from&nbsp;working&nbsp;memory&nbsp;to&nbsp;the&nbsp;long-term&nbsp;archive.<br>
+&nbsp;<br>
+A&nbsp;concept&nbsp;is&nbsp;spillable&nbsp;if&nbsp;ALL&nbsp;of:<br>
+-&nbsp;activation&nbsp;&lt;&nbsp;``activation_threshold``&nbsp;(dormant&nbsp;—&nbsp;not&nbsp;recently&nbsp;used)<br>
+-&nbsp;origin&nbsp;not&nbsp;in&nbsp;``protected_origins``&nbsp;(structural&nbsp;seeds&nbsp;are&nbsp;kept)<br>
+-&nbsp;review_count&nbsp;==&nbsp;0&nbsp;(never&nbsp;reviewed&nbsp;via&nbsp;spaced&nbsp;repetition)<br>
+&nbsp;<br>
+Concepts&nbsp;are&nbsp;spilled&nbsp;in&nbsp;ascending&nbsp;order&nbsp;of&nbsp;activation&nbsp;(most<br>
+dormant&nbsp;first)&nbsp;until&nbsp;the&nbsp;in-memory&nbsp;network&nbsp;is&nbsp;at&nbsp;or&nbsp;below<br>
+``max_in_memory``&nbsp;concepts.<br>
+&nbsp;<br>
+Edges&nbsp;involving&nbsp;spilled&nbsp;concepts&nbsp;are&nbsp;also&nbsp;archived&nbsp;in&nbsp;the<br>
+``archived_edges``&nbsp;table.&nbsp;They&nbsp;stay&nbsp;in&nbsp;working&nbsp;memory&nbsp;too<br>
+(for&nbsp;fast&nbsp;traversal&nbsp;by&nbsp;hot&nbsp;concepts),&nbsp;but&nbsp;the&nbsp;archive&nbsp;copy<br>
+survives&nbsp;if&nbsp;the&nbsp;working-memory&nbsp;edge&nbsp;is&nbsp;later&nbsp;pruned&nbsp;during<br>
+sleep&nbsp;consolidation&nbsp;or&nbsp;edge&nbsp;cleanup.<br>
+&nbsp;<br>
+Returns&nbsp;the&nbsp;number&nbsp;of&nbsp;concepts&nbsp;spilled.&nbsp;Returns&nbsp;0&nbsp;if&nbsp;no<br>
+archive&nbsp;is&nbsp;attached,&nbsp;or&nbsp;if&nbsp;working&nbsp;memory&nbsp;is&nbsp;already&nbsp;within<br>
+budget.<br>
+&nbsp;<br>
+"Under&nbsp;budget"&nbsp;and&nbsp;"nothing&nbsp;was&nbsp;dormant"&nbsp;both&nbsp;return&nbsp;0,&nbsp;so&nbsp;this<br>
+logs&nbsp;which&nbsp;one&nbsp;applied&nbsp;at&nbsp;DEBUG.&nbsp;Without&nbsp;that,&nbsp;a&nbsp;caller&nbsp;reading<br>
+only&nbsp;the&nbsp;return&nbsp;value&nbsp;cannot&nbsp;distinguish&nbsp;healthy&nbsp;idleness&nbsp;from&nbsp;a<br>
+spill&nbsp;that&nbsp;silently&nbsp;does&nbsp;nothing&nbsp;—&nbsp;which&nbsp;is&nbsp;how&nbsp;"archived&nbsp;is<br>
+zero"&nbsp;read&nbsp;as&nbsp;a&nbsp;fact&nbsp;about&nbsp;the&nbsp;system&nbsp;rather&nbsp;than&nbsp;a&nbsp;symptom.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>all_concept_ids</strong></dt>
+<dd><span class="code">All&nbsp;concept&nbsp;IDs&nbsp;across&nbsp;working&nbsp;memory&nbsp;AND&nbsp;the&nbsp;archive.<br>
+&nbsp;<br>
+Unlike&nbsp;:attr:`concept_ids`&nbsp;(working&nbsp;memory&nbsp;only),&nbsp;this<br>
+includes&nbsp;dormant&nbsp;concepts&nbsp;spilled&nbsp;to&nbsp;the&nbsp;long-term&nbsp;archive.<br>
+Useful&nbsp;for&nbsp;diagnostics,&nbsp;deduplication&nbsp;checks,&nbsp;and&nbsp;any&nbsp;code<br>
+that&nbsp;needs&nbsp;the&nbsp;complete&nbsp;set&nbsp;of&nbsp;known&nbsp;concepts.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>TYPE_CHECKING</strong> = False<br>
+<strong>logger</strong> = &lt;Logger Self_World.temporal_lobe.concepts.archival (WARNING)&gt;</td></tr></table>
+</body></html>

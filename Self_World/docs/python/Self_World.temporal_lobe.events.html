@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.temporal_lobe.events</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.temporal_lobe.html" class="white">temporal_lobe</a>.events</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/events.py">/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/events.py</a></td></tr></table>
+    <p><span class="code">External&nbsp;events&nbsp;—&nbsp;the&nbsp;stream&nbsp;of&nbsp;things&nbsp;happening&nbsp;in&nbsp;Genesis's&nbsp;world.<br>
+&nbsp;<br>
+The&nbsp;external&nbsp;world&nbsp;is&nbsp;modeled&nbsp;as&nbsp;a&nbsp;bounded&nbsp;stream&nbsp;of&nbsp;``<a href="#ExternalEvent">ExternalEvent</a>``s<br>
+flowing&nbsp;in&nbsp;both&nbsp;directions:<br>
+&nbsp;<br>
+-&nbsp;**Inbound**&nbsp;—&nbsp;the&nbsp;world&nbsp;acts&nbsp;on&nbsp;it:&nbsp;someone&nbsp;speaks&nbsp;to&nbsp;it,&nbsp;someone<br>
+&nbsp;&nbsp;speaks&nbsp;near&nbsp;it,&nbsp;a&nbsp;percept&nbsp;arrives,&nbsp;a&nbsp;presence&nbsp;enters&nbsp;or&nbsp;leaves.<br>
+-&nbsp;**Outbound**&nbsp;—&nbsp;it&nbsp;acts&nbsp;on&nbsp;the&nbsp;world:&nbsp;it&nbsp;says&nbsp;something,&nbsp;it&nbsp;looks,<br>
+&nbsp;&nbsp;it&nbsp;draws,&nbsp;it&nbsp;studies&nbsp;the&nbsp;web.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;counterpart&nbsp;to&nbsp;the&nbsp;inner&nbsp;life's&nbsp;thought&nbsp;stream:&nbsp;thoughts<br>
+arise&nbsp;inside&nbsp;it;&nbsp;events&nbsp;arrive&nbsp;from&nbsp;outside&nbsp;it.&nbsp;Both&nbsp;feed&nbsp;the&nbsp;same<br>
+cognition&nbsp;—&nbsp;the&nbsp;global&nbsp;workspace,&nbsp;memory,&nbsp;and&nbsp;neurochemistry.<br>
+&nbsp;<br>
+Events&nbsp;carry&nbsp;``topics``&nbsp;—&nbsp;words&nbsp;in&nbsp;the&nbsp;event&nbsp;that&nbsp;exist&nbsp;as&nbsp;concepts&nbsp;in<br>
+its&nbsp;network.&nbsp;Topics&nbsp;ground&nbsp;the&nbsp;event&nbsp;in&nbsp;what&nbsp;it&nbsp;actually&nbsp;knows,&nbsp;so&nbsp;a<br>
+presence's&nbsp;interests&nbsp;and&nbsp;the&nbsp;workspace's&nbsp;topic&nbsp;coherence&nbsp;reflect&nbsp;its<br>
+real&nbsp;concept&nbsp;graph&nbsp;rather&nbsp;than&nbsp;raw&nbsp;text.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="re.html">re</a><br>
+</td><td class="multicolumn"><a href="time.html">time</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.events.html#EventStream">EventStream</a>
+</dt><dt class="heading-text"><a href="Self_World.temporal_lobe.events.html#ExternalEvent">ExternalEvent</a>
+</dt></dl>
+</dd>
+<dt class="heading-text"><a href="enum.html#Enum">enum.Enum</a>(<a href="builtins.html#object">builtins.object</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.events.html#EventKind">EventKind</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="EventKind">class <strong>EventKind</strong></a>(<a href="enum.html#Enum">enum.Enum</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#EventKind">EventKind</a>(*values)<br>
+&nbsp;<br>
+The&nbsp;kind&nbsp;of&nbsp;an&nbsp;external&nbsp;world&nbsp;event.<br>
+&nbsp;<br>
+Inbound&nbsp;kinds&nbsp;describe&nbsp;the&nbsp;world&nbsp;acting&nbsp;on&nbsp;Genesis;&nbsp;outbound&nbsp;kinds<br>
+describe&nbsp;Genesis&nbsp;acting&nbsp;on&nbsp;the&nbsp;world.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.temporal_lobe.events.html#EventKind">EventKind</a></dd>
+<dd><a href="enum.html#Enum">enum.Enum</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>ACTION</strong> = &lt;EventKind.ACTION: 'action'&gt;</dl>
+
+<dl><dt><strong>ARRIVAL</strong> = &lt;EventKind.ARRIVAL: 'arrival'&gt;</dl>
+
+<dl><dt><strong>DEPARTURE</strong> = &lt;EventKind.DEPARTURE: 'departure'&gt;</dl>
+
+<dl><dt><strong>NOTIFICATION</strong> = &lt;EventKind.NOTIFICATION: 'notification'&gt;</dl>
+
+<dl><dt><strong>OVERHEARD_SPEECH</strong> = &lt;EventKind.OVERHEARD_SPEECH: 'overheard'&gt;</dl>
+
+<dl><dt><strong>PERCEPTION</strong> = &lt;EventKind.PERCEPTION: 'perception'&gt;</dl>
+
+<dl><dt><strong>USER_SPEECH</strong> = &lt;EventKind.USER_SPEECH: 'user_speech'&gt;</dl>
+
+<dl><dt><strong>UTTERANCE</strong> = &lt;EventKind.UTTERANCE: 'utterance'&gt;</dl>
+
+<hr>
+Data descriptors inherited from <a href="enum.html#Enum">enum.Enum</a>:<br>
+<dl><dt><strong>name</strong></dt>
+<dd><span class="code">The&nbsp;name&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<dl><dt><strong>value</strong></dt>
+<dd><span class="code">The&nbsp;value&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<hr>
+Static methods inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><a name="EventKind-__contains__"><strong>__contains__</strong></a>(value)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;`value`&nbsp;is&nbsp;in&nbsp;`cls`.<br>
+&nbsp;<br>
+`value`&nbsp;is&nbsp;in&nbsp;`cls`&nbsp;if:<br>
+1)&nbsp;`value`&nbsp;is&nbsp;a&nbsp;member&nbsp;of&nbsp;`cls`,&nbsp;or<br>
+2)&nbsp;`value`&nbsp;is&nbsp;the&nbsp;value&nbsp;of&nbsp;one&nbsp;of&nbsp;the&nbsp;`cls`'s&nbsp;members.</span></dd></dl>
+
+<dl><dt><a name="EventKind-__getitem__"><strong>__getitem__</strong></a>(name)</dt><dd><span class="code">Return&nbsp;the&nbsp;member&nbsp;matching&nbsp;`name`.</span></dd></dl>
+
+<dl><dt><a name="EventKind-__iter__"><strong>__iter__</strong></a>()</dt><dd><span class="code">Return&nbsp;members&nbsp;in&nbsp;definition&nbsp;order.</span></dd></dl>
+
+<dl><dt><a name="EventKind-__len__"><strong>__len__</strong></a>()</dt><dd><span class="code">Return&nbsp;the&nbsp;number&nbsp;of&nbsp;members&nbsp;(no&nbsp;aliases)</span></dd></dl>
+
+<hr>
+Readonly properties inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><strong>__members__</strong></dt>
+<dd><span class="code">Returns&nbsp;a&nbsp;mapping&nbsp;of&nbsp;member&nbsp;name-&gt;value.<br>
+&nbsp;<br>
+This&nbsp;mapping&nbsp;lists&nbsp;all&nbsp;enum&nbsp;members,&nbsp;including&nbsp;aliases.&nbsp;Note&nbsp;that&nbsp;this<br>
+is&nbsp;a&nbsp;read-only&nbsp;view&nbsp;of&nbsp;the&nbsp;internal&nbsp;mapping.</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="EventStream">class <strong>EventStream</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#EventStream">EventStream</a>(max_size:&nbsp;'int'&nbsp;=&nbsp;200)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+A&nbsp;bounded,&nbsp;thread-safe&nbsp;stream&nbsp;of&nbsp;external&nbsp;events.<br>
+&nbsp;<br>
+The&nbsp;stream&nbsp;is&nbsp;the&nbsp;world's&nbsp;working&nbsp;memory:&nbsp;recent&nbsp;events&nbsp;stay<br>
+available&nbsp;for&nbsp;attention,&nbsp;status,&nbsp;and&nbsp;persistence;&nbsp;older&nbsp;events&nbsp;fall<br>
+off&nbsp;the&nbsp;end&nbsp;(their&nbsp;consolidation&nbsp;into&nbsp;episodic&nbsp;memory&nbsp;is&nbsp;the&nbsp;memory<br>
+engine's&nbsp;job,&nbsp;not&nbsp;the&nbsp;stream's).<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="EventStream-__init__"><strong>__init__</strong></a>(self, max_size: 'int' = 200) -&gt; 'None'</dt><dd><span class="code">Create&nbsp;a&nbsp;bounded&nbsp;stream&nbsp;holding&nbsp;at&nbsp;most&nbsp;``max_size``&nbsp;events.</span></dd></dl>
+
+<dl><dt><a name="EventStream-__len__"><strong>__len__</strong></a>(self) -&gt; 'int'</dt><dd><span class="code">Number&nbsp;of&nbsp;events&nbsp;currently&nbsp;in&nbsp;the&nbsp;stream.</span></dd></dl>
+
+<dl><dt><a name="EventStream-append"><strong>append</strong></a>(self, event: 'ExternalEvent') -&gt; 'None'</dt><dd><span class="code">Record&nbsp;an&nbsp;event&nbsp;(thread-safe).</span></dd></dl>
+
+<dl><dt><a name="EventStream-recent"><strong>recent</strong></a>(self, n: 'int' = 20) -&gt; 'list[ExternalEvent]'</dt><dd><span class="code">Return&nbsp;the&nbsp;``n``&nbsp;most&nbsp;recent&nbsp;events,&nbsp;oldest&nbsp;first.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ExternalEvent">class <strong>ExternalEvent</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ExternalEvent">ExternalEvent</a>(kind:&nbsp;'<a href="#EventKind">EventKind</a>',&nbsp;source:&nbsp;'str',&nbsp;content:&nbsp;'str',&nbsp;salience:&nbsp;'float'&nbsp;=&nbsp;0.4,&nbsp;addressed:&nbsp;'bool'&nbsp;=&nbsp;False,&nbsp;topics:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;timestamp:&nbsp;'float'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;metadata:&nbsp;'dict'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;percept:&nbsp;'Any'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+One&nbsp;thing&nbsp;that&nbsp;happened&nbsp;in&nbsp;Genesis's&nbsp;external&nbsp;world.<br>
+&nbsp;<br>
+Fields:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;kind:&nbsp;What&nbsp;sort&nbsp;of&nbsp;event&nbsp;this&nbsp;is.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;source:&nbsp;Who&nbsp;produced&nbsp;it&nbsp;—&nbsp;a&nbsp;presence&nbsp;id&nbsp;for&nbsp;inbound&nbsp;events,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;``"self"``&nbsp;for&nbsp;its&nbsp;own&nbsp;outbound&nbsp;acts.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;content:&nbsp;Semantic&nbsp;description&nbsp;of&nbsp;what&nbsp;happened.&nbsp;For&nbsp;speech&nbsp;this<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;is&nbsp;the&nbsp;utterance&nbsp;text;&nbsp;for&nbsp;actions&nbsp;a&nbsp;short&nbsp;semantic&nbsp;summary.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;salience:&nbsp;Finite&nbsp;evidence&nbsp;for&nbsp;how&nbsp;much&nbsp;this&nbsp;event&nbsp;matters.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Salient&nbsp;events&nbsp;are&nbsp;broadcast&nbsp;to&nbsp;the&nbsp;workspace&nbsp;and&nbsp;stored&nbsp;as<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;memories.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;addressed:&nbsp;Whether&nbsp;the&nbsp;event&nbsp;was&nbsp;directed&nbsp;at&nbsp;its&nbsp;specifically.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;topics:&nbsp;Concept&nbsp;names&nbsp;from&nbsp;its&nbsp;network&nbsp;that&nbsp;appear&nbsp;in&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;event&nbsp;—&nbsp;grounds&nbsp;the&nbsp;event&nbsp;in&nbsp;its&nbsp;knowledge.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;timestamp:&nbsp;When&nbsp;the&nbsp;event&nbsp;happened&nbsp;(seconds&nbsp;since&nbsp;epoch).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;metadata:&nbsp;Kind-specific&nbsp;extras&nbsp;(e.g.&nbsp;the&nbsp;presence's&nbsp;name,&nbsp;its<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;full&nbsp;report&nbsp;for&nbsp;an&nbsp;action).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;percept:&nbsp;Optional&nbsp;structured&nbsp;payload&nbsp;—&nbsp;the&nbsp;thing&nbsp;perceived,&nbsp;as<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;data&nbsp;rather&nbsp;than&nbsp;text.&nbsp;A&nbsp;sound&nbsp;carries&nbsp;a&nbsp;description;&nbsp;a<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sight&nbsp;may&nbsp;carry&nbsp;the&nbsp;actual&nbsp;field&nbsp;(a&nbsp;grid,&nbsp;an&nbsp;array)&nbsp;so&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;perceptual&nbsp;systems&nbsp;downstream&nbsp;can&nbsp;process&nbsp;what&nbsp;arrived<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;instead&nbsp;of&nbsp;only&nbsp;hearing&nbsp;it&nbsp;narrated.&nbsp;Opaque&nbsp;to&nbsp;the&nbsp;world<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;layer;&nbsp;interpreted&nbsp;by&nbsp;whoever&nbsp;consumes&nbsp;the&nbsp;event.&nbsp;Not<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;persisted&nbsp;—&nbsp;it&nbsp;is&nbsp;live&nbsp;data,&nbsp;not&nbsp;part&nbsp;of&nbsp;the&nbsp;record.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ExternalEvent-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="ExternalEvent-__init__"><strong>__init__</strong></a>(self, kind: 'EventKind', source: 'str', content: 'str', salience: 'float' = 0.4, addressed: 'bool' = False, topics: 'list[str]' = &lt;factory&gt;, timestamp: 'float' = &lt;factory&gt;, metadata: 'dict' = &lt;factory&gt;, percept: 'Any' = None) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="ExternalEvent-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="ExternalEvent-describe"><strong>describe</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">A&nbsp;short&nbsp;semantic&nbsp;description,&nbsp;used&nbsp;for&nbsp;memory&nbsp;and&nbsp;broadcast.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;internal&nbsp;representation,&nbsp;not&nbsp;its&nbsp;voice&nbsp;—&nbsp;it&nbsp;is&nbsp;what&nbsp;the<br>
+event&nbsp;*is*,&nbsp;not&nbsp;what&nbsp;it&nbsp;says&nbsp;about&nbsp;it.</span></dd></dl>
+
+<dl><dt><a name="ExternalEvent-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict'</dt><dd><span class="code">Serialize&nbsp;for&nbsp;persistence.</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="ExternalEvent-from_dict"><strong>from_dict</strong></a>(data: 'dict') -&gt; 'ExternalEvent | None'</dt><dd><span class="code">Deserialize;&nbsp;returns&nbsp;None&nbsp;for&nbsp;malformed&nbsp;or&nbsp;unknown&nbsp;kinds.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>inbound</strong></dt>
+<dd><span class="code">Whether&nbsp;this&nbsp;event&nbsp;flows&nbsp;from&nbsp;the&nbsp;world&nbsp;toward&nbsp;it.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>addressed</strong></dt>
+</dl>
+<dl><dt><strong>content</strong></dt>
+</dl>
+<dl><dt><strong>kind</strong></dt>
+</dl>
+<dl><dt><strong>metadata</strong></dt>
+</dl>
+<dl><dt><strong>percept</strong></dt>
+</dl>
+<dl><dt><strong>salience</strong></dt>
+</dl>
+<dl><dt><strong>source</strong></dt>
+</dl>
+<dl><dt><strong>timestamp</strong></dt>
+</dl>
+<dl><dt><strong>topics</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'addressed': 'bool', 'content': 'str', 'kind': 'EventKind', 'metadata': 'dict', 'percept': 'Any', 'salience': 'float', 'source': 'str', 'timestamp': 'float', 'topics': 'list[str]'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'addressed': Field(name='addressed',type='bool',default=False...appingproxy({}),kw_only=False,_field_type=_FIELD), 'content': Field(name='content',type='str',default=&lt;datacla...appingproxy({}),kw_only=False,_field_type=_FIELD), 'kind': Field(name='kind',type='EventKind',default=&lt;data...appingproxy({}),kw_only=False,_field_type=_FIELD), 'metadata': Field(name='metadata',type='dict',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'percept': Field(name='percept',type='Any',default=None,def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'salience': Field(name='salience',type='float',default=0.4,d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'source': Field(name='source',type='str',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD), 'timestamp': Field(name='timestamp',type='float',default=&lt;dat...appingproxy({}),kw_only=False,_field_type=_FIELD), 'topics': Field(name='topics',type='list[str]',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('kind', 'source', 'content', 'salience', 'addressed', 'topics', 'timestamp', 'metadata', 'percept')</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-ground_topics"><strong>ground_topics</strong></a>(text: 'str', is_known: 'Callable[[str], bool]', *, max_topics: 'int' = 5) -&gt; 'list[str]'</dt><dd><span class="code">Extract&nbsp;the&nbsp;words&nbsp;in&nbsp;``text``&nbsp;that&nbsp;exist&nbsp;in&nbsp;its&nbsp;concept&nbsp;network.<br>
+&nbsp;<br>
+Grounding&nbsp;ties&nbsp;the&nbsp;event&nbsp;to&nbsp;what&nbsp;it&nbsp;actually&nbsp;knows:&nbsp;a&nbsp;topic&nbsp;is&nbsp;a<br>
+word&nbsp;it&nbsp;has&nbsp;a&nbsp;concept&nbsp;for,&nbsp;not&nbsp;just&nbsp;any&nbsp;token.&nbsp;The&nbsp;longest&nbsp;matches<br>
+are&nbsp;preferred&nbsp;so&nbsp;"memory&nbsp;consolidation"&nbsp;outranks&nbsp;"memory".<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;text:&nbsp;The&nbsp;event&nbsp;text&nbsp;to&nbsp;scan.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;is_known:&nbsp;Predicate&nbsp;—&nbsp;True&nbsp;if&nbsp;a&nbsp;lowercased&nbsp;word&nbsp;is&nbsp;a&nbsp;concept<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;it&nbsp;has&nbsp;(e.g.&nbsp;``network.get_concept``&nbsp;is&nbsp;not&nbsp;None).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;max_topics:&nbsp;Maximum&nbsp;topics&nbsp;to&nbsp;return.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>INBOUND_KINDS</strong> = frozenset({&lt;EventKind.DEPARTURE: 'departure'&gt;, &lt;EventKind.ARRIVAL: 'arrival'&gt;, &lt;EventKind.OVERHEARD_SPEECH: 'overheard'&gt;, &lt;EventKind.NOTIFICATION: 'notification'&gt;, &lt;EventKind.USER_SPEECH: 'user_speech'&gt;, &lt;EventKind.PERCEPTION: 'perception'&gt;})<br>
+<strong>OUTBOUND_KINDS</strong> = frozenset({&lt;EventKind.ACTION: 'action'&gt;, &lt;EventKind.UTTERANCE: 'utterance'&gt;})</td></tr></table>
+</body></html>

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.parietal_lobe.grid</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.parietal_lobe.html" class="white">parietal_lobe</a>.grid</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/parietal_lobe/grid.py">/home/mindyrenee/GenAnd/Genesis/Self_World/parietal_lobe/grid.py</a></td></tr></table>
+    <p><span class="code">Discrete&nbsp;grid&nbsp;—&nbsp;the&nbsp;perceptual&nbsp;substrate&nbsp;for&nbsp;spatial&nbsp;reasoning.<br>
+&nbsp;<br>
+<a href="#Grid">Grid</a>-transformation&nbsp;tasks&nbsp;and&nbsp;most&nbsp;spatial&nbsp;problems&nbsp;reduce&nbsp;to&nbsp;the&nbsp;same&nbsp;primitive:<br>
+a&nbsp;bounded&nbsp;2-D&nbsp;field&nbsp;of&nbsp;discrete&nbsp;cells.&nbsp;This&nbsp;module&nbsp;provides&nbsp;the<br>
+immutable&nbsp;``<a href="#Grid">Grid</a>``&nbsp;type&nbsp;and&nbsp;the&nbsp;geometric/colorimetric&nbsp;operations&nbsp;that<br>
+the&nbsp;perceptual&nbsp;layer&nbsp;(``scene.py``)&nbsp;and&nbsp;the&nbsp;transformation&nbsp;DSL<br>
+(``transforms.py``)&nbsp;build&nbsp;on.<br>
+&nbsp;<br>
+A&nbsp;grid&nbsp;is&nbsp;a&nbsp;tuple&nbsp;of&nbsp;tuples&nbsp;of&nbsp;ints&nbsp;—&nbsp;hashable,&nbsp;immutable,&nbsp;and&nbsp;cheap<br>
+to&nbsp;compare.&nbsp;Cell&nbsp;values&nbsp;are&nbsp;arbitrary&nbsp;symbols;&nbsp;nothing&nbsp;here&nbsp;assumes<br>
+a&nbsp;0-9&nbsp;color&nbsp;palette,&nbsp;though&nbsp;0&nbsp;is&nbsp;conventionally&nbsp;background.</span></p>
+<p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.parietal_lobe.grid.html#Grid">Grid</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Grid">class <strong>Grid</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Grid">Grid</a>(rows:&nbsp;'tuple[tuple[int,&nbsp;...],&nbsp;...]')&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+An&nbsp;immutable&nbsp;2-D&nbsp;grid&nbsp;of&nbsp;integer&nbsp;cells.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Grid-__eq__"><strong>__eq__</strong></a>(self, other: 'object') -&gt; 'bool'</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="Grid-__hash__"><strong>__hash__</strong></a>(self) -&gt; 'int'</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="Grid-__init__"><strong>__init__</strong></a>(self, rows: 'tuple[tuple[int, ...], ...]') -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Grid-__repr__"><strong>__repr__</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="Grid-at"><strong>at</strong></a>(self, r: 'int', c: 'int') -&gt; 'int'</dt></dl>
+
+<dl><dt><a name="Grid-cells_with"><strong>cells_with</strong></a>(self, value: 'int') -&gt; 'frozenset[tuple[int, int]]'</dt><dd><span class="code">Positions&nbsp;of&nbsp;every&nbsp;cell&nbsp;holding&nbsp;``value``.</span></dd></dl>
+
+<dl><dt><a name="Grid-color_counts"><strong>color_counts</strong></a>(self) -&gt; 'Counter[int]'</dt></dl>
+
+<dl><dt><a name="Grid-colors"><strong>colors</strong></a>(self) -&gt; 'frozenset[int]'</dt></dl>
+
+<dl><dt><a name="Grid-crop_to_cells"><strong>crop_to_cells</strong></a>(self, cells: 'frozenset[tuple[int, int]]') -&gt; 'Grid'</dt><dd><span class="code">Crop&nbsp;to&nbsp;the&nbsp;bounding&nbsp;box&nbsp;of&nbsp;the&nbsp;given&nbsp;cells.</span></dd></dl>
+
+<dl><dt><a name="Grid-crop_to_content"><strong>crop_to_content</strong></a>(self, background: 'int | None' = None) -&gt; 'Grid'</dt><dd><span class="code">Crop&nbsp;to&nbsp;the&nbsp;bounding&nbsp;box&nbsp;of&nbsp;non-background&nbsp;cells.<br>
+&nbsp;<br>
+Returns&nbsp;self&nbsp;when&nbsp;the&nbsp;grid&nbsp;contains&nbsp;only&nbsp;background.</span></dd></dl>
+
+<dl><dt><a name="Grid-iter_cells"><strong>iter_cells</strong></a>(self) -&gt; 'Iterator[tuple[int, int, int]]'</dt><dd><span class="code">Yield&nbsp;(row,&nbsp;col,&nbsp;value)&nbsp;for&nbsp;every&nbsp;cell.</span></dd></dl>
+
+<dl><dt><a name="Grid-most_common_color"><strong>most_common_color</strong></a>(self) -&gt; 'int'</dt><dd><span class="code">The&nbsp;most&nbsp;frequent&nbsp;cell&nbsp;value&nbsp;—&nbsp;the&nbsp;conventional&nbsp;background.</span></dd></dl>
+
+<dl><dt><a name="Grid-non_zero_cells"><strong>non_zero_cells</strong></a>(self) -&gt; 'frozenset[tuple[int, int]]'</dt></dl>
+
+<dl><dt><a name="Grid-overlay"><strong>overlay</strong></a>(self, cells: 'frozenset[tuple[int, int]]', value: 'int') -&gt; 'Grid'</dt><dd><span class="code">Paint&nbsp;cells&nbsp;with&nbsp;a&nbsp;value.</span></dd></dl>
+
+<dl><dt><a name="Grid-paste"><strong>paste</strong></a>(self, other: 'Grid', top: 'int' = 0, left: 'int' = 0) -&gt; 'Grid'</dt><dd><span class="code">Paste&nbsp;another&nbsp;grid&nbsp;at&nbsp;(top,&nbsp;left),&nbsp;clipping&nbsp;at&nbsp;edges.</span></dd></dl>
+
+<dl><dt><a name="Grid-recolor"><strong>recolor</strong></a>(self, mapping: 'dict[int, int]') -&gt; 'Grid'</dt><dd><span class="code">Rewrite&nbsp;cell&nbsp;values&nbsp;via&nbsp;a&nbsp;color&nbsp;map;&nbsp;unmapped&nbsp;values&nbsp;keep.</span></dd></dl>
+
+<dl><dt><a name="Grid-reflect_diag"><strong>reflect_diag</strong></a>(self) -&gt; 'Grid'</dt><dd><span class="code">Transpose&nbsp;along&nbsp;the&nbsp;main&nbsp;diagonal.</span></dd></dl>
+
+<dl><dt><a name="Grid-reflect_h"><strong>reflect_h</strong></a>(self) -&gt; 'Grid'</dt><dd><span class="code">Mirror&nbsp;left-right.</span></dd></dl>
+
+<dl><dt><a name="Grid-reflect_v"><strong>reflect_v</strong></a>(self) -&gt; 'Grid'</dt><dd><span class="code">Mirror&nbsp;top-bottom.</span></dd></dl>
+
+<dl><dt><a name="Grid-rotate90"><strong>rotate90</strong></a>(self, turns: 'int' = 1) -&gt; 'Grid'</dt><dd><span class="code">Rotate&nbsp;clockwise&nbsp;by&nbsp;90°&nbsp;*&nbsp;turns.</span></dd></dl>
+
+<dl><dt><a name="Grid-rows"><strong>rows</strong></a>(self) -&gt; 'tuple[tuple[int, ...], ...]'</dt></dl>
+
+<dl><dt><a name="Grid-scale"><strong>scale</strong></a>(self, factor: 'int') -&gt; 'Grid'</dt><dd><span class="code">Scale&nbsp;each&nbsp;cell&nbsp;to&nbsp;a&nbsp;factor×factor&nbsp;block.</span></dd></dl>
+
+<dl><dt><a name="Grid-subgrid"><strong>subgrid</strong></a>(self, top: 'int', left: 'int', height: 'int', width: 'int') -&gt; 'Grid'</dt><dd><span class="code">Extract&nbsp;a&nbsp;rectangular&nbsp;region.</span></dd></dl>
+
+<dl><dt><a name="Grid-tile"><strong>tile</strong></a>(self, reps_r: 'int', reps_c: 'int') -&gt; 'Grid'</dt><dd><span class="code">Tile&nbsp;the&nbsp;grid&nbsp;reps_r&nbsp;×&nbsp;reps_c&nbsp;times.</span></dd></dl>
+
+<dl><dt><a name="Grid-to_lists"><strong>to_lists</strong></a>(self) -&gt; 'list[list[int]]'</dt></dl>
+
+<dl><dt><a name="Grid-translate_cells"><strong>translate_cells</strong></a>(self, cells: 'frozenset[tuple[int, int]]', dr: 'int', dc: 'int', background: 'int' = 0) -&gt; 'Grid'</dt><dd><span class="code">Move&nbsp;the&nbsp;given&nbsp;cells&nbsp;by&nbsp;(dr,&nbsp;dc),&nbsp;leaving&nbsp;background&nbsp;behind.<br>
+&nbsp;<br>
+Cells&nbsp;that&nbsp;would&nbsp;move&nbsp;outside&nbsp;the&nbsp;grid&nbsp;are&nbsp;clipped.</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="Grid-filled"><strong>filled</strong></a>(width: 'int', height: 'int', value: 'int' = 0) -&gt; 'Grid'</dt><dd><span class="code">Build&nbsp;a&nbsp;uniform&nbsp;grid&nbsp;of&nbsp;the&nbsp;given&nbsp;size.</span></dd></dl>
+
+<dl><dt><a name="Grid-from_lists"><strong>from_lists</strong></a>(rows: 'list[list[int]]') -&gt; 'Grid'</dt><dd><span class="code">Build&nbsp;a&nbsp;grid&nbsp;from&nbsp;nested&nbsp;lists&nbsp;(e.g.&nbsp;JSON&nbsp;task&nbsp;data).</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>height</strong></dt>
+</dl>
+<dl><dt><strong>shape</strong></dt>
+<dd><span class="code">(height,&nbsp;width).</span></dd>
+</dl>
+<dl><dt><strong>width</strong></dt>
+</dl>
+</td></tr></table></td></tr></table>
+</body></html>

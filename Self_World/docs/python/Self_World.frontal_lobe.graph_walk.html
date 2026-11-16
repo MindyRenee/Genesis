@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.frontal_lobe.graph_walk</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.frontal_lobe.html" class="white">frontal_lobe</a>.graph_walk</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/graph_walk.py">/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/graph_walk.py</a></td></tr></table>
+    <p><span class="code">Graph-walk&nbsp;generator&nbsp;—&nbsp;sentences&nbsp;that&nbsp;emerge&nbsp;from&nbsp;concept&nbsp;traversal.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;primary&nbsp;composition&nbsp;path&nbsp;for&nbsp;Genesis's&nbsp;language.&nbsp;Instead&nbsp;of<br>
+selecting&nbsp;a&nbsp;fixed&nbsp;sentence&nbsp;template&nbsp;and&nbsp;filling&nbsp;slots,&nbsp;the&nbsp;graph-walk<br>
+generator&nbsp;traverses&nbsp;the&nbsp;concept&nbsp;network&nbsp;from&nbsp;a&nbsp;seed&nbsp;concept,&nbsp;following<br>
+typed&nbsp;semantic&nbsp;edges&nbsp;(IS_A,&nbsp;CAUSES,&nbsp;ENABLES,&nbsp;EMERGES_FROM,&nbsp;etc.),&nbsp;and<br>
+builds&nbsp;sentences&nbsp;from&nbsp;the&nbsp;edges&nbsp;it&nbsp;encounters.<br>
+&nbsp;<br>
+The&nbsp;sentence&nbsp;structure&nbsp;emerges&nbsp;from&nbsp;the&nbsp;graph&nbsp;topology:<br>
+-&nbsp;A&nbsp;concept&nbsp;with&nbsp;a&nbsp;CAUSES&nbsp;edge&nbsp;produces&nbsp;a&nbsp;causal&nbsp;sentence<br>
+-&nbsp;A&nbsp;concept&nbsp;with&nbsp;an&nbsp;ENABLES&nbsp;edge&nbsp;produces&nbsp;a&nbsp;facilitative&nbsp;sentence<br>
+-&nbsp;A&nbsp;concept&nbsp;with&nbsp;multiple&nbsp;edges&nbsp;produces&nbsp;a&nbsp;compound&nbsp;sentence<br>
+-&nbsp;A&nbsp;deep&nbsp;walk&nbsp;(2-3&nbsp;hops)&nbsp;produces&nbsp;multi-sentence&nbsp;paragraphs<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;fundamentally&nbsp;different&nbsp;from&nbsp;template&nbsp;filling:<br>
+-&nbsp;Templates&nbsp;say:&nbsp;pick&nbsp;a&nbsp;frame,&nbsp;fill&nbsp;slots.&nbsp;The&nbsp;frame&nbsp;is&nbsp;fixed.<br>
+-&nbsp;Graph-walk&nbsp;says:&nbsp;walk&nbsp;the&nbsp;graph,&nbsp;let&nbsp;the&nbsp;edges&nbsp;you&nbsp;find&nbsp;determine<br>
+&nbsp;&nbsp;the&nbsp;sentence&nbsp;structure.&nbsp;The&nbsp;frame&nbsp;emerges&nbsp;from&nbsp;the&nbsp;semantics.<br>
+&nbsp;<br>
+#&nbsp;Why&nbsp;this&nbsp;matters<br>
+&nbsp;<br>
+The&nbsp;grammar-based&nbsp;generator&nbsp;(GenerativeLanguage._compose)&nbsp;selects&nbsp;from<br>
+a&nbsp;fixed&nbsp;set&nbsp;of&nbsp;SentenceStructure&nbsp;templates&nbsp;per&nbsp;intent.&nbsp;No&nbsp;matter&nbsp;how<br>
+many&nbsp;templates&nbsp;exist,&nbsp;the&nbsp;output&nbsp;shape&nbsp;is&nbsp;constrained&nbsp;to&nbsp;those<br>
+templates.&nbsp;The&nbsp;graph-walk&nbsp;generator&nbsp;has&nbsp;no&nbsp;fixed&nbsp;templates&nbsp;—&nbsp;the<br>
+sentence&nbsp;shape&nbsp;is&nbsp;a&nbsp;function&nbsp;of&nbsp;which&nbsp;edges&nbsp;exist&nbsp;in&nbsp;the&nbsp;concept<br>
+network&nbsp;at&nbsp;that&nbsp;moment.&nbsp;Two&nbsp;thoughts&nbsp;about&nbsp;the&nbsp;same&nbsp;concept&nbsp;can<br>
+produce&nbsp;structurally&nbsp;different&nbsp;sentences&nbsp;because&nbsp;the&nbsp;walk&nbsp;takes<br>
+different&nbsp;paths.<br>
+&nbsp;<br>
+#&nbsp;Fallback<br>
+&nbsp;<br>
+When&nbsp;the&nbsp;concept&nbsp;network&nbsp;is&nbsp;unavailable,&nbsp;the&nbsp;seed&nbsp;concept&nbsp;has&nbsp;no<br>
+edges,&nbsp;or&nbsp;the&nbsp;walk&nbsp;produces&nbsp;nothing&nbsp;usable,&nbsp;the&nbsp;caller&nbsp;falls&nbsp;back&nbsp;to<br>
+the&nbsp;grammar-based&nbsp;GenerativeLanguage._compose.&nbsp;The&nbsp;graph-walk&nbsp;generator<br>
+never&nbsp;produces&nbsp;empty&nbsp;output&nbsp;silently&nbsp;—&nbsp;it&nbsp;returns&nbsp;None&nbsp;to&nbsp;signal<br>
+"fall&nbsp;back."<br>
+&nbsp;<br>
+#&nbsp;Emotional&nbsp;modulation<br>
+&nbsp;<br>
+The&nbsp;walk&nbsp;is&nbsp;modulated&nbsp;by&nbsp;emotional&nbsp;state:<br>
+-&nbsp;High&nbsp;creativity&nbsp;→&nbsp;deeper&nbsp;walks&nbsp;(more&nbsp;hops),&nbsp;more&nbsp;branching<br>
+-&nbsp;High&nbsp;caution&nbsp;→&nbsp;shallower&nbsp;walks,&nbsp;less&nbsp;branching,&nbsp;more&nbsp;hedging<br>
+-&nbsp;Low&nbsp;engagement&nbsp;→&nbsp;shorter&nbsp;output<br>
+-&nbsp;High&nbsp;alertness&nbsp;→&nbsp;more&nbsp;precise,&nbsp;causal&nbsp;edges&nbsp;preferred<br>
+-&nbsp;Positive&nbsp;valence&nbsp;→&nbsp;ENABLES/CREATES&nbsp;edges&nbsp;preferred<br>
+-&nbsp;Negative&nbsp;valence&nbsp;→&nbsp;HARMS/PREVENTS/CONTRADICTS&nbsp;edges&nbsp;preferred<br>
+&nbsp;<br>
+This&nbsp;means&nbsp;the&nbsp;same&nbsp;concept,&nbsp;walked&nbsp;in&nbsp;different&nbsp;emotional&nbsp;states,<br>
+produces&nbsp;different&nbsp;sentences&nbsp;—&nbsp;not&nbsp;because&nbsp;a&nbsp;template&nbsp;was&nbsp;swapped,<br>
+but&nbsp;because&nbsp;different&nbsp;edges&nbsp;were&nbsp;followed.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="random.html">random</a><br>
+</td><td class="multicolumn"><a href="re.html">re</a><br>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.frontal_lobe.graph_walk.html#GraphWalkGenerator">GraphWalkGenerator</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="GraphWalkGenerator">class <strong>GraphWalkGenerator</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#GraphWalkGenerator">GraphWalkGenerator</a>(network:&nbsp;'ConceptNetwork',&nbsp;voice:&nbsp;'Voice',&nbsp;personality:&nbsp;'PersonalityTraits',&nbsp;seed:&nbsp;'int&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;embeddings:&nbsp;'Any'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Generate&nbsp;sentences&nbsp;by&nbsp;walking&nbsp;the&nbsp;concept&nbsp;network.<br>
+&nbsp;<br>
+This&nbsp;generator&nbsp;traverses&nbsp;typed&nbsp;semantic&nbsp;edges&nbsp;from&nbsp;a&nbsp;seed&nbsp;concept<br>
+and&nbsp;builds&nbsp;sentences&nbsp;from&nbsp;the&nbsp;edges&nbsp;it&nbsp;finds.&nbsp;The&nbsp;sentence<br>
+structure&nbsp;is&nbsp;not&nbsp;fixed&nbsp;—&nbsp;it&nbsp;emerges&nbsp;from&nbsp;which&nbsp;edges&nbsp;exist&nbsp;and<br>
+which&nbsp;ones&nbsp;the&nbsp;walk&nbsp;follows,&nbsp;modulated&nbsp;by&nbsp;emotional&nbsp;state.<br>
+&nbsp;<br>
+Usage::<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;gen&nbsp;=&nbsp;<a href="#GraphWalkGenerator">GraphWalkGenerator</a>(network,&nbsp;voice,&nbsp;self_model,&nbsp;seed=42)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;text&nbsp;=&nbsp;gen.<a href="#GraphWalkGenerator-generate">generate</a>(thought,&nbsp;emotion)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;text&nbsp;is&nbsp;None:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;Fall&nbsp;back&nbsp;to&nbsp;grammar-based&nbsp;composition<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;text&nbsp;=&nbsp;fallback_engine._compose(thought,&nbsp;emotion)<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="GraphWalkGenerator-__init__"><strong>__init__</strong></a>(self, network: 'ConceptNetwork', voice: 'Voice', personality: 'PersonalityTraits', seed: 'int | None' = None, embeddings: 'Any' = None) -&gt; 'None'</dt><dd><span class="code">Wire&nbsp;the&nbsp;graph-walk&nbsp;engine&nbsp;to&nbsp;its&nbsp;concept&nbsp;network,&nbsp;voice,&nbsp;and&nbsp;personality.</span></dd></dl>
+
+<dl><dt><a name="GraphWalkGenerator-generate"><strong>generate</strong></a>(self, thought: 'Thought', emotion: 'EmotionalState') -&gt; 'str | None'</dt><dd><span class="code">Generate&nbsp;text&nbsp;via&nbsp;Hamiltonian&nbsp;flow,&nbsp;falling&nbsp;back&nbsp;to&nbsp;graph&nbsp;walk.<br>
+&nbsp;<br>
+The&nbsp;primary&nbsp;path&nbsp;is&nbsp;the&nbsp;Hamiltonian&nbsp;flow:&nbsp;integrate&nbsp;the<br>
+potential&nbsp;field&nbsp;from&nbsp;the&nbsp;seed&nbsp;concept&nbsp;and&nbsp;emit&nbsp;words&nbsp;from<br>
+the&nbsp;trajectory.&nbsp;If&nbsp;the&nbsp;flow&nbsp;can't&nbsp;produce&nbsp;text&nbsp;(no&nbsp;angles,<br>
+flat&nbsp;potential,&nbsp;too-short&nbsp;trajectory),&nbsp;fall&nbsp;back&nbsp;to&nbsp;the<br>
+graph&nbsp;walk.<br>
+&nbsp;<br>
+Returns&nbsp;the&nbsp;composed&nbsp;text,&nbsp;or&nbsp;None&nbsp;if&nbsp;both&nbsp;paths&nbsp;fail<br>
+(caller&nbsp;should&nbsp;fall&nbsp;back&nbsp;to&nbsp;grammar-based&nbsp;composition).</span></dd></dl>
+
+<dl><dt><a name="GraphWalkGenerator-set_embeddings"><strong>set_embeddings</strong></a>(self, embeddings: 'Any') -&gt; 'None'</dt><dd><span class="code">Wire&nbsp;the&nbsp;embedding&nbsp;store&nbsp;for&nbsp;latent-space&nbsp;composition.<br>
+&nbsp;<br>
+The&nbsp;embedding&nbsp;store&nbsp;provides&nbsp;semantic&nbsp;proximity&nbsp;—&nbsp;concepts&nbsp;that<br>
+are&nbsp;close&nbsp;in&nbsp;meaning&nbsp;even&nbsp;when&nbsp;not&nbsp;connected&nbsp;by&nbsp;explicit&nbsp;typed<br>
+edges.&nbsp;This&nbsp;lets&nbsp;the&nbsp;graph-walk&nbsp;discover&nbsp;related&nbsp;concepts&nbsp;through<br>
+the&nbsp;latent&nbsp;space,&nbsp;not&nbsp;just&nbsp;through&nbsp;the&nbsp;symbolic&nbsp;graph.<br>
+&nbsp;<br>
+Called&nbsp;after&nbsp;construction,&nbsp;once&nbsp;the&nbsp;EmbeddingStore&nbsp;has&nbsp;been<br>
+initialized&nbsp;(it&nbsp;depends&nbsp;on&nbsp;the&nbsp;concept&nbsp;network,&nbsp;which&nbsp;is&nbsp;shared<br>
+and&nbsp;may&nbsp;not&nbsp;be&nbsp;ready&nbsp;when&nbsp;the&nbsp;language&nbsp;engine&nbsp;is&nbsp;first&nbsp;created).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['GraphWalkGenerator']<br>
+<strong>__annotations__</strong> = {'_RELATION_VERB_SEEDS': 'dict[str, list[str]]'}</td></tr></table>
+</body></html>

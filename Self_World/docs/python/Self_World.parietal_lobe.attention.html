@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.parietal_lobe.attention</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.parietal_lobe.html" class="white">parietal_lobe</a>.attention</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/parietal_lobe/attention.py">/home/mindyrenee/GenAnd/Genesis/Self_World/parietal_lobe/attention.py</a></td></tr></table>
+    <p><span class="code">Attention&nbsp;system&nbsp;—&nbsp;selective,&nbsp;sustained,&nbsp;executive,&nbsp;and&nbsp;divided&nbsp;attention.<br>
+&nbsp;<br>
+Attention&nbsp;is&nbsp;not&nbsp;a&nbsp;single&nbsp;mechanism&nbsp;but&nbsp;a&nbsp;family&nbsp;of&nbsp;related&nbsp;processes<br>
+that&nbsp;select,&nbsp;maintain,&nbsp;bias,&nbsp;and&nbsp;divide&nbsp;cognitive&nbsp;resources.&nbsp;This<br>
+module&nbsp;implements&nbsp;four&nbsp;attention&nbsp;types,&nbsp;each&nbsp;grounded&nbsp;in&nbsp;distinct<br>
+neural&nbsp;systems:<br>
+&nbsp;<br>
+#&nbsp;Four&nbsp;attention&nbsp;types<br>
+&nbsp;<br>
+1.&nbsp;**Selective&nbsp;attention**&nbsp;(Posner&nbsp;&amp;&nbsp;Petersen,&nbsp;1990):&nbsp;Filters&nbsp;inputs<br>
+&nbsp;&nbsp;&nbsp;to&nbsp;focus&nbsp;on&nbsp;one&nbsp;while&nbsp;suppressing&nbsp;others.&nbsp;Implemented&nbsp;via&nbsp;a<br>
+&nbsp;&nbsp;&nbsp;spotlight&nbsp;that&nbsp;amplifies&nbsp;attended&nbsp;concepts&nbsp;and&nbsp;suppresses<br>
+&nbsp;&nbsp;&nbsp;unattended&nbsp;ones.&nbsp;Neural&nbsp;basis:&nbsp;frontoparietal&nbsp;network,&nbsp;particularly<br>
+&nbsp;&nbsp;&nbsp;the&nbsp;intraparietal&nbsp;sulcus&nbsp;(IPS)&nbsp;and&nbsp;frontal&nbsp;eye&nbsp;fields&nbsp;(FEF).<br>
+&nbsp;<br>
+2.&nbsp;**Sustained&nbsp;attention**&nbsp;(vigilance):&nbsp;Maintains&nbsp;focus&nbsp;on&nbsp;a&nbsp;target<br>
+&nbsp;&nbsp;&nbsp;over&nbsp;time.&nbsp;Activation&nbsp;decays&nbsp;if&nbsp;not&nbsp;refreshed,&nbsp;modeling&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;vigilance&nbsp;decrement&nbsp;—&nbsp;the&nbsp;decline&nbsp;in&nbsp;detection&nbsp;rate&nbsp;over&nbsp;prolonged<br>
+&nbsp;&nbsp;&nbsp;monitoring&nbsp;(Parasuraman&nbsp;et&nbsp;al.,&nbsp;1998).&nbsp;Neural&nbsp;basis:&nbsp;right<br>
+&nbsp;&nbsp;&nbsp;hemisphere&nbsp;frontoparietal&nbsp;network,&nbsp;locus&nbsp;coeruleus-noradrenergic<br>
+&nbsp;&nbsp;&nbsp;system.<br>
+&nbsp;<br>
+3.&nbsp;**Executive&nbsp;attention**&nbsp;(top-down&nbsp;biasing):&nbsp;Goal-directed&nbsp;attention<br>
+&nbsp;&nbsp;&nbsp;that&nbsp;amplifies&nbsp;goal-relevant&nbsp;information&nbsp;and&nbsp;suppresses<br>
+&nbsp;&nbsp;&nbsp;goal-irrelevant&nbsp;information.&nbsp;This&nbsp;is&nbsp;the&nbsp;anterior&nbsp;cingulate<br>
+&nbsp;&nbsp;&nbsp;cortex&nbsp;(ACC)–dorsolateral&nbsp;prefrontal&nbsp;cortex&nbsp;(DLPFC)&nbsp;attentional<br>
+&nbsp;&nbsp;&nbsp;control&nbsp;network&nbsp;(Miller&nbsp;&amp;&nbsp;Cohen,&nbsp;2001).&nbsp;The&nbsp;current&nbsp;goal&nbsp;biases<br>
+&nbsp;&nbsp;&nbsp;which&nbsp;concepts&nbsp;get&nbsp;amplified.<br>
+&nbsp;<br>
+4.&nbsp;**Divided&nbsp;attention**:&nbsp;Splits&nbsp;attentional&nbsp;resources&nbsp;when&nbsp;multiple<br>
+&nbsp;&nbsp;&nbsp;tasks&nbsp;need&nbsp;simultaneous&nbsp;processing.&nbsp;Resources&nbsp;are&nbsp;finite&nbsp;—&nbsp;dividing<br>
+&nbsp;&nbsp;&nbsp;them&nbsp;reduces&nbsp;the&nbsp;allocation&nbsp;to&nbsp;each&nbsp;task,&nbsp;increasing&nbsp;RT&nbsp;and<br>
+&nbsp;&nbsp;&nbsp;decreasing&nbsp;accuracy&nbsp;(Kahneman,&nbsp;1973;&nbsp;Pashler,&nbsp;1994).&nbsp;Neural&nbsp;basis:<br>
+&nbsp;&nbsp;&nbsp;prefrontal&nbsp;cortex&nbsp;resource&nbsp;allocation,&nbsp;with&nbsp;dual-task&nbsp;costs<br>
+&nbsp;&nbsp;&nbsp;reflecting&nbsp;limited&nbsp;prefrontal&nbsp;capacity.<br>
+&nbsp;<br>
+#&nbsp;Integration&nbsp;with&nbsp;the&nbsp;concept&nbsp;network<br>
+&nbsp;<br>
+Attention&nbsp;amplifies&nbsp;the&nbsp;activation&nbsp;of&nbsp;attended&nbsp;concepts&nbsp;in&nbsp;the&nbsp;concept<br>
+network.&nbsp;When&nbsp;a&nbsp;concept&nbsp;is&nbsp;attended,&nbsp;its&nbsp;activation&nbsp;is&nbsp;boosted;&nbsp;when<br>
+attention&nbsp;shifts&nbsp;away,&nbsp;the&nbsp;boost&nbsp;decays.&nbsp;This&nbsp;is&nbsp;the&nbsp;top-down<br>
+modulation&nbsp;of&nbsp;semantic&nbsp;processing&nbsp;—&nbsp;attended&nbsp;concepts&nbsp;are&nbsp;processed<br>
+faster&nbsp;and&nbsp;deeper&nbsp;(Posner&nbsp;&amp;&nbsp;Snyder,&nbsp;1975).<br>
+&nbsp;<br>
+References:<br>
+-&nbsp;Posner,&nbsp;M.&nbsp;I.,&nbsp;&amp;&nbsp;Petersen,&nbsp;S.&nbsp;E.&nbsp;(1990).&nbsp;The&nbsp;attention&nbsp;system&nbsp;of<br>
+&nbsp;&nbsp;the&nbsp;human&nbsp;brain.&nbsp;Annual&nbsp;Review&nbsp;of&nbsp;Neuroscience.<br>
+-&nbsp;Miller,&nbsp;E.&nbsp;K.,&nbsp;&amp;&nbsp;Cohen,&nbsp;J.&nbsp;D.&nbsp;(2001).&nbsp;An&nbsp;integrative&nbsp;theory&nbsp;of<br>
+&nbsp;&nbsp;prefrontal&nbsp;cortex&nbsp;function.&nbsp;Annual&nbsp;Review&nbsp;of&nbsp;Neuroscience.<br>
+-&nbsp;Parasuraman,&nbsp;R.,&nbsp;et&nbsp;al.&nbsp;(1998).&nbsp;Vigilance:&nbsp;The&nbsp;problem&nbsp;of&nbsp;sustaining<br>
+&nbsp;&nbsp;attention.&nbsp;In&nbsp;Parasuraman&nbsp;(Ed.),&nbsp;The&nbsp;Attentive&nbsp;Brain.<br>
+-&nbsp;Kahneman,&nbsp;D.&nbsp;(1973).&nbsp;Attention&nbsp;and&nbsp;Effort.&nbsp;Prentice-Hall.<br>
+-&nbsp;Pashler,&nbsp;H.&nbsp;(1994).&nbsp;Dual-task&nbsp;interference&nbsp;in&nbsp;simple&nbsp;tasks.<br>
+&nbsp;&nbsp;Psychological&nbsp;Bulletin.<br>
+-&nbsp;Posner,&nbsp;M.&nbsp;I.,&nbsp;&amp;&nbsp;Snyder,&nbsp;C.&nbsp;R.&nbsp;R.&nbsp;(1975).&nbsp;Attention&nbsp;and&nbsp;cognitive<br>
+&nbsp;&nbsp;control.&nbsp;In&nbsp;Solso&nbsp;(Ed.),&nbsp;Information&nbsp;Processing&nbsp;and&nbsp;Cognition.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="math.html">math</a><br>
+</td><td class="multicolumn"><a href="time.html">time</a><br>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.parietal_lobe.attention.html#AttentionFocus">AttentionFocus</a>
+</dt><dt class="heading-text"><a href="Self_World.parietal_lobe.attention.html#AttentionSystem">AttentionSystem</a>
+</dt></dl>
+</dd>
+<dt class="heading-text"><a href="enum.html#Enum">enum.Enum</a>(<a href="builtins.html#object">builtins.object</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.parietal_lobe.attention.html#AttentionType">AttentionType</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="AttentionFocus">class <strong>AttentionFocus</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#AttentionFocus">AttentionFocus</a>(target:&nbsp;'str',&nbsp;intensity:&nbsp;'float'&nbsp;=&nbsp;1.0,&nbsp;attention_type:&nbsp;'<a href="#AttentionType">AttentionType</a>'&nbsp;=&nbsp;&amp;lt;<a href="#AttentionType">AttentionType</a>.SELECTIVE:&nbsp;'selective'&amp;gt;,&nbsp;established_at:&nbsp;'int'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;last_refreshed:&nbsp;'int'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;goal:&nbsp;'str'&nbsp;=&nbsp;'')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;single&nbsp;focus&nbsp;of&nbsp;attention.<br>
+&nbsp;<br>
+Tracks&nbsp;what&nbsp;is&nbsp;being&nbsp;attended,&nbsp;how&nbsp;strongly,&nbsp;and&nbsp;how&nbsp;the&nbsp;focus<br>
+is&nbsp;maintained&nbsp;over&nbsp;time.&nbsp;Each&nbsp;focus&nbsp;has:<br>
+-&nbsp;A&nbsp;target&nbsp;(concept&nbsp;name&nbsp;or&nbsp;input&nbsp;identifier)<br>
+-&nbsp;An&nbsp;intensity&nbsp;(0..1,&nbsp;how&nbsp;strongly&nbsp;attended)<br>
+-&nbsp;A&nbsp;type&nbsp;(which&nbsp;attention&nbsp;mechanism&nbsp;is&nbsp;engaged)<br>
+-&nbsp;A&nbsp;refresh&nbsp;timestamp&nbsp;(for&nbsp;sustained&nbsp;attention&nbsp;decay)<br>
+-&nbsp;An&nbsp;optional&nbsp;associated&nbsp;goal&nbsp;(for&nbsp;executive&nbsp;attention)<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="AttentionFocus-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="AttentionFocus-__init__"><strong>__init__</strong></a>(self, target: 'str', intensity: 'float' = 1.0, attention_type: 'AttentionType' = &lt;AttentionType.SELECTIVE: 'selective'&gt;, established_at: 'int' = &lt;factory&gt;, last_refreshed: 'int' = &lt;factory&gt;, goal: 'str' = '') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="AttentionFocus-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>age_ms</strong></dt>
+<dd><span class="code">How&nbsp;long&nbsp;this&nbsp;focus&nbsp;has&nbsp;been&nbsp;held&nbsp;(milliseconds).</span></dd>
+</dl>
+<dl><dt><strong>time_since_refresh_ms</strong></dt>
+<dd><span class="code">Time&nbsp;since&nbsp;last&nbsp;refresh&nbsp;(for&nbsp;vigilance&nbsp;decay).</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>attention_type</strong></dt>
+</dl>
+<dl><dt><strong>established_at</strong></dt>
+</dl>
+<dl><dt><strong>goal</strong></dt>
+</dl>
+<dl><dt><strong>intensity</strong></dt>
+</dl>
+<dl><dt><strong>last_refreshed</strong></dt>
+</dl>
+<dl><dt><strong>target</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'attention_type': 'AttentionType', 'established_at': 'int', 'goal': 'str', 'intensity': 'float', 'last_refreshed': 'int', 'target': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'attention_type': Field(name='attention_type',type='AttentionType'...appingproxy({}),kw_only=False,_field_type=_FIELD), 'established_at': Field(name='established_at',type='int',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD), 'goal': Field(name='goal',type='str',default='',default_...appingproxy({}),kw_only=False,_field_type=_FIELD), 'intensity': Field(name='intensity',type='float',default=1.0,...appingproxy({}),kw_only=False,_field_type=_FIELD), 'last_refreshed': Field(name='last_refreshed',type='int',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD), 'target': Field(name='target',type='str',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('target', 'intensity', 'attention_type', 'established_at', 'last_refreshed', 'goal')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="AttentionSystem">class <strong>AttentionSystem</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#AttentionSystem">AttentionSystem</a>(network:&nbsp;'ConceptNetwork&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;decay_rate:&nbsp;'float'&nbsp;=&nbsp;0.02,&nbsp;suppression_strength:&nbsp;'float'&nbsp;=&nbsp;0.3,&nbsp;amplification_strength:&nbsp;'float'&nbsp;=&nbsp;0.4,&nbsp;max_foci:&nbsp;'int'&nbsp;=&nbsp;4)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Manages&nbsp;attention&nbsp;across&nbsp;four&nbsp;mechanisms.<br>
+&nbsp;<br>
+The&nbsp;attention&nbsp;system&nbsp;controls&nbsp;what&nbsp;Genesis&nbsp;focuses&nbsp;on&nbsp;and&nbsp;how.<br>
+It&nbsp;integrates&nbsp;with&nbsp;the&nbsp;concept&nbsp;network&nbsp;—&nbsp;attended&nbsp;concepts&nbsp;get<br>
+amplified&nbsp;activation,&nbsp;unattended&nbsp;ones&nbsp;get&nbsp;suppressed.<br>
+&nbsp;<br>
+#&nbsp;Selective&nbsp;attention<br>
+&nbsp;<br>
+``<a href="#AttentionSystem-focus_on">focus_on</a>(target)``&nbsp;puts&nbsp;a&nbsp;spotlight&nbsp;on&nbsp;one&nbsp;target,&nbsp;amplifying&nbsp;it<br>
+and&nbsp;suppressing&nbsp;others.&nbsp;``<a href="#AttentionSystem-suppress">suppress</a>(target)``&nbsp;explicitly&nbsp;suppresses<br>
+a&nbsp;target.&nbsp;This&nbsp;is&nbsp;the&nbsp;"spotlight"&nbsp;model&nbsp;of&nbsp;selective&nbsp;attention<br>
+(Posner,&nbsp;1980).<br>
+&nbsp;<br>
+#&nbsp;Sustained&nbsp;attention<br>
+&nbsp;<br>
+Foci&nbsp;decay&nbsp;over&nbsp;time&nbsp;if&nbsp;not&nbsp;refreshed.&nbsp;``<a href="#AttentionSystem-refresh">refresh</a>(target)``&nbsp;restores<br>
+a&nbsp;focus&nbsp;to&nbsp;full&nbsp;intensity.&nbsp;``<a href="#AttentionSystem-tick">tick</a>(dt)``&nbsp;applies&nbsp;decay,&nbsp;modeling&nbsp;the<br>
+vigilance&nbsp;decrement.&nbsp;The&nbsp;decay&nbsp;rate&nbsp;is&nbsp;slower&nbsp;for&nbsp;executive<br>
+(goal-directed)&nbsp;attention&nbsp;than&nbsp;for&nbsp;passive&nbsp;selective&nbsp;attention,<br>
+because&nbsp;goal-maintenance&nbsp;in&nbsp;PFC&nbsp;sustains&nbsp;activation&nbsp;(Curtis&nbsp;&amp;<br>
+D'Esposito,&nbsp;2003).<br>
+&nbsp;<br>
+#&nbsp;Executive&nbsp;attention<br>
+&nbsp;<br>
+``<a href="#AttentionSystem-set_goal">set_goal</a>(goal)``&nbsp;establishes&nbsp;a&nbsp;top-down&nbsp;bias.&nbsp;Concepts&nbsp;related&nbsp;to<br>
+the&nbsp;goal&nbsp;get&nbsp;amplified&nbsp;via&nbsp;the&nbsp;concept&nbsp;network's&nbsp;spreading<br>
+activation.&nbsp;This&nbsp;is&nbsp;the&nbsp;biased&nbsp;competition&nbsp;model&nbsp;(Desimone&nbsp;&amp;<br>
+Duncan,&nbsp;1995)&nbsp;—&nbsp;goals&nbsp;bias&nbsp;the&nbsp;competition&nbsp;among&nbsp;representations<br>
+in&nbsp;favor&nbsp;of&nbsp;goal-relevant&nbsp;ones.<br>
+&nbsp;<br>
+#&nbsp;Divided&nbsp;attention<br>
+&nbsp;<br>
+``<a href="#AttentionSystem-divide_attention">divide_attention</a>(targets)``&nbsp;splits&nbsp;resources&nbsp;across&nbsp;multiple<br>
+targets.&nbsp;Each&nbsp;target&nbsp;gets&nbsp;a&nbsp;fraction&nbsp;of&nbsp;total&nbsp;attentional&nbsp;capacity.<br>
+The&nbsp;more&nbsp;targets,&nbsp;the&nbsp;less&nbsp;each&nbsp;gets&nbsp;—&nbsp;modeling&nbsp;the&nbsp;dual-task&nbsp;cost<br>
+(Pashler,&nbsp;1994).<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="AttentionSystem-__init__"><strong>__init__</strong></a>(self, network: 'ConceptNetwork | None' = None, decay_rate: 'float' = 0.02, suppression_strength: 'float' = 0.3, amplification_strength: 'float' = 0.4, max_foci: 'int' = 4) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;attention&nbsp;system.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;network:&nbsp;The&nbsp;concept&nbsp;network&nbsp;to&nbsp;modulate.&nbsp;Attention<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;amplifies/suppresses&nbsp;concept&nbsp;activation&nbsp;in&nbsp;the&nbsp;network.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Can&nbsp;be&nbsp;None&nbsp;if&nbsp;network&nbsp;integration&nbsp;is&nbsp;not&nbsp;needed.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;decay_rate:&nbsp;How&nbsp;much&nbsp;focus&nbsp;intensity&nbsp;decays&nbsp;per&nbsp;tick.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Default&nbsp;0.02.&nbsp;Models&nbsp;vigilance&nbsp;decrement.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;suppression_strength:&nbsp;How&nbsp;much&nbsp;unattended&nbsp;concepts&nbsp;are<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;suppressed&nbsp;(0..1).&nbsp;Default&nbsp;0.3.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;amplification_strength:&nbsp;How&nbsp;much&nbsp;attended&nbsp;concepts&nbsp;are<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;amplified&nbsp;(0..1).&nbsp;Default&nbsp;0.4.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;max_foci:&nbsp;Maximum&nbsp;simultaneous&nbsp;attention&nbsp;foci.&nbsp;Default&nbsp;4<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(matching&nbsp;Cowan's&nbsp;K≈4).</span></dd></dl>
+
+<dl><dt><a name="AttentionSystem-capture"><strong>capture</strong></a>(self, target: 'str', drive: 'float') -&gt; 'AttentionFocus | None'</dt><dd><span class="code">Stimulus-driven&nbsp;attentional&nbsp;capture&nbsp;—&nbsp;the&nbsp;ventral&nbsp;network.<br>
+&nbsp;<br>
+Corbetta&nbsp;&amp;&nbsp;Shulman&nbsp;(2002):&nbsp;the&nbsp;dorsal&nbsp;frontoparietal&nbsp;network<br>
+holds&nbsp;top-down&nbsp;goals&nbsp;while&nbsp;the&nbsp;ventral&nbsp;network&nbsp;(TPJ&nbsp;+&nbsp;ventral<br>
+frontal&nbsp;cortex)&nbsp;is&nbsp;driven&nbsp;by&nbsp;stimulus&nbsp;salience&nbsp;and&nbsp;can&nbsp;seize<br>
+the&nbsp;spotlight&nbsp;when&nbsp;a&nbsp;stimulus's&nbsp;bottom-up&nbsp;drive&nbsp;outweighs&nbsp;the<br>
+incumbent&nbsp;focus.&nbsp;``capture``&nbsp;installs&nbsp;a&nbsp;focus&nbsp;only&nbsp;when&nbsp;the<br>
+drive&nbsp;exceeds&nbsp;what&nbsp;it&nbsp;must&nbsp;displace&nbsp;—&nbsp;at&nbsp;capacity&nbsp;it&nbsp;competes<br>
+against&nbsp;the&nbsp;weakest&nbsp;incumbent;&nbsp;below&nbsp;capacity&nbsp;it&nbsp;needs&nbsp;only&nbsp;a<br>
+minimal&nbsp;salience&nbsp;threshold.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;target:&nbsp;The&nbsp;stimulus&nbsp;capturing&nbsp;attention.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;drive:&nbsp;Finite&nbsp;bottom-up&nbsp;salience&nbsp;drive&nbsp;—&nbsp;the&nbsp;externally<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;computed&nbsp;competition&nbsp;signal&nbsp;(novelty,&nbsp;prediction&nbsp;error,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;affective&nbsp;intensity,&nbsp;NE&nbsp;gain&nbsp;already&nbsp;folded&nbsp;in).<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;captured&nbsp;<a href="#AttentionFocus">AttentionFocus</a>,&nbsp;or&nbsp;None&nbsp;when&nbsp;the&nbsp;drive&nbsp;lost<br>
+&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;competition&nbsp;to&nbsp;the&nbsp;incumbent&nbsp;set.</span></dd></dl>
+
+<dl><dt><a name="AttentionSystem-clear"><strong>clear</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Clear&nbsp;all&nbsp;attention&nbsp;foci&nbsp;and&nbsp;suppressions.</span></dd></dl>
+
+<dl><dt><a name="AttentionSystem-clear_goal"><strong>clear_goal</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Clear&nbsp;the&nbsp;current&nbsp;goal&nbsp;and&nbsp;remove&nbsp;executive&nbsp;attention&nbsp;foci.</span></dd></dl>
+
+<dl><dt><a name="AttentionSystem-divide_attention"><strong>divide_attention</strong></a>(self, targets: 'list[str]') -&gt; 'dict[str, float]'</dt><dd><span class="code">Divide&nbsp;attention&nbsp;across&nbsp;multiple&nbsp;targets.<br>
+&nbsp;<br>
+Resources&nbsp;are&nbsp;split&nbsp;equally&nbsp;(or&nbsp;by&nbsp;weight)&nbsp;across&nbsp;targets.<br>
+Each&nbsp;target&nbsp;gets&nbsp;a&nbsp;fraction&nbsp;of&nbsp;total&nbsp;capacity.&nbsp;The&nbsp;more<br>
+targets,&nbsp;the&nbsp;less&nbsp;each&nbsp;gets&nbsp;—&nbsp;modeling&nbsp;the&nbsp;dual-task&nbsp;cost<br>
+(Pashler,&nbsp;1994).<br>
+&nbsp;<br>
+Attentional&nbsp;capacity&nbsp;is&nbsp;finite&nbsp;(``max_foci``,&nbsp;Cowan's&nbsp;K≈4).&nbsp;If<br>
+more&nbsp;targets&nbsp;are&nbsp;requested&nbsp;than&nbsp;capacity&nbsp;can&nbsp;hold,&nbsp;only&nbsp;the<br>
+first&nbsp;``max_foci``&nbsp;(after&nbsp;de-duplication)&nbsp;are&nbsp;attended;&nbsp;the&nbsp;rest<br>
+receive&nbsp;no&nbsp;allocation.&nbsp;The&nbsp;returned&nbsp;dict&nbsp;reports&nbsp;only&nbsp;targets<br>
+that&nbsp;actually&nbsp;received&nbsp;attention&nbsp;—&nbsp;it&nbsp;never&nbsp;claims&nbsp;an&nbsp;allocation<br>
+for&nbsp;a&nbsp;target&nbsp;that&nbsp;was&nbsp;silently&nbsp;evicted.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;targets:&nbsp;List&nbsp;of&nbsp;targets&nbsp;to&nbsp;divide&nbsp;attention&nbsp;across.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Duplicates&nbsp;are&nbsp;collapsed&nbsp;to&nbsp;a&nbsp;single&nbsp;focus.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Dict&nbsp;mapping&nbsp;each&nbsp;*attended*&nbsp;target&nbsp;to&nbsp;its&nbsp;allocated<br>
+&nbsp;&nbsp;&nbsp;&nbsp;intensity.&nbsp;Unattended&nbsp;targets&nbsp;(beyond&nbsp;capacity)&nbsp;are&nbsp;absent.</span></dd></dl>
+
+<dl><dt><a name="AttentionSystem-focus_on"><strong>focus_on</strong></a>(self, target: 'str', intensity: 'float' = 1.0, attention_type: 'AttentionType' = &lt;AttentionType.SELECTIVE: 'selective'&gt;) -&gt; 'AttentionFocus'</dt><dd><span class="code">Focus&nbsp;selective&nbsp;attention&nbsp;on&nbsp;a&nbsp;target.<br>
+&nbsp;<br>
+Amplifies&nbsp;the&nbsp;target's&nbsp;activation&nbsp;in&nbsp;the&nbsp;concept&nbsp;network&nbsp;and<br>
+suppresses&nbsp;other&nbsp;active&nbsp;foci&nbsp;(spotlight&nbsp;model).&nbsp;If&nbsp;the&nbsp;maximum<br>
+number&nbsp;of&nbsp;foci&nbsp;is&nbsp;reached,&nbsp;the&nbsp;weakest&nbsp;existing&nbsp;focus&nbsp;is<br>
+replaced.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;target:&nbsp;What&nbsp;to&nbsp;attend&nbsp;to&nbsp;(concept&nbsp;name&nbsp;or&nbsp;input&nbsp;ID).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;intensity:&nbsp;How&nbsp;strongly&nbsp;to&nbsp;attend&nbsp;(0..1).&nbsp;Default&nbsp;1.0.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;attention_type:&nbsp;Which&nbsp;attention&nbsp;mechanism&nbsp;to&nbsp;engage.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;<a href="#AttentionFocus">AttentionFocus</a>&nbsp;that&nbsp;was&nbsp;established.</span></dd></dl>
+
+<dl><dt><a name="AttentionSystem-get_focus"><strong>get_focus</strong></a>(self, target: 'str') -&gt; 'AttentionFocus | None'</dt><dd><span class="code">Get&nbsp;the&nbsp;attention&nbsp;focus&nbsp;for&nbsp;a&nbsp;specific&nbsp;target.</span></dd></dl>
+
+<dl><dt><a name="AttentionSystem-is_attended"><strong>is_attended</strong></a>(self, target: 'str') -&gt; 'bool'</dt><dd><span class="code">Check&nbsp;if&nbsp;a&nbsp;target&nbsp;is&nbsp;currently&nbsp;being&nbsp;attended&nbsp;to.</span></dd></dl>
+
+<dl><dt><a name="AttentionSystem-is_suppressed"><strong>is_suppressed</strong></a>(self, target: 'str') -&gt; 'bool'</dt><dd><span class="code">Check&nbsp;if&nbsp;a&nbsp;target&nbsp;is&nbsp;currently&nbsp;being&nbsp;suppressed.</span></dd></dl>
+
+<dl><dt><a name="AttentionSystem-receive_broadcast"><strong>receive_broadcast</strong></a>(self, item: 'Any') -&gt; 'None'</dt><dd><span class="code">Receive&nbsp;a&nbsp;broadcast&nbsp;from&nbsp;the&nbsp;global&nbsp;workspace.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;**attentional&nbsp;capture**&nbsp;—&nbsp;when&nbsp;information&nbsp;ignites&nbsp;the<br>
+global&nbsp;workspace&nbsp;(becomes&nbsp;conscious),&nbsp;attention&nbsp;is&nbsp;drawn&nbsp;to&nbsp;it.<br>
+In&nbsp;GWT,&nbsp;the&nbsp;broadcast&nbsp;IS&nbsp;the&nbsp;mechanism&nbsp;by&nbsp;which&nbsp;conscious&nbsp;content<br>
+gains&nbsp;control&nbsp;over&nbsp;attentional&nbsp;resources&nbsp;(Dehaene&nbsp;&amp;&nbsp;Naccache,<br>
+2001).&nbsp;Without&nbsp;this,&nbsp;conscious&nbsp;content&nbsp;would&nbsp;be&nbsp;broadcast&nbsp;but<br>
+couldn't&nbsp;influence&nbsp;what&nbsp;the&nbsp;system&nbsp;focuses&nbsp;on&nbsp;next.<br>
+&nbsp;<br>
+The&nbsp;broadcast's&nbsp;topics&nbsp;(from&nbsp;``item.metadata["topics"]``)&nbsp;are<br>
+focused&nbsp;on&nbsp;with&nbsp;intensity&nbsp;proportional&nbsp;to&nbsp;the&nbsp;broadcast<br>
+activation.&nbsp;This&nbsp;means&nbsp;highly-activated&nbsp;conscious&nbsp;content<br>
+captures&nbsp;attention&nbsp;more&nbsp;strongly&nbsp;than&nbsp;fringe&nbsp;content.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;item:&nbsp;A&nbsp;:class:`WorkspaceItem`&nbsp;carrying&nbsp;the&nbsp;broadcast&nbsp;content.</span></dd></dl>
+
+<dl><dt><a name="AttentionSystem-refresh"><strong>refresh</strong></a>(self, target: 'str') -&gt; 'None'</dt><dd><span class="code">Refresh&nbsp;a&nbsp;focus&nbsp;to&nbsp;full&nbsp;intensity&nbsp;(sustained&nbsp;attention).<br>
+&nbsp;<br>
+Without&nbsp;refresh,&nbsp;foci&nbsp;decay&nbsp;over&nbsp;time&nbsp;(vigilance&nbsp;decrement).<br>
+Refreshing&nbsp;restores&nbsp;the&nbsp;focus&nbsp;to&nbsp;its&nbsp;original&nbsp;intensity,<br>
+modeling&nbsp;the&nbsp;top-up&nbsp;that&nbsp;occurs&nbsp;when&nbsp;attention&nbsp;is&nbsp;actively<br>
+maintained.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;target:&nbsp;The&nbsp;focus&nbsp;target&nbsp;to&nbsp;refresh.</span></dd></dl>
+
+<dl><dt><a name="AttentionSystem-set_goal"><strong>set_goal</strong></a>(self, goal: 'str') -&gt; 'None'</dt><dd><span class="code">Set&nbsp;a&nbsp;goal&nbsp;for&nbsp;executive&nbsp;(top-down)&nbsp;attention.<br>
+&nbsp;<br>
+The&nbsp;goal&nbsp;biases&nbsp;attention&nbsp;toward&nbsp;goal-relevant&nbsp;concepts.<br>
+Concepts&nbsp;semantically&nbsp;related&nbsp;to&nbsp;the&nbsp;goal&nbsp;in&nbsp;the&nbsp;concept<br>
+network&nbsp;get&nbsp;amplified&nbsp;via&nbsp;spreading&nbsp;activation.&nbsp;This&nbsp;is&nbsp;the<br>
+biased&nbsp;competition&nbsp;model&nbsp;(Desimone&nbsp;&amp;&nbsp;Duncan,&nbsp;1995).<br>
+&nbsp;<br>
+The&nbsp;goal&nbsp;string&nbsp;is&nbsp;tokenized&nbsp;into&nbsp;concept-like&nbsp;words.&nbsp;Function<br>
+words&nbsp;(articles,&nbsp;prepositions,&nbsp;conjunctions,&nbsp;etc.)&nbsp;are&nbsp;filtered<br>
+out&nbsp;so&nbsp;they&nbsp;do&nbsp;not&nbsp;waste&nbsp;limited&nbsp;focus&nbsp;capacity.&nbsp;Only&nbsp;words&nbsp;that<br>
+correspond&nbsp;to&nbsp;existing&nbsp;concepts&nbsp;in&nbsp;the&nbsp;network&nbsp;capture<br>
+executive&nbsp;attention,&nbsp;and&nbsp;at&nbsp;most&nbsp;``max_foci``&nbsp;of&nbsp;them&nbsp;—&nbsp;preventing<br>
+the&nbsp;goal's&nbsp;own&nbsp;words&nbsp;from&nbsp;evicting&nbsp;each&nbsp;other.&nbsp;Executive&nbsp;foci<br>
+from&nbsp;a&nbsp;*previous*&nbsp;goal&nbsp;are&nbsp;cleared&nbsp;first,&nbsp;so&nbsp;goal-directed<br>
+attention&nbsp;tracks&nbsp;the&nbsp;current&nbsp;goal&nbsp;rather&nbsp;than&nbsp;accumulating<br>
+stale&nbsp;biases.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;goal:&nbsp;The&nbsp;goal&nbsp;description&nbsp;(e.g.,&nbsp;"answer&nbsp;the&nbsp;question<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;about&nbsp;consciousness").</span></dd></dl>
+
+<dl><dt><a name="AttentionSystem-suppress"><strong>suppress</strong></a>(self, target: 'str') -&gt; 'None'</dt><dd><span class="code">Explicitly&nbsp;suppress&nbsp;a&nbsp;target&nbsp;(negative&nbsp;attention).<br>
+&nbsp;<br>
+Suppresses&nbsp;the&nbsp;target's&nbsp;activation&nbsp;in&nbsp;the&nbsp;concept&nbsp;network.<br>
+This&nbsp;is&nbsp;the&nbsp;complement&nbsp;of&nbsp;focus_on&nbsp;—&nbsp;selective&nbsp;attention<br>
+involves&nbsp;both&nbsp;amplification&nbsp;of&nbsp;the&nbsp;attended&nbsp;and&nbsp;suppression<br>
+of&nbsp;the&nbsp;unattended.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;target:&nbsp;What&nbsp;to&nbsp;suppress&nbsp;(concept&nbsp;name&nbsp;or&nbsp;input&nbsp;ID).</span></dd></dl>
+
+<dl><dt><a name="AttentionSystem-tick"><strong>tick</strong></a>(self, dt: 'float' = 1.0) -&gt; 'list[str]'</dt><dd><span class="code">Apply&nbsp;attention&nbsp;decay&nbsp;and&nbsp;remove&nbsp;expired&nbsp;foci.<br>
+&nbsp;<br>
+Sustained&nbsp;attention&nbsp;decays&nbsp;if&nbsp;not&nbsp;refreshed.&nbsp;Executive<br>
+(goal-directed)&nbsp;attention&nbsp;decays&nbsp;more&nbsp;slowly,&nbsp;modeling&nbsp;PFC<br>
+goal&nbsp;maintenance.&nbsp;Foci&nbsp;that&nbsp;decay&nbsp;below&nbsp;a&nbsp;minimum&nbsp;threshold<br>
+are&nbsp;removed.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;dt:&nbsp;Time&nbsp;step.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;List&nbsp;of&nbsp;targets&nbsp;whose&nbsp;foci&nbsp;expired&nbsp;(fell&nbsp;below&nbsp;threshold).</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>current_goal</strong></dt>
+<dd><span class="code">The&nbsp;current&nbsp;goal&nbsp;guiding&nbsp;executive&nbsp;attention.</span></dd>
+</dl>
+<dl><dt><strong>dominant_focus</strong></dt>
+<dd><span class="code">The&nbsp;strongest&nbsp;current&nbsp;focus&nbsp;(the&nbsp;spotlight&nbsp;center).</span></dd>
+</dl>
+<dl><dt><strong>foci</strong></dt>
+<dd><span class="code">Current&nbsp;attention&nbsp;foci.</span></dd>
+</dl>
+<dl><dt><strong>focused_targets</strong></dt>
+<dd><span class="code">Targets&nbsp;currently&nbsp;being&nbsp;attended&nbsp;to.</span></dd>
+</dl>
+<dl><dt><strong>is_focused</strong></dt>
+<dd><span class="code">Whether&nbsp;any&nbsp;attention&nbsp;is&nbsp;currently&nbsp;engaged.</span></dd>
+</dl>
+<dl><dt><strong>suppressed_targets</strong></dt>
+<dd><span class="code">Targets&nbsp;currently&nbsp;being&nbsp;suppressed.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="AttentionType">class <strong>AttentionType</strong></a>(<a href="enum.html#Enum">enum.Enum</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#AttentionType">AttentionType</a>(*values)<br>
+&nbsp;<br>
+The&nbsp;type&nbsp;of&nbsp;attention&nbsp;currently&nbsp;engaged.<br>
+&nbsp;<br>
+Different&nbsp;attention&nbsp;types&nbsp;engage&nbsp;different&nbsp;neural&nbsp;systems&nbsp;and<br>
+have&nbsp;different&nbsp;effects&nbsp;on&nbsp;processing.&nbsp;Knowing&nbsp;which&nbsp;type&nbsp;is<br>
+active&nbsp;helps&nbsp;the&nbsp;cognition&nbsp;engine&nbsp;understand&nbsp;*how*&nbsp;it's&nbsp;attending,<br>
+not&nbsp;just&nbsp;*what*&nbsp;it's&nbsp;attending&nbsp;to.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.parietal_lobe.attention.html#AttentionType">AttentionType</a></dd>
+<dd><a href="enum.html#Enum">enum.Enum</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>CAPTURED</strong> = &lt;AttentionType.CAPTURED: 'captured'&gt;</dl>
+
+<dl><dt><strong>DIVIDED</strong> = &lt;AttentionType.DIVIDED: 'divided'&gt;</dl>
+
+<dl><dt><strong>EXECUTIVE</strong> = &lt;AttentionType.EXECUTIVE: 'executive'&gt;</dl>
+
+<dl><dt><strong>SELECTIVE</strong> = &lt;AttentionType.SELECTIVE: 'selective'&gt;</dl>
+
+<dl><dt><strong>SUSTAINED</strong> = &lt;AttentionType.SUSTAINED: 'sustained'&gt;</dl>
+
+<hr>
+Data descriptors inherited from <a href="enum.html#Enum">enum.Enum</a>:<br>
+<dl><dt><strong>name</strong></dt>
+<dd><span class="code">The&nbsp;name&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<dl><dt><strong>value</strong></dt>
+<dd><span class="code">The&nbsp;value&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<hr>
+Static methods inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><a name="AttentionType-__contains__"><strong>__contains__</strong></a>(value)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;`value`&nbsp;is&nbsp;in&nbsp;`cls`.<br>
+&nbsp;<br>
+`value`&nbsp;is&nbsp;in&nbsp;`cls`&nbsp;if:<br>
+1)&nbsp;`value`&nbsp;is&nbsp;a&nbsp;member&nbsp;of&nbsp;`cls`,&nbsp;or<br>
+2)&nbsp;`value`&nbsp;is&nbsp;the&nbsp;value&nbsp;of&nbsp;one&nbsp;of&nbsp;the&nbsp;`cls`'s&nbsp;members.</span></dd></dl>
+
+<dl><dt><a name="AttentionType-__getitem__"><strong>__getitem__</strong></a>(name)</dt><dd><span class="code">Return&nbsp;the&nbsp;member&nbsp;matching&nbsp;`name`.</span></dd></dl>
+
+<dl><dt><a name="AttentionType-__iter__"><strong>__iter__</strong></a>()</dt><dd><span class="code">Return&nbsp;members&nbsp;in&nbsp;definition&nbsp;order.</span></dd></dl>
+
+<dl><dt><a name="AttentionType-__len__"><strong>__len__</strong></a>()</dt><dd><span class="code">Return&nbsp;the&nbsp;number&nbsp;of&nbsp;members&nbsp;(no&nbsp;aliases)</span></dd></dl>
+
+<hr>
+Readonly properties inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><strong>__members__</strong></dt>
+<dd><span class="code">Returns&nbsp;a&nbsp;mapping&nbsp;of&nbsp;member&nbsp;name-&gt;value.<br>
+&nbsp;<br>
+This&nbsp;mapping&nbsp;lists&nbsp;all&nbsp;enum&nbsp;members,&nbsp;including&nbsp;aliases.&nbsp;Note&nbsp;that&nbsp;this<br>
+is&nbsp;a&nbsp;read-only&nbsp;view&nbsp;of&nbsp;the&nbsp;internal&nbsp;mapping.</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['AttentionFocus', 'AttentionSystem', 'AttentionType']<br>
+<strong>__annotations__</strong> = {'_GOAL_STOPWORDS': 'frozenset[str]'}</td></tr></table>
+</body></html>

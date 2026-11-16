@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.frontal_lobe.reasoning.competence</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.frontal_lobe.html" class="white">frontal_lobe</a>.<a href="Self_World.frontal_lobe.reasoning.html" class="white">reasoning</a>.competence</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/reasoning/competence.py">/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/reasoning/competence.py</a></td></tr></table>
+    <p><span class="code">Task&nbsp;competence&nbsp;—&nbsp;domain-general&nbsp;situation&nbsp;→&nbsp;action&nbsp;→&nbsp;skill&nbsp;memory.<br>
+&nbsp;<br>
+This&nbsp;module&nbsp;is&nbsp;the&nbsp;shared&nbsp;substrate&nbsp;underneath&nbsp;domain-specific&nbsp;solvers.<br>
+It&nbsp;does&nbsp;not&nbsp;know&nbsp;about&nbsp;grids,&nbsp;tools,&nbsp;code,&nbsp;or&nbsp;conversation.&nbsp;A&nbsp;domain<br>
+adapter&nbsp;supplies&nbsp;structured&nbsp;observations&nbsp;and&nbsp;operator&nbsp;names;&nbsp;the<br>
+substrate&nbsp;supplies&nbsp;the&nbsp;parts&nbsp;every&nbsp;task&nbsp;needs:<br>
+&nbsp;<br>
+-&nbsp;**Schema&nbsp;recognition:**&nbsp;group&nbsp;states&nbsp;by&nbsp;their&nbsp;structural&nbsp;features,<br>
+&nbsp;&nbsp;available&nbsp;actions,&nbsp;entities,&nbsp;and&nbsp;success&nbsp;conditions&nbsp;rather&nbsp;than&nbsp;by<br>
+&nbsp;&nbsp;surface&nbsp;identity.<br>
+-&nbsp;**Affordance&nbsp;learning:**&nbsp;learn&nbsp;which&nbsp;state&nbsp;variables&nbsp;an&nbsp;action<br>
+&nbsp;&nbsp;changes,&nbsp;and&nbsp;with&nbsp;what&nbsp;confidence.<br>
+-&nbsp;**Prediction&nbsp;checking:**&nbsp;compare&nbsp;expected&nbsp;effects&nbsp;with&nbsp;observed<br>
+&nbsp;&nbsp;transitions&nbsp;so&nbsp;"solved"&nbsp;means&nbsp;the&nbsp;world&nbsp;actually&nbsp;satisfied&nbsp;a&nbsp;goal.<br>
+-&nbsp;**Skill&nbsp;consolidation:**&nbsp;retain&nbsp;verified&nbsp;action&nbsp;sequences&nbsp;and<br>
+&nbsp;&nbsp;retrieve&nbsp;them&nbsp;on&nbsp;structurally&nbsp;similar&nbsp;tasks.<br>
+&nbsp;<br>
+The&nbsp;design&nbsp;separates&nbsp;*schema*&nbsp;from&nbsp;*binding*:&nbsp;the&nbsp;signature&nbsp;says&nbsp;what<br>
+kind&nbsp;of&nbsp;situation&nbsp;this&nbsp;is;&nbsp;the&nbsp;concrete&nbsp;state&nbsp;values&nbsp;bind&nbsp;that&nbsp;schema<br>
+to&nbsp;the&nbsp;current&nbsp;instance.&nbsp;That&nbsp;mirrors&nbsp;current&nbsp;evidence&nbsp;that&nbsp;task-type<br>
+recognition&nbsp;and&nbsp;instance&nbsp;bindings&nbsp;are&nbsp;dissociable,&nbsp;while&nbsp;remaining<br>
+small&nbsp;enough&nbsp;to&nbsp;persist&nbsp;as&nbsp;ordinary&nbsp;JSON.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="hashlib.html">hashlib</a><br>
+<a href="json.html">json</a><br>
+</td><td class="multicolumn"><a href="logging.html">logging</a><br>
+<a href="math.html">math</a><br>
+</td><td class="multicolumn"><a href="re.html">re</a><br>
+<a href="time.html">time</a><br>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.competence.html#EffectModel">EffectModel</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.competence.html#EffectPrediction">EffectPrediction</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.competence.html#GoalCondition">GoalCondition</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.competence.html#LearnedSkill">LearnedSkill</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.competence.html#OperatorModel">OperatorModel</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.competence.html#ProcedureStep">ProcedureStep</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.competence.html#SkillMatch">SkillMatch</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.competence.html#TaskCompetence">TaskCompetence</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.competence.html#TaskContext">TaskContext</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.competence.html#TaskSchema">TaskSchema</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.competence.html#TaskSignature">TaskSignature</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.competence.html#TransitionCheck">TransitionCheck</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="EffectModel">class <strong>EffectModel</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#EffectModel">EffectModel</a>(key:&nbsp;'str',&nbsp;observations:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;unchanged:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;changed:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;numeric_changes:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;delta_sum:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;to_counts:&nbsp;'dict[str,&nbsp;int]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;to_values:&nbsp;'dict[str,&nbsp;Scalar]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Learned&nbsp;effect&nbsp;distribution&nbsp;for&nbsp;one&nbsp;state&nbsp;variable.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="EffectModel-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="EffectModel-__init__"><strong>__init__</strong></a>(self, key: 'str', observations: 'int' = 0, unchanged: 'int' = 0, changed: 'int' = 0, numeric_changes: 'int' = 0, delta_sum: 'float' = 0.0, to_counts: 'dict[str, int]' = &lt;factory&gt;, to_values: 'dict[str, Scalar]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="EffectModel-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="EffectModel-observe"><strong>observe</strong></a>(self, before: 'Scalar', after: 'Scalar') -&gt; 'None'</dt></dl>
+
+<dl><dt><a name="EffectModel-predict"><strong>predict</strong></a>(self, before: 'Scalar') -&gt; 'EffectPrediction | None'</dt></dl>
+
+<dl><dt><a name="EffectModel-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict[str, Any]'</dt></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="EffectModel-from_dict"><strong>from_dict</strong></a>(data: 'Mapping[str, Any]') -&gt; 'EffectModel'</dt><dd><span class="code">Reconstruct&nbsp;an&nbsp;<a href="#EffectModel">EffectModel</a>&nbsp;from&nbsp;a&nbsp;serialized&nbsp;mapping.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>changed</strong></dt>
+</dl>
+<dl><dt><strong>delta_sum</strong></dt>
+</dl>
+<dl><dt><strong>key</strong></dt>
+</dl>
+<dl><dt><strong>numeric_changes</strong></dt>
+</dl>
+<dl><dt><strong>observations</strong></dt>
+</dl>
+<dl><dt><strong>to_counts</strong></dt>
+</dl>
+<dl><dt><strong>to_values</strong></dt>
+</dl>
+<dl><dt><strong>unchanged</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'changed': 'int', 'delta_sum': 'float', 'key': 'str', 'numeric_changes': 'int', 'observations': 'int', 'to_counts': 'dict[str, int]', 'to_values': 'dict[str, Scalar]', 'unchanged': 'int'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'changed': Field(name='changed',type='int',default=0,defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'delta_sum': Field(name='delta_sum',type='float',default=0.0,...appingproxy({}),kw_only=False,_field_type=_FIELD), 'key': Field(name='key',type='str',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD), 'numeric_changes': Field(name='numeric_changes',type='int',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'observations': Field(name='observations',type='int',default=0,d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'to_counts': Field(name='to_counts',type='dict[str, int]',def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'to_values': Field(name='to_values',type='dict[str, Scalar]',...appingproxy({}),kw_only=False,_field_type=_FIELD), 'unchanged': Field(name='unchanged',type='int',default=0,defa...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('key', 'observations', 'unchanged', 'changed', 'numeric_changes', 'delta_sum', 'to_counts', 'to_values')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="EffectPrediction">class <strong>EffectPrediction</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#EffectPrediction">EffectPrediction</a>(key:&nbsp;'str',&nbsp;kind:&nbsp;'str',&nbsp;expected:&nbsp;'Scalar',&nbsp;confidence:&nbsp;'float',&nbsp;delta:&nbsp;'float&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;predicted&nbsp;state-variable&nbsp;change&nbsp;for&nbsp;one&nbsp;action.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="EffectPrediction-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="EffectPrediction-__init__"><strong>__init__</strong></a>(self, key: 'str', kind: 'str', expected: 'Scalar', confidence: 'float', delta: 'float | None' = None) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="EffectPrediction-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="EffectPrediction-matches"><strong>matches</strong></a>(self, actual: 'Scalar') -&gt; 'bool'</dt></dl>
+
+<dl><dt><a name="EffectPrediction-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict[str, Any]'</dt></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>confidence</strong></dt>
+</dl>
+<dl><dt><strong>delta</strong></dt>
+</dl>
+<dl><dt><strong>expected</strong></dt>
+</dl>
+<dl><dt><strong>key</strong></dt>
+</dl>
+<dl><dt><strong>kind</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'confidence': 'float', 'delta': 'float | None', 'expected': 'Scalar', 'key': 'str', 'kind': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'confidence': Field(name='confidence',type='float',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD), 'delta': Field(name='delta',type='float | None',default=N...appingproxy({}),kw_only=False,_field_type=_FIELD), 'expected': Field(name='expected',type='Scalar',default=&lt;dat...appingproxy({}),kw_only=False,_field_type=_FIELD), 'key': Field(name='key',type='str',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD), 'kind': Field(name='kind',type='str',default=&lt;dataclasse...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('key', 'kind', 'expected', 'confidence', 'delta')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="GoalCondition">class <strong>GoalCondition</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#GoalCondition">GoalCondition</a>(key:&nbsp;'str',&nbsp;op:&nbsp;'str'&nbsp;=&nbsp;'eq',&nbsp;value:&nbsp;'Any'&nbsp;=&nbsp;True,&nbsp;weight:&nbsp;'float'&nbsp;=&nbsp;1.0,&nbsp;tolerance:&nbsp;'float'&nbsp;=&nbsp;1e-09)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;serializable&nbsp;success&nbsp;predicate&nbsp;over&nbsp;a&nbsp;state&nbsp;variable.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="GoalCondition-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="GoalCondition-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="GoalCondition-__getstate__"><strong>__getstate__</strong></a> = _dataclass_getstate(self)<span class="grey"><span class="heading-text"> from <a href="dataclasses.html">dataclasses</a></span></span></dt><dd><span class="code">#&nbsp;_dataclass_getstate&nbsp;and&nbsp;_dataclass_setstate&nbsp;are&nbsp;needed&nbsp;for&nbsp;pickling&nbsp;frozen<br>
+#&nbsp;classes&nbsp;with&nbsp;slots.&nbsp;&nbsp;These&nbsp;could&nbsp;be&nbsp;slightly&nbsp;more&nbsp;performant&nbsp;if&nbsp;we&nbsp;generated<br>
+#&nbsp;the&nbsp;code&nbsp;instead&nbsp;of&nbsp;iterating&nbsp;over&nbsp;fields.&nbsp;&nbsp;But&nbsp;that&nbsp;can&nbsp;be&nbsp;a&nbsp;project&nbsp;for<br>
+#&nbsp;another&nbsp;day,&nbsp;if&nbsp;performance&nbsp;becomes&nbsp;an&nbsp;issue.</span></dd></dl>
+
+<dl><dt><a name="GoalCondition-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="GoalCondition-__init__"><strong>__init__</strong></a>(self, key: 'str', op: 'str' = 'eq', value: 'Any' = True, weight: 'float' = 1.0, tolerance: 'float' = 1e-09) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="GoalCondition-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="GoalCondition-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<dl><dt><a name="GoalCondition-__setstate__"><strong>__setstate__</strong></a> = _dataclass_setstate(self, state)<span class="grey"><span class="heading-text"> from <a href="dataclasses.html">dataclasses</a></span></span></dt></dl>
+
+<dl><dt><a name="GoalCondition-descriptor"><strong>descriptor</strong></a>(self) -&gt; 'str'</dt></dl>
+
+<dl><dt><a name="GoalCondition-satisfied"><strong>satisfied</strong></a>(self, state: 'Mapping[str, Scalar]') -&gt; 'bool'</dt></dl>
+
+<dl><dt><a name="GoalCondition-score"><strong>score</strong></a>(self, state: 'Mapping[str, Scalar]') -&gt; 'float'</dt><dd><span class="code">Return&nbsp;how&nbsp;satisfied&nbsp;this&nbsp;condition&nbsp;is,&nbsp;in&nbsp;``[0,&nbsp;1]``.</span></dd></dl>
+
+<dl><dt><a name="GoalCondition-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict[str, Any]'</dt></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="GoalCondition-from_dict"><strong>from_dict</strong></a>(data: 'Mapping[str, Any]') -&gt; 'GoalCondition'</dt><dd><span class="code">Reconstruct&nbsp;a&nbsp;<a href="#GoalCondition">GoalCondition</a>&nbsp;from&nbsp;a&nbsp;serialized&nbsp;mapping.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>key</strong></dt>
+</dl>
+<dl><dt><strong>op</strong></dt>
+</dl>
+<dl><dt><strong>tolerance</strong></dt>
+</dl>
+<dl><dt><strong>value</strong></dt>
+</dl>
+<dl><dt><strong>weight</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'key': 'str', 'op': 'str', 'tolerance': 'float', 'value': 'Any', 'weight': 'float'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'key': Field(name='key',type='str',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD), 'op': Field(name='op',type='str',default='eq',default_...appingproxy({}),kw_only=False,_field_type=_FIELD), 'tolerance': Field(name='tolerance',type='float',default=1e-0...appingproxy({}),kw_only=False,_field_type=_FIELD), 'value': Field(name='value',type='Any',default=True,defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'weight': Field(name='weight',type='float',default=1.0,def...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('key', 'op', 'value', 'weight', 'tolerance')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="LearnedSkill">class <strong>LearnedSkill</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#LearnedSkill">LearnedSkill</a>(skill_id:&nbsp;'str',&nbsp;signature:&nbsp;'<a href="#TaskSignature">TaskSignature</a>',&nbsp;steps:&nbsp;'tuple[<a href="#ProcedureStep">ProcedureStep</a>,&nbsp;...]',&nbsp;success_conditions:&nbsp;'tuple[<a href="#GoalCondition">GoalCondition</a>,&nbsp;...]',&nbsp;uses:&nbsp;'int'&nbsp;=&nbsp;1,&nbsp;successes:&nbsp;'int'&nbsp;=&nbsp;1,&nbsp;failures:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;verification_score:&nbsp;'float'&nbsp;=&nbsp;1.0,&nbsp;verification:&nbsp;'str'&nbsp;=&nbsp;'reported',&nbsp;created_at:&nbsp;'float'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;updated_at:&nbsp;'float'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;verified&nbsp;procedure&nbsp;reusable&nbsp;under&nbsp;a&nbsp;task&nbsp;schema.<br>
+&nbsp;<br>
+``verification``&nbsp;records&nbsp;the&nbsp;strongest&nbsp;evidence&nbsp;behind&nbsp;the&nbsp;skill:<br>
+"reported"&nbsp;(asserted),&nbsp;"solver"&nbsp;(epistemically&nbsp;verified),&nbsp;or<br>
+"external"&nbsp;(checked&nbsp;against&nbsp;observed&nbsp;world&nbsp;state).<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="LearnedSkill-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="LearnedSkill-__init__"><strong>__init__</strong></a>(self, skill_id: 'str', signature: 'TaskSignature', steps: 'tuple[ProcedureStep, ...]', success_conditions: 'tuple[GoalCondition, ...]', uses: 'int' = 1, successes: 'int' = 1, failures: 'int' = 0, verification_score: 'float' = 1.0, verification: 'str' = 'reported', created_at: 'float' = &lt;factory&gt;, updated_at: 'float' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="LearnedSkill-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="LearnedSkill-step_labels"><strong>step_labels</strong></a>(self) -&gt; 'tuple[str, ...]'</dt></dl>
+
+<dl><dt><a name="LearnedSkill-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict[str, Any]'</dt></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="LearnedSkill-from_dict"><strong>from_dict</strong></a>(data: 'Mapping[str, Any]') -&gt; 'LearnedSkill'</dt><dd><span class="code">Reconstruct&nbsp;a&nbsp;<a href="#LearnedSkill">LearnedSkill</a>&nbsp;from&nbsp;a&nbsp;serialized&nbsp;mapping.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>confidence</strong></dt>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>created_at</strong></dt>
+</dl>
+<dl><dt><strong>failures</strong></dt>
+</dl>
+<dl><dt><strong>signature</strong></dt>
+</dl>
+<dl><dt><strong>skill_id</strong></dt>
+</dl>
+<dl><dt><strong>steps</strong></dt>
+</dl>
+<dl><dt><strong>success_conditions</strong></dt>
+</dl>
+<dl><dt><strong>successes</strong></dt>
+</dl>
+<dl><dt><strong>updated_at</strong></dt>
+</dl>
+<dl><dt><strong>uses</strong></dt>
+</dl>
+<dl><dt><strong>verification</strong></dt>
+</dl>
+<dl><dt><strong>verification_score</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'created_at': 'float', 'failures': 'int', 'signature': 'TaskSignature', 'skill_id': 'str', 'steps': 'tuple[ProcedureStep, ...]', 'success_conditions': 'tuple[GoalCondition, ...]', 'successes': 'int', 'updated_at': 'float', 'uses': 'int', 'verification': 'str', ...}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'created_at': Field(name='created_at',type='float',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD), 'failures': Field(name='failures',type='int',default=0,defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'signature': Field(name='signature',type='TaskSignature',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'skill_id': Field(name='skill_id',type='str',default=&lt;datacl...appingproxy({}),kw_only=False,_field_type=_FIELD), 'steps': Field(name='steps',type='tuple[ProcedureStep, .....appingproxy({}),kw_only=False,_field_type=_FIELD), 'success_conditions': Field(name='success_conditions',type='tuple[Goal...appingproxy({}),kw_only=False,_field_type=_FIELD), 'successes': Field(name='successes',type='int',default=1,defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'updated_at': Field(name='updated_at',type='float',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD), 'uses': Field(name='uses',type='int',default=1,default_f...appingproxy({}),kw_only=False,_field_type=_FIELD), 'verification': Field(name='verification',type='str',default='re...appingproxy({}),kw_only=False,_field_type=_FIELD), ...}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('skill_id', 'signature', 'steps', 'success_conditions', 'uses', 'successes', 'failures', 'verification_score', 'verification', 'created_at', 'updated_at')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="OperatorModel">class <strong>OperatorModel</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#OperatorModel">OperatorModel</a>(action:&nbsp;'str',&nbsp;uses:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;successes:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;failures:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;effects:&nbsp;'dict[str,&nbsp;<a href="#EffectModel">EffectModel</a>]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;conditional:&nbsp;'dict[str,&nbsp;dict[str,&nbsp;<a href="#EffectModel">EffectModel</a>]]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Learned&nbsp;affordance&nbsp;model&nbsp;for&nbsp;one&nbsp;named&nbsp;action/operator.<br>
+&nbsp;<br>
+``effects``&nbsp;is&nbsp;the&nbsp;unconditional&nbsp;record;&nbsp;``conditional``&nbsp;holds&nbsp;the<br>
+same&nbsp;evidence&nbsp;split&nbsp;by&nbsp;the&nbsp;qualitative&nbsp;state&nbsp;shape&nbsp;it&nbsp;was&nbsp;observed<br>
+under.&nbsp;The&nbsp;split&nbsp;is&nbsp;what&nbsp;separates&nbsp;"this&nbsp;action&nbsp;changes&nbsp;this<br>
+variable"&nbsp;from&nbsp;"this&nbsp;action&nbsp;changes&nbsp;this&nbsp;variable&nbsp;*when&nbsp;the&nbsp;flag<br>
+is&nbsp;set*"&nbsp;—&nbsp;a&nbsp;model&nbsp;that&nbsp;averaged&nbsp;over&nbsp;the&nbsp;deciding&nbsp;condition&nbsp;would<br>
+predict&nbsp;wrongly&nbsp;half&nbsp;the&nbsp;time&nbsp;while&nbsp;looking&nbsp;confident.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="OperatorModel-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="OperatorModel-__init__"><strong>__init__</strong></a>(self, action: 'str', uses: 'int' = 0, successes: 'int' = 0, failures: 'int' = 0, effects: 'dict[str, EffectModel]' = &lt;factory&gt;, conditional: 'dict[str, dict[str, EffectModel]]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="OperatorModel-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="OperatorModel-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict[str, Any]'</dt></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="OperatorModel-from_dict"><strong>from_dict</strong></a>(data: 'Mapping[str, Any]') -&gt; 'OperatorModel'</dt><dd><span class="code">Reconstruct&nbsp;an&nbsp;<a href="#OperatorModel">OperatorModel</a>&nbsp;from&nbsp;a&nbsp;serialized&nbsp;mapping.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>confidence</strong></dt>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>action</strong></dt>
+</dl>
+<dl><dt><strong>conditional</strong></dt>
+</dl>
+<dl><dt><strong>effects</strong></dt>
+</dl>
+<dl><dt><strong>failures</strong></dt>
+</dl>
+<dl><dt><strong>successes</strong></dt>
+</dl>
+<dl><dt><strong>uses</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'action': 'str', 'conditional': 'dict[str, dict[str, EffectModel]]', 'effects': 'dict[str, EffectModel]', 'failures': 'int', 'successes': 'int', 'uses': 'int'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'action': Field(name='action',type='str',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD), 'conditional': Field(name='conditional',type='dict[str, dict[st...appingproxy({}),kw_only=False,_field_type=_FIELD), 'effects': Field(name='effects',type='dict[str, EffectModel...appingproxy({}),kw_only=False,_field_type=_FIELD), 'failures': Field(name='failures',type='int',default=0,defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'successes': Field(name='successes',type='int',default=0,defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'uses': Field(name='uses',type='int',default=0,default_f...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('action', 'uses', 'successes', 'failures', 'effects', 'conditional')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ProcedureStep">class <strong>ProcedureStep</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ProcedureStep">ProcedureStep</a>(action:&nbsp;'str',&nbsp;parameters:&nbsp;'dict[str,&nbsp;Any]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;family:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;description:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;position:&nbsp;'int&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+One&nbsp;serializable&nbsp;step&nbsp;in&nbsp;a&nbsp;reusable&nbsp;procedure.<br>
+&nbsp;<br>
+``position``&nbsp;is&nbsp;the&nbsp;action's&nbsp;ordinal&nbsp;in&nbsp;the&nbsp;affordance&nbsp;list&nbsp;the<br>
+adapter&nbsp;presented&nbsp;at&nbsp;learning&nbsp;time&nbsp;—&nbsp;the&nbsp;step's&nbsp;*structural*<br>
+identity,&nbsp;independent&nbsp;of&nbsp;its&nbsp;name.&nbsp;It&nbsp;is&nbsp;what&nbsp;lets&nbsp;a&nbsp;foreign<br>
+domain&nbsp;rebind&nbsp;the&nbsp;step:&nbsp;when&nbsp;two&nbsp;domains&nbsp;share&nbsp;no&nbsp;vocabulary,<br>
+"the&nbsp;action&nbsp;that&nbsp;was&nbsp;second&nbsp;in&nbsp;the&nbsp;list"&nbsp;is&nbsp;still&nbsp;meaningful.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ProcedureStep-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="ProcedureStep-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="ProcedureStep-__getstate__"><strong>__getstate__</strong></a> = _dataclass_getstate(self)<span class="grey"><span class="heading-text"> from <a href="dataclasses.html">dataclasses</a></span></span></dt><dd><span class="code">#&nbsp;_dataclass_getstate&nbsp;and&nbsp;_dataclass_setstate&nbsp;are&nbsp;needed&nbsp;for&nbsp;pickling&nbsp;frozen<br>
+#&nbsp;classes&nbsp;with&nbsp;slots.&nbsp;&nbsp;These&nbsp;could&nbsp;be&nbsp;slightly&nbsp;more&nbsp;performant&nbsp;if&nbsp;we&nbsp;generated<br>
+#&nbsp;the&nbsp;code&nbsp;instead&nbsp;of&nbsp;iterating&nbsp;over&nbsp;fields.&nbsp;&nbsp;But&nbsp;that&nbsp;can&nbsp;be&nbsp;a&nbsp;project&nbsp;for<br>
+#&nbsp;another&nbsp;day,&nbsp;if&nbsp;performance&nbsp;becomes&nbsp;an&nbsp;issue.</span></dd></dl>
+
+<dl><dt><a name="ProcedureStep-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="ProcedureStep-__init__"><strong>__init__</strong></a>(self, action: 'str', parameters: 'dict[str, Any]' = &lt;factory&gt;, family: 'str' = '', description: 'str' = '', position: 'int | None' = None) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="ProcedureStep-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="ProcedureStep-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<dl><dt><a name="ProcedureStep-__setstate__"><strong>__setstate__</strong></a> = _dataclass_setstate(self, state)<span class="grey"><span class="heading-text"> from <a href="dataclasses.html">dataclasses</a></span></span></dt></dl>
+
+<dl><dt><a name="ProcedureStep-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict[str, Any]'</dt></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="ProcedureStep-from_dict"><strong>from_dict</strong></a>(data: 'Mapping[str, Any]') -&gt; 'ProcedureStep'</dt><dd><span class="code">Reconstruct&nbsp;a&nbsp;<a href="#ProcedureStep">ProcedureStep</a>&nbsp;from&nbsp;a&nbsp;serialized&nbsp;mapping.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>label</strong></dt>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>action</strong></dt>
+</dl>
+<dl><dt><strong>description</strong></dt>
+</dl>
+<dl><dt><strong>family</strong></dt>
+</dl>
+<dl><dt><strong>parameters</strong></dt>
+</dl>
+<dl><dt><strong>position</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'action': 'str', 'description': 'str', 'family': 'str', 'parameters': 'dict[str, Any]', 'position': 'int | None'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'action': Field(name='action',type='str',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD), 'description': Field(name='description',type='str',default='',d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'family': Field(name='family',type='str',default='',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'parameters': Field(name='parameters',type='dict[str, Any]',de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'position': Field(name='position',type='int | None',default=...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('action', 'parameters', 'family', 'description', 'position')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SkillMatch">class <strong>SkillMatch</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SkillMatch">SkillMatch</a>(skill:&nbsp;'<a href="#LearnedSkill">LearnedSkill</a>',&nbsp;similarity:&nbsp;'float',&nbsp;score:&nbsp;'float')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;retrieved&nbsp;skill&nbsp;plus&nbsp;its&nbsp;structural&nbsp;match&nbsp;evidence.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="SkillMatch-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="SkillMatch-__init__"><strong>__init__</strong></a>(self, skill: 'LearnedSkill', similarity: 'float', score: 'float') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="SkillMatch-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>score</strong></dt>
+</dl>
+<dl><dt><strong>similarity</strong></dt>
+</dl>
+<dl><dt><strong>skill</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'score': 'float', 'similarity': 'float', 'skill': 'LearnedSkill'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'score': Field(name='score',type='float',default=&lt;datacla...appingproxy({}),kw_only=False,_field_type=_FIELD), 'similarity': Field(name='similarity',type='float',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD), 'skill': Field(name='skill',type='LearnedSkill',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('skill', 'similarity', 'score')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="TaskCompetence">class <strong>TaskCompetence</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#TaskCompetence">TaskCompetence</a>(*,&nbsp;match_threshold:&nbsp;'float'&nbsp;=&nbsp;0.55,&nbsp;network:&nbsp;'ConceptNetwork&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;salience_getter:&nbsp;'Callable[[],&nbsp;float]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Domain-general&nbsp;task-schema,&nbsp;transition,&nbsp;and&nbsp;skill&nbsp;memory.<br>
+&nbsp;<br>
+Adapters&nbsp;remain&nbsp;responsible&nbsp;for&nbsp;acting&nbsp;in&nbsp;the&nbsp;world.&nbsp;This&nbsp;class<br>
+owns&nbsp;the&nbsp;shared&nbsp;structures&nbsp;that&nbsp;let&nbsp;an&nbsp;adapter&nbsp;recognize&nbsp;a&nbsp;task,<br>
+learn&nbsp;what&nbsp;actions&nbsp;do,&nbsp;verify&nbsp;outcomes,&nbsp;and&nbsp;reuse&nbsp;a&nbsp;verified<br>
+procedure&nbsp;on&nbsp;a&nbsp;structurally&nbsp;similar&nbsp;task.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="TaskCompetence-__init__"><strong>__init__</strong></a>(self, *, match_threshold: 'float' = 0.55, network: 'ConceptNetwork | None' = None, salience_getter: 'Callable[[], float] | None' = None) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="TaskCompetence-epistemic_bonus"><strong>epistemic_bonus</strong></a>(self, context: 'TaskContext', action: 'str', state: 'State') -&gt; 'float'</dt><dd><span class="code">Exploration&nbsp;pull&nbsp;toward&nbsp;actions&nbsp;that&nbsp;would&nbsp;test&nbsp;an<br>
+undecided&nbsp;mechanic&nbsp;hypothesis&nbsp;—&nbsp;directed&nbsp;curiosity&nbsp;rather<br>
+than&nbsp;undirected&nbsp;novelty.</span></dd></dl>
+
+<dl><dt><a name="TaskCompetence-goal_conditions"><strong>goal_conditions</strong></a>(self, context: 'TaskContext') -&gt; 'tuple[GoalCondition, ...]'</dt><dd><span class="code">The&nbsp;best&nbsp;standing&nbsp;goal&nbsp;hypothesis's&nbsp;conditions,&nbsp;if&nbsp;any.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;goal&nbsp;*inference*:&nbsp;the&nbsp;conditions&nbsp;are&nbsp;learned&nbsp;from<br>
+terminal&nbsp;states,&nbsp;not&nbsp;handed&nbsp;down&nbsp;—&nbsp;empty&nbsp;when&nbsp;nothing&nbsp;has<br>
+been&nbsp;abduced&nbsp;or&nbsp;everything&nbsp;abduced&nbsp;has&nbsp;been&nbsp;falsified.</span></dd></dl>
+
+<dl><dt><a name="TaskCompetence-goal_score"><strong>goal_score</strong></a>(self, context: 'TaskContext', state: 'State') -&gt; 'float'</dt><dd><span class="code">Satisfaction&nbsp;of&nbsp;inferred&nbsp;goals&nbsp;minus&nbsp;avoid&nbsp;conditions.</span></dd></dl>
+
+<dl><dt><a name="TaskCompetence-hypotheses"><strong>hypotheses</strong></a>(self, context: 'TaskContext') -&gt; 'list[Any]'</dt><dd><span class="code">The&nbsp;schema's&nbsp;live&nbsp;hypotheses&nbsp;—&nbsp;for&nbsp;introspection/tests.</span></dd></dl>
+
+<dl><dt><a name="TaskCompetence-make_signature"><strong>make_signature</strong></a>(self, *, domain: 'str', state: 'State', actions: 'Iterable[str]' = (), goal_conditions: 'Iterable[GoalCondition | str]' = (), entities: 'Iterable[str]' = (), roles: 'Iterable[str]' = ()) -&gt; 'TaskSignature'</dt></dl>
+
+<dl><dt><a name="TaskCompetence-mark_skill_failure"><strong>mark_skill_failure</strong></a>(self, skill_id: 'str') -&gt; 'None'</dt></dl>
+
+<dl><dt><a name="TaskCompetence-predict"><strong>predict</strong></a>(self, context: 'TaskContext', action: 'str', state: 'State') -&gt; 'tuple[EffectPrediction, ...]'</dt><dd><span class="code">Predict&nbsp;the&nbsp;state&nbsp;variables&nbsp;an&nbsp;action&nbsp;is&nbsp;likely&nbsp;to&nbsp;change.<br>
+&nbsp;<br>
+Evidence&nbsp;resolves&nbsp;most-specific&nbsp;first:&nbsp;the&nbsp;concrete&nbsp;operator<br>
+model&nbsp;for&nbsp;this&nbsp;exact&nbsp;action,&nbsp;then&nbsp;the&nbsp;lifted&nbsp;pattern&nbsp;induced<br>
+from&nbsp;siblings&nbsp;under&nbsp;the&nbsp;same&nbsp;qualitative&nbsp;state&nbsp;shape,&nbsp;then&nbsp;a<br>
+foreign&nbsp;skill&nbsp;rebound&nbsp;positionally&nbsp;onto&nbsp;this&nbsp;schema's<br>
+affordance&nbsp;order.&nbsp;Each&nbsp;layer&nbsp;is&nbsp;weaker&nbsp;evidence&nbsp;than&nbsp;the&nbsp;last<br>
+and&nbsp;each&nbsp;is&nbsp;real&nbsp;—&nbsp;an&nbsp;action&nbsp;never&nbsp;carried&nbsp;a&nbsp;prediction&nbsp;it<br>
+could&nbsp;not&nbsp;have&nbsp;earned.</span></dd></dl>
+
+<dl><dt><a name="TaskCompetence-predicted_goal_gain"><strong>predicted_goal_gain</strong></a>(self, context: 'TaskContext', action: 'str', state: 'State') -&gt; 'float'</dt><dd><span class="code">Goal-score&nbsp;change&nbsp;predicted&nbsp;for&nbsp;``action``&nbsp;by&nbsp;the&nbsp;schema's<br>
+effect&nbsp;models&nbsp;—&nbsp;means-ends&nbsp;evaluation&nbsp;through&nbsp;the&nbsp;learned<br>
+transition&nbsp;model,&nbsp;not&nbsp;through&nbsp;the&nbsp;grid.</span></dd></dl>
+
+<dl><dt><a name="TaskCompetence-recognize"><strong>recognize</strong></a>(self, *, domain: 'str', state: 'State', actions: 'Iterable[str]' = (), goal_conditions: 'Iterable[GoalCondition | str]' = (), entities: 'Iterable[str]' = (), roles: 'Iterable[str]' = ()) -&gt; 'TaskContext'</dt><dd><span class="code">Recognize&nbsp;a&nbsp;situation&nbsp;as&nbsp;an&nbsp;existing&nbsp;schema&nbsp;or&nbsp;a&nbsp;novel&nbsp;one.</span></dd></dl>
+
+<dl><dt><a name="TaskCompetence-record_episode"><strong>record_episode</strong></a>(self, context: 'TaskContext', *, steps: 'Iterable[ProcedureStep]', success: 'bool', verification_score: 'float', goal_conditions: 'Iterable[GoalCondition]' = (), verification: 'str' = 'reported', salience: 'float | None' = None, final_state: 'State | None' = None, terminal_changes: 'Iterable[str]' = ()) -&gt; 'LearnedSkill | None'</dt><dd><span class="code">Consolidate&nbsp;a&nbsp;verified&nbsp;episode&nbsp;into&nbsp;a&nbsp;reusable&nbsp;skill.<br>
+&nbsp;<br>
+Failed&nbsp;episodes&nbsp;update&nbsp;schema&nbsp;statistics&nbsp;but&nbsp;do&nbsp;not&nbsp;become<br>
+skills;&nbsp;a&nbsp;procedure&nbsp;is&nbsp;reusable&nbsp;only&nbsp;after&nbsp;a&nbsp;verifier&nbsp;says&nbsp;the<br>
+outcome&nbsp;satisfied&nbsp;the&nbsp;task.&nbsp;``verification``&nbsp;records&nbsp;*how*<br>
+success&nbsp;was&nbsp;established&nbsp;("reported"&nbsp;&lt;&nbsp;"solver"&nbsp;&lt;&nbsp;"external")&nbsp;—<br>
+a&nbsp;skill&nbsp;never&nbsp;claims&nbsp;stronger&nbsp;evidence&nbsp;than&nbsp;it&nbsp;received,&nbsp;and<br>
+later&nbsp;stronger&nbsp;evidence&nbsp;upgrades&nbsp;the&nbsp;record.<br>
+&nbsp;<br>
+``salience``&nbsp;is&nbsp;the&nbsp;neuromodulatory&nbsp;gate:&nbsp;dopamine/arousal<br>
+state&nbsp;at&nbsp;encoding&nbsp;decides&nbsp;whether&nbsp;a&nbsp;verified&nbsp;episode<br>
+*proceduralizes*.&nbsp;Below&nbsp;the&nbsp;floor&nbsp;the&nbsp;episode&nbsp;still&nbsp;enters&nbsp;the<br>
+schema&nbsp;ledger&nbsp;—&nbsp;episodic&nbsp;memory&nbsp;forms&nbsp;—&nbsp;but&nbsp;no&nbsp;skill&nbsp;is<br>
+written.&nbsp;Low-salience&nbsp;experience&nbsp;is&nbsp;remembered,&nbsp;not&nbsp;learned.<br>
+When&nbsp;omitted,&nbsp;the&nbsp;ambient&nbsp;broadcast&nbsp;level&nbsp;is&nbsp;read.</span></dd></dl>
+
+<dl><dt><a name="TaskCompetence-record_transition"><strong>record_transition</strong></a>(self, context: 'TaskContext', action: 'str', before: 'State', after: 'State', *, success: 'bool | None' = None) -&gt; 'TransitionCheck'</dt><dd><span class="code">Learn&nbsp;an&nbsp;action's&nbsp;effects&nbsp;from&nbsp;one&nbsp;observed&nbsp;transition.<br>
+&nbsp;<br>
+The&nbsp;returned&nbsp;check&nbsp;scores&nbsp;the&nbsp;prediction&nbsp;made&nbsp;*before*&nbsp;the&nbsp;new<br>
+evidence&nbsp;was&nbsp;incorporated,&nbsp;so&nbsp;a&nbsp;surprising&nbsp;transition&nbsp;is&nbsp;visible<br>
+as&nbsp;a&nbsp;low&nbsp;score&nbsp;rather&nbsp;than&nbsp;silently&nbsp;rewritten.</span></dd></dl>
+
+<dl><dt><a name="TaskCompetence-restore_checkpoint"><strong>restore_checkpoint</strong></a>(self, path: 'Path') -&gt; 'str'</dt><dd><span class="code">Adopt&nbsp;a&nbsp;checkpoint&nbsp;only&nbsp;when&nbsp;it&nbsp;carries&nbsp;more&nbsp;evidence.<br>
+&nbsp;<br>
+``transition_count``&nbsp;is&nbsp;cumulative,&nbsp;so&nbsp;the&nbsp;file&nbsp;wins&nbsp;strictly<br>
+when&nbsp;it&nbsp;knows&nbsp;more&nbsp;than&nbsp;this&nbsp;ledger&nbsp;—&nbsp;a&nbsp;crash-recovery&nbsp;file<br>
+newer&nbsp;than&nbsp;the&nbsp;last&nbsp;clean&nbsp;save.&nbsp;An&nbsp;older&nbsp;or&nbsp;equal&nbsp;file&nbsp;would<br>
+erase&nbsp;live&nbsp;learning&nbsp;and&nbsp;is&nbsp;refused.&nbsp;Returns&nbsp;``"loaded"``,<br>
+``"none"``&nbsp;(nothing&nbsp;newer&nbsp;to&nbsp;take),&nbsp;or&nbsp;``"unknown"``&nbsp;(a&nbsp;file<br>
+existed&nbsp;but&nbsp;could&nbsp;not&nbsp;be&nbsp;read&nbsp;—&nbsp;never&nbsp;masquerades&nbsp;as&nbsp;cold<br>
+start).</span></dd></dl>
+
+<dl><dt><a name="TaskCompetence-save_checkpoint"><strong>save_checkpoint</strong></a>(self, path: 'Path') -&gt; 'bool'</dt><dd><span class="code">Episode-boundary&nbsp;checkpoint&nbsp;of&nbsp;the&nbsp;whole&nbsp;competence&nbsp;ledger.<br>
+&nbsp;<br>
+The&nbsp;main&nbsp;state&nbsp;save&nbsp;runs&nbsp;on&nbsp;shutdown&nbsp;or&nbsp;sleep;&nbsp;a&nbsp;crash&nbsp;mid-run<br>
+would&nbsp;otherwise&nbsp;take&nbsp;every&nbsp;operator&nbsp;and&nbsp;skill&nbsp;the&nbsp;episode&nbsp;just<br>
+earned.&nbsp;Advisory&nbsp;—&nbsp;a&nbsp;failed&nbsp;write&nbsp;never&nbsp;interrupts&nbsp;play.</span></dd></dl>
+
+<dl><dt><a name="TaskCompetence-skill_matches"><strong>skill_matches</strong></a>(self, signature: 'TaskSignature', *, limit: 'int' = 4) -&gt; 'list[SkillMatch]'</dt><dd><span class="code">Retrieve&nbsp;reusable&nbsp;skills,&nbsp;vocabulary-aligned&nbsp;first.<br>
+&nbsp;<br>
+Skills&nbsp;that&nbsp;clear&nbsp;full-signature&nbsp;similarity&nbsp;are&nbsp;offered<br>
+first&nbsp;—&nbsp;including&nbsp;foreign&nbsp;skills&nbsp;whose&nbsp;concrete&nbsp;vocabulary<br>
+genuinely&nbsp;aligns&nbsp;(the&nbsp;domain&nbsp;discount&nbsp;lives&nbsp;in<br>
+``<a href="#TaskSignature">TaskSignature</a>.similarity``).<br>
+&nbsp;<br>
+Skills&nbsp;from&nbsp;other&nbsp;domains&nbsp;that&nbsp;cannot&nbsp;clear&nbsp;the&nbsp;full&nbsp;bar&nbsp;can<br>
+still&nbsp;transfer&nbsp;on&nbsp;abstract&nbsp;structure&nbsp;alone:&nbsp;shared&nbsp;schema-level<br>
+roles&nbsp;plus&nbsp;a&nbsp;readable&nbsp;procedure&nbsp;interface&nbsp;—&nbsp;a&nbsp;"support"&nbsp;axis<br>
+the&nbsp;foreign&nbsp;adapter&nbsp;can&nbsp;rebind.&nbsp;For&nbsp;a&nbsp;cross&nbsp;match,<br>
+``<a href="#SkillMatch">SkillMatch</a>.similarity``&nbsp;carries&nbsp;the&nbsp;role&nbsp;overlap,&nbsp;not&nbsp;the<br>
+full-signature&nbsp;score.&nbsp;Foreign&nbsp;skills&nbsp;are&nbsp;always&nbsp;ranked&nbsp;below<br>
+similarity&nbsp;matches&nbsp;and&nbsp;capped&nbsp;separately,&nbsp;so&nbsp;they&nbsp;can&nbsp;inform<br>
+but&nbsp;never&nbsp;crowd&nbsp;out&nbsp;vocabulary-aligned&nbsp;evidence.</span></dd></dl>
+
+<dl><dt><a name="TaskCompetence-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict[str, Any]'</dt></dl>
+
+<dl><dt><a name="TaskCompetence-verify"><strong>verify</strong></a>(self, goal_conditions: 'Iterable[GoalCondition]', state: 'State') -&gt; 'float'</dt><dd><span class="code">Weighted&nbsp;satisfaction&nbsp;of&nbsp;explicit&nbsp;success&nbsp;predicates.</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="TaskCompetence-from_dict"><strong>from_dict</strong></a>(data: 'Mapping[str, Any]', *, network: 'ConceptNetwork | None' = None, salience_getter: 'Callable[[], float] | None' = None) -&gt; 'TaskCompetence'</dt><dd><span class="code">Reconstruct&nbsp;a&nbsp;<a href="#TaskCompetence">TaskCompetence</a>&nbsp;from&nbsp;a&nbsp;serialized&nbsp;mapping.<br>
+&nbsp;<br>
+``network``/``salience_getter``&nbsp;are&nbsp;runtime&nbsp;hooks&nbsp;the&nbsp;file<br>
+cannot&nbsp;carry&nbsp;—&nbsp;pass&nbsp;them&nbsp;back&nbsp;in&nbsp;or&nbsp;the&nbsp;restored&nbsp;ledger&nbsp;loses<br>
+concept&nbsp;grounding&nbsp;and&nbsp;neuromodulatory&nbsp;gating&nbsp;even&nbsp;though&nbsp;its<br>
+schemas&nbsp;and&nbsp;skills&nbsp;survive.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>schema_count</strong></dt>
+</dl>
+<dl><dt><strong>skill_count</strong></dt>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="TaskContext">class <strong>TaskContext</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#TaskContext">TaskContext</a>(signature:&nbsp;'<a href="#TaskSignature">TaskSignature</a>',&nbsp;schema:&nbsp;'<a href="#TaskSchema">TaskSchema</a>',&nbsp;similarity:&nbsp;'float',&nbsp;novel:&nbsp;'bool',&nbsp;skills:&nbsp;'tuple[<a href="#SkillMatch">SkillMatch</a>,&nbsp;...]'&nbsp;=&nbsp;(),&nbsp;action_order:&nbsp;'tuple[str,&nbsp;...]'&nbsp;=&nbsp;())&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;result&nbsp;of&nbsp;recognizing&nbsp;a&nbsp;task&nbsp;instance.<br>
+&nbsp;<br>
+``action_order``&nbsp;is&nbsp;the&nbsp;affordance&nbsp;order&nbsp;the&nbsp;adapter&nbsp;presented<br>
+for&nbsp;*this*&nbsp;instance&nbsp;—&nbsp;the&nbsp;per-episode&nbsp;positional&nbsp;index&nbsp;skills&nbsp;are<br>
+bound&nbsp;to.&nbsp;(``schema.action_order``&nbsp;accumulates&nbsp;a&nbsp;family's&nbsp;whole<br>
+vocabulary&nbsp;across&nbsp;merged&nbsp;trials,&nbsp;so&nbsp;it&nbsp;cannot&nbsp;index&nbsp;an&nbsp;episode.)<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="TaskContext-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="TaskContext-__init__"><strong>__init__</strong></a>(self, signature: 'TaskSignature', schema: 'TaskSchema', similarity: 'float', novel: 'bool', skills: 'tuple[SkillMatch, ...]' = (), action_order: 'tuple[str, ...]' = ()) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="TaskContext-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>action_order</strong></dt>
+</dl>
+<dl><dt><strong>novel</strong></dt>
+</dl>
+<dl><dt><strong>schema</strong></dt>
+</dl>
+<dl><dt><strong>signature</strong></dt>
+</dl>
+<dl><dt><strong>similarity</strong></dt>
+</dl>
+<dl><dt><strong>skills</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'action_order': 'tuple[str, ...]', 'novel': 'bool', 'schema': 'TaskSchema', 'signature': 'TaskSignature', 'similarity': 'float', 'skills': 'tuple[SkillMatch, ...]'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'action_order': Field(name='action_order',type='tuple[str, ...]'...appingproxy({}),kw_only=False,_field_type=_FIELD), 'novel': Field(name='novel',type='bool',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD), 'schema': Field(name='schema',type='TaskSchema',default=&lt;d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'signature': Field(name='signature',type='TaskSignature',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'similarity': Field(name='similarity',type='float',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD), 'skills': Field(name='skills',type='tuple[SkillMatch, ...]...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('signature', 'schema', 'similarity', 'novel', 'skills', 'action_order')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="TaskSchema">class <strong>TaskSchema</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#TaskSchema">TaskSchema</a>(schema_id:&nbsp;'str',&nbsp;signature:&nbsp;'<a href="#TaskSignature">TaskSignature</a>',&nbsp;episodes:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;successes:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;failures:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;operators:&nbsp;'dict[str,&nbsp;<a href="#OperatorModel">OperatorModel</a>]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;skill_ids:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;last_score:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;action_order:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;lifted:&nbsp;'dict[tuple[str,&nbsp;str],&nbsp;<a href="#OperatorModel">OperatorModel</a>]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;family_priors:&nbsp;'dict[str,&nbsp;int]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;hypotheses:&nbsp;'Any'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;learned&nbsp;task&nbsp;frame:&nbsp;signature&nbsp;plus&nbsp;operators&nbsp;and&nbsp;skills.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="TaskSchema-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="TaskSchema-__init__"><strong>__init__</strong></a>(self, schema_id: 'str', signature: 'TaskSignature', episodes: 'int' = 0, successes: 'int' = 0, failures: 'int' = 0, operators: 'dict[str, OperatorModel]' = &lt;factory&gt;, skill_ids: 'list[str]' = &lt;factory&gt;, last_score: 'float' = 0.0, action_order: 'list[str]' = &lt;factory&gt;, lifted: 'dict[tuple[str, str], OperatorModel]' = &lt;factory&gt;, family_priors: 'dict[str, int]' = &lt;factory&gt;, hypotheses: 'Any' = None) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="TaskSchema-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="TaskSchema-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict[str, Any]'</dt></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="TaskSchema-from_dict"><strong>from_dict</strong></a>(data: 'Mapping[str, Any]') -&gt; 'TaskSchema'</dt><dd><span class="code">Reconstruct&nbsp;a&nbsp;<a href="#TaskSchema">TaskSchema</a>&nbsp;from&nbsp;a&nbsp;serialized&nbsp;mapping.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>confidence</strong></dt>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>action_order</strong></dt>
+</dl>
+<dl><dt><strong>episodes</strong></dt>
+</dl>
+<dl><dt><strong>failures</strong></dt>
+</dl>
+<dl><dt><strong>family_priors</strong></dt>
+</dl>
+<dl><dt><strong>hypotheses</strong></dt>
+</dl>
+<dl><dt><strong>last_score</strong></dt>
+</dl>
+<dl><dt><strong>lifted</strong></dt>
+</dl>
+<dl><dt><strong>operators</strong></dt>
+</dl>
+<dl><dt><strong>schema_id</strong></dt>
+</dl>
+<dl><dt><strong>signature</strong></dt>
+</dl>
+<dl><dt><strong>skill_ids</strong></dt>
+</dl>
+<dl><dt><strong>successes</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'action_order': 'list[str]', 'episodes': 'int', 'failures': 'int', 'family_priors': 'dict[str, int]', 'hypotheses': 'Any', 'last_score': 'float', 'lifted': 'dict[tuple[str, str], OperatorModel]', 'operators': 'dict[str, OperatorModel]', 'schema_id': 'str', 'signature': 'TaskSignature', ...}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'action_order': Field(name='action_order',type='list[str]',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'episodes': Field(name='episodes',type='int',default=0,defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'failures': Field(name='failures',type='int',default=0,defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'family_priors': Field(name='family_priors',type='dict[str, int]'...appingproxy({}),kw_only=False,_field_type=_FIELD), 'hypotheses': Field(name='hypotheses',type='Any',default=None,...appingproxy({}),kw_only=False,_field_type=_FIELD), 'last_score': Field(name='last_score',type='float',default=0.0...appingproxy({}),kw_only=False,_field_type=_FIELD), 'lifted': Field(name='lifted',type='dict[tuple[str, str], ...appingproxy({}),kw_only=False,_field_type=_FIELD), 'operators': Field(name='operators',type='dict[str, OperatorM...appingproxy({}),kw_only=False,_field_type=_FIELD), 'schema_id': Field(name='schema_id',type='str',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'signature': Field(name='signature',type='TaskSignature',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), ...}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('schema_id', 'signature', 'episodes', 'successes', 'failures', 'operators', 'skill_ids', 'last_score', 'action_order', 'lifted', 'family_priors', 'hypotheses')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="TaskSignature">class <strong>TaskSignature</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#TaskSignature">TaskSignature</a>(domain:&nbsp;'str',&nbsp;state:&nbsp;'frozenset[str]',&nbsp;actions:&nbsp;'frozenset[str]',&nbsp;goals:&nbsp;'frozenset[str]',&nbsp;entities:&nbsp;'frozenset[str]'&nbsp;=&nbsp;frozenset(),&nbsp;roles:&nbsp;'frozenset[str]'&nbsp;=&nbsp;frozenset())&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;abstract&nbsp;identity&nbsp;of&nbsp;a&nbsp;task,&nbsp;independent&nbsp;of&nbsp;bound&nbsp;values.<br>
+&nbsp;<br>
+``roles``&nbsp;is&nbsp;the&nbsp;schema-level&nbsp;vocabulary:&nbsp;domain-independent<br>
+structural&nbsp;tags&nbsp;an&nbsp;adapter&nbsp;emits&nbsp;(``"self"``,&nbsp;``"navigate"``,<br>
+``"procedure"``…).&nbsp;Where&nbsp;``state``/``actions``/``entities``&nbsp;carry<br>
+domain&nbsp;terms&nbsp;that&nbsp;can&nbsp;never&nbsp;match&nbsp;across&nbsp;domains,&nbsp;roles&nbsp;are&nbsp;what<br>
+lets&nbsp;"approach&nbsp;a&nbsp;target&nbsp;while&nbsp;avoiding&nbsp;movers"&nbsp;in&nbsp;one&nbsp;engine&nbsp;look<br>
+like&nbsp;the&nbsp;same&nbsp;family&nbsp;in&nbsp;another.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="TaskSignature-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="TaskSignature-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="TaskSignature-__getstate__"><strong>__getstate__</strong></a> = _dataclass_getstate(self)<span class="grey"><span class="heading-text"> from <a href="dataclasses.html">dataclasses</a></span></span></dt><dd><span class="code">#&nbsp;_dataclass_getstate&nbsp;and&nbsp;_dataclass_setstate&nbsp;are&nbsp;needed&nbsp;for&nbsp;pickling&nbsp;frozen<br>
+#&nbsp;classes&nbsp;with&nbsp;slots.&nbsp;&nbsp;These&nbsp;could&nbsp;be&nbsp;slightly&nbsp;more&nbsp;performant&nbsp;if&nbsp;we&nbsp;generated<br>
+#&nbsp;the&nbsp;code&nbsp;instead&nbsp;of&nbsp;iterating&nbsp;over&nbsp;fields.&nbsp;&nbsp;But&nbsp;that&nbsp;can&nbsp;be&nbsp;a&nbsp;project&nbsp;for<br>
+#&nbsp;another&nbsp;day,&nbsp;if&nbsp;performance&nbsp;becomes&nbsp;an&nbsp;issue.</span></dd></dl>
+
+<dl><dt><a name="TaskSignature-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="TaskSignature-__init__"><strong>__init__</strong></a>(self, domain: 'str', state: 'frozenset[str]', actions: 'frozenset[str]', goals: 'frozenset[str]', entities: 'frozenset[str]' = frozenset(), roles: 'frozenset[str]' = frozenset()) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="TaskSignature-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="TaskSignature-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<dl><dt><a name="TaskSignature-__setstate__"><strong>__setstate__</strong></a> = _dataclass_setstate(self, state)<span class="grey"><span class="heading-text"> from <a href="dataclasses.html">dataclasses</a></span></span></dt></dl>
+
+<dl><dt><a name="TaskSignature-key"><strong>key</strong></a>(self) -&gt; 'str'</dt></dl>
+
+<dl><dt><a name="TaskSignature-similarity"><strong>similarity</strong></a>(self, other: 'TaskSignature') -&gt; 'float'</dt><dd><span class="code">Structural&nbsp;similarity&nbsp;across&nbsp;state,&nbsp;affordances,&nbsp;and&nbsp;goals.</span></dd></dl>
+
+<dl><dt><a name="TaskSignature-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict[str, Any]'</dt></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="TaskSignature-from_dict"><strong>from_dict</strong></a>(data: 'Mapping[str, Any]') -&gt; 'TaskSignature'</dt><dd><span class="code">Reconstruct&nbsp;a&nbsp;<a href="#TaskSignature">TaskSignature</a>&nbsp;from&nbsp;a&nbsp;serialized&nbsp;mapping.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>actions</strong></dt>
+</dl>
+<dl><dt><strong>domain</strong></dt>
+</dl>
+<dl><dt><strong>entities</strong></dt>
+</dl>
+<dl><dt><strong>goals</strong></dt>
+</dl>
+<dl><dt><strong>roles</strong></dt>
+</dl>
+<dl><dt><strong>state</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'actions': 'frozenset[str]', 'domain': 'str', 'entities': 'frozenset[str]', 'goals': 'frozenset[str]', 'roles': 'frozenset[str]', 'state': 'frozenset[str]'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'actions': Field(name='actions',type='frozenset[str]',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'domain': Field(name='domain',type='str',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD), 'entities': Field(name='entities',type='frozenset[str]',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'goals': Field(name='goals',type='frozenset[str]',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'roles': Field(name='roles',type='frozenset[str]',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'state': Field(name='state',type='frozenset[str]',default...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('domain', 'state', 'actions', 'goals', 'entities', 'roles')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="TransitionCheck">class <strong>TransitionCheck</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#TransitionCheck">TransitionCheck</a>(action:&nbsp;'str',&nbsp;predicted:&nbsp;'tuple[<a href="#EffectPrediction">EffectPrediction</a>,&nbsp;...]',&nbsp;observed_changes:&nbsp;'tuple[str,&nbsp;...]',&nbsp;score:&nbsp;'float',&nbsp;mismatches:&nbsp;'tuple[str,&nbsp;...]')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Expected-vs-observed&nbsp;result&nbsp;for&nbsp;one&nbsp;action.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="TransitionCheck-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="TransitionCheck-__init__"><strong>__init__</strong></a>(self, action: 'str', predicted: 'tuple[EffectPrediction, ...]', observed_changes: 'tuple[str, ...]', score: 'float', mismatches: 'tuple[str, ...]') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="TransitionCheck-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>action</strong></dt>
+</dl>
+<dl><dt><strong>mismatches</strong></dt>
+</dl>
+<dl><dt><strong>observed_changes</strong></dt>
+</dl>
+<dl><dt><strong>predicted</strong></dt>
+</dl>
+<dl><dt><strong>score</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'action': 'str', 'mismatches': 'tuple[str, ...]', 'observed_changes': 'tuple[str, ...]', 'predicted': 'tuple[EffectPrediction, ...]', 'score': 'float'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'action': Field(name='action',type='str',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD), 'mismatches': Field(name='mismatches',type='tuple[str, ...]',d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'observed_changes': Field(name='observed_changes',type='tuple[str, ....appingproxy({}),kw_only=False,_field_type=_FIELD), 'predicted': Field(name='predicted',type='tuple[EffectPredict...appingproxy({}),kw_only=False,_field_type=_FIELD), 'score': Field(name='score',type='float',default=&lt;datacla...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('action', 'predicted', 'observed_changes', 'score', 'mismatches')</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-verification_rank"><strong>verification_rank</strong></a>(kind: 'str') -&gt; 'int'</dt><dd><span class="code">Rank&nbsp;of&nbsp;a&nbsp;verification&nbsp;kind;&nbsp;unknown&nbsp;kinds&nbsp;count&nbsp;as&nbsp;reported.</span></dd></dl>
+ <dl><dt><a name="-verification_weight"><strong>verification_weight</strong></a>(kind: 'str') -&gt; 'float'</dt><dd><span class="code">Transfer-confidence&nbsp;weight&nbsp;of&nbsp;a&nbsp;verification&nbsp;kind.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>Scalar</strong> = str | int | float | bool | None<br>
+<strong>State</strong> = collections.abc.Mapping[str, typing.Any]<br>
+<strong>TYPE_CHECKING</strong> = False<br>
+<strong>VERIFICATION_KINDS</strong> = ('reported', 'solver', 'external')<br>
+<strong>__annotations__</strong> = {'VERIFICATION_KINDS': 'tuple[str, ...]'}<br>
+<strong>logger</strong> = &lt;Logger Self_World.frontal_lobe.reasoning.competence (WARNING)&gt;</td></tr></table>
+</body></html>

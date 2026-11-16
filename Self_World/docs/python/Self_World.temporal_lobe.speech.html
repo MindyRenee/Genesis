@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.temporal_lobe.speech</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.temporal_lobe.html" class="white">temporal_lobe</a>.speech</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/speech.py">/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/speech.py</a></td></tr></table>
+    <p><span class="code"><a href="#Voice">Voice</a>&nbsp;for&nbsp;Genesis&nbsp;—&nbsp;text-to-speech&nbsp;(Piper)&nbsp;and&nbsp;speech-to-text&nbsp;(Vosk).<br>
+&nbsp;<br>
+This&nbsp;module&nbsp;provides&nbsp;two&nbsp;classes:<br>
+&nbsp;<br>
+&nbsp;&nbsp;``<a href="#Voice">Voice</a>``&nbsp;—&nbsp;text-to-speech&nbsp;(TTS).&nbsp;Uses&nbsp;Piper&nbsp;neural&nbsp;TTS&nbsp;when<br>
+&nbsp;&nbsp;available&nbsp;(offline,&nbsp;high&nbsp;quality),&nbsp;falling&nbsp;back&nbsp;to&nbsp;espeak-ng.<br>
+&nbsp;<br>
+&nbsp;&nbsp;``<a href="#VoiceInput">VoiceInput</a>``&nbsp;—&nbsp;speech-to-text&nbsp;(STT).&nbsp;Uses&nbsp;Vosk&nbsp;(offline)&nbsp;when<br>
+&nbsp;&nbsp;a&nbsp;model&nbsp;is&nbsp;installed.<br>
+&nbsp;<br>
+Usage::<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;from&nbsp;temporal_lobe.speech&nbsp;import&nbsp;<a href="#Voice">Voice</a>,&nbsp;<a href="#VoiceInput">VoiceInput</a><br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;voice&nbsp;=&nbsp;<a href="#Voice">Voice</a>()&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;TTS<br>
+&nbsp;&nbsp;&nbsp;&nbsp;voice.speak("Hello&nbsp;there")&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;speaks&nbsp;aloud<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;mic&nbsp;=&nbsp;<a href="#VoiceInput">VoiceInput</a>()&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;STT<br>
+&nbsp;&nbsp;&nbsp;&nbsp;text&nbsp;=&nbsp;mic.listen()&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;blocks&nbsp;until&nbsp;you&nbsp;speak</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="collections.html">collections</a><br>
+<a href="json.html">json</a><br>
+</td><td class="multicolumn"><a href="logging.html">logging</a><br>
+<a href="os.html">os</a><br>
+</td><td class="multicolumn"><a href="subprocess.html">subprocess</a><br>
+<a href="sys.html">sys</a><br>
+</td><td class="multicolumn"><a href="time.html">time</a><br>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.speech.html#Voice">Voice</a>
+</dt><dt class="heading-text"><a href="Self_World.temporal_lobe.speech.html#VoiceInput">VoiceInput</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Voice">class <strong>Voice</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Voice">Voice</a>()&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Text-to-speech&nbsp;using&nbsp;Piper&nbsp;neural&nbsp;TTS.<br>
+&nbsp;<br>
+Piper&nbsp;runs&nbsp;entirely&nbsp;offline&nbsp;using&nbsp;ONNX&nbsp;models.&nbsp;If&nbsp;Piper&nbsp;or&nbsp;a<br>
+voice&nbsp;model&nbsp;isn't&nbsp;available,&nbsp;falls&nbsp;back&nbsp;to&nbsp;espeak-ng.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Voice-__init__"><strong>__init__</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Detect&nbsp;available&nbsp;TTS&nbsp;backends&nbsp;and&nbsp;load&nbsp;the&nbsp;Piper&nbsp;voice&nbsp;model.</span></dd></dl>
+
+<dl><dt><a name="Voice-describe"><strong>describe</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Human-readable&nbsp;description&nbsp;of&nbsp;the&nbsp;current&nbsp;TTS&nbsp;setup.</span></dd></dl>
+
+<dl><dt><a name="Voice-is_available"><strong>is_available</strong></a>(self) -&gt; 'bool'</dt><dd><span class="code">True&nbsp;if&nbsp;any&nbsp;TTS&nbsp;backend&nbsp;is&nbsp;available.</span></dd></dl>
+
+<dl><dt><a name="Voice-speak"><strong>speak</strong></a>(self, text: 'str', blocking: 'bool' = False, alertness: 'float' = 0.5, valence: 'float' = 0.0, caution: 'float' = 0.0, creativity: 'float' = 0.0, temp_c: 'float | None' = None) -&gt; 'None'</dt><dd><span class="code">Speak&nbsp;text&nbsp;aloud.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;text:&nbsp;The&nbsp;text&nbsp;to&nbsp;speak.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;blocking:&nbsp;If&nbsp;True,&nbsp;wait&nbsp;for&nbsp;speech&nbsp;to&nbsp;finish&nbsp;before<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;returning.&nbsp;If&nbsp;False,&nbsp;return&nbsp;immediately&nbsp;while<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;speech&nbsp;plays&nbsp;in&nbsp;the&nbsp;background.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;alertness:&nbsp;0-1,&nbsp;affects&nbsp;speech&nbsp;rate&nbsp;(higher&nbsp;=&nbsp;faster).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;valence:&nbsp;-1&nbsp;to&nbsp;1,&nbsp;affects&nbsp;pitch&nbsp;(positive&nbsp;=&nbsp;higher).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;caution:&nbsp;0-1,&nbsp;slows&nbsp;speech&nbsp;slightly&nbsp;(careful&nbsp;delivery).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;creativity:&nbsp;0-1,&nbsp;adds&nbsp;slight&nbsp;pitch&nbsp;variation.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;temp_c:&nbsp;body&nbsp;temperature&nbsp;in&nbsp;°C&nbsp;(None&nbsp;=&nbsp;no&nbsp;thermal&nbsp;voice).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;fever&nbsp;slows&nbsp;and&nbsp;unsteadies&nbsp;her&nbsp;speech&nbsp;over&nbsp;the&nbsp;same<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;65–85°C&nbsp;ramp&nbsp;the&nbsp;body&nbsp;calls&nbsp;warm→critical.</span></dd></dl>
+
+<dl><dt><a name="Voice-stop"><strong>stop</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Stop&nbsp;any&nbsp;currently&nbsp;playing&nbsp;speech.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>is_speaking</strong></dt>
+<dd><span class="code">True&nbsp;while&nbsp;any&nbsp;TTS&nbsp;child&nbsp;is&nbsp;still&nbsp;speaking,&nbsp;plus&nbsp;a&nbsp;short&nbsp;tail.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="VoiceInput">class <strong>VoiceInput</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#VoiceInput">VoiceInput</a>(backend:&nbsp;'str'&nbsp;=&nbsp;'auto',&nbsp;sample_rate:&nbsp;'int'&nbsp;=&nbsp;16000,&nbsp;lazy:&nbsp;'bool'&nbsp;=&nbsp;False)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Speech-to-text&nbsp;from&nbsp;the&nbsp;microphone.<br>
+&nbsp;<br>
+Uses&nbsp;the&nbsp;local&nbsp;Vosk&nbsp;model.&nbsp;There&nbsp;is&nbsp;deliberately&nbsp;no&nbsp;online&nbsp;fallback:<br>
+unavailable&nbsp;local&nbsp;weights&nbsp;mean&nbsp;unavailable&nbsp;voice&nbsp;input,&nbsp;not&nbsp;a&nbsp;silent<br>
+switch&nbsp;to&nbsp;a&nbsp;remote&nbsp;recognizer.<br>
+&nbsp;<br>
+Audio&nbsp;capture&nbsp;uses&nbsp;``sounddevice``&nbsp;which&nbsp;ships&nbsp;pre-built&nbsp;wheels.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="VoiceInput-__init__"><strong>__init__</strong></a>(self, backend: 'str' = 'auto', sample_rate: 'int' = 16000, lazy: 'bool' = False) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;speech-to-text&nbsp;with&nbsp;optional&nbsp;lazy&nbsp;model&nbsp;loading.</span></dd></dl>
+
+<dl><dt><a name="VoiceInput-listen"><strong>listen</strong></a>(self, timeout: 'float | None' = None, phrase_limit: 'float' = 10) -&gt; 'str | None'</dt><dd><span class="code">Listen&nbsp;for&nbsp;a&nbsp;single&nbsp;utterance&nbsp;and&nbsp;return&nbsp;the&nbsp;transcribed&nbsp;text.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;timeout:&nbsp;How&nbsp;long&nbsp;to&nbsp;wait&nbsp;for&nbsp;speech&nbsp;to&nbsp;start&nbsp;(seconds).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;None&nbsp;=&nbsp;wait&nbsp;indefinitely.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;phrase_limit:&nbsp;Maximum&nbsp;recording&nbsp;time&nbsp;for&nbsp;a&nbsp;single&nbsp;phrase.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Transcribed&nbsp;text,&nbsp;or&nbsp;None&nbsp;if&nbsp;no&nbsp;speech&nbsp;was&nbsp;detected.</span></dd></dl>
+
+<dl><dt><a name="VoiceInput-listen_interactive"><strong>listen_interactive</strong></a>(self, prompt: 'str' = 'Listening...') -&gt; 'str | None'</dt><dd><span class="code">Listen&nbsp;with&nbsp;a&nbsp;prompt&nbsp;printed&nbsp;to&nbsp;stdout.<br>
+&nbsp;<br>
+Prints&nbsp;the&nbsp;prompt,&nbsp;listens&nbsp;for&nbsp;speech,&nbsp;and&nbsp;returns&nbsp;the&nbsp;text.<br>
+Returns&nbsp;None&nbsp;if&nbsp;no&nbsp;speech&nbsp;is&nbsp;detected&nbsp;within&nbsp;5&nbsp;seconds.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>available</strong></dt>
+<dd><span class="code">True&nbsp;if&nbsp;a&nbsp;speech&nbsp;recognition&nbsp;backend&nbsp;is&nbsp;ready.</span></dd>
+</dl>
+<dl><dt><strong>backend_name</strong></dt>
+<dd><span class="code">Name&nbsp;of&nbsp;the&nbsp;active&nbsp;backend.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>VOSK_MODEL_DIR</strong> = PosixPath('/home/mindyrenee/.local/share/genesis/vosk-models')<br>
+<strong>VOSK_MODEL_NAME</strong> = 'vosk-model-small-en-us-0.15'<br>
+<strong>logger</strong> = &lt;Logger Self_World.temporal_lobe.speech (WARNING)&gt;</td></tr></table>
+</body></html>

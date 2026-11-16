@@ -1,0 +1,79 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Basal forebrain — the cholinergic output equation and its modulators."><title>genesis::state::basal_forebrain - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-203241e4.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="genesis" data-themes="" data-resource-suffix="" data-rustdoc-version="1.100.0 (0ef1bc386 2026-11-09)" data-channel="1.100.0" data-search-js="search-b167f383.js" data-stringdex-js="stringdex-b5109af9.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../../static.files/main-1814ead3.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-9f56287d.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module basal_forebrain</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../genesis/index.html">genesis</a><span class="version">0.2.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module basal_<wbr>forebrain</a></h2><h3><a href="#constants">Module Items</a></h3><ul class="block"><li><a href="#constants" title="Constants">Constants</a></li><li><a href="#functions" title="Functions">Functions</a></li></ul></section><div id="rustdoc-modnav"><h2><a href="../index.html">In genesis::<wbr>state</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../index.html">genesis</a>::<wbr><a href="../index.html">state</a></div><h1>Module <span>basal_<wbr>forebrain</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/genesis/state/basal_forebrain.rs.html#1-331">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Basal forebrain — the cholinergic output equation and its modulators.</p>
+<p>════════════════════════════════════════════════════════════════════
+ANATOMY
+════════════════════════════════════════════════════════════════════</p>
+<p>The basal forebrain lies ventral to the striatum and anterior to the
+hypothalamus. It holds the major cholinergic projection to the cortex
+and hippocampus: Ch1/Ch2 (medial septum, vertical diagonal band)
+supply the hippocampal complex, Ch4 (nucleus basalis of Meynert)
+supplies neocortex and amygdala. It is also a sleep-wake structure:
+three intermingled populations — wake/REM-active cholinergic,
+parvalbumin GABAergic, and glutamatergic neurons organized in a
+Glu→Ch→PV excitatory hierarchy — are all inhibited by somatostatin+
+GABAergic sleep-promoting neurons (Xu et al., Nat. Neurosci. 2015),
+and it is the best-characterized site where the homeostatic sleep
+signal acts: extracellular adenosine rises there with time awake
+(Porkka-Heiskanen et al., Science 1997) and A1-receptor activation
+inhibits the region’s wake-active neurons (Strecker et al.,
+J. Neurosci. 2000; Basheer et al., 2004). The sleep signal literally
+silences the arousal output this same region produces.</p>
+<p>════════════════════════════════════════════════════════════════════
+THE OUTPUT EQUATION
+════════════════════════════════════════════════════════════════════</p>
+<p>The region’s release level is a function of the sleep-wake network’s
+populations plus two modulators:</p>
+<p>target = ACH_BASE
++ ACH_FROM_LC · lc · (1 − A1) · D(α)
++ ACH_FROM_REM · rem</p>
+<ul>
+<li>The linear map of <code>lc</code> (wake) and <code>rem</code> (REM-on) reproduces the
+microdialysis steady states — NREM 0.34, waking 0.58, REM 0.77
+(Vazquez &amp; Baghdoyan 2001) — see <code>state::neurochemical</code> for the
+calibrated coefficients.</li>
+<li><code>A1</code> is adenosine-A1-receptor occupancy on the <em>wake-active</em>
+cholinergic population: the somnogenic signal attenuates only the
+LC-driven component, so the calibrated sleep profiles (which have
+no LC drive) are preserved exactly while waking cortical ACh sags
+as pressure builds.</li>
+<li><code>D(α)</code> is the expected-uncertainty drive (Yu &amp; Dayan, Neuron 2005):
+acetylcholine reports expected uncertainty — the brain’s estimate
+of how unreliable its own predictions are — so the wake component
+is scaled up when confidence is low and down when it is high.</li>
+</ul>
+<p>The efferent edge is also here: <a href="fn.sensory_precision_gain.html" title="fn genesis::state::basal_forebrain::sensory_precision_gain"><code>sensory_precision_gain</code></a> is the
+cholinergic gain on bottom-up prediction-error precision — ACh
+optimizes the expected precision of sensory channels by gain on
+supragranular pyramidal cells (Feldman &amp; Friston, Front. Hum.
+Neurosci. 2010; Moran et al., J. Neurosci. 2013), implemented in
+<code>daemon::active_inference</code> as a divisor on observation variance.</p>
+<p>════════════════════════════════════════════════════════════════════
+WHAT THIS MODULE IS NOT
+════════════════════════════════════════════════════════════════════</p>
+<p>Process S itself (adenosine accumulation and glymphatic clearance),
+the AChE excess decay, the coupling matrix rows, and the network
+release of the <em>other</em> chemicals live in <code>state::neurochemical</code>;
+the populations that drive <code>lc</code>/<code>rem</code> live in <code>state::sleep_network</code>.
+This module owns only the basal forebrain’s own math — what reads
+those signals and what they do to its output.</p>
+</div></details><h2 id="constants" class="section-header">Constants<a href="#constants" class="anchor">§</a></h2><dl class="item-table"><dt><a class="constant" href="constant.A1_EC50.html" title="constant genesis::state::basal_forebrain::A1_EC50">A1_EC50</a></dt><dd>Effective adenosine level for half-maximal A1 occupancy.</dd><dt><a class="constant" href="constant.A1_MAX_INHIBITION.html" title="constant genesis::state::basal_forebrain::A1_MAX_INHIBITION">A1_<wbr>MAX_<wbr>INHIBITION</a></dt><dd>Maximum fraction of the LC-driven release component that A1
+occupancy can suppress. Capped at one half: A1 activation inhibits
+firing of the wake-active cholinergic neurons but does not silence
+the population outright (Strecker et al., 2000).</dd><dt><a class="constant" href="constant.A1_OCCUPANCY_AT_REST.html" title="constant genesis::state::basal_forebrain::A1_OCCUPANCY_AT_REST">A1_<wbr>OCCUPANCY_<wbr>AT_<wbr>REST</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>A1 occupancy at the resting level — the zero point of
+<a href="fn.a1_suppression.html" title="fn genesis::state::basal_forebrain::a1_suppression"><code>a1_suppression</code></a>. Const-evaluable from the Hill form.</dd><dt><a class="constant" href="constant.ACH_BASE.html" title="constant genesis::state::basal_forebrain::ACH_BASE">ACH_<wbr>BASE</a></dt><dd>Basal (state-independent) term of the release map.</dd><dt><a class="constant" href="constant.ACH_FROM_LC.html" title="constant genesis::state::basal_forebrain::ACH_FROM_LC">ACH_<wbr>FROM_<wbr>LC</a></dt><dd>Weight of the LC (wake) population’s drive on cholinergic release.</dd><dt><a class="constant" href="constant.ACH_FROM_REM.html" title="constant genesis::state::basal_forebrain::ACH_FROM_REM">ACH_<wbr>FROM_<wbr>REM</a></dt><dd>Weight of the REM-on population’s drive on cholinergic release.</dd><dt><a class="constant" href="constant.ACH_PRECISION_GAIN.html" title="constant genesis::state::basal_forebrain::ACH_PRECISION_GAIN">ACH_<wbr>PRECISION_<wbr>GAIN</a></dt><dd>Gain of ACh deviation-from-baseline on sensory precision.</dd><dt><a class="constant" href="constant.ADENOSINE_REST.html" title="constant genesis::state::basal_forebrain::ADENOSINE_REST">ADENOSINE_<wbr>REST</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>The resting extracellular adenosine level — the chemical’s baseline
+and Process S’s lower asymptote. Suppression is measured relative
+to occupancy at this level so rest is exactly neutral.</dd><dt><a class="constant" href="constant.SENSORY_PRECISION_GAIN_MAX.html" title="constant genesis::state::basal_forebrain::SENSORY_PRECISION_GAIN_MAX">SENSORY_<wbr>PRECISION_<wbr>GAIN_<wbr>MAX</a></dt><dt><a class="constant" href="constant.SENSORY_PRECISION_GAIN_MIN.html" title="constant genesis::state::basal_forebrain::SENSORY_PRECISION_GAIN_MIN">SENSORY_<wbr>PRECISION_<wbr>GAIN_<wbr>MIN</a></dt><dd>Bounds on the precision multiplier. Attention shifts the weight of
+evidence; it does not open or close the channel.</dd><dt><a class="constant" href="constant.UNCERTAINTY_GAIN.html" title="constant genesis::state::basal_forebrain::UNCERTAINTY_GAIN">UNCERTAINTY_<wbr>GAIN</a></dt><dd>Gain of the expected-uncertainty drive on the wake component.
+0.15 moves the LC-driven term by at most ~±13% across the whole α
+range — attention modulates the state profile, it does not set it.</dd><dt><a class="constant" href="constant.UNCERTAINTY_REFERENCE.html" title="constant genesis::state::basal_forebrain::UNCERTAINTY_REFERENCE">UNCERTAINTY_<wbr>REFERENCE</a></dt><dd>Expected uncertainty at the well-predicted operating point — the
+reference where the uncertainty drive is exactly neutral. Resting
+precision sits at ~0.9 (the precision tracker’s resting target),
+so resting α ≈ 0.1.</dd></dl><h2 id="functions" class="section-header">Functions<a href="#functions" class="anchor">§</a></h2><dl class="item-table"><dt><a class="fn" href="fn.a1_occupancy.html" title="fn genesis::state::basal_forebrain::a1_occupancy">a1_<wbr>occupancy</a></dt><dd>A1-receptor occupancy: Hill equation, n = 2.</dd><dt><a class="fn" href="fn.a1_suppression.html" title="fn genesis::state::basal_forebrain::a1_suppression">a1_<wbr>suppression</a></dt><dd>Suppression of the wake-active cholinergic component, [0, A1_MAX].</dd><dt><a class="fn" href="fn.expected_uncertainty.html" title="fn genesis::state::basal_forebrain::expected_uncertainty">expected_<wbr>uncertainty</a></dt><dd>Map tracked inference precision onto the expected-uncertainty
+signal the cholinergic equation consumes: α = 1 − precision,
+clamped to [0, 1].</dd><dt><a class="fn" href="fn.release_target.html" title="fn genesis::state::basal_forebrain::release_target">release_<wbr>target</a></dt><dd>The basal forebrain’s cholinergic release target under the
+sleep-wake network’s population state.</dd><dt><a class="fn" href="fn.sensory_precision_gain.html" title="fn genesis::state::basal_forebrain::sensory_precision_gain">sensory_<wbr>precision_<wbr>gain</a></dt><dd>The multiplier on sensory (observation) precision for a given
+effective acetylcholine level:</dd><dt><a class="fn" href="fn.uncertainty_drive.html" title="fn genesis::state::basal_forebrain::uncertainty_drive">uncertainty_<wbr>drive</a></dt><dd>The multiplicative drive expected uncertainty applies to the
+wake-active cholinergic component: 1 + gain·(α − α_ref).</dd><dt><a class="fn" href="fn.wake_component.html" title="fn genesis::state::basal_forebrain::wake_component">wake_<wbr>component</a></dt><dd>The wake-active component of cholinergic release: LC drive
+attenuated by A1 occupancy and scaled by the uncertainty drive.</dd><dt><a class="fn" href="fn.wake_setpoint.html" title="fn genesis::state::basal_forebrain::wake_setpoint">wake_<wbr>setpoint</a></dt><dd>The cholinergic set-point when no sleep-wake network is running —
+the fallback path where the level homeostats instead of tracking a
+release target. The same two modulators act on the whole set-point
+(with no network there is no wake/REM decomposition).</dd></dl></section></div></main></body></html>

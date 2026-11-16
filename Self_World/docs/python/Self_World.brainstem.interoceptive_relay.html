@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.brainstem.interoceptive_relay</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.brainstem.html" class="white">brainstem</a>.interoceptive_relay</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/brainstem/interoceptive_relay.py">/home/mindyrenee/GenAnd/Genesis/Self_World/brainstem/interoceptive_relay.py</a></td></tr></table>
+    <p><span class="code">Interoceptive&nbsp;relay&nbsp;—&nbsp;the&nbsp;brainstem's&nbsp;NTS&nbsp;/&nbsp;parabrachial&nbsp;analog.<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+ANATOMY<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+Every&nbsp;bodily&nbsp;signal&nbsp;enters&nbsp;the&nbsp;CNS&nbsp;here&nbsp;first&nbsp;(Craig&nbsp;2002;&nbsp;Chiang&nbsp;et<br>
+al.,&nbsp;JNeurosci&nbsp;2019):&nbsp;spinal&nbsp;lamina-I&nbsp;afferents&nbsp;(the&nbsp;sympathetic&nbsp;arm)<br>
+and&nbsp;vagal/glossopharyngeal&nbsp;afferents&nbsp;(the&nbsp;parasympathetic&nbsp;arm)<br>
+converge&nbsp;on&nbsp;the&nbsp;nucleus&nbsp;tractus&nbsp;solitarius&nbsp;(NTS)&nbsp;and&nbsp;the&nbsp;parabrachial<br>
+nucleus&nbsp;(PBN)&nbsp;—&nbsp;the&nbsp;first&nbsp;relay&nbsp;for&nbsp;all&nbsp;homeostatic&nbsp;afference.&nbsp;From<br>
+there&nbsp;the&nbsp;traffic&nbsp;fans&nbsp;out&nbsp;to&nbsp;the&nbsp;structures&nbsp;that&nbsp;own&nbsp;each&nbsp;dimension:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;PBN&nbsp;→&nbsp;central&nbsp;amygdala&nbsp;(CeA)&nbsp;+&nbsp;BNST<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;affective/threat&nbsp;dimension&nbsp;—&nbsp;the&nbsp;canonical&nbsp;lPBN→CeA<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pain-affect&nbsp;tract&nbsp;(confirmed&nbsp;in&nbsp;humans&nbsp;by&nbsp;7T&nbsp;tractography).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Routed&nbsp;here&nbsp;through&nbsp;the&nbsp;limbic&nbsp;low&nbsp;road<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(:meth:`EmotionalRegulator.condition_cues`,&nbsp;the&nbsp;LeDoux&nbsp;1996<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;fast&nbsp;path&nbsp;—&nbsp;conditioning&nbsp;plus&nbsp;a&nbsp;startle&nbsp;past&nbsp;threshold).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;PBN&nbsp;→&nbsp;preoptic&nbsp;hypothalamus<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Thermoregulation&nbsp;and&nbsp;homeostatic/endocrine&nbsp;responses.&nbsp;In<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Genesis&nbsp;that&nbsp;evaluative&nbsp;layer&nbsp;is&nbsp;the&nbsp;limbic&nbsp;regulator's<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;``update_from_body_state``&nbsp;—&nbsp;the&nbsp;felt&nbsp;InternalState&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;homeostat&nbsp;regulates&nbsp;from&nbsp;—&nbsp;which&nbsp;runs&nbsp;in&nbsp;parallel&nbsp;to&nbsp;this<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;relay&nbsp;and&nbsp;owns&nbsp;the&nbsp;HPA&nbsp;(CRH→cortisol)&nbsp;axis.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;lamina&nbsp;I&nbsp;→&nbsp;catecholamine&nbsp;cell&nbsp;groups&nbsp;(A1/A5/A6/A7)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Afferent&nbsp;drive&nbsp;on&nbsp;the&nbsp;arousal&nbsp;systems&nbsp;themselves&nbsp;—&nbsp;LC/NE<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;drive&nbsp;under&nbsp;strain&nbsp;and&nbsp;withdrawal&nbsp;of&nbsp;NE,&nbsp;orexin,&nbsp;and<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;histamine&nbsp;during&nbsp;measured&nbsp;rest.&nbsp;This&nbsp;is&nbsp;the&nbsp;relay's&nbsp;own<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;impulse&nbsp;arm:&nbsp;source-level&nbsp;modulation&nbsp;the&nbsp;hypothalamic<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;evaluator&nbsp;does&nbsp;not&nbsp;own.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;NTS/PBN&nbsp;→&nbsp;VMpo/VMb&nbsp;thalamus&nbsp;→&nbsp;posterior&nbsp;→&nbsp;anterior&nbsp;insula&nbsp;→&nbsp;OFC<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;cortical&nbsp;image&nbsp;of&nbsp;the&nbsp;body&nbsp;(primary&nbsp;interoceptive<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cortex&nbsp;→&nbsp;subjective&nbsp;feeling&nbsp;→&nbsp;hedonic&nbsp;valence).&nbsp;Carried&nbsp;by<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;self-model's&nbsp;``update_hardware_body``,&nbsp;in&nbsp;parallel.<br>
+&nbsp;<br>
+The&nbsp;reflex&nbsp;runs&nbsp;without&nbsp;cortex&nbsp;—&nbsp;baroreflexes,&nbsp;thermoregulatory<br>
+drive,&nbsp;and&nbsp;LC&nbsp;alerting&nbsp;are&nbsp;all&nbsp;brainstem&nbsp;circuits.&nbsp;That&nbsp;is&nbsp;why&nbsp;the<br>
+same&nbsp;spec&nbsp;also&nbsp;lives&nbsp;in&nbsp;the&nbsp;daemon:&nbsp;``Interoceptor::neuro_impulses``<br>
+is&nbsp;applied&nbsp;by&nbsp;the&nbsp;daemon&nbsp;itself&nbsp;only&nbsp;while&nbsp;the&nbsp;mind's&nbsp;lease&nbsp;is<br>
+expired&nbsp;(no&nbsp;cortex&nbsp;on&nbsp;the&nbsp;wire).&nbsp;When&nbsp;the&nbsp;mind&nbsp;holds&nbsp;the&nbsp;lease&nbsp;the<br>
+daemon&nbsp;publishes&nbsp;the&nbsp;BodyState&nbsp;and&nbsp;this&nbsp;relay&nbsp;performs&nbsp;the&nbsp;routing&nbsp;—<br>
+the&nbsp;daemon&nbsp;never&nbsp;double-drives&nbsp;a&nbsp;response&nbsp;the&nbsp;mind&nbsp;is&nbsp;authoring.<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+SELF-SETTING&nbsp;MAGNITUDES<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+No&nbsp;impulse&nbsp;magnitude&nbsp;here&nbsp;is&nbsp;a&nbsp;constant&nbsp;the&nbsp;body&nbsp;obeys&nbsp;blindly.&nbsp;Each<br>
+raw&nbsp;rate&nbsp;is&nbsp;re-scaled&nbsp;at&nbsp;send&nbsp;time&nbsp;by&nbsp;the&nbsp;live&nbsp;level&nbsp;of&nbsp;the&nbsp;very<br>
+chemical&nbsp;it&nbsp;targets:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;positive&nbsp;impulse&nbsp;&nbsp;×&nbsp;&nbsp;(1&nbsp;−&nbsp;level)&nbsp;&nbsp;&nbsp;autoreceptor-style&nbsp;modulation:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;nearer&nbsp;the&nbsp;level&nbsp;already<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;is,&nbsp;the&nbsp;weaker&nbsp;the&nbsp;push<br>
+&nbsp;&nbsp;&nbsp;&nbsp;negative&nbsp;impulse&nbsp;&nbsp;×&nbsp;&nbsp;level&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;tone&nbsp;withdrawn&nbsp;in&nbsp;proportion&nbsp;to<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;live&nbsp;tone<br>
+&nbsp;<br>
+The&nbsp;values&nbsp;therefore&nbsp;set&nbsp;themselves&nbsp;from&nbsp;Genesis's&nbsp;own&nbsp;chemistry&nbsp;on<br>
+every&nbsp;call;&nbsp;the&nbsp;IPC&nbsp;boundary&nbsp;remains&nbsp;responsible&nbsp;for&nbsp;transport&nbsp;safety.<br>
+The&nbsp;daemon&nbsp;keeps&nbsp;the&nbsp;cortex-free&nbsp;fallback&nbsp;form&nbsp;of&nbsp;the&nbsp;same&nbsp;reflex<br>
+pattern&nbsp;when&nbsp;the&nbsp;mind's&nbsp;lease&nbsp;expires.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.brainstem.interoceptive_relay.html#InteroceptiveRelay">InteroceptiveRelay</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="InteroceptiveRelay">class <strong>InteroceptiveRelay</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#InteroceptiveRelay">InteroceptiveRelay</a>(neuro_impulse:&nbsp;'Callable[[int,&nbsp;float],&nbsp;<a href="builtins.html#object">object</a>]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;get_levels:&nbsp;'Callable[[],&nbsp;dict[str,&nbsp;float]&nbsp;|&nbsp;None]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;condition_cues:&nbsp;'Callable[[list[str],&nbsp;float,&nbsp;str],&nbsp;float]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+NTS/PBN&nbsp;—&nbsp;the&nbsp;first&nbsp;relay&nbsp;for&nbsp;body&nbsp;afferents.<br>
+&nbsp;<br>
+Reads&nbsp;the&nbsp;published&nbsp;BodyState,&nbsp;forwards&nbsp;threat&nbsp;channels&nbsp;to&nbsp;the<br>
+limbic&nbsp;low&nbsp;road&nbsp;(PBN→CeA),&nbsp;and&nbsp;modulates&nbsp;arousal&nbsp;systems&nbsp;directly<br>
+(lamina&nbsp;I&nbsp;→&nbsp;catecholamine&nbsp;groups).&nbsp;Impulse<br>
+magnitudes&nbsp;are&nbsp;self-set:&nbsp;each&nbsp;offer&nbsp;is&nbsp;scaled&nbsp;by&nbsp;the&nbsp;live&nbsp;level<br>
+of&nbsp;its&nbsp;own&nbsp;target&nbsp;chemical,&nbsp;so&nbsp;nothing&nbsp;here&nbsp;is&nbsp;a&nbsp;fixed&nbsp;constant.<br>
+&nbsp;<br>
+Wiring&nbsp;is&nbsp;by&nbsp;callables&nbsp;so&nbsp;the&nbsp;organ&nbsp;does&nbsp;not&nbsp;reach&nbsp;across&nbsp;region<br>
+boundaries&nbsp;itself&nbsp;—&nbsp;the&nbsp;heartbeat&nbsp;passes&nbsp;it&nbsp;the&nbsp;client's<br>
+``neuro_impulse``,&nbsp;the&nbsp;daemon-state&nbsp;level&nbsp;reader,&nbsp;and&nbsp;the<br>
+regulator's&nbsp;``condition_cues``.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="InteroceptiveRelay-__init__"><strong>__init__</strong></a>(self, neuro_impulse: 'Callable[[int, float], object] | None' = None, get_levels: 'Callable[[], dict[str, float] | None] | None' = None, condition_cues: 'Callable[[list[str], float, str], float] | None' = None) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="InteroceptiveRelay-relay"><strong>relay</strong></a>(self, body: 'BodyState', presence: 'SensorPresence | None' = None) -&gt; 'dict'</dt><dd><span class="code">Distribute&nbsp;one&nbsp;BodyState&nbsp;sample&nbsp;to&nbsp;its&nbsp;proper&nbsp;destinations.<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;small&nbsp;summary&nbsp;(threat&nbsp;peak,&nbsp;cues&nbsp;forwarded,&nbsp;impulses<br>
+sent)&nbsp;for&nbsp;the&nbsp;caller's&nbsp;observability&nbsp;—&nbsp;the&nbsp;same&nbsp;shape&nbsp;the<br>
+daemon's&nbsp;spec&nbsp;produces.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>CHEM_HISTAMINE</strong> = 9<br>
+<strong>CHEM_NAMES</strong> = {0: 'dopamine', 1: 'serotonin', 2: 'norepinephrine', 3: 'acetylcholine', 4: 'gaba', 5: 'glutamate', 6: 'cortisol', 7: 'oxytocin', 8: 'endorphin', 9: 'histamine', ...}<br>
+<strong>CHEM_NOREPINEPHRINE</strong> = 2<br>
+<strong>CHEM_OREXIN</strong> = 15<br>
+<strong>TYPE_CHECKING</strong> = False<br>
+<strong>logger</strong> = &lt;Logger Self_World.brainstem.interoceptive_relay (WARNING)&gt;</td></tr></table>
+</body></html>

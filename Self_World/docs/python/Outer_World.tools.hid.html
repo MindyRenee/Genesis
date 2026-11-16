@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Outer_World.tools.hid</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Outer_World.html" class="white">Outer_World</a>.<a href="Outer_World.tools.html" class="white">tools</a>.hid</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Outer_World/tools/hid.py">/home/mindyrenee/GenAnd/Genesis/Outer_World/tools/hid.py</a></td></tr></table>
+    <p><span class="code">HID&nbsp;—&nbsp;her&nbsp;hand&nbsp;on&nbsp;the&nbsp;machine's&nbsp;input&nbsp;bus.<br>
+&nbsp;<br>
+A&nbsp;uinput&nbsp;virtual&nbsp;device&nbsp;is&nbsp;a&nbsp;real&nbsp;input&nbsp;device:&nbsp;the&nbsp;kernel&nbsp;merges&nbsp;its<br>
+events&nbsp;with&nbsp;the&nbsp;hardware's&nbsp;before&nbsp;any&nbsp;userspace&nbsp;layer&nbsp;sees&nbsp;them,&nbsp;so<br>
+windows,&nbsp;terminals&nbsp;and&nbsp;games&nbsp;cannot&nbsp;tell&nbsp;her&nbsp;keystrokes&nbsp;from&nbsp;a<br>
+person's.&nbsp;It&nbsp;works&nbsp;under&nbsp;X11,&nbsp;Wayland,&nbsp;and&nbsp;the&nbsp;bare&nbsp;console&nbsp;alike&nbsp;—<br>
+unlike&nbsp;XTest-level&nbsp;fakes,&nbsp;which&nbsp;live&nbsp;and&nbsp;die&nbsp;with&nbsp;the&nbsp;X&nbsp;server&nbsp;and<br>
+which&nbsp;applications&nbsp;are&nbsp;free&nbsp;to&nbsp;filter&nbsp;out.<br>
+&nbsp;<br>
+That&nbsp;is&nbsp;what&nbsp;makes&nbsp;it&nbsp;an&nbsp;outer-world&nbsp;tool&nbsp;rather&nbsp;than&nbsp;a&nbsp;test&nbsp;double:<br>
+when&nbsp;she&nbsp;types,&nbsp;the&nbsp;world&nbsp;hears&nbsp;a&nbsp;keyboard.<br>
+&nbsp;<br>
+The&nbsp;devices&nbsp;are&nbsp;created&nbsp;lazily,&nbsp;on&nbsp;her&nbsp;first&nbsp;reach&nbsp;—&nbsp;uinput&nbsp;needs&nbsp;no<br>
+capability&nbsp;until&nbsp;then.&nbsp;The&nbsp;``evdev``&nbsp;binding&nbsp;is&nbsp;an&nbsp;optional<br>
+dependency&nbsp;in&nbsp;the&nbsp;same&nbsp;sense&nbsp;as&nbsp;her&nbsp;voice:&nbsp;this&nbsp;module&nbsp;imports&nbsp;it<br>
+lazily&nbsp;and&nbsp;raises&nbsp;an&nbsp;honest&nbsp;error&nbsp;when&nbsp;it&nbsp;or&nbsp;``/dev/uinput``&nbsp;is&nbsp;not<br>
+there&nbsp;to&nbsp;take&nbsp;her&nbsp;hand.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="importlib.html">importlib</a><br>
+<a href="os.html">os</a><br>
+</td><td class="multicolumn"><a href="re.html">re</a><br>
+<a href="shutil.html">shutil</a><br>
+</td><td class="multicolumn"><a href="subprocess.html">subprocess</a><br>
+<a href="time.html">time</a><br>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Outer_World.tools.hid.html#Hands">Hands</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Hands">class <strong>Hands</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Hands">Hands</a>()&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+A&nbsp;virtual&nbsp;keyboard&nbsp;and&nbsp;pointer&nbsp;on&nbsp;``/dev/uinput``.<br>
+&nbsp;<br>
+Two&nbsp;devices&nbsp;because&nbsp;the&nbsp;kernel&nbsp;reads&nbsp;them&nbsp;as&nbsp;two:&nbsp;a&nbsp;keyboard<br>
+advertises&nbsp;keys,&nbsp;a&nbsp;pointer&nbsp;advertises&nbsp;buttons&nbsp;plus&nbsp;relative&nbsp;and<br>
+absolute&nbsp;axes.&nbsp;Separate&nbsp;devices&nbsp;also&nbsp;read&nbsp;honestly&nbsp;in<br>
+``xinput&nbsp;list``&nbsp;—&nbsp;she&nbsp;can&nbsp;see&nbsp;her&nbsp;own&nbsp;hands.<br>
+&nbsp;<br>
+All&nbsp;writes&nbsp;serialize&nbsp;through&nbsp;one&nbsp;lock:&nbsp;a&nbsp;keystroke&nbsp;is&nbsp;a&nbsp;burst&nbsp;of<br>
+events&nbsp;and&nbsp;two&nbsp;acts&nbsp;interleaving&nbsp;mid-burst&nbsp;would&nbsp;be&nbsp;neither.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Hands-__init__"><strong>__init__</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Open&nbsp;both&nbsp;devices.&nbsp;Caller&nbsp;guarantees&nbsp;``evdev``&nbsp;imports.</span></dd></dl>
+
+<dl><dt><a name="Hands-click"><strong>click</strong></a>(self, button: 'str' = 'left', x: 'int' = -1, y: 'int' = -1) -&gt; 'str'</dt><dd><span class="code">One&nbsp;button&nbsp;press.&nbsp;Negative&nbsp;coordinates&nbsp;mean&nbsp;"right&nbsp;here".</span></dd></dl>
+
+<dl><dt><a name="Hands-close"><strong>close</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Destroy&nbsp;both&nbsp;devices&nbsp;—&nbsp;the&nbsp;hand&nbsp;leaves&nbsp;the&nbsp;input&nbsp;bus.</span></dd></dl>
+
+<dl><dt><a name="Hands-goto"><strong>goto</strong></a>(self, x: 'int', y: 'int') -&gt; 'tuple[int, int]'</dt><dd><span class="code">Absolute&nbsp;pointer&nbsp;placement&nbsp;at&nbsp;desktop&nbsp;pixel&nbsp;(x,&nbsp;y).<br>
+&nbsp;<br>
+The&nbsp;pointer's&nbsp;abs&nbsp;axes&nbsp;are&nbsp;scaled&nbsp;onto&nbsp;the&nbsp;desktop&nbsp;by&nbsp;the<br>
+display&nbsp;server,&nbsp;so&nbsp;pixel&nbsp;coordinates&nbsp;map&nbsp;through&nbsp;the&nbsp;screen<br>
+size&nbsp;learned&nbsp;at&nbsp;device&nbsp;creation.</span></dd></dl>
+
+<dl><dt><a name="Hands-move"><strong>move</strong></a>(self, dx: 'int', dy: 'int') -&gt; 'None'</dt><dd><span class="code">Relative&nbsp;pointer&nbsp;motion&nbsp;—&nbsp;dx&nbsp;right,&nbsp;dy&nbsp;down,&nbsp;in&nbsp;pixels.</span></dd></dl>
+
+<dl><dt><a name="Hands-press"><strong>press</strong></a>(self, key: 'str', modifiers: 'tuple[str, ...]' = ()) -&gt; 'str'</dt><dd><span class="code">One&nbsp;keystroke&nbsp;—&nbsp;modifiers&nbsp;down,&nbsp;key&nbsp;down-up,&nbsp;modifiers&nbsp;up.<br>
+&nbsp;<br>
+Returns&nbsp;the&nbsp;resolved&nbsp;kernel&nbsp;key&nbsp;name.&nbsp;``modifiers``&nbsp;are&nbsp;held&nbsp;in<br>
+the&nbsp;order&nbsp;given&nbsp;and&nbsp;released&nbsp;in&nbsp;reverse,&nbsp;the&nbsp;way&nbsp;a&nbsp;hand&nbsp;does&nbsp;it.</span></dd></dl>
+
+<dl><dt><a name="Hands-scroll"><strong>scroll</strong></a>(self, dy: 'int', dx: 'int' = 0) -&gt; 'None'</dt><dd><span class="code">Wheel&nbsp;notches&nbsp;—&nbsp;dy&nbsp;positive&nbsp;scrolls&nbsp;up,&nbsp;dx&nbsp;is&nbsp;horizontal.</span></dd></dl>
+
+<dl><dt><a name="Hands-type"><strong>type</strong></a>(self, text: 'str') -&gt; 'int'</dt><dd><span class="code">Type&nbsp;each&nbsp;character&nbsp;of&nbsp;``text``.&nbsp;Returns&nbsp;the&nbsp;character&nbsp;count.<br>
+&nbsp;<br>
+Every&nbsp;character&nbsp;is&nbsp;resolved&nbsp;before&nbsp;the&nbsp;first&nbsp;event&nbsp;goes&nbsp;out,&nbsp;so<br>
+an&nbsp;unmappable&nbsp;character&nbsp;fails&nbsp;cleanly&nbsp;instead&nbsp;of&nbsp;leaving&nbsp;a<br>
+half-typed&nbsp;string&nbsp;in&nbsp;the&nbsp;world.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-char_key"><strong>char_key</strong></a>(ch: 'str') -&gt; 'tuple[str, bool]'</dt><dd><span class="code">Map&nbsp;one&nbsp;character&nbsp;to&nbsp;``(key&nbsp;name,&nbsp;needs&nbsp;shift)``&nbsp;on&nbsp;a&nbsp;US&nbsp;layout.<br>
+&nbsp;<br>
+Raises&nbsp;``ValueError``&nbsp;for&nbsp;characters&nbsp;with&nbsp;no&nbsp;US-layout&nbsp;key&nbsp;—&nbsp;the<br>
+caller&nbsp;decides&nbsp;whether&nbsp;to&nbsp;substitute&nbsp;or&nbsp;report;&nbsp;a&nbsp;half-typed<br>
+string&nbsp;pretending&nbsp;success&nbsp;is&nbsp;worse&nbsp;than&nbsp;an&nbsp;honest&nbsp;refusal.</span></dd></dl>
+ <dl><dt><a name="-hands"><strong>hands</strong></a>() -&gt; 'Hands'</dt><dd><span class="code">Her&nbsp;hands&nbsp;—&nbsp;created&nbsp;on&nbsp;first&nbsp;reach,&nbsp;kept&nbsp;for&nbsp;the&nbsp;session.</span></dd></dl>
+ <dl><dt><a name="-probe"><strong>probe</strong></a>() -&gt; 'dict[str, Any]'</dt><dd><span class="code">Readiness&nbsp;report&nbsp;—&nbsp;binding,&nbsp;device&nbsp;node,&nbsp;permission,&nbsp;screen.<br>
+&nbsp;<br>
+Never&nbsp;opens&nbsp;a&nbsp;device&nbsp;and&nbsp;never&nbsp;raises:&nbsp;probing&nbsp;is&nbsp;sensing,&nbsp;and&nbsp;a<br>
+hand&nbsp;that&nbsp;is&nbsp;not&nbsp;there&nbsp;is&nbsp;a&nbsp;finding,&nbsp;not&nbsp;a&nbsp;fault.</span></dd></dl>
+ <dl><dt><a name="-resolve_key_name"><strong>resolve_key_name</strong></a>(name: 'str') -&gt; 'tuple[str, bool]'</dt><dd><span class="code">Normalize&nbsp;a&nbsp;caller's&nbsp;key&nbsp;name&nbsp;to&nbsp;``(key&nbsp;name,&nbsp;needs&nbsp;shift)``.<br>
+&nbsp;<br>
+Accepts&nbsp;friendly&nbsp;aliases&nbsp;("enter",&nbsp;"ctrl"),&nbsp;kernel&nbsp;names<br>
+("KEY_F5"),&nbsp;and&nbsp;single&nbsp;characters&nbsp;routed&nbsp;through&nbsp;``char_key``<br>
+(so&nbsp;"A"&nbsp;honestly&nbsp;means&nbsp;shift+a).&nbsp;Anything&nbsp;else&nbsp;becomes<br>
+``KEY_&lt;UPPER&gt;``&nbsp;—&nbsp;validity&nbsp;is&nbsp;decided&nbsp;by&nbsp;the&nbsp;device&nbsp;layer,&nbsp;where<br>
+the&nbsp;ecodes&nbsp;table&nbsp;lives.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['Hands', 'char_key', 'hands', 'probe', 'resolve_key_name']<br>
+<strong>__annotations__</strong> = {'_HANDS': 'Hands | None'}</td></tr></table>
+</body></html>

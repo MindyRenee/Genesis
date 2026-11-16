@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.basal_ganglia.td</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.basal_ganglia.html" class="white">basal_ganglia</a>.td</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/basal_ganglia/td.py">/home/mindyrenee/GenAnd/Genesis/Self_World/basal_ganglia/td.py</a></td></tr></table>
+    <p><span class="code">Temporal-difference&nbsp;(TD(λ))&nbsp;learning&nbsp;—&nbsp;dopamine&nbsp;as&nbsp;a&nbsp;reward<br>
+prediction&nbsp;error&nbsp;with&nbsp;eligibility&nbsp;traces.<br>
+&nbsp;<br>
+In&nbsp;the&nbsp;brain,&nbsp;dopamine&nbsp;neurons&nbsp;in&nbsp;the&nbsp;ventral&nbsp;tegmental&nbsp;area&nbsp;(VTA)<br>
+and&nbsp;substantia&nbsp;nigra&nbsp;do&nbsp;not&nbsp;signal&nbsp;reward&nbsp;directly&nbsp;—&nbsp;they&nbsp;signal<br>
+*reward&nbsp;prediction&nbsp;error*&nbsp;(RPE):&nbsp;the&nbsp;difference&nbsp;between&nbsp;the&nbsp;reward<br>
+actually&nbsp;received&nbsp;and&nbsp;the&nbsp;reward&nbsp;that&nbsp;was&nbsp;expected&nbsp;(Schultz,&nbsp;1997;<br>
+Schultz&nbsp;et&nbsp;al.,&nbsp;1997).<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;RPE&nbsp;=&nbsp;actual_reward&nbsp;−&nbsp;expected_reward<br>
+&nbsp;<br>
+-&nbsp;**Positive&nbsp;RPE**&nbsp;(reward&nbsp;better&nbsp;than&nbsp;expected):&nbsp;dopamine&nbsp;neurons<br>
+&nbsp;&nbsp;fire&nbsp;bursts.&nbsp;The&nbsp;state/action&nbsp;that&nbsp;led&nbsp;to&nbsp;the&nbsp;reward&nbsp;increases&nbsp;in<br>
+&nbsp;&nbsp;value&nbsp;—&nbsp;the&nbsp;organism&nbsp;learns&nbsp;to&nbsp;repeat&nbsp;it.<br>
+-&nbsp;**Negative&nbsp;RPE**&nbsp;(reward&nbsp;worse&nbsp;than&nbsp;expected):&nbsp;dopamine&nbsp;neurons<br>
+&nbsp;&nbsp;pause&nbsp;(dip&nbsp;below&nbsp;baseline).&nbsp;The&nbsp;state/action&nbsp;decreases&nbsp;in&nbsp;value.<br>
+-&nbsp;**Zero&nbsp;RPE**&nbsp;(reward&nbsp;as&nbsp;expected):&nbsp;no&nbsp;dopamine&nbsp;change.&nbsp;The<br>
+&nbsp;&nbsp;prediction&nbsp;is&nbsp;already&nbsp;accurate;&nbsp;nothing&nbsp;to&nbsp;learn.<br>
+&nbsp;<br>
+#&nbsp;TD(λ):&nbsp;eligibility&nbsp;traces<br>
+&nbsp;<br>
+This&nbsp;module&nbsp;implements&nbsp;**TD(λ)**&nbsp;—&nbsp;temporal-difference&nbsp;learning&nbsp;with<br>
+*eligibility&nbsp;traces*&nbsp;(Sutton,&nbsp;1988;&nbsp;Sutton&nbsp;&amp;&nbsp;Barto,&nbsp;2018,&nbsp;Ch.&nbsp;12).<br>
+TD(λ)&nbsp;generalizes&nbsp;TD(0):&nbsp;the&nbsp;parameter&nbsp;λ&nbsp;∈&nbsp;[0,&nbsp;1]&nbsp;interpolates&nbsp;between<br>
+one-step&nbsp;TD(0)&nbsp;(λ=0)&nbsp;and&nbsp;Monte&nbsp;Carlo&nbsp;(λ=1)&nbsp;by&nbsp;controlling&nbsp;how&nbsp;far<br>
+credit&nbsp;for&nbsp;a&nbsp;reward&nbsp;prediction&nbsp;error&nbsp;propagates&nbsp;backward&nbsp;through&nbsp;the<br>
+sequence&nbsp;of&nbsp;recently-visited&nbsp;states.<br>
+&nbsp;<br>
+The&nbsp;TD(λ)&nbsp;backward-view&nbsp;update&nbsp;(Sutton&nbsp;&amp;&nbsp;Barto,&nbsp;2018,&nbsp;§12.2):<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;δ&nbsp;=&nbsp;r&nbsp;+&nbsp;γ&nbsp;·&nbsp;V(s')&nbsp;−&nbsp;V(s)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;TD&nbsp;error&nbsp;(RPE)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;e&nbsp;←&nbsp;γλ&nbsp;·&nbsp;e&nbsp;+&nbsp;∇V(s)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;eligibility&nbsp;trace&nbsp;update<br>
+&nbsp;&nbsp;&nbsp;&nbsp;w&nbsp;←&nbsp;w&nbsp;+&nbsp;α&nbsp;·&nbsp;δ&nbsp;·&nbsp;e&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;weight&nbsp;update<br>
+&nbsp;<br>
+where:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;V(s)&nbsp;is&nbsp;the&nbsp;value&nbsp;of&nbsp;state&nbsp;s,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;r&nbsp;is&nbsp;the&nbsp;reward&nbsp;received,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;γ&nbsp;is&nbsp;the&nbsp;discount&nbsp;factor&nbsp;(future&nbsp;rewards&nbsp;worth&nbsp;less),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;s'&nbsp;is&nbsp;the&nbsp;next&nbsp;state,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;α&nbsp;is&nbsp;the&nbsp;learning&nbsp;rate,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;λ&nbsp;is&nbsp;the&nbsp;trace-decay&nbsp;parameter,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;e&nbsp;is&nbsp;the&nbsp;eligibility&nbsp;trace&nbsp;(one&nbsp;entry&nbsp;per&nbsp;feature/weight),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;∇V(s)&nbsp;is&nbsp;the&nbsp;gradient&nbsp;of&nbsp;V(s)&nbsp;w.r.t.&nbsp;the&nbsp;weights.<br>
+&nbsp;<br>
+The&nbsp;eligibility&nbsp;trace&nbsp;e&nbsp;is&nbsp;a&nbsp;decaying&nbsp;record&nbsp;of&nbsp;how&nbsp;recently&nbsp;and&nbsp;how<br>
+strongly&nbsp;each&nbsp;weight&nbsp;has&nbsp;been&nbsp;"visited"&nbsp;(its&nbsp;concept&nbsp;was&nbsp;active).<br>
+When&nbsp;a&nbsp;TD&nbsp;error&nbsp;arrives,&nbsp;ALL&nbsp;traced&nbsp;weights&nbsp;are&nbsp;updated&nbsp;in<br>
+proportion&nbsp;to&nbsp;their&nbsp;trace&nbsp;—&nbsp;not&nbsp;just&nbsp;the&nbsp;weights&nbsp;of&nbsp;the&nbsp;current<br>
+state.&nbsp;This&nbsp;is&nbsp;the&nbsp;credit-assignment&nbsp;mechanism:&nbsp;a&nbsp;concept&nbsp;visited<br>
+three&nbsp;steps&nbsp;ago&nbsp;still&nbsp;receives&nbsp;a&nbsp;share&nbsp;of&nbsp;the&nbsp;credit&nbsp;(or&nbsp;blame),<br>
+decayed&nbsp;by&nbsp;(γλ)³.<br>
+&nbsp;<br>
+**Replacing&nbsp;traces**&nbsp;are&nbsp;used&nbsp;instead&nbsp;of&nbsp;accumulating&nbsp;traces.&nbsp;Here<br>
+features&nbsp;are&nbsp;confidence/count,&nbsp;not&nbsp;binary&nbsp;indicators;&nbsp;resetting&nbsp;active<br>
+traces&nbsp;to&nbsp;these&nbsp;gradients&nbsp;is&nbsp;a&nbsp;bounded&nbsp;replacing-trace&nbsp;variant,&nbsp;not<br>
+standard&nbsp;accumulating&nbsp;semi-gradient&nbsp;TD(λ).&nbsp;The&nbsp;λ=1&nbsp;Monte&nbsp;Carlo<br>
+interpretation&nbsp;of&nbsp;standard&nbsp;TD(λ)&nbsp;therefore&nbsp;does&nbsp;not&nbsp;directly&nbsp;apply.<br>
+The&nbsp;λ=0&nbsp;update&nbsp;is&nbsp;exactly&nbsp;semi-gradient&nbsp;TD(0).<br>
+&nbsp;<br>
+When&nbsp;λ&nbsp;=&nbsp;0,&nbsp;the&nbsp;trace&nbsp;decays&nbsp;to&nbsp;zero&nbsp;immediately&nbsp;after&nbsp;each&nbsp;step,&nbsp;and<br>
+the&nbsp;update&nbsp;reduces&nbsp;*exactly*&nbsp;to&nbsp;TD(0):<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;e&nbsp;=&nbsp;∇V(s)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;trace&nbsp;=&nbsp;current&nbsp;gradient&nbsp;only<br>
+&nbsp;&nbsp;&nbsp;&nbsp;w&nbsp;←&nbsp;w&nbsp;+&nbsp;α&nbsp;·&nbsp;δ&nbsp;·&nbsp;∇V(s)<br>
+&nbsp;<br>
+Existing&nbsp;callers&nbsp;that&nbsp;construct&nbsp;``<a href="#TDLearner">TDLearner</a>(network)``&nbsp;without<br>
+specifying&nbsp;λ&nbsp;get&nbsp;semi-gradient&nbsp;TD(0).&nbsp;The&nbsp;gradient&nbsp;includes&nbsp;concept<br>
+confidence&nbsp;because&nbsp;the&nbsp;value&nbsp;function&nbsp;uses&nbsp;confidence-weighted&nbsp;features.<br>
+&nbsp;<br>
+#&nbsp;Biological&nbsp;basis:&nbsp;synaptic&nbsp;eligibility&nbsp;tags<br>
+&nbsp;<br>
+Eligibility&nbsp;traces&nbsp;are&nbsp;not&nbsp;merely&nbsp;a&nbsp;computational&nbsp;convenience&nbsp;—&nbsp;they<br>
+correspond&nbsp;to&nbsp;a&nbsp;well-established&nbsp;neurobiological&nbsp;mechanism.&nbsp;The<br>
+**synaptic&nbsp;tag&nbsp;hypothesis**&nbsp;(Morris,&nbsp;2006;&nbsp;Pan&nbsp;et&nbsp;al.,&nbsp;2005;&nbsp;Redondo<br>
+&amp;&nbsp;Morris,&nbsp;2011)&nbsp;proposes&nbsp;that:<br>
+&nbsp;<br>
+1.&nbsp;When&nbsp;a&nbsp;synapse&nbsp;is&nbsp;active&nbsp;(pre-synaptic&nbsp;firing&nbsp;coincides&nbsp;with<br>
+&nbsp;&nbsp;&nbsp;post-synaptic&nbsp;depolarization),&nbsp;it&nbsp;acquires&nbsp;a&nbsp;temporary<br>
+&nbsp;&nbsp;&nbsp;**eligibility&nbsp;tag**&nbsp;—&nbsp;a&nbsp;molecular&nbsp;marker&nbsp;(likely&nbsp;involving<br>
+&nbsp;&nbsp;&nbsp;Ca²⁺&nbsp;dynamics&nbsp;and&nbsp;CAMKII&nbsp;autophosphorylation)&nbsp;that&nbsp;marks&nbsp;it&nbsp;as<br>
+&nbsp;&nbsp;&nbsp;"eligible&nbsp;for&nbsp;plasticity."<br>
+2.&nbsp;The&nbsp;tag&nbsp;decays&nbsp;over&nbsp;seconds&nbsp;to&nbsp;minutes.<br>
+3.&nbsp;When&nbsp;a&nbsp;neuromodulator&nbsp;(dopamine)&nbsp;arrives&nbsp;—&nbsp;signaling&nbsp;a&nbsp;reward<br>
+&nbsp;&nbsp;&nbsp;prediction&nbsp;error&nbsp;—&nbsp;only&nbsp;tagged&nbsp;(eligible)&nbsp;synapses&nbsp;undergo<br>
+&nbsp;&nbsp;&nbsp;plasticity.&nbsp;The&nbsp;magnitude&nbsp;of&nbsp;change&nbsp;is&nbsp;proportional&nbsp;to&nbsp;both&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;dopamine&nbsp;signal&nbsp;and&nbsp;the&nbsp;tag&nbsp;strength.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;a&nbsp;computational&nbsp;analogy,&nbsp;not&nbsp;a&nbsp;molecular&nbsp;identification:<br>
+eligibility&nbsp;traces&nbsp;model&nbsp;delayed&nbsp;credit,&nbsp;and&nbsp;the&nbsp;TD&nbsp;error&nbsp;provides&nbsp;a<br>
+normalized&nbsp;reward-error&nbsp;signal&nbsp;rather&nbsp;than&nbsp;measured&nbsp;dopamine&nbsp;release.<br>
+Genesis's&nbsp;``get_dopamine_signal()``&nbsp;scales&nbsp;that&nbsp;error&nbsp;for&nbsp;the&nbsp;daemon;<br>
+recently&nbsp;active&nbsp;weights&nbsp;receive&nbsp;credit&nbsp;in&nbsp;proportion&nbsp;to&nbsp;their&nbsp;traces.<br>
+&nbsp;<br>
+#&nbsp;Value&nbsp;function&nbsp;approximation<br>
+&nbsp;<br>
+States&nbsp;are&nbsp;sets&nbsp;of&nbsp;active&nbsp;concepts.&nbsp;The&nbsp;value&nbsp;of&nbsp;a&nbsp;state&nbsp;is<br>
+approximated&nbsp;as&nbsp;a&nbsp;weighted&nbsp;sum&nbsp;of&nbsp;the&nbsp;confidences&nbsp;of&nbsp;its&nbsp;active<br>
+concepts&nbsp;—&nbsp;a&nbsp;linear&nbsp;function&nbsp;approximator&nbsp;over&nbsp;the&nbsp;concept&nbsp;network.<br>
+This&nbsp;lets&nbsp;TD&nbsp;learning&nbsp;generalize&nbsp;across&nbsp;similar&nbsp;states&nbsp;(states<br>
+sharing&nbsp;concepts&nbsp;have&nbsp;similar&nbsp;values)&nbsp;without&nbsp;storing&nbsp;a&nbsp;value&nbsp;for<br>
+every&nbsp;possible&nbsp;state&nbsp;combination.<br>
+&nbsp;<br>
+#&nbsp;Integration&nbsp;with&nbsp;dopamine<br>
+&nbsp;<br>
+The&nbsp;TD&nbsp;error&nbsp;(RPE)&nbsp;is&nbsp;the&nbsp;dopamine&nbsp;signal.&nbsp;``get_dopamine_signal()``<br>
+returns&nbsp;the&nbsp;most&nbsp;recent&nbsp;RPE,&nbsp;scaled&nbsp;for&nbsp;the&nbsp;neurochemical&nbsp;system.<br>
+Positive&nbsp;RPE&nbsp;→&nbsp;dopamine&nbsp;burst;&nbsp;negative&nbsp;RPE&nbsp;→&nbsp;dopamine&nbsp;dip.&nbsp;This<br>
+integrates&nbsp;with&nbsp;the&nbsp;existing&nbsp;dopamine&nbsp;impulse&nbsp;system&nbsp;in&nbsp;the<br>
+autonomous&nbsp;learner.<br>
+&nbsp;<br>
+#&nbsp;Neuromodulatory&nbsp;meta-parameters&nbsp;(Doya,&nbsp;2002)<br>
+&nbsp;<br>
+The&nbsp;ascending&nbsp;neuromodulators&nbsp;are&nbsp;not&nbsp;just&nbsp;signals&nbsp;—&nbsp;they&nbsp;are&nbsp;the<br>
+*meta-parameters*&nbsp;of&nbsp;the&nbsp;learning&nbsp;machine&nbsp;(Doya,&nbsp;2002,<br>
+"Metalearning&nbsp;and&nbsp;neuromodulation",&nbsp;Neural&nbsp;Networks&nbsp;15:495):<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;dopamine&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&gt;&nbsp;the&nbsp;TD&nbsp;error&nbsp;δ&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(this&nbsp;module)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;serotonin&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&gt;&nbsp;the&nbsp;discount&nbsp;factor&nbsp;γ&nbsp;(temporal&nbsp;horizon)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;noradrenaline&nbsp;&nbsp;-&gt;&nbsp;inverse&nbsp;temperature&nbsp;β&nbsp;(exploration;&nbsp;see<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DecisionMaker.set_exploration)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;acetylcholine&nbsp;&nbsp;-&gt;&nbsp;the&nbsp;learning&nbsp;rate&nbsp;α&nbsp;&nbsp;&nbsp;(memory&nbsp;update&nbsp;speed)<br>
+&nbsp;<br>
+``set_modulators``&nbsp;lets&nbsp;the&nbsp;body&nbsp;supply&nbsp;the&nbsp;current&nbsp;effective<br>
+serotonin&nbsp;and&nbsp;acetylcholine&nbsp;levels&nbsp;each&nbsp;turn;&nbsp;the&nbsp;learner&nbsp;then&nbsp;runs<br>
+on&nbsp;*effective*&nbsp;parameters&nbsp;rather&nbsp;than&nbsp;constants:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;γ_eff&nbsp;=&nbsp;clip(γ&nbsp;+&nbsp;0.35·(5HT&nbsp;−&nbsp;0.40),&nbsp;0.05,&nbsp;0.99)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;α_eff&nbsp;=&nbsp;α&nbsp;·&nbsp;(0.6&nbsp;+&nbsp;1.2·ACh)<br>
+&nbsp;<br>
+Serotonin&nbsp;raising&nbsp;γ&nbsp;is&nbsp;the&nbsp;patience&nbsp;mechanism&nbsp;—&nbsp;Miyazaki&nbsp;et&nbsp;al.<br>
+showed&nbsp;dorsal&nbsp;raphe&nbsp;5-HT&nbsp;firing&nbsp;ramps&nbsp;while&nbsp;an&nbsp;animal&nbsp;waits&nbsp;for&nbsp;a<br>
+delayed&nbsp;reward,&nbsp;and&nbsp;Doya&nbsp;assigns&nbsp;it&nbsp;control&nbsp;of&nbsp;the&nbsp;discount&nbsp;factor.<br>
+Acetylcholine&nbsp;raising&nbsp;α&nbsp;is&nbsp;Hasselmo's&nbsp;encoding&nbsp;mode&nbsp;—&nbsp;high&nbsp;ACh<br>
+biases&nbsp;the&nbsp;system&nbsp;toward&nbsp;writing&nbsp;new&nbsp;memory.<br>
+&nbsp;<br>
+References:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Schultz&nbsp;(1997):&nbsp;Dopamine&nbsp;neurons&nbsp;and&nbsp;their&nbsp;role&nbsp;in&nbsp;reward<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mechanisms.&nbsp;Current&nbsp;Opinion&nbsp;in&nbsp;Neurobiology,&nbsp;7,&nbsp;191-197.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Schultz&nbsp;et&nbsp;al.&nbsp;(1997):&nbsp;A&nbsp;neural&nbsp;substrate&nbsp;of&nbsp;prediction&nbsp;and<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;reward.&nbsp;Science,&nbsp;275,&nbsp;1593-1599.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Sutton&nbsp;(1988):&nbsp;Learning&nbsp;to&nbsp;predict&nbsp;by&nbsp;the&nbsp;methods&nbsp;of&nbsp;temporal<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;differences.&nbsp;Machine&nbsp;Learning,&nbsp;3,&nbsp;9-44.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Sutton&nbsp;&amp;&nbsp;Barto&nbsp;(2018):&nbsp;Reinforcement&nbsp;Learning:&nbsp;An&nbsp;Introduction<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(2nd&nbsp;ed.).&nbsp;MIT&nbsp;Press,&nbsp;Ch.&nbsp;12&nbsp;(Eligibility&nbsp;Traces).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Pan&nbsp;et&nbsp;al.&nbsp;(2005):&nbsp;Reward-predicting&nbsp;stimuli&nbsp;enhance&nbsp;dopamine<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;release&nbsp;in&nbsp;the&nbsp;VTA.&nbsp;Nature,&nbsp;437,&nbsp;1066-1070.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Doya&nbsp;(2002):&nbsp;Metalearning&nbsp;and&nbsp;neuromodulation.&nbsp;Neural&nbsp;Networks,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;15,&nbsp;495-506.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Miyazaki&nbsp;et&nbsp;al.&nbsp;(2011):&nbsp;Activation&nbsp;of&nbsp;dorsal&nbsp;raphe&nbsp;serotonin<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;neurons&nbsp;underlies&nbsp;waiting&nbsp;for&nbsp;delayed&nbsp;rewards.&nbsp;J.&nbsp;Neurosci.,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;31,&nbsp;469-479.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Morris&nbsp;(2006):&nbsp;Elements&nbsp;of&nbsp;a&nbsp;neurobiological&nbsp;theory&nbsp;of<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;hippocampal&nbsp;function.&nbsp;Hippocampus,&nbsp;16(11),&nbsp;917-926.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Redondo&nbsp;&amp;&nbsp;Morris&nbsp;(2011):&nbsp;Making&nbsp;memories&nbsp;last:&nbsp;the&nbsp;synaptic<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;tagging&nbsp;and&nbsp;capture&nbsp;hypothesis.&nbsp;Nature&nbsp;Reviews&nbsp;Neuroscience,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;12,&nbsp;17-30.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="time.html">time</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.basal_ganglia.td.html#TDLearner">TDLearner</a>
+</dt><dt class="heading-text"><a href="Self_World.basal_ganglia.td.html#TDTransition">TDTransition</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="TDLearner">class <strong>TDLearner</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#TDLearner">TDLearner</a>(network:&nbsp;'ConceptNetwork',&nbsp;*,&nbsp;learning_rate:&nbsp;'float'&nbsp;=&nbsp;0.1,&nbsp;discount:&nbsp;'float'&nbsp;=&nbsp;0.9,&nbsp;lam:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;dopamine_scale:&nbsp;'float'&nbsp;=&nbsp;0.05)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Temporal-difference&nbsp;learning&nbsp;with&nbsp;eligibility&nbsp;traces&nbsp;(TD(λ)).<br>
+&nbsp;<br>
+Learns&nbsp;to&nbsp;predict&nbsp;the&nbsp;value&nbsp;of&nbsp;states&nbsp;(sets&nbsp;of&nbsp;active&nbsp;concepts)<br>
+using&nbsp;the&nbsp;TD(λ)&nbsp;rule&nbsp;with&nbsp;replacing&nbsp;eligibility&nbsp;traces.&nbsp;The&nbsp;value<br>
+function&nbsp;is&nbsp;a&nbsp;linear&nbsp;approximation&nbsp;over&nbsp;concept&nbsp;confidences,<br>
+enabling&nbsp;generalization&nbsp;across&nbsp;similar&nbsp;states.<br>
+&nbsp;<br>
+The&nbsp;reward&nbsp;prediction&nbsp;error&nbsp;(RPE)&nbsp;serves&nbsp;as&nbsp;the&nbsp;dopamine&nbsp;signal,<br>
+integrating&nbsp;with&nbsp;Genesis's&nbsp;neurochemical&nbsp;system.&nbsp;Eligibility&nbsp;traces<br>
+propagate&nbsp;credit&nbsp;(or&nbsp;blame)&nbsp;backward&nbsp;through&nbsp;recently-visited<br>
+states&nbsp;—&nbsp;the&nbsp;longer&nbsp;ago&nbsp;a&nbsp;state&nbsp;was&nbsp;visited,&nbsp;the&nbsp;smaller&nbsp;its<br>
+share&nbsp;of&nbsp;the&nbsp;credit,&nbsp;decayed&nbsp;by&nbsp;(γλ)ⁿ&nbsp;where&nbsp;n&nbsp;is&nbsp;the&nbsp;number&nbsp;of<br>
+steps&nbsp;elapsed.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;network:&nbsp;The&nbsp;concept&nbsp;network&nbsp;(provides&nbsp;concept&nbsp;confidences<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;value&nbsp;approximation).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;learning_rate:&nbsp;TD&nbsp;learning&nbsp;rate&nbsp;α&nbsp;(default&nbsp;0.1).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;discount:&nbsp;Discount&nbsp;factor&nbsp;γ&nbsp;for&nbsp;future&nbsp;rewards&nbsp;(default&nbsp;0.9).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;lam:&nbsp;Trace-decay&nbsp;parameter&nbsp;λ&nbsp;∈&nbsp;[0,&nbsp;1]&nbsp;(default&nbsp;0.0).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;λ=0&nbsp;gives&nbsp;TD(0)&nbsp;(one-step,&nbsp;no&nbsp;credit&nbsp;propagation).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;λ=1&nbsp;gives&nbsp;Monte&nbsp;Carlo-like&nbsp;(full&nbsp;episode&nbsp;credit).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Typical&nbsp;production&nbsp;values:&nbsp;0.7–0.9.&nbsp;The&nbsp;trace&nbsp;decays&nbsp;by&nbsp;a<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;factor&nbsp;of&nbsp;γλ&nbsp;per&nbsp;step,&nbsp;so&nbsp;the&nbsp;effective&nbsp;credit&nbsp;horizon&nbsp;is<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;~1/(1−γλ)&nbsp;steps.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;dopamine_scale:&nbsp;Scaling&nbsp;factor&nbsp;for&nbsp;the&nbsp;dopamine&nbsp;signal<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(default&nbsp;0.05,&nbsp;matching&nbsp;the&nbsp;impulse&nbsp;magnitudes&nbsp;used&nbsp;by<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;autonomous&nbsp;learner).<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="TDLearner-__init__"><strong>__init__</strong></a>(self, network: 'ConceptNetwork', *, learning_rate: 'float' = 0.1, discount: 'float' = 0.9, lam: 'float' = 0.0, dopamine_scale: 'float' = 0.05) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;TD(λ)&nbsp;learner&nbsp;with&nbsp;network,&nbsp;rates,&nbsp;and&nbsp;dopamine&nbsp;scaling.</span></dd></dl>
+
+<dl><dt><a name="TDLearner-average_reward_rate"><strong>average_reward_rate</strong></a>(self) -&gt; 'float'</dt><dd><span class="code">The&nbsp;running&nbsp;average&nbsp;reward&nbsp;rate&nbsp;ρ̄&nbsp;—&nbsp;the&nbsp;tonic&nbsp;dopamine<br>
+proxy&nbsp;of&nbsp;Niv&nbsp;et&nbsp;al.&nbsp;(2007),&nbsp;driving&nbsp;response&nbsp;vigor.</span></dd></dl>
+
+<dl><dt><a name="TDLearner-effective_discount"><strong>effective_discount</strong></a>(self) -&gt; 'float'</dt><dd><span class="code">The&nbsp;modulated&nbsp;discount&nbsp;factor&nbsp;γ_eff.<br>
+&nbsp;<br>
+γ_eff&nbsp;=&nbsp;clip(γ&nbsp;+&nbsp;gain·(5HT&nbsp;−&nbsp;baseline),&nbsp;MIN,&nbsp;MAX).&nbsp;With&nbsp;no<br>
+serotonin&nbsp;level&nbsp;wired,&nbsp;returns&nbsp;the&nbsp;configured&nbsp;``discount``.</span></dd></dl>
+
+<dl><dt><a name="TDLearner-effective_learning_rate"><strong>effective_learning_rate</strong></a>(self) -&gt; 'float'</dt><dd><span class="code">The&nbsp;modulated&nbsp;learning&nbsp;rate&nbsp;α_eff.<br>
+&nbsp;<br>
+α_eff&nbsp;=&nbsp;α·(offset&nbsp;+&nbsp;gain·ACh),&nbsp;centered&nbsp;near&nbsp;the&nbsp;body's&nbsp;ACh<br>
+baseline&nbsp;so&nbsp;a&nbsp;resting&nbsp;level&nbsp;leaves&nbsp;the&nbsp;rate&nbsp;near&nbsp;α.&nbsp;With&nbsp;no<br>
+acetylcholine&nbsp;level&nbsp;wired,&nbsp;returns&nbsp;``learning_rate``.</span></dd></dl>
+
+<dl><dt><a name="TDLearner-get_dopamine_signal"><strong>get_dopamine_signal</strong></a>(self) -&gt; 'float'</dt><dd><span class="code">Get&nbsp;the&nbsp;current&nbsp;dopamine&nbsp;signal&nbsp;(scaled&nbsp;RPE).<br>
+&nbsp;<br>
+The&nbsp;reward&nbsp;prediction&nbsp;error&nbsp;is&nbsp;the&nbsp;dopamine&nbsp;signal&nbsp;in&nbsp;the<br>
+brain&nbsp;(Schultz,&nbsp;1997).&nbsp;This&nbsp;returns&nbsp;the&nbsp;most&nbsp;recent&nbsp;RPE,<br>
+scaled&nbsp;to&nbsp;the&nbsp;magnitude&nbsp;range&nbsp;used&nbsp;by&nbsp;the&nbsp;neurochemical<br>
+impulse&nbsp;system.&nbsp;Positive&nbsp;RPE&nbsp;→&nbsp;positive&nbsp;dopamine&nbsp;(burst);<br>
+negative&nbsp;RPE&nbsp;→&nbsp;negative&nbsp;dopamine&nbsp;(dip).<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;scaled&nbsp;dopamine&nbsp;signal.</span></dd></dl>
+
+<dl><dt><a name="TDLearner-get_history"><strong>get_history</strong></a>(self, limit: 'int' = 10) -&gt; 'list[TDTransition]'</dt><dd><span class="code">Get&nbsp;recent&nbsp;TD&nbsp;transitions.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;limit:&nbsp;Maximum&nbsp;number&nbsp;of&nbsp;transitions&nbsp;to&nbsp;return.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;list&nbsp;of&nbsp;recent&nbsp;<a href="#TDTransition">TDTransition</a>&nbsp;records&nbsp;(most&nbsp;recent&nbsp;last).</span></dd></dl>
+
+<dl><dt><a name="TDLearner-get_rpe"><strong>get_rpe</strong></a>(self) -&gt; 'float'</dt><dd><span class="code">Get&nbsp;the&nbsp;most&nbsp;recent&nbsp;(unscaled)&nbsp;reward&nbsp;prediction&nbsp;error.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;most&nbsp;recent&nbsp;RPE.</span></dd></dl>
+
+<dl><dt><a name="TDLearner-get_statistics"><strong>get_statistics</strong></a>(self) -&gt; 'dict[str, int | float]'</dt><dd><span class="code">Return&nbsp;statistics&nbsp;about&nbsp;the&nbsp;TD&nbsp;learner.</span></dd></dl>
+
+<dl><dt><a name="TDLearner-get_trace"><strong>get_trace</strong></a>(self, concept: 'str', action: 'str | None' = None) -&gt; 'float'</dt><dd><span class="code">Get&nbsp;the&nbsp;eligibility&nbsp;trace&nbsp;value&nbsp;for&nbsp;a&nbsp;concept.<br>
+&nbsp;<br>
+The&nbsp;trace&nbsp;reflects&nbsp;how&nbsp;recently&nbsp;the&nbsp;concept&nbsp;was&nbsp;part&nbsp;of&nbsp;an<br>
+active&nbsp;state.&nbsp;Higher&nbsp;=&nbsp;more&nbsp;recently&nbsp;active&nbsp;(more&nbsp;eligible<br>
+for&nbsp;credit&nbsp;assignment).&nbsp;Zero&nbsp;=&nbsp;not&nbsp;traced.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;concept:&nbsp;The&nbsp;concept&nbsp;name.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;action:&nbsp;Optional&nbsp;action&nbsp;for&nbsp;an&nbsp;action-conditioned&nbsp;trace.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;eligibility&nbsp;trace&nbsp;(0.0&nbsp;if&nbsp;not&nbsp;traced).</span></dd></dl>
+
+<dl><dt><a name="TDLearner-get_weight"><strong>get_weight</strong></a>(self, concept: 'str') -&gt; 'float'</dt><dd><span class="code">Get&nbsp;the&nbsp;learned&nbsp;value&nbsp;weight&nbsp;for&nbsp;a&nbsp;concept.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;concept:&nbsp;The&nbsp;concept&nbsp;name.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;weight&nbsp;(default&nbsp;1.0&nbsp;if&nbsp;unlearned).</span></dd></dl>
+
+<dl><dt><a name="TDLearner-predict_value"><strong>predict_value</strong></a>(self, state: 'list[str]', action: 'str | None' = None) -&gt; 'float'</dt><dd><span class="code">Predict&nbsp;the&nbsp;value&nbsp;of&nbsp;a&nbsp;state.<br>
+&nbsp;<br>
+The&nbsp;value&nbsp;is&nbsp;a&nbsp;weighted&nbsp;sum&nbsp;of&nbsp;the&nbsp;confidences&nbsp;of&nbsp;the&nbsp;active<br>
+concepts&nbsp;in&nbsp;the&nbsp;state.&nbsp;Concepts&nbsp;not&nbsp;in&nbsp;the&nbsp;network&nbsp;contribute<br>
+zero.&nbsp;Weights&nbsp;are&nbsp;learned&nbsp;via&nbsp;TD&nbsp;updates.<br>
+&nbsp;<br>
+V(s)&nbsp;=&nbsp;Σ_i&nbsp;w_i&nbsp;·&nbsp;confidence(concept_i)<br>
+&nbsp;<br>
+When&nbsp;``action``&nbsp;is&nbsp;supplied,&nbsp;the&nbsp;value&nbsp;is&nbsp;action-conditioned<br>
+so&nbsp;different&nbsp;actions&nbsp;in&nbsp;the&nbsp;same&nbsp;state&nbsp;can&nbsp;acquire&nbsp;different<br>
+learned&nbsp;values.&nbsp;Without&nbsp;it,&nbsp;the&nbsp;original&nbsp;state-value&nbsp;behavior<br>
+is&nbsp;unchanged.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;state:&nbsp;A&nbsp;list&nbsp;of&nbsp;concept&nbsp;names&nbsp;(the&nbsp;active&nbsp;concepts).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;action:&nbsp;Optional&nbsp;selected&nbsp;action&nbsp;used&nbsp;for&nbsp;action-conditioned<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;value&nbsp;lookup.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;predicted&nbsp;value&nbsp;of&nbsp;the&nbsp;state.</span></dd></dl>
+
+<dl><dt><a name="TDLearner-reset_traces"><strong>reset_traces</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Clear&nbsp;all&nbsp;eligibility&nbsp;traces.<br>
+&nbsp;<br>
+Called&nbsp;at&nbsp;episode/task&nbsp;boundaries&nbsp;to&nbsp;prevent&nbsp;credit&nbsp;from&nbsp;one<br>
+task&nbsp;leaking&nbsp;into&nbsp;the&nbsp;next.&nbsp;In&nbsp;continuous&nbsp;operation&nbsp;(no<br>
+explicit&nbsp;episodes),&nbsp;traces&nbsp;decay&nbsp;naturally&nbsp;and&nbsp;this&nbsp;is&nbsp;rarely<br>
+needed.</span></dd></dl>
+
+<dl><dt><a name="TDLearner-set_modulators"><strong>set_modulators</strong></a>(self, *, serotonin: 'float | None' = None, acetylcholine: 'float | None' = None) -&gt; 'None'</dt><dd><span class="code">Set&nbsp;the&nbsp;body's&nbsp;current&nbsp;neuromodulator&nbsp;levels&nbsp;for&nbsp;the<br>
+meta-parameters&nbsp;(Doya,&nbsp;2002).<br>
+&nbsp;<br>
+Serotonin&nbsp;modulates&nbsp;the&nbsp;effective&nbsp;discount&nbsp;factor&nbsp;—&nbsp;higher<br>
+5-HT&nbsp;lengthens&nbsp;the&nbsp;temporal&nbsp;horizon&nbsp;(patience).&nbsp;Acetylcholine<br>
+modulates&nbsp;the&nbsp;effective&nbsp;learning&nbsp;rate&nbsp;—&nbsp;higher&nbsp;ACh&nbsp;speeds<br>
+memory&nbsp;update&nbsp;(Hasselmo's&nbsp;encoding&nbsp;mode).&nbsp;Passing&nbsp;``None``<br>
+leaves&nbsp;the&nbsp;learner&nbsp;on&nbsp;its&nbsp;configured&nbsp;baselines.</span></dd></dl>
+
+<dl><dt><a name="TDLearner-update"><strong>update</strong></a>(self, state: 'list[str]', reward: 'float', next_state: 'list[str]', action: 'str | None' = None, next_action: 'str | None' = None) -&gt; 'float'</dt><dd><span class="code">Apply&nbsp;a&nbsp;TD(λ)&nbsp;update&nbsp;and&nbsp;return&nbsp;the&nbsp;reward&nbsp;prediction&nbsp;error.<br>
+&nbsp;<br>
+The&nbsp;TD&nbsp;error&nbsp;(RPE)&nbsp;is:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;δ&nbsp;=&nbsp;reward&nbsp;+&nbsp;γ&nbsp;·&nbsp;V(s')&nbsp;−&nbsp;V(s)<br>
+&nbsp;<br>
+Eligibility&nbsp;traces&nbsp;are&nbsp;then&nbsp;updated&nbsp;(backward&nbsp;view):<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;e&nbsp;←&nbsp;γλ&nbsp;·&nbsp;e&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;decay&nbsp;all&nbsp;traces<br>
+&nbsp;&nbsp;&nbsp;&nbsp;e[i]&nbsp;=&nbsp;∇V_i(s)&nbsp;&nbsp;for&nbsp;active&nbsp;i&nbsp;&nbsp;#&nbsp;replacing&nbsp;trace<br>
+&nbsp;<br>
+and&nbsp;all&nbsp;traced&nbsp;weights&nbsp;are&nbsp;updated:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;w[i]&nbsp;←&nbsp;w[i]&nbsp;+&nbsp;α&nbsp;·&nbsp;δ&nbsp;·&nbsp;e[i]<br>
+&nbsp;<br>
+With&nbsp;λ&nbsp;=&nbsp;0,&nbsp;the&nbsp;trace&nbsp;for&nbsp;inactive&nbsp;concepts&nbsp;is&nbsp;zero&nbsp;and&nbsp;the<br>
+trace&nbsp;for&nbsp;active&nbsp;concepts&nbsp;equals&nbsp;the&nbsp;gradient,&nbsp;so&nbsp;the&nbsp;update<br>
+reduces&nbsp;exactly&nbsp;to&nbsp;semi-gradient&nbsp;TD(0):&nbsp;only&nbsp;current-state<br>
+weights&nbsp;are&nbsp;updated,&nbsp;with&nbsp;gradient&nbsp;confidence/count.<br>
+&nbsp;<br>
+With&nbsp;λ&nbsp;&gt;&nbsp;0,&nbsp;concepts&nbsp;from&nbsp;recently-visited&nbsp;states&nbsp;retain<br>
+decaying&nbsp;traces&nbsp;and&nbsp;also&nbsp;receive&nbsp;a&nbsp;share&nbsp;of&nbsp;the&nbsp;credit&nbsp;(or<br>
+blame),&nbsp;enabling&nbsp;multi-step&nbsp;temporal&nbsp;credit&nbsp;assignment.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;state:&nbsp;The&nbsp;current&nbsp;state&nbsp;(active&nbsp;concepts).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;reward:&nbsp;The&nbsp;reward&nbsp;received.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;next_state:&nbsp;The&nbsp;resulting&nbsp;state.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;action:&nbsp;Optional&nbsp;action&nbsp;selected&nbsp;in&nbsp;the&nbsp;current&nbsp;state.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;next_action:&nbsp;Optional&nbsp;action&nbsp;associated&nbsp;with&nbsp;the&nbsp;next&nbsp;state.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;reward&nbsp;prediction&nbsp;error&nbsp;δ&nbsp;(the&nbsp;dopamine&nbsp;signal).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>ACH_LR_GAIN</strong> = 1.2</dl>
+
+<dl><dt><strong>ACH_LR_OFFSET</strong> = 0.6</dl>
+
+<dl><dt><strong>DEFAULT_DISCOUNT</strong> = 0.9</dl>
+
+<dl><dt><strong>DEFAULT_DOPAMINE_SCALE</strong> = 0.05</dl>
+
+<dl><dt><strong>DEFAULT_LAMBDA</strong> = 0.0</dl>
+
+<dl><dt><strong>DEFAULT_LEARNING_RATE</strong> = 0.1</dl>
+
+<dl><dt><strong>DISCOUNT_MAX</strong> = 0.99</dl>
+
+<dl><dt><strong>DISCOUNT_MIN</strong> = 0.05</dl>
+
+<dl><dt><strong>SEROTONIN_BASELINE</strong> = 0.4</dl>
+
+<dl><dt><strong>SEROTONIN_DISCOUNT_GAIN</strong> = 0.35</dl>
+
+<dl><dt><strong>VIGOR_EMA_RATE</strong> = 0.05</dl>
+
+<dl><dt><strong>__annotations__</strong> = {'ACH_LR_GAIN': 'float', 'ACH_LR_OFFSET': 'float', 'DEFAULT_DISCOUNT': 'float', 'DEFAULT_DOPAMINE_SCALE': 'float', 'DEFAULT_LAMBDA': 'float', 'DEFAULT_LEARNING_RATE': 'float', 'DISCOUNT_MAX': 'float', 'DISCOUNT_MIN': 'float', 'SEROTONIN_BASELINE': 'float', 'SEROTONIN_DISCOUNT_GAIN': 'float', ...}</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="TDTransition">class <strong>TDTransition</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#TDTransition">TDTransition</a>(state:&nbsp;'list[str]',&nbsp;reward:&nbsp;'float',&nbsp;next_state:&nbsp;'list[str]',&nbsp;rpe:&nbsp;'float',&nbsp;timestamp:&nbsp;'int')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;state&nbsp;transition&nbsp;record&nbsp;for&nbsp;TD&nbsp;learning.<br>
+&nbsp;<br>
+Attributes:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;state:&nbsp;The&nbsp;set&nbsp;of&nbsp;active&nbsp;concepts&nbsp;(state).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;reward:&nbsp;The&nbsp;reward&nbsp;received.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;next_state:&nbsp;The&nbsp;resulting&nbsp;state.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;rpe:&nbsp;The&nbsp;reward&nbsp;prediction&nbsp;error&nbsp;computed&nbsp;for&nbsp;this&nbsp;transition.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;timestamp:&nbsp;When&nbsp;the&nbsp;transition&nbsp;occurred.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="TDTransition-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="TDTransition-__init__"><strong>__init__</strong></a>(self, state: 'list[str]', reward: 'float', next_state: 'list[str]', rpe: 'float', timestamp: 'int') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="TDTransition-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>next_state</strong></dt>
+</dl>
+<dl><dt><strong>reward</strong></dt>
+</dl>
+<dl><dt><strong>rpe</strong></dt>
+</dl>
+<dl><dt><strong>state</strong></dt>
+</dl>
+<dl><dt><strong>timestamp</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'next_state': 'list[str]', 'reward': 'float', 'rpe': 'float', 'state': 'list[str]', 'timestamp': 'int'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'next_state': Field(name='next_state',type='list[str]',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'reward': Field(name='reward',type='float',default=&lt;datacl...appingproxy({}),kw_only=False,_field_type=_FIELD), 'rpe': Field(name='rpe',type='float',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD), 'state': Field(name='state',type='list[str]',default=&lt;dat...appingproxy({}),kw_only=False,_field_type=_FIELD), 'timestamp': Field(name='timestamp',type='int',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('state', 'reward', 'next_state', 'rpe', 'timestamp')</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['TDLearner', 'TDTransition']</td></tr></table>
+</body></html>

@@ -1,0 +1,85 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Inference signals — the active inference state projection."><title>genesis::state::inference - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-203241e4.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="genesis" data-themes="" data-resource-suffix="" data-rustdoc-version="1.100.0 (0ef1bc386 2026-11-09)" data-channel="1.100.0" data-search-js="search-b167f383.js" data-stringdex-js="stringdex-b5109af9.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../../static.files/main-1814ead3.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-9f56287d.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module inference</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../genesis/index.html">genesis</a><span class="version">0.2.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module inference</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#active-inference-in-genesis" title="Active inference in Genesis">Active inference in Genesis</a></li><li><a href="#dyadic-affective-coupling" title="Dyadic affective coupling">Dyadic affective coupling</a></li><li><a href="#layout-64-bytes" title="Layout (64 bytes)">Layout (64 bytes)</a></li></ul><h3><a href="#structs">Module Items</a></h3><ul class="block"><li><a href="#structs" title="Structs">Structs</a></li></ul></section><div id="rustdoc-modnav"><h2><a href="../index.html">In genesis::<wbr>state</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../index.html">genesis</a>::<wbr><a href="../index.html">state</a></div><h1>Module <span>inference</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/genesis/state/inference.rs.html#1-295">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Inference signals — the active inference state projection.</p>
+<p>This module defines <a href="struct.InferenceSignals.html" title="struct genesis::state::inference::InferenceSignals"><code>InferenceSignals</code></a>, a 64-byte struct that
+lives at the tail of <a href="../core_state/struct.GenesisCoreState.html" title="struct genesis::state::core_state::GenesisCoreState"><code>GenesisCoreState</code></a> (offset 3416, right after
+the checksum). It exposes the key signals from the active inference
+engine to the cognitive mind, without requiring a schema version
+bump.</p>
+<p>The block sat at 3228 in schema v3 and 3352 in v4 —
+v5 inserted the 64-byte sleep-network layer at 3224, moving the
+block here; see <a href="../core_state/struct.GenesisCoreState.html" title="struct genesis::state::core_state::GenesisCoreState"><code>crate::state::core_state::GenesisCoreState</code></a> for
+the full layout.
+<code>python/genesis_client/types.py</code> reads this block by offset and must
+be updated whenever it moves — a stale offset there parses
+successfully out of the wrong bytes.</p>
+<h2 id="active-inference-in-genesis"><a class="doc-anchor" href="#active-inference-in-genesis">§</a>Active inference in Genesis</h2>
+<p>Genesis runs a generative model of its <strong>own</strong> neurochemical
+trajectory. Before each neurochemical tick, the model predicts
+where its 18 effective levels will move. After the tick, the
+prediction error (surprise) is computed and fed back into:</p>
+<ul>
+<li><strong>Dopamine</strong>: positive prediction error → reward signal (Schultz,
+2016). The system feels “better than expected.”</li>
+<li><strong>Norepinephrine</strong>: high surprise → orienting response (Aston-
+Jones &amp; Cohen, 2005). The system pays attention to the
+unexpected.</li>
+<li><strong>Metaplasticity</strong>: high surprise → faster coupling-matrix
+learning. The system learns how to learn faster when surprised.</li>
+<li><strong>Allostatic load</strong>: sustained multisignal regulatory burden →
+cortisol baseline upregulation. The system <em>anticipates</em> stress
+and prepares (allostatic regulation, Sterling, 2012). Expected
+free energy is one of four inputs to the burden median, not the
+driver on its own.</li>
+</ul>
+<p>This is the “strange loop”: the generative model IS the system it
+predicts. Prediction errors modify the very dynamics that generate
+the next state to be predicted. The system becomes autopoietic —
+self-creating and self-maintaining through active inference.</p>
+<h2 id="dyadic-affective-coupling"><a class="doc-anchor" href="#dyadic-affective-coupling">§</a>Dyadic affective coupling</h2>
+<p>A second generative model tracks the <strong>user’s</strong> affective state
+(valence, arousal, engagement) as hidden variables, inferred from
+conversation features. The user’s predicted affective trajectory
+couples to Genesis’s own neurochemistry via oxytocin (attunement).
+When the user is positive and engaged, oxytocin rises (social
+bonding). When the user is distressed, cortisol rises (empathic
+stress). Dyadic synchrony — the rolling correlation between
+Genesis’s and the user’s valence trajectories — measures how “in
+sync” they are.</p>
+<h2 id="layout-64-bytes"><a class="doc-anchor" href="#layout-64-bytes">§</a>Layout (64 bytes)</h2><div class="example-wrap"><pre class="language-text"><code>offset  field                        type    notes
+------  -----                        ----    -----
+  0     surprise_ema                 f32     running surprise [0,1]
+  4     free_energy                  f32     surprise + uncertainty
+  8     expected_free_energy         f32     predicted future surprise
+ 12     allostasis_load              f32     anticipatory stress [0,1]
+ 16     precision                    f32     model confidence [0,1]
+ 20     attunement                   f32     oxytocin coupling [0,1]
+ 24     dyadic_synchrony             f32     valence correlation [-1,1]
+ 28     user_valence                 f32     inferred user valence [-1,1]
+ 32     user_arousal                 f32     inferred user arousal [0,1]
+ 36     user_engagement              f32     inferred user engagement [0,1]
+ 40     prediction_error_dopamine    f32     DA state prediction error (unbounded)
+ 44     prediction_error_cortisol    f32     CORT state prediction error [-2,2]
+ 48     prediction_error_serotonin   f32     SRT state prediction error [-2,2]
+ 52     model_maturity               f32     model confidence [0,1]
+ 56     inference_tick_count         u32     inference cycles run
+ 60     policy_authority             f32     delegated policy authority [0,1]</code></pre></div>
+<p>These fields are NOT covered by the CRC32 checksum (they live in
+the reserved region). This is intentional: they are derived state
+recomputed every tick, so corruption self-heals within 200ms.</p>
+<p>References:</p>
+<ul>
+<li>Friston, K. (2010). The free-energy principle: a unified brain
+theory? Nature Reviews Neuroscience, 11(2), 127–138.</li>
+<li>Seth, A. &amp; Friston, K. (2016). Active interoceptive inference
+and the emotional brain. Phil. Trans. R. Soc. B, 371.</li>
+<li>Schultz, W. (2016). Dopamine reward prediction error coding.
+Dialogues in Clinical Neuroscience, 18(1), 23–32.</li>
+<li>Aston-Jones, G. &amp; Cohen, J. D. (2005). An integrative theory of
+locus coeruleus-norepinephrine function. Annual Review of
+Neuroscience, 28, 405–450.</li>
+<li>Sterling, P. (2012). Allostasis: a model of predictive
+regulation. Physiology &amp; Behavior, 106(1), 5–15.</li>
+<li>Pezzulo, G., Rigoli, F. &amp; Friston, K. (2015). Active inference,
+homeostatic and allostatic control. Prog. Neurobiol., 134.</li>
+</ul>
+</div></details><h2 id="structs" class="section-header">Structs<a href="#structs" class="anchor">§</a></h2><dl class="item-table"><dt><a class="struct" href="struct.InferenceSignals.html" title="struct genesis::state::inference::InferenceSignals">Inference<wbr>Signals</a></dt><dd>The active inference signal projection — 64 bytes that live in the
+reserved region of <code>GenesisCoreState</code>.</dd></dl></section></div></main></body></html>

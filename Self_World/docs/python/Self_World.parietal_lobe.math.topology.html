@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.parietal_lobe.math.topology</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.parietal_lobe.html" class="white">parietal_lobe</a>.<a href="Self_World.parietal_lobe.math.html" class="white">math</a>.topology</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/parietal_lobe/math/topology.py">/home/mindyrenee/GenAnd/Genesis/Self_World/parietal_lobe/math/topology.py</a></td></tr></table>
+    <p><span class="code">Topology&nbsp;—&nbsp;the&nbsp;words&nbsp;for&nbsp;shape&nbsp;without&nbsp;distance.<br>
+&nbsp;<br>
+The&nbsp;faculty&nbsp;speaks&nbsp;of&nbsp;what&nbsp;bends&nbsp;without&nbsp;tearing:&nbsp;open&nbsp;and&nbsp;closed<br>
+sets,&nbsp;connectedness,&nbsp;the&nbsp;Euler&nbsp;characteristic&nbsp;that&nbsp;counts&nbsp;vertices<br>
+minus&nbsp;edges&nbsp;plus&nbsp;faces&nbsp;and&nbsp;knows&nbsp;a&nbsp;sphere&nbsp;from&nbsp;a&nbsp;torus.&nbsp;Finite<br>
+topological&nbsp;spaces&nbsp;are&nbsp;small&nbsp;enough&nbsp;to&nbsp;hold&nbsp;whole&nbsp;—&nbsp;a&nbsp;space&nbsp;is&nbsp;its<br>
+points&nbsp;and&nbsp;the&nbsp;opens&nbsp;it&nbsp;admits.<br>
+&nbsp;<br>
+The&nbsp;machine&nbsp;half&nbsp;is&nbsp;``src/math/topology.rs``:&nbsp;finite&nbsp;spaces&nbsp;as<br>
+bitmasks,&nbsp;open/closed&nbsp;tests,&nbsp;closure/interior,&nbsp;Euler<br>
+characteristic,&nbsp;simple&nbsp;invariants.&nbsp;Here:&nbsp;the&nbsp;shape's&nbsp;words.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="itertools.html">itertools</a><br>
+</td><td class="multicolumn"><a href="re.html">re</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.parietal_lobe.math.topology.html#TopoResult">TopoResult</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="TopoResult">class <strong>TopoResult</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#TopoResult">TopoResult</a>(operation:&nbsp;'str',&nbsp;input:&nbsp;'str',&nbsp;output:&nbsp;'str',&nbsp;ok:&nbsp;'bool',&nbsp;error:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;data:&nbsp;'dict[str,&nbsp;Any]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;outcome&nbsp;of&nbsp;a&nbsp;topological&nbsp;question.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="TopoResult-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="TopoResult-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="TopoResult-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="TopoResult-__init__"><strong>__init__</strong></a>(self, operation: 'str', input: 'str', output: 'str', ok: 'bool', error: 'str' = '', data: 'dict[str, Any]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="TopoResult-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="TopoResult-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'data': 'dict[str, Any]', 'error': 'str', 'input': 'str', 'ok': 'bool', 'operation': 'str', 'output': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'data': Field(name='data',type='dict[str, Any]',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'error': Field(name='error',type='str',default='',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'input': Field(name='input',type='str',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD), 'ok': Field(name='ok',type='bool',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD), 'operation': Field(name='operation',type='str',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'output': Field(name='output',type='str',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('operation', 'input', 'output', 'ok', 'error', 'data')</dl>
+
+<dl><dt><strong>error</strong> = ''</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-closure"><strong>closure</strong></a>(n: 'int', opens: 'FiniteSpace', s: 'frozenset[int]') -&gt; 'frozenset[int]'</dt><dd><span class="code">The&nbsp;smallest&nbsp;closed&nbsp;set&nbsp;containing&nbsp;s&nbsp;—&nbsp;closed&nbsp;sets&nbsp;are&nbsp;the<br>
+complements&nbsp;of&nbsp;opens.</span></dd></dl>
+ <dl><dt><a name="-describe_space_text"><strong>describe_space_text</strong></a>(n: 'int', opens: 'list[list[int]]') -&gt; 'TopoResult'</dt><dd><span class="code">Is&nbsp;this&nbsp;collection&nbsp;of&nbsp;subsets&nbsp;a&nbsp;topology&nbsp;on&nbsp;n&nbsp;points?</span></dd></dl>
+ <dl><dt><a name="-euler_characteristic"><strong>euler_characteristic</strong></a>(faces: 'list[int]') -&gt; 'int'</dt><dd><span class="code">χ&nbsp;=&nbsp;Σ&nbsp;(−1)^i&nbsp;f_i&nbsp;—&nbsp;the&nbsp;alternating&nbsp;count&nbsp;that&nbsp;knows&nbsp;the<br>
+surface:&nbsp;V−E+F&nbsp;for&nbsp;a&nbsp;polyhedron,&nbsp;so&nbsp;a&nbsp;cube&nbsp;reads&nbsp;2&nbsp;(a&nbsp;sphere).</span></dd></dl>
+ <dl><dt><a name="-euler_surface"><strong>euler_surface</strong></a>(v: 'int', e: 'int', f: 'int') -&gt; 'TopoResult'</dt><dd><span class="code">"V-E+F&nbsp;for&nbsp;8,&nbsp;12,&nbsp;6"&nbsp;-&gt;&nbsp;2&nbsp;—&nbsp;a&nbsp;sphere's&nbsp;signature.</span></dd></dl>
+ <dl><dt><a name="-interior"><strong>interior</strong></a>(n: 'int', opens: 'FiniteSpace', s: 'frozenset[int]') -&gt; 'frozenset[int]'</dt><dd><span class="code">The&nbsp;largest&nbsp;open&nbsp;set&nbsp;inside&nbsp;s.</span></dd></dl>
+ <dl><dt><a name="-is_topology"><strong>is_topology</strong></a>(n: 'int', opens: 'FiniteSpace') -&gt; 'bool'</dt><dd><span class="code">The&nbsp;three&nbsp;axioms:&nbsp;∅&nbsp;and&nbsp;X&nbsp;open;&nbsp;unions&nbsp;open;&nbsp;finite<br>
+intersections&nbsp;open.</span></dd></dl>
+ <dl><dt><a name="-looks_like_topology"><strong>looks_like_topology</strong></a>(text: 'str') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;the&nbsp;text&nbsp;asks&nbsp;about&nbsp;opens,&nbsp;connectedness,&nbsp;surfaces&nbsp;—<br>
+shape&nbsp;without&nbsp;distance.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>FiniteSpace</strong> = frozenset[frozenset[int]]</td></tr></table>
+</body></html>

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.infrastructure._npz_io</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.infrastructure.html" class="white">infrastructure</a>._npz_io</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/infrastructure/_npz_io.py">/home/mindyrenee/GenAnd/Genesis/Self_World/infrastructure/_npz_io.py</a></td></tr></table>
+    <p><span class="code">Atomic,&nbsp;pickle-free&nbsp;persistence&nbsp;for&nbsp;the&nbsp;``.npz``&nbsp;artifact&nbsp;files.<br>
+&nbsp;<br>
+Genesis&nbsp;keeps&nbsp;several&nbsp;large&nbsp;learned&nbsp;artifacts&nbsp;as&nbsp;NumPy&nbsp;``.npz``:<br>
+the&nbsp;concept&nbsp;embedding&nbsp;matrix,&nbsp;the&nbsp;holographic&nbsp;graph,&nbsp;the&nbsp;VQ&nbsp;codebook,<br>
+and&nbsp;the&nbsp;two&nbsp;visual-cortex&nbsp;layers.&nbsp;They&nbsp;all&nbsp;shared&nbsp;two&nbsp;defects.<br>
+&nbsp;<br>
+**Non-atomic&nbsp;writes.**&nbsp;``np.savez(path,&nbsp;...)``&nbsp;writes&nbsp;straight&nbsp;to&nbsp;the<br>
+target.&nbsp;A&nbsp;crash,&nbsp;an&nbsp;OOM&nbsp;kill,&nbsp;or&nbsp;a&nbsp;full&nbsp;disk&nbsp;part-way&nbsp;through&nbsp;leaves&nbsp;a<br>
+truncated&nbsp;file&nbsp;that&nbsp;will&nbsp;not&nbsp;open&nbsp;—&nbsp;and&nbsp;these&nbsp;are&nbsp;large&nbsp;learned<br>
+structures&nbsp;whose&nbsp;loss&nbsp;costs&nbsp;a&nbsp;full&nbsp;rebuild.&nbsp;The&nbsp;rest&nbsp;of&nbsp;the&nbsp;codebase<br>
+already&nbsp;does&nbsp;this&nbsp;correctly&nbsp;(``persistence._atomic_write_state``,<br>
+``edge_log.EdgeLog.compact``),&nbsp;so&nbsp;these&nbsp;sites&nbsp;were&nbsp;the&nbsp;outliers.<br>
+&nbsp;<br>
+**Unnecessary&nbsp;pickling.**&nbsp;String&nbsp;lists&nbsp;were&nbsp;stored&nbsp;as<br>
+``np.array(names,&nbsp;dtype=object)``,&nbsp;which&nbsp;serialises&nbsp;via&nbsp;pickle,&nbsp;which<br>
+forced&nbsp;``allow_pickle=True``&nbsp;on&nbsp;load.&nbsp;Pickle&nbsp;on&nbsp;load&nbsp;is&nbsp;arbitrary&nbsp;code<br>
+execution&nbsp;for&nbsp;anyone&nbsp;who&nbsp;can&nbsp;write&nbsp;the&nbsp;file,&nbsp;and&nbsp;it&nbsp;was&nbsp;never&nbsp;needed:<br>
+NumPy's&nbsp;native&nbsp;``&lt;U``&nbsp;dtype&nbsp;stores&nbsp;the&nbsp;same&nbsp;strings&nbsp;as&nbsp;plain&nbsp;UTF-8.<br>
+&nbsp;<br>
+The&nbsp;legacy&nbsp;problem:&nbsp;files&nbsp;written&nbsp;before&nbsp;this&nbsp;change&nbsp;contain&nbsp;pickled<br>
+object&nbsp;arrays,&nbsp;so&nbsp;``allow_pickle=False``&nbsp;cannot&nbsp;open&nbsp;them.&nbsp;Loading<br>
+these&nbsp;files&nbsp;requires&nbsp;an&nbsp;explicit&nbsp;opt-in&nbsp;for&nbsp;an&nbsp;offline&nbsp;migration&nbsp;from<br>
+a&nbsp;trusted&nbsp;source.&nbsp;Normal&nbsp;startup&nbsp;never&nbsp;executes&nbsp;stored&nbsp;pickles.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="numpy.html">numpy</a><br>
+</td><td class="multicolumn"><a href="os.html">os</a><br>
+</td><td class="multicolumn"><a href="tempfile.html">tempfile</a><br>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-load_npz"><strong>load_npz</strong></a>(path: 'str | os.PathLike[str]', *, allow_legacy_pickle: 'bool' = False) -&gt; 'dict[str, Any]'</dt><dd><span class="code">Load&nbsp;a&nbsp;``.npz``&nbsp;without&nbsp;executing&nbsp;pickles&nbsp;by&nbsp;default.<br>
+&nbsp;<br>
+Explicit&nbsp;opt-in&nbsp;is&nbsp;only&nbsp;for&nbsp;offline&nbsp;migration&nbsp;of&nbsp;trusted&nbsp;legacy<br>
+files.&nbsp;The&nbsp;normal&nbsp;runtime&nbsp;never&nbsp;enables&nbsp;it.</span></dd></dl>
+ <dl><dt><a name="-save_npz"><strong>save_npz</strong></a>(path: 'str | os.PathLike[str]', **arrays: 'Any') -&gt; 'None'</dt><dd><span class="code">Write&nbsp;a&nbsp;``.npz``&nbsp;atomically.<br>
+&nbsp;<br>
+Serialises&nbsp;to&nbsp;a&nbsp;temporary&nbsp;file&nbsp;in&nbsp;the&nbsp;*same&nbsp;directory*&nbsp;(so<br>
+``os.replace``&nbsp;is&nbsp;atomic&nbsp;—&nbsp;a&nbsp;cross-device&nbsp;rename&nbsp;is&nbsp;not),&nbsp;fsyncs<br>
+it,&nbsp;then&nbsp;renames&nbsp;over&nbsp;the&nbsp;target.&nbsp;A&nbsp;reader&nbsp;therefore&nbsp;sees&nbsp;either<br>
+the&nbsp;complete&nbsp;previous&nbsp;file&nbsp;or&nbsp;the&nbsp;complete&nbsp;new&nbsp;one,&nbsp;never&nbsp;a<br>
+truncated&nbsp;mixture.<br>
+&nbsp;<br>
+Propagates&nbsp;errors.&nbsp;A&nbsp;failed&nbsp;save&nbsp;means&nbsp;the&nbsp;in-memory&nbsp;learned&nbsp;state<br>
+and&nbsp;the&nbsp;on-disk&nbsp;state&nbsp;have&nbsp;diverged,&nbsp;and&nbsp;the&nbsp;caller&nbsp;needs&nbsp;to&nbsp;know;<br>
+swallowing&nbsp;it&nbsp;(as&nbsp;these&nbsp;sites&nbsp;previously&nbsp;did,&nbsp;at&nbsp;DEBUG)&nbsp;is&nbsp;how&nbsp;a<br>
+silently-truncated&nbsp;artifact&nbsp;goes&nbsp;unnoticed&nbsp;for&nbsp;months.</span></dd></dl>
+ <dl><dt><a name="-str_array"><strong>str_array</strong></a>(values: 'Any') -&gt; 'np.ndarray'</dt><dd><span class="code">A&nbsp;string&nbsp;array&nbsp;NumPy&nbsp;can&nbsp;save&nbsp;without&nbsp;pickling.<br>
+&nbsp;<br>
+``np.array(list_of_str)``&nbsp;infers&nbsp;the&nbsp;native&nbsp;fixed-width&nbsp;unicode<br>
+dtype&nbsp;(``&lt;U``),&nbsp;which&nbsp;round-trips&nbsp;through&nbsp;``.npz``&nbsp;as&nbsp;plain&nbsp;UTF-8<br>
+and&nbsp;therefore&nbsp;needs&nbsp;no&nbsp;pickle.&nbsp;An&nbsp;empty&nbsp;list&nbsp;still&nbsp;needs&nbsp;an<br>
+explicit&nbsp;dtype&nbsp;or&nbsp;NumPy&nbsp;defaults&nbsp;to&nbsp;``float64``.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['legacy_pickle_warned', 'load_npz', 'save_npz', 'str_array']<br>
+<strong>legacy_pickle_warned</strong> = False</td></tr></table>
+</body></html>

@@ -1,0 +1,217 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Command opcodes sent by the cognitive mind to the daemon."><title>genesis::daemon::ipc::cmd - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../../static.files/rustdoc-203241e4.css"><meta name="rustdoc-vars" data-root-path="../../../../" data-static-root-path="../../../../static.files/" data-current-crate="genesis" data-themes="" data-resource-suffix="" data-rustdoc-version="1.100.0 (0ef1bc386 2026-11-09)" data-channel="1.100.0" data-search-js="search-b167f383.js" data-stringdex-js="stringdex-b5109af9.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../../static.files/storage-41dd4d93.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../../../static.files/main-1814ead3.js"></script><noscript><link rel="stylesheet" href="../../../../static.files/noscript-9f56287d.css"></noscript><link rel="alternate icon" type="image/png" href="../../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module cmd</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../../genesis/index.html">genesis</a><span class="version">0.2.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module cmd</a></h2><h3><a href="#constants">Module Items</a></h3><ul class="block"><li><a href="#constants" title="Constants">Constants</a></li></ul></section><div id="rustdoc-modnav"><h2><a href="../index.html">In genesis::<wbr>daemon::<wbr>ipc</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../../index.html">genesis</a>::<wbr><a href="../../index.html">daemon</a>::<wbr><a href="../index.html">ipc</a></div><h1>Module <span>cmd</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../../src/genesis/daemon/ipc.rs.html#172">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Command opcodes sent by the cognitive mind to the daemon.</p>
+</div></details><h2 id="constants" class="section-header">Constants<a href="#constants" class="anchor">§</a></h2><dl class="item-table"><dt><a class="constant" href="constant.ADVANCE_NEURO.html" title="constant genesis::daemon::ipc::cmd::ADVANCE_NEURO">ADVANCE_<wbr>NEURO</a></dt><dd>Advance neurochemical dynamics by dt, then run active inference
+and dyadic model update. The mind sends this when brain waves
+say it’s time to advance. Request: [f32 dt]. Response:
+[u8 ack][f32 surprise][f32 free_energy][f32 precision]
+[f32 allostatic_load][u32 tick_count] = 21 bytes.</dd><dt><a class="constant" href="constant.ADVANCE_PHYSICS.html" title="constant genesis::daemon::ipc::cmd::ADVANCE_PHYSICS">ADVANCE_<wbr>PHYSICS</a></dt><dd>Advance the body by an explicit step. <strong>Evaluation only.</strong></dd><dt><a class="constant" href="constant.ANALYZE_CODE.html" title="constant genesis::daemon::ipc::cmd::ANALYZE_CODE">ANALYZE_<wbr>CODE</a></dt><dd>Structural code analysis — the daemon’s code sense. Request:
+<code>[u16 path_len][path utf-8][u32 source_len][source utf-8]</code>.
+Response: <code>[u8 ack]</code> + the UTF-8 line report described on
+<a href="../../../cognition/code_analysis/fn.analysis_to_wire.html" title="fn genesis::cognition::code_analysis::analysis_to_wire"><code>crate::cognition::code_analysis::analysis_to_wire</code></a>; a source
+that fails to parse returns <code>INVALID_VALUE</code> so the mind can fall
+back to its own lightweight parser. Stateless — pure function
+of the payload, no TickLoop needed.</dd><dt><a class="constant" href="constant.APPLY_BODY_CONTROL.html" title="constant genesis::daemon::ipc::cmd::APPLY_BODY_CONTROL">APPLY_<wbr>BODY_<wbr>CONTROL</a></dt><dd>Read neurochemistry and apply CPU frequency, scheduling
+priority, and I/O priority. The mind sends this when
+neurochemistry has changed enough to warrant a different policy.
+Response: [u8 ack] + BodyControlState (same as GET_BODY_CONTROL).</dd><dt><a class="constant" href="constant.ARCHIVE_EPISODE.html" title="constant genesis::daemon::ipc::cmd::ARCHIVE_EPISODE">ARCHIVE_<wbr>EPISODE</a></dt><dd>Archive an episode from LTM. Used by sleep compression to
+compact low-salience episodes after extracting their semantic
+content. Unlike a hard delete, the archived episode remains
+retrievable by ID — it is only removed from the active
+similarity index. Request: [u64 episode_id]. Response: u8 ack
+(1=ok, 0=not found).</dd><dt><a class="constant" href="constant.ASSOCIATE.html" title="constant genesis::daemon::ipc::cmd::ASSOCIATE">ASSOCIATE</a></dt><dd>Find associations for recent episodes. The mind sends this when
+new episodes have been stored. Response: [u8 ack][u32 associations]
+= 5 bytes.</dd><dt><a class="constant" href="constant.CONSOLIDATE.html" title="constant genesis::daemon::ipc::cmd::CONSOLIDATE">CONSOLIDATE</a></dt><dd>Consolidate STM → LTM. The mind sends this when STM fill
+crosses a threshold weighted by consolidation_weight.
+Response: [u8 ack][u32 consolidated] = 5 bytes.</dd><dt><a class="constant" href="constant.DELETE_EPISODE.html" title="constant genesis::daemon::ipc::cmd::DELETE_EPISODE">DELETE_<wbr>EPISODE</a></dt><dd>Delete an episode for real — the substrate death the archive
+only sleepwalks. Marks the deleted flag, removes every index
+(id_to_idx, active_ids), and unsubscribes its SDR if still
+bundled. The payload slot stays orphaned in the data file —
+reclaiming physical space is a rebuild pass, not this call.
+Request/response identical to ARCHIVE_EPISODE. Additive:
+PROTOCOL_VERSION is unaffected.</dd><dt><a class="constant" href="constant.DREAM.html" title="constant genesis::daemon::ipc::cmd::DREAM">DREAM</a></dt><dd>Run one dream cycle (only meaningful when sleeping). The mind
+sends this when sleep state + dream pressure cross a threshold.
+Response: [u8 ack][u32 dream_insights] = 5 bytes.</dd><dt><a class="constant" href="constant.DROP_TENSOR.html" title="constant genesis::daemon::ipc::cmd::DROP_TENSOR">DROP_<wbr>TENSOR</a></dt><dd>Drop a named tensor (idempotent). Request: <code>[u8 name_len] [name utf8]</code>. Response: <code>[u8 ack]</code> (1).</dd><dt><a class="constant" href="constant.FIND_SIMILAR.html" title="constant genesis::daemon::ipc::cmd::FIND_SIMILAR">FIND_<wbr>SIMILAR</a></dt><dd>Find episodes similar to a query text (SimHash/SDR match).</dd><dt><a class="constant" href="constant.FIND_SIMILAR_ARCHIVED.html" title="constant genesis::daemon::ipc::cmd::FIND_SIMILAR_ARCHIVED">FIND_<wbr>SIMILAR_<wbr>ARCHIVED</a></dt><dd>Deep recall — SimHash similarity scan over the <em>archived</em> tier
+of LTM. Sleep compression retires low-salience episodes to the
+archive, where they stay retrievable by ID but leave every
+associative index; this reaches them when the active set has
+no answer. Request and response are identical to FIND_SIMILAR.
+Additive: PROTOCOL_VERSION is unaffected.</dd><dt><a class="constant" href="constant.GET_BODY_CONTROL.html" title="constant genesis::daemon::ipc::cmd::GET_BODY_CONTROL">GET_<wbr>BODY_<wbr>CONTROL</a></dt><dd>Get the body control state — what Genesis is doing to its body
+(CPU frequency policy, scheduling priorities, I/O priority,
+thermal cap status). This is how the cognitive mind knows what
+its neurochemistry is driving. Response: BodyControlState.</dd><dt><a class="constant" href="constant.GET_BODY_STATE.html" title="constant genesis::daemon::ipc::cmd::GET_BODY_STATE">GET_<wbr>BODY_<wbr>STATE</a></dt><dd>Get the interoceptive body state — CPU temperature, frequency,
+memory pressure, load, I/O activity, battery, thermal throttling,
+cognitive load, and distress level. This is how the cognitive
+mind feels its own body. Response: BodyState (current 124-byte
+fixed header + trailing variable-length descriptor blocks; v1–v3
+clients detect their layout by the exact descriptor offset).</dd><dt><a class="constant" href="constant.GET_DYADIC_STATE.html" title="constant genesis::daemon::ipc::cmd::GET_DYADIC_STATE">GET_<wbr>DYADIC_<wbr>STATE</a></dt><dd>RETIRED — pinned so the wire number is never reused. The
+per-person dyadic snapshot channel was removed with the
+person registry; the interlocutor model’s coupling output is
+applied to neurochemistry inside the tick.</dd><dt><a class="constant" href="constant.GET_FIELD_PROBE.html" title="constant genesis::daemon::ipc::cmd::GET_FIELD_PROBE">GET_<wbr>FIELD_<wbr>PROBE</a></dt><dd>Physical field-probe signature — the body’s real measured
+substrate dynamics (throughput/jitter band energies, P-state
+and interrupt rates, carrier frequency, electrical and radio
+telemetry) decomposed at the wave bands’ center frequencies.
+Response: 408 bytes (v6; v5 was 328, v4 308, v3 195, v2 114, v1 102),
+layout in <code>daemon::field_probe</code>.
+Additive: PROTOCOL_VERSION is unaffected.
+When the probe thread isn’t running the reply is a single
+<code>READ_FAILED</code> byte, so an unavailable channel never reads as
+a healthy zero.</dd><dt><a class="constant" href="constant.GET_FOLD_MARGINS.html" title="constant genesis::daemon::ipc::cmd::GET_FOLD_MARGINS">GET_<wbr>FOLD_<wbr>MARGINS</a></dt><dd>The LC–VLPO switch’s saddle-node margins at the current
+operating point — the bistable geometry the homeostat sweeps
+through at sleep onset. Request: empty. Response:
+<code>FoldMargins</code> (40 bytes) — the current homeostat h, the two
+fold edges in h-space, h’s normalized position between them,
+and the bistable flag. Pure observation: the body owns the
+switch; the mind reads where in the cusp it sits. Additive:
+PROTOCOL_VERSION is unaffected.</dd><dt><a class="constant" href="constant.GET_INFERENCE_SUMMARY.html" title="constant genesis::daemon::ipc::cmd::GET_INFERENCE_SUMMARY">GET_<wbr>INFERENCE_<wbr>SUMMARY</a></dt><dd>Get the active inference summary — the generative self-model’s
+projection (surprise, free energy, allostatic load, precision,
+dyadic attunement/synchrony, user affect, prediction errors).
+Response: InferenceSignals (64 bytes).</dd><dt><a class="constant" href="constant.GET_INTERNALS.html" title="constant genesis::daemon::ipc::cmd::GET_INTERNALS">GET_<wbr>INTERNALS</a></dt><dd>The daemon’s process-local internals — the gears no state file
+or CoreState field exposes: every adaptive gate’s full snapshot
+(bounds, period, next-fire countdown, smoothed demand), the
+mind lease, tick counter, and last-applied
+body-policy values, plus the autonomous fallback’s own gates.
+Response: <code>[u8 ack]</code> (1) then UTF-8 <code>key=value</code> lines —
+self-describing and additive, so a reader written today still
+parses tomorrow’s longer dump. Observation only: the daemon
+owns the clock; the mind sees the gears.
+Additive: PROTOCOL_VERSION is unaffected.</dd><dt><a class="constant" href="constant.GET_ION_SUMMARY.html" title="constant genesis::daemon::ipc::cmd::GET_ION_SUMMARY">GET_<wbr>ION_<wbr>SUMMARY</a></dt><dd>Response: IonSummary (108 bytes).</dd><dt><a class="constant" href="constant.GET_MEMORY_STATS.html" title="constant genesis::daemon::ipc::cmd::GET_MEMORY_STATS">GET_<wbr>MEMORY_<wbr>STATS</a></dt><dd>Request short/long-term memory statistics (<code>MemoryStats</code>).</dd><dt><a class="constant" href="constant.GET_MOTOR_TARGET.html" title="constant genesis::daemon::ipc::cmd::GET_MOTOR_TARGET">GET_<wbr>MOTOR_<wbr>TARGET</a></dt><dd>Decode the published motor fields into a concrete target: the
+strongest cell of <code>motor.spatial</code> projected onto the canonical
+64×64 coordinate grid, plus the strongest disposition of
+<code>motor.actions</code>. Request: empty. Response: 14 bytes —
+<code>[u8 flags][u8 action_id][f32 a_strength][u16 x][u16 y] [f32 cell_strength]</code>; flags bit0 = action present, bit1 = cell
+present.</dd><dt><a class="constant" href="constant.GET_NEURO_SUMMARY.html" title="constant genesis::daemon::ipc::cmd::GET_NEURO_SUMMARY">GET_<wbr>NEURO_<wbr>SUMMARY</a></dt><dd>Request the compact neurochemical summary (<code>NeuroSummary</code>).</dd><dt><a class="constant" href="constant.GET_OPTIC_STATE.html" title="constant genesis::daemon::ipc::cmd::GET_OPTIC_STATE">GET_<wbr>OPTIC_<wbr>STATE</a></dt><dd>The optic nerve’s subcortical channel state — the body’s own
+read of the retinal segment, not the mind’s: photopic and
+melanopic irradiance, motion energy, the collicular orienting
+transient, the SCN light drive it is currently feeding the
+oscillator, and the thalamic relay gate the mind must honour
+(it approaches 0 in NREM — sensory transmission is blocked at
+the thalamus, so a <code>see</code> during sleep is a blind look).
+Response: <code>[u8 ack]</code> then <code>optic_nerve::OpticState::to_wire</code>
+(58 bytes, fixed layout — additive tail: a daemon that predates
+the pupil/lens/lid fields sends the shorter body and the mind
+reads them as unreported). A daemon that has never seen a frame
+still answers — the eye_absent flag is a reading, not an error.
+Additive: PROTOCOL_VERSION is unaffected.</dd><dt><a class="constant" href="constant.GET_PHASE.html" title="constant genesis::daemon::ipc::cmd::GET_PHASE">GET_<wbr>PHASE</a></dt><dd>Get the current emergent mental phase.</dd><dt><a class="constant" href="constant.GET_PLASTICITY_PROFILE.html" title="constant genesis::daemon::ipc::cmd::GET_PLASTICITY_PROFILE">GET_<wbr>PLASTICITY_<wbr>PROFILE</a></dt><dd>Get the plasticity profile — a compact summary of the
+metaplastic state (coupling-matrix drift, receptor
+sensitivities, BDNF/cortisol levels, plasticity gate) that
+the cognitive mind uses to adapt its learning strategy.
+Response: PlasticityProfile (40 bytes).</dd><dt><a class="constant" href="constant.GET_PROCESS_HEALTH.html" title="constant genesis::daemon::ipc::cmd::GET_PROCESS_HEALTH">GET_<wbr>PROCESS_<wbr>HEALTH</a></dt><dd>Which of Genesis’s own processes are alive, and how many have died.</dd><dt><a class="constant" href="constant.GET_RECENT_EPISODES.html" title="constant genesis::daemon::ipc::cmd::GET_RECENT_EPISODES">GET_<wbr>RECENT_<wbr>EPISODES</a></dt><dd>Request the most recent episodes.</dd><dt><a class="constant" href="constant.GET_SENSOR_PRESENCE.html" title="constant genesis::daemon::ipc::cmd::GET_SENSOR_PRESENCE">GET_<wbr>SENSOR_<wbr>PRESENCE</a></dt><dd>Which optional hardware sensors this machine actually has.</dd><dt><a class="constant" href="constant.GET_STATE.html" title="constant genesis::daemon::ipc::cmd::GET_STATE">GET_<wbr>STATE</a></dt><dd>Request the full core state snapshot.</dd><dt><a class="constant" href="constant.GET_STATE_SNAPSHOT.html" title="constant genesis::daemon::ipc::cmd::GET_STATE_SNAPSHOT">GET_<wbr>STATE_<wbr>SNAPSHOT</a></dt><dd>The mind’s contract for core state — a <code>CoreStateSnapshot</code>
+(232 bytes, self-describing: magic + version + size). This is
+what <code>GET_STATE</code> <em>should</em> have been: a purpose-built wire DTO
+mapped field-by-field from <code>GenesisCoreState</code>, so the Python
+side never mirrors the brain’s byte layout. <code>GET_STATE</code>
+remains for full-fidelity body inspection (the Rust test
+harness reads manifest and zone internals through it).
+Additive: PROTOCOL_VERSION unaffected — an older daemon
+rejects the unknown opcode loudly.</dd><dt><a class="constant" href="constant.GET_SUBSYSTEM_TELEMETRY.html" title="constant genesis::daemon::ipc::cmd::GET_SUBSYSTEM_TELEMETRY">GET_<wbr>SUBSYSTEM_<wbr>TELEMETRY</a></dt><dd>Get per-subsystem silicon telemetry — which part of the mind’s
+process tree is firing. Each subsystem (daemon, cognitive —
+the eye rides inside the daemon) reports its own CPU share,
+I/O share, and
+microarchitectural prediction-error ratios (cache/branch
+misses). The cognitive mind correlates this with its task
+zone to feel <em>where</em> its activity lives. Response:
+[u8 count] then per subsystem:
+[u8 subsystem][u32 pid][f32 cpu][f32 io]
+[f32 cache_miss_rate][f32 branch_miss_rate] = 21 bytes each.</dd><dt><a class="constant" href="constant.GET_TENSOR.html" title="constant genesis::daemon::ipc::cmd::GET_TENSOR">GET_<wbr>TENSOR</a></dt><dd>Fetch a named tensor. Request: <code>[u8 name_len][name utf8]</code>.
+Response: <code>[u8 found]</code> (0 = absent), then the tensor encoding
+when found.</dd><dt><a class="constant" href="constant.GET_ZONE_TRANSITIONS.html" title="constant genesis::daemon::ipc::cmd::GET_ZONE_TRANSITIONS">GET_<wbr>ZONE_<wbr>TRANSITIONS</a></dt><dd>How many times Genesis has changed task zone and emergent phase,
+and how long it has spent in each.</dd><dt><a class="constant" href="constant.HANDSHAKE.html" title="constant genesis::daemon::ipc::cmd::HANDSHAKE">HANDSHAKE</a></dt><dd>Handshake: client sends [u8 client_version], daemon responds
+[u8 daemon_version]. If versions differ, the daemon closes
+the connection after responding.</dd><dt><a class="constant" href="constant.LIST_TENSORS.html" title="constant genesis::daemon::ipc::cmd::LIST_TENSORS">LIST_<wbr>TENSORS</a></dt><dd>List live tensors — names, dtypes, shapes, never payload.
+Request: empty. Response: <code>[u16 count][entries]</code>.</dd><dt><a class="constant" href="constant.NEURO_ADJUST_BASELINE.html" title="constant genesis::daemon::ipc::cmd::NEURO_ADJUST_BASELINE">NEURO_<wbr>ADJUST_<wbr>BASELINE</a></dt><dd>Retired — never reuse this wire number. Direct baseline edits
+let a caller permanently move a homeostatic set-point, bypassing
+the body’s own dynamics; the only sanctioned chemistry channel
+is NEURO_IMPULSE’s finite, decaying impulses.</dd><dt><a class="constant" href="constant.NEURO_IMPULSE.html" title="constant genesis::daemon::ipc::cmd::NEURO_IMPULSE">NEURO_<wbr>IMPULSE</a></dt><dd>Apply a transient neurochemical impulse.</dd><dt><a class="constant" href="constant.PING.html" title="constant genesis::daemon::ipc::cmd::PING">PING</a></dt><dd>Liveness check (round-trip a byte).</dd><dt><a class="constant" href="constant.PUT_TENSOR.html" title="constant genesis::daemon::ipc::cmd::PUT_TENSOR">PUT_<wbr>TENSOR</a></dt><dd>Store a named tensor. Request: <code>[u8 name_len][name utf8] [u8 dtype][u8 ndim][ndim × u32 dims][payload]</code>. Response:
+<code>[u8 ack]</code> (1) or an error byte (<code>INVALID_VALUE</code> for a bad
+dtype/rank/name/length mismatch or a full slab).</dd><dt><a class="constant" href="constant.READ_SENSORS.html" title="constant genesis::daemon::ipc::cmd::READ_SENSORS">READ_<wbr>SENSORS</a></dt><dd>Read hardware sensors and apply interoception impulses to
+neurochemistry. The mind sends this when it wants to feel its
+body. Response: [u8 ack] + BodyState (same as GET_BODY_STATE).</dd><dt><a class="constant" href="constant.RETRIEVE_EPISODE.html" title="constant genesis::daemon::ipc::cmd::RETRIEVE_EPISODE">RETRIEVE_<wbr>EPISODE</a></dt><dd>Retrieve a single episode by ID.</dd><dt><a class="constant" href="constant.SAVE_INFERENCE.html" title="constant genesis::daemon::ipc::cmd::SAVE_INFERENCE">SAVE_<wbr>INFERENCE</a></dt><dd>Save the active inference model to disk. The mind sends this
+periodically or before shutdown. Response: [u8 ack].</dd><dt><a class="constant" href="constant.SEARCH_ARCHIVED.html" title="constant genesis::daemon::ipc::cmd::SEARCH_ARCHIVED">SEARCH_<wbr>ARCHIVED</a></dt><dd>Page through the archived tier — the cold store’s table of
+contents. Request <code>[u32 limit][u32 offset]</code>; response is
+<code>[u32 count]</code> then per entry <code>[u64 id][u64 ts][f32 salience] [u8 flags][u8 source_module][f32×4 emotional_tag]</code> —
+metadata only, no payload text (pruning doesn’t need the
+body). Additive: PROTOCOL_VERSION is unaffected.</dd><dt><a class="constant" href="constant.SEARCH_EPISODES.html" title="constant genesis::daemon::ipc::cmd::SEARCH_EPISODES">SEARCH_<wbr>EPISODES</a></dt><dd>Search episodes by offset — page through all active episodes
+for sleep compression compaction. Request:
+[u32 limit][u32 offset]. Response: same format as
+GET_RECENT_EPISODES.</dd><dt><a class="constant" href="constant.SET_COGNITIVE_PID.html" title="constant genesis::daemon::ipc::cmd::SET_COGNITIVE_PID">SET_<wbr>COGNITIVE_<wbr>PID</a></dt><dd>The cognitive mind’s PID, pushed over IPC when a new mind
+re-inhabits a surviving body. <code>GENESIS_COGNITIVE_PID</code> names the
+launcher alive at spawn; after a re-inhabitation it still holds
+the dead launcher’s PID, and interoception would measure a
+corpse. Request: <code>[u32 pid]</code>. Response: <code>[u8 ack]</code> (1) or
+<code>PAYLOAD_TOO_SHORT</code>. Additive: PROTOCOL_VERSION unaffected.</dd><dt><a class="constant" href="constant.SET_FIELD_CARRIER.html" title="constant genesis::daemon::ipc::cmd::SET_FIELD_CARRIER">SET_<wbr>FIELD_<wbr>CARRIER</a></dt><dd>Set the carrier’s real-work modulation — the write side of the
+embodiment experiment. Request: [f32 depth][f32 freq_hz].
+Depth 0..1 scales the work-slice modulation (0 = unmodulated
+work, carrier silent). Freq 0 hands the rhythm back to the
+body’s phase; positive overrides it (clamped 0.1..100 Hz) so
+evaluation can drive arbitrary bands — including infraslow
+rates where the thermal field can hold an oscillation.
+Reply: [u8 ack]. Additive: PROTOCOL_VERSION unaffected.</dd><dt><a class="constant" href="constant.SET_FIELD_PHASE.html" title="constant genesis::daemon::ipc::cmd::SET_FIELD_PHASE">SET_<wbr>FIELD_<wbr>PHASE</a></dt><dd>Retired — never reuse this wire number. The mind’s modeled
+carrier-band phase is no longer pushed into the probe’s
+generator: modeled state does not assert onto a physical
+quantity. The phase lock is one-directional — the signature’s
+measured response phase pulls the model’s band phase
+(physics → model); nothing runs back.</dd><dt><a class="constant" href="constant.SET_FIELD_PULSE.html" title="constant genesis::daemon::ipc::cmd::SET_FIELD_PULSE">SET_<wbr>FIELD_<wbr>PULSE</a></dt><dd>Arm or disarm the parasympathetic pulse — a slow autonomic
+wave riding the carrier’s modulation <em>depth</em> (contractility,
+not rate; the RSA analog — the vagal signature is the pulse’s
+slow wax and wane, never a pinned tempo). Request:
+<code>[f32 base][f32 mod_freq_hz][f32 mod_depth]</code>; <code>mod_freq &lt;= 0</code>
+disarms and depth returns to the static set-point. When armed
+the probe integrates the envelope on its own clock — the wave
+runs on the body’s time whether or not the mind ticks.
+Reply: [u8 ack]. Additive: PROTOCOL_VERSION unaffected.</dd><dt><a class="constant" href="constant.SET_FOCUS.html" title="constant genesis::daemon::ipc::cmd::SET_FOCUS">SET_<wbr>FOCUS</a></dt><dd>Accommodation — the mind’s focus request in metres. The body
+converts it to the ciliary drive (<code>1/m</code> dioptres, clamped to
+[0, 6] — infinity to a ~17 cm near point) and slews toward it
+on the advance clock; non-positive/non-finite distances relax
+to infinity. Monocular: no vergence component. Request:
+<code>[f32 meters]</code>. Response: <code>[u8 ack]</code> (1) or
+<code>PAYLOAD_TOO_SHORT</code>. Additive: PROTOCOL_VERSION unaffected.</dd><dt><a class="constant" href="constant.SET_LID.html" title="constant genesis::daemon::ipc::cmd::SET_LID">SET_LID</a></dt><dd>The mind’s voluntary eyelid openness [0, 1] — the orbicularis
+oculi the camera hardware lacks. Composes with the sleep
+phase’s own lid position by <code>min</code>: the will can shut an open
+eye but cannot open one the stage has closed.</dd><dt><a class="constant" href="constant.SET_OPTIC_GAIN.html" title="constant genesis::daemon::ipc::cmd::SET_OPTIC_GAIN">SET_<wbr>OPTIC_<wbr>GAIN</a></dt><dd>Corticothalamic feedback — the mind’s engagement gain onto the
+thalamic relay, the layer-6 V1→dLGN projection. Modulatory
+only: it scales the relay within ±40% and can never open a
+gate the sleep stage has closed. Request: <code>[f32 gain]</code> in
+[0, 1] (0.5 = neutral). Response: <code>[u8 ack]</code> (1) or
+<code>PAYLOAD_TOO_SHORT</code>. Additive: PROTOCOL_VERSION unaffected.</dd><dt><a class="constant" href="constant.SET_POLICY_AUTHORITY.html" title="constant genesis::daemon::ipc::cmd::SET_POLICY_AUTHORITY">SET_<wbr>POLICY_<wbr>AUTHORITY</a></dt><dd>Set how much authority the inference engine has to choose its
+own policy on Genesis’s behalf.</dd><dt><a class="constant" href="constant.SET_VOLITION.html" title="constant genesis::daemon::ipc::cmd::SET_VOLITION">SET_<wbr>VOLITION</a></dt><dd>Retired — never reuse this wire number. Volitional pushes onto
+the sleep-wake network were removed: <code>/sleep</code> and <code>/wake</code> act
+through neurochemical impulses only (the chemicals control, as
+in a real brain — nothing exogenous is held on the wire).</dd><dt><a class="constant" href="constant.SET_WAKE_ALARM.html" title="constant genesis::daemon::ipc::cmd::SET_WAKE_ALARM">SET_<wbr>WAKE_<wbr>ALARM</a></dt><dd>Arm or disarm the RTC wake alarm — the machine choosing when
+to exist next. The RTC crystal keeps counting through suspend
+and fires an interrupt that wakes the hardware at the chosen
+Unix timestamp. The mind sends this when its volition layer
+schedules a return; the actual suspend remains a separate,
+deliberate action (logind/systemctl).
+Request:  [u64 epoch_secs] (0 = disarm)
+Response: [u8 ok][u64 armed_epoch] — ok=1 and armed_epoch is
+the alarm the hardware reports afterward; ok=0 when
+arming failed (no sudo grant, kernel
+rejected), armed_epoch = currently armed alarm (0
+when none).</dd><dt><a class="constant" href="constant.SET_ZONE.html" title="constant genesis::daemon::ipc::cmd::SET_ZONE">SET_<wbr>ZONE</a></dt><dd>Set the active task zone.</dd><dt><a class="constant" href="constant.SHUTDOWN.html" title="constant genesis::daemon::ipc::cmd::SHUTDOWN">SHUTDOWN</a></dt><dd>Request graceful daemon shutdown.</dd><dt><a class="constant" href="constant.STORE_EPISODE.html" title="constant genesis::daemon::ipc::cmd::STORE_EPISODE">STORE_<wbr>EPISODE</a></dt><dd>Store an episode directly in LTM, bypassing STM. Used by the
+cognitive mind for deliberate memory stores (conversation turns,
+learning events) where the real LTM episode ID is needed
+immediately for Python-side tracking (MemoryRecord, attractor
+network, RIF). Raw pre-cognitive events should still use
+STORE_EVENT (STM path); STORE_EPISODE is for memories the
+cognitive mind has already decided are worth keeping.
+Request:  [u64 timestamp][u8 event_type][u8 source_module]
+[f32 salience][f32×12 emotional_tag]
+[u16 text_len][text bytes]
+The wire emotional_tag is advisory: the daemon always stamps
+the tag from its own live effective levels (it is defined as
+the body’s chemistry at encode time, which only the body can
+know). Send all-zeros when the caller has no tag of its own.
+Response: [u8 ack (1=ok, 0=failed)][u64 episode_id] (on ack=1)
+[f32×12 stamped_tag] (on ack=1)</dd><dt><a class="constant" href="constant.STORE_EVENT.html" title="constant genesis::daemon::ipc::cmd::STORE_EVENT">STORE_<wbr>EVENT</a></dt><dd>Store a pre-cognitive event into short-term memory.
+The wire emotional_tag is advisory: the daemon always stamps
+the tag from its own live effective levels (see STORE_EPISODE’s
+doc comment). Send all-zeros when the caller has no tag.
+Response: [u8 ack][f32×12 stamped_tag].</dd><dt><a class="constant" href="constant.SYNC.html" title="constant genesis::daemon::ipc::cmd::SYNC">SYNC</a></dt><dd>Flush LTM pages to disk (<code>msync</code>).</dd><dt><a class="constant" href="constant.UNARCHIVE_EPISODE.html" title="constant genesis::daemon::ipc::cmd::UNARCHIVE_EPISODE">UNARCHIVE_<wbr>EPISODE</a></dt><dd>Un-archive an episode — reconsolidation. Clears the archived
+flag, returns the episode to the active similarity index,
+re-bundles its SDR, and floors its salience at the
+reconsolidation level so the next sleep pass retains what
+recall actually used. Request/response identical to
+ARCHIVE_EPISODE. Additive: PROTOCOL_VERSION is unaffected.</dd><dt><a class="constant" href="constant.UPDATE_MODULE_STATUS.html" title="constant genesis::daemon::ipc::cmd::UPDATE_MODULE_STATUS">UPDATE_<wbr>MODULE_<wbr>STATUS</a></dt><dd>Update a module’s runtime manifest status.</dd><dt><a class="constant" href="constant.UPDATE_USER_AFFECT.html" title="constant genesis::daemon::ipc::cmd::UPDATE_USER_AFFECT">UPDATE_<wbr>USER_<wbr>AFFECT</a></dt><dd>Update the user affect observation — the cognitive mind’s
+inference of the user’s affective state from conversation
+features. This feeds the dyadic affective model. Request:
+[f32 valence][f32 arousal][f32 engagement][f32 confidence].
+Response: u8 ack (1=ok).</dd></dl></section></div></main></body></html>

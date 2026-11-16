@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["basal_forebrain","core_state","header","inference","ions","legacy_v3","legacy_v4","manifest","memory","neurochemical","phase_partition","sanitize","sleep_network","snapshot","zones"]};

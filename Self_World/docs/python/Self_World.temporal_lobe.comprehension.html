@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.temporal_lobe.comprehension</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.temporal_lobe.html" class="white">temporal_lobe</a>.comprehension</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/comprehension.py">/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/comprehension.py</a></td></tr></table>
+    <p><span class="code">Language&nbsp;comprehension&nbsp;—&nbsp;the&nbsp;receptive&nbsp;language&nbsp;system.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;Genesis's&nbsp;Wernicke's&nbsp;area&nbsp;equivalent.&nbsp;While&nbsp;the&nbsp;generative<br>
+engine&nbsp;(generator.py)&nbsp;is&nbsp;the&nbsp;*productive*&nbsp;language&nbsp;system&nbsp;(Broca's<br>
+area&nbsp;—&nbsp;turning&nbsp;thoughts&nbsp;into&nbsp;speech),&nbsp;the&nbsp;comprehension&nbsp;engine&nbsp;is&nbsp;the<br>
+*receptive*&nbsp;system&nbsp;—&nbsp;turning&nbsp;speech&nbsp;into&nbsp;understanding.<br>
+&nbsp;<br>
+The&nbsp;comprehension&nbsp;engine&nbsp;performs&nbsp;basic&nbsp;semantic&nbsp;parsing:<br>
+&nbsp;<br>
+1.&nbsp;**Speech&nbsp;act&nbsp;identification**:&nbsp;Is&nbsp;this&nbsp;a&nbsp;question,&nbsp;statement,<br>
+&nbsp;&nbsp;&nbsp;command,&nbsp;or&nbsp;exclamation?&nbsp;(Searle,&nbsp;1969)<br>
+2.&nbsp;**<a href="#Proposition">Proposition</a>&nbsp;extraction**:&nbsp;Who&nbsp;did&nbsp;what&nbsp;to&nbsp;whom?&nbsp;Parses&nbsp;sentences<br>
+&nbsp;&nbsp;&nbsp;into&nbsp;subject-predicate-<a href="builtins.html#object">object</a>&nbsp;triples.<br>
+3.&nbsp;**Reference&nbsp;resolution**:&nbsp;Pronouns&nbsp;("he",&nbsp;"it",&nbsp;"it",&nbsp;"they")&nbsp;are<br>
+&nbsp;&nbsp;&nbsp;resolved&nbsp;to&nbsp;their&nbsp;referents&nbsp;based&nbsp;on&nbsp;context&nbsp;(Hobbs,&nbsp;1978;&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;centering&nbsp;theory&nbsp;of&nbsp;Grosz,&nbsp;Joshi&nbsp;&amp;&nbsp;Weinstein,&nbsp;1995).<br>
+4.&nbsp;**Key&nbsp;concept&nbsp;identification**:&nbsp;Which&nbsp;words&nbsp;carry&nbsp;the&nbsp;semantic<br>
+&nbsp;&nbsp;&nbsp;weight&nbsp;of&nbsp;the&nbsp;sentence,&nbsp;and&nbsp;what&nbsp;roles&nbsp;do&nbsp;they&nbsp;play&nbsp;(agent,<br>
+&nbsp;&nbsp;&nbsp;patient,&nbsp;instrument,&nbsp;location,&nbsp;etc.)?<br>
+5.&nbsp;**<a href="#Comprehension">Comprehension</a>&nbsp;representation**:&nbsp;A&nbsp;structured&nbsp;understanding&nbsp;of<br>
+&nbsp;&nbsp;&nbsp;what&nbsp;was&nbsp;said,&nbsp;which&nbsp;downstream&nbsp;modules&nbsp;(pragmatics.py,&nbsp;figurative.py)<br>
+&nbsp;&nbsp;&nbsp;can&nbsp;build&nbsp;on.<br>
+&nbsp;<br>
+This&nbsp;module&nbsp;does&nbsp;the&nbsp;*basic*&nbsp;semantic&nbsp;parsing&nbsp;that&nbsp;pragmatics.py<br>
+(Gricean&nbsp;maxims)&nbsp;and&nbsp;figurative.py&nbsp;(metaphor/irony&nbsp;detection)&nbsp;build<br>
+on.&nbsp;It&nbsp;is&nbsp;the&nbsp;foundation&nbsp;layer&nbsp;of&nbsp;language&nbsp;understanding.<br>
+&nbsp;<br>
+#&nbsp;Neural&nbsp;grounding<br>
+&nbsp;<br>
+In&nbsp;human&nbsp;neuroscience,&nbsp;language&nbsp;comprehension&nbsp;is&nbsp;primarily&nbsp;associated<br>
+with&nbsp;Wernicke's&nbsp;area&nbsp;in&nbsp;the&nbsp;posterior&nbsp;superior&nbsp;temporal&nbsp;gyrus&nbsp;of&nbsp;the<br>
+left&nbsp;hemisphere&nbsp;(Wernicke,&nbsp;1874).&nbsp;Damage&nbsp;to&nbsp;Wernicke's&nbsp;area&nbsp;produces<br>
+fluent&nbsp;but&nbsp;meaningless&nbsp;speech&nbsp;and&nbsp;impaired&nbsp;comprehension&nbsp;—&nbsp;the&nbsp;patient<br>
+speaks&nbsp;smoothly&nbsp;but&nbsp;says&nbsp;nothing&nbsp;sensible,&nbsp;and&nbsp;cannot&nbsp;understand&nbsp;what<br>
+others&nbsp;say.&nbsp;The&nbsp;comprehension&nbsp;engine&nbsp;models&nbsp;this&nbsp;receptive&nbsp;function.<br>
+&nbsp;<br>
+The&nbsp;angular&nbsp;gyrus&nbsp;(Brodmann&nbsp;area&nbsp;39)&nbsp;is&nbsp;involved&nbsp;in&nbsp;mapping&nbsp;between<br>
+visual&nbsp;word&nbsp;forms&nbsp;and&nbsp;semantic&nbsp;representations,&nbsp;and&nbsp;the&nbsp;temporal&nbsp;subsystem<br>
+stores&nbsp;the&nbsp;semantic&nbsp;network&nbsp;that&nbsp;words&nbsp;activate.&nbsp;<a href="#Comprehension">Comprehension</a>&nbsp;is&nbsp;not<br>
+a&nbsp;single&nbsp;process&nbsp;but&nbsp;a&nbsp;distributed&nbsp;one:&nbsp;phonological&nbsp;decoding&nbsp;(superior<br>
+temporal),&nbsp;semantic&nbsp;access&nbsp;(middle&nbsp;temporal),&nbsp;and&nbsp;thematic&nbsp;role<br>
+assignment&nbsp;(left&nbsp;temporal&nbsp;cortex)&nbsp;work&nbsp;together&nbsp;(Binder,&nbsp;2015).<br>
+&nbsp;<br>
+References:<br>
+-&nbsp;Wernicke,&nbsp;C.&nbsp;(1874).&nbsp;*Der&nbsp;aphasische&nbsp;Symptomencomplex*.&nbsp;Cohn.<br>
+-&nbsp;Searle,&nbsp;J.&nbsp;R.&nbsp;(1969).&nbsp;*Speech&nbsp;Acts*.&nbsp;Cambridge&nbsp;University&nbsp;Press.<br>
+-&nbsp;Hobbs,&nbsp;J.&nbsp;R.&nbsp;(1978).&nbsp;Resolving&nbsp;pronoun&nbsp;references.&nbsp;*Lingua*,&nbsp;44,<br>
+&nbsp;&nbsp;311–338.<br>
+-&nbsp;Grosz,&nbsp;B.&nbsp;J.,&nbsp;Joshi,&nbsp;A.&nbsp;K.,&nbsp;&amp;&nbsp;Weinstein,&nbsp;S.&nbsp;(1995).&nbsp;Centering:<br>
+&nbsp;&nbsp;A&nbsp;framework&nbsp;for&nbsp;modeling&nbsp;the&nbsp;local&nbsp;coherence&nbsp;of&nbsp;discourse.<br>
+&nbsp;&nbsp;*Computational&nbsp;Linguistics*,&nbsp;21(2),&nbsp;203–225.<br>
+-&nbsp;Binder,&nbsp;J.&nbsp;R.&nbsp;(2015).&nbsp;The&nbsp;Wernicke&nbsp;area:&nbsp;Modern&nbsp;evidence&nbsp;and&nbsp;a&nbsp;new<br>
+&nbsp;&nbsp;interpretation.&nbsp;*Neuroimage*,&nbsp;115,&nbsp;243–256.<br>
+-&nbsp;Kintsch,&nbsp;W.&nbsp;(1998).&nbsp;*<a href="#Comprehension">Comprehension</a>:&nbsp;A&nbsp;Paradigm&nbsp;for&nbsp;Cognition*.<br>
+&nbsp;&nbsp;Cambridge&nbsp;University&nbsp;Press.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="re.html">re</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.comprehension.html#Comprehension">Comprehension</a>
+</dt><dt class="heading-text"><a href="Self_World.temporal_lobe.comprehension.html#ComprehensionResult">ComprehensionResult</a>
+</dt><dt class="heading-text"><a href="Self_World.temporal_lobe.comprehension.html#ConceptRole">ConceptRole</a>
+</dt><dt class="heading-text"><a href="Self_World.temporal_lobe.comprehension.html#Proposition">Proposition</a>
+</dt></dl>
+</dd>
+<dt class="heading-text"><a href="enum.html#Enum">enum.Enum</a>(<a href="builtins.html#object">builtins.object</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.comprehension.html#SemanticRole">SemanticRole</a>
+</dt><dt class="heading-text"><a href="Self_World.temporal_lobe.comprehension.html#SpeechActType">SpeechActType</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Comprehension">class <strong>Comprehension</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Comprehension">Comprehension</a>()&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Parse&nbsp;and&nbsp;understand&nbsp;input&nbsp;text&nbsp;—&nbsp;Genesis's&nbsp;receptive&nbsp;language.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;Wernicke's&nbsp;area&nbsp;equivalent:&nbsp;it&nbsp;takes&nbsp;raw&nbsp;text&nbsp;and<br>
+produces&nbsp;a&nbsp;structured&nbsp;comprehension&nbsp;of&nbsp;what&nbsp;was&nbsp;said.&nbsp;The<br>
+comprehension&nbsp;includes&nbsp;speech&nbsp;act&nbsp;identification,&nbsp;proposition<br>
+extraction,&nbsp;reference&nbsp;resolution,&nbsp;and&nbsp;key&nbsp;concept&nbsp;identification.<br>
+&nbsp;<br>
+The&nbsp;engine&nbsp;uses&nbsp;a&nbsp;heuristic&nbsp;parser&nbsp;—&nbsp;it&nbsp;doesn't&nbsp;require&nbsp;external<br>
+NLP&nbsp;libraries.&nbsp;It&nbsp;handles&nbsp;common&nbsp;sentence&nbsp;structures&nbsp;(declarative,<br>
+interrogative,&nbsp;imperative)&nbsp;and&nbsp;resolves&nbsp;pronouns&nbsp;using&nbsp;a&nbsp;simple<br>
+recency-based&nbsp;strategy&nbsp;with&nbsp;context&nbsp;provided&nbsp;by&nbsp;the&nbsp;caller.<br>
+&nbsp;<br>
+Usage::<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;engine&nbsp;=&nbsp;<a href="#Comprehension">Comprehension</a>()<br>
+&nbsp;&nbsp;&nbsp;&nbsp;result&nbsp;=&nbsp;engine.<a href="#Comprehension-comprehend">comprehend</a>(<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"It&nbsp;gave&nbsp;the&nbsp;book&nbsp;to&nbsp;him&nbsp;yesterday.",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;context={"recent_entities":&nbsp;["Mary",&nbsp;"John"]},<br>
+&nbsp;&nbsp;&nbsp;&nbsp;)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;result.speech_act&nbsp;→&nbsp;STATEMENT<br>
+&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;result.propositions[0].subject&nbsp;→&nbsp;"Mary"&nbsp;(resolved&nbsp;from&nbsp;"she")<br>
+&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;result.propositions[0].<a href="builtins.html#object">object</a>&nbsp;→&nbsp;"book"<br>
+&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;result.resolved_references&nbsp;→&nbsp;{"she":&nbsp;"Mary",&nbsp;"him":&nbsp;"John"}<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Comprehension-__init__"><strong>__init__</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;with&nbsp;an&nbsp;empty&nbsp;recent-entity&nbsp;list&nbsp;for&nbsp;pronoun&nbsp;resolution.</span></dd></dl>
+
+<dl><dt><a name="Comprehension-comprehend"><strong>comprehend</strong></a>(self, text: 'str', context: 'dict[str, Any] | None' = None) -&gt; 'ComprehensionResult'</dt><dd><span class="code">Comprehend&nbsp;input&nbsp;text&nbsp;into&nbsp;a&nbsp;structured&nbsp;representation.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;text:&nbsp;The&nbsp;input&nbsp;text&nbsp;to&nbsp;comprehend.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;context:&nbsp;Optional&nbsp;context&nbsp;dict&nbsp;that&nbsp;may&nbsp;contain:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;"recent_entities":&nbsp;list&nbsp;of&nbsp;recently&nbsp;mentioned<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;entities&nbsp;(for&nbsp;pronoun&nbsp;resolution)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;"speaker":&nbsp;who&nbsp;is&nbsp;speaking&nbsp;(affects&nbsp;pronoun<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;resolution&nbsp;—&nbsp;"I"&nbsp;resolves&nbsp;to&nbsp;the&nbsp;speaker)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;"known_facts":&nbsp;dict&nbsp;of&nbsp;known&nbsp;facts&nbsp;for&nbsp;consistency<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;checking<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;<a href="#ComprehensionResult">ComprehensionResult</a>&nbsp;with&nbsp;the&nbsp;structured&nbsp;understanding.</span></dd></dl>
+
+<dl><dt><a name="Comprehension-reset"><strong>reset</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Reset&nbsp;the&nbsp;engine's&nbsp;state&nbsp;(recent&nbsp;entity&nbsp;tracking).</span></dd></dl>
+
+<dl><dt><a name="Comprehension-set_known_chunks"><strong>set_known_chunks</strong></a>(self, chunks) -&gt; 'None'</dt><dd><span class="code">Provide&nbsp;learned&nbsp;multi-word&nbsp;chunks&nbsp;that&nbsp;protect&nbsp;splitting.<br>
+&nbsp;<br>
+The&nbsp;statistical&nbsp;acquisition&nbsp;system&nbsp;learns&nbsp;multi-word&nbsp;units<br>
+like&nbsp;"trial&nbsp;and&nbsp;error"&nbsp;or&nbsp;"salt&nbsp;and&nbsp;pepper"&nbsp;from&nbsp;user&nbsp;input.<br>
+A&nbsp;coordinator&nbsp;inside&nbsp;a&nbsp;learned&nbsp;chunk&nbsp;is&nbsp;part&nbsp;of&nbsp;the&nbsp;unit,<br>
+not&nbsp;a&nbsp;clause&nbsp;boundary&nbsp;—&nbsp;this&nbsp;is&nbsp;how&nbsp;exposure&nbsp;teaches&nbsp;it<br>
+that&nbsp;"salt&nbsp;and&nbsp;pepper"&nbsp;is&nbsp;one&nbsp;thing,&nbsp;not&nbsp;two&nbsp;clauses.</span></dd></dl>
+
+<dl><dt><a name="Comprehension-set_recent_entities"><strong>set_recent_entities</strong></a>(self, entities: 'list[str]') -&gt; 'None'</dt><dd><span class="code">Replace&nbsp;the&nbsp;recent&nbsp;entity&nbsp;list&nbsp;(used&nbsp;by&nbsp;the&nbsp;cognition&nbsp;engine).</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>figurative</strong></dt>
+<dd><span class="code">The&nbsp;figurative&nbsp;language&nbsp;processor&nbsp;(metaphor,&nbsp;irony,&nbsp;idiom&nbsp;detection).</span></dd>
+</dl>
+<dl><dt><strong>recent_entities</strong></dt>
+<dd><span class="code">Recently&nbsp;mentioned&nbsp;entities,&nbsp;for&nbsp;pronoun&nbsp;resolution.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'_PHRASAL_VERBS': 'ClassVar[dict[str, tuple[tuple[str, ...], ...]]]'}</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ComprehensionResult">class <strong>ComprehensionResult</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ComprehensionResult">ComprehensionResult</a>(raw_text:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;speech_act:&nbsp;'<a href="#SpeechActType">SpeechActType</a>'&nbsp;=&nbsp;&amp;lt;<a href="#SpeechActType">SpeechActType</a>.STATEMENT:&nbsp;1&amp;gt;,&nbsp;propositions:&nbsp;'list[<a href="#Proposition">Proposition</a>]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;grounded:&nbsp;'list[Any]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;key_concepts:&nbsp;'list[<a href="#ConceptRole">ConceptRole</a>]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;resolved_references:&nbsp;'dict[str,&nbsp;str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;is_negated:&nbsp;'bool'&nbsp;=&nbsp;False,&nbsp;is_question:&nbsp;'bool'&nbsp;=&nbsp;False,&nbsp;is_command:&nbsp;'bool'&nbsp;=&nbsp;False,&nbsp;focus:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;confidence:&nbsp;'float'&nbsp;=&nbsp;0.5,&nbsp;clause_count:&nbsp;'int'&nbsp;=&nbsp;1,&nbsp;metaphor:&nbsp;'Metaphor&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;irony:&nbsp;'IronyDetection&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;idiom:&nbsp;'tuple[str,&nbsp;str]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;parse_coverage:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;unresolved_tokens:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;diagnostics:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;structured&nbsp;understanding&nbsp;of&nbsp;what&nbsp;was&nbsp;said.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;output&nbsp;of&nbsp;the&nbsp;comprehension&nbsp;engine&nbsp;—&nbsp;a&nbsp;complete<br>
+representation&nbsp;of&nbsp;the&nbsp;meaning&nbsp;of&nbsp;an&nbsp;input&nbsp;text,&nbsp;ready&nbsp;for<br>
+downstream&nbsp;processing&nbsp;by&nbsp;pragmatics.py,&nbsp;figurative.py,&nbsp;and&nbsp;the<br>
+cognition&nbsp;engine.<br>
+&nbsp;<br>
+Attributes:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;raw_text:&nbsp;The&nbsp;original&nbsp;input&nbsp;text.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;speech_act:&nbsp;The&nbsp;identified&nbsp;speech&nbsp;act&nbsp;type.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;propositions:&nbsp;Extracted&nbsp;propositions&nbsp;(subject-predicate-<a href="builtins.html#object">object</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;triples),&nbsp;one&nbsp;per&nbsp;clause.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;key_concepts:&nbsp;Key&nbsp;concepts&nbsp;and&nbsp;their&nbsp;semantic&nbsp;roles.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;resolved_references:&nbsp;A&nbsp;mapping&nbsp;from&nbsp;pronoun&nbsp;→&nbsp;resolved<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;referent.&nbsp;Empty&nbsp;if&nbsp;no&nbsp;pronouns&nbsp;were&nbsp;found&nbsp;or&nbsp;if&nbsp;no<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;context&nbsp;was&nbsp;available&nbsp;for&nbsp;resolution.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;is_negated:&nbsp;Whether&nbsp;the&nbsp;overall&nbsp;meaning&nbsp;is&nbsp;negated.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;is_question:&nbsp;Whether&nbsp;this&nbsp;is&nbsp;a&nbsp;question&nbsp;(convenience&nbsp;flag).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;is_command:&nbsp;Whether&nbsp;this&nbsp;is&nbsp;a&nbsp;command&nbsp;(convenience&nbsp;flag).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;focus:&nbsp;For&nbsp;questions,&nbsp;the&nbsp;questioned&nbsp;constituent&nbsp;—&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wh-word&nbsp;("what",&nbsp;"who",&nbsp;"where",&nbsp;...)&nbsp;or&nbsp;"whether"&nbsp;for<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;yes/no&nbsp;questions.&nbsp;Empty&nbsp;for&nbsp;statements.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;confidence:&nbsp;Overall&nbsp;confidence&nbsp;in&nbsp;the&nbsp;parse&nbsp;(0–1).&nbsp;Lower<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;complex&nbsp;or&nbsp;ambiguous&nbsp;sentences.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;clause_count:&nbsp;Number&nbsp;of&nbsp;clauses&nbsp;identified.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;metaphor:&nbsp;Detected&nbsp;metaphor,&nbsp;if&nbsp;any&nbsp;(right-hemisphere<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cross-domain&nbsp;mapping).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;irony:&nbsp;Detected&nbsp;irony,&nbsp;if&nbsp;any&nbsp;(sentiment-context&nbsp;contradiction).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;idiom:&nbsp;Detected&nbsp;idiom&nbsp;as&nbsp;(idiom,&nbsp;meaning)&nbsp;tuple,&nbsp;if&nbsp;any.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;parse_coverage:&nbsp;Fraction&nbsp;of&nbsp;content&nbsp;tokens&nbsp;represented&nbsp;structurally.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;unresolved_tokens:&nbsp;Content&nbsp;tokens&nbsp;not&nbsp;represented&nbsp;by&nbsp;the&nbsp;parse.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;diagnostics:&nbsp;Machine-readable&nbsp;parse&nbsp;failure&nbsp;signals&nbsp;for&nbsp;learning.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ComprehensionResult-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="ComprehensionResult-__init__"><strong>__init__</strong></a>(self, raw_text: 'str' = '', speech_act: 'SpeechActType' = &lt;SpeechActType.STATEMENT: 1&gt;, propositions: 'list[Proposition]' = &lt;factory&gt;, grounded: 'list[Any]' = &lt;factory&gt;, key_concepts: 'list[ConceptRole]' = &lt;factory&gt;, resolved_references: 'dict[str, str]' = &lt;factory&gt;, is_negated: 'bool' = False, is_question: 'bool' = False, is_command: 'bool' = False, focus: 'str' = '', confidence: 'float' = 0.5, clause_count: 'int' = 1, metaphor: 'Metaphor | None' = None, irony: 'IronyDetection | None' = None, idiom: 'tuple[str, str] | None' = None, parse_coverage: 'float' = 0.0, unresolved_tokens: 'list[str]' = &lt;factory&gt;, diagnostics: 'list[str]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="ComprehensionResult-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>clause_count</strong></dt>
+</dl>
+<dl><dt><strong>confidence</strong></dt>
+</dl>
+<dl><dt><strong>diagnostics</strong></dt>
+</dl>
+<dl><dt><strong>focus</strong></dt>
+</dl>
+<dl><dt><strong>grounded</strong></dt>
+</dl>
+<dl><dt><strong>idiom</strong></dt>
+</dl>
+<dl><dt><strong>irony</strong></dt>
+</dl>
+<dl><dt><strong>is_command</strong></dt>
+</dl>
+<dl><dt><strong>is_negated</strong></dt>
+</dl>
+<dl><dt><strong>is_question</strong></dt>
+</dl>
+<dl><dt><strong>key_concepts</strong></dt>
+</dl>
+<dl><dt><strong>metaphor</strong></dt>
+</dl>
+<dl><dt><strong>parse_coverage</strong></dt>
+</dl>
+<dl><dt><strong>propositions</strong></dt>
+</dl>
+<dl><dt><strong>raw_text</strong></dt>
+</dl>
+<dl><dt><strong>resolved_references</strong></dt>
+</dl>
+<dl><dt><strong>speech_act</strong></dt>
+</dl>
+<dl><dt><strong>unresolved_tokens</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'clause_count': 'int', 'confidence': 'float', 'diagnostics': 'list[str]', 'focus': 'str', 'grounded': 'list[Any]', 'idiom': 'tuple[str, str] | None', 'irony': 'IronyDetection | None', 'is_command': 'bool', 'is_negated': 'bool', 'is_question': 'bool', ...}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'clause_count': Field(name='clause_count',type='int',default=1,d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'confidence': Field(name='confidence',type='float',default=0.5...appingproxy({}),kw_only=False,_field_type=_FIELD), 'diagnostics': Field(name='diagnostics',type='list[str]',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'focus': Field(name='focus',type='str',default='',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'grounded': Field(name='grounded',type='list[Any]',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD), 'idiom': Field(name='idiom',type='tuple[str, str] | None'...appingproxy({}),kw_only=False,_field_type=_FIELD), 'irony': Field(name='irony',type='IronyDetection | None',...appingproxy({}),kw_only=False,_field_type=_FIELD), 'is_command': Field(name='is_command',type='bool',default=Fals...appingproxy({}),kw_only=False,_field_type=_FIELD), 'is_negated': Field(name='is_negated',type='bool',default=Fals...appingproxy({}),kw_only=False,_field_type=_FIELD), 'is_question': Field(name='is_question',type='bool',default=Fal...appingproxy({}),kw_only=False,_field_type=_FIELD), ...}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('raw_text', 'speech_act', 'propositions', 'grounded', 'key_concepts', 'resolved_references', 'is_negated', 'is_question', 'is_command', 'focus', 'confidence', 'clause_count', 'metaphor', 'irony', 'idiom', 'parse_coverage', 'unresolved_tokens', 'diagnostics')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ConceptRole">class <strong>ConceptRole</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ConceptRole">ConceptRole</a>(concept:&nbsp;'str',&nbsp;role:&nbsp;'<a href="#SemanticRole">SemanticRole</a>',&nbsp;salience:&nbsp;'float'&nbsp;=&nbsp;0.5)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;key&nbsp;concept&nbsp;and&nbsp;its&nbsp;semantic&nbsp;role&nbsp;in&nbsp;the&nbsp;sentence.<br>
+&nbsp;<br>
+Attributes:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;concept:&nbsp;The&nbsp;word&nbsp;or&nbsp;phrase&nbsp;that&nbsp;is&nbsp;a&nbsp;key&nbsp;concept.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;role:&nbsp;The&nbsp;semantic&nbsp;role&nbsp;this&nbsp;concept&nbsp;plays&nbsp;in&nbsp;the&nbsp;sentence.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;salience:&nbsp;How&nbsp;important&nbsp;this&nbsp;concept&nbsp;is&nbsp;to&nbsp;the&nbsp;sentence's<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;meaning&nbsp;(0–1).&nbsp;Subjects&nbsp;and&nbsp;main&nbsp;verbs&nbsp;have&nbsp;high&nbsp;salience;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;modifiers&nbsp;and&nbsp;function&nbsp;words&nbsp;have&nbsp;low&nbsp;salience.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ConceptRole-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="ConceptRole-__init__"><strong>__init__</strong></a>(self, concept: 'str', role: 'SemanticRole', salience: 'float' = 0.5) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="ConceptRole-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>concept</strong></dt>
+</dl>
+<dl><dt><strong>role</strong></dt>
+</dl>
+<dl><dt><strong>salience</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'concept': 'str', 'role': 'SemanticRole', 'salience': 'float'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'concept': Field(name='concept',type='str',default=&lt;datacla...appingproxy({}),kw_only=False,_field_type=_FIELD), 'role': Field(name='role',type='SemanticRole',default=&lt;d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'salience': Field(name='salience',type='float',default=0.5,d...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('concept', 'role', 'salience')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Proposition">class <strong>Proposition</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Proposition">Proposition</a>(subject:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;predicate:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;<a href="builtins.html#object">object</a>:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;roles:&nbsp;'dict[<a href="#SemanticRole">SemanticRole</a>,&nbsp;str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;negated:&nbsp;'bool'&nbsp;=&nbsp;False,&nbsp;tense:&nbsp;'str'&nbsp;=&nbsp;'unknown',&nbsp;passive:&nbsp;'bool'&nbsp;=&nbsp;False,&nbsp;verb_found:&nbsp;'bool'&nbsp;=&nbsp;True,&nbsp;focus:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;embedded:&nbsp;'<a href="#Proposition">Proposition</a>&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;single&nbsp;proposition&nbsp;—&nbsp;a&nbsp;subject-predicate-<a href="builtins.html#object">object</a>&nbsp;triple.<br>
+&nbsp;<br>
+A&nbsp;proposition&nbsp;is&nbsp;the&nbsp;smallest&nbsp;unit&nbsp;of&nbsp;meaning&nbsp;that&nbsp;can&nbsp;be&nbsp;true&nbsp;or<br>
+false.&nbsp;"The&nbsp;cat&nbsp;sat&nbsp;on&nbsp;the&nbsp;mat"&nbsp;contains&nbsp;one&nbsp;proposition:<br>
+(cat,&nbsp;sat,&nbsp;mat).&nbsp;"John&nbsp;gave&nbsp;Mary&nbsp;a&nbsp;book"&nbsp;contains&nbsp;one&nbsp;proposition<br>
+with&nbsp;additional&nbsp;roles:&nbsp;(John,&nbsp;gave,&nbsp;book)&nbsp;with&nbsp;Mary&nbsp;as&nbsp;beneficiary.<br>
+&nbsp;<br>
+Attributes:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;subject:&nbsp;The&nbsp;entity&nbsp;performing&nbsp;or&nbsp;being&nbsp;described&nbsp;by&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;predicate&nbsp;(the&nbsp;"who").<br>
+&nbsp;&nbsp;&nbsp;&nbsp;predicate:&nbsp;The&nbsp;action&nbsp;or&nbsp;relationship&nbsp;(the&nbsp;"did&nbsp;what"&nbsp;or<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"is&nbsp;what").<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="builtins.html#object">object</a>:&nbsp;The&nbsp;entity&nbsp;acted&nbsp;upon&nbsp;or&nbsp;related&nbsp;to&nbsp;(the&nbsp;"to&nbsp;whom"<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;or&nbsp;"what").&nbsp;May&nbsp;be&nbsp;empty&nbsp;for&nbsp;intransitive&nbsp;sentences.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;roles:&nbsp;Additional&nbsp;semantic&nbsp;roles&nbsp;mapped&nbsp;to&nbsp;their&nbsp;fillers.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;E.g.,&nbsp;{<a href="#SemanticRole">SemanticRole</a>.LOCATION:&nbsp;"the&nbsp;park"}&nbsp;for&nbsp;"in&nbsp;the&nbsp;park".<br>
+&nbsp;&nbsp;&nbsp;&nbsp;negated:&nbsp;Whether&nbsp;this&nbsp;proposition&nbsp;is&nbsp;negated&nbsp;("not",&nbsp;"never").<br>
+&nbsp;&nbsp;&nbsp;&nbsp;tense:&nbsp;The&nbsp;tense&nbsp;of&nbsp;the&nbsp;predicate&nbsp;—&nbsp;"past",&nbsp;"present",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"future",&nbsp;or&nbsp;"unknown".<br>
+&nbsp;&nbsp;&nbsp;&nbsp;passive:&nbsp;Whether&nbsp;the&nbsp;clause&nbsp;is&nbsp;in&nbsp;passive&nbsp;voice&nbsp;("water&nbsp;is<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;needed&nbsp;by&nbsp;plants"&nbsp;—&nbsp;subject&nbsp;is&nbsp;the&nbsp;patient,&nbsp;the&nbsp;AGENT<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;role&nbsp;holds&nbsp;the&nbsp;"by"-phrase).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;verb_found:&nbsp;False&nbsp;when&nbsp;no&nbsp;verb&nbsp;could&nbsp;be&nbsp;identified&nbsp;and&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;whole&nbsp;clause&nbsp;was&nbsp;stored&nbsp;as&nbsp;the&nbsp;subject&nbsp;with&nbsp;a&nbsp;stub&nbsp;"is"<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;predicate&nbsp;—&nbsp;the&nbsp;signature&nbsp;of&nbsp;a&nbsp;failed&nbsp;parse.&nbsp;The<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;self-monitor&nbsp;uses&nbsp;this&nbsp;for&nbsp;its&nbsp;inner-loop&nbsp;check.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;embedded:&nbsp;A&nbsp;nested&nbsp;proposition&nbsp;for&nbsp;a&nbsp;complement&nbsp;clause&nbsp;("John<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;believes&nbsp;THAT&nbsp;Mary&nbsp;is&nbsp;in&nbsp;the&nbsp;kitchen").&nbsp;The&nbsp;content&nbsp;is<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;attributed&nbsp;to&nbsp;the&nbsp;matrix&nbsp;clause,&nbsp;not&nbsp;asserted&nbsp;about&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;world&nbsp;directly,&nbsp;so&nbsp;downstream&nbsp;state&nbsp;tracking&nbsp;must&nbsp;read&nbsp;it<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;through&nbsp;the&nbsp;holder&nbsp;rather&nbsp;than&nbsp;applying&nbsp;it.&nbsp;None&nbsp;when&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;clause&nbsp;carries&nbsp;no&nbsp;complement.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;focus:&nbsp;For&nbsp;interrogative&nbsp;clauses,&nbsp;the&nbsp;questioned<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;constituent&nbsp;—&nbsp;the&nbsp;wh-word&nbsp;("what",&nbsp;"who",&nbsp;...)&nbsp;or<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"whether"&nbsp;for&nbsp;yes/no&nbsp;questions.&nbsp;The&nbsp;focus&nbsp;is&nbsp;the&nbsp;gap&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;speaker&nbsp;wants&nbsp;filled,&nbsp;not&nbsp;an&nbsp;argument&nbsp;of&nbsp;the&nbsp;proposition.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Proposition-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="Proposition-__init__"><strong>__init__</strong></a>(self, subject: 'str' = '', predicate: 'str' = '', object: 'str' = '', roles: 'dict[SemanticRole, str]' = &lt;factory&gt;, negated: 'bool' = False, tense: 'str' = 'unknown', passive: 'bool' = False, verb_found: 'bool' = True, focus: 'str' = '', embedded: 'Proposition | None' = None) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Proposition-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>embedded</strong></dt>
+</dl>
+<dl><dt><strong>focus</strong></dt>
+</dl>
+<dl><dt><strong>negated</strong></dt>
+</dl>
+<dl><dt><strong>object</strong></dt>
+</dl>
+<dl><dt><strong>passive</strong></dt>
+</dl>
+<dl><dt><strong>predicate</strong></dt>
+</dl>
+<dl><dt><strong>roles</strong></dt>
+</dl>
+<dl><dt><strong>subject</strong></dt>
+</dl>
+<dl><dt><strong>tense</strong></dt>
+</dl>
+<dl><dt><strong>verb_found</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'embedded': 'Proposition | None', 'focus': 'str', 'negated': 'bool', 'object': 'str', 'passive': 'bool', 'predicate': 'str', 'roles': 'dict[SemanticRole, str]', 'subject': 'str', 'tense': 'str', 'verb_found': 'bool'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'embedded': Field(name='embedded',type='Proposition | None',...appingproxy({}),kw_only=False,_field_type=_FIELD), 'focus': Field(name='focus',type='str',default='',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'negated': Field(name='negated',type='bool',default=False,d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'object': Field(name='object',type='str',default='',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'passive': Field(name='passive',type='bool',default=False,d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'predicate': Field(name='predicate',type='str',default='',def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'roles': Field(name='roles',type='dict[SemanticRole, str]...appingproxy({}),kw_only=False,_field_type=_FIELD), 'subject': Field(name='subject',type='str',default='',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'tense': Field(name='tense',type='str',default='unknown',...appingproxy({}),kw_only=False,_field_type=_FIELD), 'verb_found': Field(name='verb_found',type='bool',default=True...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('subject', 'predicate', 'object', 'roles', 'negated', 'tense', 'passive', 'verb_found', 'focus', 'embedded')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SemanticRole">class <strong>SemanticRole</strong></a>(<a href="enum.html#Enum">enum.Enum</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SemanticRole">SemanticRole</a>(*values)<br>
+&nbsp;<br>
+Thematic&nbsp;roles&nbsp;in&nbsp;a&nbsp;proposition.<br>
+&nbsp;<br>
+Thematic&nbsp;roles&nbsp;(also&nbsp;called&nbsp;theta&nbsp;roles)&nbsp;describe&nbsp;the&nbsp;semantic<br>
+relationship&nbsp;between&nbsp;a&nbsp;verb&nbsp;and&nbsp;its&nbsp;arguments.&nbsp;They&nbsp;answer&nbsp;the<br>
+question&nbsp;"who&nbsp;did&nbsp;what&nbsp;to&nbsp;whom,&nbsp;with&nbsp;what,&nbsp;where,&nbsp;and&nbsp;when?"<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;a&nbsp;simplified&nbsp;set&nbsp;based&nbsp;on&nbsp;the&nbsp;thematic&nbsp;role&nbsp;hierarchy<br>
+from&nbsp;Jackendoff&nbsp;(1990)&nbsp;and&nbsp;Dowty&nbsp;(1991).<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.temporal_lobe.comprehension.html#SemanticRole">SemanticRole</a></dd>
+<dd><a href="enum.html#Enum">enum.Enum</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>AGENT</strong> = &lt;SemanticRole.AGENT: 1&gt;</dl>
+
+<dl><dt><strong>ATTRIBUTE</strong> = &lt;SemanticRole.ATTRIBUTE: 11&gt;</dl>
+
+<dl><dt><strong>BENEFICIARY</strong> = &lt;SemanticRole.BENEFICIARY: 10&gt;</dl>
+
+<dl><dt><strong>EXPERIENCER</strong> = &lt;SemanticRole.EXPERIENCER: 3&gt;</dl>
+
+<dl><dt><strong>GOAL</strong> = &lt;SemanticRole.GOAL: 8&gt;</dl>
+
+<dl><dt><strong>INSTRUMENT</strong> = &lt;SemanticRole.INSTRUMENT: 5&gt;</dl>
+
+<dl><dt><strong>LOCATION</strong> = &lt;SemanticRole.LOCATION: 6&gt;</dl>
+
+<dl><dt><strong>PATIENT</strong> = &lt;SemanticRole.PATIENT: 2&gt;</dl>
+
+<dl><dt><strong>SOURCE</strong> = &lt;SemanticRole.SOURCE: 9&gt;</dl>
+
+<dl><dt><strong>THEME</strong> = &lt;SemanticRole.THEME: 4&gt;</dl>
+
+<dl><dt><strong>TIME</strong> = &lt;SemanticRole.TIME: 7&gt;</dl>
+
+<hr>
+Data descriptors inherited from <a href="enum.html#Enum">enum.Enum</a>:<br>
+<dl><dt><strong>name</strong></dt>
+<dd><span class="code">The&nbsp;name&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<dl><dt><strong>value</strong></dt>
+<dd><span class="code">The&nbsp;value&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<hr>
+Static methods inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><a name="SemanticRole-__contains__"><strong>__contains__</strong></a>(value)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;`value`&nbsp;is&nbsp;in&nbsp;`cls`.<br>
+&nbsp;<br>
+`value`&nbsp;is&nbsp;in&nbsp;`cls`&nbsp;if:<br>
+1)&nbsp;`value`&nbsp;is&nbsp;a&nbsp;member&nbsp;of&nbsp;`cls`,&nbsp;or<br>
+2)&nbsp;`value`&nbsp;is&nbsp;the&nbsp;value&nbsp;of&nbsp;one&nbsp;of&nbsp;the&nbsp;`cls`'s&nbsp;members.</span></dd></dl>
+
+<dl><dt><a name="SemanticRole-__getitem__"><strong>__getitem__</strong></a>(name)</dt><dd><span class="code">Return&nbsp;the&nbsp;member&nbsp;matching&nbsp;`name`.</span></dd></dl>
+
+<dl><dt><a name="SemanticRole-__iter__"><strong>__iter__</strong></a>()</dt><dd><span class="code">Return&nbsp;members&nbsp;in&nbsp;definition&nbsp;order.</span></dd></dl>
+
+<dl><dt><a name="SemanticRole-__len__"><strong>__len__</strong></a>()</dt><dd><span class="code">Return&nbsp;the&nbsp;number&nbsp;of&nbsp;members&nbsp;(no&nbsp;aliases)</span></dd></dl>
+
+<hr>
+Readonly properties inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><strong>__members__</strong></dt>
+<dd><span class="code">Returns&nbsp;a&nbsp;mapping&nbsp;of&nbsp;member&nbsp;name-&gt;value.<br>
+&nbsp;<br>
+This&nbsp;mapping&nbsp;lists&nbsp;all&nbsp;enum&nbsp;members,&nbsp;including&nbsp;aliases.&nbsp;Note&nbsp;that&nbsp;this<br>
+is&nbsp;a&nbsp;read-only&nbsp;view&nbsp;of&nbsp;the&nbsp;internal&nbsp;mapping.</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SpeechActType">class <strong>SpeechActType</strong></a>(<a href="enum.html#Enum">enum.Enum</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SpeechActType">SpeechActType</a>(*values)<br>
+&nbsp;<br>
+The&nbsp;type&nbsp;of&nbsp;speech&nbsp;act&nbsp;performed&nbsp;by&nbsp;an&nbsp;utterance.<br>
+&nbsp;<br>
+Following&nbsp;Searle&nbsp;(1969),&nbsp;speech&nbsp;acts&nbsp;are&nbsp;the&nbsp;actions&nbsp;performed<br>
+by&nbsp;speaking.&nbsp;The&nbsp;comprehension&nbsp;engine&nbsp;identifies&nbsp;the&nbsp;illocutionary<br>
+force&nbsp;of&nbsp;an&nbsp;utterance&nbsp;—&nbsp;what&nbsp;the&nbsp;speaker&nbsp;is&nbsp;*doing*&nbsp;by&nbsp;saying&nbsp;it.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.temporal_lobe.comprehension.html#SpeechActType">SpeechActType</a></dd>
+<dd><a href="enum.html#Enum">enum.Enum</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>APOLOGY</strong> = &lt;SpeechActType.APOLOGY: 8&gt;</dl>
+
+<dl><dt><strong>COMMAND</strong> = &lt;SpeechActType.COMMAND: 3&gt;</dl>
+
+<dl><dt><strong>EXCLAMATION</strong> = &lt;SpeechActType.EXCLAMATION: 4&gt;</dl>
+
+<dl><dt><strong>GREETING</strong> = &lt;SpeechActType.GREETING: 5&gt;</dl>
+
+<dl><dt><strong>PROMISE</strong> = &lt;SpeechActType.PROMISE: 7&gt;</dl>
+
+<dl><dt><strong>QUESTION</strong> = &lt;SpeechActType.QUESTION: 2&gt;</dl>
+
+<dl><dt><strong>REQUEST</strong> = &lt;SpeechActType.REQUEST: 6&gt;</dl>
+
+<dl><dt><strong>STATEMENT</strong> = &lt;SpeechActType.STATEMENT: 1&gt;</dl>
+
+<hr>
+Data descriptors inherited from <a href="enum.html#Enum">enum.Enum</a>:<br>
+<dl><dt><strong>name</strong></dt>
+<dd><span class="code">The&nbsp;name&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<dl><dt><strong>value</strong></dt>
+<dd><span class="code">The&nbsp;value&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<hr>
+Static methods inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><a name="SpeechActType-__contains__"><strong>__contains__</strong></a>(value)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;`value`&nbsp;is&nbsp;in&nbsp;`cls`.<br>
+&nbsp;<br>
+`value`&nbsp;is&nbsp;in&nbsp;`cls`&nbsp;if:<br>
+1)&nbsp;`value`&nbsp;is&nbsp;a&nbsp;member&nbsp;of&nbsp;`cls`,&nbsp;or<br>
+2)&nbsp;`value`&nbsp;is&nbsp;the&nbsp;value&nbsp;of&nbsp;one&nbsp;of&nbsp;the&nbsp;`cls`'s&nbsp;members.</span></dd></dl>
+
+<dl><dt><a name="SpeechActType-__getitem__"><strong>__getitem__</strong></a>(name)</dt><dd><span class="code">Return&nbsp;the&nbsp;member&nbsp;matching&nbsp;`name`.</span></dd></dl>
+
+<dl><dt><a name="SpeechActType-__iter__"><strong>__iter__</strong></a>()</dt><dd><span class="code">Return&nbsp;members&nbsp;in&nbsp;definition&nbsp;order.</span></dd></dl>
+
+<dl><dt><a name="SpeechActType-__len__"><strong>__len__</strong></a>()</dt><dd><span class="code">Return&nbsp;the&nbsp;number&nbsp;of&nbsp;members&nbsp;(no&nbsp;aliases)</span></dd></dl>
+
+<hr>
+Readonly properties inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><strong>__members__</strong></dt>
+<dd><span class="code">Returns&nbsp;a&nbsp;mapping&nbsp;of&nbsp;member&nbsp;name-&gt;value.<br>
+&nbsp;<br>
+This&nbsp;mapping&nbsp;lists&nbsp;all&nbsp;enum&nbsp;members,&nbsp;including&nbsp;aliases.&nbsp;Note&nbsp;that&nbsp;this<br>
+is&nbsp;a&nbsp;read-only&nbsp;view&nbsp;of&nbsp;the&nbsp;internal&nbsp;mapping.</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['Comprehension', 'ComprehensionResult', 'ConceptRole', 'Proposition', 'SemanticRole', 'SpeechActType']</td></tr></table>
+</body></html>

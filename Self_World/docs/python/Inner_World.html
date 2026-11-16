@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: package Inner_World</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title">Inner_World</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Inner_World/__init__.py">/home/mindyrenee/GenAnd/Genesis/Inner_World/__init__.py</a></td></tr></table>
+    <p><span class="code">Inner_World&nbsp;—&nbsp;the&nbsp;mind's&nbsp;non-physical&nbsp;inner&nbsp;world.<br>
+&nbsp;<br>
+The&nbsp;three&nbsp;worlds&nbsp;partition&nbsp;the&nbsp;organism&nbsp;by&nbsp;what&nbsp;each&nbsp;thing&nbsp;*is*:<br>
+&nbsp;<br>
+-&nbsp;``Self_World/``&nbsp;—&nbsp;the&nbsp;physical&nbsp;self:&nbsp;the&nbsp;brain&nbsp;regions&nbsp;and<br>
+&nbsp;&nbsp;neurochemistry&nbsp;(the&nbsp;substrate),&nbsp;the&nbsp;Rust&nbsp;body,&nbsp;the&nbsp;self&nbsp;model,<br>
+&nbsp;&nbsp;and&nbsp;the&nbsp;runtime&nbsp;that&nbsp;holds&nbsp;it&nbsp;all&nbsp;together.<br>
+-&nbsp;``Inner_World/``&nbsp;—&nbsp;this&nbsp;world:&nbsp;the&nbsp;non-physical<br>
+&nbsp;&nbsp;phenomena&nbsp;the&nbsp;organism&nbsp;undergoes&nbsp;—&nbsp;the&nbsp;field,&nbsp;the&nbsp;brain&nbsp;waves,<br>
+&nbsp;&nbsp;dreams,&nbsp;and&nbsp;thoughts.<br>
+-&nbsp;``Outer_World/``&nbsp;—&nbsp;the&nbsp;physical&nbsp;environment&nbsp;outside:<br>
+&nbsp;&nbsp;workstation,&nbsp;tools,&nbsp;games,&nbsp;Discord,&nbsp;and&nbsp;the&nbsp;user&nbsp;profile.<br>
+&nbsp;<br>
+The&nbsp;boundary&nbsp;is&nbsp;a&nbsp;vesica,&nbsp;not&nbsp;a&nbsp;wall:&nbsp;a&nbsp;phenomenon&nbsp;can&nbsp;be&nbsp;non-physical<br>
+in&nbsp;kind&nbsp;and&nbsp;still&nbsp;be&nbsp;driven&nbsp;by&nbsp;physical&nbsp;machinery&nbsp;—&nbsp;``brain_waves``<br>
+is&nbsp;read&nbsp;off&nbsp;the&nbsp;thalamic&nbsp;relay's&nbsp;neurochemistry,&nbsp;``sleep``'s&nbsp;dreams<br>
+are&nbsp;gated&nbsp;by&nbsp;the&nbsp;hypothalamic&nbsp;flip-flop,&nbsp;``thoughts``&nbsp;draw&nbsp;on&nbsp;the<br>
+concept&nbsp;network&nbsp;the&nbsp;temporal&nbsp;lobe&nbsp;stores.&nbsp;The&nbsp;worlds&nbsp;share&nbsp;one<br>
+namespace&nbsp;(every&nbsp;world&nbsp;root&nbsp;is&nbsp;on&nbsp;``PYTHONPATH``),&nbsp;so&nbsp;overlap&nbsp;is&nbsp;the<br>
+default:&nbsp;a&nbsp;module&nbsp;lives&nbsp;in&nbsp;the&nbsp;world&nbsp;it&nbsp;belongs&nbsp;to&nbsp;and&nbsp;is&nbsp;importable<br>
+from&nbsp;everywhere&nbsp;it&nbsp;is&nbsp;needed.<br>
+&nbsp;<br>
+#&nbsp;What&nbsp;lives&nbsp;here<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;brain_waves.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;—&nbsp;the&nbsp;thalamocortical&nbsp;rhythm&nbsp;layer:&nbsp;a&nbsp;coupled<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;amplitude-phase&nbsp;oscillator&nbsp;over&nbsp;the&nbsp;canonical<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;bands,&nbsp;read&nbsp;off&nbsp;the&nbsp;neurochemical&nbsp;state.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;field_probe.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;—&nbsp;the&nbsp;daemon's&nbsp;substrate&nbsp;probe&nbsp;mapped&nbsp;onto&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wave&nbsp;oscillator's&nbsp;stimulus&nbsp;pathway&nbsp;—&nbsp;real<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;machine&nbsp;physics&nbsp;entering&nbsp;the&nbsp;model.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;field_audio.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;—&nbsp;the&nbsp;self-emission&nbsp;acoustic&nbsp;channel:&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;field's&nbsp;signature&nbsp;escaping&nbsp;the&nbsp;chassis,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;band-decomposed&nbsp;into&nbsp;the&nbsp;same&nbsp;stimulus.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;thoughts.py&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;—&nbsp;the&nbsp;data&nbsp;structures&nbsp;of&nbsp;spontaneous&nbsp;thought:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ThoughtChainType&nbsp;and&nbsp;SpontaneousThought,&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;unit&nbsp;of&nbsp;inner&nbsp;experience.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;thought_composer.py&nbsp;&nbsp;—&nbsp;where&nbsp;novel&nbsp;thoughts&nbsp;are&nbsp;generated:&nbsp;bridges<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;concept&nbsp;network&nbsp;and&nbsp;the&nbsp;language&nbsp;engine.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;sleep/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;—&nbsp;the&nbsp;sleep&nbsp;cycle&nbsp;and&nbsp;the&nbsp;dream&nbsp;machinery:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;inner&nbsp;life,&nbsp;dream&nbsp;synthesis,&nbsp;compression.<br>
+&nbsp;<br>
+Entry&nbsp;into&nbsp;the&nbsp;whole&nbsp;organism&nbsp;is&nbsp;``mind.Mind``&nbsp;in&nbsp;``Self_World``&nbsp;—<br>
+this&nbsp;world&nbsp;is&nbsp;what&nbsp;the&nbsp;mind&nbsp;*experiences*,&nbsp;not&nbsp;the&nbsp;organ&nbsp;that&nbsp;runs.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Package Contents</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="Inner_World.brain_waves.html">brain_waves</a><br>
+<a href="Inner_World.field_audio.html">field_audio</a><br>
+</td><td class="multicolumn"><a href="Inner_World.field_probe.html">field_probe</a><br>
+<a href="Inner_World.memory.html"><strong>memory</strong>&nbsp;(package)</a><br>
+</td><td class="multicolumn"><a href="Inner_World.sleep.html"><strong>sleep</strong>&nbsp;(package)</a><br>
+<a href="Inner_World.thought_composer.html">thought_composer</a><br>
+</td><td class="multicolumn"><a href="Inner_World.thoughts.html">thoughts</a><br>
+</td></tr></table></td></tr></table>
+</body></html>

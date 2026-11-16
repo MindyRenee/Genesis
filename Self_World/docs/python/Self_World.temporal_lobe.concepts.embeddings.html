@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.temporal_lobe.concepts.embeddings</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.temporal_lobe.html" class="white">temporal_lobe</a>.<a href="Self_World.temporal_lobe.concepts.html" class="white">concepts</a>.embeddings</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/concepts/embeddings.py">/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/concepts/embeddings.py</a></td></tr></table>
+    <p><span class="code">Embedding&nbsp;store&nbsp;—&nbsp;Genesis's&nbsp;latent&nbsp;space.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;sub-symbolic&nbsp;layer&nbsp;beneath&nbsp;the&nbsp;concept&nbsp;network.&nbsp;It&nbsp;provides<br>
+a&nbsp;continuous&nbsp;vector&nbsp;space&nbsp;where&nbsp;concepts&nbsp;with&nbsp;similar&nbsp;meanings&nbsp;are&nbsp;close<br>
+together.&nbsp;This&nbsp;enables&nbsp;three&nbsp;things&nbsp;the&nbsp;symbolic&nbsp;graph&nbsp;cannot&nbsp;do&nbsp;alone:<br>
+&nbsp;<br>
+1.&nbsp;**Pattern&nbsp;recognition**&nbsp;—&nbsp;"the&nbsp;tall&nbsp;plant&nbsp;in&nbsp;my&nbsp;yard"&nbsp;activates<br>
+&nbsp;&nbsp;&nbsp;"tree"&nbsp;even&nbsp;though&nbsp;no&nbsp;word&nbsp;matches&nbsp;exactly.&nbsp;The&nbsp;input&nbsp;text&nbsp;shares<br>
+&nbsp;&nbsp;&nbsp;semantic&nbsp;features&nbsp;with&nbsp;the&nbsp;tree&nbsp;concept.<br>
+&nbsp;<br>
+2.&nbsp;**Generalization**&nbsp;—&nbsp;it&nbsp;knows&nbsp;"joy"&nbsp;and&nbsp;encounters&nbsp;"elation."<br>
+&nbsp;&nbsp;&nbsp;They&nbsp;share&nbsp;many&nbsp;neighbors&nbsp;in&nbsp;the&nbsp;concept&nbsp;network,&nbsp;so&nbsp;their&nbsp;vectors<br>
+&nbsp;&nbsp;&nbsp;are&nbsp;close.&nbsp;It&nbsp;can&nbsp;reason&nbsp;about&nbsp;elation&nbsp;by&nbsp;analogy&nbsp;to&nbsp;joy,&nbsp;even<br>
+&nbsp;&nbsp;&nbsp;with&nbsp;no&nbsp;explicit&nbsp;graph&nbsp;edge.<br>
+&nbsp;<br>
+3.&nbsp;**Discovery**&nbsp;—&nbsp;during&nbsp;sleep,&nbsp;it&nbsp;scans&nbsp;the&nbsp;latent&nbsp;space&nbsp;for&nbsp;nearby<br>
+&nbsp;&nbsp;&nbsp;concepts&nbsp;that&nbsp;lack&nbsp;a&nbsp;graph&nbsp;edge&nbsp;and&nbsp;proposes&nbsp;new&nbsp;SIMILAR_TO<br>
+&nbsp;&nbsp;&nbsp;relationships.&nbsp;This&nbsp;is&nbsp;where&nbsp;generalization&nbsp;becomes&nbsp;knowledge.<br>
+&nbsp;<br>
+Architecture<br>
+------------<br>
+The&nbsp;embedding&nbsp;store&nbsp;uses&nbsp;two&nbsp;complementary&nbsp;representations:<br>
+&nbsp;<br>
+1.&nbsp;**Spectral&nbsp;embedding**&nbsp;of&nbsp;the&nbsp;concept&nbsp;graph&nbsp;—&nbsp;concepts&nbsp;that&nbsp;share<br>
+&nbsp;&nbsp;&nbsp;neighbors&nbsp;are&nbsp;close&nbsp;in&nbsp;this&nbsp;space.&nbsp;Computed&nbsp;via&nbsp;truncated&nbsp;SVD&nbsp;of<br>
+&nbsp;&nbsp;&nbsp;the&nbsp;graph&nbsp;Laplacian.&nbsp;This&nbsp;captures&nbsp;structural&nbsp;similarity&nbsp;(the&nbsp;shape<br>
+&nbsp;&nbsp;&nbsp;of&nbsp;the&nbsp;knowledge&nbsp;graph).<br>
+&nbsp;<br>
+2.&nbsp;**TF-IDF&nbsp;text&nbsp;embedding**&nbsp;—&nbsp;concepts&nbsp;are&nbsp;represented&nbsp;by&nbsp;bag-of-words<br>
+&nbsp;&nbsp;&nbsp;vectors&nbsp;over&nbsp;their&nbsp;definitions&nbsp;and&nbsp;names,&nbsp;weighted&nbsp;by&nbsp;inverse<br>
+&nbsp;&nbsp;&nbsp;document&nbsp;frequency.&nbsp;This&nbsp;captures&nbsp;lexical&nbsp;similarity&nbsp;(words&nbsp;that<br>
+&nbsp;&nbsp;&nbsp;appear&nbsp;in&nbsp;similar&nbsp;definitions).<br>
+&nbsp;<br>
+The&nbsp;final&nbsp;concept&nbsp;vector&nbsp;is&nbsp;the&nbsp;concatenation&nbsp;of&nbsp;both,&nbsp;L2-normalized.<br>
+This&nbsp;dual&nbsp;representation&nbsp;mirrors&nbsp;the&nbsp;brain's&nbsp;dual&nbsp;coding:&nbsp;structural<br>
+(hippocampal&nbsp;attractor&nbsp;basins&nbsp;from&nbsp;co-activation)&nbsp;and&nbsp;lexical<br>
+(cortical&nbsp;semantic&nbsp;networks&nbsp;from&nbsp;language).<br>
+&nbsp;<br>
+If&nbsp;pre-trained&nbsp;GloVe&nbsp;embeddings&nbsp;are&nbsp;available&nbsp;(downloaded&nbsp;via<br>
+setup_embeddings.py),&nbsp;they&nbsp;are&nbsp;used&nbsp;as&nbsp;an&nbsp;additional&nbsp;component,<br>
+providing&nbsp;distributional&nbsp;semantics&nbsp;from&nbsp;general&nbsp;English.&nbsp;This<br>
+supplements&nbsp;but&nbsp;does&nbsp;not&nbsp;replace&nbsp;the&nbsp;self-grounded&nbsp;representations.<br>
+&nbsp;<br>
+All&nbsp;vectors&nbsp;are&nbsp;L2-normalized&nbsp;at&nbsp;load&nbsp;time,&nbsp;so&nbsp;cosine&nbsp;similarity<br>
+reduces&nbsp;to&nbsp;a&nbsp;single&nbsp;dot&nbsp;product&nbsp;—&nbsp;O(N)&nbsp;per&nbsp;query&nbsp;with&nbsp;numpy<br>
+vectorization,&nbsp;fast&nbsp;enough&nbsp;for&nbsp;interactive&nbsp;use.<br>
+&nbsp;<br>
+The&nbsp;symbolic&nbsp;concept&nbsp;network&nbsp;remains&nbsp;the&nbsp;source&nbsp;of&nbsp;truth&nbsp;for&nbsp;reasoning<br>
+and&nbsp;explanation.&nbsp;The&nbsp;embedding&nbsp;space&nbsp;provides&nbsp;the&nbsp;similarity&nbsp;substrate<br>
+that&nbsp;enables&nbsp;recognition&nbsp;and&nbsp;generalization.&nbsp;They&nbsp;are&nbsp;two&nbsp;systems,<br>
+connected,&nbsp;each&nbsp;doing&nbsp;what&nbsp;it's&nbsp;good&nbsp;at.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+<a href="math.html">math</a><br>
+</td><td class="multicolumn"><a href="numpy.html">numpy</a><br>
+<a href="os.html">os</a><br>
+</td><td class="multicolumn"><a href="sqlite3.html">sqlite3</a><br>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.concepts.embeddings.html#EmbeddingStore">EmbeddingStore</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="EmbeddingStore">class <strong>EmbeddingStore</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#EmbeddingStore">EmbeddingStore</a>(network:&nbsp;'ConceptNetwork',&nbsp;data_dir:&nbsp;'str'&nbsp;=&nbsp;'.',&nbsp;filename:&nbsp;'str'&nbsp;=&nbsp;'embeddings.npz',&nbsp;dimension:&nbsp;'int&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Latent&nbsp;space&nbsp;for&nbsp;semantic&nbsp;similarity.<br>
+&nbsp;<br>
+Combines&nbsp;graph&nbsp;spectral&nbsp;embedding,&nbsp;TF-IDF&nbsp;text&nbsp;embedding,&nbsp;and<br>
+optional&nbsp;pre-trained&nbsp;word&nbsp;embeddings&nbsp;into&nbsp;a&nbsp;unified&nbsp;representation.<br>
+&nbsp;<br>
+Thread-safe&nbsp;after&nbsp;initialization.&nbsp;All&nbsp;vectors&nbsp;are&nbsp;read-only.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="EmbeddingStore-__init__"><strong>__init__</strong></a>(self, network: 'ConceptNetwork', data_dir: 'str' = '.', filename: 'str' = 'embeddings.npz', dimension: 'int | None' = None) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;embedding&nbsp;store.<br>
+&nbsp;<br>
+Loads&nbsp;cached&nbsp;embeddings&nbsp;from&nbsp;disk&nbsp;if&nbsp;present;&nbsp;otherwise&nbsp;prepares<br>
+the&nbsp;store&nbsp;for&nbsp;incremental&nbsp;learning&nbsp;from&nbsp;the&nbsp;concept&nbsp;network.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;network:&nbsp;The&nbsp;concept&nbsp;network&nbsp;whose&nbsp;nodes&nbsp;will&nbsp;be&nbsp;embedded.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;data_dir:&nbsp;Directory&nbsp;holding&nbsp;the&nbsp;cached&nbsp;``embeddings.npz``.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;filename:&nbsp;Cache&nbsp;filename&nbsp;for&nbsp;the&nbsp;embedding&nbsp;matrix.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;dimension:&nbsp;Optional&nbsp;fixed&nbsp;target&nbsp;dimension.&nbsp;If&nbsp;None,&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dimension&nbsp;is&nbsp;derived&nbsp;from&nbsp;the&nbsp;embedding&nbsp;composition.</span></dd></dl>
+
+<dl><dt><a name="EmbeddingStore-compose_concepts"><strong>compose_concepts</strong></a>(self, concept_a: 'str', concept_b: 'str', relation: 'str' = 'modifier') -&gt; 'np.ndarray | None'</dt><dd><span class="code">Combine&nbsp;two&nbsp;concept&nbsp;embeddings&nbsp;using&nbsp;tensor&nbsp;product&nbsp;composition.<br>
+&nbsp;<br>
+Uses&nbsp;circular&nbsp;convolution&nbsp;(Plate,&nbsp;1995)&nbsp;to&nbsp;bind&nbsp;the&nbsp;two<br>
+concepts&nbsp;into&nbsp;a&nbsp;single&nbsp;vector&nbsp;of&nbsp;the&nbsp;same&nbsp;dimensionality.<br>
+This&nbsp;enables&nbsp;the&nbsp;system&nbsp;to&nbsp;build&nbsp;representations&nbsp;for&nbsp;phrases<br>
+like&nbsp;"red&nbsp;car"&nbsp;or&nbsp;"fast&nbsp;runner"&nbsp;from&nbsp;individual&nbsp;concept&nbsp;vectors.<br>
+&nbsp;<br>
+The&nbsp;relation&nbsp;parameter&nbsp;determines&nbsp;the&nbsp;role&nbsp;binding:<br>
+-&nbsp;"modifier":&nbsp;concept_b&nbsp;modifies&nbsp;concept_a&nbsp;(e.g.&nbsp;"red&nbsp;car")<br>
+-&nbsp;"relation":&nbsp;concept_a&nbsp;is&nbsp;in&nbsp;relation&nbsp;to&nbsp;concept_b<br>
+-&nbsp;"compound":&nbsp;both&nbsp;concepts&nbsp;combine&nbsp;equally<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;concept_a:&nbsp;The&nbsp;primary&nbsp;concept&nbsp;(e.g.&nbsp;"car").<br>
+&nbsp;&nbsp;&nbsp;&nbsp;concept_b:&nbsp;The&nbsp;secondary&nbsp;concept&nbsp;(e.g.&nbsp;"red").<br>
+&nbsp;&nbsp;&nbsp;&nbsp;relation:&nbsp;The&nbsp;binding&nbsp;relation&nbsp;—&nbsp;"modifier",&nbsp;"relation",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;or&nbsp;"compound".<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;composed&nbsp;embedding&nbsp;vector,&nbsp;or&nbsp;None&nbsp;if&nbsp;either&nbsp;concept<br>
+&nbsp;&nbsp;&nbsp;&nbsp;has&nbsp;no&nbsp;embedding.</span></dd></dl>
+
+<dl><dt><a name="EmbeddingStore-compose_recursive"><strong>compose_recursive</strong></a>(self, vectors: 'list[np.ndarray]', relation: 'str' = 'compound') -&gt; 'np.ndarray | None'</dt><dd><span class="code">Recursively&nbsp;compose&nbsp;multiple&nbsp;vectors.<br>
+&nbsp;<br>
+Allows&nbsp;composing&nbsp;already-composed&nbsp;representations,&nbsp;enabling<br>
+hierarchical&nbsp;structure:&nbsp;compose(compose(red,&nbsp;car),&nbsp;fast)&nbsp;for<br>
+"fast&nbsp;red&nbsp;car".<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;vectors:&nbsp;A&nbsp;list&nbsp;of&nbsp;vectors&nbsp;to&nbsp;compose&nbsp;(left&nbsp;to&nbsp;right).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;relation:&nbsp;The&nbsp;composition&nbsp;relation.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;composed&nbsp;vector,&nbsp;or&nbsp;None&nbsp;if&nbsp;the&nbsp;list&nbsp;is&nbsp;empty.</span></dd></dl>
+
+<dl><dt><a name="EmbeddingStore-compose_with_role"><strong>compose_with_role</strong></a>(self, concept: 'str', role: 'str') -&gt; 'np.ndarray | None'</dt><dd><span class="code">Compose&nbsp;a&nbsp;concept&nbsp;embedding&nbsp;with&nbsp;a&nbsp;role&nbsp;vector.<br>
+&nbsp;<br>
+Role-based&nbsp;composition&nbsp;binds&nbsp;a&nbsp;concept&nbsp;to&nbsp;a&nbsp;structural&nbsp;role<br>
+(subject,&nbsp;<a href="builtins.html#object">object</a>,&nbsp;modifier,&nbsp;etc.).&nbsp;The&nbsp;role&nbsp;vector&nbsp;is&nbsp;derived<br>
+from&nbsp;a&nbsp;hash&nbsp;of&nbsp;the&nbsp;role&nbsp;name,&nbsp;ensuring&nbsp;different&nbsp;roles&nbsp;produce<br>
+different&nbsp;bindings.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;building&nbsp;block&nbsp;for&nbsp;structured&nbsp;composition:&nbsp;to<br>
+represent&nbsp;"the&nbsp;red&nbsp;car",&nbsp;you&nbsp;compose(car,&nbsp;role="head")&nbsp;and<br>
+compose(red,&nbsp;role="modifier"),&nbsp;then&nbsp;combine&nbsp;the&nbsp;results.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;concept:&nbsp;The&nbsp;concept&nbsp;to&nbsp;bind.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;role:&nbsp;The&nbsp;role&nbsp;name&nbsp;(e.g.&nbsp;"subject",&nbsp;"<a href="builtins.html#object">object</a>",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"modifier",&nbsp;"head").<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;role-bound&nbsp;embedding&nbsp;vector,&nbsp;or&nbsp;None&nbsp;if&nbsp;the&nbsp;concept<br>
+&nbsp;&nbsp;&nbsp;&nbsp;has&nbsp;no&nbsp;embedding.</span></dd></dl>
+
+<dl><dt><a name="EmbeddingStore-cosine_similarity"><strong>cosine_similarity</strong></a>(self, v1: 'np.ndarray', v2: 'np.ndarray') -&gt; 'float'</dt><dd><span class="code">Cosine&nbsp;similarity&nbsp;between&nbsp;two&nbsp;vectors.</span></dd></dl>
+
+<dl><dt><a name="EmbeddingStore-find_concepts_related_to_both"><strong>find_concepts_related_to_both</strong></a>(self, concept_a: 'str', concept_b: 'str', k: 'int' = 5, threshold: 'float' = 0.3) -&gt; 'list[tuple[str, float]]'</dt><dd><span class="code">Vesica&nbsp;query:&nbsp;find&nbsp;concepts&nbsp;in&nbsp;the&nbsp;intersection&nbsp;of&nbsp;two&nbsp;neighborhoods.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;geometric&nbsp;join&nbsp;operation&nbsp;—&nbsp;the&nbsp;vesica&nbsp;piscis&nbsp;of&nbsp;two<br>
+concept&nbsp;neighborhoods&nbsp;on&nbsp;the&nbsp;torus.&nbsp;A&nbsp;concept&nbsp;ranks&nbsp;high&nbsp;if&nbsp;it<br>
+is&nbsp;close&nbsp;to&nbsp;BOTH&nbsp;A&nbsp;and&nbsp;B,&nbsp;not&nbsp;just&nbsp;one.&nbsp;The&nbsp;combined&nbsp;score&nbsp;is<br>
+the&nbsp;minimum&nbsp;of&nbsp;the&nbsp;two&nbsp;similarities&nbsp;(intersection,&nbsp;not&nbsp;union).<br>
+&nbsp;<br>
+This&nbsp;enables&nbsp;analogical&nbsp;reasoning:&nbsp;"A&nbsp;is&nbsp;to&nbsp;B&nbsp;as&nbsp;C&nbsp;is&nbsp;to&nbsp;?"<br>
+requires&nbsp;finding&nbsp;C&nbsp;in&nbsp;the&nbsp;vesica&nbsp;of&nbsp;A's&nbsp;and&nbsp;B's&nbsp;neighborhoods.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;concept_a:&nbsp;First&nbsp;concept.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;concept_b:&nbsp;Second&nbsp;concept.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;k:&nbsp;Maximum&nbsp;number&nbsp;of&nbsp;results.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;threshold:&nbsp;Minimum&nbsp;combined&nbsp;similarity.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;List&nbsp;of&nbsp;(concept_name,&nbsp;combined_similarity)&nbsp;pairs.</span></dd></dl>
+
+<dl><dt><a name="EmbeddingStore-find_similar_concepts"><strong>find_similar_concepts</strong></a>(self, concept_name: 'str', k: 'int' = 5, threshold: 'float' = 0.5) -&gt; 'list[tuple[str, float]]'</dt><dd><span class="code">Find&nbsp;concepts&nbsp;similar&nbsp;to&nbsp;the&nbsp;given&nbsp;concept&nbsp;using&nbsp;hybrid&nbsp;distance.<br>
+&nbsp;<br>
+Uses&nbsp;the&nbsp;concept's&nbsp;own&nbsp;vector&nbsp;in&nbsp;the&nbsp;unified&nbsp;latent&nbsp;space,<br>
+combining&nbsp;toroidal&nbsp;similarity&nbsp;(experiential&nbsp;layer&nbsp;via&nbsp;geodesic<br>
+distance&nbsp;on&nbsp;T^d)&nbsp;with&nbsp;flat&nbsp;similarity&nbsp;(TF-IDF&nbsp;+&nbsp;GloVe&nbsp;via<br>
+cosine&nbsp;distance).&nbsp;The&nbsp;spectral&nbsp;component&nbsp;is&nbsp;excluded&nbsp;from<br>
+the&nbsp;toroidal&nbsp;block&nbsp;because&nbsp;it's&nbsp;polluted&nbsp;by&nbsp;hub&nbsp;attachments<br>
+—&nbsp;concepts&nbsp;attached&nbsp;to&nbsp;the&nbsp;same&nbsp;hub&nbsp;appear&nbsp;close&nbsp;even&nbsp;when<br>
+semantically&nbsp;unrelated.<br>
+&nbsp;<br>
+When&nbsp;the&nbsp;experiential&nbsp;layer&nbsp;is&nbsp;not&nbsp;available&nbsp;(no&nbsp;holographic<br>
+graph&nbsp;wired),&nbsp;falls&nbsp;back&nbsp;to&nbsp;text-only&nbsp;search&nbsp;(the&nbsp;original<br>
+behavior).<br>
+&nbsp;<br>
+The&nbsp;query&nbsp;concept&nbsp;itself&nbsp;is&nbsp;excluded&nbsp;from&nbsp;results.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;concept_name:&nbsp;The&nbsp;concept&nbsp;to&nbsp;find&nbsp;neighbors&nbsp;for.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;k:&nbsp;Maximum&nbsp;number&nbsp;of&nbsp;results.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;threshold:&nbsp;Minimum&nbsp;hybrid&nbsp;similarity&nbsp;(0-1).<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;List&nbsp;of&nbsp;(concept_name,&nbsp;similarity)&nbsp;pairs,&nbsp;sorted&nbsp;by<br>
+&nbsp;&nbsp;&nbsp;&nbsp;similarity&nbsp;descending.<br>
+&nbsp;<br>
+Locked:&nbsp;the&nbsp;search&nbsp;walks&nbsp;the&nbsp;concept&nbsp;names,&nbsp;the&nbsp;matrix,&nbsp;and&nbsp;the<br>
+dimension&nbsp;together,&nbsp;so&nbsp;they&nbsp;must&nbsp;all&nbsp;come&nbsp;from&nbsp;the&nbsp;same<br>
+generation.&nbsp;`<a href="#EmbeddingStore-refresh">refresh</a>()`&nbsp;(sleep&nbsp;thread)&nbsp;rebinds&nbsp;all&nbsp;three.</span></dd></dl>
+
+<dl><dt><a name="EmbeddingStore-find_similar_to_text"><strong>find_similar_to_text</strong></a>(self, text: 'str', k: 'int' = 5, threshold: 'float' = 0.3, exclude: 'str | None' = None) -&gt; 'list[tuple[str, float]]'</dt><dd><span class="code">Find&nbsp;concepts&nbsp;similar&nbsp;to&nbsp;arbitrary&nbsp;text&nbsp;(semantic&nbsp;matching).<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;pattern&nbsp;recognition&nbsp;method.&nbsp;It&nbsp;takes&nbsp;any&nbsp;text&nbsp;—<br>
+a&nbsp;sentence,&nbsp;a&nbsp;phrase,&nbsp;a&nbsp;question&nbsp;—&nbsp;and&nbsp;finds&nbsp;concepts&nbsp;in&nbsp;the<br>
+network&nbsp;whose&nbsp;vectors&nbsp;are&nbsp;closest.<br>
+&nbsp;<br>
+The&nbsp;text&nbsp;vector&nbsp;is&nbsp;computed&nbsp;from:<br>
+1.&nbsp;TF-IDF:&nbsp;matching&nbsp;words&nbsp;in&nbsp;concept&nbsp;definitions<br>
+2.&nbsp;GloVe&nbsp;(if&nbsp;available):&nbsp;word&nbsp;vector&nbsp;average&nbsp;for&nbsp;distributional&nbsp;match<br>
+&nbsp;<br>
+Names&nbsp;and&nbsp;aliases&nbsp;are&nbsp;resolved&nbsp;exactly,&nbsp;through&nbsp;the&nbsp;concept<br>
+index,&nbsp;in&nbsp;addition&nbsp;to&nbsp;the&nbsp;vector&nbsp;search.&nbsp;A&nbsp;bag-of-words&nbsp;vector<br>
+cannot&nbsp;represent&nbsp;a&nbsp;word&nbsp;that&nbsp;appears&nbsp;in&nbsp;no&nbsp;other&nbsp;concept's&nbsp;text<br>
+—&nbsp;the&nbsp;TF-IDF&nbsp;vocabulary&nbsp;is&nbsp;selected&nbsp;by&nbsp;document&nbsp;frequency&nbsp;—&nbsp;so<br>
+concepts&nbsp;like&nbsp;"datum",&nbsp;"entry",&nbsp;"belief"&nbsp;and&nbsp;"intention"&nbsp;had&nbsp;an<br>
+all-zero&nbsp;flat&nbsp;block&nbsp;and&nbsp;were&nbsp;invisible&nbsp;to&nbsp;this&nbsp;method&nbsp;no&nbsp;matter<br>
+how&nbsp;exactly&nbsp;the&nbsp;caller&nbsp;named&nbsp;them.&nbsp;Identity&nbsp;is&nbsp;a&nbsp;lookup,&nbsp;not&nbsp;a<br>
+cosine:&nbsp;the&nbsp;name&nbsp;index&nbsp;already&nbsp;holds&nbsp;it&nbsp;for&nbsp;working&nbsp;memory&nbsp;and<br>
+for&nbsp;the&nbsp;archive,&nbsp;with&nbsp;no&nbsp;collision&nbsp;noise&nbsp;and&nbsp;no&nbsp;extra<br>
+dimensions.<br>
+&nbsp;<br>
+Example:&nbsp;"the&nbsp;tall&nbsp;plant&nbsp;in&nbsp;my&nbsp;yard"&nbsp;→&nbsp;[("tree",&nbsp;0.82),<br>
+("plant",&nbsp;0.75),&nbsp;("garden",&nbsp;0.68),&nbsp;...]<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;text:&nbsp;Input&nbsp;text&nbsp;to&nbsp;match.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;k:&nbsp;Maximum&nbsp;number&nbsp;of&nbsp;results.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;threshold:&nbsp;Minimum&nbsp;cosine&nbsp;similarity.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;exclude:&nbsp;Optional&nbsp;concept&nbsp;name&nbsp;to&nbsp;exclude&nbsp;from&nbsp;results.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;List&nbsp;of&nbsp;(concept_name,&nbsp;similarity)&nbsp;pairs.</span></dd></dl>
+
+<dl><dt><a name="EmbeddingStore-find_similar_to_vector"><strong>find_similar_to_vector</strong></a>(self, vector: 'np.ndarray', k: 'int' = 5, threshold: 'float' = 0.5, query_has_spectral: 'bool' = True) -&gt; 'list[tuple[str, float]]'</dt><dd><span class="code">Find&nbsp;concepts&nbsp;similar&nbsp;to&nbsp;a&nbsp;given&nbsp;vector.<br>
+&nbsp;<br>
+Locked&nbsp;for&nbsp;the&nbsp;duration&nbsp;of&nbsp;the&nbsp;search.&nbsp;This&nbsp;is&nbsp;the&nbsp;entry&nbsp;point<br>
+the&nbsp;sleep&nbsp;thread's&nbsp;edge&nbsp;proposer&nbsp;uses,&nbsp;so&nbsp;it&nbsp;runs&nbsp;concurrently<br>
+with&nbsp;the&nbsp;conversation&nbsp;thread&nbsp;and,&nbsp;before&nbsp;the&nbsp;fix,&nbsp;with<br>
+`<a href="#EmbeddingStore-refresh">refresh</a>()`.&nbsp;`_search_concept_matrix`&nbsp;walks&nbsp;the&nbsp;concept&nbsp;names,<br>
+the&nbsp;matrix,&nbsp;and&nbsp;the&nbsp;dimension&nbsp;together,&nbsp;so&nbsp;all&nbsp;three&nbsp;have&nbsp;to<br>
+come&nbsp;from&nbsp;the&nbsp;same&nbsp;generation.</span></dd></dl>
+
+<dl><dt><a name="EmbeddingStore-get_angle_data"><strong>get_angle_data</strong></a>(self) -&gt; 'tuple[list[str], np.ndarray] | None'</dt><dd><span class="code">Return&nbsp;toroidal&nbsp;angle&nbsp;coordinates&nbsp;and&nbsp;their&nbsp;concept&nbsp;names.<br>
+&nbsp;<br>
+Public&nbsp;accessor&nbsp;for&nbsp;the&nbsp;language&nbsp;flow&nbsp;field's&nbsp;angular<br>
+embedding&nbsp;(consumers&nbsp;previously&nbsp;reached&nbsp;into&nbsp;``_angle_matrix``<br>
+and&nbsp;``_concept_names``&nbsp;directly).<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(names,&nbsp;angle_matrix)&nbsp;where&nbsp;names&nbsp;is&nbsp;the&nbsp;list&nbsp;of&nbsp;concept<br>
+&nbsp;&nbsp;&nbsp;&nbsp;IDs&nbsp;aligned&nbsp;with&nbsp;matrix&nbsp;rows&nbsp;and&nbsp;angle_matrix&nbsp;has&nbsp;shape<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(N,&nbsp;toroidal_dim);&nbsp;None&nbsp;if&nbsp;angles&nbsp;have&nbsp;not&nbsp;been&nbsp;computed.</span></dd></dl>
+
+<dl><dt><a name="EmbeddingStore-get_concept_matrix"><strong>get_concept_matrix</strong></a>(self) -&gt; 'tuple[np.ndarray | None, list[str]]'</dt><dd><span class="code">Return&nbsp;the&nbsp;concept&nbsp;matrix&nbsp;and&nbsp;corresponding&nbsp;concept&nbsp;names.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;public&nbsp;accessor&nbsp;for&nbsp;the&nbsp;internal&nbsp;matrix&nbsp;used&nbsp;by<br>
+VQ&nbsp;training&nbsp;and&nbsp;sleep&nbsp;compression.&nbsp;Ensures&nbsp;embeddings&nbsp;are<br>
+loaded&nbsp;before&nbsp;returning.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(matrix,&nbsp;names)&nbsp;where&nbsp;matrix&nbsp;is&nbsp;shape&nbsp;(N,&nbsp;D)&nbsp;float32&nbsp;or<br>
+&nbsp;&nbsp;&nbsp;&nbsp;None&nbsp;if&nbsp;no&nbsp;embeddings&nbsp;are&nbsp;available,&nbsp;and&nbsp;names&nbsp;is&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;list&nbsp;of&nbsp;concept&nbsp;IDs&nbsp;aligned&nbsp;with&nbsp;matrix&nbsp;rows.</span></dd></dl>
+
+<dl><dt><a name="EmbeddingStore-get_concept_vector"><strong>get_concept_vector</strong></a>(self, concept_name: 'str') -&gt; 'np.ndarray | None'</dt><dd><span class="code">Get&nbsp;the&nbsp;vector&nbsp;for&nbsp;a&nbsp;concept&nbsp;in&nbsp;the&nbsp;network.<br>
+&nbsp;<br>
+The&nbsp;vector&nbsp;combines&nbsp;spectral&nbsp;(graph&nbsp;structure),&nbsp;TF-IDF&nbsp;(text),<br>
+and&nbsp;GloVe&nbsp;(distributional)&nbsp;components.<br>
+&nbsp;<br>
+Takes&nbsp;`self.<strong>_lock</strong>`&nbsp;so&nbsp;the&nbsp;matrix&nbsp;and&nbsp;the&nbsp;index&nbsp;map&nbsp;come&nbsp;from&nbsp;the<br>
+same&nbsp;generation.&nbsp;`<a href="#EmbeddingStore-refresh">refresh</a>()`&nbsp;rebinds&nbsp;both,&nbsp;so&nbsp;an&nbsp;unsynchronised<br>
+read&nbsp;could&nbsp;look&nbsp;a&nbsp;concept&nbsp;up&nbsp;in&nbsp;the&nbsp;new&nbsp;map&nbsp;and&nbsp;index&nbsp;the&nbsp;old<br>
+matrix&nbsp;—&nbsp;a&nbsp;wrong&nbsp;vector,&nbsp;silently.&nbsp;See&nbsp;`refresh`.</span></dd></dl>
+
+<dl><dt><a name="EmbeddingStore-get_word_vector"><strong>get_word_vector</strong></a>(self, word: 'str') -&gt; 'np.ndarray | None'</dt><dd><span class="code">Get&nbsp;the&nbsp;GloVe&nbsp;vector&nbsp;for&nbsp;a&nbsp;single&nbsp;word.<br>
+&nbsp;<br>
+Returns&nbsp;None&nbsp;if&nbsp;GloVe&nbsp;is&nbsp;not&nbsp;loaded&nbsp;or&nbsp;the&nbsp;word&nbsp;is&nbsp;not&nbsp;in<br>
+the&nbsp;vocabulary.</span></dd></dl>
+
+<dl><dt><a name="EmbeddingStore-load_experiential"><strong>load_experiential</strong></a>(self, data_dir: 'str | None' = None) -&gt; 'bool'</dt><dd><span class="code">Load&nbsp;persisted&nbsp;Hebbian-adapted&nbsp;experiential&nbsp;vectors&nbsp;from&nbsp;disk.<br>
+&nbsp;<br>
+Called&nbsp;after&nbsp;_build()&nbsp;on&nbsp;startup.&nbsp;Restores&nbsp;the&nbsp;experiential<br>
+portion&nbsp;of&nbsp;the&nbsp;concept&nbsp;matrix&nbsp;from&nbsp;a&nbsp;previous&nbsp;session's<br>
+Hebbian&nbsp;learning.&nbsp;Only&nbsp;restores&nbsp;vectors&nbsp;for&nbsp;concepts&nbsp;that&nbsp;still<br>
+exist&nbsp;in&nbsp;the&nbsp;network.<br>
+&nbsp;<br>
+**Vocabulary&nbsp;alignment**:&nbsp;The&nbsp;saved&nbsp;TF-IDF&nbsp;vocabulary&nbsp;may&nbsp;differ<br>
+from&nbsp;the&nbsp;current&nbsp;vocabulary&nbsp;(concepts&nbsp;added/removed&nbsp;between<br>
+sessions).&nbsp;We&nbsp;re-map&nbsp;saved&nbsp;TF-IDF&nbsp;columns&nbsp;to&nbsp;the&nbsp;current<br>
+vocabulary&nbsp;positions&nbsp;by&nbsp;word,&nbsp;ensuring&nbsp;that&nbsp;a&nbsp;learned&nbsp;weight<br>
+for&nbsp;"brain"&nbsp;stays&nbsp;on&nbsp;the&nbsp;"brain"&nbsp;column.&nbsp;GloVe&nbsp;columns&nbsp;are<br>
+indexed&nbsp;by&nbsp;a&nbsp;fixed&nbsp;word&nbsp;list&nbsp;and&nbsp;can&nbsp;be&nbsp;copied&nbsp;directly.<br>
+&nbsp;<br>
+For&nbsp;backwards&nbsp;compatibility,&nbsp;files&nbsp;saved&nbsp;without&nbsp;vocabulary<br>
+metadata&nbsp;are&nbsp;*not*&nbsp;restored:&nbsp;without&nbsp;the&nbsp;word&nbsp;mapping&nbsp;there&nbsp;is<br>
+no&nbsp;way&nbsp;to&nbsp;prove&nbsp;the&nbsp;saved&nbsp;columns&nbsp;mean&nbsp;what&nbsp;the&nbsp;current&nbsp;columns<br>
+mean,&nbsp;and&nbsp;a&nbsp;positional&nbsp;copy&nbsp;could&nbsp;smear&nbsp;one&nbsp;concept's&nbsp;learned<br>
+weights&nbsp;onto&nbsp;unrelated&nbsp;words.&nbsp;The&nbsp;curated&nbsp;block&nbsp;is&nbsp;rebuilt&nbsp;from<br>
+the&nbsp;current&nbsp;corpus,&nbsp;so&nbsp;discarding&nbsp;is&nbsp;safe.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;data_dir:&nbsp;Directory&nbsp;to&nbsp;load&nbsp;from.&nbsp;Defaults&nbsp;to&nbsp;the&nbsp;store's<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;data_dir.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;True&nbsp;if&nbsp;any&nbsp;vectors&nbsp;were&nbsp;restored.</span></dd></dl>
+
+<dl><dt><a name="EmbeddingStore-refresh"><strong>refresh</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Recompute&nbsp;concept&nbsp;vectors&nbsp;after&nbsp;the&nbsp;network&nbsp;changes.<br>
+&nbsp;<br>
+Call&nbsp;this&nbsp;after&nbsp;adding&nbsp;new&nbsp;concepts&nbsp;to&nbsp;the&nbsp;network.<br>
+&nbsp;<br>
+This&nbsp;rebuilds&nbsp;the&nbsp;spectral&nbsp;component&nbsp;(which&nbsp;depends&nbsp;on&nbsp;graph<br>
+structure)&nbsp;while&nbsp;preserving&nbsp;the&nbsp;experiential&nbsp;components<br>
+(TF-IDF&nbsp;+&nbsp;GloVe)&nbsp;that&nbsp;carry&nbsp;Hebbian&nbsp;learning.&nbsp;New&nbsp;concepts<br>
+that&nbsp;weren't&nbsp;in&nbsp;the&nbsp;previous&nbsp;matrix&nbsp;get&nbsp;their&nbsp;experiential<br>
+vectors&nbsp;computed&nbsp;from&nbsp;scratch;&nbsp;existing&nbsp;concepts&nbsp;retain&nbsp;their<br>
+Hebbian-adapted&nbsp;vectors.</span></dd></dl>
+
+<dl><dt><a name="EmbeddingStore-resize"><strong>resize</strong></a>(self, new_dim: 'int') -&gt; 'None'</dt><dd><span class="code">Resize&nbsp;the&nbsp;embedding&nbsp;space&nbsp;to&nbsp;a&nbsp;new&nbsp;dimensionality.<br>
+&nbsp;<br>
+Pads&nbsp;with&nbsp;zeros&nbsp;if&nbsp;new_dim&nbsp;&gt;&nbsp;current&nbsp;dim,&nbsp;or&nbsp;truncates&nbsp;if<br>
+new_dim&nbsp;&lt;&nbsp;current&nbsp;dim.&nbsp;After&nbsp;resizing,&nbsp;the&nbsp;concept&nbsp;matrix&nbsp;is<br>
+re-normalized.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;new_dim:&nbsp;The&nbsp;new&nbsp;target&nbsp;dimensionality.</span></dd></dl>
+
+<dl><dt><a name="EmbeddingStore-save_experiential"><strong>save_experiential</strong></a>(self, data_dir: 'str | None' = None) -&gt; 'None'</dt><dd><span class="code">Save&nbsp;the&nbsp;Hebbian-adapted&nbsp;experiential&nbsp;vectors&nbsp;to&nbsp;disk.<br>
+&nbsp;<br>
+The&nbsp;spectral&nbsp;component&nbsp;is&nbsp;always&nbsp;recomputed&nbsp;from&nbsp;the&nbsp;graph,&nbsp;so<br>
+only&nbsp;the&nbsp;experiential&nbsp;portion&nbsp;(TF-IDF&nbsp;+&nbsp;GloVe)&nbsp;needs&nbsp;persisting.<br>
+This&nbsp;is&nbsp;called&nbsp;after&nbsp;sleep&nbsp;consolidation&nbsp;to&nbsp;preserve&nbsp;Hebbian<br>
+learning&nbsp;across&nbsp;restarts.<br>
+&nbsp;<br>
+The&nbsp;TF-IDF&nbsp;vocabulary&nbsp;is&nbsp;saved&nbsp;alongside&nbsp;the&nbsp;vectors&nbsp;so&nbsp;that<br>
+``load_experiential``&nbsp;can&nbsp;re-map&nbsp;columns&nbsp;to&nbsp;the&nbsp;current<br>
+vocabulary,&nbsp;preventing&nbsp;drift&nbsp;when&nbsp;the&nbsp;corpus&nbsp;changes&nbsp;between<br>
+sessions.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;data_dir:&nbsp;Directory&nbsp;to&nbsp;save&nbsp;to.&nbsp;Defaults&nbsp;to&nbsp;the&nbsp;store's<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;data_dir.</span></dd></dl>
+
+<dl><dt><a name="EmbeddingStore-set_holographic_graph"><strong>set_holographic_graph</strong></a>(self, hgraph: 'Any') -&gt; 'None'</dt><dd><span class="code">Wire&nbsp;the&nbsp;holographic&nbsp;graph&nbsp;for&nbsp;experiential&nbsp;layer&nbsp;building.<br>
+&nbsp;<br>
+After&nbsp;calling&nbsp;this,&nbsp;the&nbsp;embedding&nbsp;store&nbsp;can&nbsp;build&nbsp;the<br>
+experiential&nbsp;layer&nbsp;from&nbsp;the&nbsp;holographic&nbsp;graph's&nbsp;sleep-<br>
+discovered&nbsp;associations.&nbsp;Call&nbsp;``<a href="#EmbeddingStore-refresh">refresh</a>()``&nbsp;to&nbsp;rebuild.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>archive_concept_count</strong></dt>
+<dd><span class="code">Number&nbsp;of&nbsp;archived&nbsp;concepts&nbsp;with&nbsp;cold-layer&nbsp;vectors.</span></dd>
+</dl>
+<dl><dt><strong>concept_count</strong></dt>
+<dd><span class="code">Number&nbsp;of&nbsp;concepts&nbsp;with&nbsp;computed&nbsp;vectors.</span></dd>
+</dl>
+<dl><dt><strong>dimensionality</strong></dt>
+<dd><span class="code">Dimensionality&nbsp;of&nbsp;the&nbsp;embedding&nbsp;space&nbsp;(0&nbsp;if&nbsp;not&nbsp;loaded).</span></dd>
+</dl>
+<dl><dt><strong>has_embeddings</strong></dt>
+<dd><span class="code">Whether&nbsp;concept&nbsp;embeddings&nbsp;are&nbsp;available.</span></dd>
+</dl>
+<dl><dt><strong>has_glove</strong></dt>
+<dd><span class="code">Whether&nbsp;pre-trained&nbsp;GloVe&nbsp;vectors&nbsp;are&nbsp;available.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>EXPERIENTIAL_DIM</strong> = 32</dl>
+
+<dl><dt><strong>GLOVE_DIM</strong> = 50</dl>
+
+<dl><dt><strong>SPECTRAL_DIM</strong> = 32</dl>
+
+<dl><dt><strong>TFIDF_DIM</strong> = 128</dl>
+
+<dl><dt><strong>TOROIDAL_WEIGHT</strong> = 0.3</dl>
+
+<dl><dt><strong>__annotations__</strong> = {'_STOPWORDS': 'frozenset[str]'}</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>TYPE_CHECKING</strong> = False<br>
+<strong>logger</strong> = &lt;Logger Self_World.temporal_lobe.concepts.embeddings (WARNING)&gt;</td></tr></table>
+</body></html>

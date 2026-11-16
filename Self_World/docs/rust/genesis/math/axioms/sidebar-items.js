@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["Rung"],"fn":["all_invertible","classify","has_cancellation","identity","inverse_map","is_associative","is_closed","is_commutative","is_field","is_metric","is_ring","zn_add","zn_mul"],"type":["Table"]};

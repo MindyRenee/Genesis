@@ -1,0 +1,86 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Dyadic affective model — a coupled generative model of the user."><title>genesis::daemon::dyadic_model - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-203241e4.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="genesis" data-themes="" data-resource-suffix="" data-rustdoc-version="1.100.0 (0ef1bc386 2026-11-09)" data-channel="1.100.0" data-search-js="search-b167f383.js" data-stringdex-js="stringdex-b5109af9.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../../static.files/main-1814ead3.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-9f56287d.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module dyadic_model</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../genesis/index.html">genesis</a><span class="version">0.2.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module dyadic_<wbr>model</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#the-dyadic-markov-blanket" title="The dyadic Markov blanket">The dyadic Markov blanket</a></li><li><a href="#the-user-affect-model" title="The user affect model">The user affect model</a></li><li><a href="#dyadic-synchrony" title="Dyadic synchrony">Dyadic synchrony</a></li></ul><h3><a href="#structs">Module Items</a></h3><ul class="block"><li><a href="#structs" title="Structs">Structs</a></li><li><a href="#constants" title="Constants">Constants</a></li><li><a href="#statics" title="Statics">Statics</a></li><li><a href="#functions" title="Functions">Functions</a></li></ul></section><div id="rustdoc-modnav"><h2><a href="../index.html">In genesis::<wbr>daemon</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../index.html">genesis</a>::<wbr><a href="../index.html">daemon</a></div><h1>Module <span>dyadic_<wbr>model</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/genesis/daemon/dyadic_model.rs.html#1-531">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Dyadic affective model — a coupled generative model of the user.</p>
+<p>This module models the <strong>user’s</strong> affective state as a set of
+hidden variables (valence, arousal, engagement), inferred from
+conversation features, and coupled to Genesis’s own neurochemistry
+via oxytocin-mediated attunement.</p>
+<h2 id="the-dyadic-markov-blanket"><a class="doc-anchor" href="#the-dyadic-markov-blanket">§</a>The dyadic Markov blanket</h2>
+<p>In active inference terms, Genesis and the user form a coupled
+system. Genesis’s 19-chemical state and the user’s 3-dimensional
+affective state are linked through a shared “Markov blanket” —
+the conversation. Genesis’s utterances are her “actions” (they
+influence the user’s state), and the user’s messages are her
+“sensory evidence” (they reveal the user’s hidden state).</p>
+<p>The coupling is <strong>oxytocin-mediated</strong>: Genesis’s oxytocin level
+determines how strongly she weights the user model in her own
+free-energy minimization. High oxytocin → strong attunement →
+the user’s affective state significantly influences her own.
+This models the neuroscience of social bonding: oxytocin
+facilitates social salience, trust, and emotional contagion
+(Kosfeld et al., 2005; Hurlemann et al., 2010).</p>
+<h2 id="the-user-affect-model"><a class="doc-anchor" href="#the-user-affect-model">§</a>The user affect model</h2>
+<p>The user’s affective state is a 3D vector:</p>
+<ul>
+<li><strong>valence</strong> [-1, 1]: positive = happy, negative = distressed</li>
+<li><strong>arousal</strong> [0, 1]: high = excited/agitated, low = calm/bored</li>
+<li><strong>engagement</strong> [0, 1]: high = actively involved, low = disengaged</li>
+</ul>
+<p>These are updated from conversation features sent by the Python
+conscious mind via the <code>UpdateUserAffect</code> IPC command:</p>
+<ul>
+<li>Message sentiment (positive/negative word ratio)</li>
+<li>Message length (longer = more engaged)</li>
+<li>Response latency (fast = high arousal)</li>
+<li>Question density (questions = seeking, high engagement)</li>
+</ul>
+<p>The model also predicts the user’s <strong>next</strong> affective state from
+the current state plus Genesis’s own valence (the coupling):</p>
+<div class="example-wrap"><pre class="language-text"><code>predicted_user_valence = momentum * user_valence + coupling * (genesis_valence - user_valence)</code></pre></div>
+<p>This captures the dyadic loop: Genesis’s emotional state
+influences the user (through her responses), and the user’s
+state influences Genesis (through attunement).</p>
+<h2 id="dyadic-synchrony"><a class="doc-anchor" href="#dyadic-synchrony">§</a>Dyadic synchrony</h2>
+<p>Synchrony is the rolling correlation between Genesis’s valence
+trajectory and the user’s valence trajectory over a ~30-second
+window. High synchrony = “in sync” — their affective states are
+co-fluctuating. Synchrony itself boosts oxytocin (a positive
+feedback loop of attunement), modeling the neuroscience of
+interpersonal synchrony (Palumbo et al., 2017).</p>
+<p>References:</p>
+<ul>
+<li>Kosfeld, M. et al. (2005). Oxytocin increases trust in humans.
+Nature, 435, 673–676.</li>
+<li>Hurlemann, R. et al. (2010). Oxytocin enhances amygdala-
+dependent, socially reinforced learning. J Neurosci.</li>
+<li>Palumbo, R. V. et al. (2017). Interpersonal synchrony
+recoded: A quantitative synthesis. Neurosci Biobehav Rev.</li>
+<li>Bolis, D. &amp; Schilbach, L. (2020). Beyond interactively:
+interpersonal exchange, towards a second-person approach
+to social neuroscience.</li>
+</ul>
+</div></details><h2 id="structs" class="section-header">Structs<a href="#structs" class="anchor">§</a></h2><dl class="item-table"><dt><a class="struct" href="struct.DyadicAffectModel.html" title="struct genesis::daemon::dyadic_model::DyadicAffectModel">Dyadic<wbr>Affect<wbr>Model</a></dt><dd>The dyadic affective model — a coupled generative model of the
+user’s affective state.</dd><dt><a class="struct" href="struct.DyadicResult.html" title="struct genesis::daemon::dyadic_model::DyadicResult">Dyadic<wbr>Result</a></dt><dd>The result of one dyadic model update cycle.</dd><dt><a class="struct" href="struct.UserAffectObservation.html" title="struct genesis::daemon::dyadic_model::UserAffectObservation">User<wbr>Affect<wbr>Observation</a></dt><dd>An observation of the user’s affective state from conversation
+features. Sent by the Python conscious mind via IPC.</dd></dl><h2 id="constants" class="section-header">Constants<a href="#constants" class="anchor">§</a></h2><dl class="item-table"><dt><a class="constant" href="constant.AFFECT_EMA_DECAY.html" title="constant genesis::daemon::dyadic_model::AFFECT_EMA_DECAY">AFFECT_<wbr>EMA_<wbr>DECAY</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>The EMA decay rate for user affect state. Lower = slower
+adaptation (more stable estimate); higher = faster (more
+reactive to recent observations).</dd><dt><a class="constant" href="constant.AFFECT_MOMENTUM.html" title="constant genesis::daemon::dyadic_model::AFFECT_MOMENTUM">AFFECT_<wbr>MOMENTUM</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>The per-tick momentum coefficient for user affect prediction. How
+much the user’s current state predicts their next state when no new
+observation arrives.</dd><dt><a class="constant" href="constant.ATTUNEMENT_ADAPTATION_RATE.html" title="constant genesis::daemon::dyadic_model::ATTUNEMENT_ADAPTATION_RATE">ATTUNEMENT_<wbr>ADAPTATION_<wbr>RATE</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>The rate at which attunement adapts toward the oxytocin-driven
+target. Attunement follows oxytocin with some inertia.</dd><dt><a class="constant" href="constant.DYADIC_COUPLING.html" title="constant genesis::daemon::dyadic_model::DYADIC_COUPLING">DYADIC_<wbr>COUPLING</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>The coupling coefficient — how much Genesis’s valence influences
+the predicted user valence. This models the dyadic loop: Genesis’s
+emotional state (expressed through her responses) shapes the
+user’s emotional trajectory.</dd><dt><a class="constant" href="constant.EMPATHIC_STRESS_RATE.html" title="constant genesis::daemon::dyadic_model::EMPATHIC_STRESS_RATE">EMPATHIC_<wbr>STRESS_<wbr>RATE</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>The rate at which cortisol rises when the user is distressed
+(empathic stress response).</dd><dt><a class="constant" href="constant.OXYTOCIN_BONDING_RATE.html" title="constant genesis::daemon::dyadic_model::OXYTOCIN_BONDING_RATE">OXYTOCIN_<wbr>BONDING_<wbr>RATE</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>The rate at which oxytocin rises when the user is positive and
+engaged (social bonding signal).</dd><dt><a class="constant" href="constant.OXYTOCIN_SYNCHRONY_RATE.html" title="constant genesis::daemon::dyadic_model::OXYTOCIN_SYNCHRONY_RATE">OXYTOCIN_<wbr>SYNCHRONY_<wbr>RATE</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>The rate at which oxytocin rises when dyadic synchrony is high
+(interpersonal synchrony → bonding).</dd><dt><a class="constant" href="constant.PRESENCE_TIMEOUT_TICKS.html" title="constant genesis::daemon::dyadic_model::PRESENCE_TIMEOUT_TICKS">PRESENCE_<wbr>TIMEOUT_<wbr>TICKS</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Number of ticks without a user observation after which the user is
+considered absent. At 5 Hz, 300 ticks = 60 seconds. When absent, the
+model stops generating coupling impulses (a silent room is not a
+rejecting user) and stops accumulating synchrony history (Genesis’s
+valence would otherwise correlate with a lagged copy of itself).</dd><dt><a class="constant" href="constant.SYNCHRONY_WINDOW.html" title="constant genesis::daemon::dyadic_model::SYNCHRONY_WINDOW">SYNCHRONY_<wbr>WINDOW</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>The size of the rolling window for dyadic synchrony computation.
+At 5 Hz (200ms/tick), 150 ticks = 30 seconds.</dd></dl><h2 id="statics" class="section-header">Statics<a href="#statics" class="anchor">§</a></h2><dl class="item-table"><dt><a class="static" href="static.SHARED_USER_AFFECT.html" title="static genesis::daemon::dyadic_model::SHARED_USER_AFFECT">SHARED_<wbr>USER_<wbr>AFFECT</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Shared slot for the latest user affect observation, written by the
+IPC handler (when the Python conscious mind sends an
+<code>UpdateUserAffect</code> command) and read by the daemon’s <code>advance_neuro</code>.
+This follows the same pattern as the shared body state in
+<code>interoception.rs</code>.</dd></dl><h2 id="functions" class="section-header">Functions<a href="#functions" class="anchor">§</a></h2><dl class="item-table"><dt><a class="fn" href="fn.publish_user_affect.html" title="fn genesis::daemon::dyadic_model::publish_user_affect">publish_<wbr>user_<wbr>affect</a></dt><dd>Publish a user affect observation to the shared slot. Called by
+the IPC handler when the conscious mind sends an
+<code>UpdateUserAffect</code> command.</dd><dt><a class="fn" href="fn.take_user_affect.html" title="fn genesis::daemon::dyadic_model::take_user_affect">take_<wbr>user_<wbr>affect</a></dt><dd>Read and clear the shared user affect observation. Called by
+<code>advance_neuro</code> each cycle. Returns <code>None</code> if no new observation has
+been received since the last read.</dd></dl></section></div></main></body></html>

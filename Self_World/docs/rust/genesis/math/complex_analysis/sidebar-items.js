@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["de_moivre_holds","eval_poly","in_disk","mobius","roots","roots_of_unity","winding_number"],"struct":["Complex"]};

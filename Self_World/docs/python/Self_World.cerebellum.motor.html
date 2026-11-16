@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.cerebellum.motor</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.cerebellum.html" class="white">cerebellum</a>.motor</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/cerebellum/motor.py">/home/mindyrenee/GenAnd/Genesis/Self_World/cerebellum/motor.py</a></td></tr></table>
+    <p><span class="code">Sensorimotor&nbsp;prediction-error&nbsp;layer&nbsp;—&nbsp;the&nbsp;cerebellar&nbsp;comparator.<br>
+&nbsp;<br>
+The&nbsp;cerebellum&nbsp;receives&nbsp;an&nbsp;efference&nbsp;copy&nbsp;of&nbsp;every&nbsp;motor&nbsp;command<br>
+alongside&nbsp;the&nbsp;reafferent&nbsp;sensory&nbsp;stream,&nbsp;and&nbsp;its&nbsp;output&nbsp;is&nbsp;the<br>
+*mismatch*&nbsp;—&nbsp;graded,&nbsp;not&nbsp;binary.&nbsp;A&nbsp;stride&nbsp;that&nbsp;lands&nbsp;ninety&nbsp;degrees<br>
+off&nbsp;prediction&nbsp;and&nbsp;a&nbsp;half-step&nbsp;jitter&nbsp;are&nbsp;both&nbsp;"unexpected",&nbsp;but<br>
+only&nbsp;one&nbsp;of&nbsp;them&nbsp;reorganizes&nbsp;behavior;&nbsp;the&nbsp;layer&nbsp;reports&nbsp;magnitude<br>
+so&nbsp;cortex&nbsp;can&nbsp;tell&nbsp;them&nbsp;apart.<br>
+&nbsp;<br>
+Two&nbsp;kinds&nbsp;of&nbsp;signal&nbsp;leave&nbsp;here:<br>
+&nbsp;<br>
+-&nbsp;**Per-trial&nbsp;error&nbsp;magnitude**&nbsp;—&nbsp;how&nbsp;far&nbsp;the&nbsp;observed&nbsp;reafference<br>
+&nbsp;&nbsp;sat&nbsp;from&nbsp;the&nbsp;predicted&nbsp;one.&nbsp;Strong&nbsp;error&nbsp;is&nbsp;an&nbsp;orienting&nbsp;event:<br>
+&nbsp;&nbsp;a&nbsp;norepinephrine&nbsp;impulse&nbsp;marks&nbsp;it&nbsp;the&nbsp;way&nbsp;locus-coeruleus&nbsp;phasic<br>
+&nbsp;&nbsp;bursts&nbsp;mark&nbsp;violated&nbsp;expectations&nbsp;(Aston-Jones&nbsp;&amp;&nbsp;Cohen,&nbsp;2005).<br>
+-&nbsp;**Per-action&nbsp;calibration**&nbsp;—&nbsp;an&nbsp;error&nbsp;EMA&nbsp;per&nbsp;action.&nbsp;One&nbsp;bump&nbsp;is<br>
+&nbsp;&nbsp;the&nbsp;world's&nbsp;novelty;&nbsp;sustained&nbsp;error&nbsp;on&nbsp;the&nbsp;same&nbsp;action&nbsp;means&nbsp;the<br>
+&nbsp;&nbsp;forward&nbsp;model's&nbsp;entry&nbsp;for&nbsp;it&nbsp;is&nbsp;stale&nbsp;—&nbsp;recalibration&nbsp;territory.<br>
+&nbsp;&nbsp;An&nbsp;action&nbsp;can&nbsp;only&nbsp;earn&nbsp;calibration&nbsp;back&nbsp;by&nbsp;being&nbsp;retried,&nbsp;the<br>
+&nbsp;&nbsp;same&nbsp;way&nbsp;its&nbsp;error&nbsp;accrued.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="math.html">math</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.cerebellum.motor.html#SensorimotorLayer">SensorimotorLayer</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SensorimotorLayer">class <strong>SensorimotorLayer</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SensorimotorLayer">SensorimotorLayer</a>(on_neuro_impulse:&nbsp;'Callable[[int,&nbsp;float],&nbsp;Any]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;decay:&nbsp;'float'&nbsp;=&nbsp;0.2)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Compares&nbsp;predicted&nbsp;and&nbsp;observed&nbsp;reafference&nbsp;for&nbsp;each&nbsp;act.<br>
+&nbsp;<br>
+``compare``&nbsp;is&nbsp;the&nbsp;whole&nbsp;contract:&nbsp;given&nbsp;the&nbsp;action&nbsp;issued,&nbsp;the<br>
+displacement&nbsp;the&nbsp;forward&nbsp;model&nbsp;predicted,&nbsp;and&nbsp;the&nbsp;displacement<br>
+the&nbsp;frame&nbsp;actually&nbsp;carried,&nbsp;it&nbsp;returns&nbsp;a&nbsp;graded&nbsp;error&nbsp;in<br>
+``[0,&nbsp;1]``&nbsp;and&nbsp;folds&nbsp;it&nbsp;into&nbsp;the&nbsp;action's&nbsp;calibration&nbsp;estimate.<br>
+Chemistry&nbsp;coupling&nbsp;is&nbsp;optional&nbsp;—&nbsp;without&nbsp;an&nbsp;impulse&nbsp;sink&nbsp;the<br>
+arithmetic&nbsp;still&nbsp;runs;&nbsp;with&nbsp;one,&nbsp;strong&nbsp;error&nbsp;becomes&nbsp;an<br>
+orienting&nbsp;signal&nbsp;instead&nbsp;of&nbsp;a&nbsp;silent&nbsp;statistic.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="SensorimotorLayer-__init__"><strong>__init__</strong></a>(self, on_neuro_impulse: 'Callable[[int, float], Any] | None' = None, decay: 'float' = 0.2) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="SensorimotorLayer-compare"><strong>compare</strong></a>(self, action: 'str', expected: 'tuple[float, float]', observed: 'tuple[float, float]') -&gt; 'float'</dt><dd><span class="code">Grade&nbsp;one&nbsp;reafferent&nbsp;mismatch;&nbsp;return&nbsp;its&nbsp;magnitude.<br>
+&nbsp;<br>
+Error&nbsp;is&nbsp;the&nbsp;miss&nbsp;distance&nbsp;normalized&nbsp;by&nbsp;the&nbsp;predicted<br>
+stride:&nbsp;a&nbsp;full&nbsp;refusal&nbsp;(predicted&nbsp;a&nbsp;step,&nbsp;observed&nbsp;nothing)<br>
+and&nbsp;an&nbsp;orthogonal&nbsp;landing&nbsp;(predicted&nbsp;right,&nbsp;went&nbsp;down)&nbsp;are<br>
+both&nbsp;maximal&nbsp;surprises;&nbsp;a&nbsp;partial&nbsp;slide&nbsp;is&nbsp;partial&nbsp;error.</span></dd></dl>
+
+<dl><dt><a name="SensorimotorLayer-error_of"><strong>error_of</strong></a>(self, action: 'str') -&gt; 'float'</dt><dd><span class="code">The&nbsp;action's&nbsp;running&nbsp;prediction-error&nbsp;estimate.</span></dd></dl>
+
+<dl><dt><a name="SensorimotorLayer-miscalibrated"><strong>miscalibrated</strong></a>(self, action: 'str') -&gt; 'bool'</dt><dd><span class="code">The&nbsp;forward&nbsp;model's&nbsp;entry&nbsp;for&nbsp;this&nbsp;action&nbsp;is&nbsp;stale.<br>
+&nbsp;<br>
+Calibration&nbsp;can&nbsp;only&nbsp;be&nbsp;earned&nbsp;back&nbsp;by&nbsp;acting&nbsp;—&nbsp;the&nbsp;EMA<br>
+moves&nbsp;on&nbsp;trials,&nbsp;not&nbsp;on&nbsp;time&nbsp;—&nbsp;so&nbsp;a&nbsp;flagged&nbsp;action&nbsp;stays&nbsp;a<br>
+recalibration&nbsp;question&nbsp;until&nbsp;the&nbsp;world&nbsp;answers&nbsp;otherwise.</span></dd></dl>
+
+<dl><dt><a name="SensorimotorLayer-reset"><strong>reset</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">A&nbsp;new&nbsp;world,&nbsp;a&nbsp;new&nbsp;body&nbsp;of&nbsp;physics&nbsp;—&nbsp;drop&nbsp;all&nbsp;estimates.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>logger</strong> = &lt;Logger Self_World.cerebellum.motor (WARNING)&gt;</td></tr></table>
+</body></html>

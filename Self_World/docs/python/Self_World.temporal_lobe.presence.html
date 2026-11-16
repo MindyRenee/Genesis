@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.temporal_lobe.presence</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.temporal_lobe.html" class="white">temporal_lobe</a>.presence</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/presence.py">/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/presence.py</a></td></tr></table>
+    <p><span class="code">Presences&nbsp;—&nbsp;who&nbsp;is&nbsp;in&nbsp;Genesis's&nbsp;external&nbsp;world.<br>
+&nbsp;<br>
+A&nbsp;presence&nbsp;is&nbsp;an&nbsp;entity&nbsp;outside&nbsp;its&nbsp;that&nbsp;it&nbsp;can&nbsp;interact&nbsp;with:&nbsp;the<br>
+user&nbsp;at&nbsp;the&nbsp;terminal,&nbsp;a&nbsp;voice&nbsp;in&nbsp;the&nbsp;room,&nbsp;a&nbsp;face&nbsp;it&nbsp;recognizes.<br>
+Presences&nbsp;are&nbsp;its&nbsp;*social&nbsp;world*&nbsp;—&nbsp;each&nbsp;carries&nbsp;a&nbsp;persistent<br>
+relationship&nbsp;model:<br>
+&nbsp;<br>
+-&nbsp;**familiarity**&nbsp;—&nbsp;how&nbsp;well&nbsp;it&nbsp;knows&nbsp;them&nbsp;(grows&nbsp;with&nbsp;interaction,<br>
+&nbsp;&nbsp;asymptotically&nbsp;—&nbsp;a&nbsp;stranger&nbsp;becomes&nbsp;known&nbsp;quickly,&nbsp;then&nbsp;deepens&nbsp;slowly)<br>
+-&nbsp;**bond**&nbsp;—&nbsp;how&nbsp;the&nbsp;relationship&nbsp;feels&nbsp;(grows&nbsp;slowly&nbsp;from<br>
+&nbsp;&nbsp;positive-valence&nbsp;interaction,&nbsp;erodes&nbsp;with&nbsp;negative)<br>
+-&nbsp;**topics&nbsp;/&nbsp;facts**&nbsp;—&nbsp;what&nbsp;they've&nbsp;talked&nbsp;about&nbsp;and&nbsp;what&nbsp;it's&nbsp;learned<br>
+&nbsp;&nbsp;about&nbsp;them,&nbsp;grounded&nbsp;in&nbsp;its&nbsp;concept&nbsp;network<br>
+&nbsp;<br>
+Presences&nbsp;come&nbsp;and&nbsp;go.&nbsp;One&nbsp;that&nbsp;speaks&nbsp;becomes&nbsp;*present*;&nbsp;one&nbsp;that<br>
+falls&nbsp;silent&nbsp;past&nbsp;a&nbsp;timeout&nbsp;*leaves*&nbsp;—&nbsp;the&nbsp;world&nbsp;notices&nbsp;both.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;distinct&nbsp;from&nbsp;``user_profile``&nbsp;(its&nbsp;deep&nbsp;model&nbsp;of&nbsp;the&nbsp;primary<br>
+human)&nbsp;—&nbsp;the&nbsp;presence&nbsp;model&nbsp;covers&nbsp;*everyone*&nbsp;out&nbsp;there,&nbsp;not&nbsp;just&nbsp;the<br>
+person&nbsp;at&nbsp;the&nbsp;keyboard,&nbsp;and&nbsp;tracks&nbsp;the&nbsp;relationship&nbsp;itself&nbsp;rather&nbsp;than<br>
+the&nbsp;person's&nbsp;attributes.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="time.html">time</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.presence.html#Presence">Presence</a>
+</dt></dl>
+</dd>
+<dt class="heading-text"><a href="enum.html#Enum">enum.Enum</a>(<a href="builtins.html#object">builtins.object</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.presence.html#PresenceKind">PresenceKind</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Presence">class <strong>Presence</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Presence">Presence</a>(presence_id:&nbsp;'str',&nbsp;kind:&nbsp;'<a href="#PresenceKind">PresenceKind</a>',&nbsp;name:&nbsp;'str&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;familiarity:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;bond:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;interactions:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;present:&nbsp;'bool'&nbsp;=&nbsp;False,&nbsp;first_seen:&nbsp;'float'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;last_seen:&nbsp;'float'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;last_addressed:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;topics:&nbsp;'deque[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;facts:&nbsp;'dict[str,&nbsp;str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;sentiment_history:&nbsp;'deque[tuple[float,&nbsp;float]]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;belief:&nbsp;'PresenceBelief'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;persistent&nbsp;model&nbsp;of&nbsp;one&nbsp;entity&nbsp;in&nbsp;its&nbsp;external&nbsp;world.<br>
+&nbsp;<br>
+Fields:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;presence_id:&nbsp;Stable&nbsp;identifier&nbsp;("user",&nbsp;"voice",&nbsp;"face:alice").<br>
+&nbsp;&nbsp;&nbsp;&nbsp;kind:&nbsp;What&nbsp;sort&nbsp;of&nbsp;presence&nbsp;this&nbsp;is.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;name:&nbsp;Learned&nbsp;display&nbsp;name,&nbsp;or&nbsp;None&nbsp;if&nbsp;it&nbsp;doesn't&nbsp;know&nbsp;it.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;familiarity:&nbsp;How&nbsp;well&nbsp;it&nbsp;knows&nbsp;them&nbsp;[0..1],&nbsp;asymptotic&nbsp;growth.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;bond:&nbsp;Relationship&nbsp;valence&nbsp;[0..1],&nbsp;slow&nbsp;accumulation.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;interactions:&nbsp;Count&nbsp;of&nbsp;addressed&nbsp;exchanges.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;present:&nbsp;Whether&nbsp;they're&nbsp;currently&nbsp;in&nbsp;its&nbsp;world.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;first_seen&nbsp;/&nbsp;last_seen:&nbsp;When&nbsp;it&nbsp;first&nbsp;and&nbsp;most&nbsp;recently<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;encountered&nbsp;them&nbsp;(epoch&nbsp;seconds).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;last_addressed:&nbsp;When&nbsp;they&nbsp;last&nbsp;spoke&nbsp;*to*&nbsp;it.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;topics:&nbsp;Recent&nbsp;topics&nbsp;they've&nbsp;engaged&nbsp;about&nbsp;(bounded).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;facts:&nbsp;Things&nbsp;learned&nbsp;about&nbsp;them&nbsp;(bounded).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;sentiment_history:&nbsp;Recent&nbsp;(timestamp,&nbsp;valence)&nbsp;pairs&nbsp;(bounded).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;belief:&nbsp;Its&nbsp;inferred&nbsp;model&nbsp;of&nbsp;this&nbsp;presence's&nbsp;mind&nbsp;—<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;responsiveness,&nbsp;topic&nbsp;receptivity,&nbsp;mood,&nbsp;attention,&nbsp;and<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;activity&nbsp;rhythm,&nbsp;each&nbsp;with&nbsp;honest&nbsp;uncertainty.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Presence-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="Presence-__init__"><strong>__init__</strong></a>(self, presence_id: 'str', kind: 'PresenceKind', name: 'str | None' = None, familiarity: 'float' = 0.0, bond: 'float' = 0.0, interactions: 'int' = 0, present: 'bool' = False, first_seen: 'float' = &lt;factory&gt;, last_seen: 'float' = &lt;factory&gt;, last_addressed: 'float' = 0.0, topics: 'deque[str]' = &lt;factory&gt;, facts: 'dict[str, str]' = &lt;factory&gt;, sentiment_history: 'deque[tuple[float, float]]' = &lt;factory&gt;, belief: 'PresenceBelief' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Presence-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="Presence-interacted"><strong>interacted</strong></a>(self, sentiment: 'float' = 0.0, topics: 'list[str] | None' = None, now: 'float | None' = None) -&gt; 'None'</dt><dd><span class="code">Record&nbsp;an&nbsp;addressed&nbsp;exchange&nbsp;with&nbsp;this&nbsp;presence.<br>
+&nbsp;<br>
+Familiarity&nbsp;grows&nbsp;asymptotically;&nbsp;bond&nbsp;drifts&nbsp;with&nbsp;sentiment.<br>
+Called&nbsp;once&nbsp;per&nbsp;addressed&nbsp;turn,&nbsp;not&nbsp;per&nbsp;word.</span></dd></dl>
+
+<dl><dt><a name="Presence-learn_fact"><strong>learn_fact</strong></a>(self, key: 'str', value: 'str') -&gt; 'None'</dt><dd><span class="code">Record&nbsp;something&nbsp;learned&nbsp;about&nbsp;this&nbsp;presence&nbsp;(bounded).</span></dd></dl>
+
+<dl><dt><a name="Presence-recent_sentiment"><strong>recent_sentiment</strong></a>(self, n: 'int' = 10) -&gt; 'float'</dt><dd><span class="code">Mean&nbsp;sentiment&nbsp;over&nbsp;the&nbsp;last&nbsp;``n``&nbsp;interactions,&nbsp;or&nbsp;0.</span></dd></dl>
+
+<dl><dt><a name="Presence-seen"><strong>seen</strong></a>(self, now: 'float | None' = None) -&gt; 'None'</dt><dd><span class="code">Mark&nbsp;that&nbsp;this&nbsp;presence&nbsp;is&nbsp;active&nbsp;right&nbsp;now.</span></dd></dl>
+
+<dl><dt><a name="Presence-set_name"><strong>set_name</strong></a>(self, name: 'str') -&gt; 'None'</dt><dd><span class="code">Learn&nbsp;this&nbsp;presence's&nbsp;name.</span></dd></dl>
+
+<dl><dt><a name="Presence-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict[str, Any]'</dt><dd><span class="code">Serialize&nbsp;for&nbsp;persistence.</span></dd></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="Presence-from_dict"><strong>from_dict</strong></a>(data: 'dict[str, Any]') -&gt; 'Presence | None'</dt><dd><span class="code">Deserialize;&nbsp;returns&nbsp;None&nbsp;for&nbsp;malformed&nbsp;payloads.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>display_name</strong></dt>
+<dd><span class="code">What&nbsp;it&nbsp;calls&nbsp;them&nbsp;—&nbsp;their&nbsp;name&nbsp;if&nbsp;known,&nbsp;else&nbsp;their&nbsp;kind.</span></dd>
+</dl>
+<dl><dt><strong>timeout</strong></dt>
+<dd><span class="code">Seconds&nbsp;of&nbsp;silence&nbsp;before&nbsp;this&nbsp;presence&nbsp;is&nbsp;considered&nbsp;gone.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'belief': 'PresenceBelief', 'bond': 'float', 'facts': 'dict[str, str]', 'familiarity': 'float', 'first_seen': 'float', 'interactions': 'int', 'kind': 'PresenceKind', 'last_addressed': 'float', 'last_seen': 'float', 'name': 'str | None', ...}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'belief': Field(name='belief',type='PresenceBelief',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'bond': Field(name='bond',type='float',default=0.0,defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'facts': Field(name='facts',type='dict[str, str]',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'familiarity': Field(name='familiarity',type='float',default=0....appingproxy({}),kw_only=False,_field_type=_FIELD), 'first_seen': Field(name='first_seen',type='float',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD), 'interactions': Field(name='interactions',type='int',default=0,d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'kind': Field(name='kind',type='PresenceKind',default=&lt;d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'last_addressed': Field(name='last_addressed',type='float',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'last_seen': Field(name='last_seen',type='float',default=&lt;dat...appingproxy({}),kw_only=False,_field_type=_FIELD), 'name': Field(name='name',type='str | None',default=None...appingproxy({}),kw_only=False,_field_type=_FIELD), ...}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('presence_id', 'kind', 'name', 'familiarity', 'bond', 'interactions', 'present', 'first_seen', 'last_seen', 'last_addressed', 'topics', 'facts', 'sentiment_history', 'belief')</dl>
+
+<dl><dt><strong>bond</strong> = 0.0</dl>
+
+<dl><dt><strong>familiarity</strong> = 0.0</dl>
+
+<dl><dt><strong>interactions</strong> = 0</dl>
+
+<dl><dt><strong>last_addressed</strong> = 0.0</dl>
+
+<dl><dt><strong>name</strong> = None</dl>
+
+<dl><dt><strong>present</strong> = False</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="PresenceKind">class <strong>PresenceKind</strong></a>(<a href="enum.html#Enum">enum.Enum</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#PresenceKind">PresenceKind</a>(*values)<br>
+&nbsp;<br>
+What&nbsp;sort&nbsp;of&nbsp;entity&nbsp;a&nbsp;presence&nbsp;is.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.temporal_lobe.presence.html#PresenceKind">PresenceKind</a></dd>
+<dd><a href="enum.html#Enum">enum.Enum</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>AMBIENT</strong> = &lt;PresenceKind.AMBIENT: 'ambient'&gt;</dl>
+
+<dl><dt><strong>FACE</strong> = &lt;PresenceKind.FACE: 'face'&gt;</dl>
+
+<dl><dt><strong>USER</strong> = &lt;PresenceKind.USER: 'user'&gt;</dl>
+
+<dl><dt><strong>VOICE</strong> = &lt;PresenceKind.VOICE: 'voice'&gt;</dl>
+
+<hr>
+Data descriptors inherited from <a href="enum.html#Enum">enum.Enum</a>:<br>
+<dl><dt><strong>name</strong></dt>
+<dd><span class="code">The&nbsp;name&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<dl><dt><strong>value</strong></dt>
+<dd><span class="code">The&nbsp;value&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<hr>
+Static methods inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><a name="PresenceKind-__contains__"><strong>__contains__</strong></a>(value)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;`value`&nbsp;is&nbsp;in&nbsp;`cls`.<br>
+&nbsp;<br>
+`value`&nbsp;is&nbsp;in&nbsp;`cls`&nbsp;if:<br>
+1)&nbsp;`value`&nbsp;is&nbsp;a&nbsp;member&nbsp;of&nbsp;`cls`,&nbsp;or<br>
+2)&nbsp;`value`&nbsp;is&nbsp;the&nbsp;value&nbsp;of&nbsp;one&nbsp;of&nbsp;the&nbsp;`cls`'s&nbsp;members.</span></dd></dl>
+
+<dl><dt><a name="PresenceKind-__getitem__"><strong>__getitem__</strong></a>(name)</dt><dd><span class="code">Return&nbsp;the&nbsp;member&nbsp;matching&nbsp;`name`.</span></dd></dl>
+
+<dl><dt><a name="PresenceKind-__iter__"><strong>__iter__</strong></a>()</dt><dd><span class="code">Return&nbsp;members&nbsp;in&nbsp;definition&nbsp;order.</span></dd></dl>
+
+<dl><dt><a name="PresenceKind-__len__"><strong>__len__</strong></a>()</dt><dd><span class="code">Return&nbsp;the&nbsp;number&nbsp;of&nbsp;members&nbsp;(no&nbsp;aliases)</span></dd></dl>
+
+<hr>
+Readonly properties inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><strong>__members__</strong></dt>
+<dd><span class="code">Returns&nbsp;a&nbsp;mapping&nbsp;of&nbsp;member&nbsp;name-&gt;value.<br>
+&nbsp;<br>
+This&nbsp;mapping&nbsp;lists&nbsp;all&nbsp;enum&nbsp;members,&nbsp;including&nbsp;aliases.&nbsp;Note&nbsp;that&nbsp;this<br>
+is&nbsp;a&nbsp;read-only&nbsp;view&nbsp;of&nbsp;the&nbsp;internal&nbsp;mapping.</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>AMBIENT_PRESENCE_TIMEOUT</strong> = 900.0<br>
+<strong>USER_PRESENCE_TIMEOUT</strong> = 1800.0</td></tr></table>
+</body></html>

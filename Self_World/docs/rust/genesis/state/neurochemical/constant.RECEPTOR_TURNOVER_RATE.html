@@ -1,0 +1,42 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Functional rescue: receptor turnover and effective-deviation scaling."><title>RECEPTOR_TURNOVER_RATE in genesis::state::neurochemical - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-203241e4.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="genesis" data-themes="" data-resource-suffix="" data-rustdoc-version="1.100.0 (0ef1bc386 2026-11-09)" data-channel="1.100.0" data-search-js="search-b167f383.js" data-stringdex-js="stringdex-b5109af9.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../../static.files/main-1814ead3.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-9f56287d.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc constant"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">RECEPTOR_TURNOVER_RATE</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../genesis/index.html">genesis</a><span class="version">0.2.0</span></h2></div><div class="sidebar-elems"><div id="rustdoc-modnav"><h2><a href="index.html">In genesis::<wbr>state::<wbr>neurochemical</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../index.html">genesis</a>::<wbr><a href="../index.html">state</a>::<wbr><a href="index.html">neurochemical</a></div><h1>Constant <span class="constant">RECEPTOR_<wbr>TURNOVER_<wbr>RATE</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/genesis/state/neurochemical.rs.html#847">Source</a> </span></div><pre class="rust item-decl"><code>pub const RECEPTOR_TURNOVER_RATE: <a class="primitive" href="https://doc.rust-lang.org/1.100.0/std/primitive.f32.html">f32</a> = 0.0001;</code></pre><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Functional rescue: receptor turnover and effective-deviation scaling.</p>
+<p>Two mechanisms prevent permanent receptor burnout traps:</p>
+<ol>
+<li>
+<p><strong>Effective-deviation scaling</strong>: receptor downregulation is
+driven by receptor activation (effective signaling), not by
+raw ligand concentration. The deviation used for downregulation
+is scaled by receptor health: <code>effective_deviation = raw_deviation × sensitivity × desensitization × internalization</code>. When
+receptors are burnt out, effective deviation is small, so
+downregulation is weak. This is biologically correct — receptor
+downregulation is a response to overstimulation, and burnt-out
+receptors aren’t being overstimulated.</p>
+</li>
+<li>
+<p><strong>Receptor turnover</strong>: a slow background recovery toward 1.0
+that models the continuous receptor replacement/recycling that
+happens in biology (receptor half-life is days to weeks).
+This is always active but normally overwhelmed by deviation-gated
+downregulation. When downregulation is weak (low effective
+deviation due to burnout), turnover slowly restores receptor
+function.</p>
+<p>Each factor’s turnover is proportional to its adaptation rate,
+ordered by the biological cascade (5.0×, 1.0×, 0.2× for
+desensitization, internalization, sensitivity respectively —
+dephosphorylation is fast, membrane recycling intermediate,
+receptor synthesis slow). This ensures that:</p>
+<ul>
+<li>In normal overstimulation: desensitization carries the acute
+adaptation on the measured minutes timescale, and recovers
+quickly once the drive drops.</li>
+<li>In extreme burnout: health-scaled downregulation weakens as
+effective deviation collapses, letting turnover restore
+function; under sustained strong drive the factors correctly
+stay downregulated (chronic agonist → chronic tolerance).</li>
+</ul>
+</li>
+</ol>
+<p>These mechanisms are always active — no thresholds, no recovery
+zones, no limit cycles. The system smoothly transitions between
+normal adaptation and recovery as receptor health and deviation
+change.</p>
+</div></details></section></div></main></body></html>

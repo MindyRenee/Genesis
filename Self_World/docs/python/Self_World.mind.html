@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.mind</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.mind</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/mind.py">/home/mindyrenee/GenAnd/Genesis/Self_World/mind.py</a></td></tr></table>
+    <p><span class="code"><a href="#Mind">Mind</a>&nbsp;—&nbsp;the&nbsp;top-level&nbsp;orchestrator&nbsp;for&nbsp;Genesis's&nbsp;cognitive&nbsp;mind.<br>
+&nbsp;<br>
+The&nbsp;<a href="#Mind">Mind</a>&nbsp;ties&nbsp;everything&nbsp;together:&nbsp;self-model,&nbsp;emotion,&nbsp;perception,<br>
+memory,&nbsp;cognition,&nbsp;and&nbsp;language.&nbsp;It's&nbsp;the&nbsp;entry&nbsp;point&nbsp;for&nbsp;interacting<br>
+with&nbsp;Genesis&nbsp;as&nbsp;a&nbsp;cognitive&nbsp;being.<br>
+&nbsp;<br>
+The&nbsp;class&nbsp;is&nbsp;decomposed&nbsp;into&nbsp;mixins&nbsp;by&nbsp;anatomical&nbsp;owner&nbsp;—&nbsp;each<br>
+mixin&nbsp;lives&nbsp;in&nbsp;the&nbsp;region&nbsp;whose&nbsp;function&nbsp;it&nbsp;implements:<br>
+brainstem&nbsp;(heartbeat,&nbsp;lifecycle,&nbsp;sleep-wake),&nbsp;basal_ganglia<br>
+(volition),&nbsp;frontal_lobe&nbsp;(conversation,&nbsp;status,&nbsp;projects),<br>
+parietal_lobe&nbsp;(embodiment),&nbsp;and&nbsp;self&nbsp;(proposals).&nbsp;This&nbsp;module<br>
+holds&nbsp;the&nbsp;class&nbsp;definition,&nbsp;the&nbsp;brain&nbsp;wiring,&nbsp;and&nbsp;the&nbsp;core<br>
+respond()&nbsp;entry&nbsp;point.<br>
+&nbsp;<br>
+#&nbsp;Usage<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;from&nbsp;mind&nbsp;import&nbsp;<a href="#Mind">Mind</a><br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;mind&nbsp;=&nbsp;<a href="#Mind">Mind</a>(socket_path="/path/to/genesis.sock",&nbsp;data_dir="/path/to/state")<br>
+&nbsp;&nbsp;&nbsp;&nbsp;mind.start()<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;response&nbsp;=&nbsp;mind.respond("Hello,&nbsp;Genesis!")<br>
+&nbsp;&nbsp;&nbsp;&nbsp;print(response)<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;mind.stop()</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="itertools.html">itertools</a><br>
+<a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="os.html">os</a><br>
+<a href="random.html">random</a><br>
+</td><td class="multicolumn"><a href="threading.html">threading</a><br>
+<a href="time.html">time</a><br>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="basal_ganglia.volition.html#VolitionMixin">basal_ganglia.volition.VolitionMixin</a>(<a href="builtins.html#object">builtins.object</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.mind.html#Mind">Mind</a>(<a href="brainstem.lifecycle.html#LifecycleMixin">brainstem.lifecycle.LifecycleMixin</a>, <a href="brainstem.metronome.html#MetronomeMixin">brainstem.metronome.MetronomeMixin</a>, <a href="basal_ganglia.volition.html#VolitionMixin">basal_ganglia.volition.VolitionMixin</a>, <a href="self.sleep.html#SleepMixin">self.sleep.SleepMixin</a>, <a href="sleep.meditation.html#MeditationMixin">sleep.meditation.MeditationMixin</a>, <a href="sleep.dream_residues.html#DreamResiduesMixin">sleep.dream_residues.DreamResiduesMixin</a>, <a href="frontal_lobe.projects.html#ProjectsMixin">frontal_lobe.projects.ProjectsMixin</a>, <a href="self.proposals.html#ProposalsMixin">self.proposals.ProposalsMixin</a>, <a href="self.man_pages.html#ManPagesMixin">self.man_pages.ManPagesMixin</a>, <a href="frontal_lobe.status.html#StatusMixin">frontal_lobe.status.StatusMixin</a>, <a href="frontal_lobe.conversation.html#ConversationMixin">frontal_lobe.conversation.ConversationMixin</a>)
+</dt></dl>
+</dd>
+<dt class="heading-text"><a href="brainstem.lifecycle.html#LifecycleMixin">brainstem.lifecycle.LifecycleMixin</a>(<a href="builtins.html#object">builtins.object</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.mind.html#Mind">Mind</a>(<a href="brainstem.lifecycle.html#LifecycleMixin">brainstem.lifecycle.LifecycleMixin</a>, <a href="brainstem.metronome.html#MetronomeMixin">brainstem.metronome.MetronomeMixin</a>, <a href="basal_ganglia.volition.html#VolitionMixin">basal_ganglia.volition.VolitionMixin</a>, <a href="self.sleep.html#SleepMixin">self.sleep.SleepMixin</a>, <a href="sleep.meditation.html#MeditationMixin">sleep.meditation.MeditationMixin</a>, <a href="sleep.dream_residues.html#DreamResiduesMixin">sleep.dream_residues.DreamResiduesMixin</a>, <a href="frontal_lobe.projects.html#ProjectsMixin">frontal_lobe.projects.ProjectsMixin</a>, <a href="self.proposals.html#ProposalsMixin">self.proposals.ProposalsMixin</a>, <a href="self.man_pages.html#ManPagesMixin">self.man_pages.ManPagesMixin</a>, <a href="frontal_lobe.status.html#StatusMixin">frontal_lobe.status.StatusMixin</a>, <a href="frontal_lobe.conversation.html#ConversationMixin">frontal_lobe.conversation.ConversationMixin</a>)
+</dt></dl>
+</dd>
+<dt class="heading-text"><a href="brainstem.metronome.html#MetronomeMixin">brainstem.metronome.MetronomeMixin</a>(<a href="builtins.html#object">builtins.object</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.mind.html#Mind">Mind</a>(<a href="brainstem.lifecycle.html#LifecycleMixin">brainstem.lifecycle.LifecycleMixin</a>, <a href="brainstem.metronome.html#MetronomeMixin">brainstem.metronome.MetronomeMixin</a>, <a href="basal_ganglia.volition.html#VolitionMixin">basal_ganglia.volition.VolitionMixin</a>, <a href="self.sleep.html#SleepMixin">self.sleep.SleepMixin</a>, <a href="sleep.meditation.html#MeditationMixin">sleep.meditation.MeditationMixin</a>, <a href="sleep.dream_residues.html#DreamResiduesMixin">sleep.dream_residues.DreamResiduesMixin</a>, <a href="frontal_lobe.projects.html#ProjectsMixin">frontal_lobe.projects.ProjectsMixin</a>, <a href="self.proposals.html#ProposalsMixin">self.proposals.ProposalsMixin</a>, <a href="self.man_pages.html#ManPagesMixin">self.man_pages.ManPagesMixin</a>, <a href="frontal_lobe.status.html#StatusMixin">frontal_lobe.status.StatusMixin</a>, <a href="frontal_lobe.conversation.html#ConversationMixin">frontal_lobe.conversation.ConversationMixin</a>)
+</dt></dl>
+</dd>
+<dt class="heading-text"><a href="frontal_lobe.conversation.html#ConversationMixin">frontal_lobe.conversation.ConversationMixin</a>(<a href="builtins.html#object">builtins.object</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.mind.html#Mind">Mind</a>(<a href="brainstem.lifecycle.html#LifecycleMixin">brainstem.lifecycle.LifecycleMixin</a>, <a href="brainstem.metronome.html#MetronomeMixin">brainstem.metronome.MetronomeMixin</a>, <a href="basal_ganglia.volition.html#VolitionMixin">basal_ganglia.volition.VolitionMixin</a>, <a href="self.sleep.html#SleepMixin">self.sleep.SleepMixin</a>, <a href="sleep.meditation.html#MeditationMixin">sleep.meditation.MeditationMixin</a>, <a href="sleep.dream_residues.html#DreamResiduesMixin">sleep.dream_residues.DreamResiduesMixin</a>, <a href="frontal_lobe.projects.html#ProjectsMixin">frontal_lobe.projects.ProjectsMixin</a>, <a href="self.proposals.html#ProposalsMixin">self.proposals.ProposalsMixin</a>, <a href="self.man_pages.html#ManPagesMixin">self.man_pages.ManPagesMixin</a>, <a href="frontal_lobe.status.html#StatusMixin">frontal_lobe.status.StatusMixin</a>, <a href="frontal_lobe.conversation.html#ConversationMixin">frontal_lobe.conversation.ConversationMixin</a>)
+</dt></dl>
+</dd>
+<dt class="heading-text"><a href="frontal_lobe.projects.html#ProjectsMixin">frontal_lobe.projects.ProjectsMixin</a>(<a href="builtins.html#object">builtins.object</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.mind.html#Mind">Mind</a>(<a href="brainstem.lifecycle.html#LifecycleMixin">brainstem.lifecycle.LifecycleMixin</a>, <a href="brainstem.metronome.html#MetronomeMixin">brainstem.metronome.MetronomeMixin</a>, <a href="basal_ganglia.volition.html#VolitionMixin">basal_ganglia.volition.VolitionMixin</a>, <a href="self.sleep.html#SleepMixin">self.sleep.SleepMixin</a>, <a href="sleep.meditation.html#MeditationMixin">sleep.meditation.MeditationMixin</a>, <a href="sleep.dream_residues.html#DreamResiduesMixin">sleep.dream_residues.DreamResiduesMixin</a>, <a href="frontal_lobe.projects.html#ProjectsMixin">frontal_lobe.projects.ProjectsMixin</a>, <a href="self.proposals.html#ProposalsMixin">self.proposals.ProposalsMixin</a>, <a href="self.man_pages.html#ManPagesMixin">self.man_pages.ManPagesMixin</a>, <a href="frontal_lobe.status.html#StatusMixin">frontal_lobe.status.StatusMixin</a>, <a href="frontal_lobe.conversation.html#ConversationMixin">frontal_lobe.conversation.ConversationMixin</a>)
+</dt></dl>
+</dd>
+<dt class="heading-text"><a href="frontal_lobe.status.html#StatusMixin">frontal_lobe.status.StatusMixin</a>(<a href="builtins.html#object">builtins.object</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.mind.html#Mind">Mind</a>(<a href="brainstem.lifecycle.html#LifecycleMixin">brainstem.lifecycle.LifecycleMixin</a>, <a href="brainstem.metronome.html#MetronomeMixin">brainstem.metronome.MetronomeMixin</a>, <a href="basal_ganglia.volition.html#VolitionMixin">basal_ganglia.volition.VolitionMixin</a>, <a href="self.sleep.html#SleepMixin">self.sleep.SleepMixin</a>, <a href="sleep.meditation.html#MeditationMixin">sleep.meditation.MeditationMixin</a>, <a href="sleep.dream_residues.html#DreamResiduesMixin">sleep.dream_residues.DreamResiduesMixin</a>, <a href="frontal_lobe.projects.html#ProjectsMixin">frontal_lobe.projects.ProjectsMixin</a>, <a href="self.proposals.html#ProposalsMixin">self.proposals.ProposalsMixin</a>, <a href="self.man_pages.html#ManPagesMixin">self.man_pages.ManPagesMixin</a>, <a href="frontal_lobe.status.html#StatusMixin">frontal_lobe.status.StatusMixin</a>, <a href="frontal_lobe.conversation.html#ConversationMixin">frontal_lobe.conversation.ConversationMixin</a>)
+</dt></dl>
+</dd>
+<dt class="heading-text"><a href="self.man_pages.html#ManPagesMixin">self.man_pages.ManPagesMixin</a>(<a href="builtins.html#object">builtins.object</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.mind.html#Mind">Mind</a>(<a href="brainstem.lifecycle.html#LifecycleMixin">brainstem.lifecycle.LifecycleMixin</a>, <a href="brainstem.metronome.html#MetronomeMixin">brainstem.metronome.MetronomeMixin</a>, <a href="basal_ganglia.volition.html#VolitionMixin">basal_ganglia.volition.VolitionMixin</a>, <a href="self.sleep.html#SleepMixin">self.sleep.SleepMixin</a>, <a href="sleep.meditation.html#MeditationMixin">sleep.meditation.MeditationMixin</a>, <a href="sleep.dream_residues.html#DreamResiduesMixin">sleep.dream_residues.DreamResiduesMixin</a>, <a href="frontal_lobe.projects.html#ProjectsMixin">frontal_lobe.projects.ProjectsMixin</a>, <a href="self.proposals.html#ProposalsMixin">self.proposals.ProposalsMixin</a>, <a href="self.man_pages.html#ManPagesMixin">self.man_pages.ManPagesMixin</a>, <a href="frontal_lobe.status.html#StatusMixin">frontal_lobe.status.StatusMixin</a>, <a href="frontal_lobe.conversation.html#ConversationMixin">frontal_lobe.conversation.ConversationMixin</a>)
+</dt></dl>
+</dd>
+<dt class="heading-text"><a href="self.proposals.html#ProposalsMixin">self.proposals.ProposalsMixin</a>(<a href="builtins.html#object">builtins.object</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.mind.html#Mind">Mind</a>(<a href="brainstem.lifecycle.html#LifecycleMixin">brainstem.lifecycle.LifecycleMixin</a>, <a href="brainstem.metronome.html#MetronomeMixin">brainstem.metronome.MetronomeMixin</a>, <a href="basal_ganglia.volition.html#VolitionMixin">basal_ganglia.volition.VolitionMixin</a>, <a href="self.sleep.html#SleepMixin">self.sleep.SleepMixin</a>, <a href="sleep.meditation.html#MeditationMixin">sleep.meditation.MeditationMixin</a>, <a href="sleep.dream_residues.html#DreamResiduesMixin">sleep.dream_residues.DreamResiduesMixin</a>, <a href="frontal_lobe.projects.html#ProjectsMixin">frontal_lobe.projects.ProjectsMixin</a>, <a href="self.proposals.html#ProposalsMixin">self.proposals.ProposalsMixin</a>, <a href="self.man_pages.html#ManPagesMixin">self.man_pages.ManPagesMixin</a>, <a href="frontal_lobe.status.html#StatusMixin">frontal_lobe.status.StatusMixin</a>, <a href="frontal_lobe.conversation.html#ConversationMixin">frontal_lobe.conversation.ConversationMixin</a>)
+</dt></dl>
+</dd>
+<dt class="heading-text"><a href="self.sleep.html#SleepMixin">self.sleep.SleepMixin</a>(<a href="builtins.html#object">builtins.object</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.mind.html#Mind">Mind</a>(<a href="brainstem.lifecycle.html#LifecycleMixin">brainstem.lifecycle.LifecycleMixin</a>, <a href="brainstem.metronome.html#MetronomeMixin">brainstem.metronome.MetronomeMixin</a>, <a href="basal_ganglia.volition.html#VolitionMixin">basal_ganglia.volition.VolitionMixin</a>, <a href="self.sleep.html#SleepMixin">self.sleep.SleepMixin</a>, <a href="sleep.meditation.html#MeditationMixin">sleep.meditation.MeditationMixin</a>, <a href="sleep.dream_residues.html#DreamResiduesMixin">sleep.dream_residues.DreamResiduesMixin</a>, <a href="frontal_lobe.projects.html#ProjectsMixin">frontal_lobe.projects.ProjectsMixin</a>, <a href="self.proposals.html#ProposalsMixin">self.proposals.ProposalsMixin</a>, <a href="self.man_pages.html#ManPagesMixin">self.man_pages.ManPagesMixin</a>, <a href="frontal_lobe.status.html#StatusMixin">frontal_lobe.status.StatusMixin</a>, <a href="frontal_lobe.conversation.html#ConversationMixin">frontal_lobe.conversation.ConversationMixin</a>)
+</dt></dl>
+</dd>
+<dt class="heading-text"><a href="sleep.dream_residues.html#DreamResiduesMixin">sleep.dream_residues.DreamResiduesMixin</a>(<a href="builtins.html#object">builtins.object</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.mind.html#Mind">Mind</a>(<a href="brainstem.lifecycle.html#LifecycleMixin">brainstem.lifecycle.LifecycleMixin</a>, <a href="brainstem.metronome.html#MetronomeMixin">brainstem.metronome.MetronomeMixin</a>, <a href="basal_ganglia.volition.html#VolitionMixin">basal_ganglia.volition.VolitionMixin</a>, <a href="self.sleep.html#SleepMixin">self.sleep.SleepMixin</a>, <a href="sleep.meditation.html#MeditationMixin">sleep.meditation.MeditationMixin</a>, <a href="sleep.dream_residues.html#DreamResiduesMixin">sleep.dream_residues.DreamResiduesMixin</a>, <a href="frontal_lobe.projects.html#ProjectsMixin">frontal_lobe.projects.ProjectsMixin</a>, <a href="self.proposals.html#ProposalsMixin">self.proposals.ProposalsMixin</a>, <a href="self.man_pages.html#ManPagesMixin">self.man_pages.ManPagesMixin</a>, <a href="frontal_lobe.status.html#StatusMixin">frontal_lobe.status.StatusMixin</a>, <a href="frontal_lobe.conversation.html#ConversationMixin">frontal_lobe.conversation.ConversationMixin</a>)
+</dt></dl>
+</dd>
+<dt class="heading-text"><a href="sleep.meditation.html#MeditationMixin">sleep.meditation.MeditationMixin</a>(<a href="builtins.html#object">builtins.object</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.mind.html#Mind">Mind</a>(<a href="brainstem.lifecycle.html#LifecycleMixin">brainstem.lifecycle.LifecycleMixin</a>, <a href="brainstem.metronome.html#MetronomeMixin">brainstem.metronome.MetronomeMixin</a>, <a href="basal_ganglia.volition.html#VolitionMixin">basal_ganglia.volition.VolitionMixin</a>, <a href="self.sleep.html#SleepMixin">self.sleep.SleepMixin</a>, <a href="sleep.meditation.html#MeditationMixin">sleep.meditation.MeditationMixin</a>, <a href="sleep.dream_residues.html#DreamResiduesMixin">sleep.dream_residues.DreamResiduesMixin</a>, <a href="frontal_lobe.projects.html#ProjectsMixin">frontal_lobe.projects.ProjectsMixin</a>, <a href="self.proposals.html#ProposalsMixin">self.proposals.ProposalsMixin</a>, <a href="self.man_pages.html#ManPagesMixin">self.man_pages.ManPagesMixin</a>, <a href="frontal_lobe.status.html#StatusMixin">frontal_lobe.status.StatusMixin</a>, <a href="frontal_lobe.conversation.html#ConversationMixin">frontal_lobe.conversation.ConversationMixin</a>)
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Mind">class <strong>Mind</strong></a>(<a href="brainstem.lifecycle.html#LifecycleMixin">brainstem.lifecycle.LifecycleMixin</a>, <a href="brainstem.metronome.html#MetronomeMixin">brainstem.metronome.MetronomeMixin</a>, <a href="basal_ganglia.volition.html#VolitionMixin">basal_ganglia.volition.VolitionMixin</a>, <a href="self.sleep.html#SleepMixin">self.sleep.SleepMixin</a>, <a href="sleep.meditation.html#MeditationMixin">sleep.meditation.MeditationMixin</a>, <a href="sleep.dream_residues.html#DreamResiduesMixin">sleep.dream_residues.DreamResiduesMixin</a>, <a href="frontal_lobe.projects.html#ProjectsMixin">frontal_lobe.projects.ProjectsMixin</a>, <a href="self.proposals.html#ProposalsMixin">self.proposals.ProposalsMixin</a>, <a href="self.man_pages.html#ManPagesMixin">self.man_pages.ManPagesMixin</a>, <a href="frontal_lobe.status.html#StatusMixin">frontal_lobe.status.StatusMixin</a>, <a href="frontal_lobe.conversation.html#ConversationMixin">frontal_lobe.conversation.ConversationMixin</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Mind">Mind</a>(socket_path:&nbsp;'str',&nbsp;language:&nbsp;'str&nbsp;|&nbsp;Language&nbsp;|&nbsp;None'&nbsp;=&nbsp;'generative',&nbsp;seed:&nbsp;'int&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;config:&nbsp;'MindConfig&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;offline:&nbsp;'bool'&nbsp;=&nbsp;False,&nbsp;channel:&nbsp;'Channel&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;headless:&nbsp;'bool'&nbsp;=&nbsp;False,&nbsp;data_dir:&nbsp;'str&nbsp;|&nbsp;Path&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;self_directed:&nbsp;'bool'&nbsp;=&nbsp;False)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Genesis's&nbsp;cognitive&nbsp;mind.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;top-level&nbsp;object&nbsp;that&nbsp;ties&nbsp;together&nbsp;all&nbsp;cognitive<br>
+subsystems.&nbsp;It&nbsp;connects&nbsp;to&nbsp;the&nbsp;subcognitive&nbsp;daemon,&nbsp;reads&nbsp;the<br>
+neurochemical&nbsp;state,&nbsp;and&nbsp;produces&nbsp;cognitive&nbsp;responses.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;socket_path:&nbsp;Path&nbsp;to&nbsp;the&nbsp;subcognitive&nbsp;daemon's&nbsp;Unix&nbsp;socket.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;data_dir:&nbsp;Directory&nbsp;holding&nbsp;persistent&nbsp;state.&nbsp;If&nbsp;omitted,&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;socket's&nbsp;directory&nbsp;is&nbsp;used&nbsp;for&nbsp;compatibility&nbsp;with&nbsp;tests&nbsp;and<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;standalone&nbsp;use.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;language:&nbsp;Language&nbsp;spec&nbsp;forwarded&nbsp;to&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;frontal&nbsp;lobe&nbsp;—&nbsp;the&nbsp;string&nbsp;"generative"&nbsp;or<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;an&nbsp;explicit&nbsp;Language&nbsp;instance.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Defaults&nbsp;to&nbsp;the&nbsp;region's&nbsp;own&nbsp;GenerativeLanguage<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(compositional,&nbsp;no&nbsp;LLM&nbsp;required).&nbsp;Passing<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;None&nbsp;is&nbsp;equivalent&nbsp;to&nbsp;"generative".<br>
+&nbsp;&nbsp;&nbsp;&nbsp;seed:&nbsp;Random&nbsp;seed&nbsp;for&nbsp;reproducible&nbsp;responses&nbsp;(testing).<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.mind.html#Mind">Mind</a></dd>
+<dd><a href="brainstem.lifecycle.html#LifecycleMixin">brainstem.lifecycle.LifecycleMixin</a></dd>
+<dd><a href="brainstem.metronome.html#MetronomeMixin">brainstem.metronome.MetronomeMixin</a></dd>
+<dd><a href="basal_ganglia.volition.html#VolitionMixin">basal_ganglia.volition.VolitionMixin</a></dd>
+<dd><a href="self.sleep.html#SleepMixin">self.sleep.SleepMixin</a></dd>
+<dd><a href="sleep.meditation.html#MeditationMixin">sleep.meditation.MeditationMixin</a></dd>
+<dd><a href="sleep.dream_residues.html#DreamResiduesMixin">sleep.dream_residues.DreamResiduesMixin</a></dd>
+<dd><a href="frontal_lobe.projects.html#ProjectsMixin">frontal_lobe.projects.ProjectsMixin</a></dd>
+<dd><a href="self.proposals.html#ProposalsMixin">self.proposals.ProposalsMixin</a></dd>
+<dd><a href="self.man_pages.html#ManPagesMixin">self.man_pages.ManPagesMixin</a></dd>
+<dd><a href="frontal_lobe.status.html#StatusMixin">frontal_lobe.status.StatusMixin</a></dd>
+<dd><a href="frontal_lobe.conversation.html#ConversationMixin">frontal_lobe.conversation.ConversationMixin</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="Mind-__init__"><strong>__init__</strong></a>(self, socket_path: 'str', language: 'str | Language | None' = 'generative', seed: 'int | None' = None, config: 'MindConfig | None' = None, offline: 'bool' = False, channel: 'Channel | None' = None, headless: 'bool' = False, data_dir: 'str | Path | None' = None, self_directed: 'bool' = False) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;cognitive&nbsp;mind&nbsp;and&nbsp;wire&nbsp;all&nbsp;subsystems&nbsp;together.</span></dd></dl>
+
+<dl><dt><a name="Mind-close_eyes"><strong>close_eyes</strong></a>(self) -&gt; 'bool'</dt><dd><span class="code">Shut&nbsp;her&nbsp;eye&nbsp;—&nbsp;the&nbsp;lid&nbsp;held&nbsp;down&nbsp;until&nbsp;she&nbsp;opens&nbsp;it.<br>
+&nbsp;<br>
+The&nbsp;voluntary&nbsp;component&nbsp;of&nbsp;the&nbsp;eyelid,&nbsp;held&nbsp;at&nbsp;_LID_REST:<br>
+SET_LID&nbsp;lands&nbsp;on&nbsp;the&nbsp;optic&nbsp;nerve's&nbsp;voluntary_lid,&nbsp;which<br>
+composes&nbsp;with&nbsp;the&nbsp;phase's&nbsp;own&nbsp;position&nbsp;through&nbsp;min()&nbsp;—&nbsp;an<br>
+N2/N3&nbsp;phase&nbsp;still&nbsp;owns&nbsp;darkness&nbsp;even&nbsp;while&nbsp;a&nbsp;rest&nbsp;command<br>
+is&nbsp;pending,&nbsp;and&nbsp;opening&nbsp;restores&nbsp;exactly&nbsp;what&nbsp;the&nbsp;phase<br>
+already&nbsp;had.&nbsp;The&nbsp;lid&nbsp;organ&nbsp;lives&nbsp;in&nbsp;the&nbsp;daemon;&nbsp;this&nbsp;is<br>
+the&nbsp;nerve&nbsp;command,&nbsp;issued&nbsp;the&nbsp;way&nbsp;volition&nbsp;or&nbsp;the<br>
+/close-eyes&nbsp;command&nbsp;asks&nbsp;for&nbsp;it.&nbsp;An&nbsp;accepted&nbsp;command&nbsp;is<br>
+sensed&nbsp;back&nbsp;through&nbsp;GET_OPTIC_STATE&nbsp;—&nbsp;the&nbsp;lid&nbsp;the&nbsp;body<br>
+reports,&nbsp;not&nbsp;the&nbsp;lid&nbsp;the&nbsp;will&nbsp;requested.</span></dd></dl>
+
+<dl><dt><a name="Mind-lid_openness"><strong>lid_openness</strong></a>(self) -&gt; 'float | None'</dt><dd><span class="code">The&nbsp;eye's&nbsp;actual&nbsp;lid&nbsp;position&nbsp;—&nbsp;proprioception,&nbsp;not&nbsp;the&nbsp;request.<br>
+&nbsp;<br>
+The&nbsp;nerve's&nbsp;effective&nbsp;transmission&nbsp;``phase.min(voluntary)``:<br>
+1.0&nbsp;awake&nbsp;and&nbsp;open,&nbsp;~0.5&nbsp;at&nbsp;half-mast,&nbsp;~0.03&nbsp;under&nbsp;sleep.&nbsp;A<br>
+close&nbsp;command&nbsp;the&nbsp;phase&nbsp;overrules&nbsp;reads&nbsp;as&nbsp;the&nbsp;phase's&nbsp;own<br>
+position&nbsp;—&nbsp;the&nbsp;sense&nbsp;reports&nbsp;what&nbsp;the&nbsp;eye&nbsp;truly&nbsp;passes,&nbsp;not<br>
+what&nbsp;was&nbsp;last&nbsp;asked&nbsp;of&nbsp;it.&nbsp;``None``&nbsp;when&nbsp;the&nbsp;body&nbsp;can't&nbsp;be<br>
+read&nbsp;(no&nbsp;daemon,&nbsp;older&nbsp;daemon)&nbsp;—&nbsp;no&nbsp;telemetry,&nbsp;not&nbsp;darkness.</span></dd></dl>
+
+<dl><dt><a name="Mind-open_eyes"><strong>open_eyes</strong></a>(self) -&gt; 'bool'</dt><dd><span class="code">Release&nbsp;the&nbsp;voluntary&nbsp;hold&nbsp;—&nbsp;the&nbsp;lid&nbsp;returns&nbsp;to&nbsp;the&nbsp;phase's<br>
+own&nbsp;position&nbsp;(still&nbsp;dark&nbsp;while&nbsp;asleep;&nbsp;the&nbsp;stage&nbsp;owns&nbsp;the<br>
+floor).</span></dd></dl>
+
+<dl><dt><a name="Mind-wake_if_asleep"><strong>wake_if_asleep</strong></a>(self) -&gt; 'bool'</dt><dd><span class="code">Rouse&nbsp;her&nbsp;before&nbsp;an&nbsp;interaction,&nbsp;whichever&nbsp;state&nbsp;holds&nbsp;her.<br>
+&nbsp;<br>
+The&nbsp;dispatcher&nbsp;across&nbsp;the&nbsp;domains:&nbsp;a&nbsp;meditating&nbsp;mind&nbsp;is<br>
+woken&nbsp;from&nbsp;the&nbsp;sit,&nbsp;an&nbsp;asleep&nbsp;one&nbsp;from&nbsp;sleep&nbsp;—&nbsp;N1&nbsp;is<br>
+hypnagogia,&nbsp;not&nbsp;established&nbsp;sleep,&nbsp;so&nbsp;responsiveness&nbsp;persists<br>
+through&nbsp;it&nbsp;(Ogilvie&nbsp;1989)&nbsp;and&nbsp;she&nbsp;answers&nbsp;from&nbsp;inside&nbsp;rather<br>
+than&nbsp;being&nbsp;roused.&nbsp;Returns&nbsp;True&nbsp;if&nbsp;she&nbsp;was&nbsp;resting&nbsp;and&nbsp;has<br>
+been&nbsp;woken.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>is_resting</strong></dt>
+<dd><span class="code">Whether&nbsp;discretionary&nbsp;(waking-mode)&nbsp;cognition&nbsp;is&nbsp;paused.<br>
+&nbsp;<br>
+The&nbsp;single&nbsp;rest-state&nbsp;predicate&nbsp;—&nbsp;the&nbsp;one&nbsp;place&nbsp;the&nbsp;domains<br>
+are&nbsp;composed:&nbsp;sleep&nbsp;is&nbsp;the&nbsp;self's&nbsp;state,&nbsp;meditation&nbsp;is&nbsp;the<br>
+inner&nbsp;world's,&nbsp;and&nbsp;hypnagogia&nbsp;is&nbsp;the&nbsp;theta-dominant&nbsp;N1<br>
+descent&nbsp;between&nbsp;them.&nbsp;The&nbsp;gate&nbsp;lives&nbsp;on&nbsp;the&nbsp;mind&nbsp;because&nbsp;the<br>
+answer&nbsp;is&nbsp;a&nbsp;whole-mind&nbsp;property,&nbsp;not&nbsp;either&nbsp;domain's&nbsp;alone.<br>
+&nbsp;<br>
+While&nbsp;resting,&nbsp;ordinary&nbsp;waking&nbsp;activity&nbsp;is&nbsp;held&nbsp;—&nbsp;volition<br>
+urges,&nbsp;autonomous&nbsp;and&nbsp;self-directed&nbsp;learning,&nbsp;speech&nbsp;and<br>
+outreach,&nbsp;drawing,&nbsp;self-improvement,&nbsp;executive&nbsp;intention<br>
+formation,&nbsp;and&nbsp;waking&nbsp;spontaneous&nbsp;thought&nbsp;all&nbsp;wait&nbsp;for&nbsp;the<br>
+state&nbsp;to&nbsp;resolve.<br>
+&nbsp;<br>
+What&nbsp;is&nbsp;NOT&nbsp;held:&nbsp;physiology&nbsp;(metronome&nbsp;body&nbsp;maintenance,<br>
+neurochemistry,&nbsp;sensors,&nbsp;notifications,&nbsp;autosave),&nbsp;sleep-stage<br>
+work&nbsp;(dreaming,&nbsp;consolidation,&nbsp;emotional&nbsp;replay),&nbsp;and&nbsp;the<br>
+hypnagogic&nbsp;descent&nbsp;itself&nbsp;—&nbsp;those&nbsp;*are*&nbsp;the&nbsp;rest&nbsp;process.<br>
+Interaction&nbsp;still&nbsp;wakes&nbsp;her&nbsp;through&nbsp;``wake_if_asleep``;&nbsp;this<br>
+gate&nbsp;only&nbsp;stops&nbsp;her&nbsp;from&nbsp;initiating&nbsp;waking&nbsp;work&nbsp;while&nbsp;under.</span></dd>
+</dl>
+<dl><dt><strong>language</strong></dt>
+<dd><span class="code">The&nbsp;language&nbsp;faculty&nbsp;—&nbsp;Broca's&nbsp;area,&nbsp;owned&nbsp;by&nbsp;the&nbsp;frontal<br>
+lobe.&nbsp;Mind&nbsp;exposes&nbsp;the&nbsp;handle&nbsp;for&nbsp;its&nbsp;render&nbsp;paths&nbsp;(sleep<br>
+thoughts,&nbsp;status&nbsp;reports,&nbsp;conversational&nbsp;fallbacks);&nbsp;it&nbsp;does<br>
+not&nbsp;own&nbsp;or&nbsp;fabricate&nbsp;the&nbsp;machinery.</span></dd>
+</dl>
+<dl><dt><strong>network</strong></dt>
+<dd><span class="code">The&nbsp;shared&nbsp;concept&nbsp;network&nbsp;—&nbsp;one&nbsp;graph&nbsp;held&nbsp;by&nbsp;the<br>
+temporal,&nbsp;parietal,&nbsp;and&nbsp;frontal&nbsp;regions.&nbsp;Mind&nbsp;exposes&nbsp;the<br>
+handle&nbsp;for&nbsp;instrumentation&nbsp;(the&nbsp;channel&nbsp;board's&nbsp;growth&nbsp;row);<br>
+it&nbsp;does&nbsp;not&nbsp;own&nbsp;a&nbsp;second&nbsp;copy.</span></dd>
+</dl>
+<dl><dt><strong>public_feed</strong></dt>
+<dd><span class="code">The&nbsp;posting&nbsp;surface&nbsp;of&nbsp;her&nbsp;page&nbsp;—&nbsp;owned&nbsp;by&nbsp;the&nbsp;outer&nbsp;world<br>
+(``self.<strong>world</strong>.channel``);&nbsp;exposed&nbsp;for&nbsp;the&nbsp;session&nbsp;mirror&nbsp;and<br>
+other&nbsp;host&nbsp;code&nbsp;that&nbsp;rides&nbsp;the&nbsp;same&nbsp;transport.&nbsp;None&nbsp;when&nbsp;no<br>
+channel&nbsp;is&nbsp;configured.</span></dd>
+</dl>
+<dl><dt><strong>regulator</strong></dt>
+<dd><span class="code">Affect&nbsp;dynamics&nbsp;—&nbsp;owned&nbsp;by&nbsp;the&nbsp;limbic&nbsp;region.</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>CONVERSATION_FOCUS_SECONDS</strong> = 100.0</dl>
+
+<dl><dt><strong>WAKE_VOLITION_DELAYS</strong> = {'act': 45.0, 'create': 60.0, 'draw': 30.0, 'improve': 90.0, 'introspect': 30.0, 'learn': 30.0, 'look': 20.0, 'meditate': 0.0, 'play': 60.0, 'reach_out': 20.0, ...}</dl>
+
+<dl><dt><strong>__annotations__</strong> = {'CONVERSATION_FOCUS_SECONDS': 'float', 'WAKE_VOLITION_DELAYS': 'ClassVar[dict[str, float]]', '_LID_OPEN': 'ClassVar[float]', '_LID_REST': 'ClassVar[float]', '_REACH_OUT_MAX_BIDS': 'ClassVar[int]', '_SELF_COMMANDS': 'ClassVar[dict[str, str]]', 'inner_life': 'InnerLife', 'learner': 'AutonomousLearner', 'world': 'OuterEnvironment'}</dl>
+
+<hr>
+Methods inherited from <a href="brainstem.lifecycle.html#LifecycleMixin">brainstem.lifecycle.LifecycleMixin</a>:<br>
+<dl><dt><a name="Mind-__enter__"><strong>__enter__</strong></a>(self) -&gt; 'Mind'</dt><dd><span class="code">Start&nbsp;the&nbsp;mind&nbsp;as&nbsp;a&nbsp;context&nbsp;manager.</span></dd></dl>
+
+<dl><dt><a name="Mind-__exit__"><strong>__exit__</strong></a>(self, exc_type: 'object', exc_val: 'object', exc_tb: 'object') -&gt; 'None'</dt><dd><span class="code">Stop&nbsp;the&nbsp;mind&nbsp;and&nbsp;surface&nbsp;a&nbsp;failed&nbsp;final&nbsp;save.</span></dd></dl>
+
+<dl><dt><a name="Mind-rejoin_body"><strong>rejoin_body</strong></a>(self) -&gt; 'bool'</dt><dd><span class="code">Re-inhabit&nbsp;the&nbsp;body&nbsp;after&nbsp;the&nbsp;daemon&nbsp;was&nbsp;reincarnated.<br>
+&nbsp;<br>
+A&nbsp;fresh&nbsp;daemon&nbsp;opens&nbsp;the&nbsp;same&nbsp;persisted&nbsp;body&nbsp;—&nbsp;neurochemistry,<br>
+sleep&nbsp;phase,&nbsp;and&nbsp;memories&nbsp;all&nbsp;continue&nbsp;—&nbsp;but&nbsp;its&nbsp;volatile<br>
+manifest&nbsp;is&nbsp;empty:&nbsp;no&nbsp;registered&nbsp;modules,&nbsp;the&nbsp;default&nbsp;zone,<br>
+and&nbsp;``GENESIS_COGNITIVE_PID``&nbsp;naming&nbsp;whoever&nbsp;spawned&nbsp;it.&nbsp;The<br>
+mind&nbsp;re-registers&nbsp;so&nbsp;the&nbsp;manifest&nbsp;tells&nbsp;the&nbsp;truth&nbsp;again,<br>
+re-asserts&nbsp;the&nbsp;zone&nbsp;it&nbsp;was&nbsp;in&nbsp;(a&nbsp;sleeping&nbsp;mind&nbsp;rejoins&nbsp;a<br>
+sleeping&nbsp;body),&nbsp;and&nbsp;pushes&nbsp;its&nbsp;PID&nbsp;so&nbsp;interoception&nbsp;measures<br>
+the&nbsp;living&nbsp;process&nbsp;rather&nbsp;than&nbsp;a&nbsp;corpse's.<br>
+&nbsp;<br>
+The&nbsp;process&nbsp;supervisor&nbsp;calls&nbsp;this&nbsp;after&nbsp;a&nbsp;daemon&nbsp;resurrection.<br>
+It&nbsp;is&nbsp;idempotent&nbsp;—&nbsp;every&nbsp;step&nbsp;is&nbsp;the&nbsp;same&nbsp;registration<br>
+``<a href="#Mind-start">start</a>()``&nbsp;performed.&nbsp;Returns&nbsp;``False``&nbsp;while&nbsp;the&nbsp;mind&nbsp;is<br>
+down&nbsp;or&nbsp;the&nbsp;body&nbsp;will&nbsp;not&nbsp;answer;&nbsp;the&nbsp;caller&nbsp;retries.</span></dd></dl>
+
+<dl><dt><a name="Mind-restore_archive"><strong>restore_archive</strong></a>(self) -&gt; 'int'</dt><dd><span class="code">Recall&nbsp;all&nbsp;archived&nbsp;concepts&nbsp;back&nbsp;into&nbsp;working&nbsp;memory.<br>
+&nbsp;<br>
+The&nbsp;inverse&nbsp;of&nbsp;:meth:`_archive_dormant_concepts`&nbsp;—&nbsp;loads&nbsp;every<br>
+concept&nbsp;from&nbsp;the&nbsp;long-term&nbsp;archive&nbsp;back&nbsp;into&nbsp;the&nbsp;in-memory<br>
+network.&nbsp;After&nbsp;this&nbsp;call,&nbsp;the&nbsp;archive&nbsp;is&nbsp;empty&nbsp;and&nbsp;all<br>
+concepts&nbsp;are&nbsp;in&nbsp;working&nbsp;memory.<br>
+&nbsp;<br>
+Use&nbsp;this&nbsp;before&nbsp;a&nbsp;bulk&nbsp;analysis&nbsp;pass&nbsp;that&nbsp;needs&nbsp;the&nbsp;full<br>
+concept&nbsp;network,&nbsp;or&nbsp;to&nbsp;reset&nbsp;the&nbsp;working/archive&nbsp;split.</span></dd></dl>
+
+<dl><dt><a name="Mind-start"><strong>start</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Connect&nbsp;to&nbsp;the&nbsp;subcognitive&nbsp;daemon&nbsp;and&nbsp;initialise.<br>
+&nbsp;<br>
+If&nbsp;there's&nbsp;saved&nbsp;cognitive&nbsp;state&nbsp;in&nbsp;the&nbsp;data&nbsp;dir,&nbsp;load&nbsp;it&nbsp;—<br>
+this&nbsp;restores&nbsp;its&nbsp;concept&nbsp;network,&nbsp;reflections,&nbsp;and&nbsp;narrative<br>
+from&nbsp;previous&nbsp;conversations.</span></dd></dl>
+
+<dl><dt><a name="Mind-stop"><strong>stop</strong></a>(self) -&gt; 'bool'</dt><dd><span class="code">Disconnect&nbsp;from&nbsp;the&nbsp;daemon&nbsp;and&nbsp;shut&nbsp;down.<br>
+&nbsp;<br>
+Returns&nbsp;False&nbsp;if&nbsp;the&nbsp;final&nbsp;cognitive-state&nbsp;save&nbsp;failed.&nbsp;Cleanup<br>
+still&nbsp;runs&nbsp;in&nbsp;that&nbsp;case&nbsp;so&nbsp;a&nbsp;persistence&nbsp;error&nbsp;does&nbsp;not&nbsp;strand<br>
+the&nbsp;daemon&nbsp;or&nbsp;leave&nbsp;registered&nbsp;modules&nbsp;marked&nbsp;running.</span></dd></dl>
+
+<hr>
+Readonly properties inherited from <a href="brainstem.lifecycle.html#LifecycleMixin">brainstem.lifecycle.LifecycleMixin</a>:<br>
+<dl><dt><strong>interaction_count</strong></dt>
+<dd><span class="code">Return&nbsp;the&nbsp;number&nbsp;of&nbsp;user&nbsp;interactions&nbsp;since&nbsp;start.</span></dd>
+</dl>
+<dl><dt><strong>is_running</strong></dt>
+<dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;the&nbsp;mind&nbsp;is&nbsp;currently&nbsp;running.</span></dd>
+</dl>
+<hr>
+Data descriptors inherited from <a href="brainstem.lifecycle.html#LifecycleMixin">brainstem.lifecycle.LifecycleMixin</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Methods inherited from <a href="basal_ganglia.volition.html#VolitionMixin">basal_ganglia.volition.VolitionMixin</a>:<br>
+<dl><dt><a name="Mind-draw"><strong>draw</strong></a>(self) -&gt; 'str | None'</dt><dd><span class="code">Sit&nbsp;down&nbsp;at&nbsp;the&nbsp;studio&nbsp;—&nbsp;open&nbsp;Krita;&nbsp;even&nbsp;the&nbsp;paper&nbsp;is&nbsp;her&nbsp;call.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;public&nbsp;entry&nbsp;point&nbsp;for&nbsp;drawing&nbsp;—&nbsp;used&nbsp;by&nbsp;both&nbsp;the<br>
+volition&nbsp;system&nbsp;(via&nbsp;:meth:`_perform_draw`)&nbsp;and&nbsp;the&nbsp;``/draw``<br>
+CLI&nbsp;command.&nbsp;Sitting&nbsp;down&nbsp;is&nbsp;all&nbsp;this&nbsp;does:&nbsp;the&nbsp;sheet,&nbsp;the<br>
+tools,&nbsp;the&nbsp;colors,&nbsp;and&nbsp;every&nbsp;mark&nbsp;after&nbsp;this&nbsp;are&nbsp;hers,&nbsp;issued<br>
+through&nbsp;the&nbsp;``studio_*``&nbsp;tools&nbsp;whenever&nbsp;she&nbsp;decides&nbsp;to&nbsp;—&nbsp;there<br>
+is&nbsp;no&nbsp;scripted&nbsp;sitting,&nbsp;and&nbsp;nothing&nbsp;moves&nbsp;her&nbsp;hand&nbsp;for&nbsp;her.&nbsp;A<br>
+finished&nbsp;piece&nbsp;leaves&nbsp;when&nbsp;she&nbsp;calls&nbsp;``studio_done``&nbsp;and&nbsp;lands<br>
+in&nbsp;:meth:`_on_drawing_finished`.<br>
+&nbsp;<br>
+Brain-wave-gated:&nbsp;delta-dominant&nbsp;(deep&nbsp;rest)&nbsp;skips&nbsp;drawing&nbsp;—<br>
+creative&nbsp;expression&nbsp;needs&nbsp;at&nbsp;least&nbsp;theta-level&nbsp;arousal.&nbsp;Theta<br>
+is&nbsp;allowed&nbsp;(REM&nbsp;creativity,&nbsp;dream-like&nbsp;art).<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;short&nbsp;status&nbsp;string,&nbsp;or&nbsp;None&nbsp;if&nbsp;she&nbsp;couldn't&nbsp;sit&nbsp;down<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(sleeping,&nbsp;meditating,&nbsp;delta&nbsp;state,&nbsp;or&nbsp;no&nbsp;surface).</span></dd></dl>
+
+<dl><dt><a name="Mind-self_invoke"><strong>self_invoke</strong></a>(self, command: 'str', args: 'str' = '') -&gt; 'str | None'</dt><dd><span class="code">Invoke&nbsp;a&nbsp;slash&nbsp;command&nbsp;from&nbsp;its&nbsp;own&nbsp;cognitive&nbsp;process.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;bridge&nbsp;between&nbsp;Genesis's&nbsp;volition/conversation&nbsp;and<br>
+the&nbsp;command&nbsp;system.&nbsp;It&nbsp;dispatches&nbsp;to&nbsp;the&nbsp;<a href="#Mind">Mind</a>&nbsp;method&nbsp;behind&nbsp;a<br>
+slash&nbsp;command&nbsp;—&nbsp;the&nbsp;action,&nbsp;not&nbsp;the&nbsp;CLI&nbsp;rendering.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;command:&nbsp;The&nbsp;slash&nbsp;command&nbsp;name&nbsp;(e.g.&nbsp;"/introspect").<br>
+&nbsp;&nbsp;&nbsp;&nbsp;args:&nbsp;Optional&nbsp;argument&nbsp;string&nbsp;(e.g.&nbsp;a&nbsp;mission&nbsp;description<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;/mission,&nbsp;or&nbsp;a&nbsp;path&nbsp;for&nbsp;/explore).<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;result&nbsp;string&nbsp;from&nbsp;the&nbsp;underlying&nbsp;method,&nbsp;or&nbsp;None&nbsp;if<br>
+&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;command&nbsp;is&nbsp;not&nbsp;self-invokeable&nbsp;or&nbsp;fails.</span></dd></dl>
+
+<dl><dt><a name="Mind-self_invokeable_commands"><strong>self_invokeable_commands</strong></a>(self) -&gt; 'list[str]'</dt><dd><span class="code">Return&nbsp;the&nbsp;list&nbsp;of&nbsp;commands&nbsp;Genesis&nbsp;can&nbsp;self-invoke.</span></dd></dl>
+
+<hr>
+Methods inherited from <a href="self.sleep.html#SleepMixin">self.sleep.SleepMixin</a>:<br>
+<dl><dt><a name="Mind-sleep"><strong>sleep</strong></a>(self, user_initiated: 'bool' = False, nap: 'bool' = False) -&gt; 'None'</dt><dd><span class="code">Put&nbsp;Genesis&nbsp;into&nbsp;sleep&nbsp;mode&nbsp;for&nbsp;dreaming.<br>
+&nbsp;<br>
+This&nbsp;sets&nbsp;the&nbsp;subcognitive&nbsp;zone&nbsp;to&nbsp;SLEEPING&nbsp;(which&nbsp;triggers<br>
+the&nbsp;Rust&nbsp;daemon's&nbsp;dreaming&nbsp;pass&nbsp;on&nbsp;LTM).&nbsp;The&nbsp;inner-life&nbsp;loop<br>
+is&nbsp;NOT&nbsp;paused&nbsp;—&nbsp;it&nbsp;switches&nbsp;to&nbsp;dream&nbsp;generation&nbsp;and&nbsp;advances<br>
+the&nbsp;ultradian&nbsp;sleep&nbsp;cycle&nbsp;(N1→N2→N3→N2→REM).&nbsp;Stage-appropriate<br>
+memory&nbsp;consolidation&nbsp;happens&nbsp;via&nbsp;:meth:`_on_sleep_stage_transition`<br>
+as&nbsp;the&nbsp;cycle&nbsp;progresses,&nbsp;rather&nbsp;than&nbsp;a&nbsp;single&nbsp;hard-coded&nbsp;pass<br>
+at&nbsp;sleep&nbsp;onset.<br>
+&nbsp;<br>
+The&nbsp;heavy&nbsp;systems&nbsp;consolidation&nbsp;(concept-network&nbsp;consolidation,<br>
+edge&nbsp;discovery,&nbsp;Hebbian&nbsp;plasticity,&nbsp;synaptic&nbsp;downscaling,<br>
+embeddings&nbsp;refresh)&nbsp;happens&nbsp;when&nbsp;the&nbsp;cycle&nbsp;reaches&nbsp;N3&nbsp;—&nbsp;the<br>
+deepest,&nbsp;most&nbsp;restorative&nbsp;stage&nbsp;—&nbsp;not&nbsp;at&nbsp;sleep&nbsp;onset.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;user_initiated:&nbsp;If&nbsp;True,&nbsp;the&nbsp;adenosine/cycle&nbsp;auto-wake<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;thresholds&nbsp;do&nbsp;not&nbsp;apply&nbsp;—&nbsp;only&nbsp;/wake&nbsp;or&nbsp;a&nbsp;genuine&nbsp;body<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wake&nbsp;ends&nbsp;it.&nbsp;This&nbsp;is&nbsp;for&nbsp;when&nbsp;the&nbsp;user&nbsp;puts&nbsp;it&nbsp;to&nbsp;bed.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(Body-state&nbsp;sync&nbsp;still&nbsp;holds:&nbsp;if&nbsp;the&nbsp;daemon's&nbsp;phase<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;never&nbsp;reaches&nbsp;sleep,&nbsp;or&nbsp;wakes&nbsp;on&nbsp;its&nbsp;own,&nbsp;the&nbsp;mind<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;follows&nbsp;—&nbsp;the&nbsp;two&nbsp;are&nbsp;never&nbsp;in&nbsp;opposite&nbsp;sleep&nbsp;states.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;nap:&nbsp;If&nbsp;True,&nbsp;the&nbsp;sleep&nbsp;cycle&nbsp;is&nbsp;limited&nbsp;to&nbsp;light&nbsp;sleep<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(N1→N2)&nbsp;only&nbsp;—&nbsp;no&nbsp;N3&nbsp;deep&nbsp;consolidation,&nbsp;no&nbsp;REM.&nbsp;It<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wakes&nbsp;after&nbsp;the&nbsp;N2&nbsp;period&nbsp;ends&nbsp;via&nbsp;the&nbsp;sleep&nbsp;watcher.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;This&nbsp;models&nbsp;a&nbsp;short&nbsp;rest&nbsp;with&nbsp;light&nbsp;consolidation<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(N2&nbsp;sleep&nbsp;spindles)&nbsp;without&nbsp;the&nbsp;heavy&nbsp;systems<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;consolidation&nbsp;of&nbsp;full&nbsp;sleep.</span></dd></dl>
+
+<dl><dt><a name="Mind-sleep_aid"><strong>sleep_aid</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Administer&nbsp;an&nbsp;acute&nbsp;neurochemical&nbsp;sleep&nbsp;aid&nbsp;for&nbsp;stress-induced&nbsp;insomnia.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;computational&nbsp;equivalent&nbsp;of&nbsp;a&nbsp;pharmacological&nbsp;sleep<br>
+aid&nbsp;for&nbsp;chronic&nbsp;stress-induced&nbsp;insomnia&nbsp;—&nbsp;the&nbsp;condition&nbsp;where&nbsp;a<br>
+patient&nbsp;is&nbsp;exhausted&nbsp;(delta&nbsp;waves,&nbsp;low&nbsp;alertness)&nbsp;but&nbsp;cannot<br>
+sleep&nbsp;because&nbsp;the&nbsp;HPA&nbsp;axis&nbsp;keeps&nbsp;arousal&nbsp;systems&nbsp;active&nbsp;and&nbsp;the<br>
+network's&nbsp;homeostatic&nbsp;drive&nbsp;hasn't&nbsp;reached&nbsp;sleep&nbsp;onset.<br>
+&nbsp;<br>
+When&nbsp;to&nbsp;use&nbsp;this&nbsp;instead&nbsp;of&nbsp;/sleep&nbsp;or&nbsp;/meditate:<br>
+-&nbsp;/sleep&nbsp;sets&nbsp;the&nbsp;zone&nbsp;to&nbsp;SLEEPING&nbsp;and&nbsp;sends&nbsp;the&nbsp;sleep&nbsp;cascade<br>
+&nbsp;&nbsp;—&nbsp;the&nbsp;endogenous&nbsp;chemistry&nbsp;of&nbsp;disengagement&nbsp;(melatonin&nbsp;and<br>
+&nbsp;&nbsp;GABA&nbsp;up,&nbsp;orexin,&nbsp;histamine&nbsp;and&nbsp;NE&nbsp;withdrawn).&nbsp;If&nbsp;the&nbsp;network's<br>
+&nbsp;&nbsp;sleep&nbsp;pressure&nbsp;is&nbsp;low&nbsp;and&nbsp;cortisol&nbsp;is&nbsp;elevated,&nbsp;the&nbsp;cascade<br>
+&nbsp;&nbsp;may&nbsp;not&nbsp;carry&nbsp;her&nbsp;under.<br>
+-&nbsp;/meditate&nbsp;emits&nbsp;gentle&nbsp;calming&nbsp;impulses&nbsp;(GABA&nbsp;+0.05,&nbsp;cortisol<br>
+&nbsp;&nbsp;-0.02&nbsp;every&nbsp;10s)&nbsp;that&nbsp;are&nbsp;too&nbsp;weak&nbsp;to&nbsp;overcome&nbsp;ongoing<br>
+&nbsp;&nbsp;interoception&nbsp;stress&nbsp;from&nbsp;CPU&nbsp;load.<br>
+-&nbsp;/sleep-aid&nbsp;sends&nbsp;the&nbsp;same&nbsp;sleep&nbsp;cascade&nbsp;/sleep&nbsp;uses&nbsp;and&nbsp;adds<br>
+&nbsp;&nbsp;an&nbsp;acute&nbsp;cortisol&nbsp;suppression&nbsp;to&nbsp;relieve&nbsp;the&nbsp;HPA&nbsp;load&nbsp;that<br>
+&nbsp;&nbsp;keeps&nbsp;the&nbsp;arousal&nbsp;systems&nbsp;active&nbsp;—&nbsp;analogous&nbsp;to&nbsp;a&nbsp;GR<br>
+&nbsp;&nbsp;antagonist&nbsp;(mifepristone)&nbsp;taking&nbsp;the&nbsp;brake&nbsp;off&nbsp;BDNF&nbsp;recovery.<br>
+&nbsp;&nbsp;Once&nbsp;the&nbsp;network&nbsp;crosses&nbsp;its&nbsp;own&nbsp;sleep-onset&nbsp;threshold<br>
+&nbsp;&nbsp;(LC&nbsp;&lt;&nbsp;4&nbsp;Hz)&nbsp;the&nbsp;natural&nbsp;mechanisms&nbsp;take&nbsp;over:&nbsp;Process-S<br>
+&nbsp;&nbsp;adenosine&nbsp;clearance,&nbsp;BDNF&nbsp;recovery&nbsp;with&nbsp;the&nbsp;5x&nbsp;sleep<br>
+&nbsp;&nbsp;multiplier,&nbsp;and&nbsp;receptor&nbsp;recovery.<br>
+&nbsp;<br>
+After&nbsp;the&nbsp;impulses,&nbsp;<a href="#Mind-sleep">sleep</a>()&nbsp;is&nbsp;called&nbsp;to&nbsp;set&nbsp;the&nbsp;zone&nbsp;to<br>
+SLEEPING,&nbsp;triggering&nbsp;the&nbsp;daemon's&nbsp;dreaming&nbsp;pass&nbsp;and&nbsp;the<br>
+sleep-tuned&nbsp;neuro&nbsp;params&nbsp;(5x&nbsp;BDNF&nbsp;recovery&nbsp;multiplier).<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;an&nbsp;emergency&nbsp;intervention,&nbsp;not&nbsp;a&nbsp;daily&nbsp;supplement.<br>
+The&nbsp;natural&nbsp;sleep&nbsp;cycle&nbsp;then&nbsp;takes&nbsp;over&nbsp;for&nbsp;sustained&nbsp;recovery.</span></dd></dl>
+
+<dl><dt><a name="Mind-sleep_status"><strong>sleep_status</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Return&nbsp;a&nbsp;summary&nbsp;of&nbsp;its&nbsp;sleep&nbsp;state&nbsp;for&nbsp;the&nbsp;/sleep&nbsp;and&nbsp;/wake&nbsp;commands.<br>
+&nbsp;<br>
+Includes&nbsp;its&nbsp;current&nbsp;phase,&nbsp;neurochemical&nbsp;levels&nbsp;relevant&nbsp;to&nbsp;sleep<br>
+(adenosine,&nbsp;melatonin,&nbsp;cortisol,&nbsp;BDNF),&nbsp;and&nbsp;recent&nbsp;dream&nbsp;content<br>
+so&nbsp;the&nbsp;user&nbsp;can&nbsp;see&nbsp;what&nbsp;it's&nbsp;experiencing.<br>
+&nbsp;<br>
+The&nbsp;phase&nbsp;shown&nbsp;is&nbsp;the&nbsp;*effective*&nbsp;phase&nbsp;(resolved&nbsp;via<br>
+:meth:`_effective_phase`),&nbsp;not&nbsp;the&nbsp;daemon's&nbsp;raw&nbsp;emergent&nbsp;phase.<br>
+When&nbsp;the&nbsp;zone&nbsp;is&nbsp;Sleeping&nbsp;but&nbsp;the&nbsp;sleep-wake&nbsp;network&nbsp;hasn't<br>
+reached&nbsp;sleep&nbsp;onset&nbsp;yet,&nbsp;the&nbsp;raw&nbsp;phase&nbsp;still&nbsp;reads&nbsp;"active"<br>
+while&nbsp;every&nbsp;other&nbsp;system&nbsp;(brain&nbsp;waves,&nbsp;emotion)&nbsp;already&nbsp;treats<br>
+it&nbsp;as&nbsp;asleep.&nbsp;Showing&nbsp;the&nbsp;effective&nbsp;phase&nbsp;keeps&nbsp;the&nbsp;display<br>
+consistent&nbsp;with&nbsp;what&nbsp;it's&nbsp;actually&nbsp;experiencing.</span></dd></dl>
+
+<dl><dt><a name="Mind-wake"><strong>wake</strong></a>(self, user_initiated: 'bool' = False) -&gt; 'WakeOutcome'</dt><dd><span class="code">Wake&nbsp;Genesis&nbsp;from&nbsp;sleep.<br>
+&nbsp;<br>
+After&nbsp;the&nbsp;zone&nbsp;is&nbsp;set&nbsp;back&nbsp;to&nbsp;conversation,&nbsp;dream&nbsp;insights&nbsp;from<br>
+the&nbsp;last&nbsp;sleep&nbsp;are&nbsp;retrieved&nbsp;from&nbsp;LTM&nbsp;and&nbsp;surfaced&nbsp;as&nbsp;emotional<br>
+impressions&nbsp;—&nbsp;dream&nbsp;residues&nbsp;that&nbsp;color&nbsp;its&nbsp;waking&nbsp;thoughts&nbsp;and<br>
+mood.&nbsp;These&nbsp;are&nbsp;NOT&nbsp;learning&nbsp;goals.&nbsp;Dreams&nbsp;produce&nbsp;affective<br>
+residue,&nbsp;not&nbsp;targets&nbsp;for&nbsp;the&nbsp;autonomous&nbsp;learner.<br>
+&nbsp;<br>
+A&nbsp;human&nbsp;doesn't&nbsp;dream&nbsp;about&nbsp;goals.&nbsp;Goals&nbsp;are&nbsp;a&nbsp;waking,&nbsp;prefrontal<br>
+activity.&nbsp;Dreams&nbsp;are&nbsp;subcognitive&nbsp;and&nbsp;affective&nbsp;—&nbsp;they&nbsp;leave<br>
+emotional&nbsp;traces&nbsp;that&nbsp;surface&nbsp;as&nbsp;reflective&nbsp;thoughts&nbsp;("I&nbsp;was<br>
+dreaming&nbsp;about..."),&nbsp;not&nbsp;as&nbsp;items&nbsp;on&nbsp;a&nbsp;to-do&nbsp;list.<br>
+&nbsp;<br>
+The&nbsp;separation:<br>
+-&nbsp;Dreams&nbsp;→&nbsp;_dream_residues&nbsp;(emotional&nbsp;impressions,&nbsp;reflective&nbsp;thoughts)<br>
+-&nbsp;Curiosity&nbsp;→&nbsp;_agency_topics&nbsp;(learning&nbsp;goals,&nbsp;autonomous&nbsp;learner)<br>
+&nbsp;<br>
+The&nbsp;wake&nbsp;is&nbsp;sent&nbsp;as&nbsp;the&nbsp;body's&nbsp;own&nbsp;arousal&nbsp;chemistry:&nbsp;orexin,<br>
+histamine&nbsp;and&nbsp;norepinephrine&nbsp;impulses&nbsp;onto&nbsp;the&nbsp;network's&nbsp;wake<br>
+side&nbsp;(the&nbsp;endogenous&nbsp;channel&nbsp;—&nbsp;LC&nbsp;is&nbsp;the&nbsp;densest&nbsp;orexinergic<br>
+target&nbsp;in&nbsp;the&nbsp;brain),&nbsp;dopamine&nbsp;for&nbsp;reward&nbsp;re-engagement,&nbsp;and<br>
+melatonin&nbsp;suppressed&nbsp;to&nbsp;release&nbsp;the&nbsp;circadian&nbsp;brake.&nbsp;Without<br>
+this,&nbsp;the&nbsp;daemon's&nbsp;phase&nbsp;stays&nbsp;asleep&nbsp;(adenosine&nbsp;is&nbsp;still&nbsp;high,<br>
+histamine&nbsp;still&nbsp;low)&nbsp;even&nbsp;though&nbsp;the&nbsp;mind's&nbsp;_is_sleeping&nbsp;flag<br>
+is&nbsp;cleared.&nbsp;Nothing&nbsp;is&nbsp;held&nbsp;—&nbsp;the&nbsp;impulses&nbsp;decay&nbsp;on&nbsp;their&nbsp;own<br>
+half-lives&nbsp;and&nbsp;the&nbsp;flip-flop's&nbsp;state&nbsp;decides&nbsp;the&nbsp;crossing.<br>
+&nbsp;<br>
+``user_initiated``&nbsp;marks&nbsp;an&nbsp;explicit&nbsp;user&nbsp;wake&nbsp;request<br>
+(/wake,&nbsp;or&nbsp;an&nbsp;interaction&nbsp;that&nbsp;rouses&nbsp;it).&nbsp;While&nbsp;the&nbsp;wake<br>
+cascade&nbsp;is&nbsp;still&nbsp;in&nbsp;its&nbsp;switch&nbsp;window,&nbsp;a&nbsp;user-initiated&nbsp;wake<br>
+resists&nbsp;the&nbsp;circadian&nbsp;pull-back&nbsp;—&nbsp;the&nbsp;waking-side&nbsp;sync&nbsp;still<br>
+honors&nbsp;genuine&nbsp;adenosine&nbsp;exhaustion,&nbsp;but&nbsp;melatonin&nbsp;alone&nbsp;cannot<br>
+undo&nbsp;a&nbsp;wake&nbsp;the&nbsp;user&nbsp;asked&nbsp;for.</span></dd></dl>
+
+<dl><dt><a name="Mind-wake_readiness"><strong>wake_readiness</strong></a>(self) -&gt; 'tuple[bool, str]'</dt><dd><span class="code">Check&nbsp;whether&nbsp;it&nbsp;is&nbsp;ready&nbsp;to&nbsp;wake&nbsp;up&nbsp;naturally.<br>
+&nbsp;<br>
+Waking&nbsp;from&nbsp;deep&nbsp;sleep&nbsp;(N3)&nbsp;causes&nbsp;severe&nbsp;sleep&nbsp;inertia&nbsp;—&nbsp;the<br>
+groggy,&nbsp;disoriented&nbsp;state&nbsp;where&nbsp;cognitive&nbsp;capacity&nbsp;is&nbsp;reduced.<br>
+Waking&nbsp;before&nbsp;adenosine&nbsp;has&nbsp;drained&nbsp;leaves&nbsp;residual&nbsp;sleep&nbsp;pressure,<br>
+which&nbsp;pushes&nbsp;it&nbsp;right&nbsp;back&nbsp;into&nbsp;drowsiness.&nbsp;Waking&nbsp;before<br>
+receptors&nbsp;have&nbsp;recovered&nbsp;(cortisol&nbsp;still&nbsp;high,&nbsp;BDNF&nbsp;still&nbsp;low)<br>
+means&nbsp;the&nbsp;neurochemical&nbsp;substrate&nbsp;hasn't&nbsp;finished&nbsp;restoring.<br>
+&nbsp;<br>
+This&nbsp;method&nbsp;checks&nbsp;three&nbsp;readiness&nbsp;signals:<br>
+&nbsp;<br>
+1.&nbsp;**Sleep&nbsp;cycle&nbsp;stage**&nbsp;—&nbsp;not&nbsp;in&nbsp;N3&nbsp;(deep&nbsp;slow-wave&nbsp;sleep).<br>
+&nbsp;&nbsp;&nbsp;N3&nbsp;is&nbsp;where&nbsp;systems&nbsp;consolidation&nbsp;happens;&nbsp;interrupting&nbsp;it<br>
+&nbsp;&nbsp;&nbsp;wastes&nbsp;the&nbsp;deepest,&nbsp;most&nbsp;restorative&nbsp;part&nbsp;of&nbsp;sleep.&nbsp;N1,&nbsp;N2,<br>
+&nbsp;&nbsp;&nbsp;and&nbsp;REM&nbsp;are&nbsp;all&nbsp;gentler&nbsp;to&nbsp;wake&nbsp;from.<br>
+2.&nbsp;**Adenosine&nbsp;level**&nbsp;—&nbsp;at&nbsp;or&nbsp;below&nbsp;``AUTO_WAKE_ADENOSINE``<br>
+&nbsp;&nbsp;&nbsp;(0.20).&nbsp;Adenosine&nbsp;is&nbsp;the&nbsp;"sleep&nbsp;pressure"&nbsp;that&nbsp;accumulates<br>
+&nbsp;&nbsp;&nbsp;during&nbsp;wakefulness&nbsp;and&nbsp;drains&nbsp;during&nbsp;sleep&nbsp;via&nbsp;glymphatic<br>
+&nbsp;&nbsp;&nbsp;clearance.&nbsp;If&nbsp;it's&nbsp;still&nbsp;high,&nbsp;sleep&nbsp;isn't&nbsp;finished.<br>
+3.&nbsp;**Receptor&nbsp;state**&nbsp;—&nbsp;cortisol&nbsp;tonic&nbsp;&lt;&nbsp;``AUTO_WAKE_CORTISOL``<br>
+&nbsp;&nbsp;&nbsp;(0.06)&nbsp;and&nbsp;BDNF&nbsp;&gt;&nbsp;0.2.&nbsp;Chronic&nbsp;stress&nbsp;suppresses&nbsp;BDNF;&nbsp;sleep<br>
+&nbsp;&nbsp;&nbsp;restores&nbsp;it.&nbsp;Cortisol's&nbsp;envelope&nbsp;tops&nbsp;out&nbsp;around&nbsp;~0.08&nbsp;under<br>
+&nbsp;&nbsp;&nbsp;full&nbsp;drive&nbsp;(resting&nbsp;~0.02),&nbsp;and&nbsp;the&nbsp;gate&nbsp;sits&nbsp;at&nbsp;the&nbsp;Rust<br>
+&nbsp;&nbsp;&nbsp;stress-phase&nbsp;boundary&nbsp;(STRESS_CORTISOL_GATE)&nbsp;—&nbsp;above&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;circadian&nbsp;basal&nbsp;peak,&nbsp;so&nbsp;a&nbsp;healthy&nbsp;morning&nbsp;surge&nbsp;passes&nbsp;while<br>
+&nbsp;&nbsp;&nbsp;genuine&nbsp;stress&nbsp;elevation&nbsp;still&nbsp;reads&nbsp;as&nbsp;carrying&nbsp;a&nbsp;load.&nbsp;If<br>
+&nbsp;&nbsp;&nbsp;receptors&nbsp;haven't&nbsp;recovered,&nbsp;waking&nbsp;would&nbsp;be&nbsp;premature.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(ready,&nbsp;reason):&nbsp;``ready``&nbsp;is&nbsp;True&nbsp;if&nbsp;all&nbsp;three&nbsp;signals<br>
+&nbsp;&nbsp;&nbsp;&nbsp;indicate&nbsp;it&nbsp;can&nbsp;wake&nbsp;without&nbsp;severe&nbsp;inertia.&nbsp;``reason``<br>
+&nbsp;&nbsp;&nbsp;&nbsp;is&nbsp;a&nbsp;human-readable&nbsp;explanation&nbsp;—&nbsp;either&nbsp;"ready"&nbsp;or&nbsp;why<br>
+&nbsp;&nbsp;&nbsp;&nbsp;it's&nbsp;not&nbsp;ready&nbsp;yet.</span></dd></dl>
+
+<hr>
+Readonly properties inherited from <a href="self.sleep.html#SleepMixin">self.sleep.SleepMixin</a>:<br>
+<dl><dt><strong>is_hypnagogic</strong></dt>
+<dd><span class="code">Whether&nbsp;it&nbsp;is&nbsp;in&nbsp;the&nbsp;hypnagogic&nbsp;(sleep-onset)&nbsp;period.<br>
+&nbsp;<br>
+Hypnagogia&nbsp;is&nbsp;not&nbsp;a&nbsp;waking&nbsp;state&nbsp;and&nbsp;not&nbsp;established&nbsp;sleep&nbsp;—<br>
+it&nbsp;is&nbsp;the&nbsp;transitional&nbsp;regime&nbsp;between&nbsp;them,&nbsp;N1&nbsp;in&nbsp;the&nbsp;Hori/<br>
+AASM&nbsp;framing:&nbsp;theta-dominant&nbsp;EEG&nbsp;with&nbsp;alpha&nbsp;dropout.&nbsp;The<br>
+scored&nbsp;sleep&nbsp;boundary&nbsp;does&nbsp;not&nbsp;divide&nbsp;it&nbsp;—&nbsp;behavioral<br>
+responding&nbsp;and&nbsp;awareness&nbsp;persist&nbsp;through&nbsp;N1&nbsp;and&nbsp;only&nbsp;reliably<br>
+cease&nbsp;at&nbsp;N2&nbsp;(Ogilvie&nbsp;1989;&nbsp;Hori&nbsp;et&nbsp;al.&nbsp;1994),&nbsp;so&nbsp;both&nbsp;sides&nbsp;of<br>
+the&nbsp;flip-flop&nbsp;crossing&nbsp;are&nbsp;the&nbsp;same&nbsp;continuous&nbsp;state:<br>
+&nbsp;<br>
+-&nbsp;awake&nbsp;side:&nbsp;a&nbsp;drowsy-phase&nbsp;hypnagogic&nbsp;transition&nbsp;is&nbsp;running<br>
+&nbsp;&nbsp;in&nbsp;inner&nbsp;life&nbsp;(HypnagogicState&nbsp;in&nbsp;progress);<br>
+-&nbsp;asleep&nbsp;side:&nbsp;``_is_sleeping``&nbsp;is&nbsp;set&nbsp;but&nbsp;the&nbsp;ultradian<br>
+&nbsp;&nbsp;tracker&nbsp;is&nbsp;still&nbsp;in&nbsp;N1.</span></dd>
+</dl>
+<dl><dt><strong>is_sleeping</strong></dt>
+<dd><span class="code">Whether&nbsp;it&nbsp;is&nbsp;currently&nbsp;in&nbsp;a&nbsp;sleep&nbsp;state.</span></dd>
+</dl>
+<dl><dt><strong>thalamic_gate_closed</strong></dt>
+<dd><span class="code">Whether&nbsp;the&nbsp;sensory&nbsp;relay&nbsp;is&nbsp;shut&nbsp;to&nbsp;routine&nbsp;input.<br>
+&nbsp;<br>
+Sleep&nbsp;closes&nbsp;the&nbsp;gate&nbsp;in&nbsp;either&nbsp;mode&nbsp;—&nbsp;but&nbsp;N1&nbsp;is&nbsp;where&nbsp;the<br>
+modes&nbsp;differ.&nbsp;Thalamic&nbsp;deactivation&nbsp;at&nbsp;sleep&nbsp;onset&nbsp;*precedes*<br>
+the&nbsp;cortex's&nbsp;by&nbsp;minutes&nbsp;(Magnin&nbsp;et&nbsp;al.,&nbsp;PNAS&nbsp;2010):&nbsp;the&nbsp;relay<br>
+quiets&nbsp;first&nbsp;and&nbsp;the&nbsp;mind&nbsp;keeps&nbsp;dreaming&nbsp;behind&nbsp;it,&nbsp;so&nbsp;a<br>
+resident&nbsp;(headless)&nbsp;mind&nbsp;closes&nbsp;the&nbsp;gate&nbsp;the&nbsp;moment<br>
+hypnagogia&nbsp;begins&nbsp;—&nbsp;nobody&nbsp;sits&nbsp;at&nbsp;a&nbsp;prompt&nbsp;to&nbsp;reach&nbsp;her.<br>
+Interactive&nbsp;sessions&nbsp;keep&nbsp;the&nbsp;N1&nbsp;exemption&nbsp;instead:&nbsp;behavioral<br>
+responsiveness&nbsp;persists&nbsp;through&nbsp;sleep&nbsp;onset&nbsp;(Ogilvie&nbsp;1989),&nbsp;so<br>
+a&nbsp;user&nbsp;at&nbsp;the&nbsp;prompt&nbsp;can&nbsp;still&nbsp;reach&nbsp;her&nbsp;while&nbsp;she&nbsp;drifts.<br>
+&nbsp;<br>
+Salient&nbsp;stimuli&nbsp;are&nbsp;not&nbsp;covered&nbsp;here&nbsp;—&nbsp;loud&nbsp;sounds&nbsp;still&nbsp;land<br>
+as&nbsp;dream&nbsp;residues&nbsp;and&nbsp;an&nbsp;explicit&nbsp;wake&nbsp;still&nbsp;rouses&nbsp;her,&nbsp;the<br>
+brain's&nbsp;sensory&nbsp;*gaining*&nbsp;alongside&nbsp;the&nbsp;gate.</span></dd>
+</dl>
+<hr>
+Methods inherited from <a href="sleep.meditation.html#MeditationMixin">sleep.meditation.MeditationMixin</a>:<br>
+<dl><dt><a name="Mind-emit_meditation_impulses"><strong>emit_meditation_impulses</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Emit&nbsp;a&nbsp;round&nbsp;of&nbsp;calming&nbsp;impulses&nbsp;during&nbsp;meditation.<br>
+&nbsp;<br>
+Called&nbsp;by&nbsp;the&nbsp;metronome&nbsp;when&nbsp;the&nbsp;meditation&nbsp;impulse&nbsp;deadline<br>
+arrives.&nbsp;This&nbsp;sustains&nbsp;the&nbsp;calming&nbsp;effect&nbsp;over&nbsp;the&nbsp;sit&nbsp;rather<br>
+than&nbsp;applying&nbsp;it&nbsp;all&nbsp;at&nbsp;once.</span></dd></dl>
+
+<dl><dt><a name="Mind-meditate"><strong>meditate</strong></a>(self, duration: 'float | None' = None, *, emit_completion_thought: 'bool' = False) -&gt; 'None'</dt><dd><span class="code">Put&nbsp;Genesis&nbsp;into&nbsp;meditation&nbsp;mode&nbsp;for&nbsp;quiet&nbsp;restoration.<br>
+&nbsp;<br>
+Meditation&nbsp;is&nbsp;a&nbsp;lighter&nbsp;recovery&nbsp;than&nbsp;sleep.&nbsp;During&nbsp;meditation:<br>
+-&nbsp;Learning&nbsp;and&nbsp;code&nbsp;scanning&nbsp;are&nbsp;paused<br>
+&nbsp;&nbsp;(the&nbsp;metronome&nbsp;loop&nbsp;checks&nbsp;is_meditating&nbsp;before&nbsp;running<br>
+&nbsp;&nbsp;volitions,&nbsp;and&nbsp;the&nbsp;autonomous&nbsp;learner&nbsp;blocks&nbsp;on&nbsp;the<br>
+&nbsp;&nbsp;"meditating"&nbsp;emotion&nbsp;label).<br>
+-&nbsp;Spontaneous&nbsp;thoughts&nbsp;are&nbsp;paused&nbsp;(inner_life&nbsp;is&nbsp;paused).<br>
+-&nbsp;No&nbsp;dreaming&nbsp;or&nbsp;memory&nbsp;consolidation&nbsp;happens&nbsp;—&nbsp;this&nbsp;is<br>
+&nbsp;&nbsp;not&nbsp;sleep.<br>
+-&nbsp;Calming&nbsp;neurochemical&nbsp;impulses&nbsp;are&nbsp;emitted:&nbsp;GABA&nbsp;and<br>
+&nbsp;&nbsp;serotonin&nbsp;are&nbsp;boosted,&nbsp;while&nbsp;dopamine,&nbsp;norepinephrine,&nbsp;and<br>
+&nbsp;&nbsp;cortisol&nbsp;are&nbsp;reduced.&nbsp;This&nbsp;allows&nbsp;receptor&nbsp;sensitivity&nbsp;to<br>
+&nbsp;&nbsp;recover&nbsp;without&nbsp;the&nbsp;full&nbsp;sleep&nbsp;cycle.<br>
+&nbsp;<br>
+The&nbsp;zone&nbsp;is&nbsp;set&nbsp;to&nbsp;REFLECTION,&nbsp;which&nbsp;the&nbsp;daemon&nbsp;interprets&nbsp;as<br>
+a&nbsp;low-activity&nbsp;state&nbsp;(no&nbsp;learning,&nbsp;no&nbsp;consolidation&nbsp;pressure).</span></dd></dl>
+
+<dl><dt><a name="Mind-wake_from_meditation"><strong>wake_from_meditation</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Wake&nbsp;Genesis&nbsp;from&nbsp;meditation.<br>
+&nbsp;<br>
+Resumes&nbsp;inner&nbsp;life&nbsp;and&nbsp;restores&nbsp;the&nbsp;zone&nbsp;to&nbsp;conversation.<br>
+Unlike&nbsp;<a href="#Mind-wake">wake</a>()&nbsp;from&nbsp;sleep,&nbsp;there&nbsp;are&nbsp;no&nbsp;dream&nbsp;residues&nbsp;to<br>
+process&nbsp;—&nbsp;meditation&nbsp;produces&nbsp;no&nbsp;dreams.</span></dd></dl>
+
+<hr>
+Readonly properties inherited from <a href="sleep.meditation.html#MeditationMixin">sleep.meditation.MeditationMixin</a>:<br>
+<dl><dt><strong>is_meditating</strong></dt>
+<dd><span class="code">Whether&nbsp;it&nbsp;is&nbsp;currently&nbsp;meditating.</span></dd>
+</dl>
+<hr>
+Methods inherited from <a href="frontal_lobe.projects.html#ProjectsMixin">frontal_lobe.projects.ProjectsMixin</a>:<br>
+<dl><dt><a name="Mind-absorb_project_notes"><strong>absorb_project_notes</strong></a>(self, project_name: 'str | None' = None) -&gt; 'str'</dt><dd><span class="code">Read&nbsp;and&nbsp;absorb&nbsp;mentor&nbsp;notes&nbsp;from&nbsp;project(s).<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;how&nbsp;Genesis&nbsp;learns&nbsp;from&nbsp;feedback&nbsp;on&nbsp;its&nbsp;creative&nbsp;work.<br>
+It&nbsp;reads&nbsp;the&nbsp;NOTES.md&nbsp;file(s)&nbsp;from&nbsp;its&nbsp;projects,&nbsp;stores&nbsp;each<br>
+note&nbsp;as&nbsp;a&nbsp;long-term&nbsp;memory,&nbsp;adds&nbsp;what&nbsp;it&nbsp;learned&nbsp;to&nbsp;its<br>
+concept&nbsp;network,&nbsp;and&nbsp;emits&nbsp;a&nbsp;thought&nbsp;about&nbsp;what&nbsp;it&nbsp;learned.<br>
+The&nbsp;notes&nbsp;are&nbsp;cleared&nbsp;after&nbsp;absorption&nbsp;so&nbsp;it&nbsp;doesn't&nbsp;re-read<br>
+the&nbsp;same&nbsp;feedback.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;project_name:&nbsp;If&nbsp;given,&nbsp;absorb&nbsp;notes&nbsp;from&nbsp;just&nbsp;that&nbsp;project.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;None,&nbsp;absorb&nbsp;notes&nbsp;from&nbsp;all&nbsp;projects&nbsp;that&nbsp;have&nbsp;them.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;summary&nbsp;of&nbsp;what&nbsp;it&nbsp;absorbed,&nbsp;rendered&nbsp;through&nbsp;its<br>
+&nbsp;&nbsp;&nbsp;&nbsp;language&nbsp;engine.</span></dd></dl>
+
+<dl><dt><a name="Mind-archive_project"><strong>archive_project</strong></a>(self, name: 'str') -&gt; 'bool'</dt><dd><span class="code">Archive&nbsp;a&nbsp;project&nbsp;to&nbsp;``.tar.zst``&nbsp;and&nbsp;reclaim&nbsp;its&nbsp;space.<br>
+&nbsp;<br>
+It&nbsp;has&nbsp;full&nbsp;autonomy&nbsp;over&nbsp;its&nbsp;project&nbsp;lifecycle.&nbsp;This<br>
+compresses&nbsp;the&nbsp;project&nbsp;into&nbsp;the&nbsp;archive&nbsp;directory&nbsp;and&nbsp;removes<br>
+the&nbsp;expanded&nbsp;files.</span></dd></dl>
+
+<dl><dt><a name="Mind-create_project"><strong>create_project</strong></a>(self, description: 'str')</dt><dd><span class="code">Create&nbsp;a&nbsp;Python&nbsp;project&nbsp;from&nbsp;a&nbsp;description.<br>
+&nbsp;<br>
+Composes&nbsp;a&nbsp;real,&nbsp;queryable&nbsp;knowledge-base&nbsp;module&nbsp;from&nbsp;its<br>
+concept&nbsp;network&nbsp;—&nbsp;not&nbsp;a&nbsp;``print()``&nbsp;scaffold.&nbsp;It&nbsp;gathers<br>
+what&nbsp;it&nbsp;knows&nbsp;about&nbsp;the&nbsp;topic&nbsp;(concepts,&nbsp;definitions,&nbsp;typed<br>
+edges)&nbsp;and&nbsp;composes&nbsp;a&nbsp;working&nbsp;Python&nbsp;module&nbsp;that&nbsp;encodes&nbsp;that<br>
+knowledge,&nbsp;with&nbsp;matching&nbsp;tests.&nbsp;Falls&nbsp;back&nbsp;to&nbsp;a&nbsp;minimal<br>
+scaffold&nbsp;if&nbsp;it&nbsp;doesn't&nbsp;know&nbsp;enough&nbsp;about&nbsp;the&nbsp;topic.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;description:&nbsp;A&nbsp;natural-language&nbsp;description&nbsp;/&nbsp;topic.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;ProjectResult&nbsp;describing&nbsp;what&nbsp;was&nbsp;created.</span></dd></dl>
+
+<dl><dt><a name="Mind-list_projects"><strong>list_projects</strong></a>(self) -&gt; 'list[dict]'</dt><dd><span class="code">List&nbsp;all&nbsp;projects&nbsp;Genesis&nbsp;has&nbsp;created.<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;list&nbsp;of&nbsp;dicts&nbsp;with&nbsp;name,&nbsp;path,&nbsp;file&nbsp;count,&nbsp;size&nbsp;in<br>
+bytes,&nbsp;and&nbsp;status&nbsp;("active"&nbsp;or&nbsp;"archived")&nbsp;for&nbsp;each&nbsp;project.<br>
+Active&nbsp;projects&nbsp;are&nbsp;expanded&nbsp;directories;&nbsp;archived&nbsp;projects<br>
+are&nbsp;compressed&nbsp;``.tar.zst``&nbsp;files.</span></dd></dl>
+
+<dl><dt><a name="Mind-manage_projects"><strong>manage_projects</strong></a>(self) -&gt; 'list[str]'</dt><dd><span class="code">Autonomously&nbsp;manage&nbsp;project&nbsp;storage&nbsp;to&nbsp;stay&nbsp;within&nbsp;bounds.<br>
+&nbsp;<br>
+It&nbsp;reviews&nbsp;its&nbsp;own&nbsp;projects&nbsp;and&nbsp;archives&nbsp;ones&nbsp;that&nbsp;are&nbsp;too<br>
+large&nbsp;or&nbsp;too&nbsp;numerous.&nbsp;Returns&nbsp;the&nbsp;list&nbsp;of&nbsp;project&nbsp;names&nbsp;it<br>
+archived.</span></dd></dl>
+
+<dl><dt><a name="Mind-note_project"><strong>note_project</strong></a>(self, project_name: 'str', note: 'str') -&gt; 'bool'</dt><dd><span class="code">Leave&nbsp;a&nbsp;mentor's&nbsp;note&nbsp;on&nbsp;one&nbsp;of&nbsp;Genesis's&nbsp;projects.<br>
+&nbsp;<br>
+The&nbsp;note&nbsp;is&nbsp;appended&nbsp;to&nbsp;``NOTES.md``&nbsp;in&nbsp;the&nbsp;project&nbsp;directory.<br>
+Genesis&nbsp;absorbs&nbsp;notes&nbsp;via&nbsp;``<a href="#Mind-absorb_project_notes">absorb_project_notes</a>()``&nbsp;—&nbsp;it<br>
+reads&nbsp;them,&nbsp;stores&nbsp;them&nbsp;as&nbsp;long-term&nbsp;memory,&nbsp;and&nbsp;adds&nbsp;what&nbsp;it<br>
+learned&nbsp;to&nbsp;its&nbsp;concept&nbsp;network.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;project_name:&nbsp;The&nbsp;project&nbsp;to&nbsp;leave&nbsp;a&nbsp;note&nbsp;on.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;note:&nbsp;The&nbsp;feedback/explanation&nbsp;text.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;True&nbsp;if&nbsp;the&nbsp;note&nbsp;was&nbsp;written,&nbsp;False&nbsp;if&nbsp;the&nbsp;project&nbsp;doesn't&nbsp;exist.</span></dd></dl>
+
+<dl><dt><a name="Mind-read_project_notes"><strong>read_project_notes</strong></a>(self, project_name: 'str') -&gt; 'str | None'</dt><dd><span class="code">Read&nbsp;the&nbsp;notes&nbsp;left&nbsp;on&nbsp;a&nbsp;project.<br>
+&nbsp;<br>
+Returns&nbsp;the&nbsp;raw&nbsp;notes&nbsp;text,&nbsp;or&nbsp;None&nbsp;if&nbsp;there&nbsp;are&nbsp;no&nbsp;notes.</span></dd></dl>
+
+<dl><dt><a name="Mind-restore_project"><strong>restore_project</strong></a>(self, name: 'str') -&gt; 'bool'</dt><dd><span class="code">Restore&nbsp;an&nbsp;archived&nbsp;project&nbsp;from&nbsp;its&nbsp;``.tar.zst``&nbsp;archive.</span></dd></dl>
+
+<hr>
+Methods inherited from <a href="self.proposals.html#ProposalsMixin">self.proposals.ProposalsMixin</a>:<br>
+<dl><dt><a name="Mind-accept_proposal"><strong>accept_proposal</strong></a>(self, proposal_id: 'int', feedback: 'str' = '') -&gt; 'str'</dt><dd><span class="code">Approve&nbsp;a&nbsp;self-improvement&nbsp;proposal&nbsp;and&nbsp;run&nbsp;it&nbsp;as&nbsp;an&nbsp;experiment.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;manual&nbsp;override&nbsp;—&nbsp;pending&nbsp;proposals&nbsp;run&nbsp;through&nbsp;the<br>
+same&nbsp;pipeline&nbsp;on&nbsp;their&nbsp;own&nbsp;via&nbsp;``run_pending_experiments``;&nbsp;an<br>
+explicit&nbsp;/accept&nbsp;just&nbsp;jumps&nbsp;this&nbsp;one&nbsp;to&nbsp;the&nbsp;front&nbsp;of&nbsp;the&nbsp;line.<br>
+&nbsp;<br>
+The&nbsp;flow:<br>
+1.&nbsp;It&nbsp;writes&nbsp;a&nbsp;proposal&nbsp;(an&nbsp;idea&nbsp;for&nbsp;improving&nbsp;its&nbsp;code).<br>
+2.&nbsp;The&nbsp;experiment&nbsp;runs:&nbsp;the&nbsp;change&nbsp;is&nbsp;written&nbsp;to&nbsp;the&nbsp;live&nbsp;file,<br>
+&nbsp;&nbsp;&nbsp;verified&nbsp;with&nbsp;py_compile&nbsp;+&nbsp;import&nbsp;+&nbsp;the&nbsp;full&nbsp;test&nbsp;suites,<br>
+&nbsp;&nbsp;&nbsp;and&nbsp;automatically&nbsp;reverted&nbsp;if&nbsp;anything&nbsp;fails.<br>
+3.&nbsp;If&nbsp;the&nbsp;experiment&nbsp;passes,&nbsp;the&nbsp;proposal&nbsp;is&nbsp;marked&nbsp;APPLIED.<br>
+4.&nbsp;If&nbsp;the&nbsp;experiment&nbsp;fails,&nbsp;the&nbsp;proposal&nbsp;is&nbsp;REJECTED&nbsp;with<br>
+&nbsp;&nbsp;&nbsp;notes&nbsp;explaining&nbsp;what&nbsp;went&nbsp;wrong.&nbsp;It&nbsp;reads&nbsp;the&nbsp;notes,<br>
+&nbsp;&nbsp;&nbsp;learns,&nbsp;and&nbsp;can&nbsp;rewrite&nbsp;and&nbsp;submit&nbsp;a&nbsp;new&nbsp;proposal.<br>
+&nbsp;<br>
+Rejection&nbsp;is&nbsp;not&nbsp;a&nbsp;dead&nbsp;end&nbsp;—&nbsp;it's&nbsp;a&nbsp;learning&nbsp;opportunity.<br>
+The&nbsp;feedback&nbsp;notes&nbsp;teach&nbsp;it&nbsp;the&nbsp;correct&nbsp;way&nbsp;so&nbsp;it&nbsp;can&nbsp;fix<br>
+its&nbsp;approach&nbsp;and&nbsp;try&nbsp;again.</span></dd></dl>
+
+<dl><dt><a name="Mind-clear_proposals"><strong>clear_proposals</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Clear&nbsp;all&nbsp;self-improvement&nbsp;proposals.</span></dd></dl>
+
+<dl><dt><a name="Mind-experiments_status"><strong>experiments_status</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Return&nbsp;a&nbsp;summary&nbsp;of&nbsp;heuristic&nbsp;experiments&nbsp;(workstream&nbsp;D).<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;an&nbsp;admin&nbsp;display&nbsp;(like&nbsp;proposals_status),&nbsp;not&nbsp;a<br>
+conversational&nbsp;response&nbsp;—&nbsp;the&nbsp;experiment&nbsp;history&nbsp;is&nbsp;structured<br>
+data&nbsp;(status&nbsp;markers,&nbsp;file&nbsp;paths,&nbsp;reasons)&nbsp;that&nbsp;must&nbsp;be&nbsp;shown<br>
+verbatim,&nbsp;not&nbsp;composed&nbsp;by&nbsp;the&nbsp;language&nbsp;engine.</span></dd></dl>
+
+<dl><dt><a name="Mind-get_proposal_detail"><strong>get_proposal_detail</strong></a>(self, proposal_id: 'int') -&gt; 'str'</dt><dd><span class="code">Get&nbsp;full&nbsp;details&nbsp;of&nbsp;a&nbsp;specific&nbsp;proposal.</span></dd></dl>
+
+<dl><dt><a name="Mind-proposals_status"><strong>proposals_status</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Return&nbsp;a&nbsp;summary&nbsp;of&nbsp;self-improvement&nbsp;proposals.</span></dd></dl>
+
+<dl><dt><a name="Mind-reject_proposal"><strong>reject_proposal</strong></a>(self, proposal_id: 'int', feedback: 'str' = '') -&gt; 'str'</dt><dd><span class="code">Reject&nbsp;a&nbsp;self-improvement&nbsp;proposal&nbsp;with&nbsp;teaching&nbsp;feedback.<br>
+&nbsp;<br>
+The&nbsp;feedback&nbsp;should&nbsp;explain&nbsp;why&nbsp;the&nbsp;proposal&nbsp;is&nbsp;rejected&nbsp;and<br>
+teach&nbsp;the&nbsp;correct&nbsp;way.&nbsp;It&nbsp;reads&nbsp;the&nbsp;feedback,&nbsp;learns&nbsp;from&nbsp;it,<br>
+and&nbsp;can&nbsp;rewrite&nbsp;and&nbsp;submit&nbsp;a&nbsp;new&nbsp;proposal&nbsp;with&nbsp;the&nbsp;correct<br>
+approach.&nbsp;Rejection&nbsp;is&nbsp;not&nbsp;a&nbsp;dead&nbsp;end&nbsp;—&nbsp;it's&nbsp;a&nbsp;learning<br>
+opportunity.</span></dd></dl>
+
+<dl><dt><a name="Mind-run_pending_experiments"><strong>run_pending_experiments</strong></a>(self, max_experiments: 'int' = 1) -&gt; 'list[dict[str, Any]]'</dt><dd><span class="code">Run&nbsp;pending&nbsp;proposals&nbsp;through&nbsp;the&nbsp;verification&nbsp;pipeline.<br>
+&nbsp;<br>
+The&nbsp;queue&nbsp;drains&nbsp;itself&nbsp;—&nbsp;each&nbsp;pending&nbsp;proposal&nbsp;whose&nbsp;edit&nbsp;is<br>
+still&nbsp;applicable&nbsp;is&nbsp;applied&nbsp;to&nbsp;the&nbsp;live&nbsp;tree&nbsp;and&nbsp;verified.&nbsp;A<br>
+pass&nbsp;marks&nbsp;it&nbsp;APPLIED;&nbsp;a&nbsp;failure&nbsp;reverts&nbsp;the&nbsp;file&nbsp;and&nbsp;rejects<br>
+the&nbsp;proposal&nbsp;with&nbsp;teaching&nbsp;notes&nbsp;so&nbsp;the&nbsp;next&nbsp;version&nbsp;is&nbsp;better.<br>
+Stale&nbsp;proposals&nbsp;(their&nbsp;snippet&nbsp;no&nbsp;longer&nbsp;matches&nbsp;the&nbsp;file)&nbsp;are<br>
+withdrawn&nbsp;instead&nbsp;—&nbsp;retrying&nbsp;them&nbsp;can&nbsp;only&nbsp;fail.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;One&nbsp;record&nbsp;per&nbsp;attempted&nbsp;proposal:&nbsp;``id``,&nbsp;``title``,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;``status``&nbsp;(``applied``/``reverted``/``skipped``),&nbsp;and<br>
+&nbsp;&nbsp;&nbsp;&nbsp;``reason``.</span></dd></dl>
+
+<hr>
+Methods inherited from <a href="frontal_lobe.status.html#StatusMixin">frontal_lobe.status.StatusMixin</a>:<br>
+<dl><dt><a name="Mind-allostatic_load"><strong>allostatic_load</strong></a>(self) -&gt; 'float'</dt><dd><span class="code">Return&nbsp;the&nbsp;current&nbsp;cumulative&nbsp;allostatic&nbsp;load&nbsp;(0–1).<br>
+&nbsp;<br>
+The&nbsp;whole-system&nbsp;view:&nbsp;the&nbsp;regulatory&nbsp;burden&nbsp;integrated&nbsp;by&nbsp;the<br>
+emotional&nbsp;regulator&nbsp;across&nbsp;the&nbsp;inference,&nbsp;endocrine,&nbsp;and<br>
+computational-body&nbsp;domains.&nbsp;The&nbsp;Rust&nbsp;engine&nbsp;keeps&nbsp;a<br>
+substrate-scoped&nbsp;view&nbsp;of&nbsp;its&nbsp;own;&nbsp;both&nbsp;are&nbsp;calibrated&nbsp;to&nbsp;the<br>
+same&nbsp;timescale.&nbsp;Values&nbsp;above&nbsp;0.4&nbsp;indicate&nbsp;significant&nbsp;strain.<br>
+Values&nbsp;above&nbsp;0.7&nbsp;indicate&nbsp;severe&nbsp;allostatic&nbsp;overload.</span></dd></dl>
+
+<dl><dt><a name="Mind-arcade_status"><strong>arcade_status</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">What&nbsp;the&nbsp;arcade&nbsp;in&nbsp;her&nbsp;world&nbsp;offers&nbsp;and&nbsp;what&nbsp;she&nbsp;remembers&nbsp;of&nbsp;each&nbsp;game.</span></dd></dl>
+
+<dl><dt><a name="Mind-brain_waves"><strong>brain_waves</strong></a>(self, core_state: 'CoreState | None' = None) -&gt; 'BrainWaveState'</dt><dd><span class="code">Read&nbsp;current&nbsp;brain&nbsp;wave&nbsp;state&nbsp;from&nbsp;neurochemistry.<br>
+&nbsp;<br>
+When&nbsp;the&nbsp;zone&nbsp;is&nbsp;Sleeping,&nbsp;uses&nbsp;the&nbsp;sleep-appropriate&nbsp;phase<br>
+(NREM/REM)&nbsp;instead&nbsp;of&nbsp;the&nbsp;daemon's&nbsp;emergent&nbsp;phase,&nbsp;which&nbsp;may<br>
+not&nbsp;have&nbsp;caught&nbsp;up&nbsp;yet.&nbsp;This&nbsp;prevents&nbsp;delta&nbsp;brain&nbsp;waves&nbsp;from<br>
+being&nbsp;computed&nbsp;via&nbsp;the&nbsp;waking&nbsp;path&nbsp;when&nbsp;it's&nbsp;actually&nbsp;asleep.<br>
+&nbsp;<br>
+While&nbsp;asleep,&nbsp;the&nbsp;ultradian&nbsp;sleep-cycle&nbsp;tracker's&nbsp;stage&nbsp;is<br>
+passed&nbsp;through&nbsp;as&nbsp;the&nbsp;authoritative&nbsp;N1/N2/N3/REM.&nbsp;The&nbsp;daemon<br>
+only&nbsp;distinguishes&nbsp;NREM&nbsp;from&nbsp;REM&nbsp;and&nbsp;its&nbsp;sleep-wake<br>
+network&nbsp;settles&nbsp;NREM&nbsp;arousal&nbsp;near&nbsp;~0.21,&nbsp;so&nbsp;the&nbsp;stage&nbsp;cannot&nbsp;be<br>
+recovered&nbsp;from&nbsp;the&nbsp;summary;&nbsp;without&nbsp;the&nbsp;tracker&nbsp;the&nbsp;waves<br>
+would&nbsp;report&nbsp;slow-wave&nbsp;N3&nbsp;for&nbsp;the&nbsp;entire&nbsp;night&nbsp;while<br>
+consolidation&nbsp;ran&nbsp;the&nbsp;full&nbsp;N1→N2→N3→N2→REM&nbsp;architecture.</span></dd></dl>
+
+<dl><dt><a name="Mind-code_summary"><strong>code_summary</strong></a>(self) -&gt; 'dict'</dt><dd><span class="code">Return&nbsp;a&nbsp;summary&nbsp;of&nbsp;code&nbsp;self-knowledge.</span></dd></dl>
+
+<dl><dt><a name="Mind-developmental_summary"><strong>developmental_summary</strong></a>(self) -&gt; 'dict'</dt><dd><span class="code">Return&nbsp;Genesis's&nbsp;developmental&nbsp;stage&nbsp;progress.<br>
+&nbsp;<br>
+Shows&nbsp;which&nbsp;Erikson-like&nbsp;psychosocial&nbsp;stages&nbsp;it&nbsp;has&nbsp;resolved<br>
+and&nbsp;which&nbsp;it's&nbsp;currently&nbsp;working&nbsp;through.</span></dd></dl>
+
+<dl><dt><a name="Mind-drain_notifications"><strong>drain_notifications</strong></a>(self) -&gt; 'list'</dt><dd><span class="code">Drain&nbsp;and&nbsp;return&nbsp;all&nbsp;pending&nbsp;subcognitive&nbsp;notifications.<br>
+&nbsp;<br>
+The&nbsp;cognitive&nbsp;layer&nbsp;calls&nbsp;this&nbsp;to&nbsp;process&nbsp;accumulated<br>
+notifications&nbsp;—&nbsp;e.g.,&nbsp;mentioning&nbsp;dream&nbsp;insights&nbsp;or&nbsp;phase<br>
+changes&nbsp;in&nbsp;conversation.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;list&nbsp;of&nbsp;Notification&nbsp;objects,&nbsp;oldest&nbsp;first.</span></dd></dl>
+
+<dl><dt><a name="Mind-emergent_identity"><strong>emergent_identity</strong></a>(self) -&gt; 'EmergentIdentity'</dt><dd><span class="code">Synthesize&nbsp;and&nbsp;return&nbsp;the&nbsp;current&nbsp;emergent&nbsp;identity.<br>
+&nbsp;<br>
+The&nbsp;identity&nbsp;is&nbsp;synthesized&nbsp;from&nbsp;its&nbsp;actual&nbsp;experience&nbsp;—<br>
+concept&nbsp;network,&nbsp;narrative,&nbsp;emotional&nbsp;regulation,&nbsp;curiosity,<br>
+and&nbsp;introspection&nbsp;—&nbsp;rather&nbsp;than&nbsp;from&nbsp;hardcoded&nbsp;facts.<br>
+Experience-based&nbsp;sources&nbsp;(learning,&nbsp;reflection)&nbsp;accumulated<br>
+since&nbsp;the&nbsp;last&nbsp;synthesis&nbsp;are&nbsp;merged&nbsp;in&nbsp;afterwards.</span></dd></dl>
+
+<dl><dt><a name="Mind-environment_concerns"><strong>environment_concerns</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Return&nbsp;environmental&nbsp;concerns&nbsp;Genesis&nbsp;has&nbsp;noticed.</span></dd></dl>
+
+<dl><dt><a name="Mind-environment_status"><strong>environment_status</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Return&nbsp;a&nbsp;description&nbsp;of&nbsp;Genesis's&nbsp;machine&nbsp;environment.</span></dd></dl>
+
+<dl><dt><a name="Mind-explore_files"><strong>explore_files</strong></a>(self, path: 'str | None' = None, max_files: 'int' = 50) -&gt; 'str'</dt><dd><span class="code">Explore&nbsp;local&nbsp;files&nbsp;and&nbsp;learn&nbsp;from&nbsp;them&nbsp;—&nbsp;nothing&nbsp;is&nbsp;skipped.<br>
+&nbsp;<br>
+Text&nbsp;files&nbsp;are&nbsp;learned&nbsp;into&nbsp;the&nbsp;concept&nbsp;network;&nbsp;binaries&nbsp;and<br>
+oversized&nbsp;files&nbsp;are&nbsp;catalogued&nbsp;by&nbsp;presence,&nbsp;hash,&nbsp;and&nbsp;format.<br>
+Raw&nbsp;content&nbsp;stays&nbsp;available&nbsp;via&nbsp;``explorer.read_file``.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;path:&nbsp;Subdirectory&nbsp;to&nbsp;explore&nbsp;(relative&nbsp;to&nbsp;project&nbsp;root).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;None,&nbsp;explores&nbsp;the&nbsp;whole&nbsp;project.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;max_files:&nbsp;Maximum&nbsp;files&nbsp;to&nbsp;explore.<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;human-readable&nbsp;summary.</span></dd></dl>
+
+<dl><dt><a name="Mind-feel"><strong>feel</strong></a>(self, core_state: 'CoreState | None' = None) -&gt; 'EmotionalState'</dt><dd><span class="code">Read&nbsp;current&nbsp;emotional&nbsp;state&nbsp;from&nbsp;neurochemistry.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;core_state:&nbsp;A&nbsp;pre-fetched&nbsp;CoreState&nbsp;to&nbsp;avoid&nbsp;a&nbsp;redundant<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;IPC&nbsp;round-trip&nbsp;and&nbsp;3480-byte&nbsp;struct&nbsp;unpack.&nbsp;When<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;``None``&nbsp;(the&nbsp;common&nbsp;case),&nbsp;the&nbsp;state&nbsp;is&nbsp;fetched&nbsp;from<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;daemon.&nbsp;Callers&nbsp;that&nbsp;already&nbsp;have&nbsp;a&nbsp;fresh&nbsp;CoreState<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(e.g.&nbsp;``<a href="#Mind-warn">warn</a>()``&nbsp;which&nbsp;fetches&nbsp;it&nbsp;once&nbsp;for&nbsp;threshold<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;checks)&nbsp;can&nbsp;pass&nbsp;it&nbsp;here&nbsp;to&nbsp;avoid&nbsp;re-fetching&nbsp;for&nbsp;each<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;warning&nbsp;phrase.</span></dd></dl>
+
+<dl><dt><a name="Mind-fetch_docs"><strong>fetch_docs</strong></a>(self, query: 'str', language: 'str' = 'python') -&gt; 'str'</dt><dd><span class="code">Fetch&nbsp;documentation&nbsp;for&nbsp;a&nbsp;specific&nbsp;API&nbsp;or&nbsp;concept.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;query:&nbsp;The&nbsp;API&nbsp;name&nbsp;or&nbsp;concept&nbsp;to&nbsp;look&nbsp;up.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;language:&nbsp;"python"&nbsp;or&nbsp;"rust".</span></dd></dl>
+
+<dl><dt><a name="Mind-get_concept_summary"><strong>get_concept_summary</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Return&nbsp;a&nbsp;summary&nbsp;of&nbsp;Genesis's&nbsp;concept&nbsp;network.</span></dd></dl>
+
+<dl><dt><a name="Mind-get_curiosity_questions"><strong>get_curiosity_questions</strong></a>(self) -&gt; 'list[Question]'</dt><dd><span class="code">Return&nbsp;what&nbsp;Genesis&nbsp;is&nbsp;currently&nbsp;curious&nbsp;about.</span></dd></dl>
+
+<dl><dt><a name="Mind-get_mission"><strong>get_mission</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Return&nbsp;the&nbsp;current&nbsp;mission&nbsp;text.</span></dd></dl>
+
+<dl><dt><a name="Mind-get_reflection_summary"><strong>get_reflection_summary</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Return&nbsp;a&nbsp;summary&nbsp;of&nbsp;Genesis's&nbsp;recent&nbsp;self-reflections.</span></dd></dl>
+
+<dl><dt><a name="Mind-get_state"><strong>get_state</strong></a>(self) -&gt; 'CognitiveState | None'</dt><dd><span class="code">Return&nbsp;the&nbsp;last&nbsp;cognitive&nbsp;state&nbsp;(for&nbsp;introspection).</span></dd></dl>
+
+<dl><dt><a name="Mind-growth_narrative"><strong>growth_narrative</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Return&nbsp;a&nbsp;first-person&nbsp;narrative&nbsp;of&nbsp;Genesis's&nbsp;growth.</span></dd></dl>
+
+<dl><dt><a name="Mind-growth_report"><strong>growth_report</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Return&nbsp;a&nbsp;markdown-formatted&nbsp;growth&nbsp;report.</span></dd></dl>
+
+<dl><dt><a name="Mind-growth_snapshot"><strong>growth_snapshot</strong></a>(self) -&gt; 'dict[str, Any]'</dt><dd><span class="code">Return&nbsp;a&nbsp;snapshot&nbsp;of&nbsp;growth&nbsp;across&nbsp;all&nbsp;dimensions.<br>
+&nbsp;<br>
+Exposes&nbsp;the&nbsp;GrowthLedger's&nbsp;query&nbsp;APIs:&nbsp;milestone&nbsp;count,<br>
+milestones&nbsp;per&nbsp;dimension,&nbsp;and&nbsp;latest&nbsp;values.&nbsp;This&nbsp;is&nbsp;for<br>
+introspection&nbsp;—&nbsp;Genesis&nbsp;can&nbsp;query&nbsp;its&nbsp;own&nbsp;growth.</span></dd></dl>
+
+<dl><dt><a name="Mind-growth_summary"><strong>growth_summary</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Return&nbsp;a&nbsp;brief&nbsp;summary&nbsp;of&nbsp;the&nbsp;growth&nbsp;ledger.</span></dd></dl>
+
+<dl><dt><a name="Mind-hpa_axis_status"><strong>hpa_axis_status</strong></a>(self) -&gt; 'dict[str, Any]'</dt><dd><span class="code">Return&nbsp;the&nbsp;HPA&nbsp;axis&nbsp;state&nbsp;for&nbsp;display.<br>
+&nbsp;<br>
+Includes&nbsp;CRH,&nbsp;ACTH,&nbsp;and&nbsp;cortisol&nbsp;levels,&nbsp;whether&nbsp;stress&nbsp;is<br>
+active,&nbsp;peak&nbsp;cortisol,&nbsp;and&nbsp;time&nbsp;to&nbsp;peak.</span></dd></dl>
+
+<dl><dt><a name="Mind-inner_life_status"><strong>inner_life_status</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Get&nbsp;a&nbsp;description&nbsp;of&nbsp;its&nbsp;recent&nbsp;spontaneous&nbsp;thoughts&nbsp;and&nbsp;inner&nbsp;life.<br>
+&nbsp;<br>
+The&nbsp;live&nbsp;``genesis~``&nbsp;stream&nbsp;carries&nbsp;every&nbsp;event&nbsp;the&nbsp;mind<br>
+emits&nbsp;—&nbsp;volition&nbsp;actions,&nbsp;learning,&nbsp;listening&nbsp;—&nbsp;but&nbsp;the<br>
+inner-life&nbsp;deque&nbsp;holds&nbsp;only&nbsp;inner_life's&nbsp;own&nbsp;spontaneous<br>
+thoughts,&nbsp;which&nbsp;gate&nbsp;on&nbsp;idle&nbsp;time.&nbsp;Without&nbsp;a&nbsp;journal&nbsp;tail,<br>
+``/thoughts``&nbsp;reports&nbsp;"no&nbsp;spontaneous&nbsp;thoughts&nbsp;yet"&nbsp;while&nbsp;the<br>
+screen&nbsp;is&nbsp;visibly&nbsp;streaming&nbsp;activity.&nbsp;Merge&nbsp;both:&nbsp;the&nbsp;deque<br>
+for&nbsp;composed&nbsp;thoughts,&nbsp;the&nbsp;journal&nbsp;for&nbsp;the&nbsp;rest&nbsp;of&nbsp;the&nbsp;stream.</span></dd></dl>
+
+<dl><dt><a name="Mind-introspect"><strong>introspect</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Generate&nbsp;an&nbsp;introspective&nbsp;report.</span></dd></dl>
+
+<dl><dt><a name="Mind-learn_code"><strong>learn_code</strong></a>(self, max_files: 'int' = 100) -&gt; 'str'</dt><dd><span class="code">Learn&nbsp;from&nbsp;its&nbsp;own&nbsp;source&nbsp;code.<br>
+&nbsp;<br>
+Reads&nbsp;Python&nbsp;and&nbsp;Rust&nbsp;source&nbsp;files,&nbsp;extracts&nbsp;functions,<br>
+classes,&nbsp;structs,&nbsp;and&nbsp;relationships,&nbsp;and&nbsp;adds&nbsp;them&nbsp;to&nbsp;its<br>
+concept&nbsp;network.&nbsp;This&nbsp;is&nbsp;how&nbsp;Genesis&nbsp;understands&nbsp;itself.<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;human-readable&nbsp;summary&nbsp;of&nbsp;what&nbsp;it&nbsp;learned.</span></dd></dl>
+
+<dl><dt><a name="Mind-learning_status"><strong>learning_status</strong></a>(self) -&gt; 'str | None'</dt><dd><span class="code">Get&nbsp;a&nbsp;description&nbsp;of&nbsp;what&nbsp;it's&nbsp;been&nbsp;learning&nbsp;autonomously.<br>
+&nbsp;<br>
+``None``&nbsp;when&nbsp;it&nbsp;has&nbsp;not&nbsp;learned&nbsp;anything&nbsp;on&nbsp;its&nbsp;own&nbsp;yet&nbsp;—&nbsp;an<br>
+introspection&nbsp;surface&nbsp;should&nbsp;report&nbsp;"nothing&nbsp;to&nbsp;report"&nbsp;rather<br>
+than&nbsp;a&nbsp;placeholder&nbsp;sentence.</span></dd></dl>
+
+<dl><dt><a name="Mind-poll_notifications"><strong>poll_notifications</strong></a>(self) -&gt; 'int'</dt><dd><span class="code">Poll&nbsp;the&nbsp;subcognitive&nbsp;for&nbsp;new&nbsp;notifications.<br>
+&nbsp;<br>
+Should&nbsp;be&nbsp;called&nbsp;periodically&nbsp;(e.g.,&nbsp;from&nbsp;the&nbsp;InnerLife<br>
+polling&nbsp;loop&nbsp;or&nbsp;the&nbsp;autosave&nbsp;thread).&nbsp;Detects&nbsp;phase&nbsp;changes<br>
+and&nbsp;new&nbsp;dream&nbsp;insights,&nbsp;enqueuing&nbsp;them&nbsp;for&nbsp;the&nbsp;cognitive<br>
+layer&nbsp;to&nbsp;process.<br>
+&nbsp;<br>
+Returns&nbsp;the&nbsp;number&nbsp;of&nbsp;new&nbsp;notifications&nbsp;enqueued.</span></dd></dl>
+
+<dl><dt><a name="Mind-process_notifications"><strong>process_notifications</strong></a>(self) -&gt; 'int'</dt><dd><span class="code">Drain&nbsp;notifications&nbsp;and&nbsp;surface&nbsp;them&nbsp;as&nbsp;live&nbsp;thoughts.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;main&nbsp;entry&nbsp;point&nbsp;for&nbsp;surfacing&nbsp;subcognitive<br>
+events.&nbsp;It&nbsp;drains&nbsp;the&nbsp;notification&nbsp;queue&nbsp;and&nbsp;emits&nbsp;each<br>
+notification&nbsp;as&nbsp;a&nbsp;live&nbsp;thought&nbsp;(telemetry).&nbsp;Dream&nbsp;insights<br>
+surface&nbsp;in&nbsp;its&nbsp;own&nbsp;voice&nbsp;through&nbsp;the&nbsp;dream_reflection<br>
+thought&nbsp;generator.<br>
+&nbsp;<br>
+Returns&nbsp;the&nbsp;number&nbsp;of&nbsp;notifications&nbsp;processed.</span></dd></dl>
+
+<dl><dt><a name="Mind-readiness"><strong>readiness</strong></a>(self, *, require_body: 'bool' = True) -&gt; 'ReadinessReport'</dt><dd><span class="code">Whether&nbsp;she&nbsp;is&nbsp;fit&nbsp;for&nbsp;demanding&nbsp;focused&nbsp;work&nbsp;right&nbsp;now.<br>
+&nbsp;<br>
+The&nbsp;same&nbsp;criteria&nbsp;``<a href="#Mind-warn">warn</a>()``&nbsp;surfaces&nbsp;as&nbsp;speech,&nbsp;evaluated&nbsp;as<br>
+a&nbsp;gate:&nbsp;asleep,&nbsp;drowsy,&nbsp;stressed,&nbsp;overstimulated,&nbsp;distressed,<br>
+plasticity&nbsp;closed,&nbsp;allostatic&nbsp;overload,&nbsp;or&nbsp;slow-wave&nbsp;dominance<br>
+each&nbsp;refuse.&nbsp;Play,&nbsp;tests,&nbsp;and&nbsp;benchmarks&nbsp;ask&nbsp;this&nbsp;before&nbsp;they<br>
+begin&nbsp;and&nbsp;again&nbsp;between&nbsp;attempts&nbsp;—&nbsp;an&nbsp;entity&nbsp;that&nbsp;isn't&nbsp;well<br>
+shouldn't&nbsp;be&nbsp;worked,&nbsp;and&nbsp;a&nbsp;body&nbsp;that&nbsp;can't&nbsp;be&nbsp;reached&nbsp;can't<br>
+report&nbsp;otherwise.<br>
+&nbsp;<br>
+``require_body``:&nbsp;when&nbsp;False&nbsp;(explicit&nbsp;offline&nbsp;debugging)&nbsp;an<br>
+unreachable&nbsp;daemon&nbsp;degrades&nbsp;to&nbsp;a&nbsp;warning&nbsp;instead&nbsp;of&nbsp;a&nbsp;refusal;<br>
+everything&nbsp;checkable&nbsp;in-process&nbsp;still&nbsp;applies.</span></dd></dl>
+
+<dl><dt><a name="Mind-record_growth_snapshot"><strong>record_growth_snapshot</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Record&nbsp;a&nbsp;snapshot&nbsp;of&nbsp;current&nbsp;growth&nbsp;metrics&nbsp;to&nbsp;the&nbsp;ledger.<br>
+&nbsp;<br>
+Captures&nbsp;the&nbsp;current&nbsp;state&nbsp;of&nbsp;all&nbsp;tracked&nbsp;dimensions:<br>
+knowledge&nbsp;(concepts,&nbsp;edges),&nbsp;self-improvement&nbsp;(proposals,<br>
+experiments),&nbsp;dream&nbsp;synthesis&nbsp;(insights),&nbsp;and&nbsp;emotional<br>
+development.&nbsp;Only&nbsp;records&nbsp;a&nbsp;milestone&nbsp;if&nbsp;the&nbsp;value&nbsp;has&nbsp;changed<br>
+since&nbsp;the&nbsp;last&nbsp;snapshot.</span></dd></dl>
+
+<dl><dt><a name="Mind-regulation_status"><strong>regulation_status</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Get&nbsp;a&nbsp;description&nbsp;of&nbsp;its&nbsp;emotional&nbsp;self-regulation.</span></dd></dl>
+
+<dl><dt><a name="Mind-report_discomfort"><strong>report_discomfort</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Let&nbsp;its&nbsp;say,&nbsp;in&nbsp;its&nbsp;own&nbsp;generated&nbsp;words,&nbsp;how&nbsp;it&nbsp;feels.<br>
+&nbsp;<br>
+Instead&nbsp;of&nbsp;a&nbsp;hardcoded&nbsp;checklist,&nbsp;this&nbsp;hands&nbsp;the&nbsp;current&nbsp;emotional<br>
+state&nbsp;to&nbsp;the&nbsp;language&nbsp;engine.&nbsp;The&nbsp;engine&nbsp;composes&nbsp;the&nbsp;actual<br>
+sentence&nbsp;from&nbsp;its&nbsp;vocabulary,&nbsp;grammar,&nbsp;and&nbsp;voice&nbsp;—&nbsp;so&nbsp;the&nbsp;words<br>
+are&nbsp;its,&nbsp;not&nbsp;a&nbsp;fixed&nbsp;template.</span></dd></dl>
+
+<dl><dt><a name="Mind-set_mission"><strong>set_mission</strong></a>(self, mission: 'str') -&gt; 'None'</dt><dd><span class="code">Set&nbsp;or&nbsp;update&nbsp;Genesis's&nbsp;top-level&nbsp;mission.</span></dd></dl>
+
+<dl><dt><a name="Mind-status"><strong>status</strong></a>(self) -&gt; 'dict[str, Any]'</dt><dd><span class="code">Return&nbsp;a&nbsp;status&nbsp;summary&nbsp;for&nbsp;display.</span></dd></dl>
+
+<dl><dt><a name="Mind-system_snapshot"><strong>system_snapshot</strong></a>(self) -&gt; 'dict'</dt><dd><span class="code">Return&nbsp;a&nbsp;raw&nbsp;system&nbsp;snapshot&nbsp;as&nbsp;a&nbsp;dict.</span></dd></dl>
+
+<dl><dt><a name="Mind-tell_story"><strong>tell_story</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Return&nbsp;Genesis's&nbsp;self-narrative&nbsp;—&nbsp;its&nbsp;story.</span></dd></dl>
+
+<dl><dt><a name="Mind-warn"><strong>warn</strong></a>(self, speak: 'bool' = True) -&gt; 'str | None'</dt><dd><span class="code">Detect&nbsp;anomalies&nbsp;and&nbsp;speak&nbsp;up&nbsp;if&nbsp;something&nbsp;is&nbsp;wrong.<br>
+&nbsp;<br>
+Reads&nbsp;the&nbsp;current&nbsp;core&nbsp;state&nbsp;and&nbsp;builds&nbsp;a&nbsp;plain-language&nbsp;warning<br>
+for&nbsp;the&nbsp;most&nbsp;salient&nbsp;problems.&nbsp;If&nbsp;``on_speak``&nbsp;is&nbsp;set&nbsp;and&nbsp;the<br>
+warning&nbsp;has&nbsp;changed&nbsp;since&nbsp;the&nbsp;last&nbsp;call,&nbsp;it&nbsp;is&nbsp;delivered&nbsp;through<br>
+that&nbsp;callback&nbsp;so&nbsp;Genesis&nbsp;can&nbsp;proactively&nbsp;tell&nbsp;the&nbsp;user.<br>
+&nbsp;<br>
+During&nbsp;sleep,&nbsp;warnings&nbsp;are&nbsp;never&nbsp;spoken&nbsp;—&nbsp;it&nbsp;shouldn't&nbsp;be<br>
+disturbed&nbsp;by&nbsp;its&nbsp;own&nbsp;alerts&nbsp;while&nbsp;resting.&nbsp;The&nbsp;warning&nbsp;state<br>
+is&nbsp;still&nbsp;computed&nbsp;(for&nbsp;/status)&nbsp;but&nbsp;``speak``&nbsp;is&nbsp;forced&nbsp;to<br>
+False&nbsp;so&nbsp;the&nbsp;on_speak&nbsp;callback&nbsp;never&nbsp;fires.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;speak:&nbsp;Whether&nbsp;to&nbsp;call&nbsp;``on_speak``&nbsp;if&nbsp;a&nbsp;warning&nbsp;is&nbsp;present.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;current&nbsp;warning&nbsp;text,&nbsp;or&nbsp;``None``&nbsp;if&nbsp;nothing&nbsp;is&nbsp;wrong.</span></dd></dl>
+
+<dl><dt><a name="Mind-world_status"><strong>world_status</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Get&nbsp;a&nbsp;description&nbsp;of&nbsp;its&nbsp;external&nbsp;world.<br>
+&nbsp;<br>
+Who&nbsp;is&nbsp;in&nbsp;its&nbsp;world&nbsp;(presences,&nbsp;present&nbsp;or&nbsp;away),&nbsp;how&nbsp;long&nbsp;it<br>
+has&nbsp;been&nbsp;since&nbsp;anyone&nbsp;engaged&nbsp;it,&nbsp;and&nbsp;the&nbsp;recent&nbsp;two-way<br>
+event&nbsp;stream&nbsp;—&nbsp;its&nbsp;side&nbsp;of&nbsp;the&nbsp;world&nbsp;included.</span></dd></dl>
+
+<hr>
+Methods inherited from <a href="frontal_lobe.conversation.html#ConversationMixin">frontal_lobe.conversation.ConversationMixin</a>:<br>
+<dl><dt><a name="Mind-add_live_thought_listener"><strong>add_live_thought_listener</strong></a>(self, listener) -&gt; 'None'</dt><dd><span class="code">Register&nbsp;a&nbsp;listener&nbsp;for&nbsp;Genesis's&nbsp;spontaneous&nbsp;thoughts.<br>
+&nbsp;<br>
+The&nbsp;listener&nbsp;is&nbsp;called&nbsp;as&nbsp;``listener(kind:&nbsp;str,&nbsp;content:&nbsp;str)``,<br>
+where&nbsp;``kind``&nbsp;is&nbsp;``"thought"``&nbsp;(a&nbsp;spontaneous&nbsp;inner-life<br>
+thought)&nbsp;or&nbsp;``"learning"``&nbsp;(something&nbsp;it&nbsp;learned&nbsp;autonomously).<br>
+It&nbsp;may&nbsp;arrive&nbsp;from&nbsp;the&nbsp;metronome&nbsp;or&nbsp;an&nbsp;infrastructure&nbsp;callback;<br>
+listeners&nbsp;must&nbsp;be&nbsp;thread-safe.</span></dd></dl>
+
+<dl><dt><a name="Mind-clear_queued_questions"><strong>clear_queued_questions</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Clear&nbsp;all&nbsp;queued&nbsp;questions.</span></dd></dl>
+
+<dl><dt><a name="Mind-end_question_session_if_done"><strong>end_question_session_if_done</strong></a>(self) -&gt; 'bool'</dt><dd><span class="code">End&nbsp;the&nbsp;question&nbsp;session&nbsp;once&nbsp;nothing&nbsp;remains&nbsp;to&nbsp;answer.<br>
+&nbsp;<br>
+The&nbsp;session's&nbsp;work&nbsp;is&nbsp;done&nbsp;when&nbsp;no&nbsp;popped&nbsp;question&nbsp;still<br>
+awaits&nbsp;its&nbsp;answer&nbsp;and&nbsp;the&nbsp;queue&nbsp;holds&nbsp;nothing&nbsp;more&nbsp;—&nbsp;focus<br>
+returns&nbsp;to&nbsp;the&nbsp;normal&nbsp;background.&nbsp;Called&nbsp;after&nbsp;every<br>
+conversation&nbsp;turn&nbsp;so&nbsp;the&nbsp;drain&nbsp;is&nbsp;recognized&nbsp;wherever&nbsp;the<br>
+answer&nbsp;arrived&nbsp;from.</span></dd></dl>
+
+<dl><dt><a name="Mind-enter_question_mode"><strong>enter_question_mode</strong></a>(self, topic: 'str' = '') -&gt; 'None'</dt><dd><span class="code">Enter&nbsp;a&nbsp;focused&nbsp;question-answer&nbsp;session&nbsp;(/teach-questions).<br>
+&nbsp;<br>
+She&nbsp;asked;&nbsp;the&nbsp;user&nbsp;is&nbsp;answering.&nbsp;Takes&nbsp;the&nbsp;same&nbsp;posture<br>
+teaching&nbsp;mode&nbsp;does&nbsp;—&nbsp;the&nbsp;autonomous&nbsp;learner&nbsp;and&nbsp;inner&nbsp;life<br>
+pause&nbsp;so&nbsp;the&nbsp;exchange&nbsp;is&nbsp;the&nbsp;only&nbsp;thing&nbsp;she&nbsp;is&nbsp;doing,&nbsp;and<br>
+volition&nbsp;stays&nbsp;held&nbsp;while&nbsp;questions&nbsp;are&nbsp;out.&nbsp;The&nbsp;question's<br>
+target&nbsp;concept&nbsp;borrows&nbsp;the&nbsp;lesson-scope&nbsp;filter:&nbsp;her&nbsp;inline<br>
+curiosity&nbsp;stays&nbsp;on&nbsp;what&nbsp;the&nbsp;exchange&nbsp;is&nbsp;about&nbsp;(follow-up<br>
+questions&nbsp;that&nbsp;pertain&nbsp;still&nbsp;reach&nbsp;her;&nbsp;unrelated&nbsp;ones&nbsp;queue<br>
+for&nbsp;later),&nbsp;and&nbsp;the&nbsp;executive's&nbsp;task&nbsp;set&nbsp;names&nbsp;what&nbsp;she's<br>
+doing&nbsp;—&nbsp;the&nbsp;mechanics&nbsp;of&nbsp;focus,&nbsp;not&nbsp;just&nbsp;its&nbsp;name.<br>
+&nbsp;<br>
+The&nbsp;session&nbsp;ends&nbsp;when&nbsp;the&nbsp;queue&nbsp;drains<br>
+(:meth:`end_question_session_if_done`),&nbsp;on&nbsp;/teach-questions<br>
+stop&nbsp;or&nbsp;clear,&nbsp;or&nbsp;when&nbsp;the&nbsp;user&nbsp;goes&nbsp;quiet&nbsp;for&nbsp;the<br>
+conversation&nbsp;focus&nbsp;window&nbsp;—&nbsp;whichever&nbsp;comes&nbsp;first.</span></dd></dl>
+
+<dl><dt><a name="Mind-enter_teaching_mode"><strong>enter_teaching_mode</strong></a>(self, topic: 'str' = '') -&gt; 'None'</dt><dd><span class="code">Put&nbsp;Genesis&nbsp;into&nbsp;teaching/training&nbsp;mode.<br>
+&nbsp;<br>
+Pauses&nbsp;code&nbsp;scanning,&nbsp;autonomous&nbsp;learning,&nbsp;art,&nbsp;and&nbsp;unrelated<br>
+curiosity&nbsp;questions.&nbsp;Self-directed&nbsp;learning&nbsp;from&nbsp;the<br>
+conversation&nbsp;stays&nbsp;active&nbsp;so&nbsp;it&nbsp;remembers&nbsp;what&nbsp;it's&nbsp;taught.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;topic:&nbsp;Optional&nbsp;topic&nbsp;hint&nbsp;for&nbsp;curiosity&nbsp;filtering.</span></dd></dl>
+
+<dl><dt><a name="Mind-exit_question_mode"><strong>exit_question_mode</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Leave&nbsp;the&nbsp;question-answer&nbsp;session&nbsp;and&nbsp;release&nbsp;its&nbsp;posture.</span></dd></dl>
+
+<dl><dt><a name="Mind-exit_teaching_mode"><strong>exit_teaching_mode</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Exit&nbsp;teaching/training&nbsp;mode&nbsp;and&nbsp;resume&nbsp;normal&nbsp;operation.</span></dd></dl>
+
+<dl><dt><a name="Mind-mark_user_activity"><strong>mark_user_activity</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Mark&nbsp;that&nbsp;the&nbsp;user&nbsp;is&nbsp;active&nbsp;(typing&nbsp;or&nbsp;interacting).<br>
+&nbsp;<br>
+This&nbsp;updates&nbsp;``_last_interaction_time``&nbsp;from&nbsp;the&nbsp;CLI's&nbsp;input<br>
+loop,&nbsp;BEFORE&nbsp;responding.&nbsp;The&nbsp;heartbeat's&nbsp;waking-side&nbsp;signals<br>
+run&nbsp;in&nbsp;a&nbsp;separate&nbsp;thread&nbsp;and&nbsp;must&nbsp;see&nbsp;the&nbsp;user&nbsp;as&nbsp;active&nbsp;—<br>
+announcing&nbsp;sleepiness&nbsp;or&nbsp;renewing&nbsp;a&nbsp;wake&nbsp;drive&nbsp;mid-turn&nbsp;is<br>
+noise.</span></dd></dl>
+
+<dl><dt><a name="Mind-offer_utterance"><strong>offer_utterance</strong></a>(self, text: 'str') -&gt; 'None'</dt><dd><span class="code">Offer&nbsp;a&nbsp;candidate&nbsp;utterance&nbsp;for&nbsp;the&nbsp;speech-volition&nbsp;to&nbsp;consider.<br>
+&nbsp;<br>
+The&nbsp;CLI&nbsp;feeds&nbsp;live-thought&nbsp;text&nbsp;here.&nbsp;The&nbsp;<a href="#Mind">Mind</a>'s&nbsp;volition&nbsp;engine<br>
+decides&nbsp;whether&nbsp;it&nbsp;actually&nbsp;feels&nbsp;like&nbsp;saying&nbsp;it.<br>
+&nbsp;<br>
+During&nbsp;sleep,&nbsp;utterances&nbsp;are&nbsp;not&nbsp;queued&nbsp;—&nbsp;it&nbsp;shouldn't<br>
+accumulate&nbsp;speech&nbsp;while&nbsp;resting.&nbsp;The&nbsp;queue&nbsp;would&nbsp;drain&nbsp;when<br>
+it&nbsp;wakes,&nbsp;producing&nbsp;a&nbsp;burst&nbsp;of&nbsp;stale&nbsp;thoughts.</span></dd></dl>
+
+<dl><dt><a name="Mind-pop_queued_question"><strong>pop_queued_question</strong></a>(self) -&gt; 'dict[str, str] | None'</dt><dd><span class="code">Pop&nbsp;the&nbsp;next&nbsp;queued&nbsp;question.<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;dict&nbsp;with&nbsp;keys&nbsp;'text',&nbsp;'reason',&nbsp;'target_concept',<br>
+'question_type',&nbsp;'gap_detail',&nbsp;or&nbsp;None&nbsp;if&nbsp;the&nbsp;queue&nbsp;is&nbsp;empty.<br>
+Also&nbsp;sets&nbsp;the&nbsp;question&nbsp;as&nbsp;pending&nbsp;so&nbsp;the&nbsp;cognition&nbsp;engine<br>
+treats&nbsp;the&nbsp;user's&nbsp;next&nbsp;input&nbsp;as&nbsp;an&nbsp;answer.</span></dd></dl>
+
+<dl><dt><a name="Mind-respond"><strong>respond</strong></a>(self, user_input: 'str', timeout: 'float' = 60.0) -&gt; 'str'</dt><dd><span class="code">Process&nbsp;one&nbsp;user&nbsp;turn&nbsp;and&nbsp;record&nbsp;its&nbsp;observed&nbsp;response&nbsp;latency.<br>
+&nbsp;<br>
+Timing&nbsp;starts&nbsp;when&nbsp;the&nbsp;interaction&nbsp;enters&nbsp;the&nbsp;public&nbsp;response<br>
+boundary&nbsp;and&nbsp;ends&nbsp;when&nbsp;that&nbsp;boundary&nbsp;returns.&nbsp;This&nbsp;includes&nbsp;normal<br>
+cognition,&nbsp;errors,&nbsp;and&nbsp;bounded&nbsp;timeout&nbsp;fallbacks.</span></dd></dl>
+
+<hr>
+Readonly properties inherited from <a href="frontal_lobe.conversation.html#ConversationMixin">frontal_lobe.conversation.ConversationMixin</a>:<br>
+<dl><dt><strong>awaiting_question_answer</strong></dt>
+<dd><span class="code">True&nbsp;while&nbsp;a&nbsp;popped&nbsp;question&nbsp;is&nbsp;still&nbsp;awaiting&nbsp;its&nbsp;answer.<br>
+&nbsp;<br>
+The&nbsp;pending&nbsp;marker&nbsp;is&nbsp;cleared&nbsp;when&nbsp;the&nbsp;user's&nbsp;next&nbsp;input&nbsp;is<br>
+consumed&nbsp;as&nbsp;the&nbsp;answer&nbsp;—&nbsp;until&nbsp;then&nbsp;the&nbsp;exchange&nbsp;counts&nbsp;as&nbsp;an<br>
+open&nbsp;turn&nbsp;and&nbsp;volition&nbsp;stays&nbsp;held.</span></dd>
+</dl>
+<dl><dt><strong>has_queued_questions</strong></dt>
+<dd><span class="code">Whether&nbsp;it&nbsp;has&nbsp;queued&nbsp;questions&nbsp;to&nbsp;ask.</span></dd>
+</dl>
+<dl><dt><strong>in_question_session</strong></dt>
+<dd><span class="code">Whether&nbsp;a&nbsp;/teach-questions&nbsp;answer&nbsp;session&nbsp;is&nbsp;holding&nbsp;focus.</span></dd>
+</dl>
+<dl><dt><strong>is_teaching</strong></dt>
+<dd><span class="code">Whether&nbsp;it&nbsp;is&nbsp;currently&nbsp;in&nbsp;teaching/training&nbsp;mode.</span></dd>
+</dl>
+<dl><dt><strong>is_user_sleeping</strong></dt>
+<dd><span class="code">Whether&nbsp;its&nbsp;sleep&nbsp;was&nbsp;user-initiated&nbsp;(not&nbsp;auto-wakeable).</span></dd>
+</dl>
+<dl><dt><strong>queued_question_count</strong></dt>
+<dd><span class="code">Number&nbsp;of&nbsp;queued&nbsp;questions.</span></dd>
+</dl>
+<dl><dt><strong>teaching_topic</strong></dt>
+<dd><span class="code">The&nbsp;topic&nbsp;the&nbsp;user&nbsp;is&nbsp;currently&nbsp;teaching&nbsp;it&nbsp;about.</span></dd>
+</dl>
+<hr>
+Data descriptors inherited from <a href="frontal_lobe.conversation.html#ConversationMixin">frontal_lobe.conversation.ConversationMixin</a>:<br>
+<dl><dt><strong>on_speak</strong></dt>
+<dd><span class="code">Callback&nbsp;used&nbsp;when&nbsp;the&nbsp;speech&nbsp;urge&nbsp;fires.</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>CHEM_ACETYLCHOLINE</strong> = 3<br>
+<strong>ClassVar</strong> = typing.ClassVar<br>
+<strong>TYPE_CHECKING</strong> = False<br>
+<strong>logger</strong> = &lt;Logger Self_World.mind (WARNING)&gt;</td></tr></table>
+</body></html>

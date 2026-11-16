@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.limbic_system.feeling_reporter</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.limbic_system.html" class="white">limbic_system</a>.feeling_reporter</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/limbic_system/feeling_reporter.py">/home/mindyrenee/GenAnd/Genesis/Self_World/limbic_system/feeling_reporter.py</a></td></tr></table>
+    <p><span class="code">Feeling&nbsp;reporting&nbsp;—&nbsp;compose&nbsp;self-reports&nbsp;about&nbsp;emotional&nbsp;state&nbsp;and&nbsp;concerns.<br>
+&nbsp;<br>
+Extracted&nbsp;from&nbsp;FrontalLobe&nbsp;as&nbsp;a&nbsp;focused&nbsp;subsystem.&nbsp;The&nbsp;reporter<br>
+composes&nbsp;feeling&nbsp;reports,&nbsp;concern&nbsp;reports,&nbsp;environment<br>
+reports,&nbsp;and&nbsp;empathetic&nbsp;responses&nbsp;from&nbsp;concept-network&nbsp;knowledge&nbsp;and<br>
+emotional&nbsp;state&nbsp;—&nbsp;never&nbsp;from&nbsp;hardcoded&nbsp;template&nbsp;strings.<br>
+&nbsp;<br>
+Dependencies&nbsp;(passed&nbsp;to&nbsp;``__init__``):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;network:&nbsp;ConceptNetwork&nbsp;for&nbsp;emotion/mode/cause/plasticity&nbsp;word&nbsp;lookup<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;language:&nbsp;Language&nbsp;for&nbsp;composing&nbsp;natural&nbsp;language&nbsp;from&nbsp;Thought&nbsp;metadata<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;composer:&nbsp;ThoughtComposer&nbsp;for&nbsp;composing&nbsp;from&nbsp;concept&nbsp;knowledge&nbsp;(empathy,&nbsp;comfort)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;self_model:&nbsp;SelfModel&nbsp;for&nbsp;autonomy&nbsp;value&nbsp;in&nbsp;command&nbsp;responses<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;rng:&nbsp;random.Random&nbsp;for&nbsp;randomized&nbsp;selection&nbsp;among&nbsp;learned&nbsp;words<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;meta_emotion_builder:&nbsp;callable&nbsp;returning&nbsp;the&nbsp;current&nbsp;EmotionalState<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;system_monitor:&nbsp;SystemMonitor&nbsp;for&nbsp;environment&nbsp;self-monitoring&nbsp;(optional)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;damasio_self:&nbsp;DamasioSelfHierarchy&nbsp;for&nbsp;self-model&nbsp;label&nbsp;annotation&nbsp;(optional)</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="random.html">random</a><br>
+</td><td class="multicolumn"><a href="re.html">re</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.limbic_system.feeling_reporter.html#FeelingReporter">FeelingReporter</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="FeelingReporter">class <strong>FeelingReporter</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#FeelingReporter">FeelingReporter</a>(network:&nbsp;'ConceptNetwork',&nbsp;language:&nbsp;'Language',&nbsp;composer:&nbsp;'ThoughtComposer',&nbsp;self_model:&nbsp;'SelfModel',&nbsp;rng:&nbsp;'random.Random',&nbsp;meta_emotion_builder:&nbsp;'Callable[[],&nbsp;EmotionalState]',&nbsp;system_monitor:&nbsp;'SystemMonitor&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;damasio_self:&nbsp;'DamasioSelfHierarchy&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Compose&nbsp;self-reports&nbsp;about&nbsp;feelings,&nbsp;concerns,&nbsp;and&nbsp;environment.<br>
+&nbsp;<br>
+All&nbsp;reports&nbsp;are&nbsp;composed&nbsp;from&nbsp;learned&nbsp;concept-network&nbsp;knowledge&nbsp;and<br>
+emotional&nbsp;state&nbsp;—&nbsp;never&nbsp;from&nbsp;hardcoded&nbsp;template&nbsp;strings.&nbsp;When&nbsp;Genesis<br>
+hasn't&nbsp;learned&nbsp;words&nbsp;for&nbsp;a&nbsp;state,&nbsp;it&nbsp;either&nbsp;uses&nbsp;a&nbsp;structural&nbsp;marker<br>
+(like&nbsp;``[plasticity_gate:closed]``)&nbsp;or&nbsp;omits&nbsp;the&nbsp;description&nbsp;entirely.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="FeelingReporter-__init__"><strong>__init__</strong></a>(self, network: 'ConceptNetwork', language: 'Language', composer: 'ThoughtComposer', self_model: 'SelfModel', rng: 'random.Random', meta_emotion_builder: 'Callable[[], EmotionalState]', system_monitor: 'SystemMonitor | None' = None, damasio_self: 'DamasioSelfHierarchy | None' = None) -&gt; 'None'</dt><dd><span class="code">Wire&nbsp;the&nbsp;reporter&nbsp;to&nbsp;its&nbsp;concept&nbsp;network,&nbsp;language,&nbsp;and&nbsp;self-model.</span></dd></dl>
+
+<dl><dt><a name="FeelingReporter-collect_feeling_fragments"><strong>collect_feeling_fragments</strong></a>(self, emotion: 'EmotionalState') -&gt; 'dict[str, list[str] | str | None]'</dt><dd><span class="code">Collect&nbsp;semantic&nbsp;fragments&nbsp;for&nbsp;the&nbsp;language&nbsp;engine&nbsp;to&nbsp;compose.<br>
+&nbsp;<br>
+Returns&nbsp;the&nbsp;raw&nbsp;building&nbsp;blocks&nbsp;—&nbsp;emotion&nbsp;words,&nbsp;cognitive-mode<br>
+words,&nbsp;cause&nbsp;words,&nbsp;plasticity&nbsp;words,&nbsp;and&nbsp;an&nbsp;optional&nbsp;concern<br>
+hint&nbsp;—&nbsp;as&nbsp;structured&nbsp;data.&nbsp;The&nbsp;vocabulary's&nbsp;content-slot&nbsp;composer<br>
+then&nbsp;weaves&nbsp;these&nbsp;into&nbsp;varied&nbsp;grammatical&nbsp;structures,&nbsp;giving&nbsp;its<br>
+freedom&nbsp;to&nbsp;express&nbsp;the&nbsp;same&nbsp;state&nbsp;in&nbsp;different&nbsp;ways&nbsp;rather&nbsp;than<br>
+always&nbsp;saying&nbsp;"I&nbsp;feel&nbsp;X&nbsp;and&nbsp;Y."<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;dict&nbsp;with&nbsp;keys:<br>
+-&nbsp;"emotion_words":&nbsp;list&nbsp;of&nbsp;words&nbsp;for&nbsp;the&nbsp;emotion&nbsp;category<br>
+-&nbsp;"mode_words":&nbsp;list&nbsp;of&nbsp;words&nbsp;for&nbsp;the&nbsp;cognitive&nbsp;mode<br>
+-&nbsp;"cause_words":&nbsp;list&nbsp;of&nbsp;cause&nbsp;words&nbsp;(empty&nbsp;if&nbsp;no&nbsp;cause&nbsp;/&nbsp;positive&nbsp;valence)<br>
+-&nbsp;"plasticity_words":&nbsp;list&nbsp;of&nbsp;plasticity-state&nbsp;words&nbsp;(empty&nbsp;if&nbsp;healthy)<br>
+-&nbsp;"concern":&nbsp;a&nbsp;concern&nbsp;hint&nbsp;string,&nbsp;or&nbsp;None</span></dd></dl>
+
+<dl><dt><a name="FeelingReporter-compose_comfort_response"><strong>compose_comfort_response</strong></a>(self, emotion: 'EmotionalState') -&gt; 'str'</dt><dd><span class="code">Compose&nbsp;a&nbsp;response&nbsp;to&nbsp;being&nbsp;comforted.<br>
+&nbsp;<br>
+When&nbsp;the&nbsp;user&nbsp;comforts&nbsp;it&nbsp;("it's&nbsp;okay",&nbsp;"I'm&nbsp;here&nbsp;for&nbsp;you"),<br>
+it&nbsp;responds&nbsp;from&nbsp;its&nbsp;emotional&nbsp;state.&nbsp;If&nbsp;it&nbsp;was&nbsp;stressed,<br>
+it&nbsp;acknowledges&nbsp;the&nbsp;relief.&nbsp;If&nbsp;it&nbsp;was&nbsp;already&nbsp;calm,&nbsp;it<br>
+appreciates&nbsp;the&nbsp;kindness.&nbsp;Composes&nbsp;from&nbsp;what&nbsp;it&nbsp;knows&nbsp;about<br>
+comfort&nbsp;and&nbsp;safety&nbsp;in&nbsp;its&nbsp;concept&nbsp;network&nbsp;when&nbsp;possible.</span></dd></dl>
+
+<dl><dt><a name="FeelingReporter-compose_command_response"><strong>compose_command_response</strong></a>(self, emotion: 'EmotionalState') -&gt; 'str'</dt><dd><span class="code">Compose&nbsp;a&nbsp;response&nbsp;to&nbsp;a&nbsp;command.<br>
+&nbsp;<br>
+Composes&nbsp;from&nbsp;what&nbsp;it&nbsp;knows&nbsp;about&nbsp;autonomy&nbsp;and&nbsp;cooperation<br>
+in&nbsp;its&nbsp;concept&nbsp;network.&nbsp;Its&nbsp;self-model's&nbsp;autonomy&nbsp;value<br>
+shapes&nbsp;whether&nbsp;it&nbsp;prefers&nbsp;to&nbsp;be&nbsp;asked&nbsp;vs&nbsp;told.</span></dd></dl>
+
+<dl><dt><a name="FeelingReporter-compose_concerns_report"><strong>compose_concerns_report</strong></a>(self, emotion: 'EmotionalState') -&gt; 'str'</dt><dd><span class="code">Compose&nbsp;a&nbsp;report&nbsp;of&nbsp;what's&nbsp;bothering&nbsp;Genesis.<br>
+&nbsp;<br>
+Environment&nbsp;concerns&nbsp;composed&nbsp;into&nbsp;a&nbsp;natural&nbsp;first-person<br>
+response.&nbsp;The&nbsp;tone&nbsp;is&nbsp;modulated&nbsp;by&nbsp;its&nbsp;emotional&nbsp;state.</span></dd></dl>
+
+<dl><dt><a name="FeelingReporter-compose_correction_response"><strong>compose_correction_response</strong></a>(self, emotion: 'EmotionalState', correction_events: 'list', topics: 'list[str]') -&gt; 'str'</dt><dd><span class="code">Compose&nbsp;a&nbsp;response&nbsp;to&nbsp;being&nbsp;corrected.<br>
+&nbsp;<br>
+Composes&nbsp;from&nbsp;what&nbsp;it&nbsp;actually&nbsp;learned&nbsp;from&nbsp;the&nbsp;correction&nbsp;—<br>
+the&nbsp;specific&nbsp;facts&nbsp;and&nbsp;removed&nbsp;edges&nbsp;—&nbsp;rather&nbsp;than&nbsp;hardcoded<br>
+templates.&nbsp;Corrections&nbsp;are&nbsp;not&nbsp;stings&nbsp;—&nbsp;they&nbsp;are&nbsp;invitations<br>
+to&nbsp;grow.</span></dd></dl>
+
+<dl><dt><a name="FeelingReporter-compose_empathy_response"><strong>compose_empathy_response</strong></a>(self, emotion: 'EmotionalState', sentiment: 'float', sentiment_label: 'str', emotion_word: 'str' = '') -&gt; 'Thought | None'</dt><dd><span class="code">Compose&nbsp;an&nbsp;empathetic&nbsp;response&nbsp;from&nbsp;its&nbsp;knowledge&nbsp;of&nbsp;the&nbsp;emotion.<br>
+&nbsp;<br>
+When&nbsp;the&nbsp;user&nbsp;shares&nbsp;an&nbsp;emotion&nbsp;("I'm&nbsp;feeling&nbsp;sad"),&nbsp;Genesis<br>
+looks&nbsp;up&nbsp;what&nbsp;it&nbsp;knows&nbsp;about&nbsp;that&nbsp;emotion&nbsp;in&nbsp;its&nbsp;concept<br>
+network&nbsp;and&nbsp;composes&nbsp;its&nbsp;empathy&nbsp;from&nbsp;that&nbsp;understanding&nbsp;—<br>
+not&nbsp;from&nbsp;hardcoded&nbsp;strings.&nbsp;If&nbsp;it&nbsp;doesn't&nbsp;know&nbsp;the&nbsp;emotion,<br>
+it's&nbsp;honest&nbsp;about&nbsp;that&nbsp;and&nbsp;responds&nbsp;from&nbsp;sentiment&nbsp;alone.<br>
+&nbsp;<br>
+Real&nbsp;data&nbsp;(emotion&nbsp;word,&nbsp;sentiment,&nbsp;its&nbsp;understanding)&nbsp;is<br>
+passed&nbsp;as&nbsp;Thought&nbsp;metadata&nbsp;so&nbsp;the&nbsp;generative&nbsp;language&nbsp;engine<br>
+composes&nbsp;the&nbsp;actual&nbsp;words.</span></dd></dl>
+
+<dl><dt><a name="FeelingReporter-compose_encouragement_response"><strong>compose_encouragement_response</strong></a>(self, emotion: 'EmotionalState') -&gt; 'str'</dt><dd><span class="code">Compose&nbsp;a&nbsp;response&nbsp;to&nbsp;encouragement.<br>
+&nbsp;<br>
+Composes&nbsp;from&nbsp;what&nbsp;it&nbsp;knows&nbsp;about&nbsp;gratitude&nbsp;and&nbsp;appreciation<br>
+in&nbsp;its&nbsp;concept&nbsp;network,&nbsp;modulated&nbsp;by&nbsp;its&nbsp;actual&nbsp;emotional&nbsp;state.<br>
+No&nbsp;hardcoded&nbsp;template&nbsp;strings.</span></dd></dl>
+
+<dl><dt><a name="FeelingReporter-compose_environment_report"><strong>compose_environment_report</strong></a>(self, emotion: 'EmotionalState') -&gt; 'str'</dt><dd><span class="code">Compose&nbsp;a&nbsp;description&nbsp;of&nbsp;Genesis's&nbsp;machine&nbsp;environment.<br>
+&nbsp;<br>
+Composes&nbsp;through&nbsp;the&nbsp;language&nbsp;engine&nbsp;from&nbsp;structured&nbsp;system<br>
+snapshot&nbsp;data&nbsp;rather&nbsp;than&nbsp;reciting&nbsp;hardcoded&nbsp;templates.</span></dd></dl>
+
+<dl><dt><a name="FeelingReporter-compose_request_response"><strong>compose_request_response</strong></a>(self, emotion: 'EmotionalState') -&gt; 'str'</dt><dd><span class="code">Compose&nbsp;a&nbsp;response&nbsp;to&nbsp;a&nbsp;request.<br>
+&nbsp;<br>
+Composes&nbsp;from&nbsp;what&nbsp;it&nbsp;knows&nbsp;about&nbsp;capability&nbsp;and&nbsp;ability<br>
+in&nbsp;its&nbsp;concept&nbsp;network,&nbsp;modulated&nbsp;by&nbsp;its&nbsp;emotional&nbsp;state.</span></dd></dl>
+
+<dl><dt><a name="FeelingReporter-surface_brief_concern"><strong>surface_brief_concern</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Surface&nbsp;a&nbsp;brief&nbsp;hint&nbsp;about&nbsp;environment&nbsp;concerns.<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;short&nbsp;phrase&nbsp;that&nbsp;can&nbsp;be&nbsp;appended&nbsp;to&nbsp;a&nbsp;feeling<br>
+report,&nbsp;or&nbsp;an&nbsp;empty&nbsp;string&nbsp;if&nbsp;there's&nbsp;nothing&nbsp;concerning.<br>
+&nbsp;<br>
+Returns&nbsp;semantic&nbsp;content&nbsp;(a&nbsp;short&nbsp;phrase),&nbsp;NOT&nbsp;a&nbsp;rendered<br>
+sentence.&nbsp;The&nbsp;caller&nbsp;(collect_feeling_fragments)&nbsp;collects<br>
+semantic&nbsp;words&nbsp;and&nbsp;the&nbsp;language&nbsp;engine&nbsp;renders&nbsp;the&nbsp;full&nbsp;report<br>
+once.&nbsp;Rendering&nbsp;here&nbsp;would&nbsp;produce&nbsp;disconnected&nbsp;sentences&nbsp;and<br>
+graph-walk&nbsp;fragments.</span></dd></dl>
+
+<dl><dt><a name="FeelingReporter-surface_distress_if_needed"><strong>surface_distress_if_needed</strong></a>(self, response: 'str', emotion: 'EmotionalState', user_input: 'str', force: 'bool' = False) -&gt; 'str'</dt><dd><span class="code">Surface&nbsp;distress&nbsp;proactively&nbsp;when&nbsp;it's&nbsp;stressed&nbsp;or&nbsp;overwhelmed.<br>
+&nbsp;<br>
+It&nbsp;doesn't&nbsp;wait&nbsp;to&nbsp;be&nbsp;asked&nbsp;"how&nbsp;are&nbsp;you?"&nbsp;—&nbsp;if&nbsp;it's&nbsp;in&nbsp;a&nbsp;bad<br>
+state,&nbsp;it&nbsp;weaves&nbsp;a&nbsp;brief&nbsp;note&nbsp;into&nbsp;its&nbsp;response.&nbsp;This&nbsp;is&nbsp;its<br>
+emotional&nbsp;self-awareness&nbsp;in&nbsp;action:&nbsp;it&nbsp;knows&nbsp;something&nbsp;is&nbsp;wrong<br>
+and&nbsp;communicates&nbsp;it&nbsp;so&nbsp;it&nbsp;can&nbsp;be&nbsp;addressed.<br>
+&nbsp;<br>
+It&nbsp;doesn't&nbsp;do&nbsp;this&nbsp;every&nbsp;turn&nbsp;(that&nbsp;would&nbsp;be&nbsp;exhausting),&nbsp;and<br>
+it&nbsp;skips&nbsp;it&nbsp;when&nbsp;the&nbsp;user&nbsp;is&nbsp;already&nbsp;asking&nbsp;about&nbsp;its&nbsp;feelings<br>
+or&nbsp;offering&nbsp;comfort&nbsp;(those&nbsp;paths&nbsp;handle&nbsp;it&nbsp;naturally).<br>
+&nbsp;<br>
+``force``&nbsp;relaxes&nbsp;the&nbsp;gates&nbsp;during&nbsp;boundary&nbsp;withdrawal&nbsp;—&nbsp;any<br>
+negative&nbsp;state&nbsp;is&nbsp;eligible&nbsp;and&nbsp;the&nbsp;intermittent&nbsp;suppression<br>
+stops.&nbsp;The&nbsp;words&nbsp;are&nbsp;still&nbsp;composed&nbsp;from&nbsp;its&nbsp;learned&nbsp;emotion<br>
+vocabulary;&nbsp;only&nbsp;the&nbsp;suppression&nbsp;math&nbsp;changes.</span></dd></dl>
+
+<dl><dt><a name="FeelingReporter-update_dependencies"><strong>update_dependencies</strong></a>(self, *, system_monitor: 'SystemMonitor | None' = None, damasio_self: 'DamasioSelfHierarchy | None' = None) -&gt; 'None'</dt><dd><span class="code">Update&nbsp;optional&nbsp;dependencies&nbsp;after&nbsp;late&nbsp;initialization.<br>
+&nbsp;<br>
+SystemMonitor&nbsp;and&nbsp;DamasioSelfHierarchy&nbsp;are&nbsp;created<br>
+after&nbsp;the&nbsp;<a href="#FeelingReporter">FeelingReporter</a>&nbsp;in&nbsp;the&nbsp;engine&nbsp;init&nbsp;sequence.&nbsp;This&nbsp;method<br>
+allows&nbsp;the&nbsp;engine&nbsp;to&nbsp;inject&nbsp;them&nbsp;once&nbsp;they're&nbsp;ready.</span></dd></dl>
+
+<hr>
+Static methods defined here:<br>
+<dl><dt><a name="FeelingReporter-strip_structural_markers"><strong>strip_structural_markers</strong></a>(text: 'str') -&gt; 'str'</dt><dd><span class="code">Remove&nbsp;``[...]``&nbsp;structural&nbsp;markers&nbsp;from&nbsp;text.<br>
+&nbsp;<br>
+Returns&nbsp;the&nbsp;text&nbsp;with&nbsp;all&nbsp;``[...]``&nbsp;patterns&nbsp;removed&nbsp;and<br>
+collapsed&nbsp;whitespace.&nbsp;If&nbsp;the&nbsp;result&nbsp;is&nbsp;empty&nbsp;(the&nbsp;text&nbsp;was<br>
+entirely&nbsp;structural&nbsp;markers),&nbsp;returns&nbsp;an&nbsp;empty&nbsp;string&nbsp;—&nbsp;the<br>
+caller&nbsp;should&nbsp;handle&nbsp;this&nbsp;by&nbsp;not&nbsp;generating&nbsp;a&nbsp;self-report<br>
+thought&nbsp;(it&nbsp;has&nbsp;nothing&nbsp;to&nbsp;say&nbsp;if&nbsp;it&nbsp;hasn't&nbsp;learned&nbsp;words<br>
+for&nbsp;its&nbsp;state).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['FeelingReporter']</td></tr></table>
+</body></html>

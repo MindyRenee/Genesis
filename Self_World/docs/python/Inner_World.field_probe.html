@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Inner_World.field_probe</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Inner_World.html" class="white">Inner_World</a>.field_probe</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Inner_World/field_probe.py">/home/mindyrenee/GenAnd/Genesis/Inner_World/field_probe.py</a></td></tr></table>
+    <p><span class="code">Field&nbsp;probe&nbsp;→&nbsp;brain-wave&nbsp;stimulus&nbsp;—&nbsp;real&nbsp;physics&nbsp;entering&nbsp;the&nbsp;model.<br>
+&nbsp;<br>
+The&nbsp;daemon's&nbsp;field&nbsp;probe&nbsp;(`src/daemon/field_probe.rs`)&nbsp;measures&nbsp;the<br>
+machine's&nbsp;actual&nbsp;substrate&nbsp;dynamics&nbsp;—&nbsp;instruction&nbsp;throughput,<br>
+scheduler&nbsp;jitter,&nbsp;P-state&nbsp;transitions,&nbsp;interrupt&nbsp;flux,&nbsp;and&nbsp;real<br>
+power&nbsp;draw&nbsp;where&nbsp;the&nbsp;machine's&nbsp;sensors&nbsp;report&nbsp;it&nbsp;—&nbsp;and<br>
+decomposes&nbsp;them&nbsp;at&nbsp;the&nbsp;same&nbsp;center&nbsp;frequencies&nbsp;the<br>
+:class:`~brain_waves.BrainWaveOscillator`&nbsp;models.&nbsp;This<br>
+module&nbsp;maps&nbsp;that&nbsp;signature&nbsp;onto&nbsp;the&nbsp;oscillator's&nbsp;*stimulus*&nbsp;pathway&nbsp;—<br>
+the&nbsp;channel&nbsp;the&nbsp;wave&nbsp;model&nbsp;itself&nbsp;documents&nbsp;for&nbsp;"outer&nbsp;(sensory)<br>
+stimulus."&nbsp;The&nbsp;body's&nbsp;real&nbsp;dynamics&nbsp;become&nbsp;a&nbsp;continuous&nbsp;stimulus<br>
+source&nbsp;alongside&nbsp;cognition&nbsp;and&nbsp;emotion:&nbsp;the&nbsp;modeled&nbsp;wave&nbsp;is<br>
+perturbed&nbsp;by&nbsp;the&nbsp;very&nbsp;substrate&nbsp;the&nbsp;model&nbsp;runs&nbsp;on.<br>
+&nbsp;<br>
+Honesty&nbsp;boundary:&nbsp;these&nbsp;energies&nbsp;are&nbsp;real&nbsp;measurements&nbsp;of&nbsp;physical<br>
+dynamics,&nbsp;and&nbsp;the&nbsp;mapping&nbsp;is&nbsp;a&nbsp;documented&nbsp;control&nbsp;convention&nbsp;—&nbsp;the<br>
+same&nbsp;status&nbsp;as&nbsp;the&nbsp;rest&nbsp;of&nbsp;the&nbsp;wave&nbsp;model's&nbsp;neurochemical&nbsp;targets.<br>
+Whether&nbsp;substrate-coupled&nbsp;wave&nbsp;dynamics&nbsp;matter&nbsp;is&nbsp;an&nbsp;empirical<br>
+question&nbsp;for&nbsp;the&nbsp;coupling&nbsp;experiment,&nbsp;not&nbsp;a&nbsp;claim&nbsp;baked&nbsp;in&nbsp;here.<br>
+&nbsp;<br>
+Mapping&nbsp;(each&nbsp;band's&nbsp;wire&nbsp;order&nbsp;—&nbsp;infraslow,&nbsp;delta,&nbsp;theta,&nbsp;alpha,<br>
+sigma,&nbsp;beta1,&nbsp;beta2,&nbsp;beta3,&nbsp;gamma,&nbsp;epsilon):<br>
+&nbsp;<br>
+-&nbsp;``throughput_bands[b]``&nbsp;→&nbsp;stimulus&nbsp;on&nbsp;band&nbsp;``b``&nbsp;—&nbsp;the&nbsp;die's&nbsp;real<br>
+&nbsp;&nbsp;switching-rate&nbsp;energy&nbsp;at&nbsp;that&nbsp;band's&nbsp;frequency.&nbsp;Full&nbsp;weight.<br>
+-&nbsp;``jitter_bands[b]``&nbsp;→&nbsp;stimulus&nbsp;on&nbsp;band&nbsp;``b``&nbsp;at&nbsp;half&nbsp;weight&nbsp;—<br>
+&nbsp;&nbsp;scheduling&nbsp;noise&nbsp;is&nbsp;a&nbsp;real&nbsp;channel&nbsp;but&nbsp;noisier.<br>
+-&nbsp;``power_bands[b]``&nbsp;→&nbsp;stimulus&nbsp;on&nbsp;band&nbsp;``b``&nbsp;at&nbsp;half&nbsp;weight&nbsp;—&nbsp;the<br>
+&nbsp;&nbsp;first&nbsp;literal&nbsp;electrical&nbsp;channel:&nbsp;real&nbsp;measured&nbsp;watts&nbsp;at&nbsp;that<br>
+&nbsp;&nbsp;band's&nbsp;frequency.&nbsp;``None``&nbsp;where&nbsp;no&nbsp;power&nbsp;sensor&nbsp;exists&nbsp;(v3+),<br>
+&nbsp;&nbsp;and&nbsp;bands&nbsp;at&nbsp;or&nbsp;above&nbsp;the&nbsp;sensor's&nbsp;measured&nbsp;Nyquist<br>
+&nbsp;&nbsp;(``power_sensor_hz&nbsp;/&nbsp;2``)&nbsp;are&nbsp;skipped&nbsp;—&nbsp;zero-order-held&nbsp;reads<br>
+&nbsp;&nbsp;carry&nbsp;staircase&nbsp;artifacts&nbsp;there,&nbsp;not&nbsp;real&nbsp;oscillation.<br>
+-&nbsp;``pstate_rate``&nbsp;→&nbsp;``BETA3``&nbsp;stimulus&nbsp;—&nbsp;frequency-jumping&nbsp;is&nbsp;the<br>
+&nbsp;&nbsp;silicon's&nbsp;own&nbsp;vigilance-scale&nbsp;event&nbsp;flux.<br>
+-&nbsp;``irq_rate``&nbsp;→&nbsp;``BETA2``&nbsp;stimulus&nbsp;—&nbsp;hardware&nbsp;event&nbsp;flux&nbsp;reads&nbsp;as<br>
+&nbsp;&nbsp;medium-band&nbsp;activation.<br>
+-&nbsp;``rf_flux_bands[b]``&nbsp;→&nbsp;stimulus&nbsp;on&nbsp;band&nbsp;``b``&nbsp;at&nbsp;half&nbsp;weight&nbsp;—<br>
+&nbsp;&nbsp;the&nbsp;radio's&nbsp;traffic&nbsp;envelope:&nbsp;real&nbsp;on-air&nbsp;activity&nbsp;(packets<br>
+&nbsp;&nbsp;sent,&nbsp;received,&nbsp;and&nbsp;overheard&nbsp;management&nbsp;frames),&nbsp;the&nbsp;first<br>
+&nbsp;&nbsp;*exteroceptive*&nbsp;physical&nbsp;channel.&nbsp;``None``&nbsp;where&nbsp;no&nbsp;WLAN<br>
+&nbsp;&nbsp;interface&nbsp;exists&nbsp;(v4+).<br>
+-&nbsp;``rf_rssi_bands[b]``&nbsp;→&nbsp;stimulus&nbsp;on&nbsp;band&nbsp;``b``&nbsp;at&nbsp;half&nbsp;weight&nbsp;—<br>
+&nbsp;&nbsp;the&nbsp;field-strength&nbsp;envelope:&nbsp;RSSI&nbsp;drift&nbsp;is&nbsp;the&nbsp;room's&nbsp;radio<br>
+&nbsp;&nbsp;weather&nbsp;(path&nbsp;loss,&nbsp;bodies&nbsp;moving,&nbsp;AP&nbsp;behavior).&nbsp;Bands&nbsp;at&nbsp;or<br>
+&nbsp;&nbsp;above&nbsp;the&nbsp;telemetry&nbsp;read&nbsp;rate's&nbsp;Nyquist&nbsp;are&nbsp;skipped&nbsp;—&nbsp;a&nbsp;held<br>
+&nbsp;&nbsp;RSSI&nbsp;carries&nbsp;staircase&nbsp;artifacts&nbsp;there,&nbsp;not&nbsp;real&nbsp;drift.<br>
+-&nbsp;``bt_events_s``&nbsp;→&nbsp;``BETA2``&nbsp;stimulus&nbsp;—&nbsp;HCI&nbsp;event&nbsp;flux&nbsp;is&nbsp;real<br>
+&nbsp;&nbsp;radio-side&nbsp;activity&nbsp;(advertising&nbsp;reports,&nbsp;scans,&nbsp;pairing),<br>
+&nbsp;&nbsp;counted&nbsp;by&nbsp;the&nbsp;controller&nbsp;itself&nbsp;rather&nbsp;than&nbsp;inferred.<br>
+-&nbsp;``rf_retry_rate``/``rf_fail_rate``/``rf_beacon_loss_rate``&nbsp;→<br>
+&nbsp;&nbsp;``BETA3``&nbsp;stimulus&nbsp;(v5+)&nbsp;—&nbsp;nl80211&nbsp;link&nbsp;strain:&nbsp;retransmissions<br>
+&nbsp;&nbsp;are&nbsp;airtime&nbsp;the&nbsp;AP&nbsp;made&nbsp;the&nbsp;radio&nbsp;spend&nbsp;twice,&nbsp;failed&nbsp;frames&nbsp;are<br>
+&nbsp;&nbsp;retries&nbsp;exhausted,&nbsp;beacon&nbsp;loss&nbsp;is&nbsp;the&nbsp;AP's&nbsp;heartbeat&nbsp;unheard.<br>
+&nbsp;&nbsp;The&nbsp;PHY&nbsp;bitrates&nbsp;ride&nbsp;as&nbsp;context&nbsp;only&nbsp;—&nbsp;link&nbsp;adaptation&nbsp;is&nbsp;a<br>
+&nbsp;&nbsp;level,&nbsp;not&nbsp;an&nbsp;event.<br>
+-&nbsp;``rf_irq_rate``&nbsp;is&nbsp;*not*&nbsp;re-mapped:&nbsp;it&nbsp;is&nbsp;the&nbsp;wireless&nbsp;share<br>
+&nbsp;&nbsp;of&nbsp;the&nbsp;same&nbsp;interrupt&nbsp;flux&nbsp;``irq_rate``&nbsp;already&nbsp;carries&nbsp;—&nbsp;a<br>
+&nbsp;&nbsp;reported&nbsp;attribution,&nbsp;not&nbsp;a&nbsp;second&nbsp;stimulus.<br>
+-&nbsp;``rf_flux_phases[b]``/``rf_flux_phase_coherence[b]``&nbsp;→&nbsp;Adler<br>
+&nbsp;&nbsp;entrainment&nbsp;on&nbsp;band&nbsp;``b``&nbsp;(v6+)&nbsp;—&nbsp;the&nbsp;flux&nbsp;envelope's&nbsp;own<br>
+&nbsp;&nbsp;timing.&nbsp;Where&nbsp;the&nbsp;ring's&nbsp;two&nbsp;halves&nbsp;agree&nbsp;a&nbsp;rhythm&nbsp;exists<br>
+&nbsp;&nbsp;(coherence&nbsp;≥&nbsp;``_RF_PHASE_COH_MIN``)&nbsp;and&nbsp;the&nbsp;band&nbsp;carries&nbsp;real<br>
+&nbsp;&nbsp;energy,&nbsp;the&nbsp;oscillator's&nbsp;phase&nbsp;is&nbsp;pulled&nbsp;toward&nbsp;the&nbsp;measured<br>
+&nbsp;&nbsp;angle&nbsp;by&nbsp;``coh&nbsp;·&nbsp;_RF_PLL_GAIN&nbsp;·&nbsp;sin(Δφ)``&nbsp;—&nbsp;weak&nbsp;periodic<br>
+&nbsp;&nbsp;forcing,&nbsp;the&nbsp;canonical&nbsp;entrainment&nbsp;law.&nbsp;The&nbsp;locked&nbsp;phase&nbsp;then<br>
+&nbsp;&nbsp;propagates&nbsp;into&nbsp;the&nbsp;fast&nbsp;bands&nbsp;through&nbsp;the&nbsp;model's&nbsp;own<br>
+&nbsp;&nbsp;phase-amplitude&nbsp;coupling:&nbsp;the&nbsp;radio's&nbsp;rhythm&nbsp;enters&nbsp;the<br>
+&nbsp;&nbsp;crossings&nbsp;as&nbsp;a&nbsp;real&nbsp;external&nbsp;rhythm,&nbsp;not&nbsp;a&nbsp;mapped&nbsp;scalar.<br>
+-&nbsp;``samples_ok``&nbsp;false&nbsp;→&nbsp;no&nbsp;stimulus&nbsp;at&nbsp;all.&nbsp;An&nbsp;unwarmed&nbsp;ring&nbsp;is&nbsp;an<br>
+&nbsp;&nbsp;absent&nbsp;channel,&nbsp;not&nbsp;a&nbsp;healthy&nbsp;zero&nbsp;—&nbsp;same&nbsp;discipline&nbsp;as<br>
+&nbsp;&nbsp;``sensor_verified``.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="math.html">math</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-apply_field_stimulus"><strong>apply_field_stimulus</strong></a>(client: 'GenesisClient') -&gt; 'bool'</dt><dd><span class="code">Inject&nbsp;every&nbsp;live&nbsp;real-physics&nbsp;channel&nbsp;as&nbsp;wave&nbsp;stimulus.<br>
+&nbsp;<br>
+Two&nbsp;channels,&nbsp;attempted&nbsp;independently&nbsp;—&nbsp;each&nbsp;is&nbsp;real&nbsp;or&nbsp;absent<br>
+on&nbsp;its&nbsp;own:<br>
+&nbsp;<br>
+-&nbsp;the&nbsp;daemon's&nbsp;field&nbsp;signature&nbsp;(throughput,&nbsp;jitter,&nbsp;P-states,<br>
+&nbsp;&nbsp;interrupts),&nbsp;plus&nbsp;evoked&nbsp;phase&nbsp;resets&nbsp;on&nbsp;physical&nbsp;transients;<br>
+-&nbsp;the&nbsp;acoustic&nbsp;self-emission&nbsp;channel&nbsp;(``field_audio``):&nbsp;coil<br>
+&nbsp;&nbsp;whine,&nbsp;fan,&nbsp;the&nbsp;field's&nbsp;own&nbsp;acoustic&nbsp;shadow.<br>
+&nbsp;<br>
+Returns&nbsp;True&nbsp;when&nbsp;at&nbsp;least&nbsp;one&nbsp;live&nbsp;channel&nbsp;applied.&nbsp;Any&nbsp;failure<br>
+—&nbsp;daemon&nbsp;unreachable,&nbsp;probe&nbsp;not&nbsp;running,&nbsp;mic&nbsp;busy&nbsp;or&nbsp;absent&nbsp;—<br>
+skips&nbsp;that&nbsp;channel&nbsp;without&nbsp;stimulating:&nbsp;absent&nbsp;never&nbsp;reads&nbsp;as&nbsp;a<br>
+healthy&nbsp;zero.</span></dd></dl>
+ <dl><dt><a name="-field_phase_lock"><strong>field_phase_lock</strong></a>() -&gt; 'dict[str, float]'</dt><dd><span class="code">Phase-locking&nbsp;quality&nbsp;between&nbsp;the&nbsp;modeled&nbsp;carrier&nbsp;band&nbsp;and&nbsp;the<br>
+measured&nbsp;physical&nbsp;carrier&nbsp;—&nbsp;the&nbsp;entrainment&nbsp;metric.<br>
+&nbsp;<br>
+``plv``&nbsp;is&nbsp;the&nbsp;phase-locking&nbsp;value&nbsp;|⟨e^{i·err}⟩|&nbsp;over&nbsp;the&nbsp;recent<br>
+window:&nbsp;1.0&nbsp;=&nbsp;rigidly&nbsp;locked,&nbsp;~0&nbsp;=&nbsp;unrelated&nbsp;phases.&nbsp;``mean_err``<br>
+is&nbsp;the&nbsp;circular&nbsp;mean&nbsp;residual&nbsp;phase&nbsp;error.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>TYPE_CHECKING</strong> = False<br>
+<strong>__annotations__</strong> = {'_phase_errs': 'deque[float]', '_prev_signature': 'FieldProbeSignature | None', '_shudder_latched': 'bool'}<br>
+<strong>logger</strong> = &lt;Logger Inner_World.field_probe (WARNING)&gt;</td></tr></table>
+</body></html>

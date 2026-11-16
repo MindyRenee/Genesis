@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["MARKER_G03","MOTOR_ACTIONS","MOTOR_ACTION_IDS","MOTOR_FIELD_CELLS","MOTOR_FIELD_HEIGHT","MOTOR_FIELD_WIDTH","MOTOR_SPATIAL"],"fn":["action_winner","cell_coord","cell_index","current_motor_target","f32_at","spatial_extremum","spatial_readout","spatial_trough","spatial_winner"],"struct":["MotorTarget","SpatialDistribution"]};

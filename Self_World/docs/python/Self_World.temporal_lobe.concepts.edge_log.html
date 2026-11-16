@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.temporal_lobe.concepts.edge_log</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.temporal_lobe.html" class="white">temporal_lobe</a>.<a href="Self_World.temporal_lobe.concepts.html" class="white">concepts</a>.edge_log</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/concepts/edge_log.py">/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/concepts/edge_log.py</a></td></tr></table>
+    <p><span class="code">Canonical&nbsp;edge&nbsp;log&nbsp;—&nbsp;the&nbsp;single&nbsp;source&nbsp;of&nbsp;truth&nbsp;for&nbsp;relationships.<br>
+&nbsp;<br>
+The&nbsp;concept&nbsp;network's&nbsp;edge&nbsp;list&nbsp;is&nbsp;a&nbsp;fold&nbsp;over&nbsp;this&nbsp;log,&nbsp;not&nbsp;an<br>
+independently&nbsp;persisted&nbsp;structure.&nbsp;Everything&nbsp;else&nbsp;that&nbsp;looks&nbsp;like&nbsp;a<br>
+relationship&nbsp;store&nbsp;—&nbsp;the&nbsp;cognitive_state.json&nbsp;edge&nbsp;array,&nbsp;the&nbsp;archive<br>
+edge&nbsp;table,&nbsp;the&nbsp;holographic&nbsp;npz&nbsp;—&nbsp;is&nbsp;either&nbsp;a&nbsp;derived&nbsp;view&nbsp;of&nbsp;this<br>
+log&nbsp;or&nbsp;a&nbsp;separate&nbsp;tier&nbsp;(cold&nbsp;typed&nbsp;associations)&nbsp;with&nbsp;its&nbsp;own&nbsp;scope.<br>
+&nbsp;<br>
+Semantics:&nbsp;append-only,&nbsp;last-write-wins&nbsp;per&nbsp;edge&nbsp;key.<br>
+&nbsp;<br>
+-&nbsp;``assert``&nbsp;—&nbsp;upsert&nbsp;an&nbsp;edge.&nbsp;Carries&nbsp;absolute&nbsp;weight;&nbsp;re-asserting<br>
+&nbsp;&nbsp;an&nbsp;existing&nbsp;edge&nbsp;records&nbsp;the&nbsp;new&nbsp;weight&nbsp;(reinforcement).<br>
+-&nbsp;``retract``&nbsp;—&nbsp;tombstone&nbsp;an&nbsp;edge.&nbsp;Fold&nbsp;drops&nbsp;it.<br>
+-&nbsp;``snapshot``&nbsp;—&nbsp;replace&nbsp;the&nbsp;entire&nbsp;fold&nbsp;base.&nbsp;Used&nbsp;by&nbsp;bulk&nbsp;rewrites<br>
+&nbsp;&nbsp;(sleep&nbsp;compression)&nbsp;and&nbsp;by&nbsp;seeding&nbsp;an&nbsp;empty&nbsp;log&nbsp;from&nbsp;a&nbsp;live&nbsp;network.<br>
+&nbsp;&nbsp;Everything&nbsp;before&nbsp;a&nbsp;snapshot&nbsp;line&nbsp;is&nbsp;dead&nbsp;history&nbsp;once&nbsp;compaction<br>
+&nbsp;&nbsp;runs.<br>
+&nbsp;<br>
+Compaction&nbsp;rewrites&nbsp;the&nbsp;file&nbsp;as&nbsp;a&nbsp;single&nbsp;snapshot&nbsp;line&nbsp;of&nbsp;the&nbsp;live<br>
+fold,&nbsp;then&nbsp;appends&nbsp;nothing&nbsp;else&nbsp;—&nbsp;history&nbsp;is&nbsp;a&nbsp;debugging&nbsp;aid,&nbsp;not&nbsp;a<br>
+requirement.<br>
+&nbsp;<br>
+Derivability:&nbsp;edges&nbsp;whose&nbsp;content&nbsp;is&nbsp;a&nbsp;function&nbsp;of&nbsp;the&nbsp;embedding<br>
+geometry&nbsp;(untyped&nbsp;associations&nbsp;created&nbsp;by&nbsp;machine&nbsp;pipelines&nbsp;—<br>
+hub_attachment,&nbsp;semantic&nbsp;bridges,&nbsp;co-occurrence)&nbsp;are&nbsp;never&nbsp;logged.<br>
+They&nbsp;are&nbsp;recomputed&nbsp;at&nbsp;query&nbsp;time&nbsp;by&nbsp;the&nbsp;similarity&nbsp;provider.&nbsp;The<br>
+log&nbsp;holds&nbsp;only&nbsp;earned&nbsp;facts:&nbsp;typed&nbsp;relational&nbsp;claims&nbsp;and&nbsp;untyped<br>
+associations&nbsp;with&nbsp;asserted&nbsp;or&nbsp;observed&nbsp;provenance.<br>
+&nbsp;<br>
+Decay&nbsp;is&nbsp;a&nbsp;fold-time&nbsp;policy&nbsp;(``decay_fn``),&nbsp;off&nbsp;by&nbsp;default&nbsp;—&nbsp;the&nbsp;log<br>
+stores&nbsp;raw&nbsp;earned&nbsp;weights&nbsp;and&nbsp;lets&nbsp;the&nbsp;reader&nbsp;price&nbsp;them.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="json.html">json</a><br>
+<a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="math.html">math</a><br>
+<a href="os.html">os</a><br>
+</td><td class="multicolumn"><a href="tempfile.html">tempfile</a><br>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.concepts.edge_log.html#EdgeLog">EdgeLog</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="EdgeLog">class <strong>EdgeLog</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#EdgeLog">EdgeLog</a>(path:&nbsp;'Path',&nbsp;decay_fn:&nbsp;'Callable[[Edge,&nbsp;int],&nbsp;float]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Append-only&nbsp;canonical&nbsp;store&nbsp;for&nbsp;concept-network&nbsp;edges.<br>
+&nbsp;<br>
+The&nbsp;log&nbsp;file&nbsp;is&nbsp;JSONL:&nbsp;one&nbsp;event&nbsp;per&nbsp;line.&nbsp;Append&nbsp;is&nbsp;O(1)&nbsp;and<br>
+crash-safe&nbsp;(a&nbsp;torn&nbsp;last&nbsp;line&nbsp;is&nbsp;detected&nbsp;and&nbsp;skipped&nbsp;on&nbsp;fold).<br>
+``<a href="#EdgeLog-fold">fold</a>()``&nbsp;replays&nbsp;the&nbsp;log&nbsp;into&nbsp;the&nbsp;live&nbsp;edge&nbsp;map;&nbsp;``<a href="#EdgeLog-compact">compact</a>()``<br>
+rewrites&nbsp;it&nbsp;as&nbsp;a&nbsp;single&nbsp;snapshot.<br>
+&nbsp;<br>
+Thread-safe:&nbsp;all&nbsp;mutating&nbsp;calls&nbsp;serialize&nbsp;on&nbsp;an&nbsp;internal&nbsp;lock.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="EdgeLog-__enter__"><strong>__enter__</strong></a>(self) -&gt; 'EdgeLog'</dt></dl>
+
+<dl><dt><a name="EdgeLog-__exit__"><strong>__exit__</strong></a>(self, *exc: 'object') -&gt; 'None'</dt></dl>
+
+<dl><dt><a name="EdgeLog-__init__"><strong>__init__</strong></a>(self, path: 'Path', decay_fn: 'Callable[[Edge, int], float] | None' = None) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="EdgeLog-__len__"><strong>__len__</strong></a>(self) -&gt; 'int'</dt></dl>
+
+<dl><dt><a name="EdgeLog-assert_edge"><strong>assert_edge</strong></a>(self, source: 'str', target: 'str', relation: 'RelationType', weight: 'float', origin: 'str', created_at: 'int') -&gt; 'bool'</dt><dd><span class="code">Append&nbsp;an&nbsp;assert&nbsp;event.&nbsp;Returns&nbsp;False&nbsp;if&nbsp;the&nbsp;edge&nbsp;is&nbsp;derivable.<br>
+&nbsp;<br>
+Derivable&nbsp;edges&nbsp;are&nbsp;rejected&nbsp;at&nbsp;the&nbsp;boundary&nbsp;—&nbsp;callers&nbsp;can<br>
+pass&nbsp;every&nbsp;edge&nbsp;blindly&nbsp;and&nbsp;the&nbsp;log&nbsp;enforces&nbsp;the&nbsp;rule.</span></dd></dl>
+
+<dl><dt><a name="EdgeLog-close"><strong>close</strong></a>(self) -&gt; 'None'</dt></dl>
+
+<dl><dt><a name="EdgeLog-compact"><strong>compact</strong></a>(self) -&gt; 'int'</dt><dd><span class="code">Rewrite&nbsp;the&nbsp;log&nbsp;as&nbsp;a&nbsp;single&nbsp;snapshot&nbsp;of&nbsp;the&nbsp;live&nbsp;fold.<br>
+&nbsp;<br>
+Returns&nbsp;the&nbsp;number&nbsp;of&nbsp;live&nbsp;edges&nbsp;written.&nbsp;Atomic&nbsp;via<br>
+temp-file&nbsp;+&nbsp;rename;&nbsp;the&nbsp;fold&nbsp;is&nbsp;taken&nbsp;under&nbsp;the&nbsp;lock&nbsp;so&nbsp;no<br>
+append&nbsp;can&nbsp;interleave&nbsp;mid-compaction.</span></dd></dl>
+
+<dl><dt><a name="EdgeLog-fold"><strong>fold</strong></a>(self, now_ms: 'int' = 0) -&gt; 'dict[str, Edge]'</dt><dd><span class="code">Replay&nbsp;the&nbsp;log&nbsp;into&nbsp;the&nbsp;live&nbsp;edge&nbsp;map&nbsp;(last&nbsp;write&nbsp;wins).<br>
+&nbsp;<br>
+Returns&nbsp;``{key:&nbsp;Edge}``&nbsp;for&nbsp;every&nbsp;live&nbsp;(non-retracted,<br>
+non-derivable)&nbsp;edge.&nbsp;``now_ms``&nbsp;is&nbsp;passed&nbsp;to&nbsp;the&nbsp;decay&nbsp;policy<br>
+when&nbsp;one&nbsp;is&nbsp;attached;&nbsp;weights&nbsp;are&nbsp;stored&nbsp;raw&nbsp;either&nbsp;way&nbsp;—<br>
+decay,&nbsp;when&nbsp;enabled,&nbsp;prices&nbsp;at&nbsp;fold&nbsp;time&nbsp;rather&nbsp;than&nbsp;mutating<br>
+history.</span></dd></dl>
+
+<dl><dt><a name="EdgeLog-retract_edge"><strong>retract_edge</strong></a>(self, source: 'str', target: 'str', relation: 'RelationType') -&gt; 'None'</dt><dd><span class="code">Append&nbsp;a&nbsp;tombstone&nbsp;for&nbsp;an&nbsp;edge&nbsp;triple.</span></dd></dl>
+
+<dl><dt><a name="EdgeLog-snapshot"><strong>snapshot</strong></a>(self, edges: 'list[Edge]') -&gt; 'None'</dt><dd><span class="code">Append&nbsp;a&nbsp;full-state&nbsp;snapshot,&nbsp;resetting&nbsp;the&nbsp;fold&nbsp;base.</span></dd></dl>
+
+<dl><dt><a name="EdgeLog-sync"><strong>sync</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Flush&nbsp;+&nbsp;fsync&nbsp;pending&nbsp;appends&nbsp;(called&nbsp;at&nbsp;save&nbsp;points).</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>is_empty</strong></dt>
+<dd><span class="code">True&nbsp;when&nbsp;the&nbsp;log&nbsp;holds&nbsp;no&nbsp;events.<br>
+&nbsp;<br>
+The&nbsp;file&nbsp;itself&nbsp;is&nbsp;created&nbsp;at&nbsp;open&nbsp;time&nbsp;(``a+``),&nbsp;so&nbsp;existence<br>
+is&nbsp;meaningless&nbsp;—&nbsp;only&nbsp;a&nbsp;non-empty&nbsp;log&nbsp;is&nbsp;authoritative.</span></dd>
+</dl>
+<dl><dt><strong>path</strong></dt>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-edge_key"><strong>edge_key</strong></a>(source: 'str', target: 'str', relation: 'str') -&gt; 'str'</dt><dd><span class="code">Stable&nbsp;string&nbsp;key&nbsp;for&nbsp;an&nbsp;edge&nbsp;triple&nbsp;(used&nbsp;as&nbsp;fold&nbsp;map&nbsp;key).</span></dd></dl>
+ <dl><dt><a name="-is_derivable_edge"><strong>is_derivable_edge</strong></a>(relation: 'RelationType | str', origin: 'str') -&gt; 'bool'</dt><dd><span class="code">True&nbsp;if&nbsp;this&nbsp;edge&nbsp;is&nbsp;pipeline-generated&nbsp;geometry,&nbsp;not&nbsp;an&nbsp;earned&nbsp;fact.<br>
+&nbsp;<br>
+Derivable&nbsp;edges&nbsp;must&nbsp;never&nbsp;be&nbsp;persisted&nbsp;—&nbsp;they&nbsp;are&nbsp;recomputed&nbsp;at<br>
+query&nbsp;time&nbsp;by&nbsp;the&nbsp;similarity&nbsp;provider.&nbsp;The&nbsp;rule&nbsp;is&nbsp;intentionally<br>
+asymmetric:<br>
+&nbsp;<br>
+-&nbsp;Typed&nbsp;relations&nbsp;are&nbsp;always&nbsp;canonical:&nbsp;``is_a``,&nbsp;``causes``,<br>
+&nbsp;&nbsp;``calls``&nbsp;are&nbsp;claims&nbsp;that&nbsp;similarity&nbsp;cannot&nbsp;reconstruct,&nbsp;no<br>
+&nbsp;&nbsp;matter&nbsp;which&nbsp;pipeline&nbsp;produced&nbsp;them.<br>
+-&nbsp;Untyped&nbsp;relations&nbsp;(``related_to``,&nbsp;``bridges``,&nbsp;``similar_to``)<br>
+&nbsp;&nbsp;are&nbsp;derivable&nbsp;only&nbsp;with&nbsp;a&nbsp;KNOWN&nbsp;pipeline&nbsp;origin.&nbsp;Unlisted<br>
+&nbsp;&nbsp;provenance&nbsp;defaults&nbsp;to&nbsp;canonical&nbsp;—&nbsp;a&nbsp;false&nbsp;positive&nbsp;costs<br>
+&nbsp;&nbsp;decay&nbsp;bandwidth;&nbsp;a&nbsp;false&nbsp;negative&nbsp;loses&nbsp;an&nbsp;irrecoverable<br>
+&nbsp;&nbsp;experiential&nbsp;binding&nbsp;(sleep-replay&nbsp;links,&nbsp;introspection<br>
+&nbsp;&nbsp;associations,&nbsp;sensory&nbsp;co-activation).</span></dd></dl>
+ <dl><dt><a name="-is_web_origin"><strong>is_web_origin</strong></a>(origin: 'str') -&gt; 'bool'</dt><dd><span class="code">True&nbsp;if&nbsp;this&nbsp;edge&nbsp;origin&nbsp;marks&nbsp;network-learned&nbsp;(untrusted-source)&nbsp;content.</span></dd></dl>
+ <dl><dt><a name="-open_edge_log"><strong>open_edge_log</strong></a>(data_dir: 'str | Path', decay_fn: 'Callable[[Edge, int], float] | None' = None) -&gt; 'EdgeLog'</dt><dd><span class="code">Open&nbsp;(creating&nbsp;if&nbsp;needed)&nbsp;the&nbsp;canonical&nbsp;edge&nbsp;log&nbsp;for&nbsp;a&nbsp;data&nbsp;dir.</span></dd></dl>
+ <dl><dt><a name="-web_domain_of"><strong>web_domain_of</strong></a>(origin: 'str') -&gt; 'str | None'</dt><dd><span class="code">The&nbsp;source&nbsp;domain&nbsp;of&nbsp;a&nbsp;web&nbsp;origin,&nbsp;or&nbsp;None&nbsp;for&nbsp;non-web&nbsp;origins.</span></dd></dl>
+ <dl><dt><a name="-web_origin"><strong>web_origin</strong></a>(domain_or_url: 'str') -&gt; 'str'</dt><dd><span class="code">Canonical&nbsp;origin&nbsp;for&nbsp;a&nbsp;network-learned&nbsp;edge&nbsp;from&nbsp;a&nbsp;web&nbsp;domain.<br>
+&nbsp;<br>
+Accepts&nbsp;a&nbsp;bare&nbsp;domain&nbsp;(``en.wikipedia.org``)&nbsp;or&nbsp;a&nbsp;full&nbsp;URL&nbsp;and<br>
+returns&nbsp;``web:&lt;domain&gt;``&nbsp;with&nbsp;the&nbsp;domain&nbsp;lowercased&nbsp;and&nbsp;any&nbsp;port,<br>
+credentials,&nbsp;or&nbsp;path&nbsp;stripped.&nbsp;Unparseable&nbsp;input&nbsp;maps&nbsp;to<br>
+``web:unknown``&nbsp;rather&nbsp;than&nbsp;raising&nbsp;—&nbsp;provenance&nbsp;must&nbsp;never&nbsp;break<br>
+the&nbsp;learning&nbsp;pipeline.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>DERIVABLE_ORIGINS</strong> = frozenset({'associative_bridge', 'bridge', 'bridge_creation', 'co_occurrence', 'dedupe', 'global_connect', ...})<br>
+<strong>GEOMETRIC_RELATIONS</strong> = frozenset({&lt;RelationType.SIMILAR_TO: 'similar_to'&gt;, &lt;RelationType.RELATED_TO: 'related_to'&gt;, &lt;RelationType.BRIDGES: 'bridges'&gt;})<br>
+<strong>WEB_ORIGIN_PREFIX</strong> = 'web:'<br>
+<strong>WEB_SOURCES_CAP</strong> = 8<br>
+<strong>__annotations__</strong> = {'DERIVABLE_ORIGINS': 'frozenset[str]', 'GEOMETRIC_RELATIONS': 'frozenset[RelationType]'}<br>
+<strong>logger</strong> = &lt;Logger Self_World.temporal_lobe.concepts.edge_log (WARNING)&gt;</td></tr></table>
+</body></html>

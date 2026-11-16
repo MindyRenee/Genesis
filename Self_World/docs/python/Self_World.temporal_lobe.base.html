@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.temporal_lobe.base</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.temporal_lobe.html" class="white">temporal_lobe</a>.base</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/base.py">/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/base.py</a></td></tr></table>
+    <p><span class="code"><a href="#Language">Language</a>&nbsp;engine&nbsp;interface&nbsp;—&nbsp;pluggable&nbsp;text&nbsp;generation.<br>
+&nbsp;<br>
+The&nbsp;language&nbsp;engine&nbsp;translates&nbsp;structured&nbsp;thoughts&nbsp;into&nbsp;natural&nbsp;language.<br>
+Different&nbsp;backends&nbsp;can&nbsp;be&nbsp;dropped&nbsp;in:<br>
+&nbsp;<br>
+-&nbsp;GenerativeLanguage:&nbsp;compositional&nbsp;generation&nbsp;from&nbsp;grammar&nbsp;+&nbsp;vocabulary<br>
+&nbsp;&nbsp;+&nbsp;voice&nbsp;(the&nbsp;default)<br>
+&nbsp;<br>
+The&nbsp;interface&nbsp;is&nbsp;deliberately&nbsp;simple:&nbsp;a&nbsp;<a href="#Thought">Thought</a>&nbsp;goes&nbsp;in,&nbsp;a&nbsp;string<br>
+comes&nbsp;out.&nbsp;The&nbsp;complexity&nbsp;is&nbsp;in&nbsp;the&nbsp;implementation.</span></p>
+<p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="abc.html#ABC">abc.ABC</a>(<a href="builtins.html#object">builtins.object</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.base.html#Language">Language</a>
+</dt></dl>
+</dd>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.base.html#SyntacticStructure">SyntacticStructure</a>
+</dt><dt class="heading-text"><a href="Self_World.temporal_lobe.base.html#Thought">Thought</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Language">class <strong>Language</strong></a>(<a href="abc.html#ABC">abc.ABC</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code">Abstract&nbsp;base&nbsp;class&nbsp;for&nbsp;language&nbsp;engines.<br>
+&nbsp;<br>
+A&nbsp;language&nbsp;engine&nbsp;takes&nbsp;a&nbsp;<a href="#Thought">Thought</a>&nbsp;and&nbsp;produces&nbsp;natural&nbsp;language&nbsp;text.<br>
+The&nbsp;same&nbsp;thought&nbsp;can&nbsp;be&nbsp;rendered&nbsp;differently&nbsp;depending&nbsp;on&nbsp;the&nbsp;engine<br>
+and&nbsp;the&nbsp;emotional&nbsp;state.<br>
+&nbsp;<br>
+The&nbsp;``current_brain_waves``&nbsp;attribute&nbsp;is&nbsp;set&nbsp;by&nbsp;the&nbsp;cognition&nbsp;engine<br>
+before&nbsp;rendering&nbsp;so&nbsp;the&nbsp;language&nbsp;engine&nbsp;can&nbsp;modulate&nbsp;voice,&nbsp;prosody,<br>
+and&nbsp;sentence&nbsp;complexity&nbsp;based&nbsp;on&nbsp;brain&nbsp;wave&nbsp;state&nbsp;without&nbsp;threading<br>
+it&nbsp;through&nbsp;every&nbsp;<a href="#Language-render">render</a>()&nbsp;call.&nbsp;It&nbsp;may&nbsp;be&nbsp;None&nbsp;when&nbsp;no&nbsp;brain&nbsp;wave<br>
+state&nbsp;is&nbsp;available&nbsp;(e.g.&nbsp;in&nbsp;tests).<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.temporal_lobe.base.html#Language">Language</a></dd>
+<dd><a href="abc.html#ABC">abc.ABC</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="Language-acquire_from_input"><strong>acquire_from_input</strong></a>(self, text: 'str') -&gt; 'None'</dt><dd><span class="code">Learn&nbsp;language&nbsp;units&nbsp;from&nbsp;user&nbsp;input.<br>
+&nbsp;<br>
+Default&nbsp;implementation&nbsp;is&nbsp;a&nbsp;no-op.&nbsp;Subclasses&nbsp;(e.g.<br>
+GenerativeLanguage)&nbsp;override&nbsp;this&nbsp;to&nbsp;run&nbsp;statistical&nbsp;language<br>
+acquisition&nbsp;—&nbsp;tracking&nbsp;transitional&nbsp;probabilities,&nbsp;segmenting<br>
+words,&nbsp;and&nbsp;chunking&nbsp;multi-word&nbsp;units&nbsp;from&nbsp;the&nbsp;input&nbsp;stream.<br>
+&nbsp;<br>
+Called&nbsp;by&nbsp;the&nbsp;cognition&nbsp;engine&nbsp;on&nbsp;every&nbsp;user&nbsp;turn,&nbsp;before<br>
+perception,&nbsp;so&nbsp;the&nbsp;language&nbsp;engine&nbsp;can&nbsp;learn&nbsp;from&nbsp;the&nbsp;raw<br>
+text&nbsp;before&nbsp;it&nbsp;is&nbsp;processed.</span></dd></dl>
+
+<dl><dt><a name="Language-compose_question"><strong>compose_question</strong></a>(self, question_data: 'dict', emotion: 'Any') -&gt; 'str'</dt><dd><span class="code">Compose&nbsp;a&nbsp;question&nbsp;from&nbsp;semantic&nbsp;metadata.<br>
+&nbsp;<br>
+Default&nbsp;implementation&nbsp;produces&nbsp;a&nbsp;question&nbsp;from&nbsp;the<br>
+``target_concept``&nbsp;and&nbsp;``question_type``&nbsp;fields&nbsp;using&nbsp;the<br>
+<a href="#Thought">Thought</a>&nbsp;→&nbsp;render&nbsp;pipeline.&nbsp;Subclasses&nbsp;(e.g.&nbsp;GenerativeLanguage)<br>
+override&nbsp;this&nbsp;with&nbsp;richer&nbsp;compositional&nbsp;generation.</span></dd></dl>
+
+<dl><dt><a name="Language-generate"><strong>generate</strong></a>(self, thought: 'Thought', emotion: 'Any') -&gt; 'str'</dt><dd><span class="code">Generate&nbsp;text&nbsp;from&nbsp;a&nbsp;thought.<br>
+&nbsp;<br>
+Default&nbsp;implementation&nbsp;delegates&nbsp;to&nbsp;:meth:`render`.<br>
+Subclasses&nbsp;(e.g.&nbsp;GenerativeLanguage)&nbsp;override&nbsp;this&nbsp;with<br>
+compositional&nbsp;generation&nbsp;from&nbsp;grammar&nbsp;+&nbsp;vocabulary&nbsp;+&nbsp;voice.</span></dd></dl>
+
+<dl><dt><a name="Language-render"><strong>render</strong></a>(self, thought: 'Thought', emotional_state: 'Any') -&gt; 'str'</dt><dd><span class="code">Render&nbsp;a&nbsp;thought&nbsp;as&nbsp;natural&nbsp;language&nbsp;text.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;thought:&nbsp;The&nbsp;structured&nbsp;thought&nbsp;to&nbsp;render.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;emotional_state:&nbsp;The&nbsp;current&nbsp;EmotionalState&nbsp;(affects&nbsp;tone,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;verbosity,&nbsp;formality).<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Natural&nbsp;language&nbsp;text.</span></dd></dl>
+
+<dl><dt><a name="Language-set_embeddings"><strong>set_embeddings</strong></a>(self, embeddings: 'Any') -&gt; 'None'</dt><dd><span class="code">Wire&nbsp;the&nbsp;embedding&nbsp;store&nbsp;for&nbsp;latent-space&nbsp;composition.<br>
+&nbsp;<br>
+Default&nbsp;implementation&nbsp;is&nbsp;a&nbsp;no-op.&nbsp;Subclasses&nbsp;(e.g.<br>
+GenerativeLanguage)&nbsp;override&nbsp;this&nbsp;to&nbsp;pass&nbsp;the&nbsp;embedding&nbsp;store<br>
+to&nbsp;the&nbsp;graph-walk&nbsp;generator&nbsp;for&nbsp;semantic&nbsp;proximity-based<br>
+composition.<br>
+&nbsp;<br>
+Called&nbsp;by&nbsp;the&nbsp;cognition&nbsp;engine&nbsp;after&nbsp;the&nbsp;EmbeddingStore&nbsp;is<br>
+initialized&nbsp;—&nbsp;it&nbsp;depends&nbsp;on&nbsp;the&nbsp;concept&nbsp;network,&nbsp;which&nbsp;is<br>
+shared&nbsp;and&nbsp;may&nbsp;not&nbsp;be&nbsp;ready&nbsp;when&nbsp;the&nbsp;language&nbsp;engine&nbsp;is&nbsp;first<br>
+created.</span></dd></dl>
+
+<dl><dt><a name="Language-set_network"><strong>set_network</strong></a>(self, network: 'Any') -&gt; 'None'</dt><dd><span class="code">Re-sync&nbsp;the&nbsp;concept&nbsp;network&nbsp;reference&nbsp;after&nbsp;state&nbsp;restore.<br>
+&nbsp;<br>
+Default&nbsp;implementation&nbsp;is&nbsp;a&nbsp;no-op.&nbsp;Subclasses&nbsp;(e.g.<br>
+GenerativeLanguage)&nbsp;override&nbsp;this&nbsp;to&nbsp;update&nbsp;the&nbsp;network<br>
+reference&nbsp;in&nbsp;the&nbsp;engine,&nbsp;vocabulary,&nbsp;and&nbsp;graph-walk&nbsp;generator.<br>
+&nbsp;<br>
+Called&nbsp;by&nbsp;the&nbsp;mind&nbsp;after&nbsp;state&nbsp;restore&nbsp;replaces&nbsp;the&nbsp;concept<br>
+network&nbsp;—&nbsp;without&nbsp;this,&nbsp;the&nbsp;language&nbsp;engine&nbsp;would&nbsp;check<br>
+concept&nbsp;existence&nbsp;against&nbsp;the&nbsp;old&nbsp;(pre-restore)&nbsp;network.</span></dd></dl>
+
+<dl><dt><a name="Language-set_self_composer"><strong>set_self_composer</strong></a>(self, composer: 'Any', reflection: 'Any') -&gt; 'None'</dt><dd><span class="code">Wire&nbsp;the&nbsp;self-composer&nbsp;and&nbsp;reflection&nbsp;engine.<br>
+&nbsp;<br>
+Default&nbsp;implementation&nbsp;is&nbsp;a&nbsp;no-op.&nbsp;Subclasses&nbsp;(e.g.<br>
+GenerativeLanguage)&nbsp;override&nbsp;this&nbsp;to&nbsp;forward&nbsp;the&nbsp;composer&nbsp;and<br>
+reflection&nbsp;engine&nbsp;to&nbsp;the&nbsp;vocabulary,&nbsp;so&nbsp;the<br>
+``self_reflection_clause``&nbsp;slot&nbsp;is&nbsp;composed&nbsp;from&nbsp;its&nbsp;actual<br>
+metacognition&nbsp;instead&nbsp;of&nbsp;reciting&nbsp;a&nbsp;canned&nbsp;phrase.<br>
+&nbsp;<br>
+Called&nbsp;by&nbsp;the&nbsp;mind&nbsp;after&nbsp;the&nbsp;cognition&nbsp;engine&nbsp;(which&nbsp;owns&nbsp;the<br>
+reflection&nbsp;engine)&nbsp;has&nbsp;been&nbsp;initialized.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>learned_chunks</strong></dt>
+<dd><span class="code">Multi-word&nbsp;chunks&nbsp;learned&nbsp;through&nbsp;statistical&nbsp;chunking.<br>
+&nbsp;<br>
+Default&nbsp;is&nbsp;empty.&nbsp;The&nbsp;cognition&nbsp;engine&nbsp;feeds&nbsp;these&nbsp;into&nbsp;the<br>
+comprehension&nbsp;engine&nbsp;so&nbsp;learned&nbsp;units&nbsp;("trial&nbsp;and&nbsp;error")&nbsp;are<br>
+not&nbsp;split&nbsp;at&nbsp;internal&nbsp;coordinators.</span></dd>
+</dl>
+<dl><dt><strong>name</strong></dt>
+<dd><span class="code">Human-readable&nbsp;name&nbsp;of&nbsp;this&nbsp;engine.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__abstractmethods__</strong> = frozenset({'name', 'render'})</dl>
+
+<dl><dt><strong>__annotations__</strong> = {'current_brain_waves': 'Any'}</dl>
+
+<dl><dt><strong>current_brain_waves</strong> = None</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SyntacticStructure">class <strong>SyntacticStructure</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SyntacticStructure">SyntacticStructure</a>(subject:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;verb:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;<a href="builtins.html#object">object</a>:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;clause_type:&nbsp;'str'&nbsp;=&nbsp;'declarative',&nbsp;complexity:&nbsp;'int'&nbsp;=&nbsp;1,&nbsp;dependencies:&nbsp;'list[tuple[str,&nbsp;str,&nbsp;str]]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Syntactic&nbsp;structure&nbsp;of&nbsp;a&nbsp;thought's&nbsp;underlying&nbsp;sentence.<br>
+&nbsp;<br>
+Grounded&nbsp;in&nbsp;dependency&nbsp;grammar&nbsp;(Tesnière,&nbsp;1959),&nbsp;which&nbsp;models<br>
+sentences&nbsp;as&nbsp;a&nbsp;network&nbsp;of&nbsp;directed&nbsp;dependencies&nbsp;between&nbsp;words.<br>
+Each&nbsp;dependency&nbsp;connects&nbsp;a&nbsp;*governor*&nbsp;(head)&nbsp;to&nbsp;a&nbsp;*dependent*<br>
+(modifier)&nbsp;via&nbsp;a&nbsp;named&nbsp;*relation*&nbsp;(subject,&nbsp;<a href="builtins.html#object">object</a>,&nbsp;modifier,<br>
+etc.).&nbsp;Unlike&nbsp;phrase-structure&nbsp;grammar,&nbsp;dependency&nbsp;grammar<br>
+directly&nbsp;captures&nbsp;the&nbsp;relational&nbsp;structure&nbsp;that&nbsp;drives&nbsp;both<br>
+parsing&nbsp;and&nbsp;generation.<br>
+&nbsp;<br>
+Fields:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;subject:&nbsp;The&nbsp;subject&nbsp;of&nbsp;the&nbsp;sentence&nbsp;(the&nbsp;entity&nbsp;performing<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;or&nbsp;being&nbsp;described&nbsp;by&nbsp;the&nbsp;verb).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;verb:&nbsp;The&nbsp;main&nbsp;verb&nbsp;(the&nbsp;predicative&nbsp;core).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<a href="builtins.html#object">object</a>:&nbsp;The&nbsp;direct&nbsp;<a href="builtins.html#object">object</a>&nbsp;(the&nbsp;entity&nbsp;acted&nbsp;upon).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;clause_type:&nbsp;The&nbsp;clause&nbsp;type&nbsp;—&nbsp;declarative,&nbsp;interrogative,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;imperative,&nbsp;or&nbsp;exclamatory.&nbsp;This&nbsp;determines&nbsp;sentence-level<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;form&nbsp;(e.g.&nbsp;subject-verb&nbsp;inversion&nbsp;for&nbsp;questions).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;complexity:&nbsp;Clause&nbsp;complexity,&nbsp;1=simple&nbsp;(one&nbsp;independent<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;clause),&nbsp;2=compound&nbsp;(two&nbsp;independent&nbsp;clauses&nbsp;joined&nbsp;by&nbsp;a<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;coordinator),&nbsp;3=complex&nbsp;(one&nbsp;independent&nbsp;+&nbsp;one&nbsp;or&nbsp;more<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dependent&nbsp;clauses),&nbsp;4=compound-complex.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;dependencies:&nbsp;A&nbsp;list&nbsp;of&nbsp;(governor,&nbsp;relation,&nbsp;dependent)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;triples&nbsp;describing&nbsp;the&nbsp;dependency&nbsp;parse.&nbsp;Each&nbsp;triple<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;follows&nbsp;the&nbsp;convention&nbsp;that&nbsp;the&nbsp;governor&nbsp;is&nbsp;the&nbsp;head&nbsp;word<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;and&nbsp;the&nbsp;dependent&nbsp;is&nbsp;the&nbsp;word&nbsp;that&nbsp;depends&nbsp;on&nbsp;it.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="SyntacticStructure-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="SyntacticStructure-__init__"><strong>__init__</strong></a>(self, subject: 'str' = '', verb: 'str' = '', object: 'str' = '', clause_type: 'str' = 'declarative', complexity: 'int' = 1, dependencies: 'list[tuple[str, str, str]]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="SyntacticStructure-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>clause_type</strong></dt>
+</dl>
+<dl><dt><strong>complexity</strong></dt>
+</dl>
+<dl><dt><strong>dependencies</strong></dt>
+</dl>
+<dl><dt><strong>object</strong></dt>
+</dl>
+<dl><dt><strong>subject</strong></dt>
+</dl>
+<dl><dt><strong>verb</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'clause_type': 'str', 'complexity': 'int', 'dependencies': 'list[tuple[str, str, str]]', 'object': 'str', 'subject': 'str', 'verb': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'clause_type': Field(name='clause_type',type='str',default='dec...appingproxy({}),kw_only=False,_field_type=_FIELD), 'complexity': Field(name='complexity',type='int',default=1,def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'dependencies': Field(name='dependencies',type='list[tuple[str, ...appingproxy({}),kw_only=False,_field_type=_FIELD), 'object': Field(name='object',type='str',default='',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'subject': Field(name='subject',type='str',default='',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'verb': Field(name='verb',type='str',default='',default_...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('subject', 'verb', 'object', 'clause_type', 'complexity', 'dependencies')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Thought">class <strong>Thought</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Thought">Thought</a>(content:&nbsp;'str',&nbsp;intent:&nbsp;'str',&nbsp;emotion:&nbsp;'str'&nbsp;=&nbsp;'neutral',&nbsp;topics:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;self_reflection:&nbsp;'bool'&nbsp;=&nbsp;False,&nbsp;confidence:&nbsp;'float'&nbsp;=&nbsp;0.7,&nbsp;metadata:&nbsp;'dict[str,&nbsp;Any]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;syntax:&nbsp;'<a href="#SyntacticStructure">SyntacticStructure</a>&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;prosody:&nbsp;'ProsodyPattern&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;structured&nbsp;thought&nbsp;that&nbsp;the&nbsp;language&nbsp;engine&nbsp;renders&nbsp;as&nbsp;text.<br>
+&nbsp;<br>
+Thoughts&nbsp;are&nbsp;not&nbsp;strings&nbsp;—&nbsp;they're&nbsp;semantic&nbsp;structures.&nbsp;This&nbsp;allows<br>
+different&nbsp;language&nbsp;engines&nbsp;to&nbsp;render&nbsp;the&nbsp;same&nbsp;thought&nbsp;differently.<br>
+A&nbsp;compositional&nbsp;engine&nbsp;produces&nbsp;variation&nbsp;from&nbsp;the&nbsp;system's&nbsp;own<br>
+grammar,&nbsp;vocabulary,&nbsp;semantic&nbsp;graph,&nbsp;and&nbsp;learned&nbsp;language&nbsp;statistics.<br>
+&nbsp;<br>
+Fields:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;content:&nbsp;The&nbsp;main&nbsp;semantic&nbsp;content&nbsp;(what&nbsp;the&nbsp;thought&nbsp;is&nbsp;about)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;intent:&nbsp;What&nbsp;Genesis&nbsp;is&nbsp;trying&nbsp;to&nbsp;do&nbsp;(inform,&nbsp;ask,&nbsp;reflect,&nbsp;etc.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;emotion:&nbsp;The&nbsp;emotional&nbsp;tone&nbsp;to&nbsp;convey<br>
+&nbsp;&nbsp;&nbsp;&nbsp;topics:&nbsp;Key&nbsp;topics&nbsp;to&nbsp;mention<br>
+&nbsp;&nbsp;&nbsp;&nbsp;self_reflection:&nbsp;Whether&nbsp;this&nbsp;is&nbsp;introspective<br>
+&nbsp;&nbsp;&nbsp;&nbsp;confidence:&nbsp;How&nbsp;certain&nbsp;Genesis&nbsp;is&nbsp;about&nbsp;this&nbsp;thought<br>
+&nbsp;&nbsp;&nbsp;&nbsp;metadata:&nbsp;Engine-specific&nbsp;data<br>
+&nbsp;&nbsp;&nbsp;&nbsp;syntax:&nbsp;Optional&nbsp;syntactic&nbsp;structure&nbsp;(dependency&nbsp;parse)&nbsp;that<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;constrains&nbsp;how&nbsp;the&nbsp;thought&nbsp;is&nbsp;rendered.&nbsp;When&nbsp;present,&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;language&nbsp;engine&nbsp;can&nbsp;use&nbsp;the&nbsp;subject/verb/<a href="builtins.html#object">object</a>&nbsp;and<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dependency&nbsp;triples&nbsp;to&nbsp;produce&nbsp;grammatically&nbsp;faithful&nbsp;text.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;prosody:&nbsp;Optional&nbsp;prosody&nbsp;pattern&nbsp;that&nbsp;controls&nbsp;rhythm,&nbsp;pacing,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;emphasis,&nbsp;and&nbsp;intonation.&nbsp;When&nbsp;present,&nbsp;the&nbsp;language&nbsp;engine<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;applies&nbsp;prosodic&nbsp;markers&nbsp;to&nbsp;the&nbsp;generated&nbsp;text.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Thought-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="Thought-__init__"><strong>__init__</strong></a>(self, content: 'str', intent: 'str', emotion: 'str' = 'neutral', topics: 'list[str]' = &lt;factory&gt;, self_reflection: 'bool' = False, confidence: 'float' = 0.7, metadata: 'dict[str, Any]' = &lt;factory&gt;, syntax: 'SyntacticStructure | None' = None, prosody: 'ProsodyPattern | None' = None) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Thought-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>confidence</strong></dt>
+</dl>
+<dl><dt><strong>content</strong></dt>
+</dl>
+<dl><dt><strong>emotion</strong></dt>
+</dl>
+<dl><dt><strong>intent</strong></dt>
+</dl>
+<dl><dt><strong>metadata</strong></dt>
+</dl>
+<dl><dt><strong>prosody</strong></dt>
+</dl>
+<dl><dt><strong>self_reflection</strong></dt>
+</dl>
+<dl><dt><strong>syntax</strong></dt>
+</dl>
+<dl><dt><strong>topics</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'confidence': 'float', 'content': 'str', 'emotion': 'str', 'intent': 'str', 'metadata': 'dict[str, Any]', 'prosody': 'ProsodyPattern | None', 'self_reflection': 'bool', 'syntax': 'SyntacticStructure | None', 'topics': 'list[str]'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'confidence': Field(name='confidence',type='float',default=0.7...appingproxy({}),kw_only=False,_field_type=_FIELD), 'content': Field(name='content',type='str',default=&lt;datacla...appingproxy({}),kw_only=False,_field_type=_FIELD), 'emotion': Field(name='emotion',type='str',default='neutral...appingproxy({}),kw_only=False,_field_type=_FIELD), 'intent': Field(name='intent',type='str',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD), 'metadata': Field(name='metadata',type='dict[str, Any]',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'prosody': Field(name='prosody',type='ProsodyPattern | None...appingproxy({}),kw_only=False,_field_type=_FIELD), 'self_reflection': Field(name='self_reflection',type='bool',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'syntax': Field(name='syntax',type='SyntacticStructure | N...appingproxy({}),kw_only=False,_field_type=_FIELD), 'topics': Field(name='topics',type='list[str]',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('content', 'intent', 'emotion', 'topics', 'self_reflection', 'confidence', 'metadata', 'syntax', 'prosody')</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>TYPE_CHECKING</strong> = False</td></tr></table>
+</body></html>

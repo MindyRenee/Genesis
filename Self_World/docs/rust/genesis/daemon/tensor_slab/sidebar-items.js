@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["MAX_DIMS","MAX_NAME_LEN","MAX_SLAB_BYTES","MAX_TENSORS","MAX_TENSOR_BYTES"],"enum":["TensorError"],"fn":["checked_elements","decode_name","encode_list","slab"],"mod":["dtype"],"static":["SLAB"],"struct":["Tensor","TensorSlab"]};

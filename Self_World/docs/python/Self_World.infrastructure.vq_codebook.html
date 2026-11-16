@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.infrastructure.vq_codebook</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.infrastructure.html" class="white">infrastructure</a>.vq_codebook</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/infrastructure/vq_codebook.py">/home/mindyrenee/GenAnd/Genesis/Self_World/infrastructure/vq_codebook.py</a></td></tr></table>
+    <p><span class="code">Vector&nbsp;Quantization&nbsp;codebook&nbsp;—&nbsp;compresses&nbsp;Genesis's&nbsp;concept&nbsp;embedding&nbsp;space.<br>
+&nbsp;<br>
+The&nbsp;concept&nbsp;network&nbsp;has&nbsp;thousands&nbsp;of&nbsp;concepts,&nbsp;each&nbsp;with&nbsp;a&nbsp;210-dimensional<br>
+embedding&nbsp;(spectral&nbsp;+&nbsp;TF-IDF&nbsp;+&nbsp;GloVe).&nbsp;Most&nbsp;of&nbsp;these&nbsp;embeddings&nbsp;are<br>
+near-duplicates&nbsp;in&nbsp;semantic&nbsp;space&nbsp;—&nbsp;``dog``,&nbsp;``puppy``,&nbsp;``canine``&nbsp;cluster<br>
+tightly.&nbsp;Vector&nbsp;quantization&nbsp;replaces&nbsp;the&nbsp;full&nbsp;set&nbsp;of&nbsp;vectors&nbsp;with&nbsp;a<br>
+smaller&nbsp;**codebook**&nbsp;of&nbsp;prototype&nbsp;vectors.&nbsp;Each&nbsp;original&nbsp;vector&nbsp;is&nbsp;encoded<br>
+as&nbsp;``(prototype_id,&nbsp;residual)``&nbsp;—&nbsp;the&nbsp;prototype&nbsp;plus&nbsp;a&nbsp;small&nbsp;correction.<br>
+&nbsp;<br>
+The&nbsp;residual&nbsp;is&nbsp;quantized&nbsp;to&nbsp;int8&nbsp;to&nbsp;save&nbsp;space.&nbsp;The&nbsp;reconstruction&nbsp;is::<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;vector&nbsp;≈&nbsp;codebook[prototype_id]&nbsp;+&nbsp;residual&nbsp;*&nbsp;residual_scale<br>
+&nbsp;<br>
+This&nbsp;reduces&nbsp;storage&nbsp;from&nbsp;``N&nbsp;×&nbsp;D&nbsp;×&nbsp;4``&nbsp;bytes&nbsp;(float32)&nbsp;to<br>
+``K&nbsp;×&nbsp;D&nbsp;×&nbsp;4&nbsp;+&nbsp;N&nbsp;×&nbsp;(4&nbsp;+&nbsp;D)``&nbsp;bytes&nbsp;(codebook&nbsp;+&nbsp;int32&nbsp;id&nbsp;+&nbsp;int8&nbsp;residual).<br>
+For&nbsp;12K&nbsp;concepts,&nbsp;210&nbsp;dims,&nbsp;2K&nbsp;prototypes::<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Before:&nbsp;12,000&nbsp;×&nbsp;210&nbsp;×&nbsp;4&nbsp;=&nbsp;10.1&nbsp;MB<br>
+&nbsp;&nbsp;&nbsp;&nbsp;After:&nbsp;&nbsp;2,000&nbsp;×&nbsp;210&nbsp;×&nbsp;4&nbsp;+&nbsp;12,000&nbsp;×&nbsp;(4&nbsp;+&nbsp;210)&nbsp;=&nbsp;1.7&nbsp;MB&nbsp;+&nbsp;2.6&nbsp;MB&nbsp;=&nbsp;4.3&nbsp;MB<br>
+&nbsp;<br>
+The&nbsp;codebook&nbsp;is&nbsp;retrained&nbsp;during&nbsp;algorithmic&nbsp;sleep&nbsp;(N3)&nbsp;via&nbsp;mini-batch<br>
+k-means.&nbsp;Concepts&nbsp;that&nbsp;share&nbsp;a&nbsp;prototype&nbsp;with&nbsp;tiny&nbsp;residuals&nbsp;are&nbsp;merge<br>
+candidates&nbsp;—&nbsp;the&nbsp;sleep&nbsp;compression&nbsp;pass&nbsp;can&nbsp;fold&nbsp;them&nbsp;together.<br>
+&nbsp;<br>
+#&nbsp;Neuroscience&nbsp;grounding<br>
+&nbsp;<br>
+This&nbsp;models&nbsp;the&nbsp;compression&nbsp;of&nbsp;episodic&nbsp;memories&nbsp;into&nbsp;semantic&nbsp;memory<br>
+during&nbsp;sleep&nbsp;consolidation.&nbsp;The&nbsp;hippocampus&nbsp;stores&nbsp;detailed,&nbsp;high-capacity<br>
+episodic&nbsp;traces;&nbsp;the&nbsp;neocortex&nbsp;stores&nbsp;compressed,&nbsp;schema-like&nbsp;semantic<br>
+knowledge.&nbsp;The&nbsp;codebook&nbsp;prototypes&nbsp;are&nbsp;the&nbsp;"schemas"&nbsp;—&nbsp;the&nbsp;typical<br>
+patterns&nbsp;—&nbsp;and&nbsp;the&nbsp;residuals&nbsp;are&nbsp;the&nbsp;episode-specific&nbsp;detail&nbsp;that<br>
+distinguishes&nbsp;one&nbsp;instance&nbsp;from&nbsp;another.<br>
+&nbsp;<br>
+(Tononi&nbsp;&amp;&nbsp;Cirelli,&nbsp;2006;&nbsp;McClelland&nbsp;et&nbsp;al.,&nbsp;1995)</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="numpy.html">numpy</a><br>
+</td><td class="multicolumn"><a href="os.html">os</a><br>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.infrastructure.vq_codebook.html#VQCodebook">VQCodebook</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="VQCodebook">class <strong>VQCodebook</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#VQCodebook">VQCodebook</a>(dim:&nbsp;'int'&nbsp;=&nbsp;210,&nbsp;k:&nbsp;'int'&nbsp;=&nbsp;2048,&nbsp;residual_scale:&nbsp;'float&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Vector&nbsp;quantization&nbsp;codebook&nbsp;for&nbsp;concept&nbsp;embeddings.<br>
+&nbsp;<br>
+Stores&nbsp;K&nbsp;prototype&nbsp;vectors&nbsp;and&nbsp;per-concept&nbsp;encoding&nbsp;(prototype_id&nbsp;+<br>
+int8&nbsp;residual).&nbsp;The&nbsp;codebook&nbsp;is&nbsp;trained&nbsp;via&nbsp;mini-batch&nbsp;k-means&nbsp;in<br>
+pure&nbsp;numpy&nbsp;(no&nbsp;scipy/sklearn&nbsp;dependency).<br>
+&nbsp;<br>
+Thread-safe&nbsp;after&nbsp;training.&nbsp;All&nbsp;arrays&nbsp;are&nbsp;read-only&nbsp;post-fit.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="VQCodebook-__init__"><strong>__init__</strong></a>(self, dim: 'int' = 210, k: 'int' = 2048, residual_scale: 'float | None' = None) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;vector&nbsp;quantization&nbsp;codebook.</span></dd></dl>
+
+<dl><dt><a name="VQCodebook-compression_ratio"><strong>compression_ratio</strong></a>(self) -&gt; 'float'</dt><dd><span class="code">Compute&nbsp;the&nbsp;compression&nbsp;ratio&nbsp;vs.&nbsp;storing&nbsp;full&nbsp;float32&nbsp;vectors.<br>
+&nbsp;<br>
+Returns&nbsp;the&nbsp;ratio&nbsp;(uncompressed_size&nbsp;/&nbsp;compressed_size).<br>
+A&nbsp;ratio&nbsp;of&nbsp;2.0&nbsp;means&nbsp;the&nbsp;codebook&nbsp;uses&nbsp;half&nbsp;the&nbsp;storage.</span></dd></dl>
+
+<dl><dt><a name="VQCodebook-count_merge_candidates"><strong>count_merge_candidates</strong></a>(self, threshold: 'float') -&gt; 'int'</dt><dd><span class="code">Number&nbsp;of&nbsp;within-prototype&nbsp;pairs&nbsp;closer&nbsp;than&nbsp;``threshold``.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;cheap&nbsp;half&nbsp;of&nbsp;:meth:`find_merge_candidates`,&nbsp;and&nbsp;it&nbsp;is<br>
+what&nbsp;callers&nbsp;usually&nbsp;want.&nbsp;The&nbsp;full&nbsp;list&nbsp;was&nbsp;being&nbsp;built&nbsp;only&nbsp;to<br>
+be&nbsp;counted&nbsp;and&nbsp;logged:&nbsp;with&nbsp;~12k&nbsp;concepts&nbsp;in&nbsp;few&nbsp;prototypes&nbsp;that<br>
+is&nbsp;millions&nbsp;of&nbsp;tuples,&nbsp;and&nbsp;materializing&nbsp;them&nbsp;was&nbsp;the&nbsp;single<br>
+largest&nbsp;cost&nbsp;in&nbsp;an&nbsp;N3&nbsp;sleep&nbsp;pass.</span></dd></dl>
+
+<dl><dt><a name="VQCodebook-decode"><strong>decode</strong></a>(self, prototype_id: 'int', residual: 'np.ndarray') -&gt; 'np.ndarray'</dt><dd><span class="code">Reconstruct&nbsp;a&nbsp;vector&nbsp;from&nbsp;(prototype_id,&nbsp;residual).<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;prototype_id:&nbsp;Index&nbsp;into&nbsp;the&nbsp;codebook.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;residual:&nbsp;(D,)&nbsp;int8&nbsp;residual.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(D,)&nbsp;float32&nbsp;reconstructed&nbsp;vector.</span></dd></dl>
+
+<dl><dt><a name="VQCodebook-encode"><strong>encode</strong></a>(self, vector: 'np.ndarray') -&gt; 'tuple[int, np.ndarray]'</dt><dd><span class="code">Encode&nbsp;a&nbsp;single&nbsp;vector&nbsp;as&nbsp;(prototype_id,&nbsp;int8&nbsp;residual).<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;vector:&nbsp;(D,)&nbsp;float32&nbsp;vector.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Tuple&nbsp;of&nbsp;(prototype_id,&nbsp;residual_int8)&nbsp;where&nbsp;residual&nbsp;is<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(D,)&nbsp;int8.</span></dd></dl>
+
+<dl><dt><a name="VQCodebook-find_merge_candidates"><strong>find_merge_candidates</strong></a>(self, threshold: 'float', limit: 'int | None' = 32) -&gt; 'list[tuple[str, str, float]]'</dt><dd><span class="code">Closest&nbsp;within-prototype&nbsp;pairs,&nbsp;as&nbsp;(concept_a,&nbsp;concept_b,&nbsp;distance).<br>
+&nbsp;<br>
+Sorted&nbsp;by&nbsp;distance&nbsp;ascending.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;threshold:&nbsp;Maximum&nbsp;L2&nbsp;distance&nbsp;to&nbsp;be&nbsp;considered&nbsp;a&nbsp;candidate.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;limit:&nbsp;Return&nbsp;at&nbsp;most&nbsp;this&nbsp;many,&nbsp;the&nbsp;closest.&nbsp;Defaults&nbsp;to&nbsp;32<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;because&nbsp;the&nbsp;unbounded&nbsp;case&nbsp;is&nbsp;a&nbsp;trap:&nbsp;with&nbsp;~12k&nbsp;concepts<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;in&nbsp;few&nbsp;prototypes&nbsp;it&nbsp;returns&nbsp;7.7M&nbsp;tuples&nbsp;and&nbsp;took&nbsp;142&nbsp;s&nbsp;of<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;a&nbsp;175&nbsp;s&nbsp;sleep&nbsp;pass,&nbsp;and&nbsp;the&nbsp;one&nbsp;caller&nbsp;that&nbsp;hit&nbsp;it&nbsp;only<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wanted&nbsp;a&nbsp;count.&nbsp;Pass&nbsp;``limit=None``&nbsp;to&nbsp;deliberately&nbsp;get<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;everything.&nbsp;Use&nbsp;:meth:`count_merge_candidates`&nbsp;when&nbsp;only<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;number&nbsp;matters&nbsp;—&nbsp;it&nbsp;allocates&nbsp;nothing.</span></dd></dl>
+
+<dl><dt><a name="VQCodebook-fit"><strong>fit</strong></a>(self, vectors: 'np.ndarray', concept_names: 'list[str]', iters: 'int' = 25, batch_size: 'int' = 1024, seed: 'int' = 42) -&gt; 'dict[str, float]'</dt><dd><span class="code">Train&nbsp;the&nbsp;codebook&nbsp;via&nbsp;mini-batch&nbsp;k-means.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;vectors:&nbsp;(N,&nbsp;D)&nbsp;float32&nbsp;matrix&nbsp;of&nbsp;concept&nbsp;embeddings.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;concept_names:&nbsp;List&nbsp;of&nbsp;N&nbsp;concept&nbsp;names&nbsp;(parallel&nbsp;to&nbsp;vectors).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;iters:&nbsp;Number&nbsp;of&nbsp;k-means&nbsp;iterations.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;batch_size:&nbsp;Mini-batch&nbsp;size&nbsp;for&nbsp;k-means&nbsp;updates.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;seed:&nbsp;Random&nbsp;seed&nbsp;for&nbsp;reproducibility.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Dict&nbsp;with&nbsp;raw/normalized&nbsp;reconstruction&nbsp;error,&nbsp;cosine&nbsp;similarity,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;residual&nbsp;saturation,&nbsp;and&nbsp;training&nbsp;dimensions/iterations.</span></dd></dl>
+
+<dl><dt><a name="VQCodebook-fit_steps"><strong>fit_steps</strong></a>(self, vectors: 'np.ndarray', concept_names: 'list[str]', iters: 'int' = 25, batch_size: 'int' = 1024, seed: 'int' = 42)</dt><dd><span class="code">Train&nbsp;the&nbsp;codebook&nbsp;incrementally&nbsp;—&nbsp;one&nbsp;Lloyd&nbsp;iteration&nbsp;per&nbsp;step.<br>
+&nbsp;<br>
+Identical&nbsp;math&nbsp;to&nbsp;:meth:`fit`,&nbsp;but&nbsp;the&nbsp;training&nbsp;loop&nbsp;is&nbsp;a<br>
+generator:&nbsp;each&nbsp;``next()``&nbsp;runs&nbsp;one&nbsp;mini-batch&nbsp;assign+update<br>
+iteration,&nbsp;so&nbsp;a&nbsp;caller&nbsp;can&nbsp;spread&nbsp;a&nbsp;full&nbsp;training&nbsp;pass&nbsp;across<br>
+many&nbsp;small&nbsp;slices&nbsp;—&nbsp;e.g.&nbsp;one&nbsp;iteration&nbsp;per&nbsp;sleep&nbsp;tick,&nbsp;the&nbsp;way<br>
+consolidation&nbsp;actually&nbsp;happens&nbsp;(incrementally&nbsp;across&nbsp;the<br>
+night,&nbsp;not&nbsp;in&nbsp;one&nbsp;blocked&nbsp;pass).&nbsp;Convergence&nbsp;early-exits&nbsp;the<br>
+same&nbsp;way,&nbsp;and&nbsp;``_encode_all``&nbsp;runs&nbsp;once&nbsp;at&nbsp;the&nbsp;end.<br>
+&nbsp;<br>
+Yields:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;``{"iter":&nbsp;iters_run}``&nbsp;after&nbsp;each&nbsp;iteration.<br>
+&nbsp;<br>
+Returns&nbsp;(as&nbsp;``StopIteration.value``):<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;same&nbsp;stats&nbsp;dict&nbsp;:meth:`fit`&nbsp;returns.</span></dd></dl>
+
+<dl><dt><a name="VQCodebook-load"><strong>load</strong></a>(self, path: 'str') -&gt; 'bool'</dt><dd><span class="code">Load&nbsp;the&nbsp;codebook&nbsp;from&nbsp;an&nbsp;.npz&nbsp;file.<br>
+&nbsp;<br>
+Returns&nbsp;True&nbsp;if&nbsp;loaded,&nbsp;False&nbsp;if&nbsp;file&nbsp;doesn't&nbsp;exist&nbsp;or&nbsp;is<br>
+incompatible.</span></dd></dl>
+
+<dl><dt><a name="VQCodebook-reconstruct"><strong>reconstruct</strong></a>(self, concept_name: 'str') -&gt; 'np.ndarray | None'</dt><dd><span class="code">Reconstruct&nbsp;the&nbsp;vector&nbsp;for&nbsp;a&nbsp;concept.<br>
+&nbsp;<br>
+Returns&nbsp;None&nbsp;if&nbsp;the&nbsp;concept&nbsp;is&nbsp;not&nbsp;in&nbsp;the&nbsp;codebook.</span></dd></dl>
+
+<dl><dt><a name="VQCodebook-reconstruct_all"><strong>reconstruct_all</strong></a>(self) -&gt; 'np.ndarray'</dt><dd><span class="code">Reconstruct&nbsp;all&nbsp;concept&nbsp;vectors,&nbsp;shape&nbsp;(N,&nbsp;D).</span></dd></dl>
+
+<dl><dt><a name="VQCodebook-reconstruction_quality"><strong>reconstruction_quality</strong></a>(self) -&gt; 'float'</dt><dd><span class="code">Return&nbsp;scale-normalized&nbsp;reconstruction&nbsp;quality&nbsp;in&nbsp;[0,&nbsp;1].<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;one&nbsp;minus&nbsp;the&nbsp;relative&nbsp;reconstruction&nbsp;error,&nbsp;clamped&nbsp;to<br>
+[0,&nbsp;1].&nbsp;The&nbsp;error&nbsp;is&nbsp;measured&nbsp;against&nbsp;the&nbsp;actual&nbsp;stored<br>
+prototype-plus-int8-residual&nbsp;representation&nbsp;from&nbsp;the&nbsp;last&nbsp;fit.</span></dd></dl>
+
+<dl><dt><a name="VQCodebook-save"><strong>save</strong></a>(self, path: 'str') -&gt; 'None'</dt><dd><span class="code">Save&nbsp;the&nbsp;codebook&nbsp;to&nbsp;an&nbsp;.npz&nbsp;file.</span></dd></dl>
+
+<dl><dt><a name="VQCodebook-stats"><strong>stats</strong></a>(self) -&gt; 'dict[str, float]'</dt><dd><span class="code">Return&nbsp;a&nbsp;summary&nbsp;of&nbsp;codebook&nbsp;statistics.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>concept_names</strong></dt>
+<dd><span class="code">Concept&nbsp;names&nbsp;in&nbsp;encoding&nbsp;order.</span></dd>
+</dl>
+<dl><dt><strong>is_trained</strong></dt>
+<dd><span class="code">Whether&nbsp;the&nbsp;codebook&nbsp;has&nbsp;been&nbsp;trained.</span></dd>
+</dl>
+<dl><dt><strong>n_concepts</strong></dt>
+<dd><span class="code">Number&nbsp;of&nbsp;concepts&nbsp;currently&nbsp;encoded.</span></dd>
+</dl>
+<dl><dt><strong>prototypes</strong></dt>
+<dd><span class="code">The&nbsp;K&nbsp;prototype&nbsp;vectors,&nbsp;shape&nbsp;(K,&nbsp;D).</span></dd>
+</dl>
+<dl><dt><strong>reconstruction_cosine</strong></dt>
+<dd><span class="code">Mean&nbsp;per-vector&nbsp;cosine&nbsp;similarity&nbsp;of&nbsp;reconstructed&nbsp;vectors.</span></dd>
+</dl>
+<dl><dt><strong>reconstruction_error</strong></dt>
+<dd><span class="code">Mean&nbsp;squared&nbsp;reconstruction&nbsp;error&nbsp;from&nbsp;last&nbsp;training.</span></dd>
+</dl>
+<dl><dt><strong>relative_reconstruction_error</strong></dt>
+<dd><span class="code">Mean&nbsp;squared&nbsp;reconstruction&nbsp;error&nbsp;normalized&nbsp;by&nbsp;input&nbsp;energy.</span></dd>
+</dl>
+<dl><dt><strong>residual_saturation_fraction</strong></dt>
+<dd><span class="code">Fraction&nbsp;of&nbsp;residual&nbsp;coefficients&nbsp;clipped&nbsp;by&nbsp;int8&nbsp;quantization.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>DEFAULT_BATCH_SIZE</strong> = 1024</dl>
+
+<dl><dt><strong>DEFAULT_ITERS</strong> = 25</dl>
+
+<dl><dt><strong>DEFAULT_K</strong> = 2048</dl>
+
+<dl><dt><strong>DEFAULT_RESIDUAL_SCALE</strong> = 0.1</dl>
+
+<dl><dt><strong>MIN_RESIDUAL_SCALE</strong> = 1e-06</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>logger</strong> = &lt;Logger Self_World.infrastructure.vq_codebook (WARNING)&gt;</td></tr></table>
+</body></html>

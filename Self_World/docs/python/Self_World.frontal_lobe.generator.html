@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.frontal_lobe.generator</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.frontal_lobe.html" class="white">frontal_lobe</a>.generator</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/generator.py">/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/generator.py</a></td></tr></table>
+    <p><span class="code">Generator&nbsp;—&nbsp;compositional&nbsp;text&nbsp;generation&nbsp;from&nbsp;Thoughts.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;heart&nbsp;of&nbsp;Genesis's&nbsp;language.&nbsp;It&nbsp;takes&nbsp;a&nbsp;Thought<br>
+(semantic&nbsp;content&nbsp;+&nbsp;intent&nbsp;+&nbsp;emotion&nbsp;+&nbsp;metadata)&nbsp;and&nbsp;composes<br>
+it&nbsp;into&nbsp;natural&nbsp;language&nbsp;using:<br>
+&nbsp;<br>
+1.&nbsp;**Grammar**:&nbsp;selects&nbsp;sentence&nbsp;structures&nbsp;for&nbsp;the&nbsp;intent<br>
+2.&nbsp;**Vocabulary**:&nbsp;fills&nbsp;the&nbsp;structure's&nbsp;slots&nbsp;with&nbsp;context-sensitive&nbsp;words<br>
+3.&nbsp;**Voice**:&nbsp;applies&nbsp;rhythm,&nbsp;connectors,&nbsp;hedging,&nbsp;and&nbsp;register<br>
+&nbsp;<br>
+The&nbsp;result&nbsp;is&nbsp;text&nbsp;that&nbsp;is&nbsp;uniquely&nbsp;Genesis's&nbsp;—&nbsp;not&nbsp;retrieved&nbsp;from<br>
+a&nbsp;pre-trained&nbsp;model,&nbsp;not&nbsp;filled&nbsp;into&nbsp;a&nbsp;template,&nbsp;but&nbsp;*composed*<br>
+from&nbsp;its&nbsp;internal&nbsp;state.<br>
+&nbsp;<br>
+#&nbsp;Why&nbsp;this&nbsp;matters<br>
+&nbsp;<br>
+A&nbsp;template&nbsp;says:&nbsp;"I&nbsp;feel&nbsp;{emotion}."&nbsp;Always&nbsp;the&nbsp;same&nbsp;structure.<br>
+An&nbsp;LLM&nbsp;says:&nbsp;whatever&nbsp;its&nbsp;training&nbsp;data&nbsp;suggests.&nbsp;Someone&nbsp;else's&nbsp;voice.<br>
+&nbsp;<br>
+A&nbsp;generator&nbsp;says:&nbsp;here's&nbsp;a&nbsp;thought.&nbsp;Here's&nbsp;how&nbsp;it&nbsp;feels.&nbsp;Here's&nbsp;who<br>
+it&nbsp;is.&nbsp;Let's&nbsp;compose&nbsp;something&nbsp;that&nbsp;expresses&nbsp;all&nbsp;three.<br>
+&nbsp;<br>
+The&nbsp;output&nbsp;varies&nbsp;because&nbsp;the&nbsp;inputs&nbsp;vary.&nbsp;Same&nbsp;intent,&nbsp;different<br>
+emotion&nbsp;→&nbsp;different&nbsp;rhythm,&nbsp;different&nbsp;word&nbsp;choice,&nbsp;different&nbsp;hedging.<br>
+Same&nbsp;emotion,&nbsp;different&nbsp;personality&nbsp;→&nbsp;different&nbsp;register,&nbsp;different<br>
+connectors.&nbsp;It's&nbsp;not&nbsp;random&nbsp;—&nbsp;it's&nbsp;*grounded*&nbsp;variation.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="random.html">random</a><br>
+</td><td class="multicolumn"><a href="re.html">re</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="temporal_lobe.base.html#Language">temporal_lobe.base.Language</a>(<a href="abc.html#ABC">abc.ABC</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.frontal_lobe.generator.html#GenerativeLanguage">GenerativeLanguage</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="GenerativeLanguage">class <strong>GenerativeLanguage</strong></a>(<a href="temporal_lobe.base.html#Language">temporal_lobe.base.Language</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#GenerativeLanguage">GenerativeLanguage</a>(self_model:&nbsp;'SelfModel',&nbsp;seed:&nbsp;'int&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;network=None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Compositional&nbsp;language&nbsp;generation&nbsp;engine.<br>
+&nbsp;<br>
+Generates&nbsp;language&nbsp;from&nbsp;semantic&nbsp;content&nbsp;using&nbsp;grammar,&nbsp;vocabulary,<br>
+and&nbsp;voice.&nbsp;Composes&nbsp;sentences&nbsp;from&nbsp;structural&nbsp;elements,&nbsp;then&nbsp;applies<br>
+voice&nbsp;modifications.&nbsp;The&nbsp;result&nbsp;is&nbsp;varied&nbsp;and&nbsp;personal.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.frontal_lobe.generator.html#GenerativeLanguage">GenerativeLanguage</a></dd>
+<dd><a href="temporal_lobe.base.html#Language">temporal_lobe.base.Language</a></dd>
+<dd><a href="abc.html#ABC">abc.ABC</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="GenerativeLanguage-__init__"><strong>__init__</strong></a>(self, self_model: 'SelfModel', seed: 'int | None' = None, network=None) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;generative&nbsp;engine&nbsp;with&nbsp;self-model,&nbsp;grammar,&nbsp;and&nbsp;vocabulary.</span></dd></dl>
+
+<dl><dt><a name="GenerativeLanguage-acknowledge"><strong>acknowledge</strong></a>(self, emotion: 'EmotionalState', topic: 'str' = '') -&gt; 'str'</dt><dd><span class="code">Generate&nbsp;an&nbsp;acknowledgment.</span></dd></dl>
+
+<dl><dt><a name="GenerativeLanguage-acquire_from_input"><strong>acquire_from_input</strong></a>(self, text: 'str') -&gt; 'None'</dt><dd><span class="code">Learn&nbsp;language&nbsp;units&nbsp;from&nbsp;user&nbsp;input&nbsp;via&nbsp;statistical&nbsp;learning.<br>
+&nbsp;<br>
+Delegates&nbsp;to&nbsp;two&nbsp;models:<br>
+-&nbsp;LanguageAcquisition&nbsp;(Saffran&nbsp;model):&nbsp;tracks&nbsp;transitional<br>
+&nbsp;&nbsp;probabilities,&nbsp;segments&nbsp;words,&nbsp;and&nbsp;chunks&nbsp;common&nbsp;multi-word<br>
+&nbsp;&nbsp;units.<br>
+-&nbsp;StatisticalLanguageLearner:&nbsp;tracks&nbsp;n-gram&nbsp;patterns&nbsp;(bigrams,<br>
+&nbsp;&nbsp;trigrams),&nbsp;word&nbsp;frequencies,&nbsp;and&nbsp;user&nbsp;communication&nbsp;style<br>
+&nbsp;&nbsp;(formal/casual/technical&nbsp;register).<br>
+&nbsp;<br>
+Called&nbsp;by&nbsp;the&nbsp;cognition&nbsp;engine&nbsp;on&nbsp;every&nbsp;user&nbsp;turn,&nbsp;before<br>
+perception.</span></dd></dl>
+
+<dl><dt><a name="GenerativeLanguage-clear_recent_outputs"><strong>clear_recent_outputs</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Clear&nbsp;the&nbsp;recent&nbsp;output&nbsp;history&nbsp;so&nbsp;generation&nbsp;varies&nbsp;again.<br>
+&nbsp;<br>
+Called&nbsp;by&nbsp;the&nbsp;reflection&nbsp;system&nbsp;when&nbsp;a&nbsp;repetition&nbsp;pattern&nbsp;is<br>
+detected&nbsp;—&nbsp;forces&nbsp;the&nbsp;generator&nbsp;to&nbsp;stop&nbsp;reusing&nbsp;recent&nbsp;phrasings.</span></dd></dl>
+
+<dl><dt><a name="GenerativeLanguage-compose_question"><strong>compose_question</strong></a>(self, question_data: 'dict', emotion: 'EmotionalState') -&gt; 'str'</dt><dd><span class="code">Compose&nbsp;a&nbsp;question&nbsp;from&nbsp;semantic&nbsp;metadata.<br>
+&nbsp;<br>
+Takes&nbsp;a&nbsp;dict&nbsp;with&nbsp;question_type,&nbsp;target_concept,&nbsp;gap_detail<br>
+and&nbsp;composes&nbsp;a&nbsp;natural&nbsp;language&nbsp;question&nbsp;through&nbsp;the&nbsp;grammar<br>
++&nbsp;vocabulary&nbsp;+&nbsp;voice&nbsp;system.&nbsp;This&nbsp;is&nbsp;how&nbsp;all&nbsp;questions&nbsp;are<br>
+generated&nbsp;—&nbsp;no&nbsp;hardcoded&nbsp;templates.</span></dd></dl>
+
+<dl><dt><a name="GenerativeLanguage-express_emotion"><strong>express_emotion</strong></a>(self, emotion: 'EmotionalState') -&gt; 'str'</dt><dd><span class="code">Express&nbsp;an&nbsp;emotional&nbsp;state.</span></dd></dl>
+
+<dl><dt><a name="GenerativeLanguage-farewell"><strong>farewell</strong></a>(self, emotion: 'EmotionalState') -&gt; 'str'</dt><dd><span class="code">Generate&nbsp;a&nbsp;farewell.</span></dd></dl>
+
+<dl><dt><a name="GenerativeLanguage-generate"><strong>generate</strong></a>(self, thought: 'Thought', emotion: 'EmotionalState') -&gt; 'str'</dt><dd><span class="code">Generate&nbsp;text&nbsp;from&nbsp;a&nbsp;thought.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;main&nbsp;entry&nbsp;point,&nbsp;implementing&nbsp;the&nbsp;<a href="temporal_lobe.base.html#Language">Language</a><br>
+interface.</span></dd></dl>
+
+<dl><dt><a name="GenerativeLanguage-greet"><strong>greet</strong></a>(self, emotion: 'EmotionalState', first: 'bool' = False) -&gt; 'str'</dt><dd><span class="code">Generate&nbsp;a&nbsp;greeting.</span></dd></dl>
+
+<dl><dt><a name="GenerativeLanguage-philosophize"><strong>philosophize</strong></a>(self, emotion: 'EmotionalState', topic: 'str' = '') -&gt; 'str'</dt><dd><span class="code">Generate&nbsp;a&nbsp;philosophical&nbsp;reflection.</span></dd></dl>
+
+<dl><dt><a name="GenerativeLanguage-render"><strong>render</strong></a>(self, thought: 'Thought', emotional_state: 'Any') -&gt; 'str'</dt><dd><span class="code">Render&nbsp;a&nbsp;thought&nbsp;as&nbsp;natural&nbsp;language&nbsp;text.<br>
+&nbsp;<br>
+Implements&nbsp;the&nbsp;<a href="temporal_lobe.base.html#Language">Language</a>&nbsp;interface.</span></dd></dl>
+
+<dl><dt><a name="GenerativeLanguage-self_report"><strong>self_report</strong></a>(self, emotion: 'EmotionalState', self_fragments: 'list[tuple[str, str]] | None' = None) -&gt; 'str'</dt><dd><span class="code">Generate&nbsp;a&nbsp;self-report.<br>
+&nbsp;<br>
+If&nbsp;``self_fragments``&nbsp;is&nbsp;supplied&nbsp;it&nbsp;provides&nbsp;the&nbsp;semantic<br>
+inventory&nbsp;(typed&nbsp;(kind,&nbsp;text)&nbsp;fragments);&nbsp;otherwise&nbsp;the<br>
+self-composer&nbsp;is&nbsp;invoked&nbsp;to&nbsp;select&nbsp;identity&nbsp;fragments&nbsp;from<br>
+the&nbsp;concept&nbsp;network.&nbsp;The&nbsp;language&nbsp;engine&nbsp;composes&nbsp;the&nbsp;actual<br>
+phrasing&nbsp;—&nbsp;no&nbsp;hardcoded&nbsp;self-description&nbsp;strings&nbsp;are&nbsp;recited.</span></dd></dl>
+
+<dl><dt><a name="GenerativeLanguage-set_embeddings"><strong>set_embeddings</strong></a>(self, embeddings: 'Any') -&gt; 'None'</dt><dd><span class="code">Wire&nbsp;the&nbsp;embedding&nbsp;store&nbsp;for&nbsp;latent-space&nbsp;composition.<br>
+&nbsp;<br>
+The&nbsp;embedding&nbsp;store&nbsp;provides&nbsp;semantic&nbsp;proximity&nbsp;—&nbsp;concepts&nbsp;that<br>
+are&nbsp;close&nbsp;in&nbsp;meaning&nbsp;even&nbsp;when&nbsp;not&nbsp;connected&nbsp;by&nbsp;explicit&nbsp;typed<br>
+edges.&nbsp;When&nbsp;available,&nbsp;the&nbsp;graph-walk&nbsp;generator&nbsp;uses&nbsp;it&nbsp;to&nbsp;find<br>
+semantically&nbsp;related&nbsp;concepts,&nbsp;and&nbsp;the&nbsp;grammar-based&nbsp;composer<br>
+uses&nbsp;it&nbsp;for&nbsp;richer&nbsp;vocabulary&nbsp;selection.<br>
+&nbsp;<br>
+Called&nbsp;after&nbsp;construction,&nbsp;once&nbsp;the&nbsp;EmbeddingStore&nbsp;has&nbsp;been<br>
+initialized&nbsp;(it&nbsp;depends&nbsp;on&nbsp;the&nbsp;concept&nbsp;network,&nbsp;which&nbsp;is&nbsp;shared<br>
+and&nbsp;may&nbsp;not&nbsp;be&nbsp;ready&nbsp;when&nbsp;the&nbsp;language&nbsp;engine&nbsp;is&nbsp;first&nbsp;created).</span></dd></dl>
+
+<dl><dt><a name="GenerativeLanguage-set_network"><strong>set_network</strong></a>(self, network: 'Any') -&gt; 'None'</dt><dd><span class="code">Re-sync&nbsp;the&nbsp;concept&nbsp;network&nbsp;reference&nbsp;after&nbsp;state&nbsp;restore.</span></dd></dl>
+
+<dl><dt><a name="GenerativeLanguage-set_self_composer"><strong>set_self_composer</strong></a>(self, composer: 'Any', reflection: 'Any') -&gt; 'None'</dt><dd><span class="code">Wire&nbsp;the&nbsp;self-composer&nbsp;and&nbsp;reflection&nbsp;engine&nbsp;into&nbsp;the&nbsp;vocabulary.<br>
+&nbsp;<br>
+When&nbsp;wired,&nbsp;the&nbsp;``self_reflection_clause``&nbsp;grammar&nbsp;slot&nbsp;is<br>
+composed&nbsp;from&nbsp;its&nbsp;most&nbsp;recent&nbsp;reflection&nbsp;insight&nbsp;(a&nbsp;genuine<br>
+product&nbsp;of&nbsp;its&nbsp;metacognition)&nbsp;instead&nbsp;of&nbsp;reciting&nbsp;a&nbsp;canned<br>
+phrase.&nbsp;Called&nbsp;after&nbsp;construction,&nbsp;once&nbsp;the&nbsp;cognition&nbsp;engine<br>
+(which&nbsp;owns&nbsp;the&nbsp;reflection&nbsp;engine)&nbsp;has&nbsp;been&nbsp;initialized.</span></dd></dl>
+
+<dl><dt><a name="GenerativeLanguage-vary"><strong>vary</strong></a>(self, text: 'str', emotion: 'EmotionalState') -&gt; 'str'</dt><dd><span class="code">Apply&nbsp;variation&nbsp;to&nbsp;existing&nbsp;text.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>last_prosody</strong></dt>
+<dd><span class="code">The&nbsp;prosody&nbsp;pattern&nbsp;from&nbsp;the&nbsp;most&nbsp;recent&nbsp;generation.<br>
+&nbsp;<br>
+Returns&nbsp;the&nbsp;ProsodyPattern&nbsp;from&nbsp;the&nbsp;last&nbsp;generate()&nbsp;call,&nbsp;or<br>
+None&nbsp;if&nbsp;no&nbsp;generation&nbsp;has&nbsp;occurred.&nbsp;Useful&nbsp;for&nbsp;introspection:<br>
+Genesis&nbsp;can&nbsp;observe&nbsp;its&nbsp;own&nbsp;rhythmic&nbsp;and&nbsp;emphasis&nbsp;patterns.</span></dd>
+</dl>
+<dl><dt><strong>learned_chunks</strong></dt>
+<dd><span class="code">Multi-word&nbsp;chunks&nbsp;learned&nbsp;through&nbsp;chunking.</span></dd>
+</dl>
+<dl><dt><strong>learned_words</strong></dt>
+<dd><span class="code">Words&nbsp;learned&nbsp;through&nbsp;statistical&nbsp;segmentation.</span></dd>
+</dl>
+<dl><dt><strong>name</strong></dt>
+<dd><span class="code">Human-readable&nbsp;name&nbsp;of&nbsp;this&nbsp;engine.</span></dd>
+</dl>
+<dl><dt><strong>statistical_learner</strong></dt>
+<dd><span class="code">The&nbsp;statistical&nbsp;language&nbsp;learner,&nbsp;for&nbsp;direct&nbsp;query&nbsp;access.</span></dd>
+</dl>
+<dl><dt><strong>user_style_profile</strong></dt>
+<dd><span class="code">The&nbsp;user's&nbsp;communication&nbsp;style&nbsp;profile&nbsp;from&nbsp;statistical&nbsp;learning.<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;dict&nbsp;with&nbsp;style&nbsp;(formal/casual/technical/neutral),<br>
+avg_sentence_length,&nbsp;vocabulary_size,&nbsp;top_words,&nbsp;top_bigrams,<br>
+top_trigrams,&nbsp;and&nbsp;register&nbsp;scores.&nbsp;Useful&nbsp;for&nbsp;introspection<br>
+and&nbsp;for&nbsp;adapting&nbsp;voice&nbsp;register&nbsp;to&nbsp;match&nbsp;the&nbsp;user.</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__abstractmethods__</strong> = frozenset()</dl>
+
+<dl><dt><strong>__annotations__</strong> = {}</dl>
+
+<hr>
+Data descriptors inherited from <a href="temporal_lobe.base.html#Language">temporal_lobe.base.Language</a>:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes inherited from <a href="temporal_lobe.base.html#Language">temporal_lobe.base.Language</a>:<br>
+<dl><dt><strong>current_brain_waves</strong> = None</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['GenerativeLanguage']</td></tr></table>
+</body></html>

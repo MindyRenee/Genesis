@@ -1,0 +1,75 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Memory-mapped core state file."><title>genesis::store::mmap_state - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-203241e4.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="genesis" data-themes="" data-resource-suffix="" data-rustdoc-version="1.100.0 (0ef1bc386 2026-11-09)" data-channel="1.100.0" data-search-js="search-b167f383.js" data-stringdex-js="stringdex-b5109af9.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../../static.files/main-1814ead3.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-9f56287d.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module mmap_state</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../genesis/index.html">genesis</a><span class="version">0.2.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module mmap_<wbr>state</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#why-mmap-instead-of-readwrite" title="Why mmap instead of read/write?">Why mmap instead of read/write?</a></li><li><a href="#memory-safety-why-no-genesiscorestate" title="Memory safety: why no `&#38;GenesisCoreState`?">Memory safety: why no <code>&amp;GenesisCoreState</code>?</a><ul><li><a href="#the-writer-never-forms-a-reference-into-the-mapping" title="The writer never forms a reference into the mapping">The writer never forms a reference into the mapping</a></li></ul></li><li><a href="#file-layout" title="File layout">File layout</a></li></ul><h3><a href="#structs">Module Items</a></h3><ul class="block"><li><a href="#structs" title="Structs">Structs</a></li><li><a href="#enums" title="Enums">Enums</a></li><li><a href="#constants" title="Constants">Constants</a></li><li><a href="#functions" title="Functions">Functions</a></li></ul></section><div id="rustdoc-modnav"><h2><a href="../index.html">In genesis::<wbr>store</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../index.html">genesis</a>::<wbr><a href="../index.html">store</a></div><h1>Module <span>mmap_<wbr>state</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/genesis/store/mmap_state.rs.html#1-1579">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Memory-mapped core state file.</p>
+<p>This is the persistence layer for <a href="../../state/core_state/struct.GenesisCoreState.html" title="struct genesis::state::core_state::GenesisCoreState"><code>GenesisCoreState</code></a>. It handles:</p>
+<ul>
+<li><strong>Creating</strong> a new state file on disk (zeroed, then initialised)</li>
+<li><strong>Opening</strong> an existing state file and mapping it into memory</li>
+<li><strong>Crash recovery</strong>: detecting corruption via magic, version, and
+checksum, and recovering when possible</li>
+<li><strong>Lock-free reads</strong>: readers get an owned copy of the state via
+a single volatile copy — no Rust reference to the mmap’d
+memory is ever created, so there is no aliasing with concurrent
+writers. A racing read may observe a torn snapshot; readers that
+cannot tolerate that take the flock-serialized
+<code>read_consistent_locked</code> path.</li>
+<li><strong>Serialized writes</strong>: writers are serialized by the in-process
+<code>write_lock</code> mutex and the cross-process flock; each publish is
+a single volatile copy of a fully-prepared stack state.</li>
+<li><strong>Synchronisation</strong>: <code>sync()</code> flushes dirty pages to disk so
+state survives a crash</li>
+</ul>
+<h3 id="why-mmap-instead-of-readwrite"><a class="doc-anchor" href="#why-mmap-instead-of-readwrite">§</a>Why mmap instead of read/write?</h3>
+<p>On a 4.7 GB RAM machine, we can’t afford to hold copies of state
+in heap memory. With mmap, the OS manages paging — the ~3.4 KB
+state struct occupies a single page (4 KB), and the kernel keeps
+it cached or pages it out as needed. We get a direct pointer to
+the file’s contents with zero copy.</p>
+<h3 id="memory-safety-why-no-genesiscorestate"><a class="doc-anchor" href="#memory-safety-why-no-genesiscorestate">§</a>Memory safety: why no <code>&amp;GenesisCoreState</code>?</h3>
+<p>The mmap’d region is <code>MAP_SHARED</code> — it can be modified by another
+thread (via <a href="struct.MmapState.html#method.modify" title="method genesis::store::mmap_state::MmapState::modify"><code>MmapState::modify</code></a>) or another process at any time. Returning
+a Rust <code>&amp;GenesisCoreState</code> from the mmap’d memory would be
+<strong>undefined behaviour</strong>: Rust’s aliasing rules forbid a <code>&amp;</code> from
+coexisting with a <code>&amp;mut</code> to the same bytes. The compiler is free
+to assume that a <code>&amp;</code>
+reference’s pointee does not change, which could cause miscompilation
+when another thread writes through <code>&amp;mut</code>.</p>
+<p>Instead, the read API (<a href="struct.MmapState.html#method.read" title="method genesis::store::mmap_state::MmapState::read"><code>MmapState::read</code></a> and <a href="struct.MmapState.html#method.read_consistent" title="method genesis::store::mmap_state::MmapState::read_consistent"><code>MmapState::read_consistent</code></a>) performs
+volatile byte copies through raw pointers, returning an <strong>owned</strong>
+<code>GenesisCoreState</code> on the stack. Readers therefore create no
+reference to the mmap’d memory at all.</p>
+<h4 id="the-writer-never-forms-a-reference-into-the-mapping"><a class="doc-anchor" href="#the-writer-never-forms-a-reference-into-the-mapping">§</a>The writer never forms a reference into the mapping</h4>
+<p>Every production write path — <a href="struct.MmapState.html#method.modify" title="method genesis::store::mmap_state::MmapState::modify"><code>MmapState::modify</code></a> and the open-time
+repairs/migrations — runs its mutation on a <strong>stack copy</strong> and
+publishes it with <code>publish_stack</code> (a single <code>write_volatile</code>).
+No <code>&amp;</code> or <code>&amp;mut</code> into
+the shared mapping is ever formed, so there is no aliasing with
+concurrent readers under Stacked/Tree Borrows: the old pattern
+(a <code>&amp;mut GenesisCoreState</code> materialised into <code>MAP_SHARED</code> for the
+whole transaction, which Miri flagged and which only happened to
+survive because volatile loads are never dead) is gone.</p>
+<p>Consequences, kept deliberately:</p>
+<ul>
+<li>A panicking <a href="struct.MmapState.html#method.modify" title="method genesis::store::mmap_state::MmapState::modify"><code>MmapState::modify</code></a> closure only ever saw the stack copy, so
+the mapping needs no rollback — it was never touched.</li>
+<li><code>read_volatile</code> in the readers remains load-bearing: it stops
+the compiler eliding or merging the loads, it is not (and never
+was) what made concurrent access defined.</li>
+<li><code>MmapState::state_mut</code> was removed: it formed <code>&amp;mut</code> references
+into <code>MAP_SHARED</code> memory with exclusivity left to the caller,
+and the only callers were tests that now use <code>modify</code>’s stack
+copy. No API may vend references into the mapping.</li>
+</ul>
+<h3 id="file-layout"><a class="doc-anchor" href="#file-layout">§</a>File layout</h3><div class="example-wrap"><pre class="language-text"><code>offset 0:     GenesisCoreState (3480 bytes)
+offset 3480:  (unused, padding to page boundary)</code></pre></div>
+<p>The state struct is 3480 bytes and the file is page-aligned, so the
+mapping is at least one page and the state sits at its start. (On a
+host with a 64 KiB page — aarch64, for instance — <code>page_align_up</code>
+expands the file to 64 KiB, not 4 KiB.)</p>
+</div></details><h2 id="structs" class="section-header">Structs<a href="#structs" class="anchor">§</a></h2><dl class="item-table"><dt><a class="struct" href="struct.MmapState.html" title="struct genesis::store::mmap_state::MmapState">Mmap<wbr>State</a></dt><dd>A memory-mapped Genesis core state file.</dd></dl><h2 id="enums" class="section-header">Enums<a href="#enums" class="anchor">§</a></h2><dl class="item-table"><dt><a class="enum" href="enum.StateFileError.html" title="enum genesis::store::mmap_state::StateFileError">State<wbr>File<wbr>Error</a></dt><dd>Errors that can occur when working with the state file.</dd></dl><h2 id="constants" class="section-header">Constants<a href="#constants" class="anchor">§</a></h2><dl class="item-table"><dt><a class="constant" href="constant.FILE_SIZE.html" title="constant genesis::store::mmap_state::FILE_SIZE">FILE_<wbr>SIZE</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>The logical file size — one 4K page. The state struct (3480 bytes)
+fits comfortably, with the rest as padding.</dd><dt><a class="constant" href="constant.MARKER_G07.html" title="constant genesis::store::mmap_state::MARKER_G07">MARKER_<wbr>G07</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Provenance marker — one letter of the creator lattice (see
+PROVENANCE.md) — the persistence layer itself carries one.</dd></dl><h2 id="functions" class="section-header">Functions<a href="#functions" class="anchor">§</a></h2><dl class="item-table"><dt><a class="fn" href="fn.local_phase_of_day.html" title="fn genesis::store::mmap_state::local_phase_of_day">local_<wbr>phase_<wbr>of_<wbr>day</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Derive the initial circadian phase [0, 1) from the local time of
+day encoded in <code>now_ms</code> (Unix epoch milliseconds).</dd><dt><a class="fn" href="fn.local_seconds_of_day.html" title="fn genesis::store::mmap_state::local_seconds_of_day">local_<wbr>seconds_<wbr>of_<wbr>day</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Seconds since local midnight at <code>now_ms</code>, falling back to UTC when the
+local conversion is unavailable. See <a href="fn.local_phase_of_day.html" title="fn genesis::store::mmap_state::local_phase_of_day"><code>local_phase_of_day</code></a>.</dd><dt><a class="fn" href="fn.mapped_len.html" title="fn genesis::store::mmap_state::mapped_len">mapped_<wbr>len</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>The actual mmap/ftruncate length: <code>FILE_SIZE</code> rounded up to the OS
+page size. On 4K-page machines this equals <code>FILE_SIZE</code>; on 16K/64K-page
+machines (aarch64) it ensures the whole mapping is backed by the file
+(otherwise the tail page is unbacked and faults with SIGBUS) and that
+<code>munmap</code>/<code>msync</code> cover the full mapping.</dd></dl></section></div></main></body></html>

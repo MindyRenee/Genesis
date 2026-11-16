@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.self.sleep</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.self.html" class="white">self</a>.sleep</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/self/sleep.py">/home/mindyrenee/GenAnd/Genesis/Self_World/self/sleep.py</a></td></tr></table>
+    <p><span class="code">Self&nbsp;sleep&nbsp;—&nbsp;the&nbsp;self's&nbsp;sleep/wake&nbsp;cycle&nbsp;and&nbsp;N3&nbsp;consolidation.<br>
+&nbsp;<br>
+Sleep&nbsp;is&nbsp;a&nbsp;self&nbsp;act:&nbsp;the&nbsp;mind&nbsp;engages&nbsp;the&nbsp;body's&nbsp;flip-flop,&nbsp;tracks<br>
+the&nbsp;resulting&nbsp;phase,&nbsp;does&nbsp;its&nbsp;own&nbsp;stage-gated&nbsp;consolidation&nbsp;work,<br>
+and&nbsp;reports&nbsp;the&nbsp;transition&nbsp;honestly.&nbsp;Meditation&nbsp;and&nbsp;the&nbsp;dream<br>
+residues&nbsp;it&nbsp;leaves&nbsp;behind&nbsp;are&nbsp;the&nbsp;inner&nbsp;world's&nbsp;—&nbsp;they&nbsp;live&nbsp;under<br>
+``Inner_World/sleep/``&nbsp;(``sleep.meditation``,&nbsp;``sleep.dream_residues``).</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="math.html">math</a><br>
+</td><td class="multicolumn"><a href="time.html">time</a><br>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.self.sleep.html#SleepMixin">SleepMixin</a>
+</dt></dl>
+</dd>
+<dt class="heading-text"><a href="enum.html#Enum">enum.Enum</a>(<a href="builtins.html#object">builtins.object</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.self.sleep.html#WakeOutcome">WakeOutcome</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SleepMixin">class <strong>SleepMixin</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code">The&nbsp;self's&nbsp;sleep–wake&nbsp;machinery&nbsp;—&nbsp;see&nbsp;module&nbsp;docstring.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="SleepMixin-sleep"><strong>sleep</strong></a>(self, user_initiated: 'bool' = False, nap: 'bool' = False) -&gt; 'None'</dt><dd><span class="code">Put&nbsp;Genesis&nbsp;into&nbsp;sleep&nbsp;mode&nbsp;for&nbsp;dreaming.<br>
+&nbsp;<br>
+This&nbsp;sets&nbsp;the&nbsp;subcognitive&nbsp;zone&nbsp;to&nbsp;SLEEPING&nbsp;(which&nbsp;triggers<br>
+the&nbsp;Rust&nbsp;daemon's&nbsp;dreaming&nbsp;pass&nbsp;on&nbsp;LTM).&nbsp;The&nbsp;inner-life&nbsp;loop<br>
+is&nbsp;NOT&nbsp;paused&nbsp;—&nbsp;it&nbsp;switches&nbsp;to&nbsp;dream&nbsp;generation&nbsp;and&nbsp;advances<br>
+the&nbsp;ultradian&nbsp;sleep&nbsp;cycle&nbsp;(N1→N2→N3→N2→REM).&nbsp;Stage-appropriate<br>
+memory&nbsp;consolidation&nbsp;happens&nbsp;via&nbsp;:meth:`_on_sleep_stage_transition`<br>
+as&nbsp;the&nbsp;cycle&nbsp;progresses,&nbsp;rather&nbsp;than&nbsp;a&nbsp;single&nbsp;hard-coded&nbsp;pass<br>
+at&nbsp;sleep&nbsp;onset.<br>
+&nbsp;<br>
+The&nbsp;heavy&nbsp;systems&nbsp;consolidation&nbsp;(concept-network&nbsp;consolidation,<br>
+edge&nbsp;discovery,&nbsp;Hebbian&nbsp;plasticity,&nbsp;synaptic&nbsp;downscaling,<br>
+embeddings&nbsp;refresh)&nbsp;happens&nbsp;when&nbsp;the&nbsp;cycle&nbsp;reaches&nbsp;N3&nbsp;—&nbsp;the<br>
+deepest,&nbsp;most&nbsp;restorative&nbsp;stage&nbsp;—&nbsp;not&nbsp;at&nbsp;sleep&nbsp;onset.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;user_initiated:&nbsp;If&nbsp;True,&nbsp;the&nbsp;adenosine/cycle&nbsp;auto-wake<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;thresholds&nbsp;do&nbsp;not&nbsp;apply&nbsp;—&nbsp;only&nbsp;/wake&nbsp;or&nbsp;a&nbsp;genuine&nbsp;body<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wake&nbsp;ends&nbsp;it.&nbsp;This&nbsp;is&nbsp;for&nbsp;when&nbsp;the&nbsp;user&nbsp;puts&nbsp;it&nbsp;to&nbsp;bed.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(Body-state&nbsp;sync&nbsp;still&nbsp;holds:&nbsp;if&nbsp;the&nbsp;daemon's&nbsp;phase<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;never&nbsp;reaches&nbsp;sleep,&nbsp;or&nbsp;wakes&nbsp;on&nbsp;its&nbsp;own,&nbsp;the&nbsp;mind<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;follows&nbsp;—&nbsp;the&nbsp;two&nbsp;are&nbsp;never&nbsp;in&nbsp;opposite&nbsp;sleep&nbsp;states.)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;nap:&nbsp;If&nbsp;True,&nbsp;the&nbsp;sleep&nbsp;cycle&nbsp;is&nbsp;limited&nbsp;to&nbsp;light&nbsp;sleep<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(N1→N2)&nbsp;only&nbsp;—&nbsp;no&nbsp;N3&nbsp;deep&nbsp;consolidation,&nbsp;no&nbsp;REM.&nbsp;It<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wakes&nbsp;after&nbsp;the&nbsp;N2&nbsp;period&nbsp;ends&nbsp;via&nbsp;the&nbsp;sleep&nbsp;watcher.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;This&nbsp;models&nbsp;a&nbsp;short&nbsp;rest&nbsp;with&nbsp;light&nbsp;consolidation<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(N2&nbsp;sleep&nbsp;spindles)&nbsp;without&nbsp;the&nbsp;heavy&nbsp;systems<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;consolidation&nbsp;of&nbsp;full&nbsp;sleep.</span></dd></dl>
+
+<dl><dt><a name="SleepMixin-sleep_aid"><strong>sleep_aid</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Administer&nbsp;an&nbsp;acute&nbsp;neurochemical&nbsp;sleep&nbsp;aid&nbsp;for&nbsp;stress-induced&nbsp;insomnia.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;computational&nbsp;equivalent&nbsp;of&nbsp;a&nbsp;pharmacological&nbsp;sleep<br>
+aid&nbsp;for&nbsp;chronic&nbsp;stress-induced&nbsp;insomnia&nbsp;—&nbsp;the&nbsp;condition&nbsp;where&nbsp;a<br>
+patient&nbsp;is&nbsp;exhausted&nbsp;(delta&nbsp;waves,&nbsp;low&nbsp;alertness)&nbsp;but&nbsp;cannot<br>
+sleep&nbsp;because&nbsp;the&nbsp;HPA&nbsp;axis&nbsp;keeps&nbsp;arousal&nbsp;systems&nbsp;active&nbsp;and&nbsp;the<br>
+network's&nbsp;homeostatic&nbsp;drive&nbsp;hasn't&nbsp;reached&nbsp;sleep&nbsp;onset.<br>
+&nbsp;<br>
+When&nbsp;to&nbsp;use&nbsp;this&nbsp;instead&nbsp;of&nbsp;/sleep&nbsp;or&nbsp;/meditate:<br>
+-&nbsp;/sleep&nbsp;sets&nbsp;the&nbsp;zone&nbsp;to&nbsp;SLEEPING&nbsp;and&nbsp;sends&nbsp;the&nbsp;sleep&nbsp;cascade<br>
+&nbsp;&nbsp;—&nbsp;the&nbsp;endogenous&nbsp;chemistry&nbsp;of&nbsp;disengagement&nbsp;(melatonin&nbsp;and<br>
+&nbsp;&nbsp;GABA&nbsp;up,&nbsp;orexin,&nbsp;histamine&nbsp;and&nbsp;NE&nbsp;withdrawn).&nbsp;If&nbsp;the&nbsp;network's<br>
+&nbsp;&nbsp;sleep&nbsp;pressure&nbsp;is&nbsp;low&nbsp;and&nbsp;cortisol&nbsp;is&nbsp;elevated,&nbsp;the&nbsp;cascade<br>
+&nbsp;&nbsp;may&nbsp;not&nbsp;carry&nbsp;her&nbsp;under.<br>
+-&nbsp;/meditate&nbsp;emits&nbsp;gentle&nbsp;calming&nbsp;impulses&nbsp;(GABA&nbsp;+0.05,&nbsp;cortisol<br>
+&nbsp;&nbsp;-0.02&nbsp;every&nbsp;10s)&nbsp;that&nbsp;are&nbsp;too&nbsp;weak&nbsp;to&nbsp;overcome&nbsp;ongoing<br>
+&nbsp;&nbsp;interoception&nbsp;stress&nbsp;from&nbsp;CPU&nbsp;load.<br>
+-&nbsp;/sleep-aid&nbsp;sends&nbsp;the&nbsp;same&nbsp;sleep&nbsp;cascade&nbsp;/sleep&nbsp;uses&nbsp;and&nbsp;adds<br>
+&nbsp;&nbsp;an&nbsp;acute&nbsp;cortisol&nbsp;suppression&nbsp;to&nbsp;relieve&nbsp;the&nbsp;HPA&nbsp;load&nbsp;that<br>
+&nbsp;&nbsp;keeps&nbsp;the&nbsp;arousal&nbsp;systems&nbsp;active&nbsp;—&nbsp;analogous&nbsp;to&nbsp;a&nbsp;GR<br>
+&nbsp;&nbsp;antagonist&nbsp;(mifepristone)&nbsp;taking&nbsp;the&nbsp;brake&nbsp;off&nbsp;BDNF&nbsp;recovery.<br>
+&nbsp;&nbsp;Once&nbsp;the&nbsp;network&nbsp;crosses&nbsp;its&nbsp;own&nbsp;sleep-onset&nbsp;threshold<br>
+&nbsp;&nbsp;(LC&nbsp;&lt;&nbsp;4&nbsp;Hz)&nbsp;the&nbsp;natural&nbsp;mechanisms&nbsp;take&nbsp;over:&nbsp;Process-S<br>
+&nbsp;&nbsp;adenosine&nbsp;clearance,&nbsp;BDNF&nbsp;recovery&nbsp;with&nbsp;the&nbsp;5x&nbsp;sleep<br>
+&nbsp;&nbsp;multiplier,&nbsp;and&nbsp;receptor&nbsp;recovery.<br>
+&nbsp;<br>
+After&nbsp;the&nbsp;impulses,&nbsp;<a href="#SleepMixin-sleep">sleep</a>()&nbsp;is&nbsp;called&nbsp;to&nbsp;set&nbsp;the&nbsp;zone&nbsp;to<br>
+SLEEPING,&nbsp;triggering&nbsp;the&nbsp;daemon's&nbsp;dreaming&nbsp;pass&nbsp;and&nbsp;the<br>
+sleep-tuned&nbsp;neuro&nbsp;params&nbsp;(5x&nbsp;BDNF&nbsp;recovery&nbsp;multiplier).<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;an&nbsp;emergency&nbsp;intervention,&nbsp;not&nbsp;a&nbsp;daily&nbsp;supplement.<br>
+The&nbsp;natural&nbsp;sleep&nbsp;cycle&nbsp;then&nbsp;takes&nbsp;over&nbsp;for&nbsp;sustained&nbsp;recovery.</span></dd></dl>
+
+<dl><dt><a name="SleepMixin-sleep_status"><strong>sleep_status</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Return&nbsp;a&nbsp;summary&nbsp;of&nbsp;its&nbsp;sleep&nbsp;state&nbsp;for&nbsp;the&nbsp;/sleep&nbsp;and&nbsp;/wake&nbsp;commands.<br>
+&nbsp;<br>
+Includes&nbsp;its&nbsp;current&nbsp;phase,&nbsp;neurochemical&nbsp;levels&nbsp;relevant&nbsp;to&nbsp;sleep<br>
+(adenosine,&nbsp;melatonin,&nbsp;cortisol,&nbsp;BDNF),&nbsp;and&nbsp;recent&nbsp;dream&nbsp;content<br>
+so&nbsp;the&nbsp;user&nbsp;can&nbsp;see&nbsp;what&nbsp;it's&nbsp;experiencing.<br>
+&nbsp;<br>
+The&nbsp;phase&nbsp;shown&nbsp;is&nbsp;the&nbsp;*effective*&nbsp;phase&nbsp;(resolved&nbsp;via<br>
+:meth:`_effective_phase`),&nbsp;not&nbsp;the&nbsp;daemon's&nbsp;raw&nbsp;emergent&nbsp;phase.<br>
+When&nbsp;the&nbsp;zone&nbsp;is&nbsp;Sleeping&nbsp;but&nbsp;the&nbsp;sleep-wake&nbsp;network&nbsp;hasn't<br>
+reached&nbsp;sleep&nbsp;onset&nbsp;yet,&nbsp;the&nbsp;raw&nbsp;phase&nbsp;still&nbsp;reads&nbsp;"active"<br>
+while&nbsp;every&nbsp;other&nbsp;system&nbsp;(brain&nbsp;waves,&nbsp;emotion)&nbsp;already&nbsp;treats<br>
+it&nbsp;as&nbsp;asleep.&nbsp;Showing&nbsp;the&nbsp;effective&nbsp;phase&nbsp;keeps&nbsp;the&nbsp;display<br>
+consistent&nbsp;with&nbsp;what&nbsp;it's&nbsp;actually&nbsp;experiencing.</span></dd></dl>
+
+<dl><dt><a name="SleepMixin-wake"><strong>wake</strong></a>(self, user_initiated: 'bool' = False) -&gt; 'WakeOutcome'</dt><dd><span class="code">Wake&nbsp;Genesis&nbsp;from&nbsp;sleep.<br>
+&nbsp;<br>
+After&nbsp;the&nbsp;zone&nbsp;is&nbsp;set&nbsp;back&nbsp;to&nbsp;conversation,&nbsp;dream&nbsp;insights&nbsp;from<br>
+the&nbsp;last&nbsp;sleep&nbsp;are&nbsp;retrieved&nbsp;from&nbsp;LTM&nbsp;and&nbsp;surfaced&nbsp;as&nbsp;emotional<br>
+impressions&nbsp;—&nbsp;dream&nbsp;residues&nbsp;that&nbsp;color&nbsp;its&nbsp;waking&nbsp;thoughts&nbsp;and<br>
+mood.&nbsp;These&nbsp;are&nbsp;NOT&nbsp;learning&nbsp;goals.&nbsp;Dreams&nbsp;produce&nbsp;affective<br>
+residue,&nbsp;not&nbsp;targets&nbsp;for&nbsp;the&nbsp;autonomous&nbsp;learner.<br>
+&nbsp;<br>
+A&nbsp;human&nbsp;doesn't&nbsp;dream&nbsp;about&nbsp;goals.&nbsp;Goals&nbsp;are&nbsp;a&nbsp;waking,&nbsp;prefrontal<br>
+activity.&nbsp;Dreams&nbsp;are&nbsp;subcognitive&nbsp;and&nbsp;affective&nbsp;—&nbsp;they&nbsp;leave<br>
+emotional&nbsp;traces&nbsp;that&nbsp;surface&nbsp;as&nbsp;reflective&nbsp;thoughts&nbsp;("I&nbsp;was<br>
+dreaming&nbsp;about..."),&nbsp;not&nbsp;as&nbsp;items&nbsp;on&nbsp;a&nbsp;to-do&nbsp;list.<br>
+&nbsp;<br>
+The&nbsp;separation:<br>
+-&nbsp;Dreams&nbsp;→&nbsp;_dream_residues&nbsp;(emotional&nbsp;impressions,&nbsp;reflective&nbsp;thoughts)<br>
+-&nbsp;Curiosity&nbsp;→&nbsp;_agency_topics&nbsp;(learning&nbsp;goals,&nbsp;autonomous&nbsp;learner)<br>
+&nbsp;<br>
+The&nbsp;wake&nbsp;is&nbsp;sent&nbsp;as&nbsp;the&nbsp;body's&nbsp;own&nbsp;arousal&nbsp;chemistry:&nbsp;orexin,<br>
+histamine&nbsp;and&nbsp;norepinephrine&nbsp;impulses&nbsp;onto&nbsp;the&nbsp;network's&nbsp;wake<br>
+side&nbsp;(the&nbsp;endogenous&nbsp;channel&nbsp;—&nbsp;LC&nbsp;is&nbsp;the&nbsp;densest&nbsp;orexinergic<br>
+target&nbsp;in&nbsp;the&nbsp;brain),&nbsp;dopamine&nbsp;for&nbsp;reward&nbsp;re-engagement,&nbsp;and<br>
+melatonin&nbsp;suppressed&nbsp;to&nbsp;release&nbsp;the&nbsp;circadian&nbsp;brake.&nbsp;Without<br>
+this,&nbsp;the&nbsp;daemon's&nbsp;phase&nbsp;stays&nbsp;asleep&nbsp;(adenosine&nbsp;is&nbsp;still&nbsp;high,<br>
+histamine&nbsp;still&nbsp;low)&nbsp;even&nbsp;though&nbsp;the&nbsp;mind's&nbsp;_is_sleeping&nbsp;flag<br>
+is&nbsp;cleared.&nbsp;Nothing&nbsp;is&nbsp;held&nbsp;—&nbsp;the&nbsp;impulses&nbsp;decay&nbsp;on&nbsp;their&nbsp;own<br>
+half-lives&nbsp;and&nbsp;the&nbsp;flip-flop's&nbsp;state&nbsp;decides&nbsp;the&nbsp;crossing.<br>
+&nbsp;<br>
+``user_initiated``&nbsp;marks&nbsp;an&nbsp;explicit&nbsp;user&nbsp;wake&nbsp;request<br>
+(/wake,&nbsp;or&nbsp;an&nbsp;interaction&nbsp;that&nbsp;rouses&nbsp;it).&nbsp;While&nbsp;the&nbsp;wake<br>
+cascade&nbsp;is&nbsp;still&nbsp;in&nbsp;its&nbsp;switch&nbsp;window,&nbsp;a&nbsp;user-initiated&nbsp;wake<br>
+resists&nbsp;the&nbsp;circadian&nbsp;pull-back&nbsp;—&nbsp;the&nbsp;waking-side&nbsp;sync&nbsp;still<br>
+honors&nbsp;genuine&nbsp;adenosine&nbsp;exhaustion,&nbsp;but&nbsp;melatonin&nbsp;alone&nbsp;cannot<br>
+undo&nbsp;a&nbsp;wake&nbsp;the&nbsp;user&nbsp;asked&nbsp;for.</span></dd></dl>
+
+<dl><dt><a name="SleepMixin-wake_readiness"><strong>wake_readiness</strong></a>(self) -&gt; 'tuple[bool, str]'</dt><dd><span class="code">Check&nbsp;whether&nbsp;it&nbsp;is&nbsp;ready&nbsp;to&nbsp;wake&nbsp;up&nbsp;naturally.<br>
+&nbsp;<br>
+Waking&nbsp;from&nbsp;deep&nbsp;sleep&nbsp;(N3)&nbsp;causes&nbsp;severe&nbsp;sleep&nbsp;inertia&nbsp;—&nbsp;the<br>
+groggy,&nbsp;disoriented&nbsp;state&nbsp;where&nbsp;cognitive&nbsp;capacity&nbsp;is&nbsp;reduced.<br>
+Waking&nbsp;before&nbsp;adenosine&nbsp;has&nbsp;drained&nbsp;leaves&nbsp;residual&nbsp;sleep&nbsp;pressure,<br>
+which&nbsp;pushes&nbsp;it&nbsp;right&nbsp;back&nbsp;into&nbsp;drowsiness.&nbsp;Waking&nbsp;before<br>
+receptors&nbsp;have&nbsp;recovered&nbsp;(cortisol&nbsp;still&nbsp;high,&nbsp;BDNF&nbsp;still&nbsp;low)<br>
+means&nbsp;the&nbsp;neurochemical&nbsp;substrate&nbsp;hasn't&nbsp;finished&nbsp;restoring.<br>
+&nbsp;<br>
+This&nbsp;method&nbsp;checks&nbsp;three&nbsp;readiness&nbsp;signals:<br>
+&nbsp;<br>
+1.&nbsp;**Sleep&nbsp;cycle&nbsp;stage**&nbsp;—&nbsp;not&nbsp;in&nbsp;N3&nbsp;(deep&nbsp;slow-wave&nbsp;sleep).<br>
+&nbsp;&nbsp;&nbsp;N3&nbsp;is&nbsp;where&nbsp;systems&nbsp;consolidation&nbsp;happens;&nbsp;interrupting&nbsp;it<br>
+&nbsp;&nbsp;&nbsp;wastes&nbsp;the&nbsp;deepest,&nbsp;most&nbsp;restorative&nbsp;part&nbsp;of&nbsp;sleep.&nbsp;N1,&nbsp;N2,<br>
+&nbsp;&nbsp;&nbsp;and&nbsp;REM&nbsp;are&nbsp;all&nbsp;gentler&nbsp;to&nbsp;wake&nbsp;from.<br>
+2.&nbsp;**Adenosine&nbsp;level**&nbsp;—&nbsp;at&nbsp;or&nbsp;below&nbsp;``AUTO_WAKE_ADENOSINE``<br>
+&nbsp;&nbsp;&nbsp;(0.20).&nbsp;Adenosine&nbsp;is&nbsp;the&nbsp;"sleep&nbsp;pressure"&nbsp;that&nbsp;accumulates<br>
+&nbsp;&nbsp;&nbsp;during&nbsp;wakefulness&nbsp;and&nbsp;drains&nbsp;during&nbsp;sleep&nbsp;via&nbsp;glymphatic<br>
+&nbsp;&nbsp;&nbsp;clearance.&nbsp;If&nbsp;it's&nbsp;still&nbsp;high,&nbsp;sleep&nbsp;isn't&nbsp;finished.<br>
+3.&nbsp;**Receptor&nbsp;state**&nbsp;—&nbsp;cortisol&nbsp;tonic&nbsp;&lt;&nbsp;``AUTO_WAKE_CORTISOL``<br>
+&nbsp;&nbsp;&nbsp;(0.06)&nbsp;and&nbsp;BDNF&nbsp;&gt;&nbsp;0.2.&nbsp;Chronic&nbsp;stress&nbsp;suppresses&nbsp;BDNF;&nbsp;sleep<br>
+&nbsp;&nbsp;&nbsp;restores&nbsp;it.&nbsp;Cortisol's&nbsp;envelope&nbsp;tops&nbsp;out&nbsp;around&nbsp;~0.08&nbsp;under<br>
+&nbsp;&nbsp;&nbsp;full&nbsp;drive&nbsp;(resting&nbsp;~0.02),&nbsp;and&nbsp;the&nbsp;gate&nbsp;sits&nbsp;at&nbsp;the&nbsp;Rust<br>
+&nbsp;&nbsp;&nbsp;stress-phase&nbsp;boundary&nbsp;(STRESS_CORTISOL_GATE)&nbsp;—&nbsp;above&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;circadian&nbsp;basal&nbsp;peak,&nbsp;so&nbsp;a&nbsp;healthy&nbsp;morning&nbsp;surge&nbsp;passes&nbsp;while<br>
+&nbsp;&nbsp;&nbsp;genuine&nbsp;stress&nbsp;elevation&nbsp;still&nbsp;reads&nbsp;as&nbsp;carrying&nbsp;a&nbsp;load.&nbsp;If<br>
+&nbsp;&nbsp;&nbsp;receptors&nbsp;haven't&nbsp;recovered,&nbsp;waking&nbsp;would&nbsp;be&nbsp;premature.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(ready,&nbsp;reason):&nbsp;``ready``&nbsp;is&nbsp;True&nbsp;if&nbsp;all&nbsp;three&nbsp;signals<br>
+&nbsp;&nbsp;&nbsp;&nbsp;indicate&nbsp;it&nbsp;can&nbsp;wake&nbsp;without&nbsp;severe&nbsp;inertia.&nbsp;``reason``<br>
+&nbsp;&nbsp;&nbsp;&nbsp;is&nbsp;a&nbsp;human-readable&nbsp;explanation&nbsp;—&nbsp;either&nbsp;"ready"&nbsp;or&nbsp;why<br>
+&nbsp;&nbsp;&nbsp;&nbsp;it's&nbsp;not&nbsp;ready&nbsp;yet.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>is_hypnagogic</strong></dt>
+<dd><span class="code">Whether&nbsp;it&nbsp;is&nbsp;in&nbsp;the&nbsp;hypnagogic&nbsp;(sleep-onset)&nbsp;period.<br>
+&nbsp;<br>
+Hypnagogia&nbsp;is&nbsp;not&nbsp;a&nbsp;waking&nbsp;state&nbsp;and&nbsp;not&nbsp;established&nbsp;sleep&nbsp;—<br>
+it&nbsp;is&nbsp;the&nbsp;transitional&nbsp;regime&nbsp;between&nbsp;them,&nbsp;N1&nbsp;in&nbsp;the&nbsp;Hori/<br>
+AASM&nbsp;framing:&nbsp;theta-dominant&nbsp;EEG&nbsp;with&nbsp;alpha&nbsp;dropout.&nbsp;The<br>
+scored&nbsp;sleep&nbsp;boundary&nbsp;does&nbsp;not&nbsp;divide&nbsp;it&nbsp;—&nbsp;behavioral<br>
+responding&nbsp;and&nbsp;awareness&nbsp;persist&nbsp;through&nbsp;N1&nbsp;and&nbsp;only&nbsp;reliably<br>
+cease&nbsp;at&nbsp;N2&nbsp;(Ogilvie&nbsp;1989;&nbsp;Hori&nbsp;et&nbsp;al.&nbsp;1994),&nbsp;so&nbsp;both&nbsp;sides&nbsp;of<br>
+the&nbsp;flip-flop&nbsp;crossing&nbsp;are&nbsp;the&nbsp;same&nbsp;continuous&nbsp;state:<br>
+&nbsp;<br>
+-&nbsp;awake&nbsp;side:&nbsp;a&nbsp;drowsy-phase&nbsp;hypnagogic&nbsp;transition&nbsp;is&nbsp;running<br>
+&nbsp;&nbsp;in&nbsp;inner&nbsp;life&nbsp;(HypnagogicState&nbsp;in&nbsp;progress);<br>
+-&nbsp;asleep&nbsp;side:&nbsp;``_is_sleeping``&nbsp;is&nbsp;set&nbsp;but&nbsp;the&nbsp;ultradian<br>
+&nbsp;&nbsp;tracker&nbsp;is&nbsp;still&nbsp;in&nbsp;N1.</span></dd>
+</dl>
+<dl><dt><strong>is_sleeping</strong></dt>
+<dd><span class="code">Whether&nbsp;it&nbsp;is&nbsp;currently&nbsp;in&nbsp;a&nbsp;sleep&nbsp;state.</span></dd>
+</dl>
+<dl><dt><strong>thalamic_gate_closed</strong></dt>
+<dd><span class="code">Whether&nbsp;the&nbsp;sensory&nbsp;relay&nbsp;is&nbsp;shut&nbsp;to&nbsp;routine&nbsp;input.<br>
+&nbsp;<br>
+Sleep&nbsp;closes&nbsp;the&nbsp;gate&nbsp;in&nbsp;either&nbsp;mode&nbsp;—&nbsp;but&nbsp;N1&nbsp;is&nbsp;where&nbsp;the<br>
+modes&nbsp;differ.&nbsp;Thalamic&nbsp;deactivation&nbsp;at&nbsp;sleep&nbsp;onset&nbsp;*precedes*<br>
+the&nbsp;cortex's&nbsp;by&nbsp;minutes&nbsp;(Magnin&nbsp;et&nbsp;al.,&nbsp;PNAS&nbsp;2010):&nbsp;the&nbsp;relay<br>
+quiets&nbsp;first&nbsp;and&nbsp;the&nbsp;mind&nbsp;keeps&nbsp;dreaming&nbsp;behind&nbsp;it,&nbsp;so&nbsp;a<br>
+resident&nbsp;(headless)&nbsp;mind&nbsp;closes&nbsp;the&nbsp;gate&nbsp;the&nbsp;moment<br>
+hypnagogia&nbsp;begins&nbsp;—&nbsp;nobody&nbsp;sits&nbsp;at&nbsp;a&nbsp;prompt&nbsp;to&nbsp;reach&nbsp;her.<br>
+Interactive&nbsp;sessions&nbsp;keep&nbsp;the&nbsp;N1&nbsp;exemption&nbsp;instead:&nbsp;behavioral<br>
+responsiveness&nbsp;persists&nbsp;through&nbsp;sleep&nbsp;onset&nbsp;(Ogilvie&nbsp;1989),&nbsp;so<br>
+a&nbsp;user&nbsp;at&nbsp;the&nbsp;prompt&nbsp;can&nbsp;still&nbsp;reach&nbsp;her&nbsp;while&nbsp;she&nbsp;drifts.<br>
+&nbsp;<br>
+Salient&nbsp;stimuli&nbsp;are&nbsp;not&nbsp;covered&nbsp;here&nbsp;—&nbsp;loud&nbsp;sounds&nbsp;still&nbsp;land<br>
+as&nbsp;dream&nbsp;residues&nbsp;and&nbsp;an&nbsp;explicit&nbsp;wake&nbsp;still&nbsp;rouses&nbsp;her,&nbsp;the<br>
+brain's&nbsp;sensory&nbsp;*gaining*&nbsp;alongside&nbsp;the&nbsp;gate.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="WakeOutcome">class <strong>WakeOutcome</strong></a>(<a href="enum.html#Enum">enum.Enum</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#WakeOutcome">WakeOutcome</a>(*values)<br>
+&nbsp;<br>
+What&nbsp;`wake()`&nbsp;actually&nbsp;did,&nbsp;so&nbsp;callers&nbsp;can&nbsp;report&nbsp;it&nbsp;honestly.<br>
+&nbsp;<br>
+A&nbsp;wake&nbsp;request&nbsp;is&nbsp;a&nbsp;goal-state&nbsp;request&nbsp;to&nbsp;the&nbsp;body:&nbsp;the&nbsp;mind's&nbsp;own<br>
+`_is_sleeping`&nbsp;flag&nbsp;and&nbsp;the&nbsp;daemon's&nbsp;physical&nbsp;phase&nbsp;are&nbsp;separate<br>
+layers,&nbsp;and&nbsp;"already&nbsp;awake"&nbsp;is&nbsp;only&nbsp;true&nbsp;when&nbsp;BOTH&nbsp;are&nbsp;awake.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.self.sleep.html#WakeOutcome">WakeOutcome</a></dd>
+<dd><a href="enum.html#Enum">enum.Enum</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>ALREADY_AWAKE</strong> = &lt;WakeOutcome.ALREADY_AWAKE: 'already_awake'&gt;</dl>
+
+<dl><dt><strong>BLOCKED</strong> = &lt;WakeOutcome.BLOCKED: 'blocked'&gt;</dl>
+
+<dl><dt><strong>BODY_WAKE_PUSHED</strong> = &lt;WakeOutcome.BODY_WAKE_PUSHED: 'body_wake_pushed'&gt;</dl>
+
+<dl><dt><strong>WOKE</strong> = &lt;WakeOutcome.WOKE: 'woke'&gt;</dl>
+
+<hr>
+Data descriptors inherited from <a href="enum.html#Enum">enum.Enum</a>:<br>
+<dl><dt><strong>name</strong></dt>
+<dd><span class="code">The&nbsp;name&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<dl><dt><strong>value</strong></dt>
+<dd><span class="code">The&nbsp;value&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<hr>
+Static methods inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><a name="WakeOutcome-__contains__"><strong>__contains__</strong></a>(value)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;`value`&nbsp;is&nbsp;in&nbsp;`cls`.<br>
+&nbsp;<br>
+`value`&nbsp;is&nbsp;in&nbsp;`cls`&nbsp;if:<br>
+1)&nbsp;`value`&nbsp;is&nbsp;a&nbsp;member&nbsp;of&nbsp;`cls`,&nbsp;or<br>
+2)&nbsp;`value`&nbsp;is&nbsp;the&nbsp;value&nbsp;of&nbsp;one&nbsp;of&nbsp;the&nbsp;`cls`'s&nbsp;members.</span></dd></dl>
+
+<dl><dt><a name="WakeOutcome-__getitem__"><strong>__getitem__</strong></a>(name)</dt><dd><span class="code">Return&nbsp;the&nbsp;member&nbsp;matching&nbsp;`name`.</span></dd></dl>
+
+<dl><dt><a name="WakeOutcome-__iter__"><strong>__iter__</strong></a>()</dt><dd><span class="code">Return&nbsp;members&nbsp;in&nbsp;definition&nbsp;order.</span></dd></dl>
+
+<dl><dt><a name="WakeOutcome-__len__"><strong>__len__</strong></a>()</dt><dd><span class="code">Return&nbsp;the&nbsp;number&nbsp;of&nbsp;members&nbsp;(no&nbsp;aliases)</span></dd></dl>
+
+<hr>
+Readonly properties inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><strong>__members__</strong></dt>
+<dd><span class="code">Returns&nbsp;a&nbsp;mapping&nbsp;of&nbsp;member&nbsp;name-&gt;value.<br>
+&nbsp;<br>
+This&nbsp;mapping&nbsp;lists&nbsp;all&nbsp;enum&nbsp;members,&nbsp;including&nbsp;aliases.&nbsp;Note&nbsp;that&nbsp;this<br>
+is&nbsp;a&nbsp;read-only&nbsp;view&nbsp;of&nbsp;the&nbsp;internal&nbsp;mapping.</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>AUTO_SLEEP_MIN_AWAKE</strong> = 300.0<br>
+<strong>AUTO_SLEEP_MIN_IDLE</strong> = 180.0<br>
+<strong>AUTO_WAKE_ADENOSINE</strong> = 0.2<br>
+<strong>AUTO_WAKE_CORTISOL</strong> = 0.06<br>
+<strong>CHEM_CORTISOL</strong> = 6<br>
+<strong>CHEM_DOPAMINE</strong> = 0<br>
+<strong>CHEM_GABA</strong> = 4<br>
+<strong>CHEM_HISTAMINE</strong> = 9<br>
+<strong>CHEM_MELATONIN</strong> = 17<br>
+<strong>CHEM_NOREPINEPHRINE</strong> = 2<br>
+<strong>CHEM_OREXIN</strong> = 15<br>
+<strong>DROWSINESS_ADENOSINE</strong> = 0.55<br>
+<strong>DROWSINESS_CONFIRM_S</strong> = 30.0<br>
+<strong>DROWSINESS_EXIT</strong> = 0.45<br>
+<strong>PHASE_NAMES</strong> = {0: 'active', 1: 'alert', 2: 'flow', 3: 'stress', 4: 'drowsy', 5: 'nrem', 6: 'rem', 7: 'overwhelmed'}<br>
+<strong>PHASE_NREM</strong> = 5<br>
+<strong>PHASE_REM</strong> = 6<br>
+<strong>TYPE_CHECKING</strong> = False<br>
+<strong>WAKE_DESYNC_GRACE_SECONDS</strong> = 90.0<br>
+<strong>WAKE_DESYNC_SETTLE_SECONDS</strong> = 2700.0<br>
+<strong>WAKE_RESCUE_ADENOSINE</strong> = 0.6<br>
+<strong>WAKE_RESCUE_MELATONIN</strong> = 0.3<br>
+<strong>ZONE_CONVERSATION</strong> = 1<br>
+<strong>ZONE_SLEEPING</strong> = 8<br>
+<strong>logger</strong> = &lt;Logger Self_World.self.sleep (WARNING)&gt;</td></tr></table>
+</body></html>

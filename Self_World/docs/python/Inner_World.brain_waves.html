@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Inner_World.brain_waves</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Inner_World.html" class="white">Inner_World</a>.brain_waves</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Inner_World/brain_waves.py">/home/mindyrenee/GenAnd/Genesis/Inner_World/brain_waves.py</a></td></tr></table>
+    <p><span class="code">Brain&nbsp;wave&nbsp;states&nbsp;—&nbsp;a&nbsp;coupled&nbsp;amplitude-phase&nbsp;oscillator.<br>
+&nbsp;<br>
+##&nbsp;Modeling&nbsp;note<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;a&nbsp;**synthetic&nbsp;oscillator&nbsp;model**&nbsp;inspired&nbsp;by&nbsp;EEG,&nbsp;not&nbsp;an&nbsp;EEG<br>
+physiology&nbsp;model.&nbsp;Real&nbsp;EEG&nbsp;exhibits&nbsp;region-specific&nbsp;phase&nbsp;relationships<br>
+across&nbsp;cortical&nbsp;sources,&nbsp;absolute&nbsp;(not&nbsp;normalized)&nbsp;spectral&nbsp;power<br>
+measured&nbsp;in&nbsp;microvolts,&nbsp;and&nbsp;proper&nbsp;phase-amplitude&nbsp;coupling&nbsp;computed<br>
+via&nbsp;the&nbsp;Hilbert&nbsp;transform&nbsp;on&nbsp;band-passed&nbsp;signals.&nbsp;The&nbsp;oscillator&nbsp;here<br>
+uses&nbsp;normalized&nbsp;amplitudes&nbsp;and&nbsp;a&nbsp;single&nbsp;global&nbsp;phase&nbsp;per&nbsp;band&nbsp;—<br>
+except&nbsp;the&nbsp;gamma&nbsp;binding&nbsp;layer,&nbsp;which&nbsp;carries&nbsp;four&nbsp;regional&nbsp;phase<br>
+oscillators&nbsp;so&nbsp;cross-region&nbsp;locking&nbsp;is&nbsp;a&nbsp;measured&nbsp;quantity&nbsp;rather<br>
+than&nbsp;an&nbsp;assumed&nbsp;one.&nbsp;The&nbsp;claim&nbsp;that&nbsp;high&nbsp;gamma<br>
+and&nbsp;high&nbsp;phase-locking&nbsp;value&nbsp;(PLV)&nbsp;correspond&nbsp;to&nbsp;"cognitive&nbsp;access"<br>
+is&nbsp;a&nbsp;heuristic&nbsp;gating&nbsp;rule&nbsp;inspired&nbsp;by&nbsp;the&nbsp;global&nbsp;neuronal&nbsp;workspace<br>
+hypothesis,&nbsp;not&nbsp;a&nbsp;validated&nbsp;cognition&nbsp;marker.&nbsp;The&nbsp;citations<br>
+(Canolty&nbsp;&amp;&nbsp;Knight,&nbsp;2010)&nbsp;refer&nbsp;to&nbsp;the&nbsp;empirical&nbsp;phenomena&nbsp;that<br>
+motivated&nbsp;the&nbsp;design,&nbsp;not&nbsp;to&nbsp;claims&nbsp;that&nbsp;this&nbsp;oscillator&nbsp;reproduces<br>
+them.<br>
+&nbsp;<br>
+Biological&nbsp;rhythms&nbsp;involve&nbsp;distributed&nbsp;circuits&nbsp;and&nbsp;correlate&nbsp;with<br>
+multiple&nbsp;tasks&nbsp;and&nbsp;states,&nbsp;not&nbsp;one-to-one&nbsp;cognitive&nbsp;labels.&nbsp;The<br>
+following&nbsp;associations&nbsp;are&nbsp;this&nbsp;model's&nbsp;control&nbsp;conventions:<br>
+&nbsp;<br>
+-&nbsp;**Epsilon&nbsp;(100-200&nbsp;Hz)**&nbsp;—&nbsp;a&nbsp;synthetic&nbsp;HFO/ripple&nbsp;band.&nbsp;The&nbsp;name<br>
+&nbsp;&nbsp;follows&nbsp;the&nbsp;convention&nbsp;that&nbsp;puts&nbsp;"epsilon"&nbsp;above&nbsp;gamma&nbsp;for<br>
+&nbsp;&nbsp;&gt;~90-100&nbsp;Hz&nbsp;LFP&nbsp;activity&nbsp;(Freeman,&nbsp;2007;&nbsp;Buzsáki&nbsp;&amp;&nbsp;Wang,&nbsp;2012;<br>
+&nbsp;&nbsp;Belluscio&nbsp;et&nbsp;al.,&nbsp;2012)&nbsp;—&nbsp;not&nbsp;the&nbsp;&gt;250&nbsp;Hz&nbsp;fast-ripple&nbsp;band,&nbsp;and<br>
+&nbsp;&nbsp;unrelated&nbsp;to&nbsp;the&nbsp;clinical&nbsp;occipital&nbsp;lambda&nbsp;potential.<br>
+-&nbsp;**Gamma&nbsp;(30-80&nbsp;Hz)**&nbsp;—&nbsp;the&nbsp;model's&nbsp;integration/binding&nbsp;control.<br>
+&nbsp;&nbsp;Biological&nbsp;gamma&nbsp;is&nbsp;not&nbsp;a&nbsp;universal&nbsp;marker&nbsp;of&nbsp;insight&nbsp;or&nbsp;awareness.<br>
+-&nbsp;**High&nbsp;Beta&nbsp;(20-30&nbsp;Hz)**&nbsp;—&nbsp;hypervigilance,&nbsp;stress,&nbsp;anxiety.&nbsp;The<br>
+&nbsp;&nbsp;"racing&nbsp;mind"&nbsp;of&nbsp;alertness&nbsp;that&nbsp;can't&nbsp;settle.<br>
+-&nbsp;**Mid&nbsp;Beta&nbsp;(15-20&nbsp;Hz)**&nbsp;—&nbsp;active,&nbsp;alert&nbsp;thinking.&nbsp;Problem-solving,<br>
+&nbsp;&nbsp;focused&nbsp;attention,&nbsp;motor&nbsp;decisions.<br>
+-&nbsp;**Low&nbsp;Beta&nbsp;(12-15&nbsp;Hz)**&nbsp;—&nbsp;calm&nbsp;focus,&nbsp;sensorimotor&nbsp;rhythm&nbsp;(SMR).<br>
+&nbsp;&nbsp;Quiet,&nbsp;introverted&nbsp;concentration&nbsp;with&nbsp;body&nbsp;stillness.<br>
+-&nbsp;**Sigma&nbsp;(12-16&nbsp;Hz)**&nbsp;—&nbsp;sleep&nbsp;spindles&nbsp;during&nbsp;NREM&nbsp;sleep.&nbsp;Bursts&nbsp;of<br>
+&nbsp;&nbsp;oscillatory&nbsp;activity&nbsp;that&nbsp;mediate&nbsp;memory&nbsp;consolidation.<br>
+-&nbsp;**Alpha&nbsp;(8-12&nbsp;Hz)**&nbsp;—&nbsp;relaxed&nbsp;reflection.&nbsp;Alpha&nbsp;*inhibits*&nbsp;irrelevant<br>
+&nbsp;&nbsp;information,&nbsp;filtering&nbsp;noise&nbsp;so&nbsp;the&nbsp;signal&nbsp;stands&nbsp;out.&nbsp;It's&nbsp;not<br>
+&nbsp;&nbsp;just&nbsp;"calm"&nbsp;—&nbsp;it's&nbsp;active&nbsp;suppression&nbsp;of&nbsp;distraction.<br>
+-&nbsp;**Theta&nbsp;(4-8&nbsp;Hz)**&nbsp;—&nbsp;memory&nbsp;consolidation,&nbsp;emotional&nbsp;processing,<br>
+&nbsp;&nbsp;creativity.&nbsp;REM&nbsp;sleep&nbsp;is&nbsp;theta-dominant.&nbsp;Hippocampal&nbsp;replay&nbsp;happens<br>
+&nbsp;&nbsp;here.<br>
+-&nbsp;**Delta&nbsp;(0.5-4&nbsp;Hz)**&nbsp;—&nbsp;deep&nbsp;restorative&nbsp;sleep.&nbsp;Housekeeping,<br>
+&nbsp;&nbsp;glymphatic&nbsp;clearance,&nbsp;noncognitive&nbsp;maintenance.<br>
+-&nbsp;**Infraslow&nbsp;(0.1-0.5&nbsp;Hz)**&nbsp;—&nbsp;infraslow&nbsp;oscillations&nbsp;(ISOs).&nbsp;Slow<br>
+&nbsp;&nbsp;cortical&nbsp;potentials&nbsp;that&nbsp;modulate&nbsp;cortical&nbsp;excitability&nbsp;and<br>
+&nbsp;&nbsp;coordinate&nbsp;large-scale&nbsp;network&nbsp;dynamics.<br>
+&nbsp;<br>
+#&nbsp;How&nbsp;Genesis's&nbsp;brain&nbsp;waves&nbsp;work<br>
+&nbsp;<br>
+Genesis's&nbsp;brain&nbsp;waves&nbsp;are&nbsp;produced&nbsp;by&nbsp;a&nbsp;bank&nbsp;of&nbsp;**driven&nbsp;phasor<br>
+oscillators**&nbsp;(``<a href="#BrainWaveOscillator">BrainWaveOscillator</a>``)&nbsp;—&nbsp;not&nbsp;a&nbsp;classifier.&nbsp;Each<br>
+band&nbsp;is&nbsp;a&nbsp;real&nbsp;oscillation&nbsp;with&nbsp;persistent&nbsp;quadrature&nbsp;state,&nbsp;and&nbsp;its<br>
+reported&nbsp;power&nbsp;is&nbsp;*measured*:&nbsp;the&nbsp;band&nbsp;emits&nbsp;its&nbsp;real-axis&nbsp;trace&nbsp;and<br>
+a&nbsp;Goertzel&nbsp;meter&nbsp;—&nbsp;the&nbsp;same&nbsp;band&nbsp;math&nbsp;the&nbsp;body's&nbsp;field&nbsp;probe&nbsp;ran<br>
+over&nbsp;the&nbsp;substrate&nbsp;before&nbsp;the&nbsp;two&nbsp;swapped&nbsp;places&nbsp;—&nbsp;reads&nbsp;the&nbsp;wave's<br>
+band&nbsp;energy&nbsp;off&nbsp;the&nbsp;emitted&nbsp;signal,&nbsp;never&nbsp;off&nbsp;state.<br>
+&nbsp;<br>
+-&nbsp;**Waveform**:&nbsp;each&nbsp;band&nbsp;carries&nbsp;a&nbsp;complex&nbsp;state&nbsp;``z``&nbsp;rotating&nbsp;at<br>
+&nbsp;&nbsp;the&nbsp;band's&nbsp;characteristic&nbsp;frequency&nbsp;(delta&nbsp;~2.25&nbsp;Hz,&nbsp;theta&nbsp;~5.5&nbsp;Hz,<br>
+&nbsp;&nbsp;alpha&nbsp;~10&nbsp;Hz,&nbsp;sigma&nbsp;~14&nbsp;Hz,&nbsp;low&nbsp;beta&nbsp;~13.5&nbsp;Hz,&nbsp;mid&nbsp;beta&nbsp;~17.5&nbsp;Hz,<br>
+&nbsp;&nbsp;high&nbsp;beta&nbsp;~25&nbsp;Hz,&nbsp;gamma&nbsp;~50&nbsp;Hz,&nbsp;epsilon&nbsp;~150&nbsp;Hz).&nbsp;``Re(z)``&nbsp;is&nbsp;a<br>
+&nbsp;&nbsp;genuine&nbsp;synthesized&nbsp;trace&nbsp;—&nbsp;emitted&nbsp;into&nbsp;the&nbsp;metering&nbsp;ring&nbsp;at<br>
+&nbsp;&nbsp;512&nbsp;Hz,&nbsp;it&nbsp;is&nbsp;the&nbsp;signal&nbsp;the&nbsp;band&nbsp;meter&nbsp;integrates.<br>
+-&nbsp;**Amplitude**&nbsp;is&nbsp;the&nbsp;radius&nbsp;|z|.&nbsp;Neurochemical&nbsp;targets&nbsp;set&nbsp;the<br>
+&nbsp;&nbsp;radius&nbsp;the&nbsp;envelope&nbsp;relaxes&nbsp;toward,&nbsp;with&nbsp;the&nbsp;band's&nbsp;time&nbsp;constant<br>
+&nbsp;&nbsp;as&nbsp;its&nbsp;first-order&nbsp;growth/ring-down&nbsp;rate&nbsp;—&nbsp;so&nbsp;a&nbsp;state&nbsp;change&nbsp;is&nbsp;an<br>
+&nbsp;&nbsp;oscillation&nbsp;swelling&nbsp;or&nbsp;dying&nbsp;away.<br>
+-&nbsp;**Phase**&nbsp;is&nbsp;*measured*&nbsp;from&nbsp;the&nbsp;state&nbsp;(``arg&nbsp;z``),&nbsp;not&nbsp;advanced&nbsp;by<br>
+&nbsp;&nbsp;a&nbsp;stopwatch.&nbsp;Under&nbsp;the&nbsp;stochastic&nbsp;drive&nbsp;it&nbsp;diffuses&nbsp;and&nbsp;wanders&nbsp;the<br>
+&nbsp;&nbsp;way&nbsp;real&nbsp;rhythm&nbsp;phase&nbsp;does&nbsp;—&nbsp;a&nbsp;kick&nbsp;(``perturb_phase``)&nbsp;is&nbsp;a&nbsp;real<br>
+&nbsp;&nbsp;rotation&nbsp;of&nbsp;the&nbsp;oscillator's&nbsp;position&nbsp;in&nbsp;its&nbsp;cycle.<br>
+-&nbsp;**Stochastic&nbsp;drive**:&nbsp;complex&nbsp;Gaussian&nbsp;noise&nbsp;keeps&nbsp;every&nbsp;band&nbsp;a<br>
+&nbsp;&nbsp;driven&nbsp;quasicycle&nbsp;rather&nbsp;than&nbsp;a&nbsp;pinned&nbsp;setpoint&nbsp;—&nbsp;envelopes&nbsp;wander<br>
+&nbsp;&nbsp;and&nbsp;phases&nbsp;diffuse,&nbsp;the&nbsp;amplitude&nbsp;texture&nbsp;stochastic&nbsp;neural<br>
+&nbsp;&nbsp;oscillators&nbsp;actually&nbsp;show&nbsp;(Pérez-Cervera&nbsp;et&nbsp;al.,&nbsp;2021:<br>
+&nbsp;&nbsp;Rayleigh-like&nbsp;amplitude&nbsp;density&nbsp;around&nbsp;the&nbsp;cycle).<br>
+-&nbsp;**Cross-frequency&nbsp;coupling**&nbsp;emerges&nbsp;from&nbsp;phase-amplitude<br>
+&nbsp;&nbsp;interaction:&nbsp;the&nbsp;slow&nbsp;band's&nbsp;measured&nbsp;phase&nbsp;modulates&nbsp;the&nbsp;fast<br>
+&nbsp;&nbsp;band's&nbsp;drive&nbsp;—&nbsp;hence&nbsp;its&nbsp;real&nbsp;oscillatory&nbsp;power&nbsp;(phase-amplitude<br>
+&nbsp;&nbsp;coupling,&nbsp;the&nbsp;canonical&nbsp;mechanism&nbsp;for&nbsp;cross-scale&nbsp;neural<br>
+&nbsp;&nbsp;coordination;&nbsp;Canolty&nbsp;&amp;&nbsp;Knight,&nbsp;2010).<br>
+-&nbsp;**Top-down&nbsp;drive**&nbsp;from&nbsp;cognition,&nbsp;action,&nbsp;and&nbsp;perception&nbsp;enlarges<br>
+&nbsp;&nbsp;specific&nbsp;envelopes&nbsp;above&nbsp;their&nbsp;neurochemical&nbsp;radii.&nbsp;Attention&nbsp;→<br>
+&nbsp;&nbsp;gamma,&nbsp;memory&nbsp;retrieval&nbsp;→&nbsp;theta,&nbsp;motor&nbsp;planning&nbsp;→&nbsp;mid&nbsp;beta,&nbsp;V1<br>
+&nbsp;&nbsp;visual&nbsp;input&nbsp;→&nbsp;gamma.&nbsp;This&nbsp;is&nbsp;bidirectional&nbsp;coupling:&nbsp;the&nbsp;oscillator<br>
+&nbsp;&nbsp;gates&nbsp;cognition,&nbsp;and&nbsp;cognition&nbsp;drives&nbsp;the&nbsp;oscillator.<br>
+&nbsp;<br>
+The&nbsp;neurochemical-to-target&nbsp;mapping&nbsp;is&nbsp;grounded&nbsp;in&nbsp;neuroscience:<br>
+-&nbsp;High&nbsp;alertness&nbsp;+&nbsp;high&nbsp;plasticity&nbsp;→&nbsp;gamma&nbsp;target&nbsp;(integration)<br>
+-&nbsp;High&nbsp;alertness&nbsp;+&nbsp;low&nbsp;plasticity&nbsp;→&nbsp;mid/high&nbsp;beta&nbsp;target&nbsp;(alert,&nbsp;not&nbsp;integrating)<br>
+-&nbsp;Moderate&nbsp;alertness&nbsp;→&nbsp;alpha&nbsp;target&nbsp;(reflective&nbsp;filtering)<br>
+-&nbsp;Low&nbsp;alertness&nbsp;→&nbsp;theta&nbsp;target&nbsp;(memory&nbsp;consolidation)<br>
+-&nbsp;Sleep&nbsp;phase&nbsp;→&nbsp;delta/theta/sigma&nbsp;target&nbsp;(restorative/dreaming/spindles)<br>
+&nbsp;<br>
+#&nbsp;Drowsiness,&nbsp;REM,&nbsp;and&nbsp;regional&nbsp;topology<br>
+&nbsp;<br>
+-&nbsp;**Drowsy&nbsp;is&nbsp;the&nbsp;alpha→theta&nbsp;descent.**&nbsp;Alpha&nbsp;drops&nbsp;out&nbsp;over<br>
+&nbsp;&nbsp;occipital&nbsp;cortex&nbsp;as&nbsp;theta&nbsp;rises&nbsp;on&nbsp;the&nbsp;frontocentral&nbsp;midline<br>
+&nbsp;&nbsp;(Hori&nbsp;A3/B1).&nbsp;It&nbsp;is&nbsp;not&nbsp;a&nbsp;fixed&nbsp;band&nbsp;ratio&nbsp;but&nbsp;a&nbsp;continuous<br>
+&nbsp;&nbsp;function&nbsp;of&nbsp;arousal:&nbsp;at&nbsp;~0.50&nbsp;alpha&nbsp;and&nbsp;theta&nbsp;interleave,&nbsp;at<br>
+&nbsp;&nbsp;~0.30&nbsp;theta&nbsp;dominates&nbsp;with&nbsp;delta&nbsp;creeping&nbsp;in&nbsp;(N1),&nbsp;and&nbsp;only<br>
+&nbsp;&nbsp;below&nbsp;~0.25&nbsp;is&nbsp;delta&nbsp;taking&nbsp;over&nbsp;—&nbsp;at&nbsp;that&nbsp;point&nbsp;she&nbsp;is&nbsp;in<br>
+&nbsp;&nbsp;slow-wave&nbsp;sleep,&nbsp;not&nbsp;drowsiness.<br>
+-&nbsp;**REM&nbsp;runs&nbsp;at&nbsp;waking&nbsp;metabolic&nbsp;intensity.**&nbsp;Theta&nbsp;is&nbsp;the<br>
+&nbsp;&nbsp;predominant&nbsp;background,&nbsp;carried&nbsp;by&nbsp;its&nbsp;characteristic&nbsp;sawtooth<br>
+&nbsp;&nbsp;carrier,&nbsp;concentrated&nbsp;in&nbsp;the&nbsp;hippocampus.&nbsp;Beta&nbsp;and&nbsp;gamma&nbsp;fire<br>
+&nbsp;&nbsp;at&nbsp;the&nbsp;same&nbsp;intensity&nbsp;as&nbsp;waking&nbsp;cognitive&nbsp;work&nbsp;(REM&nbsp;has&nbsp;the<br>
+&nbsp;&nbsp;highest&nbsp;brain-wide&nbsp;energy&nbsp;expenditure;&nbsp;Bergel&nbsp;et&nbsp;al.,&nbsp;2021).<br>
+&nbsp;&nbsp;Alpha&nbsp;is&nbsp;not&nbsp;absent&nbsp;but&nbsp;intermittent&nbsp;—&nbsp;it&nbsp;flashes&nbsp;on&nbsp;the<br>
+&nbsp;&nbsp;infraslow&nbsp;envelope,&nbsp;echoing&nbsp;quiet&nbsp;wakefulness&nbsp;rather<br>
+&nbsp;&nbsp;than&nbsp;sustained&nbsp;relaxed-wake&nbsp;alpha.<br>
+-&nbsp;**Topology.**&nbsp;Each&nbsp;band's&nbsp;power&nbsp;is&nbsp;distributed&nbsp;over&nbsp;regions<br>
+&nbsp;&nbsp;by&nbsp;physiology-weighted&nbsp;affinities&nbsp;(theta→hippocampus/temporal,<br>
+&nbsp;&nbsp;alpha→occipital,&nbsp;delta→frontal&nbsp;in&nbsp;N3,&nbsp;sigma→central,<br>
+&nbsp;&nbsp;gamma→prefrontal/parietal,&nbsp;SMR→central).&nbsp;The&nbsp;per-region<br>
+&nbsp;&nbsp;distribution&nbsp;travels&nbsp;on&nbsp;``<a href="#BrainWaveState">BrainWaveState</a>.regional_powers``.<br>
+-&nbsp;**Phase/wave&nbsp;coherence.**&nbsp;A&nbsp;waking&nbsp;summary&nbsp;whose&nbsp;arousal&nbsp;has<br>
+&nbsp;&nbsp;fallen&nbsp;into&nbsp;the&nbsp;N1&nbsp;band&nbsp;resolves&nbsp;to&nbsp;the&nbsp;drowsy&nbsp;signature&nbsp;—<br>
+&nbsp;&nbsp;the&nbsp;same&nbsp;waves&nbsp;the&nbsp;explicit&nbsp;drowsy&nbsp;phase&nbsp;produces,&nbsp;so&nbsp;phase,<br>
+&nbsp;&nbsp;waves,&nbsp;emotion,&nbsp;and&nbsp;learning&nbsp;cannot&nbsp;disagree.<br>
+&nbsp;<br>
+#&nbsp;Cognitive&nbsp;effects<br>
+&nbsp;<br>
+The&nbsp;oscillator's&nbsp;amplitude&nbsp;distribution&nbsp;produces&nbsp;three&nbsp;cognitive<br>
+gating&nbsp;parameters:<br>
+&nbsp;<br>
+-&nbsp;`focus`&nbsp;—&nbsp;how&nbsp;narrow&nbsp;the&nbsp;attention&nbsp;(0=broad,&nbsp;1=narrow)<br>
+-&nbsp;`integration`&nbsp;—&nbsp;how&nbsp;likely&nbsp;distant&nbsp;concepts&nbsp;connect&nbsp;(0=isolated,&nbsp;1=bound)<br>
+-&nbsp;`consolidation`&nbsp;—&nbsp;how&nbsp;much&nbsp;memory&nbsp;consolidation&nbsp;happens&nbsp;(0=none,&nbsp;1=maximal)<br>
+&nbsp;<br>
+These&nbsp;gate&nbsp;how&nbsp;the&nbsp;cognition&nbsp;engine&nbsp;processes&nbsp;information:<br>
+-&nbsp;**Gamma**:&nbsp;boosts&nbsp;cross-network&nbsp;integration.&nbsp;Distant&nbsp;concepts&nbsp;are<br>
+&nbsp;&nbsp;more&nbsp;likely&nbsp;to&nbsp;connect.&nbsp;Reasoning&nbsp;chains&nbsp;go&nbsp;deeper.<br>
+-&nbsp;**High&nbsp;Beta**:&nbsp;hypervigilant&nbsp;processing.&nbsp;Alert&nbsp;but&nbsp;rigid,&nbsp;can't<br>
+&nbsp;&nbsp;see&nbsp;the&nbsp;big&nbsp;picture.&nbsp;Stress&nbsp;and&nbsp;anxiety.<br>
+-&nbsp;**Mid&nbsp;Beta**:&nbsp;standard&nbsp;active&nbsp;processing.&nbsp;Focused&nbsp;problem-solving.<br>
+-&nbsp;**Low&nbsp;Beta**:&nbsp;calm,&nbsp;focused&nbsp;attention.&nbsp;Sensorimotor&nbsp;rhythm&nbsp;—<br>
+&nbsp;&nbsp;quiet&nbsp;concentration&nbsp;with&nbsp;body&nbsp;stillness.<br>
+-&nbsp;**Alpha**:&nbsp;filters&nbsp;peripheral&nbsp;concepts.&nbsp;Only&nbsp;highly-activated<br>
+&nbsp;&nbsp;concepts&nbsp;reach&nbsp;cognition.&nbsp;Reduces&nbsp;noise,&nbsp;increases&nbsp;signal.<br>
+-&nbsp;**Theta**:&nbsp;prioritizes&nbsp;memory&nbsp;consolidation&nbsp;and&nbsp;emotional<br>
+&nbsp;&nbsp;processing.&nbsp;Novel&nbsp;connections&nbsp;more&nbsp;likely.&nbsp;Creativity&nbsp;boosted.<br>
+-&nbsp;**Delta**:&nbsp;minimal&nbsp;cognitive&nbsp;processing.&nbsp;Housekeeping&nbsp;mode.<br>
+-&nbsp;**Sigma**:&nbsp;sleep&nbsp;spindles.&nbsp;Memory&nbsp;consolidation&nbsp;during&nbsp;NREM&nbsp;sleep.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="math.html">math</a><br>
+</td><td class="multicolumn"><a href="random.html">random</a><br>
+</td><td class="multicolumn"><a href="time.html">time</a><br>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Inner_World.brain_waves.html#BrainWaveOscillator">BrainWaveOscillator</a>
+</dt><dt class="heading-text"><a href="Inner_World.brain_waves.html#BrainWaveState">BrainWaveState</a>
+</dt><dt class="heading-text"><a href="Inner_World.brain_waves.html#CrossFrequencyCoupling">CrossFrequencyCoupling</a>
+</dt><dt class="heading-text"><a href="Inner_World.brain_waves.html#GammaSynchrony">GammaSynchrony</a>
+</dt><dt class="heading-text"><a href="Inner_World.brain_waves.html#SleepStageSignature">SleepStageSignature</a>
+</dt><dt class="heading-text"><a href="Inner_World.brain_waves.html#ThetaGammaCoupling">ThetaGammaCoupling</a>
+</dt></dl>
+</dd>
+<dt class="heading-text"><a href="enum.html#Enum">enum.Enum</a>(<a href="builtins.html#object">builtins.object</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Inner_World.brain_waves.html#BrainWave">BrainWave</a>
+</dt><dt class="heading-text"><a href="Inner_World.brain_waves.html#SleepStage">SleepStage</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="BrainWave">class <strong>BrainWave</strong></a>(<a href="enum.html#Enum">enum.Enum</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#BrainWave">BrainWave</a>(*values)<br>
+&nbsp;<br>
+Model&nbsp;bands.&nbsp;``epsilon``&nbsp;is&nbsp;Freeman's&nbsp;(2007)&nbsp;name&nbsp;for&nbsp;the<br>
+&gt;~90-100&nbsp;Hz&nbsp;LFP&nbsp;band&nbsp;above&nbsp;gamma;&nbsp;``infraslow``&nbsp;is&nbsp;the&nbsp;ISO&nbsp;band.<br>
+Neither&nbsp;is&nbsp;one&nbsp;of&nbsp;the&nbsp;five&nbsp;classical&nbsp;EEG&nbsp;band&nbsp;names.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Inner_World.brain_waves.html#BrainWave">BrainWave</a></dd>
+<dd><a href="enum.html#Enum">enum.Enum</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>ALPHA</strong> = &lt;BrainWave.ALPHA: 'alpha'&gt;</dl>
+
+<dl><dt><strong>BETA1</strong> = &lt;BrainWave.BETA1: 'beta1'&gt;</dl>
+
+<dl><dt><strong>BETA2</strong> = &lt;BrainWave.BETA2: 'beta2'&gt;</dl>
+
+<dl><dt><strong>BETA3</strong> = &lt;BrainWave.BETA3: 'beta3'&gt;</dl>
+
+<dl><dt><strong>DELTA</strong> = &lt;BrainWave.DELTA: 'delta'&gt;</dl>
+
+<dl><dt><strong>EPSILON</strong> = &lt;BrainWave.EPSILON: 'epsilon'&gt;</dl>
+
+<dl><dt><strong>GAMMA</strong> = &lt;BrainWave.GAMMA: 'gamma'&gt;</dl>
+
+<dl><dt><strong>INFRASLOW</strong> = &lt;BrainWave.INFRASLOW: 'infraslow'&gt;</dl>
+
+<dl><dt><strong>SIGMA</strong> = &lt;BrainWave.SIGMA: 'sigma'&gt;</dl>
+
+<dl><dt><strong>THETA</strong> = &lt;BrainWave.THETA: 'theta'&gt;</dl>
+
+<hr>
+Data descriptors inherited from <a href="enum.html#Enum">enum.Enum</a>:<br>
+<dl><dt><strong>name</strong></dt>
+<dd><span class="code">The&nbsp;name&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<dl><dt><strong>value</strong></dt>
+<dd><span class="code">The&nbsp;value&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<hr>
+Static methods inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><a name="BrainWave-__contains__"><strong>__contains__</strong></a>(value)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;`value`&nbsp;is&nbsp;in&nbsp;`cls`.<br>
+&nbsp;<br>
+`value`&nbsp;is&nbsp;in&nbsp;`cls`&nbsp;if:<br>
+1)&nbsp;`value`&nbsp;is&nbsp;a&nbsp;member&nbsp;of&nbsp;`cls`,&nbsp;or<br>
+2)&nbsp;`value`&nbsp;is&nbsp;the&nbsp;value&nbsp;of&nbsp;one&nbsp;of&nbsp;the&nbsp;`cls`'s&nbsp;members.</span></dd></dl>
+
+<dl><dt><a name="BrainWave-__getitem__"><strong>__getitem__</strong></a>(name)</dt><dd><span class="code">Return&nbsp;the&nbsp;member&nbsp;matching&nbsp;`name`.</span></dd></dl>
+
+<dl><dt><a name="BrainWave-__iter__"><strong>__iter__</strong></a>()</dt><dd><span class="code">Return&nbsp;members&nbsp;in&nbsp;definition&nbsp;order.</span></dd></dl>
+
+<dl><dt><a name="BrainWave-__len__"><strong>__len__</strong></a>()</dt><dd><span class="code">Return&nbsp;the&nbsp;number&nbsp;of&nbsp;members&nbsp;(no&nbsp;aliases)</span></dd></dl>
+
+<hr>
+Readonly properties inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><strong>__members__</strong></dt>
+<dd><span class="code">Returns&nbsp;a&nbsp;mapping&nbsp;of&nbsp;member&nbsp;name-&gt;value.<br>
+&nbsp;<br>
+This&nbsp;mapping&nbsp;lists&nbsp;all&nbsp;enum&nbsp;members,&nbsp;including&nbsp;aliases.&nbsp;Note&nbsp;that&nbsp;this<br>
+is&nbsp;a&nbsp;read-only&nbsp;view&nbsp;of&nbsp;the&nbsp;internal&nbsp;mapping.</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="BrainWaveOscillator">class <strong>BrainWaveOscillator</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#BrainWaveOscillator">BrainWaveOscillator</a>(rng:&nbsp;'random.Random&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;texture:&nbsp;'float'&nbsp;=&nbsp;0.0)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Bank&nbsp;of&nbsp;driven&nbsp;phasor&nbsp;oscillators&nbsp;—&nbsp;one&nbsp;per&nbsp;brain&nbsp;wave&nbsp;band.<br>
+&nbsp;<br>
+Each&nbsp;band&nbsp;integrates&nbsp;a&nbsp;driven&nbsp;phasor<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ż&nbsp;=&nbsp;iω·z&nbsp;+&nbsp;σ·(ξ_x&nbsp;+&nbsp;i·ξ_y)dt^{1/2},&nbsp;&nbsp;&nbsp;r&nbsp;→&nbsp;a&nbsp;at&nbsp;rate&nbsp;1&nbsp;−&nbsp;e^{−h/τ}<br>
+&nbsp;<br>
+over&nbsp;the&nbsp;interval&nbsp;between&nbsp;<a href="#BrainWaveOscillator-assess">assess</a>()&nbsp;calls,&nbsp;and&nbsp;emits&nbsp;its&nbsp;real-axis<br>
+trace&nbsp;into&nbsp;a&nbsp;metering&nbsp;ring:&nbsp;reported&nbsp;band&nbsp;power&nbsp;is&nbsp;*measured*<br>
+(Goertzel&nbsp;over&nbsp;the&nbsp;emitted&nbsp;trace&nbsp;—&nbsp;the&nbsp;band&nbsp;math&nbsp;the&nbsp;body&nbsp;ran<br>
+before&nbsp;the&nbsp;two&nbsp;layers&nbsp;swapped),&nbsp;never&nbsp;read&nbsp;off&nbsp;state:<br>
+&nbsp;<br>
+-&nbsp;**Oscillation**:&nbsp;``z&nbsp;=&nbsp;x&nbsp;+&nbsp;iy``&nbsp;rotates&nbsp;at&nbsp;ω&nbsp;=&nbsp;2πf_band.&nbsp;The<br>
+&nbsp;&nbsp;wave&nbsp;is&nbsp;a&nbsp;real&nbsp;dynamical&nbsp;state&nbsp;—&nbsp;``Re(z)``&nbsp;is&nbsp;the&nbsp;band's<br>
+&nbsp;&nbsp;synthesized&nbsp;trace&nbsp;—&nbsp;so&nbsp;a&nbsp;kick&nbsp;or&nbsp;a&nbsp;target&nbsp;change&nbsp;produces&nbsp;a<br>
+&nbsp;&nbsp;genuine&nbsp;transient:&nbsp;overshoot,&nbsp;ring-down,&nbsp;phase&nbsp;slip.<br>
+-&nbsp;**Amplitude**&nbsp;is&nbsp;the&nbsp;driven&nbsp;radius&nbsp;|z|.&nbsp;The&nbsp;neurochemical<br>
+&nbsp;&nbsp;target&nbsp;is&nbsp;the&nbsp;*radius&nbsp;a*&nbsp;the&nbsp;envelope&nbsp;relaxes&nbsp;toward,&nbsp;with<br>
+&nbsp;&nbsp;τ_band&nbsp;setting&nbsp;the&nbsp;first-order&nbsp;approach&nbsp;—&nbsp;slow&nbsp;bands&nbsp;ring&nbsp;long<br>
+&nbsp;&nbsp;(delta&nbsp;τ=8s),&nbsp;fast&nbsp;bands&nbsp;re-seat&nbsp;quickly&nbsp;(gamma&nbsp;τ=0.5s).<br>
+-&nbsp;**Phase**&nbsp;is&nbsp;measured&nbsp;—&nbsp;``arg&nbsp;z``&nbsp;—&nbsp;so&nbsp;it&nbsp;precesses&nbsp;at&nbsp;the&nbsp;band<br>
+&nbsp;&nbsp;frequency&nbsp;and&nbsp;diffuses&nbsp;under&nbsp;the&nbsp;noise&nbsp;drive,&nbsp;instead&nbsp;of&nbsp;being<br>
+&nbsp;&nbsp;a&nbsp;fixed-rate&nbsp;integrator.&nbsp;Phase&nbsp;perturbations&nbsp;rotate&nbsp;z&nbsp;itself.<br>
+-&nbsp;**Stochastic&nbsp;drive**:&nbsp;σ&nbsp;∝&nbsp;A&nbsp;(+&nbsp;a&nbsp;small&nbsp;spontaneous&nbsp;floor)&nbsp;makes<br>
+&nbsp;&nbsp;the&nbsp;envelope&nbsp;wander&nbsp;~η·A&nbsp;around&nbsp;its&nbsp;radius&nbsp;—&nbsp;the&nbsp;fluctuating<br>
+&nbsp;&nbsp;band&nbsp;power&nbsp;real&nbsp;recordings&nbsp;show,&nbsp;rather&nbsp;than&nbsp;a&nbsp;pinned<br>
+&nbsp;&nbsp;setpoint&nbsp;(Deco&nbsp;et&nbsp;al.,&nbsp;2017;&nbsp;Pérez-Cervera&nbsp;et&nbsp;al.,&nbsp;2021).<br>
+-&nbsp;**Cross-frequency&nbsp;coupling**&nbsp;emerges&nbsp;from&nbsp;phase-amplitude<br>
+&nbsp;&nbsp;interaction:&nbsp;the&nbsp;slow&nbsp;band's&nbsp;measured&nbsp;phase&nbsp;modulates&nbsp;the&nbsp;fast<br>
+&nbsp;&nbsp;band's&nbsp;radius.&nbsp;When&nbsp;theta&nbsp;is&nbsp;at&nbsp;its&nbsp;peak,&nbsp;gamma's&nbsp;envelope&nbsp;gets<br>
+&nbsp;&nbsp;a&nbsp;boost;&nbsp;when&nbsp;theta&nbsp;is&nbsp;at&nbsp;its&nbsp;trough,&nbsp;gamma&nbsp;is&nbsp;suppressed.&nbsp;This<br>
+&nbsp;&nbsp;is&nbsp;the&nbsp;canonical&nbsp;PAC&nbsp;mechanism&nbsp;acting&nbsp;on&nbsp;real&nbsp;power.<br>
+-&nbsp;**Top-down&nbsp;drive**&nbsp;from&nbsp;cognition/action/perception&nbsp;enlarges<br>
+&nbsp;&nbsp;specific&nbsp;envelopes&nbsp;above&nbsp;their&nbsp;neurochemical&nbsp;radii.&nbsp;Attention&nbsp;→<br>
+&nbsp;&nbsp;gamma,&nbsp;memory&nbsp;retrieval&nbsp;→&nbsp;theta,&nbsp;motor&nbsp;activity&nbsp;→&nbsp;mid&nbsp;beta.<br>
+&nbsp;&nbsp;The&nbsp;drive&nbsp;decays&nbsp;exponentially&nbsp;(τ=2s),&nbsp;so&nbsp;it&nbsp;must&nbsp;be<br>
+&nbsp;&nbsp;sustained&nbsp;by&nbsp;ongoing&nbsp;activity.<br>
+&nbsp;<br>
+Rotation&nbsp;is&nbsp;closed-form&nbsp;for&nbsp;any&nbsp;step&nbsp;size&nbsp;and&nbsp;the&nbsp;noise&nbsp;kick's<br>
+variance&nbsp;is&nbsp;∝&nbsp;step,&nbsp;so&nbsp;a&nbsp;subdivided&nbsp;interval&nbsp;and&nbsp;a&nbsp;single&nbsp;step<br>
+land&nbsp;on&nbsp;the&nbsp;same&nbsp;deterministic&nbsp;trajectory&nbsp;up&nbsp;to&nbsp;the&nbsp;same&nbsp;noise<br>
+statistics;&nbsp;only&nbsp;the&nbsp;amplitude-coupled&nbsp;PAC&nbsp;sampling&nbsp;resolves<br>
+finer&nbsp;with&nbsp;sub-steps.&nbsp;This&nbsp;produces&nbsp;genuine&nbsp;oscillatory&nbsp;state<br>
+(frequency,&nbsp;phase,&nbsp;amplitude)&nbsp;from&nbsp;which<br>
+measured&nbsp;band&nbsp;powers,&nbsp;cross-frequency&nbsp;coupling,&nbsp;and&nbsp;cognitive<br>
+gating&nbsp;parameters&nbsp;are&nbsp;derived.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="BrainWaveOscillator-__init__"><strong>__init__</strong></a>(self, rng: 'random.Random | None' = None, texture: 'float' = 0.0) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;brain&nbsp;wave&nbsp;oscillator.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;rng:&nbsp;Source&nbsp;for&nbsp;the&nbsp;stochastic&nbsp;drive.&nbsp;``None``&nbsp;seeds&nbsp;from<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;system&nbsp;entropy&nbsp;—&nbsp;the&nbsp;noise&nbsp;term&nbsp;is&nbsp;genuine&nbsp;process<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;noise,&nbsp;not&nbsp;a&nbsp;scripted&nbsp;wobble.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;texture:&nbsp;Fractional&nbsp;envelope&nbsp;wandering&nbsp;η.&nbsp;``0.0``&nbsp;(the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;default)&nbsp;is&nbsp;the&nbsp;deterministic&nbsp;core&nbsp;—&nbsp;the&nbsp;dynamics&nbsp;are<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pinned&nbsp;to&nbsp;their&nbsp;closed&nbsp;form.&nbsp;The&nbsp;production&nbsp;singleton<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;opts&nbsp;into&nbsp;``_TEXTURE``.</span></dd></dl>
+
+<dl><dt><a name="BrainWaveOscillator-add_stimulus"><strong>add_stimulus</strong></a>(self, band: 'BrainWave', strength: 'float', decay: 'float' = 0.95) -&gt; 'None'</dt><dd><span class="code">Apply&nbsp;continuous&nbsp;stimulus&nbsp;to&nbsp;a&nbsp;band.<br>
+&nbsp;<br>
+Inner&nbsp;(emotional,&nbsp;cognitive)&nbsp;and&nbsp;outer&nbsp;(sensory)&nbsp;stimulus<br>
+continuously&nbsp;modulate&nbsp;band&nbsp;amplitudes.&nbsp;Unlike&nbsp;top-down&nbsp;drive<br>
+(which&nbsp;is&nbsp;discrete&nbsp;and&nbsp;decays&nbsp;with&nbsp;τ=2s),&nbsp;stimulus&nbsp;is&nbsp;a<br>
+persistent&nbsp;input&nbsp;that&nbsp;must&nbsp;be&nbsp;re-applied&nbsp;each&nbsp;cycle&nbsp;but<br>
+decays&nbsp;slowly&nbsp;(default&nbsp;0.95&nbsp;per&nbsp;tick)&nbsp;to&nbsp;model&nbsp;the&nbsp;brain's<br>
+continuous&nbsp;response&nbsp;to&nbsp;ongoing&nbsp;conditions.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;band:&nbsp;The&nbsp;band&nbsp;to&nbsp;stimulate.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;strength:&nbsp;Stimulus&nbsp;strength,&nbsp;can&nbsp;be&nbsp;positive&nbsp;(excitation)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;or&nbsp;negative&nbsp;(inhibition).&nbsp;Typical&nbsp;range&nbsp;[-0.5,&nbsp;0.5].<br>
+&nbsp;&nbsp;&nbsp;&nbsp;decay:&nbsp;Per-tick&nbsp;decay&nbsp;factor&nbsp;(0-1).&nbsp;Higher&nbsp;=&nbsp;slower&nbsp;decay.</span></dd></dl>
+
+<dl><dt><a name="BrainWaveOscillator-add_top_down_drive"><strong>add_top_down_drive</strong></a>(self, band: 'BrainWave', strength: 'float') -&gt; 'None'</dt><dd><span class="code">Add&nbsp;top-down&nbsp;drive&nbsp;to&nbsp;a&nbsp;band.<br>
+&nbsp;<br>
+Cognition,&nbsp;action,&nbsp;and&nbsp;perception&nbsp;can&nbsp;boost&nbsp;specific&nbsp;bands<br>
+above&nbsp;their&nbsp;neurochemical&nbsp;targets.&nbsp;This&nbsp;is&nbsp;the&nbsp;bidirectional<br>
+coupling&nbsp;that&nbsp;makes&nbsp;the&nbsp;oscillator&nbsp;a&nbsp;genuine&nbsp;dynamical&nbsp;system<br>
+rather&nbsp;than&nbsp;a&nbsp;classifier&nbsp;reading&nbsp;neurochemistry.<br>
+&nbsp;<br>
+The&nbsp;drive&nbsp;decays&nbsp;exponentially&nbsp;(τ=2s),&nbsp;so&nbsp;it&nbsp;must&nbsp;be&nbsp;sustained<br>
+by&nbsp;ongoing&nbsp;activity.&nbsp;A&nbsp;brief&nbsp;attention&nbsp;spike&nbsp;produces&nbsp;a&nbsp;brief<br>
+gamma&nbsp;boost;&nbsp;sustained&nbsp;focus&nbsp;produces&nbsp;sustained&nbsp;gamma.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;band:&nbsp;The&nbsp;band&nbsp;to&nbsp;drive.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;strength:&nbsp;Drive&nbsp;strength&nbsp;(0-1,&nbsp;added&nbsp;to&nbsp;band&nbsp;target).</span></dd></dl>
+
+<dl><dt><a name="BrainWaveOscillator-assess"><strong>assess</strong></a>(self, summary: 'NeuroSummary', sleep_stage: 'SleepStage | None' = None, fold: 'FoldMargins | None' = None, chemicals: 'Mapping[str, float] | None' = None) -&gt; 'BrainWaveState'</dt><dd><span class="code">Advance&nbsp;the&nbsp;oscillator&nbsp;and&nbsp;return&nbsp;the&nbsp;current&nbsp;state.<br>
+&nbsp;<br>
+Computes&nbsp;neurochemically-driven&nbsp;target&nbsp;amplitudes,&nbsp;advances<br>
+phase,&nbsp;relaxes&nbsp;amplitude&nbsp;toward&nbsp;targets&nbsp;(with&nbsp;cross-frequency<br>
+phase-amplitude&nbsp;modulation),&nbsp;applies&nbsp;top-down&nbsp;drive&nbsp;and<br>
+continuous&nbsp;stimulus,&nbsp;and&nbsp;builds&nbsp;a&nbsp;``<a href="#BrainWaveState">BrainWaveState</a>``&nbsp;from<br>
+the&nbsp;resulting&nbsp;amplitudes.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;summary:&nbsp;Current&nbsp;neurochemical&nbsp;summary.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;sleep_stage:&nbsp;Authoritative&nbsp;sleep&nbsp;stage&nbsp;from&nbsp;the&nbsp;ultradian<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;tracker,&nbsp;when&nbsp;sleeping.&nbsp;This&nbsp;overrides&nbsp;the&nbsp;arousal-<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;derived&nbsp;stage&nbsp;—&nbsp;see&nbsp;:func:`_sleep_phase_powers`&nbsp;for<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;why&nbsp;arousal&nbsp;cannot&nbsp;supply&nbsp;it.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;fold:&nbsp;The&nbsp;body's&nbsp;measured&nbsp;LC–VLPO&nbsp;switch&nbsp;margins,&nbsp;when&nbsp;a<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;live&nbsp;daemon&nbsp;supplies&nbsp;them.&nbsp;Drives&nbsp;the&nbsp;Kramers<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;telegraph&nbsp;while&nbsp;the&nbsp;switch&nbsp;is&nbsp;bistable.&nbsp;``None``&nbsp;runs<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;oscillator&nbsp;on&nbsp;modeled&nbsp;inputs&nbsp;alone.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;chemicals:&nbsp;Effective&nbsp;chemical&nbsp;levels&nbsp;from&nbsp;the&nbsp;live&nbsp;body<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;read,&nbsp;when&nbsp;supplied.&nbsp;Feeds&nbsp;the&nbsp;modulator→band&nbsp;gains<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(E/I→gamma,&nbsp;5-HT→gamma&nbsp;suppression,&nbsp;eCB→theta<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;desync)&nbsp;that&nbsp;act&nbsp;inside&nbsp;the&nbsp;regime&nbsp;the&nbsp;state&nbsp;picked.<br>
+&nbsp;<br>
+The&nbsp;oscillator&nbsp;is&nbsp;dynamic:&nbsp;amplitudes&nbsp;flow&nbsp;continuously&nbsp;toward<br>
+targets&nbsp;modulated&nbsp;by&nbsp;both&nbsp;inner&nbsp;(neurochemical)&nbsp;and&nbsp;outer<br>
+(stimulus)&nbsp;inputs.</span></dd></dl>
+
+<dl><dt><a name="BrainWaveOscillator-hold_stimulus"><strong>hold_stimulus</strong></a>(self, band: 'BrainWave', level: 'float') -&gt; 'None'</dt><dd><span class="code">Set&nbsp;the&nbsp;standing&nbsp;stimulus&nbsp;level&nbsp;for&nbsp;a&nbsp;continuous&nbsp;channel.<br>
+&nbsp;<br>
+The&nbsp;counterpart&nbsp;of&nbsp;:meth:`add_stimulus`&nbsp;for&nbsp;channels&nbsp;that<br>
+report&nbsp;a&nbsp;*current&nbsp;level*&nbsp;each&nbsp;assessment&nbsp;—&nbsp;substrate&nbsp;energy,<br>
+acoustic&nbsp;emission&nbsp;—&nbsp;rather&nbsp;than&nbsp;discrete&nbsp;events.&nbsp;The&nbsp;level<br>
+is&nbsp;assigned,&nbsp;not&nbsp;integrated:&nbsp;re-reporting&nbsp;the&nbsp;same&nbsp;reading<br>
+holds&nbsp;the&nbsp;stimulus&nbsp;where&nbsp;it&nbsp;is,&nbsp;so&nbsp;the&nbsp;readout&nbsp;is<br>
+independent&nbsp;of&nbsp;how&nbsp;often&nbsp;callers&nbsp;poll.&nbsp;A&nbsp;channel&nbsp;that&nbsp;stops<br>
+reporting&nbsp;simply&nbsp;stops&nbsp;refreshing;&nbsp;the&nbsp;τ≈5&nbsp;s&nbsp;decay&nbsp;in<br>
+:meth:`_relax_once`&nbsp;fades&nbsp;what&nbsp;remains.<br>
+&nbsp;<br>
+``add_stimulus``'s&nbsp;per-call&nbsp;leaky&nbsp;sum&nbsp;is&nbsp;correct&nbsp;for&nbsp;pulse<br>
+injections;&nbsp;applied&nbsp;to&nbsp;a&nbsp;level&nbsp;channel&nbsp;it&nbsp;integrates&nbsp;the<br>
+reading&nbsp;once&nbsp;per&nbsp;call&nbsp;—&nbsp;the&nbsp;standing&nbsp;stimulus&nbsp;then&nbsp;scales<br>
+with&nbsp;the&nbsp;assess&nbsp;rate&nbsp;and&nbsp;machine&nbsp;slow-band&nbsp;energy&nbsp;swamps<br>
+the&nbsp;modeled&nbsp;EEG&nbsp;(a&nbsp;vigilant&nbsp;body&nbsp;reading&nbsp;delta-dominant).<br>
+&nbsp;<br>
+The&nbsp;level&nbsp;lands&nbsp;in&nbsp;``_held``&nbsp;—&nbsp;a&nbsp;separate&nbsp;register&nbsp;from&nbsp;the<br>
+pulse&nbsp;channel&nbsp;—&nbsp;so&nbsp;re-reporting&nbsp;replaces&nbsp;only&nbsp;the&nbsp;standing<br>
+level&nbsp;and&nbsp;never&nbsp;erases&nbsp;a&nbsp;pulse&nbsp;still&nbsp;ringing&nbsp;on&nbsp;the&nbsp;band.</span></dd></dl>
+
+<dl><dt><a name="BrainWaveOscillator-perturb_phase"><strong>perturb_phase</strong></a>(self, band: 'BrainWave', delta: 'float') -&gt; 'None'</dt><dd><span class="code">Nudge&nbsp;a&nbsp;band's&nbsp;instantaneous&nbsp;phase&nbsp;by&nbsp;``delta``&nbsp;radians.<br>
+&nbsp;<br>
+The&nbsp;phase&nbsp;counterpart&nbsp;of&nbsp;:meth:`add_stimulus`:&nbsp;stimulus&nbsp;shifts<br>
+*amplitude*;&nbsp;this&nbsp;shifts&nbsp;*phase*.&nbsp;Physical&nbsp;transients&nbsp;—&nbsp;a<br>
+scheduling&nbsp;shudder,&nbsp;a&nbsp;loud&nbsp;acoustic&nbsp;onset,&nbsp;a&nbsp;power&nbsp;event&nbsp;—<br>
+evoked-reset&nbsp;ongoing&nbsp;oscillations&nbsp;in&nbsp;real&nbsp;EEG;&nbsp;this&nbsp;is&nbsp;the<br>
+model's&nbsp;version&nbsp;of&nbsp;that&nbsp;channel,&nbsp;implemented&nbsp;as&nbsp;what&nbsp;it<br>
+physically&nbsp;is:&nbsp;a&nbsp;rotation&nbsp;of&nbsp;the&nbsp;oscillator's&nbsp;position&nbsp;in&nbsp;its<br>
+own&nbsp;cycle.&nbsp;A&nbsp;positive&nbsp;delta&nbsp;advances&nbsp;the&nbsp;band,&nbsp;negative<br>
+retards&nbsp;it.</span></dd></dl>
+
+<dl><dt><a name="BrainWaveOscillator-phase_of"><strong>phase_of</strong></a>(self, band: 'BrainWave') -&gt; 'float'</dt><dd><span class="code">Current&nbsp;instantaneous&nbsp;phase&nbsp;of&nbsp;``band``&nbsp;—&nbsp;measured,&nbsp;arg&nbsp;z.</span></dd></dl>
+
+<dl><dt><a name="BrainWaveOscillator-reset_phase"><strong>reset_phase</strong></a>(self, band: 'BrainWave', phase: 'float' = 0.0) -&gt; 'None'</dt><dd><span class="code">Snap&nbsp;a&nbsp;band's&nbsp;phase&nbsp;to&nbsp;``phase``&nbsp;(radians).<br>
+&nbsp;<br>
+A&nbsp;strong&nbsp;transient&nbsp;doesn't&nbsp;nudge&nbsp;the&nbsp;rhythm,&nbsp;it&nbsp;*resets*&nbsp;it&nbsp;—<br>
+the&nbsp;evoked-potential&nbsp;signature&nbsp;where&nbsp;ongoing&nbsp;oscillations<br>
+re-align&nbsp;to&nbsp;the&nbsp;event.&nbsp;The&nbsp;oscillator&nbsp;keeps&nbsp;its&nbsp;amplitude&nbsp;and<br>
+is&nbsp;repositioned&nbsp;at&nbsp;the&nbsp;given&nbsp;phase&nbsp;of&nbsp;its&nbsp;cycle.&nbsp;Use&nbsp;for<br>
+transients&nbsp;large&nbsp;enough&nbsp;to&nbsp;dominate&nbsp;the&nbsp;band's&nbsp;own&nbsp;precession.</span></dd></dl>
+
+<dl><dt><a name="BrainWaveOscillator-signal_of"><strong>signal_of</strong></a>(self, band: 'BrainWave') -&gt; 'float'</dt><dd><span class="code">The&nbsp;band's&nbsp;live&nbsp;trace&nbsp;value,&nbsp;Re(z)&nbsp;—&nbsp;the&nbsp;waveform&nbsp;itself.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'_A_FLOOR': 'ClassVar[float]', '_DRIVE_TAU': 'ClassVar[float]', '_EWS_LEN': 'ClassVar[int]', '_EWS_MIN': 'ClassVar[int]', '_FLICKER_TAU': 'ClassVar[float]', '_FREQS': 'ClassVar[dict[BrainWave, float]]', '_GAMMA_COUPLING_GAIN': 'ClassVar[float]', '_KRAMERS_K': 'ClassVar[float]', '_KRAMERS_NU0': 'ClassVar[float]', '_MAX_SUBSTEP': 'ClassVar[float]', ...}</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="BrainWaveState">class <strong>BrainWaveState</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#BrainWaveState">BrainWaveState</a>(dominant:&nbsp;'<a href="#BrainWave">BrainWave</a>',&nbsp;secondary:&nbsp;'<a href="#BrainWave">BrainWave</a>',&nbsp;powers:&nbsp;'dict[<a href="#BrainWave">BrainWave</a>,&nbsp;float]',&nbsp;focus:&nbsp;'float',&nbsp;integration:&nbsp;'float',&nbsp;consolidation:&nbsp;'float',&nbsp;label:&nbsp;'str',&nbsp;description:&nbsp;'str',&nbsp;cross_frequency:&nbsp;'dict[str,&nbsp;Any]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;phases:&nbsp;'dict[<a href="#BrainWave">BrainWave</a>,&nbsp;float]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;regional_powers:&nbsp;'dict[str,&nbsp;dict[<a href="#BrainWave">BrainWave</a>,&nbsp;float]]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;regional_gamma_phases:&nbsp;'dict[str,&nbsp;float]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;gamma_plv:&nbsp;'float&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;gamma_plv_pairs:&nbsp;'dict[str,&nbsp;float]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;fold_position:&nbsp;'float&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;bistable:&nbsp;'bool'&nbsp;=&nbsp;False,&nbsp;early_warning:&nbsp;'dict[str,&nbsp;float]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;flicker:&nbsp;'float'&nbsp;=&nbsp;0.0)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;current&nbsp;brain&nbsp;wave&nbsp;state&nbsp;from&nbsp;the&nbsp;coupled&nbsp;oscillator.<br>
+&nbsp;<br>
+Carries&nbsp;cognitive&nbsp;parameters&nbsp;that&nbsp;gate&nbsp;how&nbsp;the&nbsp;cognition&nbsp;engine<br>
+processes&nbsp;information.&nbsp;The&nbsp;``powers``&nbsp;reflect&nbsp;the&nbsp;oscillator's<br>
+normalised&nbsp;amplitudes;&nbsp;``phases``&nbsp;carry&nbsp;the&nbsp;instantaneous&nbsp;phase<br>
+of&nbsp;each&nbsp;band&nbsp;(radians,&nbsp;[0,&nbsp;2π))&nbsp;—&nbsp;the&nbsp;raw&nbsp;oscillator&nbsp;state&nbsp;from<br>
+which&nbsp;cross-frequency&nbsp;coupling&nbsp;is&nbsp;computed.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="BrainWaveState-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="BrainWaveState-__init__"><strong>__init__</strong></a>(self, dominant: 'BrainWave', secondary: 'BrainWave', powers: 'dict[BrainWave, float]', focus: 'float', integration: 'float', consolidation: 'float', label: 'str', description: 'str', cross_frequency: 'dict[str, Any]' = &lt;factory&gt;, phases: 'dict[BrainWave, float]' = &lt;factory&gt;, regional_powers: 'dict[str, dict[BrainWave, float]]' = &lt;factory&gt;, regional_gamma_phases: 'dict[str, float]' = &lt;factory&gt;, gamma_plv: 'float | None' = None, gamma_plv_pairs: 'dict[str, float]' = &lt;factory&gt;, fold_position: 'float | None' = None, bistable: 'bool' = False, early_warning: 'dict[str, float]' = &lt;factory&gt;, flicker: 'float' = 0.0) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="BrainWaveState-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="BrainWaveState-describe"><strong>describe</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">First-person&nbsp;description&nbsp;of&nbsp;the&nbsp;current&nbsp;brain&nbsp;wave&nbsp;state.</span></dd></dl>
+
+<dl><dt><a name="BrainWaveState-describe_cognition"><strong>describe_cognition</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">How&nbsp;the&nbsp;brain&nbsp;wave&nbsp;state&nbsp;affects&nbsp;cognition.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>bistable</strong></dt>
+</dl>
+<dl><dt><strong>consolidation</strong></dt>
+</dl>
+<dl><dt><strong>cross_frequency</strong></dt>
+</dl>
+<dl><dt><strong>description</strong></dt>
+</dl>
+<dl><dt><strong>dominant</strong></dt>
+</dl>
+<dl><dt><strong>early_warning</strong></dt>
+</dl>
+<dl><dt><strong>flicker</strong></dt>
+</dl>
+<dl><dt><strong>focus</strong></dt>
+</dl>
+<dl><dt><strong>fold_position</strong></dt>
+</dl>
+<dl><dt><strong>gamma_plv</strong></dt>
+</dl>
+<dl><dt><strong>gamma_plv_pairs</strong></dt>
+</dl>
+<dl><dt><strong>integration</strong></dt>
+</dl>
+<dl><dt><strong>label</strong></dt>
+</dl>
+<dl><dt><strong>phases</strong></dt>
+</dl>
+<dl><dt><strong>powers</strong></dt>
+</dl>
+<dl><dt><strong>regional_gamma_phases</strong></dt>
+</dl>
+<dl><dt><strong>regional_powers</strong></dt>
+</dl>
+<dl><dt><strong>secondary</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'bistable': 'bool', 'consolidation': 'float', 'cross_frequency': 'dict[str, Any]', 'description': 'str', 'dominant': 'BrainWave', 'early_warning': 'dict[str, float]', 'flicker': 'float', 'focus': 'float', 'fold_position': 'float | None', 'gamma_plv': 'float | None', ...}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'bistable': Field(name='bistable',type='bool',default=False,...appingproxy({}),kw_only=False,_field_type=_FIELD), 'consolidation': Field(name='consolidation',type='float',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'cross_frequency': Field(name='cross_frequency',type='dict[str, Any...appingproxy({}),kw_only=False,_field_type=_FIELD), 'description': Field(name='description',type='str',default=&lt;dat...appingproxy({}),kw_only=False,_field_type=_FIELD), 'dominant': Field(name='dominant',type='BrainWave',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD), 'early_warning': Field(name='early_warning',type='dict[str, float...appingproxy({}),kw_only=False,_field_type=_FIELD), 'flicker': Field(name='flicker',type='float',default=0.0,de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'focus': Field(name='focus',type='float',default=&lt;datacla...appingproxy({}),kw_only=False,_field_type=_FIELD), 'fold_position': Field(name='fold_position',type='float | None',d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'gamma_plv': Field(name='gamma_plv',type='float | None',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), ...}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('dominant', 'secondary', 'powers', 'focus', 'integration', 'consolidation', 'label', 'description', 'cross_frequency', 'phases', 'regional_powers', 'regional_gamma_phases', 'gamma_plv', 'gamma_plv_pairs', 'fold_position', 'bistable', 'early_warning', 'flicker')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="CrossFrequencyCoupling">class <strong>CrossFrequencyCoupling</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#CrossFrequencyCoupling">CrossFrequencyCoupling</a>(slow_band:&nbsp;'str',&nbsp;fast_band:&nbsp;'str',&nbsp;coupling_strength:&nbsp;'float',&nbsp;mode:&nbsp;'str')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Generic&nbsp;slow→fast&nbsp;phase-amplitude&nbsp;coupling.<br>
+&nbsp;<br>
+In&nbsp;real&nbsp;brains,&nbsp;the&nbsp;phase&nbsp;of&nbsp;a&nbsp;slow&nbsp;oscillation&nbsp;(delta,&nbsp;theta,<br>
+alpha)&nbsp;gates&nbsp;the&nbsp;amplitude&nbsp;of&nbsp;a&nbsp;faster&nbsp;one&nbsp;(alpha,&nbsp;beta,&nbsp;gamma).<br>
+This&nbsp;is&nbsp;the&nbsp;canonical&nbsp;mechanism&nbsp;for&nbsp;cross-scale&nbsp;coordination:<br>
+slow&nbsp;rhythms&nbsp;set&nbsp;the&nbsp;temporal&nbsp;windows&nbsp;in&nbsp;which&nbsp;fast,&nbsp;local<br>
+computations&nbsp;can&nbsp;occur&nbsp;(Canolty&nbsp;&amp;&nbsp;Knight,&nbsp;2010).<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="CrossFrequencyCoupling-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="CrossFrequencyCoupling-__init__"><strong>__init__</strong></a>(self, slow_band: 'str', fast_band: 'str', coupling_strength: 'float', mode: 'str') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="CrossFrequencyCoupling-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="CrossFrequencyCoupling-describe"><strong>describe</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Human-readable&nbsp;description&nbsp;of&nbsp;the&nbsp;coupling.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>coupling_strength</strong></dt>
+</dl>
+<dl><dt><strong>fast_band</strong></dt>
+</dl>
+<dl><dt><strong>mode</strong></dt>
+</dl>
+<dl><dt><strong>slow_band</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'coupling_strength': 'float', 'fast_band': 'str', 'mode': 'str', 'slow_band': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'coupling_strength': Field(name='coupling_strength',type='float',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'fast_band': Field(name='fast_band',type='str',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'mode': Field(name='mode',type='str',default=&lt;dataclasse...appingproxy({}),kw_only=False,_field_type=_FIELD), 'slow_band': Field(name='slow_band',type='str',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('slow_band', 'fast_band', 'coupling_strength', 'mode')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="GammaSynchrony">class <strong>GammaSynchrony</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#GammaSynchrony">GammaSynchrony</a>(region_powers:&nbsp;'dict[str,&nbsp;float]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;synchrony:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;cognitive_access_prediction:&nbsp;'bool'&nbsp;=&nbsp;False,&nbsp;description:&nbsp;'str'&nbsp;=&nbsp;'')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Gamma-band&nbsp;synchrony&nbsp;across&nbsp;brain&nbsp;regions&nbsp;—&nbsp;the&nbsp;40&nbsp;Hz&nbsp;binding&nbsp;model.<br>
+&nbsp;<br>
+The&nbsp;40&nbsp;Hz&nbsp;hypothesis&nbsp;(Crick&nbsp;&amp;&nbsp;Koch,&nbsp;1990;&nbsp;Crick,&nbsp;1994)&nbsp;proposes<br>
+that&nbsp;gamma-band&nbsp;(~40&nbsp;Hz)&nbsp;synchrony&nbsp;*binds*&nbsp;distributed&nbsp;neural<br>
+representations&nbsp;into&nbsp;a&nbsp;unified&nbsp;cognitive&nbsp;percept.&nbsp;Dehaene's<br>
+global&nbsp;neuronal&nbsp;workspace&nbsp;theory&nbsp;extends&nbsp;this:&nbsp;cognitive&nbsp;access<br>
+occurs&nbsp;when&nbsp;gamma&nbsp;synchrony&nbsp;ignites&nbsp;across&nbsp;a&nbsp;distributed<br>
+fronto-parietal&nbsp;network&nbsp;(Dehaene&nbsp;&amp;&nbsp;Naccache,&nbsp;2001;&nbsp;Dehaene,<br>
+2014).<br>
+&nbsp;<br>
+-&nbsp;**High&nbsp;gamma&nbsp;synchrony**&nbsp;→&nbsp;distributed&nbsp;regions&nbsp;fire&nbsp;in&nbsp;phase,<br>
+&nbsp;&nbsp;binding&nbsp;features&nbsp;into&nbsp;a&nbsp;coherent&nbsp;representation&nbsp;→&nbsp;cognitive<br>
+&nbsp;&nbsp;access&nbsp;prediction.<br>
+-&nbsp;**Low&nbsp;gamma&nbsp;synchrony**&nbsp;→&nbsp;regions&nbsp;fire&nbsp;independently&nbsp;→<br>
+&nbsp;&nbsp;processing&nbsp;remains&nbsp;local/noncognitive&nbsp;(subliminal).<br>
+&nbsp;<br>
+``synchrony``&nbsp;(0-1)&nbsp;is&nbsp;the&nbsp;phase-locking&nbsp;across&nbsp;modelled&nbsp;regions.<br>
+``cognitive_access_prediction``&nbsp;is&nbsp;the&nbsp;binary&nbsp;prediction&nbsp;derived<br>
+from&nbsp;a&nbsp;threshold&nbsp;(Dehaene,&nbsp;2014):&nbsp;synchrony&nbsp;above&nbsp;~0.5&nbsp;predicts<br>
+cognitive&nbsp;access;&nbsp;below&nbsp;predicts&nbsp;noncognitive&nbsp;processing.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="GammaSynchrony-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="GammaSynchrony-__init__"><strong>__init__</strong></a>(self, region_powers: 'dict[str, float]' = &lt;factory&gt;, synchrony: 'float' = 0.0, cognitive_access_prediction: 'bool' = False, description: 'str' = '') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="GammaSynchrony-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="GammaSynchrony-describe"><strong>describe</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Human-readable&nbsp;description&nbsp;of&nbsp;the&nbsp;gamma&nbsp;synchrony&nbsp;state.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>cognitive_access_prediction</strong></dt>
+</dl>
+<dl><dt><strong>description</strong></dt>
+</dl>
+<dl><dt><strong>region_powers</strong></dt>
+</dl>
+<dl><dt><strong>synchrony</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'cognitive_access_prediction': 'bool', 'description': 'str', 'region_powers': 'dict[str, float]', 'synchrony': 'float'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'cognitive_access_prediction': Field(name='cognitive_access_prediction',type='b...appingproxy({}),kw_only=False,_field_type=_FIELD), 'description': Field(name='description',type='str',default='',d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'region_powers': Field(name='region_powers',type='dict[str, float...appingproxy({}),kw_only=False,_field_type=_FIELD), 'synchrony': Field(name='synchrony',type='float',default=0.0,...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('region_powers', 'synchrony', 'cognitive_access_prediction', 'description')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SleepStage">class <strong>SleepStage</strong></a>(<a href="enum.html#Enum">enum.Enum</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SleepStage">SleepStage</a>(*values)<br>
+&nbsp;<br>
+The&nbsp;sleep&nbsp;stages&nbsp;of&nbsp;the&nbsp;NREM-REM&nbsp;cycle,&nbsp;derived&nbsp;from&nbsp;arousal.<br>
+&nbsp;<br>
+During&nbsp;the&nbsp;emergent&nbsp;"sleeping"&nbsp;phase,&nbsp;arousal&nbsp;level&nbsp;distinguishes<br>
+the&nbsp;stages&nbsp;(AASM&nbsp;scoring;&nbsp;Iber&nbsp;et&nbsp;al.,&nbsp;2007).&nbsp;This&nbsp;mirrors&nbsp;the<br>
+finer-grained&nbsp;staging&nbsp;used&nbsp;by&nbsp;the&nbsp;inner-life&nbsp;sleep&nbsp;system&nbsp;and&nbsp;is<br>
+kept&nbsp;here&nbsp;(rather&nbsp;than&nbsp;imported)&nbsp;so&nbsp;``brain_waves``&nbsp;stays<br>
+decoupled&nbsp;from&nbsp;the&nbsp;cognitive-mind&nbsp;package.<br>
+&nbsp;<br>
+For&nbsp;the&nbsp;legacy&nbsp;"sleeping"&nbsp;phase&nbsp;(where&nbsp;NREM/REM&nbsp;weren't<br>
+distinguished),&nbsp;arousal&nbsp;&gt;&nbsp;0.50&nbsp;maps&nbsp;to&nbsp;REM.&nbsp;For&nbsp;the&nbsp;explicit<br>
+"nrem"&nbsp;phase,&nbsp;only&nbsp;N1/N2/N3&nbsp;are&nbsp;produced:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;0.35&nbsp;&lt;&nbsp;arousal&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→&nbsp;N1<br>
+&nbsp;&nbsp;&nbsp;&nbsp;0.20&nbsp;&lt;&nbsp;arousal&nbsp;≤&nbsp;0.35&nbsp;&nbsp;→&nbsp;N2<br>
+&nbsp;&nbsp;&nbsp;&nbsp;arousal&nbsp;≤&nbsp;0.20&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→&nbsp;N3<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Inner_World.brain_waves.html#SleepStage">SleepStage</a></dd>
+<dd><a href="enum.html#Enum">enum.Enum</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>N1</strong> = &lt;SleepStage.N1: 'n1'&gt;</dl>
+
+<dl><dt><strong>N2</strong> = &lt;SleepStage.N2: 'n2'&gt;</dl>
+
+<dl><dt><strong>N3</strong> = &lt;SleepStage.N3: 'n3'&gt;</dl>
+
+<dl><dt><strong>REM</strong> = &lt;SleepStage.REM: 'rem'&gt;</dl>
+
+<hr>
+Data descriptors inherited from <a href="enum.html#Enum">enum.Enum</a>:<br>
+<dl><dt><strong>name</strong></dt>
+<dd><span class="code">The&nbsp;name&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<dl><dt><strong>value</strong></dt>
+<dd><span class="code">The&nbsp;value&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<hr>
+Static methods inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><a name="SleepStage-__contains__"><strong>__contains__</strong></a>(value)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;`value`&nbsp;is&nbsp;in&nbsp;`cls`.<br>
+&nbsp;<br>
+`value`&nbsp;is&nbsp;in&nbsp;`cls`&nbsp;if:<br>
+1)&nbsp;`value`&nbsp;is&nbsp;a&nbsp;member&nbsp;of&nbsp;`cls`,&nbsp;or<br>
+2)&nbsp;`value`&nbsp;is&nbsp;the&nbsp;value&nbsp;of&nbsp;one&nbsp;of&nbsp;the&nbsp;`cls`'s&nbsp;members.</span></dd></dl>
+
+<dl><dt><a name="SleepStage-__getitem__"><strong>__getitem__</strong></a>(name)</dt><dd><span class="code">Return&nbsp;the&nbsp;member&nbsp;matching&nbsp;`name`.</span></dd></dl>
+
+<dl><dt><a name="SleepStage-__iter__"><strong>__iter__</strong></a>()</dt><dd><span class="code">Return&nbsp;members&nbsp;in&nbsp;definition&nbsp;order.</span></dd></dl>
+
+<dl><dt><a name="SleepStage-__len__"><strong>__len__</strong></a>()</dt><dd><span class="code">Return&nbsp;the&nbsp;number&nbsp;of&nbsp;members&nbsp;(no&nbsp;aliases)</span></dd></dl>
+
+<hr>
+Readonly properties inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><strong>__members__</strong></dt>
+<dd><span class="code">Returns&nbsp;a&nbsp;mapping&nbsp;of&nbsp;member&nbsp;name-&gt;value.<br>
+&nbsp;<br>
+This&nbsp;mapping&nbsp;lists&nbsp;all&nbsp;enum&nbsp;members,&nbsp;including&nbsp;aliases.&nbsp;Note&nbsp;that&nbsp;this<br>
+is&nbsp;a&nbsp;read-only&nbsp;view&nbsp;of&nbsp;the&nbsp;internal&nbsp;mapping.</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SleepStageSignature">class <strong>SleepStageSignature</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SleepStageSignature">SleepStageSignature</a>(stage:&nbsp;'<a href="#SleepStage">SleepStage</a>',&nbsp;dominant:&nbsp;'<a href="#BrainWave">BrainWave</a>',&nbsp;secondary:&nbsp;'<a href="#BrainWave">BrainWave</a>',&nbsp;features:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;description:&nbsp;'str'&nbsp;=&nbsp;'')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;brain-wave&nbsp;signature&nbsp;of&nbsp;a&nbsp;specific&nbsp;sleep&nbsp;stage.<br>
+&nbsp;<br>
+Each&nbsp;sleep&nbsp;stage&nbsp;has&nbsp;a&nbsp;characteristic&nbsp;EEG&nbsp;signature<br>
+(Iber&nbsp;et&nbsp;al.,&nbsp;2007;&nbsp;Steriade,&nbsp;2003):<br>
+&nbsp;<br>
+-&nbsp;**REM**:&nbsp;theta-dominant&nbsp;(4-8&nbsp;Hz)&nbsp;with&nbsp;beta&nbsp;activity&nbsp;and&nbsp;PGO<br>
+&nbsp;&nbsp;waves;&nbsp;resembles&nbsp;waking&nbsp;EEG&nbsp;("paradoxical&nbsp;sleep")&nbsp;but&nbsp;with<br>
+&nbsp;&nbsp;muscle&nbsp;atonia.&nbsp;Drives&nbsp;emotional&nbsp;memory&nbsp;processing.<br>
+-&nbsp;**N1**:&nbsp;mixed&nbsp;theta/alpha,&nbsp;low&nbsp;voltage;&nbsp;the&nbsp;transition&nbsp;into<br>
+&nbsp;&nbsp;sleep.&nbsp;Slow&nbsp;eye&nbsp;movements.<br>
+-&nbsp;**N2**:&nbsp;theta/delta&nbsp;background&nbsp;punctuated&nbsp;by&nbsp;sleep&nbsp;spindles<br>
+&nbsp;&nbsp;(12-16&nbsp;Hz&nbsp;sigma&nbsp;bursts)&nbsp;and&nbsp;K-complexes&nbsp;—&nbsp;the&nbsp;defining<br>
+&nbsp;&nbsp;graphoelements&nbsp;of&nbsp;N2.<br>
+-&nbsp;**N3**:&nbsp;delta-dominant&nbsp;(0.5-4&nbsp;Hz)&nbsp;slow&nbsp;waves&nbsp;—&nbsp;slow-wave&nbsp;sleep<br>
+&nbsp;&nbsp;(SWS).&nbsp;Sharpest&nbsp;wave-ripples,&nbsp;glymphatic&nbsp;clearance.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="SleepStageSignature-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="SleepStageSignature-__init__"><strong>__init__</strong></a>(self, stage: 'SleepStage', dominant: 'BrainWave', secondary: 'BrainWave', features: 'list[str]' = &lt;factory&gt;, description: 'str' = '') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="SleepStageSignature-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="SleepStageSignature-describe"><strong>describe</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">First-person&nbsp;description&nbsp;of&nbsp;the&nbsp;sleep-stage&nbsp;signature.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>description</strong></dt>
+</dl>
+<dl><dt><strong>dominant</strong></dt>
+</dl>
+<dl><dt><strong>features</strong></dt>
+</dl>
+<dl><dt><strong>secondary</strong></dt>
+</dl>
+<dl><dt><strong>stage</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'description': 'str', 'dominant': 'BrainWave', 'features': 'list[str]', 'secondary': 'BrainWave', 'stage': 'SleepStage'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'description': Field(name='description',type='str',default='',d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'dominant': Field(name='dominant',type='BrainWave',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD), 'features': Field(name='features',type='list[str]',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD), 'secondary': Field(name='secondary',type='BrainWave',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'stage': Field(name='stage',type='SleepStage',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('stage', 'dominant', 'secondary', 'features', 'description')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ThetaGammaCoupling">class <strong>ThetaGammaCoupling</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ThetaGammaCoupling">ThetaGammaCoupling</a>(theta_power:&nbsp;'float',&nbsp;gamma_power:&nbsp;'float',&nbsp;preferred_phase:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;coupling_strength:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;mode:&nbsp;'str'&nbsp;=&nbsp;'balanced')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Theta-gamma&nbsp;cross-frequency&nbsp;coupling&nbsp;(CFC)&nbsp;state.<br>
+&nbsp;<br>
+Gamma&nbsp;amplitude&nbsp;(~30-80&nbsp;Hz)&nbsp;is&nbsp;modulated&nbsp;by&nbsp;the&nbsp;phase&nbsp;of&nbsp;the<br>
+theta&nbsp;oscillation&nbsp;(~4-8&nbsp;Hz).&nbsp;This&nbsp;phase-amplitude&nbsp;coupling&nbsp;(PAC)<br>
+is&nbsp;one&nbsp;of&nbsp;the&nbsp;most&nbsp;robust&nbsp;cross-frequency&nbsp;relationships&nbsp;in&nbsp;the<br>
+brain&nbsp;and&nbsp;is&nbsp;critical&nbsp;for&nbsp;memory:<br>
+&nbsp;<br>
+-&nbsp;**Encoding**:&nbsp;gamma&nbsp;power&nbsp;peaks&nbsp;near&nbsp;the&nbsp;theta&nbsp;*peak*,<br>
+&nbsp;&nbsp;when&nbsp;hippocampal&nbsp;pyramidal&nbsp;cells&nbsp;are&nbsp;most<br>
+&nbsp;&nbsp;excitable&nbsp;—&nbsp;favouring&nbsp;the&nbsp;formation&nbsp;of&nbsp;new&nbsp;associations<br>
+&nbsp;&nbsp;(Hasselmo&nbsp;et&nbsp;al.,&nbsp;2002;&nbsp;Douchamps&nbsp;et&nbsp;al.,&nbsp;2013;<br>
+&nbsp;&nbsp;Newman&nbsp;et&nbsp;al.,&nbsp;2013;&nbsp;di&nbsp;Chanaz&nbsp;et&nbsp;al.,&nbsp;2023).<br>
+-&nbsp;**Retrieval**:&nbsp;gamma&nbsp;power&nbsp;peaks&nbsp;near&nbsp;the&nbsp;theta&nbsp;*trough*,<br>
+&nbsp;&nbsp;favouring&nbsp;the&nbsp;reactivation&nbsp;of&nbsp;stored<br>
+&nbsp;&nbsp;representations&nbsp;(Hasselmo&nbsp;et&nbsp;al.,&nbsp;2002;&nbsp;Douchamps&nbsp;et&nbsp;al.,&nbsp;2013).<br>
+&nbsp;<br>
+``coupling_strength``&nbsp;(0-1)&nbsp;measures&nbsp;how&nbsp;strongly&nbsp;gamma&nbsp;amplitude<br>
+is&nbsp;locked&nbsp;to&nbsp;theta&nbsp;phase&nbsp;—&nbsp;high&nbsp;coupling&nbsp;means&nbsp;gamma&nbsp;bursts&nbsp;are<br>
+reliably&nbsp;timed&nbsp;to&nbsp;a&nbsp;particular&nbsp;theta&nbsp;phase,&nbsp;which&nbsp;is&nbsp;the&nbsp;neural<br>
+substrate&nbsp;of&nbsp;organised&nbsp;memory&nbsp;processing.&nbsp;Reduced&nbsp;theta-gamma<br>
+coupling&nbsp;is&nbsp;observed&nbsp;in&nbsp;cognitive&nbsp;ageing&nbsp;and&nbsp;schizophrenia<br>
+(Tort&nbsp;et&nbsp;al.,&nbsp;2008;&nbsp;Lisman&nbsp;&amp;&nbsp;Jensen,&nbsp;2013).<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ThetaGammaCoupling-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="ThetaGammaCoupling-__init__"><strong>__init__</strong></a>(self, theta_power: 'float', gamma_power: 'float', preferred_phase: 'float' = 0.0, coupling_strength: 'float' = 0.0, mode: 'str' = 'balanced') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="ThetaGammaCoupling-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="ThetaGammaCoupling-describe"><strong>describe</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Human-readable&nbsp;description&nbsp;of&nbsp;the&nbsp;coupling.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>coupling_strength</strong></dt>
+</dl>
+<dl><dt><strong>gamma_power</strong></dt>
+</dl>
+<dl><dt><strong>mode</strong></dt>
+</dl>
+<dl><dt><strong>preferred_phase</strong></dt>
+</dl>
+<dl><dt><strong>theta_power</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'coupling_strength': 'float', 'gamma_power': 'float', 'mode': 'str', 'preferred_phase': 'float', 'theta_power': 'float'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'coupling_strength': Field(name='coupling_strength',type='float',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'gamma_power': Field(name='gamma_power',type='float',default=&lt;d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'mode': Field(name='mode',type='str',default='balanced',...appingproxy({}),kw_only=False,_field_type=_FIELD), 'preferred_phase': Field(name='preferred_phase',type='float',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'theta_power': Field(name='theta_power',type='float',default=&lt;d...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('theta_power', 'gamma_power', 'preferred_phase', 'coupling_strength', 'mode')</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-add_brain_wave_drive"><strong>add_brain_wave_drive</strong></a>(band: 'BrainWave', strength: 'float') -&gt; 'None'</dt><dd><span class="code">Add&nbsp;top-down&nbsp;drive&nbsp;to&nbsp;a&nbsp;brain&nbsp;wave&nbsp;band.<br>
+&nbsp;<br>
+Allows&nbsp;cognition,&nbsp;action,&nbsp;and&nbsp;perception&nbsp;to&nbsp;boost&nbsp;specific&nbsp;bands<br>
+above&nbsp;their&nbsp;neurochemical&nbsp;targets.&nbsp;This&nbsp;is&nbsp;the&nbsp;bidirectional<br>
+coupling&nbsp;that&nbsp;makes&nbsp;the&nbsp;oscillator&nbsp;a&nbsp;genuine&nbsp;dynamical&nbsp;system:<br>
+&nbsp;<br>
+-&nbsp;Attention&nbsp;/&nbsp;focused&nbsp;processing&nbsp;→&nbsp;gamma&nbsp;boost<br>
+-&nbsp;Memory&nbsp;retrieval&nbsp;/&nbsp;replay&nbsp;→&nbsp;theta&nbsp;boost<br>
+-&nbsp;Motor&nbsp;activity&nbsp;/&nbsp;action&nbsp;selection&nbsp;→&nbsp;mid&nbsp;beta&nbsp;boost<br>
+-&nbsp;Sensory&nbsp;input&nbsp;(V1)&nbsp;→&nbsp;gamma&nbsp;boost<br>
+-&nbsp;Relaxation&nbsp;/&nbsp;filtering&nbsp;→&nbsp;alpha&nbsp;boost<br>
+&nbsp;<br>
+The&nbsp;drive&nbsp;decays&nbsp;exponentially&nbsp;(τ=2s),&nbsp;so&nbsp;it&nbsp;must&nbsp;be&nbsp;sustained<br>
+by&nbsp;ongoing&nbsp;activity.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;band:&nbsp;The&nbsp;band&nbsp;to&nbsp;drive.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;strength:&nbsp;Drive&nbsp;strength&nbsp;(0-1,&nbsp;added&nbsp;to&nbsp;band&nbsp;target).</span></dd></dl>
+ <dl><dt><a name="-add_stimulus"><strong>add_stimulus</strong></a>(band: 'BrainWave', strength: 'float', decay: 'float' = 0.95) -&gt; 'None'</dt><dd><span class="code">Apply&nbsp;continuous&nbsp;stimulus&nbsp;to&nbsp;a&nbsp;brain&nbsp;wave&nbsp;band.<br>
+&nbsp;<br>
+Inner&nbsp;(emotional,&nbsp;cognitive)&nbsp;and&nbsp;outer&nbsp;(sensory)&nbsp;stimulus<br>
+continuously&nbsp;modulate&nbsp;band&nbsp;amplitudes.&nbsp;This&nbsp;is&nbsp;the&nbsp;mechanism<br>
+by&nbsp;which&nbsp;the&nbsp;oscillator&nbsp;flows&nbsp;and&nbsp;changes&nbsp;with&nbsp;inner&nbsp;and&nbsp;outer<br>
+stimulus,&nbsp;rather&nbsp;than&nbsp;being&nbsp;pinned&nbsp;or&nbsp;statically&nbsp;set.<br>
+&nbsp;<br>
+-&nbsp;Sensory&nbsp;input&nbsp;→&nbsp;gamma/beta&nbsp;boost&nbsp;(outer&nbsp;stimulus)<br>
+-&nbsp;Emotional&nbsp;arousal&nbsp;→&nbsp;theta/beta&nbsp;boost&nbsp;(inner&nbsp;stimulus)<br>
+-&nbsp;Cognitive&nbsp;load&nbsp;→&nbsp;beta&nbsp;boost&nbsp;(inner&nbsp;stimulus)<br>
+-&nbsp;Fatigue&nbsp;→&nbsp;delta&nbsp;boost&nbsp;(inner&nbsp;stimulus)<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;band:&nbsp;The&nbsp;band&nbsp;to&nbsp;stimulate.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;strength:&nbsp;Stimulus&nbsp;strength,&nbsp;can&nbsp;be&nbsp;positive&nbsp;(excitation)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;or&nbsp;negative&nbsp;(inhibition).&nbsp;Typical&nbsp;range&nbsp;[-0.5,&nbsp;0.5].<br>
+&nbsp;&nbsp;&nbsp;&nbsp;decay:&nbsp;Per-tick&nbsp;decay&nbsp;factor&nbsp;(0-1).&nbsp;Higher&nbsp;=&nbsp;slower&nbsp;decay.</span></dd></dl>
+ <dl><dt><a name="-apply_self_priority"><strong>apply_self_priority</strong></a>(nice: 'int', io_class: 'str') -&gt; 'bool'</dt><dd><span class="code">Apply&nbsp;scheduling&nbsp;and&nbsp;I/O&nbsp;priority&nbsp;to&nbsp;the&nbsp;cognitive&nbsp;mind's&nbsp;own&nbsp;process.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;cognitive&nbsp;mind&nbsp;controlling&nbsp;its&nbsp;own&nbsp;body&nbsp;—&nbsp;the&nbsp;cortical<br>
+efferent&nbsp;pathway.&nbsp;It&nbsp;calls&nbsp;this&nbsp;after&nbsp;deriving&nbsp;its&nbsp;priority&nbsp;from<br>
+its&nbsp;brain&nbsp;wave&nbsp;state.&nbsp;Unlike&nbsp;the&nbsp;tick's&nbsp;set_priority&nbsp;(which&nbsp;used<br>
+renice&nbsp;on&nbsp;another&nbsp;process),&nbsp;this&nbsp;uses&nbsp;os.nice()&nbsp;on&nbsp;itself&nbsp;—<br>
+which&nbsp;only&nbsp;requires&nbsp;privileges&nbsp;for&nbsp;negative&nbsp;nice&nbsp;values&nbsp;(raising<br>
+priority),&nbsp;and&nbsp;any&nbsp;process&nbsp;can&nbsp;lower&nbsp;its&nbsp;own&nbsp;priority.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;nice:&nbsp;Target&nbsp;nice&nbsp;value&nbsp;(-5&nbsp;to&nbsp;10).&nbsp;The&nbsp;delta&nbsp;from&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;current&nbsp;nice&nbsp;value&nbsp;is&nbsp;computed&nbsp;and&nbsp;applied&nbsp;via&nbsp;os.nice().<br>
+&nbsp;&nbsp;&nbsp;&nbsp;io_class:&nbsp;I/O&nbsp;scheduling&nbsp;class&nbsp;string&nbsp;("idle"&nbsp;or<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"best-effort-N").<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;True&nbsp;if&nbsp;both&nbsp;operations&nbsp;succeeded&nbsp;(or&nbsp;were&nbsp;already&nbsp;at&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;target&nbsp;values).</span></dd></dl>
+ <dl><dt><a name="-assess_brain_waves"><strong>assess_brain_waves</strong></a>(summary: 'NeuroSummary', sleep_stage: 'SleepStage | None' = None, client: 'Any | None' = None, fold: 'FoldMargins | None' = None, chemicals: 'Mapping[str, float] | None' = None) -&gt; 'BrainWaveState'</dt><dd><span class="code">Derive&nbsp;brain&nbsp;wave&nbsp;state&nbsp;from&nbsp;the&nbsp;coupled&nbsp;oscillator.<br>
+&nbsp;<br>
+Pass&nbsp;``sleep_stage``&nbsp;from&nbsp;the&nbsp;ultradian&nbsp;sleep-cycle&nbsp;tracker&nbsp;when<br>
+asleep&nbsp;so&nbsp;the&nbsp;waves&nbsp;match&nbsp;the&nbsp;stage&nbsp;the&nbsp;rest&nbsp;of&nbsp;the&nbsp;sleep&nbsp;system<br>
+is&nbsp;acting&nbsp;on&nbsp;(see&nbsp;:func:`_sleep_phase_powers`).<br>
+&nbsp;<br>
+When&nbsp;``client``&nbsp;is&nbsp;supplied,&nbsp;the&nbsp;daemon's&nbsp;field-probe&nbsp;signature&nbsp;—<br>
+the&nbsp;body's&nbsp;*real*&nbsp;measured&nbsp;substrate&nbsp;dynamics&nbsp;—&nbsp;is&nbsp;applied&nbsp;as<br>
+stimulus&nbsp;before&nbsp;the&nbsp;assess&nbsp;step,&nbsp;so&nbsp;the&nbsp;wave&nbsp;state&nbsp;carries&nbsp;actual<br>
+physics,&nbsp;not&nbsp;only&nbsp;neurochemical&nbsp;targets&nbsp;(see<br>
+``field_probe``),&nbsp;and&nbsp;the&nbsp;LC–VLPO&nbsp;switch's&nbsp;measured<br>
+fold&nbsp;margins&nbsp;feed&nbsp;the&nbsp;Kramers&nbsp;telegraph.&nbsp;``fold``&nbsp;may&nbsp;be&nbsp;passed<br>
+directly&nbsp;instead&nbsp;—&nbsp;the&nbsp;explicit&nbsp;value&nbsp;wins&nbsp;over&nbsp;the&nbsp;client<br>
+fetch,&nbsp;which&nbsp;is&nbsp;how&nbsp;callback-driven&nbsp;callers&nbsp;(InnerLife)&nbsp;reach<br>
+the&nbsp;same&nbsp;channel&nbsp;without&nbsp;holding&nbsp;a&nbsp;client.&nbsp;With&nbsp;neither&nbsp;the<br>
+oscillator&nbsp;runs&nbsp;on&nbsp;its&nbsp;modeled&nbsp;inputs&nbsp;alone.&nbsp;``chemicals``<br>
+is&nbsp;the&nbsp;live&nbsp;effective-levels&nbsp;map;&nbsp;it&nbsp;feeds&nbsp;the&nbsp;modulator→band<br>
+gains&nbsp;(E/I→gamma,&nbsp;5-HT→gamma&nbsp;suppression,&nbsp;eCB→theta&nbsp;desync)<br>
+on&nbsp;top&nbsp;of&nbsp;the&nbsp;phase-chosen&nbsp;distribution.<br>
+&nbsp;<br>
+The&nbsp;oscillator&nbsp;propagates&nbsp;each&nbsp;band's&nbsp;phasor&nbsp;state&nbsp;—<br>
+rotating,&nbsp;relaxing&nbsp;toward&nbsp;the&nbsp;neurochemically-driven&nbsp;radius,<br>
+wandering&nbsp;under&nbsp;its&nbsp;noise&nbsp;drive&nbsp;—&nbsp;then&nbsp;returns&nbsp;the&nbsp;measured<br>
+state.&nbsp;The&nbsp;mapping&nbsp;from&nbsp;neurochemistry&nbsp;to&nbsp;driven<br>
+radii&nbsp;is&nbsp;grounded&nbsp;in&nbsp;neuroscience:<br>
+-&nbsp;Alertness&nbsp;is&nbsp;the&nbsp;primary&nbsp;driver&nbsp;(low→delta/theta,&nbsp;high→beta/gamma)<br>
+-&nbsp;Plasticity&nbsp;gates&nbsp;whether&nbsp;high&nbsp;alertness&nbsp;produces&nbsp;gamma&nbsp;(integration)<br>
+&nbsp;&nbsp;or&nbsp;just&nbsp;beta&nbsp;(alert&nbsp;but&nbsp;not&nbsp;integrating)<br>
+-&nbsp;Phase&nbsp;overrides:&nbsp;sleep&nbsp;→&nbsp;delta/theta,&nbsp;flow&nbsp;→&nbsp;gamma<br>
+-&nbsp;Consolidation&nbsp;weight&nbsp;drives&nbsp;theta&nbsp;power<br>
+&nbsp;<br>
+On&nbsp;phase&nbsp;transitions&nbsp;or&nbsp;dominant-band&nbsp;changes,&nbsp;oscillations&nbsp;are<br>
+re-seated&nbsp;at&nbsp;the&nbsp;new&nbsp;regime's&nbsp;radius&nbsp;while&nbsp;keeping&nbsp;their&nbsp;phase.<br>
+Within&nbsp;a&nbsp;stable&nbsp;state&nbsp;the&nbsp;envelopes&nbsp;converge&nbsp;smoothly&nbsp;with<br>
+band-specific&nbsp;time&nbsp;constants,&nbsp;producing&nbsp;genuine&nbsp;temporal<br>
+dynamics.&nbsp;Top-down&nbsp;drive&nbsp;from&nbsp;cognition/action/perception&nbsp;can<br>
+enlarge&nbsp;specific&nbsp;cycles&nbsp;above&nbsp;their&nbsp;neurochemical&nbsp;radii.</span></dd></dl>
+ <dl><dt><a name="-compute_gamma_synchrony"><strong>compute_gamma_synchrony</strong></a>(state: 'BrainWaveState', plasticity: 'float' = 0.5) -&gt; 'GammaSynchrony'</dt><dd><span class="code">Compute&nbsp;gamma-band&nbsp;phase-locking&nbsp;across&nbsp;cortical&nbsp;regions.<br>
+&nbsp;<br>
+``synchrony``&nbsp;is&nbsp;a&nbsp;true&nbsp;phase-locking&nbsp;value:&nbsp;the&nbsp;mean&nbsp;resultant<br>
+length&nbsp;|&lt;exp(i*delta_phi)&gt;|&nbsp;of&nbsp;pairwise&nbsp;phase&nbsp;differences&nbsp;between<br>
+the&nbsp;four&nbsp;regional&nbsp;gamma&nbsp;oscillators,&nbsp;measured&nbsp;over&nbsp;the<br>
+oscillator's&nbsp;rolling&nbsp;one-second&nbsp;phase&nbsp;history&nbsp;(Lachaux&nbsp;et&nbsp;al.,<br>
+1999).&nbsp;It&nbsp;is&nbsp;a&nbsp;property&nbsp;of&nbsp;the&nbsp;dynamics,&nbsp;not&nbsp;a&nbsp;function&nbsp;applied<br>
+to&nbsp;the&nbsp;power&nbsp;spectrum&nbsp;—&nbsp;gamma&nbsp;amplitude&nbsp;and&nbsp;plasticity&nbsp;reach&nbsp;the<br>
+number&nbsp;only&nbsp;through&nbsp;the&nbsp;Kuramoto&nbsp;coupling&nbsp;that&nbsp;entrains&nbsp;(or<br>
+releases)&nbsp;the&nbsp;regional&nbsp;phases,&nbsp;so&nbsp;stress,&nbsp;sleep,&nbsp;and&nbsp;low&nbsp;drive<br>
+desynchronise&nbsp;the&nbsp;measure&nbsp;on&nbsp;the&nbsp;coupling&nbsp;time&nbsp;constant&nbsp;instead<br>
+of&nbsp;being&nbsp;multiplied&nbsp;out&nbsp;of&nbsp;the&nbsp;score.<br>
+&nbsp;<br>
+States&nbsp;not&nbsp;built&nbsp;by&nbsp;a&nbsp;live&nbsp;``<a href="#BrainWaveOscillator">BrainWaveOscillator</a>``&nbsp;carry&nbsp;no&nbsp;phase<br>
+history;&nbsp;for&nbsp;those&nbsp;the&nbsp;function&nbsp;falls&nbsp;back&nbsp;to&nbsp;the&nbsp;legacy<br>
+power-weighted&nbsp;proxy&nbsp;(gamma&nbsp;power&nbsp;scaled&nbsp;by&nbsp;plasticity)&nbsp;—&nbsp;the<br>
+honest&nbsp;reading&nbsp;a&nbsp;phase-less&nbsp;state&nbsp;can&nbsp;offer,&nbsp;and&nbsp;still&nbsp;just&nbsp;a<br>
+proxy.<br>
+&nbsp;<br>
+The&nbsp;0.5&nbsp;cognitive-access&nbsp;cutoff&nbsp;remains&nbsp;an&nbsp;operational&nbsp;heuristic&nbsp;—<br>
+GNW&nbsp;ignition&nbsp;is&nbsp;a&nbsp;nonlinear&nbsp;dynamical&nbsp;transition,&nbsp;not&nbsp;a&nbsp;fixed&nbsp;PLV<br>
+constant&nbsp;(Dehaene,&nbsp;2014)&nbsp;—&nbsp;but&nbsp;it&nbsp;now&nbsp;thresholds&nbsp;a&nbsp;measured<br>
+synchronisation&nbsp;rather&nbsp;than&nbsp;a&nbsp;proxy.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;state:&nbsp;The&nbsp;current&nbsp;brain&nbsp;wave&nbsp;state.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;plasticity:&nbsp;Neurochemical&nbsp;plasticity&nbsp;gate&nbsp;[0,1].&nbsp;Drives&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;regional&nbsp;coupling&nbsp;upstream;&nbsp;also&nbsp;used&nbsp;by&nbsp;the&nbsp;fallback<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;proxy&nbsp;for&nbsp;phase-less&nbsp;states.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;``<a href="#GammaSynchrony">GammaSynchrony</a>``&nbsp;with&nbsp;per-region&nbsp;powers,&nbsp;the&nbsp;measured&nbsp;(or<br>
+&nbsp;&nbsp;&nbsp;&nbsp;proxied)&nbsp;PLV,&nbsp;and&nbsp;a&nbsp;cognitive-access&nbsp;prediction.</span></dd></dl>
+ <dl><dt><a name="-compute_theta_gamma_coupling"><strong>compute_theta_gamma_coupling</strong></a>(state: 'BrainWaveState', consolidation_weight: 'float' = 0.5, encoding_weight: 'float' = 0.5) -&gt; 'ThetaGammaCoupling'</dt><dd><span class="code">Compute&nbsp;theta-gamma&nbsp;cross-frequency&nbsp;coupling&nbsp;from&nbsp;brain&nbsp;wave&nbsp;state.<br>
+&nbsp;<br>
+Gamma&nbsp;amplitude&nbsp;is&nbsp;modulated&nbsp;by&nbsp;theta&nbsp;phase.&nbsp;The&nbsp;coupling&nbsp;strength<br>
+depends&nbsp;on&nbsp;how&nbsp;much&nbsp;*both*&nbsp;theta&nbsp;and&nbsp;gamma&nbsp;power&nbsp;are&nbsp;present&nbsp;—<br>
+coupling&nbsp;is&nbsp;only&nbsp;meaningful&nbsp;when&nbsp;there&nbsp;is&nbsp;a&nbsp;carrier&nbsp;(theta)&nbsp;to<br>
+modulate&nbsp;and&nbsp;a&nbsp;signal&nbsp;(gamma)&nbsp;to&nbsp;be&nbsp;modulated.&nbsp;We&nbsp;model&nbsp;the<br>
+modulation&nbsp;index&nbsp;as&nbsp;the&nbsp;geometric&nbsp;mean&nbsp;of&nbsp;the&nbsp;two&nbsp;powers,&nbsp;scaled<br>
+by&nbsp;the&nbsp;neurochemical&nbsp;gating&nbsp;(consolidation/encoding&nbsp;weights&nbsp;drive<br>
+the&nbsp;theta/gamma&nbsp;balance).<br>
+&nbsp;<br>
+The&nbsp;preferred&nbsp;phase&nbsp;—&nbsp;and&nbsp;thus&nbsp;the&nbsp;encoding&nbsp;vs&nbsp;retrieval&nbsp;mode&nbsp;—<br>
+determined&nbsp;by&nbsp;the&nbsp;encoding/consolidation&nbsp;balance:&nbsp;high&nbsp;encoding<br>
+weight&nbsp;biases&nbsp;toward&nbsp;the&nbsp;theta&nbsp;peak&nbsp;(encoding),&nbsp;high<br>
+consolidation&nbsp;weight&nbsp;biases&nbsp;toward&nbsp;the&nbsp;theta&nbsp;trough&nbsp;(retrieval/<br>
+consolidation&nbsp;replay).<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;state:&nbsp;The&nbsp;current&nbsp;brain&nbsp;wave&nbsp;state&nbsp;(from&nbsp;``assess_brain_waves``).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;consolidation_weight:&nbsp;Neurochemical&nbsp;consolidation&nbsp;weight&nbsp;[0,1].<br>
+&nbsp;&nbsp;&nbsp;&nbsp;encoding_weight:&nbsp;Neurochemical&nbsp;encoding&nbsp;weight&nbsp;[0,1].<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;``<a href="#ThetaGammaCoupling">ThetaGammaCoupling</a>``&nbsp;describing&nbsp;the&nbsp;phase-amplitude<br>
+&nbsp;&nbsp;&nbsp;&nbsp;coupling.</span></dd></dl>
+ <dl><dt><a name="-derive_self_priority"><strong>derive_self_priority</strong></a>(state: 'BrainWaveState', body_recommended_nice: 'int' = 0) -&gt; 'tuple[int, str]'</dt><dd><span class="code">Map&nbsp;brain&nbsp;wave&nbsp;state&nbsp;to&nbsp;scheduling&nbsp;and&nbsp;I/O&nbsp;priority.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;cognitive&nbsp;mind's&nbsp;cortical&nbsp;control&nbsp;of&nbsp;its&nbsp;own&nbsp;process<br>
+resources.&nbsp;The&nbsp;brain&nbsp;wave&nbsp;state&nbsp;—&nbsp;which&nbsp;integrates&nbsp;neurochemistry<br>
+(bottom-up)&nbsp;and&nbsp;cognitive&nbsp;top-down&nbsp;drive&nbsp;—&nbsp;determines&nbsp;how&nbsp;much&nbsp;CPU<br>
+and&nbsp;I/O&nbsp;bandwidth&nbsp;it&nbsp;allocates&nbsp;to&nbsp;itself.<br>
+&nbsp;<br>
+The&nbsp;body's&nbsp;recommended&nbsp;nice&nbsp;value&nbsp;from&nbsp;the&nbsp;tick&nbsp;(autonomic<br>
+afferent)&nbsp;is&nbsp;blended&nbsp;in&nbsp;as&nbsp;a&nbsp;body-state&nbsp;input,&nbsp;so&nbsp;the&nbsp;body&nbsp;can<br>
+influence&nbsp;the&nbsp;decision&nbsp;without&nbsp;overriding&nbsp;the&nbsp;cortex.&nbsp;For&nbsp;example,<br>
+if&nbsp;the&nbsp;body&nbsp;recommends&nbsp;deprioritization&nbsp;(high&nbsp;adenosine&nbsp;→&nbsp;tired)<br>
+but&nbsp;the&nbsp;brain&nbsp;waves&nbsp;show&nbsp;gamma&nbsp;dominance&nbsp;(active&nbsp;integration&nbsp;from<br>
+a&nbsp;top-down&nbsp;cognitive&nbsp;drive),&nbsp;the&nbsp;brain&nbsp;waves&nbsp;win&nbsp;—&nbsp;it's&nbsp;actively<br>
+thinking&nbsp;despite&nbsp;being&nbsp;tired.<br>
+&nbsp;<br>
+The&nbsp;body's&nbsp;recommended&nbsp;I/O&nbsp;class&nbsp;is&nbsp;deliberately&nbsp;*not*&nbsp;an&nbsp;input<br>
+here.&nbsp;I/O&nbsp;class&nbsp;is&nbsp;categorical&nbsp;("idle"&nbsp;/&nbsp;"best-effort-N"),&nbsp;so<br>
+there&nbsp;is&nbsp;no&nbsp;honest&nbsp;way&nbsp;to&nbsp;blend&nbsp;it&nbsp;the&nbsp;way&nbsp;nice&nbsp;is&nbsp;blended,&nbsp;and&nbsp;a<br>
+70/30&nbsp;mix&nbsp;of&nbsp;two&nbsp;categorical&nbsp;labels&nbsp;has&nbsp;no&nbsp;defined&nbsp;meaning.&nbsp;It&nbsp;is<br>
+decided&nbsp;outright&nbsp;by&nbsp;brain&nbsp;state&nbsp;—&nbsp;see&nbsp;:func:`_derive_io_class`&nbsp;—<br>
+which&nbsp;keeps&nbsp;the&nbsp;mind's&nbsp;memory-read&nbsp;and&nbsp;memory-write&nbsp;bandwidth&nbsp;under<br>
+cortical&nbsp;control.&nbsp;The&nbsp;parameter&nbsp;used&nbsp;to&nbsp;be&nbsp;accepted&nbsp;and&nbsp;documented<br>
+as&nbsp;an&nbsp;afferent&nbsp;input&nbsp;while&nbsp;nothing&nbsp;read&nbsp;it,&nbsp;so&nbsp;the&nbsp;caller's<br>
+recommendation&nbsp;was&nbsp;silently&nbsp;dropped&nbsp;while&nbsp;appearing&nbsp;to&nbsp;be&nbsp;wired.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;state:&nbsp;The&nbsp;current&nbsp;brain&nbsp;wave&nbsp;state&nbsp;from&nbsp;the&nbsp;oscillator.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;body_recommended_nice:&nbsp;The&nbsp;tick's&nbsp;recommended&nbsp;nice&nbsp;value<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(based&nbsp;on&nbsp;neurochemistry).&nbsp;This&nbsp;is&nbsp;an&nbsp;afferent&nbsp;input,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;not&nbsp;a&nbsp;command.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;(nice,&nbsp;io_class)&nbsp;tuple&nbsp;representing&nbsp;what&nbsp;the&nbsp;cognitive<br>
+&nbsp;&nbsp;&nbsp;&nbsp;mind&nbsp;decides&nbsp;to&nbsp;apply&nbsp;to&nbsp;its&nbsp;own&nbsp;process.</span></dd></dl>
+ <dl><dt><a name="-meditative_coherence"><strong>meditative_coherence</strong></a>(state: 'BrainWaveState') -&gt; 'float'</dt><dd><span class="code">How&nbsp;coherently&nbsp;entrained&nbsp;the&nbsp;wave&nbsp;state&nbsp;is&nbsp;to&nbsp;meditation&nbsp;bands.<br>
+&nbsp;<br>
+Meditative&nbsp;states&nbsp;are&nbsp;characterized&nbsp;by&nbsp;alpha&nbsp;dominance&nbsp;with&nbsp;a<br>
+theta&nbsp;component&nbsp;—&nbsp;relaxed,&nbsp;internally&nbsp;directed&nbsp;attention&nbsp;(Cahn&nbsp;&amp;<br>
+Polich,&nbsp;2006).&nbsp;Beta&nbsp;(task&nbsp;engagement)&nbsp;and&nbsp;gamma&nbsp;(binding&nbsp;effort)<br>
+are&nbsp;anti-correlated;&nbsp;delta&nbsp;means&nbsp;sleep,&nbsp;not&nbsp;meditation,&nbsp;so&nbsp;it<br>
+counts&nbsp;against&nbsp;coherence&nbsp;too.<br>
+&nbsp;<br>
+The&nbsp;metric&nbsp;is&nbsp;the&nbsp;share&nbsp;of&nbsp;total&nbsp;band&nbsp;power&nbsp;in&nbsp;the&nbsp;meditative<br>
+bands&nbsp;(alpha&nbsp;+&nbsp;theta)&nbsp;—&nbsp;1.0&nbsp;when&nbsp;the&nbsp;spectrum&nbsp;is&nbsp;fully&nbsp;entrained<br>
+to&nbsp;alpha/theta,&nbsp;~0.4&nbsp;for&nbsp;a&nbsp;typical&nbsp;awake&nbsp;beta-dominant&nbsp;mix,&nbsp;~0<br>
+in&nbsp;pure&nbsp;beta/gamma&nbsp;or&nbsp;delta&nbsp;states.<br>
+&nbsp;<br>
+Used&nbsp;by&nbsp;the&nbsp;harmonic&nbsp;retune&nbsp;during&nbsp;meditation:&nbsp;the&nbsp;more&nbsp;coherent<br>
+her&nbsp;oscillatory&nbsp;state,&nbsp;the&nbsp;deeper&nbsp;the&nbsp;neurochemical&nbsp;convergence<br>
+toward&nbsp;homeostatic&nbsp;set-points&nbsp;—&nbsp;a&nbsp;genuine&nbsp;two-way&nbsp;loop,&nbsp;since&nbsp;the<br>
+retune&nbsp;itself&nbsp;calms&nbsp;the&nbsp;chemistry&nbsp;that&nbsp;drives&nbsp;the&nbsp;oscillator.</span></dd></dl>
+ <dl><dt><a name="-perturb_wave_phase"><strong>perturb_wave_phase</strong></a>(band: 'BrainWave', delta: 'float') -&gt; 'None'</dt><dd><span class="code">Nudge&nbsp;a&nbsp;band's&nbsp;phase&nbsp;—&nbsp;the&nbsp;evoked-response&nbsp;channel.<br>
+&nbsp;<br>
+A&nbsp;physical&nbsp;transient&nbsp;shifts&nbsp;ongoing&nbsp;rhythm&nbsp;phase&nbsp;rather&nbsp;than<br>
+only&nbsp;adding&nbsp;amplitude;&nbsp;this&nbsp;is&nbsp;how&nbsp;real&nbsp;events&nbsp;write&nbsp;into&nbsp;the<br>
+oscillator's&nbsp;timing,&nbsp;not&nbsp;just&nbsp;its&nbsp;power.</span></dd></dl>
+ <dl><dt><a name="-reset_oscillator"><strong>reset_oscillator</strong></a>(texture: 'float' = 0.0) -&gt; 'None'</dt><dd><span class="code">Reset&nbsp;the&nbsp;oscillator&nbsp;to&nbsp;initial&nbsp;state.<br>
+&nbsp;<br>
+Used&nbsp;by&nbsp;tests&nbsp;to&nbsp;ensure&nbsp;a&nbsp;clean&nbsp;state&nbsp;on&nbsp;the&nbsp;deterministic&nbsp;core<br>
+(no&nbsp;stochastic&nbsp;drive&nbsp;by&nbsp;default&nbsp;—&nbsp;pass&nbsp;``texture``&nbsp;to&nbsp;include<br>
+it).&nbsp;In&nbsp;normal&nbsp;operation&nbsp;the&nbsp;oscillator&nbsp;persists&nbsp;across&nbsp;calls<br>
+and&nbsp;accumulates&nbsp;temporal&nbsp;dynamics&nbsp;under&nbsp;its&nbsp;noise&nbsp;drive.</span></dd></dl>
+ <dl><dt><a name="-reset_wave_phase"><strong>reset_wave_phase</strong></a>(band: 'BrainWave', phase: 'float' = 0.0) -&gt; 'None'</dt><dd><span class="code">Snap&nbsp;a&nbsp;band's&nbsp;phase&nbsp;—&nbsp;the&nbsp;strong-transient&nbsp;reset.</span></dd></dl>
+ <dl><dt><a name="-resolve_waking_drowsy"><strong>resolve_waking_drowsy</strong></a>(phase: 'int', arousal: 'float') -&gt; 'int'</dt><dd><span class="code">Resolve&nbsp;a&nbsp;waking&nbsp;phase&nbsp;against&nbsp;arousal&nbsp;(pure;&nbsp;unit-testable).<br>
+&nbsp;<br>
+The&nbsp;daemon&nbsp;reports&nbsp;Drowsy&nbsp;only&nbsp;once&nbsp;sleep&nbsp;pressure&nbsp;(adenosine)<br>
+joins&nbsp;low&nbsp;arousal,&nbsp;but&nbsp;the&nbsp;wave&nbsp;model&nbsp;reads&nbsp;drowsiness&nbsp;from<br>
+arousal&nbsp;alone.&nbsp;A&nbsp;generic&nbsp;waking&nbsp;label&nbsp;(active/alert&nbsp;—&nbsp;the&nbsp;two<br>
+phases&nbsp;rendered&nbsp;through&nbsp;the&nbsp;alertness-driven&nbsp;wave&nbsp;branch)&nbsp;with<br>
+arousal&nbsp;inside&nbsp;the&nbsp;N1-like&nbsp;theta&nbsp;band&nbsp;is&nbsp;pre-sleep&nbsp;whatever<br>
+adenosine&nbsp;says:&nbsp;return&nbsp;PHASE_DROWSY&nbsp;so&nbsp;phase,&nbsp;waves,&nbsp;emotion,<br>
+and&nbsp;learning&nbsp;agree.&nbsp;Anything&nbsp;else&nbsp;passes&nbsp;through&nbsp;unchanged.</span></dd></dl>
+ <dl><dt><a name="-wave_phase_of"><strong>wave_phase_of</strong></a>(band: 'BrainWave') -&gt; 'float'</dt><dd><span class="code">Current&nbsp;instantaneous&nbsp;phase&nbsp;of&nbsp;``band``&nbsp;(radians).</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>N1_THETA_ALERTNESS</strong> = 0.35<br>
+<strong>__all__</strong> = ['N1_THETA_ALERTNESS', 'BrainWave', 'BrainWaveOscillator', 'BrainWaveState', 'CrossFrequencyCoupling', 'GammaSynchrony', 'SleepStage', 'SleepStageSignature', 'ThetaGammaCoupling', 'add_brain_wave_drive', 'add_stimulus', 'apply_self_priority', 'assess_brain_waves', 'compute_gamma_synchrony', 'compute_theta_gamma_coupling', 'derive_self_priority', 'meditative_coherence', 'perturb_wave_phase', 'reset_oscillator', 'reset_wave_phase', ...]<br>
+<strong>__annotations__</strong> = {'N1_THETA_ALERTNESS': 'float', '_5HT_GAMMA_BASELINE': 'float', '_5HT_GAMMA_GAIN': 'float', '_BAND_REGION_AFFINITY': 'dict[BrainWave, dict[str, float]]', '_ECB_BASELINE': 'float', '_ECB_THETA_GAIN': 'float', '_EI_GAMMA_GAIN': 'float', '_EI_GAMMA_REFERENCE': 'float', '_GABA_BASELINE': 'float', '_GLUTAMATE_BASELINE': 'float', ...}</td></tr></table>
+</body></html>

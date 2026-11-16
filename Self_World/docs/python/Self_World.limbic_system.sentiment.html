@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.limbic_system.sentiment</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.limbic_system.html" class="white">limbic_system</a>.sentiment</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/limbic_system/sentiment.py">/home/mindyrenee/GenAnd/Genesis/Self_World/limbic_system/sentiment.py</a></td></tr></table>
+    <p><span class="code">Affect&nbsp;appraisal&nbsp;as&nbsp;compositional&nbsp;operator&nbsp;algebra&nbsp;on&nbsp;valence–arousal&nbsp;space.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;not&nbsp;a&nbsp;rule&nbsp;engine.&nbsp;An&nbsp;utterance's&nbsp;affect&nbsp;is&nbsp;computed&nbsp;by&nbsp;folding<br>
+a&nbsp;sequence&nbsp;of&nbsp;*linear&nbsp;operators*&nbsp;and&nbsp;*affect&nbsp;vectors*&nbsp;over&nbsp;a<br>
+two-dimensional&nbsp;affective&nbsp;space&nbsp;—&nbsp;the&nbsp;same&nbsp;formal&nbsp;family&nbsp;cognitive<br>
+science&nbsp;uses&nbsp;for&nbsp;compositional&nbsp;semantics&nbsp;and&nbsp;dimensional&nbsp;affect:<br>
+&nbsp;<br>
+-&nbsp;**Affective&nbsp;space**&nbsp;A&nbsp;⊂&nbsp;ℝ²&nbsp;=&nbsp;(valence&nbsp;v,&nbsp;arousal&nbsp;a)&nbsp;—&nbsp;Russell's<br>
+&nbsp;&nbsp;circumplex&nbsp;/&nbsp;dimensional&nbsp;affect&nbsp;(Russell&nbsp;1980,&nbsp;Psych.&nbsp;Rev.&nbsp;87;<br>
+&nbsp;&nbsp;Barrett&nbsp;&amp;&nbsp;Russell&nbsp;1999).&nbsp;Every&nbsp;word&nbsp;Genesis&nbsp;has&nbsp;learned&nbsp;carries&nbsp;an<br>
+&nbsp;&nbsp;affect&nbsp;vector&nbsp;φ(w)&nbsp;=&nbsp;(v,&nbsp;κ|v|):&nbsp;its&nbsp;learned&nbsp;valence&nbsp;plus&nbsp;the&nbsp;arousal<br>
+&nbsp;&nbsp;its&nbsp;intensity&nbsp;implies.&nbsp;The&nbsp;lexicon&nbsp;itself&nbsp;is&nbsp;*learned&nbsp;through<br>
+&nbsp;&nbsp;interaction*&nbsp;—&nbsp;nothing&nbsp;about&nbsp;word&nbsp;meaning&nbsp;is&nbsp;seeded.<br>
+&nbsp;<br>
+-&nbsp;**Composition&nbsp;is&nbsp;linear-operator&nbsp;action.**&nbsp;Grammatical&nbsp;modifiers&nbsp;are<br>
+&nbsp;&nbsp;not&nbsp;flags&nbsp;on&nbsp;a&nbsp;counter;&nbsp;they&nbsp;are&nbsp;2×2&nbsp;matrices&nbsp;acting&nbsp;on&nbsp;the&nbsp;next<br>
+&nbsp;&nbsp;affect&nbsp;vector&nbsp;(Smolensky&nbsp;1990-style&nbsp;vector-space&nbsp;semantics&nbsp;—&nbsp;meaning<br>
+&nbsp;&nbsp;composes&nbsp;by&nbsp;linear&nbsp;operations&nbsp;on&nbsp;a&nbsp;state&nbsp;space):<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;negation&nbsp;&nbsp;&nbsp;&nbsp;N&nbsp;=&nbsp;[[−ρ,&nbsp;0],&nbsp;[0,&nbsp;1]]&nbsp;&nbsp;&nbsp;—&nbsp;valence&nbsp;reflection;&nbsp;arousal<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;survives&nbsp;("not&nbsp;good"&nbsp;is<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;still&nbsp;*felt*,&nbsp;just&nbsp;inverted)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;intensifier&nbsp;G&nbsp;=&nbsp;g·I,&nbsp;&nbsp;&nbsp;g&nbsp;&gt;&nbsp;1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;—&nbsp;isotropic&nbsp;dilation<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;diminisher&nbsp;&nbsp;D&nbsp;=&nbsp;d·I,&nbsp;&nbsp;&nbsp;d&nbsp;&lt;&nbsp;1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;—&nbsp;isotropic&nbsp;contraction<br>
+&nbsp;<br>
+&nbsp;&nbsp;Consecutive&nbsp;modifiers&nbsp;compose&nbsp;by&nbsp;multiplication&nbsp;—&nbsp;"not&nbsp;very&nbsp;good"&nbsp;is<br>
+&nbsp;&nbsp;N·G·φ,&nbsp;an&nbsp;operator&nbsp;product,&nbsp;not&nbsp;a&nbsp;patchwork&nbsp;of&nbsp;booleans.<br>
+&nbsp;<br>
+-&nbsp;**Modifier&nbsp;scope&nbsp;is&nbsp;persistence-decayed,&nbsp;not&nbsp;windowed.**&nbsp;A&nbsp;pending<br>
+&nbsp;&nbsp;operator&nbsp;carries&nbsp;charge&nbsp;q&nbsp;∈&nbsp;[0,1];&nbsp;every&nbsp;intervening&nbsp;neutral&nbsp;token<br>
+&nbsp;&nbsp;decays&nbsp;it&nbsp;q&nbsp;←&nbsp;q·e^{−1/τ}&nbsp;and&nbsp;the&nbsp;operator&nbsp;acts&nbsp;only&nbsp;while&nbsp;q&nbsp;≥&nbsp;½&nbsp;—<br>
+&nbsp;&nbsp;its&nbsp;*half-life*.&nbsp;Scale&nbsp;modifiers&nbsp;(τ_mod&nbsp;≈&nbsp;1/ln&nbsp;2.5)&nbsp;discharge&nbsp;after&nbsp;a<br>
+&nbsp;&nbsp;single&nbsp;neutral&nbsp;token;&nbsp;negation&nbsp;(τ_neg&nbsp;=&nbsp;4.5)&nbsp;survives&nbsp;~3,&nbsp;the&nbsp;same<br>
+&nbsp;&nbsp;syntactic&nbsp;reach&nbsp;VADER&nbsp;hardcodes&nbsp;as&nbsp;a&nbsp;counter&nbsp;—&nbsp;but&nbsp;here&nbsp;it&nbsp;is&nbsp;the<br>
+&nbsp;&nbsp;half-life&nbsp;of&nbsp;a&nbsp;transient&nbsp;expectation,&nbsp;a&nbsp;drift&nbsp;term,&nbsp;not&nbsp;a&nbsp;rule.<br>
+&nbsp;<br>
+-&nbsp;**Contrastive&nbsp;junctions&nbsp;flush&nbsp;the&nbsp;integrator.**&nbsp;"good&nbsp;but&nbsp;slow"<br>
+&nbsp;&nbsp;attenuates&nbsp;the&nbsp;accumulated&nbsp;state&nbsp;S&nbsp;←&nbsp;(1−Λ)·S&nbsp;at&nbsp;the&nbsp;junction&nbsp;—&nbsp;a<br>
+&nbsp;&nbsp;leak&nbsp;jump,&nbsp;the&nbsp;discrete&nbsp;analog&nbsp;of&nbsp;an&nbsp;attentional&nbsp;reset&nbsp;in&nbsp;the<br>
+&nbsp;&nbsp;affect&nbsp;integrator&nbsp;—&nbsp;so&nbsp;the&nbsp;clause&nbsp;after&nbsp;"but"&nbsp;dominates&nbsp;the&nbsp;residue<br>
+&nbsp;&nbsp;the&nbsp;way&nbsp;post-contrastive&nbsp;weighting&nbsp;intends,&nbsp;without&nbsp;a&nbsp;special&nbsp;pass.<br>
+&nbsp;<br>
+-&nbsp;**Emphasis&nbsp;is&nbsp;an&nbsp;arousal&nbsp;operator.**&nbsp;ALL-CAPS&nbsp;dilates&nbsp;the&nbsp;token's<br>
+&nbsp;&nbsp;affect&nbsp;vector;&nbsp;repeated&nbsp;"!"&nbsp;applies&nbsp;a&nbsp;scalar&nbsp;gain&nbsp;to&nbsp;the&nbsp;terminal<br>
+&nbsp;&nbsp;state&nbsp;—&nbsp;emphasis&nbsp;lives&nbsp;on&nbsp;the&nbsp;arousal&nbsp;axis&nbsp;where&nbsp;it&nbsp;belongs&nbsp;and<br>
+&nbsp;&nbsp;leaks&nbsp;onto&nbsp;valence&nbsp;through&nbsp;the&nbsp;same&nbsp;compress.<br>
+&nbsp;<br>
+-&nbsp;**Report&nbsp;is&nbsp;a&nbsp;saturating&nbsp;compress.**&nbsp;The&nbsp;terminal&nbsp;valence&nbsp;is<br>
+&nbsp;&nbsp;normalized&nbsp;through&nbsp;the&nbsp;signed&nbsp;compress&nbsp;x/√(x²+α)&nbsp;(a&nbsp;smooth<br>
+&nbsp;&nbsp;odd&nbsp;sigmoid&nbsp;—&nbsp;the&nbsp;report&nbsp;map&nbsp;is&nbsp;compressive&nbsp;like&nbsp;every&nbsp;affect<br>
+&nbsp;&nbsp;readout).&nbsp;Positive/negative/neutral&nbsp;proportions&nbsp;are&nbsp;the&nbsp;valence<br>
+&nbsp;&nbsp;masses&nbsp;of&nbsp;the&nbsp;trajectory&nbsp;normalized&nbsp;against&nbsp;token&nbsp;mass.<br>
+&nbsp;<br>
+Word&nbsp;valences&nbsp;remain&nbsp;learned&nbsp;(``LEARNED_LEXICON``);&nbsp;the&nbsp;function-word<br>
+operator&nbsp;table&nbsp;is&nbsp;grammar,&nbsp;not&nbsp;meaning&nbsp;—&nbsp;"not",&nbsp;"very",&nbsp;"but"&nbsp;are<br>
+syntactic&nbsp;operators&nbsp;in&nbsp;every&nbsp;speaker&nbsp;of&nbsp;English,&nbsp;which&nbsp;is&nbsp;exactly&nbsp;the<br>
+kind&nbsp;of&nbsp;seed&nbsp;the&nbsp;project&nbsp;allows:&nbsp;building&nbsp;blocks,&nbsp;not&nbsp;answers.<br>
+&nbsp;<br>
+References:&nbsp;Russell&nbsp;(1980);&nbsp;Barrett&nbsp;&amp;&nbsp;Russell&nbsp;(1999);&nbsp;Smolensky<br>
+(1990)&nbsp;tensor-product&nbsp;semantics;&nbsp;Oravecz&nbsp;&amp;&nbsp;Tuerlinckx&nbsp;(2011)&nbsp;and<br>
+Kuppens,&nbsp;Oravecz&nbsp;&amp;&nbsp;Tuerlinckx&nbsp;(2010),&nbsp;feelings&nbsp;as&nbsp;a&nbsp;linear&nbsp;dynamical<br>
+system.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="math.html">math</a><br>
+</td><td class="multicolumn"><a href="numpy.html">numpy</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-analyze_sentiment"><strong>analyze_sentiment</strong></a>(text: 'str') -&gt; 'dict'</dt><dd><span class="code">Appraise&nbsp;the&nbsp;affect&nbsp;of&nbsp;a&nbsp;text&nbsp;in&nbsp;valence–arousal&nbsp;space.<br>
+&nbsp;<br>
+The&nbsp;trajectory&nbsp;folds&nbsp;operator-applied&nbsp;affect&nbsp;vectors;&nbsp;the&nbsp;report<br>
+compresses&nbsp;the&nbsp;terminal&nbsp;valence&nbsp;and&nbsp;reads&nbsp;the&nbsp;valence&nbsp;masses.<br>
+&nbsp;<br>
+Returns&nbsp;a&nbsp;dict&nbsp;with:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;compound:&nbsp;compressed&nbsp;terminal&nbsp;valence<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;arousal:&nbsp;compressed&nbsp;terminal&nbsp;arousal<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;positive:&nbsp;positive&nbsp;valence&nbsp;mass&nbsp;proportion<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;negative:&nbsp;negative&nbsp;valence&nbsp;mass&nbsp;proportion<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;neutral:&nbsp;unaffective&nbsp;mass&nbsp;proportion<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;sentiment_words:&nbsp;int&nbsp;—&nbsp;affect&nbsp;vectors&nbsp;that&nbsp;entered&nbsp;the&nbsp;fold</span></dd></dl>
+ <dl><dt><a name="-clear_learned_sentiment"><strong>clear_learned_sentiment</strong></a>() -&gt; 'None'</dt><dd><span class="code">Clear&nbsp;the&nbsp;learned&nbsp;overlay&nbsp;(tests&nbsp;/&nbsp;fresh-start&nbsp;only).</span></dd></dl>
+ <dl><dt><a name="-has_learned_sentiment"><strong>has_learned_sentiment</strong></a>(word: 'str') -&gt; 'bool'</dt><dd><span class="code">True&nbsp;when&nbsp;the&nbsp;word&nbsp;has&nbsp;a&nbsp;learned&nbsp;(non-seed)&nbsp;sentiment&nbsp;score.</span></dd></dl>
+ <dl><dt><a name="-learn_sentiment"><strong>learn_sentiment</strong></a>(word: 'str', score: 'float') -&gt; 'None'</dt><dd><span class="code">Register&nbsp;a&nbsp;learned&nbsp;sentiment&nbsp;score,&nbsp;overriding&nbsp;the&nbsp;seed&nbsp;lexicon.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;word:&nbsp;Single&nbsp;word&nbsp;(case-insensitive,&nbsp;stored&nbsp;lowercased).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;score:&nbsp;Learned&nbsp;valence.&nbsp;Positive&nbsp;=&nbsp;pleasant,&nbsp;negative&nbsp;=<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;unpleasant.&nbsp;Finite&nbsp;scores&nbsp;are&nbsp;stored&nbsp;unchanged.</span></dd></dl>
+ <dl><dt><a name="-lookup_sentiment"><strong>lookup_sentiment</strong></a>(word: 'str') -&gt; 'float | None'</dt><dd><span class="code">Look&nbsp;up&nbsp;a&nbsp;word's&nbsp;sentiment:&nbsp;learned&nbsp;first,&nbsp;seed&nbsp;lexicon&nbsp;fallback.<br>
+&nbsp;<br>
+Returns&nbsp;None&nbsp;when&nbsp;neither&nbsp;source&nbsp;knows&nbsp;the&nbsp;word.</span></dd></dl>
+ <dl><dt><a name="-set_core_affect"><strong>set_core_affect</strong></a>(valence: 'float' = 0.0, arousal: 'float' = 0.0) -&gt; 'None'</dt><dd><span class="code">Set&nbsp;the&nbsp;organism's&nbsp;standing&nbsp;affective&nbsp;state&nbsp;(core&nbsp;affect).<br>
+&nbsp;<br>
+The&nbsp;fold&nbsp;starts&nbsp;at&nbsp;this&nbsp;point,&nbsp;so&nbsp;the&nbsp;same&nbsp;stimulus&nbsp;appraises<br>
+differently&nbsp;in&nbsp;an&nbsp;aroused&nbsp;body&nbsp;than&nbsp;a&nbsp;calm&nbsp;one&nbsp;—&nbsp;the&nbsp;misattribution<br>
+term&nbsp;of&nbsp;emotion.&nbsp;Finite&nbsp;values&nbsp;are&nbsp;retained&nbsp;unchanged.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>CONTRASTIVES</strong> = frozenset({'although', 'but', 'except', 'however', 'nevertheless', 'nonetheless', ...})<br>
+<strong>DIMINISHERS</strong> = {'barely': 0.4, 'bit': 0.7, 'fairly': 0.8, 'hardly': 0.4, 'kinda': 0.7, 'less': 0.6, 'little': 0.7, 'marginally': 0.5, 'mildly': 0.6, 'moderately': 0.7, ...}<br>
+<strong>INTENSIFIERS</strong> = {'absolutely': 1.8, 'awfully': 1.5, 'completely': 1.7, 'deeply': 1.6, 'especially': 1.4, 'exceptionally': 1.7, 'extremely': 1.8, 'highly': 1.6, 'hugely': 1.5, 'incredibly': 1.7, ...}<br>
+<strong>LEARNED_LEXICON</strong> = {}<br>
+<strong>LEXICON</strong> = {}<br>
+<strong>MODIFIER_PHRASES</strong> = {('a', 'bit'): 0.7, ('a', 'great', 'deal'): 1.5, ('a', 'little'): 0.7, ('a', 'lot'): 1.5, ('a', 'tad'): 0.5, ('a', 'touch'): 0.6, ('kind', 'of'): 0.7, ('sort', 'of'): 0.7, ('very', 'much'): 1.4}<br>
+<strong>NEGATIONS</strong> = frozenset({'arent', 'cannot', 'cant', 'couldnt', 'didnt', 'doesnt', ...})<br>
+<strong>__annotations__</strong> = {'CONTRASTIVES': 'frozenset[str]', 'DIMINISHERS': 'dict[str, float]', 'INTENSIFIERS': 'dict[str, float]', 'LEARNED_LEXICON': 'dict[str, float]', 'LEXICON': 'dict[str, float]', 'MODIFIER_PHRASES': 'dict[tuple[str, ...], float]', 'NEGATIONS': 'frozenset[str]', '_CORE_AFFECT': 'tuple[float, float]'}</td></tr></table>
+</body></html>

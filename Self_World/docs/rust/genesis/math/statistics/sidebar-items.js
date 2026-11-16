@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["arithmetic_mean","geometric_mean","harmonic_mean","median","percentile","power_mean","summarize","variance"],"struct":["StatSummary"]};

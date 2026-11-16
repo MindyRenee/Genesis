@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.frontal_lobe.reasoning.decision</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.frontal_lobe.html" class="white">frontal_lobe</a>.<a href="Self_World.frontal_lobe.reasoning.html" class="white">reasoning</a>.decision</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/reasoning/decision.py">/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/reasoning/decision.py</a></td></tr></table>
+    <p><span class="code">Decision-making&nbsp;—&nbsp;selecting&nbsp;among&nbsp;alternatives&nbsp;based&nbsp;on&nbsp;evidence,<br>
+goals,&nbsp;uncertainty,&nbsp;and&nbsp;values.<br>
+&nbsp;<br>
+Genesis&nbsp;had&nbsp;a&nbsp;generation&nbsp;pipeline:&nbsp;perceive&nbsp;→&nbsp;classify&nbsp;intent&nbsp;→&nbsp;match<br>
+rule&nbsp;in&nbsp;priority&nbsp;tree&nbsp;→&nbsp;generate&nbsp;response&nbsp;→&nbsp;modulate&nbsp;confidence.&nbsp;It<br>
+did&nbsp;not&nbsp;have&nbsp;a&nbsp;decision&nbsp;process:&nbsp;generate&nbsp;alternatives&nbsp;→&nbsp;evaluate<br>
+against&nbsp;criteria&nbsp;→&nbsp;select&nbsp;the&nbsp;best.&nbsp;Every&nbsp;"decision-making"&nbsp;component<br>
+(DDM,&nbsp;executive,&nbsp;TD&nbsp;learning,&nbsp;probabilistic&nbsp;reasoning)&nbsp;was&nbsp;wired&nbsp;as&nbsp;a<br>
+modulator&nbsp;of&nbsp;an&nbsp;already-chosen&nbsp;response,&nbsp;not&nbsp;as&nbsp;a&nbsp;selector&nbsp;among<br>
+alternatives.<br>
+&nbsp;<br>
+This&nbsp;module&nbsp;closes&nbsp;that&nbsp;gap&nbsp;with&nbsp;a&nbsp;**decision&nbsp;engine**&nbsp;that:<br>
+&nbsp;<br>
+1.&nbsp;**Generates&nbsp;candidate&nbsp;actions**&nbsp;—&nbsp;for&nbsp;each&nbsp;turn,&nbsp;enumerate&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;plausible&nbsp;actions&nbsp;Genesis&nbsp;could&nbsp;take&nbsp;(answer,&nbsp;ask&nbsp;for&nbsp;clarification,<br>
+&nbsp;&nbsp;&nbsp;reflect,&nbsp;acknowledge,&nbsp;etc.).<br>
+&nbsp;<br>
+2.&nbsp;**Evaluates&nbsp;each&nbsp;candidate&nbsp;against&nbsp;multiple&nbsp;criteria**&nbsp;—&nbsp;evidence<br>
+&nbsp;&nbsp;&nbsp;strength,&nbsp;goal&nbsp;relevance,&nbsp;uncertainty,&nbsp;expected&nbsp;value,&nbsp;and&nbsp;a&nbsp;value<br>
+&nbsp;&nbsp;&nbsp;framework&nbsp;(accuracy,&nbsp;honesty,&nbsp;helpfulness,&nbsp;curiosity,&nbsp;safety).<br>
+&nbsp;<br>
+3.&nbsp;**Selects&nbsp;the&nbsp;best**&nbsp;—&nbsp;the&nbsp;candidate&nbsp;with&nbsp;the&nbsp;highest&nbsp;multi-criteria<br>
+&nbsp;&nbsp;&nbsp;score&nbsp;wins.&nbsp;This&nbsp;replaces&nbsp;the&nbsp;first-match-wins&nbsp;deliberation&nbsp;tree<br>
+&nbsp;&nbsp;&nbsp;with&nbsp;genuine&nbsp;selection&nbsp;among&nbsp;alternatives.<br>
+&nbsp;<br>
+4.&nbsp;**Switches&nbsp;actions&nbsp;under&nbsp;uncertainty**&nbsp;—&nbsp;when&nbsp;confidence&nbsp;in&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;primary&nbsp;action&nbsp;is&nbsp;low&nbsp;and&nbsp;uncertainty&nbsp;is&nbsp;high,&nbsp;the&nbsp;engine&nbsp;switches<br>
+&nbsp;&nbsp;&nbsp;to&nbsp;a&nbsp;more&nbsp;appropriate&nbsp;action&nbsp;(e.g.,&nbsp;from&nbsp;answering&nbsp;to&nbsp;asking&nbsp;for<br>
+&nbsp;&nbsp;&nbsp;clarification).<br>
+&nbsp;<br>
+5.&nbsp;**Consults&nbsp;the&nbsp;TD&nbsp;value&nbsp;function**&nbsp;—&nbsp;before&nbsp;committing,&nbsp;the&nbsp;engine<br>
+&nbsp;&nbsp;&nbsp;queries&nbsp;``predict_value()``&nbsp;for&nbsp;the&nbsp;candidate's&nbsp;resulting&nbsp;state,<br>
+&nbsp;&nbsp;&nbsp;incorporating&nbsp;learned&nbsp;value&nbsp;into&nbsp;the&nbsp;decision.<br>
+&nbsp;<br>
+6.&nbsp;**Applies&nbsp;executive&nbsp;inhibition**&nbsp;—&nbsp;the&nbsp;executive's<br>
+&nbsp;&nbsp;&nbsp;``inhibit_response()``&nbsp;can&nbsp;suppress&nbsp;a&nbsp;prepotent&nbsp;response,&nbsp;allowing<br>
+&nbsp;&nbsp;&nbsp;the&nbsp;system&nbsp;to&nbsp;withhold&nbsp;action&nbsp;when&nbsp;appropriate.<br>
+&nbsp;<br>
+##&nbsp;Integration<br>
+&nbsp;<br>
+The&nbsp;engine&nbsp;is&nbsp;wired&nbsp;into&nbsp;the&nbsp;cognition&nbsp;engine&nbsp;as<br>
+``self.<strong>decision_engine</strong>``&nbsp;and&nbsp;called&nbsp;after&nbsp;deliberation.&nbsp;The<br>
+deliberation&nbsp;tree&nbsp;still&nbsp;produces&nbsp;a&nbsp;*default*&nbsp;action&nbsp;(preserving<br>
+traceability),&nbsp;but&nbsp;the&nbsp;decision&nbsp;engine&nbsp;can&nbsp;override&nbsp;it&nbsp;when&nbsp;another<br>
+candidate&nbsp;scores&nbsp;higher.&nbsp;The&nbsp;DDM&nbsp;then&nbsp;accumulates&nbsp;real&nbsp;evidence&nbsp;for<br>
+each&nbsp;competing&nbsp;option,&nbsp;and&nbsp;the&nbsp;winner&nbsp;actually&nbsp;determines&nbsp;the&nbsp;action.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="random.html">random</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.decision.html#CandidateAction">CandidateAction</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.decision.html#DecisionMaker">DecisionMaker</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.decision.html#DecisionOutcome">DecisionOutcome</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.decision.html#ResourceState">ResourceState</a>
+</dt></dl>
+</dd>
+<dt class="heading-text"><a href="enum.html#Enum">enum.Enum</a>(<a href="builtins.html#object">builtins.object</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.decision.html#ActionType">ActionType</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ActionType">class <strong>ActionType</strong></a>(<a href="enum.html#Enum">enum.Enum</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ActionType">ActionType</a>(*values)<br>
+&nbsp;<br>
+The&nbsp;kinds&nbsp;of&nbsp;actions&nbsp;Genesis&nbsp;can&nbsp;take&nbsp;in&nbsp;response&nbsp;to&nbsp;input.<br>
+&nbsp;<br>
+These&nbsp;are&nbsp;the&nbsp;*action&nbsp;types*&nbsp;—&nbsp;the&nbsp;high-level&nbsp;decision&nbsp;of&nbsp;what&nbsp;to<br>
+do.&nbsp;The&nbsp;language&nbsp;engine&nbsp;then&nbsp;generates&nbsp;the&nbsp;specific&nbsp;words&nbsp;for&nbsp;the<br>
+chosen&nbsp;action.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.frontal_lobe.reasoning.decision.html#ActionType">ActionType</a></dd>
+<dd><a href="enum.html#Enum">enum.Enum</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>ACKNOWLEDGE</strong> = &lt;ActionType.ACKNOWLEDGE: 'acknowledge'&gt;</dl>
+
+<dl><dt><strong>ANSWER</strong> = &lt;ActionType.ANSWER: 'answer'&gt;</dl>
+
+<dl><dt><strong>ASK</strong> = &lt;ActionType.ASK: 'ask'&gt;</dl>
+
+<dl><dt><strong>EMPATHIZE</strong> = &lt;ActionType.EMPATHIZE: 'empathize'&gt;</dl>
+
+<dl><dt><strong>GREET</strong> = &lt;ActionType.GREET: 'greet'&gt;</dl>
+
+<dl><dt><strong>INVESTIGATE</strong> = &lt;ActionType.INVESTIGATE: 'investigate'&gt;</dl>
+
+<dl><dt><strong>REFLECT</strong> = &lt;ActionType.REFLECT: 'reflect'&gt;</dl>
+
+<dl><dt><strong>WITHHOLD</strong> = &lt;ActionType.WITHHOLD: 'withhold'&gt;</dl>
+
+<hr>
+Data descriptors inherited from <a href="enum.html#Enum">enum.Enum</a>:<br>
+<dl><dt><strong>name</strong></dt>
+<dd><span class="code">The&nbsp;name&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<dl><dt><strong>value</strong></dt>
+<dd><span class="code">The&nbsp;value&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<hr>
+Static methods inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><a name="ActionType-__contains__"><strong>__contains__</strong></a>(value)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;`value`&nbsp;is&nbsp;in&nbsp;`cls`.<br>
+&nbsp;<br>
+`value`&nbsp;is&nbsp;in&nbsp;`cls`&nbsp;if:<br>
+1)&nbsp;`value`&nbsp;is&nbsp;a&nbsp;member&nbsp;of&nbsp;`cls`,&nbsp;or<br>
+2)&nbsp;`value`&nbsp;is&nbsp;the&nbsp;value&nbsp;of&nbsp;one&nbsp;of&nbsp;the&nbsp;`cls`'s&nbsp;members.</span></dd></dl>
+
+<dl><dt><a name="ActionType-__getitem__"><strong>__getitem__</strong></a>(name)</dt><dd><span class="code">Return&nbsp;the&nbsp;member&nbsp;matching&nbsp;`name`.</span></dd></dl>
+
+<dl><dt><a name="ActionType-__iter__"><strong>__iter__</strong></a>()</dt><dd><span class="code">Return&nbsp;members&nbsp;in&nbsp;definition&nbsp;order.</span></dd></dl>
+
+<dl><dt><a name="ActionType-__len__"><strong>__len__</strong></a>()</dt><dd><span class="code">Return&nbsp;the&nbsp;number&nbsp;of&nbsp;members&nbsp;(no&nbsp;aliases)</span></dd></dl>
+
+<hr>
+Readonly properties inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><strong>__members__</strong></dt>
+<dd><span class="code">Returns&nbsp;a&nbsp;mapping&nbsp;of&nbsp;member&nbsp;name-&gt;value.<br>
+&nbsp;<br>
+This&nbsp;mapping&nbsp;lists&nbsp;all&nbsp;enum&nbsp;members,&nbsp;including&nbsp;aliases.&nbsp;Note&nbsp;that&nbsp;this<br>
+is&nbsp;a&nbsp;read-only&nbsp;view&nbsp;of&nbsp;the&nbsp;internal&nbsp;mapping.</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="CandidateAction">class <strong>CandidateAction</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#CandidateAction">CandidateAction</a>(action_type:&nbsp;'<a href="#ActionType">ActionType</a>',&nbsp;criteria_scores:&nbsp;'dict[str,&nbsp;float]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;composite_score:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;confidence:&nbsp;'float'&nbsp;=&nbsp;0.5,&nbsp;rationale:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;td_value:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;inhibited:&nbsp;'bool'&nbsp;=&nbsp;False,&nbsp;bg_disinhibition:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;bg_conflict:&nbsp;'float'&nbsp;=&nbsp;0.0)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;candidate&nbsp;action&nbsp;evaluated&nbsp;by&nbsp;the&nbsp;decision&nbsp;engine.<br>
+&nbsp;<br>
+Each&nbsp;candidate&nbsp;has&nbsp;an&nbsp;action&nbsp;type,&nbsp;a&nbsp;set&nbsp;of&nbsp;criteria&nbsp;scores,&nbsp;and&nbsp;a<br>
+composite&nbsp;score&nbsp;that&nbsp;combines&nbsp;them.&nbsp;The&nbsp;candidate&nbsp;with&nbsp;the&nbsp;highest<br>
+composite&nbsp;score&nbsp;is&nbsp;selected.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="CandidateAction-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="CandidateAction-__init__"><strong>__init__</strong></a>(self, action_type: 'ActionType', criteria_scores: 'dict[str, float]' = &lt;factory&gt;, composite_score: 'float' = 0.0, confidence: 'float' = 0.5, rationale: 'str' = '', td_value: 'float' = 0.0, inhibited: 'bool' = False, bg_disinhibition: 'float' = 0.0, bg_conflict: 'float' = 0.0) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="CandidateAction-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="CandidateAction-score"><strong>score</strong></a>(self, criterion: 'str') -&gt; 'float'</dt><dd><span class="code">Get&nbsp;the&nbsp;score&nbsp;for&nbsp;a&nbsp;specific&nbsp;criterion.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>action_type</strong></dt>
+</dl>
+<dl><dt><strong>bg_conflict</strong></dt>
+</dl>
+<dl><dt><strong>bg_disinhibition</strong></dt>
+</dl>
+<dl><dt><strong>composite_score</strong></dt>
+</dl>
+<dl><dt><strong>confidence</strong></dt>
+</dl>
+<dl><dt><strong>criteria_scores</strong></dt>
+</dl>
+<dl><dt><strong>inhibited</strong></dt>
+</dl>
+<dl><dt><strong>rationale</strong></dt>
+</dl>
+<dl><dt><strong>td_value</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'action_type': 'ActionType', 'bg_conflict': 'float', 'bg_disinhibition': 'float', 'composite_score': 'float', 'confidence': 'float', 'criteria_scores': 'dict[str, float]', 'inhibited': 'bool', 'rationale': 'str', 'td_value': 'float'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'action_type': Field(name='action_type',type='ActionType',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'bg_conflict': Field(name='bg_conflict',type='float',default=0....appingproxy({}),kw_only=False,_field_type=_FIELD), 'bg_disinhibition': Field(name='bg_disinhibition',type='float',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'composite_score': Field(name='composite_score',type='float',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'confidence': Field(name='confidence',type='float',default=0.5...appingproxy({}),kw_only=False,_field_type=_FIELD), 'criteria_scores': Field(name='criteria_scores',type='dict[str, flo...appingproxy({}),kw_only=False,_field_type=_FIELD), 'inhibited': Field(name='inhibited',type='bool',default=False...appingproxy({}),kw_only=False,_field_type=_FIELD), 'rationale': Field(name='rationale',type='str',default='',def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'td_value': Field(name='td_value',type='float',default=0.0,d...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('action_type', 'criteria_scores', 'composite_score', 'confidence', 'rationale', 'td_value', 'inhibited', 'bg_disinhibition', 'bg_conflict')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="DecisionMaker">class <strong>DecisionMaker</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#DecisionMaker">DecisionMaker</a>(network:&nbsp;'ConceptNetwork',&nbsp;executive:&nbsp;'ExecutiveFunction&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;td_learner:&nbsp;'TDLearner&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;value_weights:&nbsp;'dict[str,&nbsp;float]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;resource_state:&nbsp;'<a href="#ResourceState">ResourceState</a>&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Selects&nbsp;among&nbsp;candidate&nbsp;actions&nbsp;based&nbsp;on&nbsp;multiple&nbsp;criteria.<br>
+&nbsp;<br>
+Class-level&nbsp;constants&nbsp;for&nbsp;the&nbsp;neuromodulatory&nbsp;exploration&nbsp;gate<br>
+(see&nbsp;``set_exploration``):&nbsp;``NE_BASELINE``&nbsp;is&nbsp;the&nbsp;daemon's&nbsp;tonic<br>
+NE&nbsp;resting&nbsp;level,&nbsp;``EXPLORATION_GAIN``&nbsp;converts&nbsp;excess&nbsp;tonic&nbsp;NE<br>
+into&nbsp;Gaussian&nbsp;noise&nbsp;variance&nbsp;on&nbsp;the&nbsp;disinhibition&nbsp;scores.<br>
+&nbsp;<br>
+Given&nbsp;a&nbsp;context&nbsp;(perception&nbsp;intent,&nbsp;reasoning&nbsp;results,&nbsp;goals,<br>
+uncertainty),&nbsp;the&nbsp;engine:<br>
+&nbsp;<br>
+1.&nbsp;Generates&nbsp;candidate&nbsp;actions.<br>
+2.&nbsp;Evaluates&nbsp;each&nbsp;against&nbsp;multiple&nbsp;criteria&nbsp;(evidence&nbsp;strength,<br>
+&nbsp;&nbsp;&nbsp;goal&nbsp;relevance,&nbsp;uncertainty,&nbsp;expected&nbsp;value,&nbsp;values).<br>
+3.&nbsp;Optionally&nbsp;consults&nbsp;the&nbsp;TD&nbsp;value&nbsp;function&nbsp;for&nbsp;each&nbsp;candidate.<br>
+4.&nbsp;Selects&nbsp;the&nbsp;highest-scoring&nbsp;candidate.<br>
+5.&nbsp;Applies&nbsp;executive&nbsp;inhibition&nbsp;if&nbsp;the&nbsp;best&nbsp;score&nbsp;is&nbsp;too&nbsp;low.<br>
+6.&nbsp;Switches&nbsp;actions&nbsp;under&nbsp;high&nbsp;uncertainty.<br>
+&nbsp;<br>
+This&nbsp;replaces&nbsp;the&nbsp;first-match-wins&nbsp;deliberation&nbsp;tree&nbsp;with&nbsp;genuine<br>
+multi-criteria&nbsp;selection&nbsp;among&nbsp;alternatives.<br>
+&nbsp;<br>
+Usage::<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;decision&nbsp;=&nbsp;<a href="#DecisionMaker">DecisionMaker</a>(network,&nbsp;executive,&nbsp;td_learner)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;result&nbsp;=&nbsp;decision.<a href="#DecisionMaker-decide">decide</a>(<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;default_action=<a href="#ActionType">ActionType</a>.ANSWER,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;reasoning_results=results,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;confidence=0.7,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;uncertainty=0.2,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;goals=["understand&nbsp;photosynthesis"],<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;topics=["photosynthesis"],<br>
+&nbsp;&nbsp;&nbsp;&nbsp;)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;result.action_type&nbsp;==&nbsp;<a href="#ActionType">ActionType</a>.ASK:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;Genesis&nbsp;decided&nbsp;to&nbsp;ask&nbsp;for&nbsp;clarification&nbsp;instead&nbsp;of&nbsp;answering<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;...<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="DecisionMaker-__init__"><strong>__init__</strong></a>(self, network: 'ConceptNetwork', executive: 'ExecutiveFunction | None' = None, td_learner: 'TDLearner | None' = None, value_weights: 'dict[str, float] | None' = None, resource_state: 'ResourceState | None' = None) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;decision&nbsp;engine.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;network:&nbsp;The&nbsp;concept&nbsp;network&nbsp;—&nbsp;for&nbsp;checking&nbsp;concept<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;existence&nbsp;and&nbsp;confidence.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;executive:&nbsp;The&nbsp;executive&nbsp;function&nbsp;—&nbsp;for&nbsp;response&nbsp;inhibition.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;None,&nbsp;inhibition&nbsp;is&nbsp;skipped.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;td_learner:&nbsp;The&nbsp;TD&nbsp;learner&nbsp;—&nbsp;for&nbsp;value&nbsp;lookup&nbsp;before<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;commitment.&nbsp;If&nbsp;None,&nbsp;TD&nbsp;values&nbsp;are&nbsp;not&nbsp;consulted.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;value_weights:&nbsp;Custom&nbsp;weights&nbsp;for&nbsp;the&nbsp;value&nbsp;criteria.&nbsp;If<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;None,&nbsp;default&nbsp;weights&nbsp;are&nbsp;used.</span></dd></dl>
+
+<dl><dt><a name="DecisionMaker-decide"><strong>decide</strong></a>(self, default_action: 'ActionType', reasoning_results: 'list[ReasoningResult] | None' = None, confidence: 'float' = 0.7, uncertainty: 'float' = 0.2, goals: 'list[str] | None' = None, topics: 'list[str] | None' = None, perception_intent: 'str' = '') -&gt; 'DecisionOutcome'</dt><dd><span class="code">Make&nbsp;a&nbsp;decision&nbsp;among&nbsp;candidate&nbsp;actions.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;main&nbsp;entry&nbsp;point.&nbsp;Given&nbsp;a&nbsp;default&nbsp;action&nbsp;(from&nbsp;the<br>
+deliberation&nbsp;tree),&nbsp;the&nbsp;engine&nbsp;evaluates&nbsp;all&nbsp;candidates&nbsp;and<br>
+selects&nbsp;the&nbsp;best&nbsp;one.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;default_action:&nbsp;The&nbsp;action&nbsp;the&nbsp;deliberation&nbsp;tree&nbsp;chose.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;reasoning_results:&nbsp;The&nbsp;reasoning&nbsp;results&nbsp;available.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;confidence:&nbsp;Confidence&nbsp;in&nbsp;the&nbsp;default&nbsp;action.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;uncertainty:&nbsp;Uncertainty&nbsp;about&nbsp;the&nbsp;response&nbsp;(0..1).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;goals:&nbsp;Active&nbsp;goals.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;topics:&nbsp;Topics&nbsp;in&nbsp;the&nbsp;current&nbsp;context.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;perception_intent:&nbsp;The&nbsp;perceived&nbsp;intent&nbsp;of&nbsp;the&nbsp;input.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;<a href="#DecisionOutcome">DecisionOutcome</a>&nbsp;with&nbsp;the&nbsp;selected&nbsp;action&nbsp;and&nbsp;rationale.</span></dd></dl>
+
+<dl><dt><a name="DecisionMaker-restore_from_dict"><strong>restore_from_dict</strong></a>(self, data: 'dict[str, object]') -&gt; 'None'</dt><dd><span class="code">Restore&nbsp;state&nbsp;from&nbsp;persistence.</span></dd></dl>
+
+<dl><dt><a name="DecisionMaker-set_exploration"><strong>set_exploration</strong></a>(self, norepinephrine: 'float | None') -&gt; 'None'</dt><dd><span class="code">Set&nbsp;the&nbsp;body's&nbsp;tonic&nbsp;norepinephrine&nbsp;level&nbsp;for&nbsp;exploration.<br>
+&nbsp;<br>
+NE&nbsp;controls&nbsp;the&nbsp;randomness&nbsp;of&nbsp;action&nbsp;selection&nbsp;(Doya,&nbsp;2002):<br>
+elevated&nbsp;tonic&nbsp;LC-NE&nbsp;is&nbsp;the&nbsp;exploration&nbsp;mode&nbsp;—&nbsp;it&nbsp;widens&nbsp;the<br>
+search&nbsp;over&nbsp;candidate&nbsp;actions&nbsp;instead&nbsp;of&nbsp;always&nbsp;committing&nbsp;to<br>
+the&nbsp;argmax&nbsp;disinhibition&nbsp;(Aston-Jones&nbsp;&amp;&nbsp;Cohen,&nbsp;2005).&nbsp;At&nbsp;or<br>
+below&nbsp;the&nbsp;daemon's&nbsp;tonic&nbsp;baseline&nbsp;the&nbsp;noise&nbsp;variance&nbsp;is&nbsp;zero<br>
+and&nbsp;selection&nbsp;is&nbsp;exactly&nbsp;the&nbsp;deterministic&nbsp;competition.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;norepinephrine:&nbsp;Effective&nbsp;NE&nbsp;level&nbsp;in&nbsp;[0,&nbsp;1],&nbsp;or&nbsp;None&nbsp;to<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;to&nbsp;deterministic&nbsp;selection.</span></dd></dl>
+
+<dl><dt><a name="DecisionMaker-set_vigor"><strong>set_vigor</strong></a>(self, level: 'float | None') -&gt; 'None'</dt><dd><span class="code">Set&nbsp;the&nbsp;tonic-dopamine&nbsp;vigor&nbsp;signal&nbsp;for&nbsp;action&nbsp;selection.<br>
+&nbsp;<br>
+Niv&nbsp;et&nbsp;al.&nbsp;(2007)&nbsp;identify&nbsp;tonic&nbsp;DA&nbsp;with&nbsp;the&nbsp;average&nbsp;reward<br>
+rate&nbsp;ρ̄&nbsp;—&nbsp;the&nbsp;opportunity&nbsp;cost&nbsp;of&nbsp;time.&nbsp;High&nbsp;vigor&nbsp;lowers&nbsp;the<br>
+basal-ganglia&nbsp;release&nbsp;threshold&nbsp;(the&nbsp;system&nbsp;acts&nbsp;readily);<br>
+low&nbsp;vigor&nbsp;raises&nbsp;it&nbsp;(the&nbsp;system&nbsp;withholds).&nbsp;Fed&nbsp;from<br>
+``TDLearner.average_reward_rate()``.&nbsp;``None``&nbsp;resets&nbsp;to&nbsp;no<br>
+vigor&nbsp;modulation.</span></dd></dl>
+
+<dl><dt><a name="DecisionMaker-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict[str, object]'</dt><dd><span class="code">Serialize&nbsp;state&nbsp;for&nbsp;persistence.</span></dd></dl>
+
+<dl><dt><a name="DecisionMaker-update_resource_state"><strong>update_resource_state</strong></a>(self, state: 'ResourceState | None') -&gt; 'None'</dt><dd><span class="code">Update&nbsp;the&nbsp;latest&nbsp;embodied&nbsp;constraint&nbsp;snapshot.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>decisions</strong></dt>
+<dd><span class="code">All&nbsp;decisions&nbsp;ever&nbsp;made&nbsp;(copy).</span></dd>
+</dl>
+<dl><dt><strong>inhibition_count</strong></dt>
+<dd><span class="code">Times&nbsp;a&nbsp;response&nbsp;was&nbsp;inhibited.</span></dd>
+</dl>
+<dl><dt><strong>override_count</strong></dt>
+<dd><span class="code">Times&nbsp;the&nbsp;decision&nbsp;overrode&nbsp;the&nbsp;deliberation&nbsp;default.</span></dd>
+</dl>
+<dl><dt><strong>uncertainty_switch_count</strong></dt>
+<dd><span class="code">Times&nbsp;an&nbsp;action&nbsp;was&nbsp;switched&nbsp;due&nbsp;to&nbsp;uncertainty.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>EXPLORATION_GAIN</strong> = 0.5</dl>
+
+<dl><dt><strong>NE_BASELINE</strong> = 0.3</dl>
+
+<dl><dt><strong>__annotations__</strong> = {'EXPLORATION_GAIN': 'float', 'NE_BASELINE': 'float'}</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="DecisionOutcome">class <strong>DecisionOutcome</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#DecisionOutcome">DecisionOutcome</a>(selected:&nbsp;'<a href="#CandidateAction">CandidateAction</a>',&nbsp;candidates:&nbsp;'list[<a href="#CandidateAction">CandidateAction</a>]',&nbsp;overridden_default:&nbsp;'bool',&nbsp;inhibition_applied:&nbsp;'bool'&nbsp;=&nbsp;False,&nbsp;uncertainty_switched:&nbsp;'bool'&nbsp;=&nbsp;False,&nbsp;notes:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;conflict:&nbsp;'float'&nbsp;=&nbsp;0.0)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;result&nbsp;of&nbsp;a&nbsp;decision&nbsp;—&nbsp;which&nbsp;action&nbsp;was&nbsp;selected&nbsp;and&nbsp;why.<br>
+&nbsp;<br>
+Contains&nbsp;the&nbsp;selected&nbsp;action,&nbsp;all&nbsp;evaluated&nbsp;candidates&nbsp;(for<br>
+introspection),&nbsp;and&nbsp;the&nbsp;reasoning&nbsp;behind&nbsp;the&nbsp;selection.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="DecisionOutcome-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="DecisionOutcome-__init__"><strong>__init__</strong></a>(self, selected: 'CandidateAction', candidates: 'list[CandidateAction]', overridden_default: 'bool', inhibition_applied: 'bool' = False, uncertainty_switched: 'bool' = False, notes: 'list[str]' = &lt;factory&gt;, conflict: 'float' = 0.0) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="DecisionOutcome-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="DecisionOutcome-describe"><strong>describe</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Human-readable&nbsp;summary&nbsp;of&nbsp;the&nbsp;decision.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>action_type</strong></dt>
+<dd><span class="code">The&nbsp;selected&nbsp;action&nbsp;type.</span></dd>
+</dl>
+<dl><dt><strong>confidence</strong></dt>
+<dd><span class="code">The&nbsp;confidence&nbsp;in&nbsp;the&nbsp;selected&nbsp;action.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>candidates</strong></dt>
+</dl>
+<dl><dt><strong>conflict</strong></dt>
+</dl>
+<dl><dt><strong>inhibition_applied</strong></dt>
+</dl>
+<dl><dt><strong>notes</strong></dt>
+</dl>
+<dl><dt><strong>overridden_default</strong></dt>
+</dl>
+<dl><dt><strong>selected</strong></dt>
+</dl>
+<dl><dt><strong>uncertainty_switched</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'candidates': 'list[CandidateAction]', 'conflict': 'float', 'inhibition_applied': 'bool', 'notes': 'list[str]', 'overridden_default': 'bool', 'selected': 'CandidateAction', 'uncertainty_switched': 'bool'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'candidates': Field(name='candidates',type='list[CandidateActi...appingproxy({}),kw_only=False,_field_type=_FIELD), 'conflict': Field(name='conflict',type='float',default=0.0,d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'inhibition_applied': Field(name='inhibition_applied',type='bool',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'notes': Field(name='notes',type='list[str]',default=&lt;dat...appingproxy({}),kw_only=False,_field_type=_FIELD), 'overridden_default': Field(name='overridden_default',type='bool',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'selected': Field(name='selected',type='CandidateAction',def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'uncertainty_switched': Field(name='uncertainty_switched',type='bool',de...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('selected', 'candidates', 'overridden_default', 'inhibition_applied', 'uncertainty_switched', 'notes', 'conflict')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ResourceState">class <strong>ResourceState</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ResourceState">ResourceState</a>(available:&nbsp;'bool'&nbsp;=&nbsp;False,&nbsp;hardware_distressed:&nbsp;'bool'&nbsp;=&nbsp;False,&nbsp;psi_cpu:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;psi_io:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;psi_mem:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;throttle_state:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;on_ac_power:&nbsp;'bool'&nbsp;=&nbsp;True,&nbsp;energy_reserve:&nbsp;'float'&nbsp;=&nbsp;1.0)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Snapshot&nbsp;of&nbsp;machine-resource&nbsp;constraints&nbsp;available&nbsp;to&nbsp;cognition.<br>
+&nbsp;<br>
+This&nbsp;boundary&nbsp;<a href="builtins.html#object">object</a>&nbsp;does&nbsp;not&nbsp;invent&nbsp;thermal&nbsp;or&nbsp;battery&nbsp;thresholds:<br>
+``hardware_distressed``&nbsp;is&nbsp;the&nbsp;daemon's&nbsp;own&nbsp;verdict,&nbsp;while&nbsp;pressure<br>
+channels&nbsp;are&nbsp;kernel&nbsp;measurements.&nbsp;Missing&nbsp;data&nbsp;is&nbsp;unavailable.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ResourceState-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="ResourceState-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="ResourceState-__getstate__"><strong>__getstate__</strong></a> = _dataclass_getstate(self)<span class="grey"><span class="heading-text"> from <a href="dataclasses.html">dataclasses</a></span></span></dt><dd><span class="code">#&nbsp;_dataclass_getstate&nbsp;and&nbsp;_dataclass_setstate&nbsp;are&nbsp;needed&nbsp;for&nbsp;pickling&nbsp;frozen<br>
+#&nbsp;classes&nbsp;with&nbsp;slots.&nbsp;&nbsp;These&nbsp;could&nbsp;be&nbsp;slightly&nbsp;more&nbsp;performant&nbsp;if&nbsp;we&nbsp;generated<br>
+#&nbsp;the&nbsp;code&nbsp;instead&nbsp;of&nbsp;iterating&nbsp;over&nbsp;fields.&nbsp;&nbsp;But&nbsp;that&nbsp;can&nbsp;be&nbsp;a&nbsp;project&nbsp;for<br>
+#&nbsp;another&nbsp;day,&nbsp;if&nbsp;performance&nbsp;becomes&nbsp;an&nbsp;issue.</span></dd></dl>
+
+<dl><dt><a name="ResourceState-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="ResourceState-__init__"><strong>__init__</strong></a>(self, available: 'bool' = False, hardware_distressed: 'bool' = False, psi_cpu: 'float' = 0.0, psi_io: 'float' = 0.0, psi_mem: 'float' = 0.0, throttle_state: 'float' = 0.0, on_ac_power: 'bool' = True, energy_reserve: 'float' = 1.0) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="ResourceState-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="ResourceState-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<dl><dt><a name="ResourceState-__setstate__"><strong>__setstate__</strong></a> = _dataclass_setstate(self, state)<span class="grey"><span class="heading-text"> from <a href="dataclasses.html">dataclasses</a></span></span></dt></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>constrained</strong></dt>
+<dd><span class="code">Whether&nbsp;the&nbsp;substrate&nbsp;currently&nbsp;reports&nbsp;an&nbsp;execution&nbsp;constraint.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>available</strong></dt>
+</dl>
+<dl><dt><strong>energy_reserve</strong></dt>
+</dl>
+<dl><dt><strong>hardware_distressed</strong></dt>
+</dl>
+<dl><dt><strong>on_ac_power</strong></dt>
+</dl>
+<dl><dt><strong>psi_cpu</strong></dt>
+</dl>
+<dl><dt><strong>psi_io</strong></dt>
+</dl>
+<dl><dt><strong>psi_mem</strong></dt>
+</dl>
+<dl><dt><strong>throttle_state</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'available': 'bool', 'energy_reserve': 'float', 'hardware_distressed': 'bool', 'on_ac_power': 'bool', 'psi_cpu': 'float', 'psi_io': 'float', 'psi_mem': 'float', 'throttle_state': 'float'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'available': Field(name='available',type='bool',default=False...appingproxy({}),kw_only=False,_field_type=_FIELD), 'energy_reserve': Field(name='energy_reserve',type='float',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'hardware_distressed': Field(name='hardware_distressed',type='bool',def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'on_ac_power': Field(name='on_ac_power',type='bool',default=Tru...appingproxy({}),kw_only=False,_field_type=_FIELD), 'psi_cpu': Field(name='psi_cpu',type='float',default=0.0,de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'psi_io': Field(name='psi_io',type='float',default=0.0,def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'psi_mem': Field(name='psi_mem',type='float',default=0.0,de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'throttle_state': Field(name='throttle_state',type='float',default...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('available', 'hardware_distressed', 'psi_cpu', 'psi_io', 'psi_mem', 'throttle_state', 'on_ac_power', 'energy_reserve')</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['ActionType', 'CandidateAction', 'DecisionMaker', 'DecisionOutcome', 'ResourceState']<br>
+<strong>__annotations__</strong> = {'_DEFAULT_VALUE_WEIGHTS': 'dict[str, float]'}</td></tr></table>
+</body></html>

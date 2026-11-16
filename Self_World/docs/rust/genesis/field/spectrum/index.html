@@ -1,0 +1,49 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Spectral observables of the field’s own dynamics."><title>genesis::field::spectrum - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-203241e4.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="genesis" data-themes="" data-resource-suffix="" data-rustdoc-version="1.100.0 (0ef1bc386 2026-11-09)" data-channel="1.100.0" data-search-js="search-b167f383.js" data-stringdex-js="stringdex-b5109af9.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../../static.files/main-1814ead3.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-9f56287d.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module spectrum</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../genesis/index.html">genesis</a><span class="version">0.2.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module spectrum</a></h2><h3><a href="#structs">Module Items</a></h3><ul class="block"><li><a href="#structs" title="Structs">Structs</a></li><li><a href="#constants" title="Constants">Constants</a></li><li><a href="#functions" title="Functions">Functions</a></li></ul></section><div id="rustdoc-modnav"><h2><a href="../index.html">In genesis::<wbr>field</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../index.html">genesis</a>::<wbr><a href="../index.html">field</a></div><h1>Module <span>spectrum</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/genesis/field/spectrum.rs.html#1-527">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Spectral observables of the field’s own dynamics.</p>
+<p>The field substrate is her computational medium: three fibers —
+body, prediction, agency — drift, couple, and fluctuate on the
+latent manifold under gauge transport and a Langevin thermostat.
+This module is the band decomposition of <em>that</em> trajectory: the
+same center frequencies the cortical wave model reports, measured
+off the field’s own motion rather than assumed.</p>
+<p>Two channels mirror the substrate’s two honest observables:</p>
+<ul>
+<li><strong>flux</strong> — the speed of the fibers’ centroid through latent
+space (|Δmean|/h per integration substep). The field’s motion
+energy per band: how much of its wandering lives at each
+rhythm.</li>
+<li><strong>tension</strong> — the fibers’ mean deviation from their own
+centroid (latent-coordinate spread). The disagreement’s
+spectral shadow: where the field’s internal argument oscillates.</li>
+</ul>
+<p>The carrier block tracks the consensus vector’s own kinematics —
+displacement speed, winding rate, accumulated winding phase —
+the same measured quantities <code>daemon::maxwell</code> evaluates, kept
+here so the spectrum and the signature read one trajectory.</p>
+<p>Sampling is the field’s own integration rate: <code>observe</code> substeps
+the coupling at <a href="constant.SPECTRUM_STEP_HZ.html" title="constant genesis::field::spectrum::SPECTRUM_STEP_HZ"><code>SPECTRUM_STEP_HZ</code></a>, so the rings resolve the
+modeled continuous dynamics — the same ODEs integrated finer,
+which is more accurate, not a second instrument. Bands above the
+achieved rate’s Nyquist bound are zeroed: an unresolvable band
+is an absent channel, never an aliased reading.</p>
+</div></details><h2 id="structs" class="section-header">Structs<a href="#structs" class="anchor">§</a></h2><dl class="item-table"><dt><a class="struct" href="struct.BandChannel.html" title="struct genesis::field::spectrum::BandChannel">Band<wbr>Channel</a></dt><dd>One band-decomposed channel’s reading.</dd><dt><a class="struct" href="struct.FieldSpectrum.html" title="struct genesis::field::spectrum::FieldSpectrum">Field<wbr>Spectrum</a></dt><dd>The field’s spectral signature — everything the wave model’s
+stimulus path and the carrier lock consume, computed from her
+own substrate trajectory.</dd><dt><a class="struct" href="struct.Ring.html" title="struct genesis::field::spectrum::Ring">Ring</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>A fixed-depth ring of the field’s spectral samples.</dd><dt><a class="struct" href="struct.RingIter.html" title="struct genesis::field::spectrum::RingIter">Ring<wbr>Iter</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="struct" href="struct.SpectrumReading.html" title="struct genesis::field::spectrum::SpectrumReading">Spectrum<wbr>Reading</a></dt><dd>The wire-ready spectral reading — f64 throughout, presence as
+flags rather than fabricated zeros.</dd></dl><h2 id="constants" class="section-header">Constants<a href="#constants" class="anchor">§</a></h2><dl class="item-table"><dt><a class="constant" href="constant.BASELINE_ALPHA.html" title="constant genesis::field::spectrum::BASELINE_ALPHA">BASELINE_<wbr>ALPHA</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Baseline EMA rate per signature read — band energies are reported
+relative to the channel’s own recent history (≈0.125 typical on
+a quiet field), so a sustained elevation reads as elevation
+rather than as an absolute that means nothing across hosts.</dd><dt><a class="constant" href="constant.CARRIER_ALPHA.html" title="constant genesis::field::spectrum::CARRIER_ALPHA">CARRIER_<wbr>ALPHA</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Consensus-kinematics EMA rate per observe — the carrier readings
+smooth over ~7 integrations (~1.4 s at the 5 Hz tick).</dd><dt><a class="constant" href="constant.FIELD_BANDS.html" title="constant genesis::field::spectrum::FIELD_BANDS">FIELD_<wbr>BANDS</a></dt><dd>Band center frequencies (Hz) — the cortical wave model’s own
+bands, in wire order: infraslow, delta, theta, alpha, sigma,
+beta1, beta2, beta3, gamma, epsilon.</dd><dt><a class="constant" href="constant.RATE_ALPHA.html" title="constant genesis::field::spectrum::RATE_ALPHA">RATE_<wbr>ALPHA</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Achieved-rate EMA rate per observe.</dd><dt><a class="constant" href="constant.RING_LEN.html" title="constant genesis::field::spectrum::RING_LEN">RING_<wbr>LEN</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Ring depth — 4096 samples ≈ 16.4 s at the nominal rate: ~4 cycles
+of infraslow, hundreds of the fast bands.</dd><dt><a class="constant" href="constant.SPECTRUM_STEP_HZ.html" title="constant genesis::field::spectrum::SPECTRUM_STEP_HZ">SPECTRUM_<wbr>STEP_<wbr>HZ</a></dt><dd>Internal integration/sampling rate (Hz). The field’s coupling
+substeps at this cadence inside each <code>observe</code>; 250 Hz resolves
+every band through gamma and leaves epsilon (150 Hz) honestly
+above Nyquist — the same coverage boundary the substrate’s own
+dynamics can support.</dd><dt><a class="constant" href="constant.WARM_SAMPLES.html" title="constant genesis::field::spectrum::WARM_SAMPLES">WARM_<wbr>SAMPLES</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Samples before the spectrum reports warm — ~4 s: enough for the
+fast bands to resolve; the slow bands keep accumulating baseline
+afterward. Below this the signature’s presence flag stays clear.</dd></dl><h2 id="functions" class="section-header">Functions<a href="#functions" class="anchor">§</a></h2><dl class="item-table"><dt><a class="fn" href="fn.band_phase.html" title="fn genesis::field::spectrum::band_phase">band_<wbr>phase</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Quadrature phase of <code>samples</code> at <code>freq</code> — the DFT bin’s angle,
+atan2(−Σx·sin, Σx·cos) at the exact frequency (not the Goertzel
+bin), the phase a band-limited rhythm actually carries.</dd><dt><a class="fn" href="fn.band_power.html" title="fn genesis::field::spectrum::band_power">band_<wbr>power</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Goertzel power of <code>samples</code> at <code>freq</code> sampled at <code>fs</code> — the same
+second-order recurrence the wave model’s own band meter runs:
+<code>s₀ = x + coeff·s₁ − s₂</code>, <code>coeff = 2·cos(2πk/n)</code> at the bin
+nearest <code>freq</code>; power <code>= (s₁² + s₂² − coeff·s₁·s₂)/n²</code>.</dd></dl></section></div></main></body></html>

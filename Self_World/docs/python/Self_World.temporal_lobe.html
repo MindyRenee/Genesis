@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: package Self_World.temporal_lobe</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.temporal_lobe</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/__init__.py">/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/__init__.py</a></td></tr></table>
+    <p><span class="code">Temporal&nbsp;subsystem&nbsp;—&nbsp;memory,&nbsp;recognition,&nbsp;and&nbsp;auditory&nbsp;processing.<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+ANATOMY&nbsp;AND&nbsp;FUNCTION<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+The&nbsp;temporal&nbsp;subsystem&nbsp;is&nbsp;the&nbsp;brain's&nbsp;center&nbsp;for&nbsp;memory,&nbsp;<a href="builtins.html#object">object</a>&nbsp;recognition,<br>
+and&nbsp;auditory&nbsp;processing.&nbsp;It&nbsp;contains&nbsp;the&nbsp;hippocampal&nbsp;system&nbsp;(memory<br>
+formation&nbsp;and&nbsp;retrieval),&nbsp;the&nbsp;inferotemporal&nbsp;cortex&nbsp;(<a href="builtins.html#object">object</a><br>
+recognition&nbsp;—&nbsp;the&nbsp;end&nbsp;of&nbsp;the&nbsp;ventral&nbsp;"what"&nbsp;stream),&nbsp;and&nbsp;the&nbsp;auditory<br>
+cortex&nbsp;(sound&nbsp;processing).<br>
+&nbsp;<br>
+Key&nbsp;functions:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Episodic&nbsp;memory&nbsp;formation&nbsp;and&nbsp;retrieval&nbsp;(hippocampus)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Object&nbsp;recognition&nbsp;and&nbsp;categorization&nbsp;(inferotemporal&nbsp;cortex)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Auditory&nbsp;processing&nbsp;(superior&nbsp;temporal&nbsp;gyrus)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Semantic&nbsp;memory&nbsp;consolidation&nbsp;(neocortical&nbsp;storage)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Pattern&nbsp;separation&nbsp;and&nbsp;completion&nbsp;(dentate&nbsp;gyrus,&nbsp;CA3)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Spatial&nbsp;memory&nbsp;(entorhinal&nbsp;cortex,&nbsp;place/grid&nbsp;cells)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Emotional&nbsp;memory&nbsp;(amygdala-temporal&nbsp;interactions)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Language&nbsp;comprehension&nbsp;(Wernicke's&nbsp;area,&nbsp;left&nbsp;temporal)<br>
+&nbsp;<br>
+The&nbsp;temporal&nbsp;subsystem&nbsp;receives&nbsp;input&nbsp;from:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Occipital&nbsp;subsystem&nbsp;(ventral&nbsp;stream:&nbsp;V1&nbsp;P-pathway&nbsp;-&gt;&nbsp;V4&nbsp;-&gt;&nbsp;VTC&nbsp;-&gt;&nbsp;IT)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Auditory&nbsp;nerve&nbsp;(cochlea&nbsp;-&gt;&nbsp;brainstem&nbsp;-&gt;&nbsp;thalamus&nbsp;-&gt;&nbsp;A1)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Parietal&nbsp;subsystem&nbsp;(spatial&nbsp;context&nbsp;for&nbsp;<a href="builtins.html#object">object</a>-location&nbsp;binding)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Frontal&nbsp;subsystem&nbsp;(top-down&nbsp;attention&nbsp;and&nbsp;retrieval&nbsp;cues)<br>
+&nbsp;<br>
+Pipeline&nbsp;(ventral&nbsp;"what"&nbsp;stream,&nbsp;continued&nbsp;from&nbsp;occipital&nbsp;subsystem):<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;V1&nbsp;P-pathway&nbsp;output&nbsp;(color/detail&nbsp;from&nbsp;LGN&nbsp;parvocellular&nbsp;stream)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;v<br>
+&nbsp;&nbsp;&nbsp;&nbsp;[V4]&nbsp;Mid-level&nbsp;visual&nbsp;cortex&nbsp;(occipital&nbsp;subsystem)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;Pools&nbsp;V1&nbsp;latents&nbsp;into&nbsp;larger&nbsp;receptive&nbsp;fields<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;Adds&nbsp;chromatic&nbsp;channels<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;v<br>
+&nbsp;&nbsp;&nbsp;&nbsp;[VTC]&nbsp;Ventral&nbsp;temporal&nbsp;cortex&nbsp;(occipital&nbsp;subsystem)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;PCA&nbsp;of&nbsp;V4&nbsp;activations<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;v<br>
+&nbsp;&nbsp;&nbsp;&nbsp;[IT]&nbsp;Inferotemporal&nbsp;cortex&nbsp;(object_recognition.py)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;Object&nbsp;categorization&nbsp;and&nbsp;identification<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;YOLOv5s&nbsp;approximates&nbsp;IT&nbsp;<a href="builtins.html#object">object</a>-selective&nbsp;neurons<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;Produces:&nbsp;<a href="#DetectedObject">DetectedObject</a>&nbsp;list&nbsp;(name,&nbsp;confidence,&nbsp;position)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;v<br>
+&nbsp;&nbsp;&nbsp;&nbsp;[MTL&nbsp;bridge]&nbsp;(in&nbsp;vision&nbsp;—&nbsp;VTC&nbsp;-&gt;&nbsp;concept&nbsp;embeddings)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;Visual-concept&nbsp;association<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;v<br>
+&nbsp;&nbsp;&nbsp;&nbsp;[Hippocampus]&nbsp;(memory/&nbsp;package)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;Episodic&nbsp;memory&nbsp;formation&nbsp;and&nbsp;retrieval<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;Pattern&nbsp;separation&nbsp;(dentate&nbsp;gyrus)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;Pattern&nbsp;completion&nbsp;(CA3&nbsp;attractor)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;Systems&nbsp;consolidation&nbsp;(hippocampal&nbsp;-&gt;&nbsp;neocortical)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;v<br>
+&nbsp;&nbsp;&nbsp;&nbsp;[Neocortex]&nbsp;(concept_network&nbsp;+&nbsp;memory/semantic.py)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;Semantic&nbsp;memory&nbsp;consolidation<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;Schema&nbsp;formation<br>
+&nbsp;<br>
+Pipeline&nbsp;(auditory&nbsp;"what"&nbsp;stream):<br>
+&nbsp;<br>
+The&nbsp;auditory&nbsp;"what"&nbsp;stream:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;cochlea&nbsp;-&gt;&nbsp;brainstem&nbsp;-&gt;&nbsp;thalamus&nbsp;(MGN)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;v<br>
+&nbsp;&nbsp;&nbsp;&nbsp;[A1]&nbsp;Primary&nbsp;auditory&nbsp;cortex&nbsp;(auditory.py)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;Spectral&nbsp;feature&nbsp;extraction<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;Sound&nbsp;event&nbsp;classification&nbsp;(speech/music/impact/noise/nature)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;Spectrotemporal&nbsp;receptive&nbsp;fields<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;v<br>
+&nbsp;&nbsp;&nbsp;&nbsp;[Belt/Parabelt]&nbsp;Higher&nbsp;auditory&nbsp;areas<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;Phonological&nbsp;processing,&nbsp;sound&nbsp;categorization<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;v<br>
+&nbsp;&nbsp;&nbsp;&nbsp;[Wernicke's&nbsp;area]&nbsp;Language&nbsp;comprehension&nbsp;(left&nbsp;temporal)<br>
+&nbsp;<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+MATHEMATICAL&nbsp;FOUNDATION<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+Hippocampal&nbsp;Memory&nbsp;Systems<br>
+---------------------------<br>
+&nbsp;<br>
+CA3&nbsp;Recurrent&nbsp;Attractor&nbsp;(pattern&nbsp;completion):<br>
+&nbsp;<br>
+The&nbsp;CA3&nbsp;region&nbsp;has&nbsp;extensive&nbsp;recurrent&nbsp;collaterals&nbsp;that&nbsp;form&nbsp;an<br>
+autoassociative&nbsp;network.&nbsp;Memories&nbsp;are&nbsp;stored&nbsp;as&nbsp;attractors&nbsp;via<br>
+Hebbian&nbsp;learning.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Storage:&nbsp;&nbsp;W_ij&nbsp;=&nbsp;sum_mu&nbsp;&nbsp;xi_i^mu&nbsp;*&nbsp;xi_j^mu<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Retrieval:&nbsp;r_i&nbsp;=&nbsp;phi(&nbsp;sum_j&nbsp;W_ij&nbsp;*&nbsp;r_j&nbsp;+&nbsp;I_i&nbsp;)<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;where:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;W_ij&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;recurrent&nbsp;synaptic&nbsp;weight<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;xi^mu&nbsp;&nbsp;&nbsp;=&nbsp;memory&nbsp;pattern&nbsp;mu&nbsp;(binary&nbsp;vector)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;I_i&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;external&nbsp;input&nbsp;(partial&nbsp;cue)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;phi&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;activation&nbsp;function&nbsp;(typically&nbsp;sigmoid)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;r_i&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;firing&nbsp;rate&nbsp;of&nbsp;neuron&nbsp;i<br>
+&nbsp;<br>
+A&nbsp;partial&nbsp;cue&nbsp;I_i&nbsp;activates&nbsp;the&nbsp;nearest&nbsp;stored&nbsp;attractor&nbsp;via&nbsp;pattern<br>
+completion.&nbsp;The&nbsp;attractor&nbsp;dynamics&nbsp;pull&nbsp;the&nbsp;activity&nbsp;toward&nbsp;the<br>
+stored&nbsp;pattern&nbsp;even&nbsp;if&nbsp;the&nbsp;cue&nbsp;is&nbsp;noisy&nbsp;or&nbsp;incomplete.<br>
+&nbsp;<br>
+In&nbsp;Genesis:&nbsp;memory/systems.py&nbsp;AttractorNetwork&nbsp;implements&nbsp;this.<br>
+Patterns&nbsp;are&nbsp;stored&nbsp;via&nbsp;Hebbian&nbsp;outer&nbsp;products&nbsp;and&nbsp;retrieved&nbsp;via<br>
+iterative&nbsp;dynamics.&nbsp;The&nbsp;auto_associate()&nbsp;method&nbsp;performs&nbsp;pattern<br>
+completion.<br>
+&nbsp;<br>
+Dentate&nbsp;Gyrus&nbsp;Pattern&nbsp;Separation:<br>
+&nbsp;<br>
+The&nbsp;dentate&nbsp;gyrus&nbsp;orthogonalizes&nbsp;similar&nbsp;inputs&nbsp;to&nbsp;distinct&nbsp;sparse<br>
+codes,&nbsp;preventing&nbsp;interference&nbsp;between&nbsp;similar&nbsp;memories.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;minimize&nbsp;&nbsp;||x&nbsp;-&nbsp;Phi&nbsp;*&nbsp;z||^2&nbsp;&nbsp;+&nbsp;&nbsp;lambda&nbsp;*&nbsp;||z||_1<br>
+&nbsp;&nbsp;&nbsp;&nbsp;subject&nbsp;to&nbsp;&nbsp;z&nbsp;&gt;=&nbsp;0<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;where:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;x&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;entorhinal&nbsp;cortex&nbsp;input<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Phi&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;expansion&nbsp;matrix&nbsp;(sparse,&nbsp;high-dimensional)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;z&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;sparse&nbsp;dentate&nbsp;code<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;lambda&nbsp;&nbsp;=&nbsp;sparsity&nbsp;weight<br>
+&nbsp;<br>
+The&nbsp;expansion&nbsp;from&nbsp;EC&nbsp;to&nbsp;dentate&nbsp;(much&nbsp;larger)&nbsp;combined&nbsp;with&nbsp;sparse<br>
+coding&nbsp;ensures&nbsp;similar&nbsp;inputs&nbsp;map&nbsp;to&nbsp;orthogonal&nbsp;representations.<br>
+&nbsp;<br>
+In&nbsp;Genesis:&nbsp;the&nbsp;attractor&nbsp;network's&nbsp;similarity&nbsp;threshold&nbsp;(0.75)<br>
+serves&nbsp;a&nbsp;pattern-separation&nbsp;function&nbsp;—&nbsp;similar&nbsp;patterns&nbsp;above<br>
+threshold&nbsp;are&nbsp;treated&nbsp;as&nbsp;the&nbsp;same,&nbsp;below&nbsp;threshold&nbsp;as&nbsp;distinct.&nbsp;A<br>
+proper&nbsp;dentate&nbsp;model&nbsp;would&nbsp;add&nbsp;explicit&nbsp;sparse&nbsp;expansion.<br>
+&nbsp;<br>
+Grid&nbsp;Cells&nbsp;(medial&nbsp;entorhinal&nbsp;cortex):<br>
+&nbsp;<br>
+Grid&nbsp;cells&nbsp;fire&nbsp;at&nbsp;hexagonal&nbsp;lattices&nbsp;of&nbsp;locations,&nbsp;providing&nbsp;a<br>
+metric&nbsp;for&nbsp;space.&nbsp;They&nbsp;use&nbsp;a&nbsp;continuous&nbsp;attractor&nbsp;with&nbsp;path<br>
+integration.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;tau&nbsp;*&nbsp;dr/dt&nbsp;=&nbsp;-r&nbsp;+&nbsp;W(r)&nbsp;+&nbsp;v(t)&nbsp;.&nbsp;grad(r)<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;where:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;W(r)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;recurrent&nbsp;connectivity&nbsp;(Mexican-hat&nbsp;on&nbsp;torus)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;v(t)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;animal&nbsp;velocity<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;grad(r)&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;spatial&nbsp;gradient&nbsp;of&nbsp;activity<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;r&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;firing&nbsp;rate&nbsp;field<br>
+&nbsp;<br>
+The&nbsp;velocity-driven&nbsp;shift&nbsp;moves&nbsp;the&nbsp;activity&nbsp;bump&nbsp;according&nbsp;to<br>
+self-motion,&nbsp;producing&nbsp;hexagonal&nbsp;firing&nbsp;patterns.&nbsp;Multiple&nbsp;modules<br>
+with&nbsp;geometrically&nbsp;spaced&nbsp;grid&nbsp;scales&nbsp;(lambda_n&nbsp;=&nbsp;lambda_0&nbsp;*&nbsp;r^n,<br>
+r&nbsp;~&nbsp;1.7)&nbsp;provide&nbsp;a&nbsp;multi-scale&nbsp;spatial&nbsp;code.<br>
+&nbsp;<br>
+In&nbsp;Genesis:&nbsp;not&nbsp;yet&nbsp;implemented.&nbsp;Would&nbsp;be&nbsp;added&nbsp;when&nbsp;spatial<br>
+memory&nbsp;and&nbsp;navigation&nbsp;are&nbsp;needed.<br>
+&nbsp;<br>
+Place&nbsp;Cells&nbsp;(hippocampus):<br>
+&nbsp;<br>
+Place&nbsp;cells&nbsp;fire&nbsp;at&nbsp;single&nbsp;locations,&nbsp;derived&nbsp;from&nbsp;grid&nbsp;cell&nbsp;inputs<br>
+via&nbsp;sparse&nbsp;coding.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;minimize&nbsp;&nbsp;||x_grid&nbsp;-&nbsp;Phi_place&nbsp;*&nbsp;z||^2&nbsp;&nbsp;+&nbsp;&nbsp;lambda&nbsp;*&nbsp;||z||_1<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;where:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;x_grid&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;vector&nbsp;of&nbsp;grid&nbsp;cell&nbsp;activities<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Phi_place&nbsp;=&nbsp;place-cell&nbsp;dictionary<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;z&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;sparse&nbsp;place&nbsp;code&nbsp;(typically&nbsp;1&nbsp;active&nbsp;cell)<br>
+&nbsp;<br>
+In&nbsp;Genesis:&nbsp;not&nbsp;yet&nbsp;implemented.<br>
+&nbsp;<br>
+Laplace&nbsp;Transform&nbsp;Temporal&nbsp;Representation&nbsp;(Howard&nbsp;et&nbsp;al.,&nbsp;2014):<br>
+&nbsp;<br>
+Time&nbsp;is&nbsp;represented&nbsp;via&nbsp;leaky&nbsp;integrators&nbsp;at&nbsp;multiple&nbsp;timescales.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;F(s,&nbsp;t)&nbsp;=&nbsp;integral_0^t&nbsp;&nbsp;f(tau)&nbsp;*&nbsp;e^{-s(t-tau)}&nbsp;dtau<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;where:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;f(tau)&nbsp;=&nbsp;input&nbsp;function&nbsp;(events)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;s&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;timescale&nbsp;parameter&nbsp;(inverse&nbsp;time&nbsp;constant)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;F(s,t)&nbsp;=&nbsp;Laplace&nbsp;transform&nbsp;at&nbsp;timescale&nbsp;s,&nbsp;time&nbsp;t<br>
+&nbsp;<br>
+The&nbsp;inverse&nbsp;Laplace&nbsp;transform&nbsp;recovers&nbsp;temporal&nbsp;history.&nbsp;By<br>
+integrating&nbsp;velocity,&nbsp;the&nbsp;same&nbsp;framework&nbsp;codes&nbsp;spatial&nbsp;position.<br>
+&nbsp;<br>
+In&nbsp;Genesis:&nbsp;the&nbsp;memory&nbsp;engine's&nbsp;decay&nbsp;and&nbsp;consolidation&nbsp;dynamics<br>
+approximate&nbsp;this&nbsp;—&nbsp;memories&nbsp;decay&nbsp;at&nbsp;multiple&nbsp;timescales&nbsp;(STM<br>
+ring&nbsp;buffer,&nbsp;LTM&nbsp;store,&nbsp;spaced&nbsp;repetition&nbsp;scheduler).<br>
+&nbsp;<br>
+&nbsp;<br>
+Auditory&nbsp;Cortex&nbsp;(Spectrotemporal&nbsp;Receptive&nbsp;Fields)<br>
+----------------------------------------------------<br>
+&nbsp;<br>
+The&nbsp;primary&nbsp;auditory&nbsp;cortex&nbsp;(A1)&nbsp;analyzes&nbsp;sound&nbsp;via<br>
+spectrotemporal&nbsp;receptive&nbsp;fields&nbsp;(STRFs)&nbsp;—&nbsp;kernels&nbsp;that&nbsp;capture<br>
+the&nbsp;time-frequency&nbsp;structure&nbsp;of&nbsp;natural&nbsp;sounds.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;r(t)&nbsp;=&nbsp;integral&nbsp;integral&nbsp;&nbsp;h(tau,&nbsp;f)&nbsp;*&nbsp;s(t&nbsp;-&nbsp;tau,&nbsp;f)&nbsp;dtau&nbsp;df<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;where:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;h(tau,&nbsp;f)&nbsp;=&nbsp;STRF&nbsp;kernel&nbsp;(time-frequency&nbsp;receptive&nbsp;field)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;s(t,&nbsp;f)&nbsp;&nbsp;&nbsp;=&nbsp;spectrogram&nbsp;(sound&nbsp;energy&nbsp;at&nbsp;time&nbsp;t,&nbsp;freq&nbsp;f)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;r(t)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;neural&nbsp;response&nbsp;at&nbsp;time&nbsp;t<br>
+&nbsp;<br>
+A1&nbsp;encodes&nbsp;fine&nbsp;acoustic&nbsp;details&nbsp;(frequency,&nbsp;timing).&nbsp;Higher<br>
+auditory&nbsp;areas&nbsp;(belt,&nbsp;parabelt)&nbsp;encode&nbsp;abstracted&nbsp;phonological<br>
+features&nbsp;and&nbsp;sound&nbsp;categories.<br>
+&nbsp;<br>
+In&nbsp;Genesis:&nbsp;auditory.py&nbsp;implements&nbsp;a&nbsp;simplified&nbsp;version&nbsp;using<br>
+spectral&nbsp;features&nbsp;(RMS&nbsp;energy,&nbsp;spectral&nbsp;centroid,&nbsp;zero-crossing<br>
+rate,&nbsp;spectral&nbsp;flux,&nbsp;rolloff)&nbsp;computed&nbsp;via&nbsp;FFT&nbsp;on&nbsp;1024-sample<br>
+blocks.&nbsp;Classification&nbsp;is&nbsp;rule-based&nbsp;(not&nbsp;learned&nbsp;STRFs)&nbsp;—<br>
+speech/music/impact/noise/nature&nbsp;categories&nbsp;are&nbsp;determined&nbsp;by<br>
+threshold&nbsp;heuristics&nbsp;on&nbsp;the&nbsp;spectral&nbsp;features.&nbsp;This&nbsp;is<br>
+functionally&nbsp;equivalent&nbsp;to&nbsp;A1's&nbsp;role&nbsp;(sound&nbsp;categorization)&nbsp;but<br>
+not&nbsp;biologically&nbsp;detailed.<br>
+&nbsp;<br>
+&nbsp;<br>
+Object&nbsp;Recognition&nbsp;(Inferotemporal&nbsp;Cortex)<br>
+--------------------------------------------<br>
+&nbsp;<br>
+The&nbsp;inferotemporal&nbsp;(IT)&nbsp;cortex&nbsp;contains&nbsp;neurons&nbsp;selective&nbsp;for<br>
+complex&nbsp;shapes&nbsp;and&nbsp;<a href="builtins.html#object">object</a>&nbsp;categories.&nbsp;It's&nbsp;the&nbsp;final&nbsp;stage&nbsp;of&nbsp;the<br>
+ventral&nbsp;"what"&nbsp;pathway.<br>
+&nbsp;<br>
+In&nbsp;primates,&nbsp;IT&nbsp;neurons&nbsp;show&nbsp;invariance&nbsp;to&nbsp;position,&nbsp;scale,&nbsp;and<br>
+viewpoint&nbsp;—&nbsp;they&nbsp;respond&nbsp;to&nbsp;"faces"&nbsp;or&nbsp;"chairs"&nbsp;regardless&nbsp;of<br>
+where&nbsp;they&nbsp;appear.&nbsp;This&nbsp;invariance&nbsp;is&nbsp;built&nbsp;up&nbsp;through&nbsp;the<br>
+hierarchy:&nbsp;V1&nbsp;-&gt;&nbsp;V2&nbsp;-&gt;&nbsp;V4&nbsp;-&gt;&nbsp;PIT&nbsp;-&gt;&nbsp;CIT&nbsp;-&gt;&nbsp;AIT.<br>
+&nbsp;<br>
+In&nbsp;Genesis:&nbsp;object_recognition.py&nbsp;uses&nbsp;YOLOv5s&nbsp;(a&nbsp;deep&nbsp;CNN)&nbsp;to<br>
+approximate&nbsp;IT&nbsp;function.&nbsp;YOLOv5s&nbsp;is&nbsp;trained&nbsp;on&nbsp;COCO&nbsp;(80&nbsp;<a href="builtins.html#object">object</a><br>
+categories)&nbsp;and&nbsp;produces&nbsp;bounding&nbsp;boxes&nbsp;with&nbsp;class&nbsp;scores.&nbsp;It&nbsp;is<br>
+not&nbsp;biologically&nbsp;accurate&nbsp;but&nbsp;serves&nbsp;the&nbsp;same&nbsp;functional&nbsp;role:<br>
+turning&nbsp;pixels&nbsp;into&nbsp;<a href="builtins.html#object">object</a>&nbsp;labels&nbsp;with&nbsp;position&nbsp;invariance.<br>
+&nbsp;<br>
+The&nbsp;mathematical&nbsp;model&nbsp;(if&nbsp;we&nbsp;were&nbsp;to&nbsp;build&nbsp;one):<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;features&nbsp;=&nbsp;CNN(image)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;hierarchical&nbsp;features<br>
+&nbsp;&nbsp;&nbsp;&nbsp;class_scores&nbsp;=&nbsp;W&nbsp;*&nbsp;features&nbsp;+&nbsp;b&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;classification&nbsp;head<br>
+&nbsp;&nbsp;&nbsp;&nbsp;bbox&nbsp;=&nbsp;regressor(features)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;bounding&nbsp;box&nbsp;regression<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;class&nbsp;=&nbsp;argmax(class_scores)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;confidence&nbsp;=&nbsp;softmax(class_scores)[class]<br>
+&nbsp;<br>
+In&nbsp;practice,&nbsp;YOLOv5s&nbsp;handles&nbsp;all&nbsp;of&nbsp;this&nbsp;internally.&nbsp;We&nbsp;treat&nbsp;it<br>
+as&nbsp;a&nbsp;black-box&nbsp;approximation&nbsp;of&nbsp;IT&nbsp;cortex.<br>
+&nbsp;<br>
+&nbsp;<br>
+Dream&nbsp;Synthesis&nbsp;(structurally-similar&nbsp;far-pair&nbsp;proposal&nbsp;+&nbsp;waking&nbsp;validation)<br>
+-----------------------------------------------------------------------------<br>
+&nbsp;<br>
+During&nbsp;REM&nbsp;(high&nbsp;acetylcholine,&nbsp;low&nbsp;norepinephrine)&nbsp;the&nbsp;synthesizer<br>
+goes&nbsp;beyond&nbsp;random&nbsp;association:&nbsp;it&nbsp;finds&nbsp;concept&nbsp;pairs&nbsp;that&nbsp;are<br>
+*structurally&nbsp;similar&nbsp;but&nbsp;far&nbsp;apart*&nbsp;in&nbsp;the&nbsp;graph&nbsp;—&nbsp;same&nbsp;relation<br>
+signature,&nbsp;distant&nbsp;positions&nbsp;—&nbsp;and&nbsp;proposes&nbsp;novel&nbsp;typed&nbsp;edges<br>
+between&nbsp;them&nbsp;as&nbsp;hypotheticals&nbsp;at&nbsp;low&nbsp;confidence:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;hypothetical&nbsp;edge&nbsp;weight&nbsp;=&nbsp;0.15<br>
+&nbsp;<br>
+On&nbsp;the&nbsp;next&nbsp;wake&nbsp;(or&nbsp;a&nbsp;dream-review&nbsp;pass),&nbsp;each&nbsp;hypothetical&nbsp;is<br>
+validated&nbsp;by&nbsp;abductive/analogical&nbsp;inference&nbsp;over&nbsp;independent<br>
+evidence.&nbsp;An&nbsp;edge&nbsp;supported&nbsp;by&nbsp;&gt;=&nbsp;2&nbsp;corroborating&nbsp;paths&nbsp;is&nbsp;promoted:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;promoted&nbsp;edge&nbsp;weight&nbsp;=&nbsp;0.45<br>
+&nbsp;<br>
+Unsupported&nbsp;hypotheticals&nbsp;decay.&nbsp;This&nbsp;is&nbsp;the&nbsp;sleep-time&nbsp;generation<br>
+of&nbsp;genuinely&nbsp;new&nbsp;structure&nbsp;—&nbsp;the&nbsp;same&nbsp;far-transfer&nbsp;mechanism<br>
+analogical&nbsp;reasoning&nbsp;uses&nbsp;while&nbsp;awake,&nbsp;run&nbsp;unconstrained.<br>
+&nbsp;<br>
+In&nbsp;Genesis:&nbsp;sleep/dream_synthesis.py&nbsp;DreamSynthesis&nbsp;implements<br>
+the&nbsp;propose/validate&nbsp;cycle;&nbsp;DreamProposal,&nbsp;DreamValidationResult,<br>
+and&nbsp;DreamInsight&nbsp;are&nbsp;its&nbsp;records.<br>
+&nbsp;<br>
+&nbsp;<br>
+Sleep&nbsp;Compression&nbsp;(bounded&nbsp;memory,&nbsp;honestly&nbsp;modeled)<br>
+------------------------------------------------------<br>
+&nbsp;<br>
+The&nbsp;compressor&nbsp;keeps&nbsp;Genesis&nbsp;bounded:&nbsp;VQ&nbsp;codebook&nbsp;retraining<br>
+(re-quantizing&nbsp;the&nbsp;embedding&nbsp;space),&nbsp;edge&nbsp;migration&nbsp;into&nbsp;the<br>
+holographic&nbsp;graph,&nbsp;and&nbsp;episode&nbsp;summarization&nbsp;with&nbsp;raw-episode<br>
+deletion&nbsp;past&nbsp;the&nbsp;LTM&nbsp;cap.<br>
+&nbsp;<br>
+Modeling&nbsp;note:&nbsp;this&nbsp;is&nbsp;*memory&nbsp;compaction*,&nbsp;inspired&nbsp;by&nbsp;but&nbsp;not<br>
+equivalent&nbsp;to&nbsp;biological&nbsp;consolidation.&nbsp;Biological&nbsp;systems<br>
+consolidation&nbsp;is&nbsp;selective&nbsp;replay&nbsp;and&nbsp;systems-level&nbsp;transformation<br>
+in&nbsp;which&nbsp;hippocampal&nbsp;episodic&nbsp;traces&nbsp;are&nbsp;gradually&nbsp;integrated&nbsp;into<br>
+neocortical&nbsp;semantic&nbsp;networks&nbsp;(Rasch&nbsp;&amp;&nbsp;Born,&nbsp;2013)&nbsp;—&nbsp;it&nbsp;is&nbsp;not<br>
+destructive&nbsp;deletion.&nbsp;The&nbsp;compact-LTM&nbsp;phase&nbsp;here&nbsp;deletes&nbsp;raw<br>
+episodes&nbsp;after&nbsp;summarization;&nbsp;that&nbsp;is&nbsp;an&nbsp;engineering&nbsp;bound,&nbsp;not&nbsp;a<br>
+claim&nbsp;about&nbsp;biology.<br>
+&nbsp;<br>
+In&nbsp;Genesis:&nbsp;sleep/compression.py&nbsp;SleepCompressor&nbsp;implements&nbsp;the<br>
+pass&nbsp;(VQ&nbsp;iters,&nbsp;salience&nbsp;threshold,&nbsp;homeostasis&nbsp;scale,&nbsp;and&nbsp;merge<br>
+threshold&nbsp;are&nbsp;its&nbsp;tuning&nbsp;surface).<br>
+&nbsp;<br>
+&nbsp;<br>
+STDP&nbsp;(timing-dependent&nbsp;synaptic&nbsp;efficacy)<br>
+-------------------------------------------<br>
+&nbsp;<br>
+STDP&nbsp;is&nbsp;a&nbsp;timing-dependent&nbsp;learning&nbsp;rule&nbsp;over&nbsp;a&nbsp;synaptic&nbsp;substrate<br>
+deliberately&nbsp;separate&nbsp;from&nbsp;the&nbsp;semantic&nbsp;graph:&nbsp;ConceptNetwork&nbsp;edges<br>
+encode&nbsp;explicit&nbsp;semantic&nbsp;relationships,&nbsp;embeddings&nbsp;encode<br>
+representational&nbsp;similarity,&nbsp;and&nbsp;synaptic&nbsp;efficacy&nbsp;encodes&nbsp;learned<br>
+directed&nbsp;strength&nbsp;between&nbsp;active&nbsp;units.&nbsp;For&nbsp;Δt&nbsp;=&nbsp;t_post&nbsp;−&nbsp;t_pre:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Δt&nbsp;&gt;&nbsp;0:&nbsp;&nbsp;Δw&nbsp;=&nbsp;+A⁺&nbsp;·&nbsp;exp(-Δt&nbsp;/&nbsp;τ⁺)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(LTP&nbsp;—&nbsp;pre&nbsp;before&nbsp;post)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Δt&nbsp;&lt;&nbsp;0:&nbsp;&nbsp;Δw&nbsp;=&nbsp;−A⁻&nbsp;·&nbsp;exp(Δt&nbsp;/&nbsp;τ⁻)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(LTD&nbsp;—&nbsp;post&nbsp;before&nbsp;pre)<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;τ⁺&nbsp;=&nbsp;τ⁻&nbsp;=&nbsp;20&nbsp;ms,&nbsp;A⁺&nbsp;=&nbsp;0.01,&nbsp;A⁻&nbsp;=&nbsp;0.012,&nbsp;window&nbsp;=&nbsp;40&nbsp;ms<br>
+&nbsp;<br>
+The&nbsp;slight&nbsp;A⁻&nbsp;&gt;&nbsp;A⁺&nbsp;bias&nbsp;is&nbsp;homeostatic&nbsp;—&nbsp;unpaired&nbsp;activity&nbsp;tends<br>
+weakly&nbsp;toward&nbsp;depression&nbsp;rather&nbsp;than&nbsp;runaway&nbsp;potentiation.&nbsp;The<br>
+timing&nbsp;rule&nbsp;is&nbsp;followed&nbsp;by&nbsp;a&nbsp;three-factor&nbsp;neuromodulatory&nbsp;gate:<br>
+eligibility&nbsp;alone&nbsp;does&nbsp;not&nbsp;write;&nbsp;the&nbsp;neuromodulatory&nbsp;context<br>
+decides&nbsp;whether&nbsp;the&nbsp;timed&nbsp;pairing&nbsp;consolidates.<br>
+&nbsp;<br>
+In&nbsp;Genesis:&nbsp;temporal_lobe/stdp.py&nbsp;STDP&nbsp;over&nbsp;temporal_lobe/synapses.py<br>
+SynapticStore.&nbsp;HebbianPlasticity&nbsp;(above,&nbsp;in&nbsp;temporal_lobe/)&nbsp;is<br>
+the&nbsp;correlation-based&nbsp;counterpart&nbsp;that&nbsp;adapts&nbsp;the&nbsp;embedding&nbsp;space;<br>
+STDP&nbsp;is&nbsp;the&nbsp;timing-based&nbsp;rule&nbsp;that&nbsp;adapts&nbsp;the&nbsp;efficacy&nbsp;substrate.<br>
+&nbsp;<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+BRAIN&nbsp;WAVES<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+The&nbsp;temporal&nbsp;subsystem&nbsp;is&nbsp;dominated&nbsp;by&nbsp;theta&nbsp;oscillations&nbsp;(hippocampal<br>
+memory)&nbsp;and&nbsp;gamma&nbsp;(active&nbsp;processing),&nbsp;with&nbsp;important&nbsp;roles&nbsp;for<br>
+alpha&nbsp;and&nbsp;beta.<br>
+&nbsp;<br>
+Theta&nbsp;(4-8&nbsp;Hz)&nbsp;—&nbsp;The&nbsp;hippocampal&nbsp;memory&nbsp;rhythm<br>
+-------------------------------------------------<br>
+&nbsp;<br>
+Theta&nbsp;is&nbsp;the&nbsp;dominant&nbsp;rhythm&nbsp;of&nbsp;the&nbsp;hippocampus&nbsp;during&nbsp;active<br>
+exploration&nbsp;and&nbsp;memory&nbsp;formation.&nbsp;Theta-gamma&nbsp;coupling&nbsp;is&nbsp;the<br>
+mechanism&nbsp;by&nbsp;which&nbsp;memories&nbsp;are&nbsp;encoded:&nbsp;gamma&nbsp;cycles&nbsp;nest&nbsp;within<br>
+theta&nbsp;cycles,&nbsp;and&nbsp;the&nbsp;theta&nbsp;phase&nbsp;determines&nbsp;whether&nbsp;encoding&nbsp;or<br>
+retrieval&nbsp;occurs&nbsp;(Hasselmo&nbsp;et&nbsp;al.,&nbsp;2002).<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Encoding:&nbsp;gamma&nbsp;on&nbsp;theta&nbsp;rising&nbsp;phase<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Retrieval:&nbsp;gamma&nbsp;on&nbsp;theta&nbsp;falling&nbsp;phase<br>
+&nbsp;<br>
+In&nbsp;Genesis:&nbsp;the&nbsp;brain&nbsp;wave&nbsp;system&nbsp;tracks&nbsp;theta&nbsp;as&nbsp;the&nbsp;memory<br>
+rhythm.&nbsp;The&nbsp;memory&nbsp;engine's&nbsp;consolidation&nbsp;dynamics&nbsp;(sleep<br>
+replay,&nbsp;systems&nbsp;consolidation)&nbsp;are&nbsp;theta-gated.&nbsp;The<br>
+compute_theta_gamma_coupling()&nbsp;function&nbsp;in&nbsp;brain_waves.py<br>
+measures&nbsp;this&nbsp;coupling.<br>
+&nbsp;<br>
+Gamma&nbsp;(30-100&nbsp;Hz)&nbsp;—&nbsp;Active&nbsp;processing&nbsp;and&nbsp;binding<br>
+----------------------------------------------------<br>
+&nbsp;<br>
+Gamma&nbsp;in&nbsp;the&nbsp;temporal&nbsp;subsystem&nbsp;reflects&nbsp;active&nbsp;memory&nbsp;processing&nbsp;—<br>
+the&nbsp;binding&nbsp;of&nbsp;features&nbsp;into&nbsp;coherent&nbsp;memory&nbsp;representations.<br>
+Hippocampal&nbsp;gamma&nbsp;is&nbsp;nested&nbsp;within&nbsp;theta&nbsp;(Buzsáki,&nbsp;2006).<br>
+&nbsp;<br>
+In&nbsp;Genesis:&nbsp;gamma&nbsp;is&nbsp;tracked&nbsp;globally&nbsp;by&nbsp;the&nbsp;brain&nbsp;wave&nbsp;system.<br>
+The&nbsp;temporal&nbsp;subsystem's&nbsp;memory&nbsp;retrieval&nbsp;and&nbsp;recognition&nbsp;processes<br>
+contribute&nbsp;to&nbsp;gamma&nbsp;power&nbsp;through&nbsp;their&nbsp;activation&nbsp;dynamics.<br>
+&nbsp;<br>
+Alpha&nbsp;(8-12&nbsp;Hz)&nbsp;—&nbsp;Cortical&nbsp;idling&nbsp;and&nbsp;gating<br>
+----------------------------------------------<br>
+&nbsp;<br>
+Temporal&nbsp;alpha&nbsp;reflects&nbsp;the&nbsp;idling&nbsp;state&nbsp;of&nbsp;temporal&nbsp;cortex.&nbsp;Low<br>
+alpha&nbsp;(desynchronization)&nbsp;during&nbsp;active&nbsp;memory&nbsp;retrieval&nbsp;and<br>
+language&nbsp;processing;&nbsp;high&nbsp;alpha&nbsp;during&nbsp;idle&nbsp;states.<br>
+&nbsp;<br>
+In&nbsp;Genesis:&nbsp;alpha&nbsp;is&nbsp;tracked&nbsp;globally.&nbsp;The&nbsp;temporal&nbsp;subsystem's<br>
+contribution&nbsp;to&nbsp;alpha&nbsp;is&nbsp;through&nbsp;its&nbsp;processing&nbsp;state&nbsp;—&nbsp;active<br>
+recognition&nbsp;and&nbsp;memory&nbsp;retrieval&nbsp;desynchronize&nbsp;alpha.<br>
+&nbsp;<br>
+Beta&nbsp;(13-30&nbsp;Hz)&nbsp;—&nbsp;Top-down&nbsp;control<br>
+------------------------------------<br>
+&nbsp;<br>
+Beta&nbsp;in&nbsp;the&nbsp;temporal&nbsp;subsystem&nbsp;reflects&nbsp;top-down&nbsp;control&nbsp;from&nbsp;the<br>
+frontal&nbsp;subsystem&nbsp;—&nbsp;goal-directed&nbsp;retrieval,&nbsp;selective&nbsp;attention&nbsp;to<br>
+specific&nbsp;memories&nbsp;or&nbsp;objects.&nbsp;Beta&nbsp;coordinates&nbsp;the<br>
+frontotemporal&nbsp;network&nbsp;during&nbsp;memory&nbsp;retrieval.<br>
+&nbsp;<br>
+In&nbsp;Genesis:&nbsp;beta&nbsp;is&nbsp;tracked&nbsp;globally.&nbsp;The&nbsp;temporal&nbsp;subsystem's<br>
+interaction&nbsp;with&nbsp;the&nbsp;frontal&nbsp;subsystem&nbsp;during&nbsp;goal-directed&nbsp;memory<br>
+retrieval&nbsp;contributes&nbsp;to&nbsp;beta-band&nbsp;activity.<br>
+&nbsp;<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+ANATOMICAL&nbsp;BOUNDARIES<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+The&nbsp;temporal&nbsp;subsystem&nbsp;is&nbsp;bounded&nbsp;by:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Occipital&nbsp;subsystem&nbsp;(behind):&nbsp;receives&nbsp;ventral&nbsp;stream&nbsp;output<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(V1&nbsp;-&gt;&nbsp;V4&nbsp;-&gt;&nbsp;VTC&nbsp;-&gt;&nbsp;IT)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Parietal&nbsp;subsystem&nbsp;(above):&nbsp;receives&nbsp;spatial&nbsp;context&nbsp;for<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="builtins.html#object">object</a>-location&nbsp;binding<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Frontal&nbsp;subsystem&nbsp;(in&nbsp;front):&nbsp;receives&nbsp;retrieval&nbsp;cues,&nbsp;sends<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;top-down&nbsp;attention<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Brainstem&nbsp;(below):&nbsp;receives&nbsp;auditory&nbsp;nerve&nbsp;input<br>
+&nbsp;<br>
+The&nbsp;memory/&nbsp;package&nbsp;is&nbsp;a&nbsp;multi-subsystem&nbsp;system:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Hippocampal&nbsp;memory&nbsp;(memory/memory.py,&nbsp;memory/systems.py)&nbsp;is<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;temporal&nbsp;subsystem<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Working&nbsp;memory&nbsp;(memory/working.py)&nbsp;is&nbsp;frontal&nbsp;subsystem&nbsp;(PFC)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Procedural&nbsp;memory&nbsp;(memory/procedural.py)&nbsp;is&nbsp;basal&nbsp;ganglia<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Semantic&nbsp;memory&nbsp;(memory/semantic.py)&nbsp;is&nbsp;neocortical<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(temporal-parietal)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Spaced&nbsp;repetition&nbsp;(memory/spaced_repetition.py)&nbsp;is&nbsp;a<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;learning&nbsp;mechanism,&nbsp;not&nbsp;subsystem-specific<br>
+&nbsp;<br>
+Because&nbsp;memory/&nbsp;spans&nbsp;multiple&nbsp;subsystems,&nbsp;it&nbsp;stays&nbsp;at&nbsp;the&nbsp;top&nbsp;level<br>
+and&nbsp;is&nbsp;referenced&nbsp;by&nbsp;this&nbsp;subsystem,&nbsp;the&nbsp;frontal&nbsp;subsystem,&nbsp;and&nbsp;the&nbsp;basal<br>
+ganglia.&nbsp;This&nbsp;subsystem&nbsp;documents&nbsp;the&nbsp;hippocampal&nbsp;components&nbsp;as<br>
+temporal&nbsp;subsystem&nbsp;functions.<br>
+&nbsp;<br>
+The&nbsp;MTL&nbsp;bridge&nbsp;(temporal_lobe/mtl_bridge.py,&nbsp;projected&nbsp;through<br>
+occipital_lobe)&nbsp;is&nbsp;anatomically&nbsp;temporal&nbsp;but<br>
+functionally&nbsp;part&nbsp;of&nbsp;the&nbsp;ventral&nbsp;visual&nbsp;stream.&nbsp;It's&nbsp;documented<br>
+in&nbsp;both&nbsp;places&nbsp;—&nbsp;the&nbsp;occipital&nbsp;subsystem&nbsp;describes&nbsp;its&nbsp;role&nbsp;in&nbsp;the<br>
+visual&nbsp;pipeline,&nbsp;and&nbsp;this&nbsp;subsystem&nbsp;describes&nbsp;its&nbsp;anatomical&nbsp;location.<br>
+&nbsp;<br>
+&nbsp;<br>
+════════════════════════════════════════════════════════════════════════<br>
+MODULE&nbsp;ORGANIZATION<br>
+════════════════════════════════════════════════════════════════════════<br>
+&nbsp;<br>
+Modules&nbsp;in&nbsp;this&nbsp;folder&nbsp;(purely&nbsp;temporal&nbsp;subsystem):<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;auditory.py<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#AuditoryCortex">AuditoryCortex</a>&nbsp;—&nbsp;spectral&nbsp;feature&nbsp;extraction,&nbsp;sound&nbsp;event<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;classification&nbsp;(speech/music/impact/noise/nature).&nbsp;Runs&nbsp;in<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;a&nbsp;background&nbsp;thread,&nbsp;captures&nbsp;audio&nbsp;via&nbsp;sounddevice,&nbsp;computes<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;FFT-based&nbsp;features&nbsp;on&nbsp;1024-sample&nbsp;blocks.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;object_recognition.py<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#ObjectRecognizer">ObjectRecognizer</a>&nbsp;—&nbsp;YOLOv5s-based&nbsp;<a href="builtins.html#object">object</a>&nbsp;detection&nbsp;and<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;identification.&nbsp;Approximates&nbsp;inferotemporal&nbsp;(IT)&nbsp;cortex<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;function:&nbsp;turning&nbsp;pixels&nbsp;into&nbsp;<a href="builtins.html#object">object</a>&nbsp;labels&nbsp;with&nbsp;position<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;invariance.&nbsp;Detects&nbsp;80&nbsp;COCO&nbsp;categories.<br>
+&nbsp;<br>
+Top-level&nbsp;modules&nbsp;referenced&nbsp;by&nbsp;this&nbsp;subsystem&nbsp;(multi-subsystem):<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(top-level)&nbsp;memory/<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MemorySystem&nbsp;—&nbsp;episodic&nbsp;memory&nbsp;retrieval&nbsp;and&nbsp;context<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(hippocampal,&nbsp;temporal&nbsp;subsystem)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;AttractorNetwork&nbsp;—&nbsp;CA3-like&nbsp;pattern&nbsp;completion<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(hippocampal,&nbsp;temporal&nbsp;subsystem)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;EmotionalMemorySystem&nbsp;—&nbsp;emotional&nbsp;memory&nbsp;tagging<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(amygdala-temporal)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;PrimingSystem&nbsp;—&nbsp;priming/association&nbsp;activation<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(temporal&nbsp;subsystem)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SpreadingActivation&nbsp;—&nbsp;spreading&nbsp;activation&nbsp;across&nbsp;network<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(temporal&nbsp;subsystem)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;WorkingMemory&nbsp;—&nbsp;Baddeley&nbsp;working&nbsp;memory&nbsp;model<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(frontal&nbsp;subsystem&nbsp;—&nbsp;referenced&nbsp;by&nbsp;control)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ProceduralMemory&nbsp;—&nbsp;skills&nbsp;and&nbsp;habits<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(basal&nbsp;ganglia)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SemanticMemory&nbsp;—&nbsp;semantic&nbsp;knowledge&nbsp;store<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(neocortical,&nbsp;temporal-parietal)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SpacedRepetitionScheduler&nbsp;—&nbsp;spaced&nbsp;repetition<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(learning&nbsp;mechanism,&nbsp;not&nbsp;subsystem-specific)<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(this&nbsp;region&nbsp;—&nbsp;Wernicke's&nbsp;side&nbsp;of&nbsp;language)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;comprehension.py,&nbsp;acquisition.py,&nbsp;vocabulary.py,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;morphology.py,&nbsp;figurative.py,&nbsp;statistical_learner.py,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;base.py,&nbsp;semantic_grounding.py&nbsp;—&nbsp;parsing,&nbsp;the&nbsp;lexicon,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;semantic&nbsp;grounding.&nbsp;Production&nbsp;(generator.py,&nbsp;grammar.py,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;voice.py,&nbsp;...)&nbsp;is&nbsp;Broca's&nbsp;side&nbsp;and&nbsp;lives&nbsp;in&nbsp;frontal_lobe.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Anatomically&nbsp;the&nbsp;language&nbsp;network&nbsp;spans&nbsp;left&nbsp;temporal<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(Wernicke's)&nbsp;and&nbsp;left&nbsp;frontal&nbsp;(Broca's),&nbsp;but&nbsp;the&nbsp;temporal<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;subsystem&nbsp;is&nbsp;the&nbsp;primary&nbsp;semantic&nbsp;center.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(concepts/)&nbsp;network.py<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ConceptNetwork&nbsp;—&nbsp;the&nbsp;semantic&nbsp;graph.&nbsp;Nodes&nbsp;are&nbsp;concepts,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;edges&nbsp;are&nbsp;relationships.&nbsp;This&nbsp;is&nbsp;the&nbsp;anterior&nbsp;temporal<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;subsystem's&nbsp;semantic&nbsp;hub&nbsp;—&nbsp;the&nbsp;region&nbsp;that&nbsp;binds&nbsp;multimodal<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;features&nbsp;into&nbsp;unified&nbsp;concept&nbsp;representations.&nbsp;Used&nbsp;by<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;nearly&nbsp;every&nbsp;module.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(concepts/)&nbsp;embeddings.py<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;EmbeddingStore&nbsp;—&nbsp;the&nbsp;latent&nbsp;semantic&nbsp;space.&nbsp;Provides<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sub-symbolic&nbsp;vector&nbsp;representations&nbsp;for&nbsp;concepts.&nbsp;This<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;is&nbsp;the&nbsp;temporal&nbsp;subsystem's&nbsp;latent&nbsp;semantic&nbsp;space&nbsp;beneath&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;symbolic&nbsp;concept&nbsp;network.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(infrastructure/)&nbsp;wordnet_dictionary.py<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;WordNetDictionary&nbsp;—&nbsp;Genesis's&nbsp;primary&nbsp;word&nbsp;reference.&nbsp;Looks<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;up&nbsp;definitions,&nbsp;synonyms,&nbsp;hypernyms.&nbsp;Anatomically&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;temporal&nbsp;subsystem&nbsp;stores&nbsp;lexical-semantic&nbsp;knowledge.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(infrastructure/)&nbsp;vq_codebook.py<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;VQCodebook&nbsp;—&nbsp;vector&nbsp;quantization&nbsp;of&nbsp;the&nbsp;embedding&nbsp;space.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Compresses&nbsp;the&nbsp;210-dimensional&nbsp;embeddings&nbsp;into&nbsp;discrete<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;codes.&nbsp;Temporal&nbsp;subsystem&nbsp;semantic&nbsp;compression.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(concepts/)&nbsp;holographic.py<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;HolographicAssociativeGraph&nbsp;—&nbsp;fixed-size&nbsp;associative&nbsp;memory.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Replaces&nbsp;auto-generated&nbsp;bridge&nbsp;edges&nbsp;with&nbsp;a&nbsp;holographic<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;representation.&nbsp;Temporal-limbic&nbsp;associative&nbsp;memory.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(concepts/)&nbsp;archive.py<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ConceptArchive&nbsp;—&nbsp;long-term&nbsp;concept&nbsp;storage.&nbsp;Two-tier<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;memory&nbsp;mirroring&nbsp;biological&nbsp;memory:&nbsp;active&nbsp;(hippocampal)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;and&nbsp;archived&nbsp;(neocortical).&nbsp;Temporal&nbsp;subsystem&nbsp;memory&nbsp;tiers.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(concepts/)&nbsp;edge_proposer.py<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;EdgeProposer&nbsp;—&nbsp;discovers&nbsp;new&nbsp;concept&nbsp;relationships&nbsp;from<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;embedding&nbsp;proximity.&nbsp;Runs&nbsp;during&nbsp;sleep&nbsp;(hippocampal&nbsp;replay<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;+&nbsp;consolidation).&nbsp;Temporal&nbsp;subsystem&nbsp;+&nbsp;sleep&nbsp;interaction.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(concepts/)&nbsp;schema_induction.py<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SchemaInducer&nbsp;—&nbsp;reifies&nbsp;repeated&nbsp;relational&nbsp;structure&nbsp;into<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;schema&nbsp;concepts&nbsp;(``_gen:``&nbsp;hubs)&nbsp;during&nbsp;sleep&nbsp;consolidation.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;abstraction&nbsp;step&nbsp;of&nbsp;consolidation:&nbsp;shared&nbsp;roles&nbsp;collapse<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;into&nbsp;named&nbsp;classes.&nbsp;Temporal&nbsp;subsystem&nbsp;+&nbsp;sleep&nbsp;interaction.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(concepts/)&nbsp;topology.py<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;NetworkTopology&nbsp;—&nbsp;graph-theoretic&nbsp;metrics&nbsp;on&nbsp;the&nbsp;concept<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;network.&nbsp;Computes&nbsp;clustering,&nbsp;small-world&nbsp;properties,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;hub&nbsp;detection.&nbsp;Temporal&nbsp;subsystem&nbsp;knowledge&nbsp;structure&nbsp;analysis.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(perception/)&nbsp;ambient.py<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;AmbientListener&nbsp;—&nbsp;speech&nbsp;recognition&nbsp;via&nbsp;Vosk.&nbsp;Captures<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;audio&nbsp;and&nbsp;transcribes&nbsp;utterances.&nbsp;The&nbsp;auditory-temporal<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;pathway:&nbsp;cochlea&nbsp;-&gt;&nbsp;auditory&nbsp;cortex&nbsp;-&gt;&nbsp;Wernicke's&nbsp;area.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;speech.py<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Voice&nbsp;—&nbsp;text-to-speech&nbsp;(Piper)&nbsp;and&nbsp;speech-to-text&nbsp;(Vosk).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Motor&nbsp;output&nbsp;of&nbsp;language&nbsp;(Broca's&nbsp;area&nbsp;+&nbsp;motor&nbsp;cortex).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Anatomically&nbsp;frontal&nbsp;but&nbsp;functionally&nbsp;part&nbsp;of&nbsp;the&nbsp;language<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;network&nbsp;centered&nbsp;in&nbsp;the&nbsp;temporal&nbsp;subsystem.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(thalamus/)&nbsp;brain_waves.py<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Brain&nbsp;wave&nbsp;system&nbsp;—&nbsp;tracks&nbsp;theta,&nbsp;gamma,&nbsp;alpha,&nbsp;beta,&nbsp;delta<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;across&nbsp;all&nbsp;subsystems.&nbsp;Referenced&nbsp;by&nbsp;every&nbsp;subsystem.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;mtl_bridge.py<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="#MemoryBridge">MemoryBridge</a>&nbsp;—&nbsp;the&nbsp;VTC&nbsp;-&gt;&nbsp;concept&nbsp;embedding&nbsp;projection.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Owned&nbsp;here:&nbsp;the&nbsp;medial&nbsp;temporal&nbsp;lobe&nbsp;is&nbsp;the&nbsp;ventral<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"what"&nbsp;stream's&nbsp;endpoint.&nbsp;``occipital_lobe``&nbsp;imports&nbsp;it<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;across&nbsp;the&nbsp;boundary&nbsp;rather&nbsp;than&nbsp;duplicating&nbsp;it.<br>
+&nbsp;<br>
+Modules&nbsp;homed&nbsp;in&nbsp;or&nbsp;used&nbsp;by&nbsp;this&nbsp;subsystem:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(temporal_lobe/)&nbsp;concept_learner.py,&nbsp;topic_resolver.py,&nbsp;memory_store.py<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ConceptLearner&nbsp;—&nbsp;word&nbsp;labeling&nbsp;and&nbsp;activation&nbsp;spreading&nbsp;into<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;network&nbsp;(semantic&nbsp;learning).&nbsp;TopicResolver&nbsp;—&nbsp;topic<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;extraction&nbsp;and&nbsp;concept&nbsp;variant&nbsp;matching&nbsp;(lexical-semantic<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;lookup).&nbsp;MemoryStore&nbsp;—&nbsp;conversation&nbsp;and&nbsp;cognitive&nbsp;event<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;persistence&nbsp;(episodic&nbsp;recording).<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(sleep&nbsp;package)&nbsp;dream_synthesis.py,&nbsp;compression.py<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DreamSynthesis&nbsp;—&nbsp;REM-time&nbsp;proposal&nbsp;of&nbsp;novel&nbsp;typed&nbsp;edges<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;between&nbsp;structurally&nbsp;similar&nbsp;far-apart&nbsp;concepts,&nbsp;validated&nbsp;on<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;waking.&nbsp;SleepCompressor&nbsp;—&nbsp;the&nbsp;bounded-memory&nbsp;compaction&nbsp;pass<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(VQ&nbsp;retraining,&nbsp;holographic&nbsp;edge&nbsp;migration,&nbsp;episode<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;summarization).&nbsp;Both&nbsp;are&nbsp;hippocampal-replay&nbsp;processes&nbsp;riding<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;on&nbsp;the&nbsp;sleep&nbsp;state&nbsp;the&nbsp;brainstem&nbsp;sets.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(concepts/)&nbsp;consolidation.py,&nbsp;dynamics.py,&nbsp;extraction.py,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;archival.py,&nbsp;edge_log.py,&nbsp;types.py<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;semantic&nbsp;hub's&nbsp;machinery:&nbsp;ConsolidationMixin&nbsp;(sleep<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;processing&nbsp;and&nbsp;review&nbsp;bridges),&nbsp;DynamicsMixin&nbsp;(spreading<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;activation&nbsp;and&nbsp;cortical&nbsp;ticks),&nbsp;ExtractionMixin&nbsp;(concept<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;extraction&nbsp;from&nbsp;text),&nbsp;ArchivalMixin&nbsp;(the&nbsp;archival&nbsp;tier),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;EdgeLog&nbsp;(the&nbsp;append-only&nbsp;edge&nbsp;journal&nbsp;with&nbsp;web&nbsp;provenance),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;and&nbsp;the&nbsp;CorticalLayer/Provenance&nbsp;types.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(perception/)&nbsp;core.py,&nbsp;recognition.py<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Intent&nbsp;/&nbsp;QuestionType&nbsp;—&nbsp;input-side&nbsp;comprehension<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;classification&nbsp;(what&nbsp;kind&nbsp;of&nbsp;speech&nbsp;act,&nbsp;what&nbsp;kind&nbsp;of<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;question)&nbsp;—&nbsp;Wernicke's-side&nbsp;parsing.&nbsp;FaceRecognizer&nbsp;—<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;YuNet&nbsp;detection&nbsp;+&nbsp;SFace&nbsp;128-d&nbsp;embeddings;&nbsp;the&nbsp;fusiform&nbsp;face<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;area&nbsp;(occipitotemporal;&nbsp;also&nbsp;used&nbsp;by&nbsp;occipital_lobe).<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(Wernicke's&nbsp;side&nbsp;of&nbsp;language)&nbsp;figurative.py,&nbsp;statistical_learner.py,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;semantic_grounding.py,&nbsp;base.py,&nbsp;morphology.py<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;FigurativeLanguageProcessor&nbsp;—&nbsp;metaphor&nbsp;(cross-domain&nbsp;"X&nbsp;is<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Y")&nbsp;and&nbsp;irony&nbsp;detection.&nbsp;StatisticalLanguageLearner&nbsp;—&nbsp;n-gram<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;patterns&nbsp;and&nbsp;user-style&nbsp;adaptation&nbsp;from&nbsp;heard&nbsp;input.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SemanticGrounder&nbsp;—&nbsp;resolves&nbsp;heard&nbsp;names&nbsp;against&nbsp;the&nbsp;network<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;without&nbsp;mutating&nbsp;it.&nbsp;base.py&nbsp;—&nbsp;the&nbsp;Thought&nbsp;/<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SyntacticStructure&nbsp;/&nbsp;Language&nbsp;interface&nbsp;both&nbsp;language<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;halves&nbsp;implement.&nbsp;morphology.py&nbsp;—&nbsp;the&nbsp;shared&nbsp;inflectional<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;engine:&nbsp;comprehension&nbsp;deconjugates&nbsp;("runs"&nbsp;→&nbsp;"run"),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;production&nbsp;conjugates&nbsp;("they&nbsp;run"&nbsp;vs&nbsp;"it&nbsp;runs");&nbsp;one&nbsp;module<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;so&nbsp;the&nbsp;two&nbsp;systems&nbsp;never&nbsp;disagree&nbsp;about&nbsp;English.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(temporal_lobe/)&nbsp;stdp.py,&nbsp;synapses.py,&nbsp;plasticity.py,&nbsp;dual.py<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;STDP&nbsp;over&nbsp;SynapticStore&nbsp;—&nbsp;timing-dependent&nbsp;synaptic&nbsp;efficacy,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;deliberately&nbsp;separate&nbsp;from&nbsp;the&nbsp;semantic&nbsp;graph&nbsp;and&nbsp;embeddings<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(see&nbsp;the&nbsp;STDP&nbsp;section&nbsp;above).&nbsp;HebbianPlasticity&nbsp;—&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;correlation-based&nbsp;counterpart&nbsp;that&nbsp;adapts&nbsp;the&nbsp;embeddings.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;DualSystemLearner&nbsp;—&nbsp;hippocampal&nbsp;episodes&nbsp;consolidating&nbsp;into<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;neocortical&nbsp;memory&nbsp;(HippocampalEpisode&nbsp;-&gt;&nbsp;NeocorticalMemory).<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(self/)&nbsp;learning.py<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SelfDirectedLearner&nbsp;—&nbsp;deriving&nbsp;new&nbsp;network&nbsp;facts&nbsp;from&nbsp;what&nbsp;it<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;already&nbsp;knows&nbsp;(reasoning,&nbsp;inference,&nbsp;conversation)&nbsp;instead&nbsp;of<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;fetching&nbsp;from&nbsp;external&nbsp;sources.&nbsp;Semantic&nbsp;learning,&nbsp;temporal.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;events.py,&nbsp;presence.py&nbsp;(the&nbsp;former<br>
+&nbsp;&nbsp;&nbsp;&nbsp;world/&nbsp;package's&nbsp;brain-side&nbsp;halves)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;external&nbsp;environment&nbsp;itself&nbsp;—&nbsp;``OuterEnvironment``&nbsp;—&nbsp;lives&nbsp;in<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;``environment``&nbsp;(environment-side,&nbsp;not&nbsp;brain&nbsp;tissue);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;this&nbsp;package&nbsp;consumes&nbsp;it&nbsp;because&nbsp;the&nbsp;remembered,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;relational&nbsp;structure&nbsp;it&nbsp;holds&nbsp;IS&nbsp;the&nbsp;hippocampal–entorhinal<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cognitive&nbsp;map&nbsp;plus&nbsp;the&nbsp;superior&nbsp;temporal&nbsp;sulcus's&nbsp;social<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;perception.&nbsp;The&nbsp;world&nbsp;also&nbsp;holds&nbsp;her&nbsp;channel&nbsp;—&nbsp;the&nbsp;public<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;page&nbsp;where&nbsp;she&nbsp;posts&nbsp;and,&nbsp;when&nbsp;an&nbsp;ear&nbsp;exists,&nbsp;hears;&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;page&nbsp;<a href="builtins.html#object">object</a>&nbsp;itself&nbsp;is&nbsp;environment-side&nbsp;(``discord.channel``),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;not&nbsp;a&nbsp;mind&nbsp;organ.&nbsp;The&nbsp;neuroanatomical<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;substrate&nbsp;is&nbsp;the&nbsp;hippocampal–entorhinal&nbsp;cognitive&nbsp;map&nbsp;plus<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;superior&nbsp;temporal&nbsp;sulcus's&nbsp;social&nbsp;perception:&nbsp;a&nbsp;map&nbsp;of<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;states&nbsp;and&nbsp;transitions&nbsp;learned&nbsp;from&nbsp;experience&nbsp;(Tolman;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;O'Keefe&nbsp;&amp;&nbsp;Nadel;&nbsp;successor-representation&nbsp;predictive&nbsp;maps,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Stachenfeld&nbsp;et&nbsp;al.&nbsp;2017;&nbsp;structure/content&nbsp;factorization&nbsp;in<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;MEC,&nbsp;Whittington&nbsp;et&nbsp;al.&nbsp;2020&nbsp;—&nbsp;and,&nbsp;current&nbsp;as&nbsp;of<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;October&nbsp;2026,&nbsp;compositional-map&nbsp;models&nbsp;in&nbsp;Nature<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Communications&nbsp;2025&nbsp;and&nbsp;predictive-map&nbsp;accounts&nbsp;in&nbsp;Frontiers<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2026).&nbsp;Presence&nbsp;records&nbsp;are&nbsp;the&nbsp;STS&nbsp;people-detector&nbsp;output;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;event&nbsp;stream&nbsp;is&nbsp;the&nbsp;episodic&nbsp;record&nbsp;the&nbsp;hippocampus&nbsp;keeps.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(brainstem/)&nbsp;architecture.py&nbsp;—&nbsp;the&nbsp;consolidation&nbsp;machinery<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SynapticDownscaler&nbsp;(the&nbsp;synaptic&nbsp;homeostasis&nbsp;downscaler&nbsp;—<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SHY's&nbsp;slow-wave&nbsp;downscaling)&nbsp;and&nbsp;HippocampalReplay<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(ReplayItem&nbsp;—&nbsp;the&nbsp;replay&nbsp;that&nbsp;drives&nbsp;consolidation&nbsp;and&nbsp;dream<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;content).&nbsp;The&nbsp;ultradian&nbsp;SleepCycleTracker&nbsp;rides&nbsp;the&nbsp;same<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;module&nbsp;—&nbsp;all&nbsp;three&nbsp;operate&nbsp;on&nbsp;this&nbsp;package's&nbsp;concept&nbsp;network.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Package Contents</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="Self_World.temporal_lobe.acquisition.html">acquisition</a><br>
+<a href="Self_World.temporal_lobe.auditory.html">auditory</a><br>
+<a href="Self_World.temporal_lobe.base.html">base</a><br>
+<a href="Self_World.temporal_lobe.bdnf.html">bdnf</a><br>
+<a href="Self_World.temporal_lobe.cognitive_map.html">cognitive_map</a><br>
+<a href="Self_World.temporal_lobe.comprehension.html">comprehension</a><br>
+<a href="Self_World.temporal_lobe.concept_learner.html">concept_learner</a><br>
+</td><td class="multicolumn"><a href="Self_World.temporal_lobe.concepts.html"><strong>concepts</strong>&nbsp;(package)</a><br>
+<a href="Self_World.temporal_lobe.dual.html">dual</a><br>
+<a href="Self_World.temporal_lobe.events.html">events</a><br>
+<a href="Self_World.temporal_lobe.figurative.html">figurative</a><br>
+<a href="Self_World.temporal_lobe.memory_store.html">memory_store</a><br>
+<a href="Self_World.temporal_lobe.morphology.html">morphology</a><br>
+<a href="Self_World.temporal_lobe.mtl_bridge.html">mtl_bridge</a><br>
+</td><td class="multicolumn"><a href="Self_World.temporal_lobe.object_recognition.html">object_recognition</a><br>
+<a href="Self_World.temporal_lobe.plasticity.html">plasticity</a><br>
+<a href="Self_World.temporal_lobe.presence.html">presence</a><br>
+<a href="Self_World.temporal_lobe.semantic_grounding.html">semantic_grounding</a><br>
+<a href="Self_World.temporal_lobe.semantics.html">semantics</a><br>
+<a href="Self_World.temporal_lobe.speech.html">speech</a><br>
+<a href="Self_World.temporal_lobe.statistical_learner.html">statistical_learner</a><br>
+</td><td class="multicolumn"><a href="Self_World.temporal_lobe.stdp.html">stdp</a><br>
+<a href="Self_World.temporal_lobe.synapses.html">synapses</a><br>
+<a href="Self_World.temporal_lobe.temporal.html">temporal</a><br>
+<a href="Self_World.temporal_lobe.topic_resolver.html">topic_resolver</a><br>
+<a href="Self_World.temporal_lobe.vocabulary.html">vocabulary</a><br>
+<a href="Self_World.temporal_lobe.vtc.html">vtc</a><br>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.auditory.html#AuditoryCortex">Self_World.temporal_lobe.auditory.AuditoryCortex</a>
+</dt><dt class="heading-text"><a href="Self_World.temporal_lobe.auditory.html#SoundEvent">Self_World.temporal_lobe.auditory.SoundEvent</a>
+</dt><dt class="heading-text"><a href="Self_World.temporal_lobe.mtl_bridge.html#MemoryBridge">Self_World.temporal_lobe.mtl_bridge.MemoryBridge</a>
+</dt><dt class="heading-text"><a href="Self_World.temporal_lobe.mtl_bridge.html#TrainingExample">Self_World.temporal_lobe.mtl_bridge.TrainingExample</a>
+</dt><dt class="heading-text"><a href="Self_World.temporal_lobe.object_recognition.html#DetectedObject">Self_World.temporal_lobe.object_recognition.DetectedObject</a>
+</dt><dt class="heading-text"><a href="Self_World.temporal_lobe.object_recognition.html#ObjectRecognizer">Self_World.temporal_lobe.object_recognition.ObjectRecognizer</a>
+</dt><dt class="heading-text"><a href="Self_World.temporal_lobe.vtc.html#VTCFeatureSpace">Self_World.temporal_lobe.vtc.VTCFeatureSpace</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="AuditoryCortex">class <strong>AuditoryCortex</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#AuditoryCortex">AuditoryCortex</a>(callback:&nbsp;'Callable[[<a href="#SoundEvent">SoundEvent</a>],&nbsp;None]',&nbsp;sample_rate:&nbsp;'int'&nbsp;=&nbsp;16000,&nbsp;block_size:&nbsp;'int'&nbsp;=&nbsp;1024,&nbsp;is_speaking:&nbsp;'Callable[[],&nbsp;bool]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Continuously&nbsp;listens&nbsp;to&nbsp;and&nbsp;classifies&nbsp;non-speech&nbsp;sounds.<br>
+&nbsp;<br>
+Runs&nbsp;a&nbsp;background&nbsp;thread&nbsp;that&nbsp;captures&nbsp;audio,&nbsp;computes&nbsp;spectral<br>
+features&nbsp;in&nbsp;real-time,&nbsp;segments&nbsp;sound&nbsp;events,&nbsp;classifies&nbsp;them,<br>
+and&nbsp;calls&nbsp;a&nbsp;callback&nbsp;for&nbsp;each&nbsp;event.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;callback:&nbsp;Called&nbsp;as&nbsp;``callback(event:&nbsp;<a href="#SoundEvent">SoundEvent</a>)``&nbsp;for&nbsp;each<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;detected&nbsp;sound&nbsp;event.&nbsp;Silence&nbsp;events&nbsp;are&nbsp;emitted&nbsp;at&nbsp;a<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;reduced&nbsp;rate&nbsp;(once&nbsp;per&nbsp;quiet&nbsp;period,&nbsp;not&nbsp;every&nbsp;block).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;sample_rate:&nbsp;Audio&nbsp;sample&nbsp;rate.&nbsp;16000&nbsp;matches&nbsp;the&nbsp;ambient<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;listener.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;block_size:&nbsp;Audio&nbsp;block&nbsp;size&nbsp;for&nbsp;feature&nbsp;extraction.&nbsp;1024<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;samples&nbsp;≈&nbsp;64ms&nbsp;at&nbsp;16kHz.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;is_speaking:&nbsp;Optional&nbsp;callback&nbsp;returning&nbsp;True&nbsp;if&nbsp;Genesis&nbsp;is<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;currently&nbsp;speaking&nbsp;(TTS).&nbsp;When&nbsp;it's&nbsp;speaking,&nbsp;audio<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;capture&nbsp;is&nbsp;paused&nbsp;to&nbsp;prevent&nbsp;self-listening.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="AuditoryCortex-__init__"><strong>__init__</strong></a>(self, callback: 'Callable[[SoundEvent], None]', sample_rate: 'int' = 16000, block_size: 'int' = 1024, is_speaking: 'Callable[[], bool] | None' = None) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;auditory&nbsp;cortex.</span></dd></dl>
+
+<dl><dt><a name="AuditoryCortex-recent_events"><strong>recent_events</strong></a>(self) -&gt; 'list[SoundEvent]'</dt><dd><span class="code">Return&nbsp;recent&nbsp;sound&nbsp;events&nbsp;(for&nbsp;debugging).</span></dd></dl>
+
+<dl><dt><a name="AuditoryCortex-start"><strong>start</strong></a>(self) -&gt; 'bool'</dt><dd><span class="code">Start&nbsp;the&nbsp;auditory&nbsp;cortex.&nbsp;Returns&nbsp;True&nbsp;on&nbsp;success.</span></dd></dl>
+
+<dl><dt><a name="AuditoryCortex-stop"><strong>stop</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Stop&nbsp;the&nbsp;auditory&nbsp;cortex.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>running</strong></dt>
+<dd><span class="code">Whether&nbsp;the&nbsp;auditory&nbsp;cortex&nbsp;thread&nbsp;is&nbsp;active.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="DetectedObject">class <strong>DetectedObject</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#DetectedObject">DetectedObject</a>(name:&nbsp;'str',&nbsp;confidence:&nbsp;'float',&nbsp;bbox:&nbsp;'tuple[int,&nbsp;int,&nbsp;int,&nbsp;int]',&nbsp;center:&nbsp;'tuple[float,&nbsp;float]',&nbsp;area_ratio:&nbsp;'float')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+An&nbsp;<a href="builtins.html#object">object</a>&nbsp;identified&nbsp;in&nbsp;the&nbsp;visual&nbsp;field.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;its&nbsp;ventral-stream&nbsp;percept:&nbsp;it&nbsp;doesn't&nbsp;just&nbsp;see&nbsp;edges,<br>
+it&nbsp;sees&nbsp;*what*&nbsp;is&nbsp;there&nbsp;and&nbsp;*where*&nbsp;it&nbsp;is.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="DetectedObject-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="DetectedObject-__init__"><strong>__init__</strong></a>(self, name: 'str', confidence: 'float', bbox: 'tuple[int, int, int, int]', center: 'tuple[float, float]', area_ratio: 'float') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="DetectedObject-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>position_description</strong></dt>
+<dd><span class="code">Where&nbsp;in&nbsp;its&nbsp;visual&nbsp;field&nbsp;the&nbsp;object&nbsp;is&nbsp;(left/center/right,&nbsp;top/middle/bottom).</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>area_ratio</strong></dt>
+</dl>
+<dl><dt><strong>bbox</strong></dt>
+</dl>
+<dl><dt><strong>center</strong></dt>
+</dl>
+<dl><dt><strong>confidence</strong></dt>
+</dl>
+<dl><dt><strong>name</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'area_ratio': 'float', 'bbox': 'tuple[int, int, int, int]', 'center': 'tuple[float, float]', 'confidence': 'float', 'name': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'area_ratio': Field(name='area_ratio',type='float',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD), 'bbox': Field(name='bbox',type='tuple[int, int, int, int...appingproxy({}),kw_only=False,_field_type=_FIELD), 'center': Field(name='center',type='tuple[float, float]',d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'confidence': Field(name='confidence',type='float',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD), 'name': Field(name='name',type='str',default=&lt;dataclasse...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('name', 'confidence', 'bbox', 'center', 'area_ratio')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="MemoryBridge">class <strong>MemoryBridge</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#MemoryBridge">MemoryBridge</a>(vtc_dim:&nbsp;'int'&nbsp;=&nbsp;32,&nbsp;embedding_dim:&nbsp;'int'&nbsp;=&nbsp;193,&nbsp;ridge_lambda:&nbsp;'float'&nbsp;=&nbsp;0.1)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Medial&nbsp;temporal&nbsp;subsystem&nbsp;bridge&nbsp;—&nbsp;VTC&nbsp;→&nbsp;concept&nbsp;embedding&nbsp;projection.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;key&nbsp;transformation:&nbsp;dense&nbsp;visual&nbsp;feature&nbsp;representations<br>
+in&nbsp;VTC&nbsp;space&nbsp;become&nbsp;sparse&nbsp;concept&nbsp;representations&nbsp;in&nbsp;the&nbsp;MTL.&nbsp;The<br>
+bridge&nbsp;is&nbsp;a&nbsp;linear&nbsp;projection&nbsp;matrix&nbsp;W&nbsp;that&nbsp;maps&nbsp;VTC&nbsp;vectors&nbsp;to<br>
+concept&nbsp;embedding&nbsp;space.<br>
+&nbsp;<br>
+Learning&nbsp;is&nbsp;one-shot:&nbsp;collect&nbsp;(vtc_vector,&nbsp;concept_embedding)&nbsp;pairs<br>
+and&nbsp;solve&nbsp;least-squares:&nbsp;W&nbsp;=&nbsp;argmin&nbsp;‖E&nbsp;-&nbsp;V&nbsp;Wᵀ‖²&nbsp;where&nbsp;E&nbsp;is&nbsp;the<br>
+matrix&nbsp;of&nbsp;concept&nbsp;embeddings&nbsp;and&nbsp;V&nbsp;is&nbsp;the&nbsp;matrix&nbsp;of&nbsp;VTC&nbsp;vectors.<br>
+&nbsp;<br>
+This&nbsp;mirrors&nbsp;how&nbsp;the&nbsp;MTL&nbsp;rapidly&nbsp;encodes&nbsp;new&nbsp;associations&nbsp;—<br>
+human&nbsp;medial-temporal&nbsp;neurons&nbsp;can&nbsp;form&nbsp;selective&nbsp;responses&nbsp;from<br>
+a&nbsp;single&nbsp;exposure&nbsp;(single-trial&nbsp;encoding;&nbsp;Rutishauser&nbsp;et&nbsp;al.,<br>
+2006).<br>
+&nbsp;<br>
+Associations&nbsp;form&nbsp;naturally:&nbsp;when&nbsp;Genesis&nbsp;reads&nbsp;a&nbsp;Wikipedia&nbsp;article<br>
+about&nbsp;"tree"&nbsp;and&nbsp;sees&nbsp;the&nbsp;article's&nbsp;lead&nbsp;image,&nbsp;the&nbsp;VTC&nbsp;vector&nbsp;from<br>
+that&nbsp;image&nbsp;is&nbsp;paired&nbsp;with&nbsp;the&nbsp;"tree"&nbsp;concept&nbsp;embedding.&nbsp;No&nbsp;manual<br>
+teaching&nbsp;—&nbsp;it&nbsp;learns&nbsp;to&nbsp;see&nbsp;the&nbsp;same&nbsp;way&nbsp;it&nbsp;learns&nbsp;to&nbsp;read:&nbsp;by<br>
+encountering&nbsp;images&nbsp;in&nbsp;context.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="MemoryBridge-__init__"><strong>__init__</strong></a>(self, vtc_dim: 'int' = 32, embedding_dim: 'int' = 193, ridge_lambda: 'float' = 0.1) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;MTL&nbsp;bridge.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;vtc_dim:&nbsp;dimensionality&nbsp;of&nbsp;VTC&nbsp;feature&nbsp;vectors.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;embedding_dim:&nbsp;dimensionality&nbsp;of&nbsp;concept&nbsp;embeddings.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ridge_lambda:&nbsp;L2&nbsp;regularization&nbsp;for&nbsp;ridge&nbsp;regression<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(prevents&nbsp;overfitting&nbsp;with&nbsp;few&nbsp;examples).</span></dd></dl>
+
+<dl><dt><a name="MemoryBridge-generate"><strong>generate</strong></a>(self, concept_embedding: 'np.ndarray') -&gt; 'np.ndarray | None'</dt><dd><span class="code">Generate&nbsp;a&nbsp;VTC&nbsp;vector&nbsp;from&nbsp;a&nbsp;concept&nbsp;embedding&nbsp;(top-down&nbsp;path).<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;generative&nbsp;direction:&nbsp;given&nbsp;a&nbsp;concept,&nbsp;predict&nbsp;what<br>
+VTC&nbsp;features&nbsp;it&nbsp;should&nbsp;produce.&nbsp;Used&nbsp;for&nbsp;imagination&nbsp;and<br>
+prediction&nbsp;in&nbsp;the&nbsp;predictive&nbsp;coding&nbsp;loop.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;concept_embedding:&nbsp;embedding&nbsp;vector&nbsp;for&nbsp;the&nbsp;concept.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Predicted&nbsp;VTC&nbsp;vector,&nbsp;or&nbsp;None&nbsp;if&nbsp;bridge&nbsp;isn't&nbsp;trained.</span></dd></dl>
+
+<dl><dt><a name="MemoryBridge-learn_association"><strong>learn_association</strong></a>(self, vtc_vector: 'np.ndarray', concept_name: 'str', concept_embedding: 'np.ndarray') -&gt; 'None'</dt><dd><span class="code">Learn&nbsp;a&nbsp;visual-concept&nbsp;association&nbsp;from&nbsp;natural&nbsp;experience.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;called&nbsp;automatically&nbsp;when&nbsp;Genesis&nbsp;encounters&nbsp;an&nbsp;image<br>
+in&nbsp;context&nbsp;(e.g.,&nbsp;the&nbsp;lead&nbsp;image&nbsp;of&nbsp;a&nbsp;Wikipedia&nbsp;article&nbsp;about<br>
+"tree").&nbsp;The&nbsp;VTC&nbsp;vector&nbsp;from&nbsp;the&nbsp;image&nbsp;is&nbsp;paired&nbsp;with&nbsp;the<br>
+concept&nbsp;embedding,&nbsp;and&nbsp;the&nbsp;projection&nbsp;matrix&nbsp;W&nbsp;is&nbsp;refit.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;vtc_vector:&nbsp;VTC&nbsp;feature&nbsp;vector&nbsp;for&nbsp;the&nbsp;image.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;concept_name:&nbsp;concept&nbsp;ID&nbsp;(e.g.,&nbsp;"tree").<br>
+&nbsp;&nbsp;&nbsp;&nbsp;concept_embedding:&nbsp;embedding&nbsp;vector&nbsp;for&nbsp;the&nbsp;concept.</span></dd></dl>
+
+<dl><dt><a name="MemoryBridge-load"><strong>load</strong></a>(self, path: 'Path' = PosixPath('/home/mindyrenee/.local/share/genesis/visual_cortex/memory_bridge.npz')) -&gt; 'bool'</dt><dd><span class="code">Load&nbsp;MTL&nbsp;bridge&nbsp;from&nbsp;disk.&nbsp;Returns&nbsp;True&nbsp;if&nbsp;loaded.</span></dd></dl>
+
+<dl><dt><a name="MemoryBridge-recognize"><strong>recognize</strong></a>(self, vtc_vector: 'np.ndarray') -&gt; 'tuple[str | None, float]'</dt><dd><span class="code">Recognize&nbsp;what&nbsp;concept&nbsp;an&nbsp;image&nbsp;corresponds&nbsp;to.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;vtc_vector:&nbsp;VTC&nbsp;feature&nbsp;vector&nbsp;for&nbsp;the&nbsp;image.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(concept_name,&nbsp;confidence)&nbsp;or&nbsp;(None,&nbsp;0.0)&nbsp;if&nbsp;unrecognized.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Confidence&nbsp;is&nbsp;cosine&nbsp;similarity&nbsp;to&nbsp;the&nbsp;nearest&nbsp;concept.</span></dd></dl>
+
+<dl><dt><a name="MemoryBridge-recognize_all"><strong>recognize_all</strong></a>(self, vtc_vector: 'np.ndarray', k: 'int' = 5) -&gt; 'list[tuple[str, float]]'</dt><dd><span class="code">Return&nbsp;top-k&nbsp;concept&nbsp;matches&nbsp;for&nbsp;a&nbsp;VTC&nbsp;vector.</span></dd></dl>
+
+<dl><dt><a name="MemoryBridge-save"><strong>save</strong></a>(self, path: 'Path' = PosixPath('/home/mindyrenee/.local/share/genesis/visual_cortex/memory_bridge.npz')) -&gt; 'None'</dt><dd><span class="code">Save&nbsp;MTL&nbsp;bridge&nbsp;to&nbsp;disk.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>embedding_reconstruction_cosine</strong></dt>
+</dl>
+<dl><dt><strong>embedding_reconstruction_mse</strong></dt>
+</dl>
+<dl><dt><strong>embedding_reconstruction_relative_error</strong></dt>
+</dl>
+<dl><dt><strong>n_concepts</strong></dt>
+<dd><span class="code">Number&nbsp;of&nbsp;distinct&nbsp;concepts&nbsp;learned.</span></dd>
+</dl>
+<dl><dt><strong>n_examples</strong></dt>
+<dd><span class="code">Number&nbsp;of&nbsp;training&nbsp;examples.</span></dd>
+</dl>
+<dl><dt><strong>vtc_cycle_reconstruction_mse</strong></dt>
+</dl>
+<dl><dt><strong>vtc_cycle_reconstruction_relative_error</strong></dt>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ObjectRecognizer">class <strong>ObjectRecognizer</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ObjectRecognizer">ObjectRecognizer</a>()&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Detect&nbsp;and&nbsp;identify&nbsp;objects&nbsp;using&nbsp;YOLOv5s.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;Genesis's&nbsp;inferotemporal&nbsp;cortex&nbsp;—&nbsp;the&nbsp;ventral-stream<br>
+"what"&nbsp;pathway&nbsp;that&nbsp;turns&nbsp;pixels&nbsp;into&nbsp;<a href="builtins.html#object">object</a>&nbsp;categories.&nbsp;It&nbsp;is<br>
+lazily&nbsp;initialized&nbsp;on&nbsp;first&nbsp;use.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ObjectRecognizer-__init__"><strong>__init__</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;<a href="builtins.html#object">object</a>&nbsp;recognizer&nbsp;with&nbsp;no&nbsp;loaded&nbsp;model.<br>
+&nbsp;<br>
+The&nbsp;YOLOv5s&nbsp;ONNX&nbsp;model&nbsp;is&nbsp;loaded&nbsp;lazily&nbsp;on&nbsp;first&nbsp;use&nbsp;via<br>
+``<a href="#ObjectRecognizer-is_available">is_available</a>()``&nbsp;or&nbsp;``<a href="#ObjectRecognizer-detect_objects">detect_objects</a>()``,&nbsp;so&nbsp;constructing<br>
+this&nbsp;<a href="builtins.html#object">object</a>&nbsp;is&nbsp;cheap&nbsp;even&nbsp;if&nbsp;the&nbsp;model&nbsp;file&nbsp;is&nbsp;missing.</span></dd></dl>
+
+<dl><dt><a name="ObjectRecognizer-detect_objects"><strong>detect_objects</strong></a>(self, rgb_frame: 'np.ndarray') -&gt; 'list[DetectedObject]'</dt><dd><span class="code">Detect&nbsp;objects&nbsp;in&nbsp;an&nbsp;RGB&nbsp;frame.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;rgb_frame:&nbsp;HxWx3&nbsp;uint8&nbsp;RGB&nbsp;image&nbsp;from&nbsp;the&nbsp;optic&nbsp;nerve.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;List&nbsp;of&nbsp;<a href="#DetectedObject">DetectedObject</a>,&nbsp;sorted&nbsp;by&nbsp;confidence&nbsp;(highest&nbsp;first).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Empty&nbsp;list&nbsp;if&nbsp;no&nbsp;objects&nbsp;are&nbsp;detected&nbsp;or&nbsp;the&nbsp;model&nbsp;is<br>
+&nbsp;&nbsp;&nbsp;&nbsp;unavailable.</span></dd></dl>
+
+<dl><dt><a name="ObjectRecognizer-is_available"><strong>is_available</strong></a>(self) -&gt; 'bool'</dt><dd><span class="code">Check&nbsp;if&nbsp;the&nbsp;<a href="builtins.html#object">object</a>&nbsp;detection&nbsp;model&nbsp;is&nbsp;loaded.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SoundEvent">class <strong>SoundEvent</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SoundEvent">SoundEvent</a>(sound_type:&nbsp;'str',&nbsp;confidence:&nbsp;'float',&nbsp;loudness:&nbsp;'float',&nbsp;brightness:&nbsp;'float',&nbsp;noisiness:&nbsp;'float',&nbsp;duration:&nbsp;'float',&nbsp;timestamp:&nbsp;'float',&nbsp;description:&nbsp;'str'&nbsp;=&nbsp;'')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;perceived&nbsp;sound&nbsp;event&nbsp;in&nbsp;the&nbsp;environment.<br>
+&nbsp;<br>
+Attributes:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;sound_type:&nbsp;Category&nbsp;of&nbsp;the&nbsp;sound&nbsp;—&nbsp;"music",&nbsp;"impact",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"noise",&nbsp;"nature",&nbsp;"silence".&nbsp;Speech&nbsp;is&nbsp;handled&nbsp;by<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;ambient&nbsp;listener,&nbsp;not&nbsp;here.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;confidence:&nbsp;Classification&nbsp;confidence,&nbsp;0-1.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;loudness:&nbsp;Normalized&nbsp;RMS&nbsp;energy,&nbsp;0-1&nbsp;(0&nbsp;=&nbsp;silence,&nbsp;1&nbsp;=&nbsp;very<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;loud).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;brightness:&nbsp;Spectral&nbsp;centroid&nbsp;normalized&nbsp;to&nbsp;0-1&nbsp;(0&nbsp;=&nbsp;deep/<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dark,&nbsp;1&nbsp;=&nbsp;bright/sharp).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;noisiness:&nbsp;Spectral&nbsp;flatness&nbsp;(Wiener&nbsp;entropy)&nbsp;normalized&nbsp;to<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;0-1&nbsp;(0&nbsp;=&nbsp;tonal/smooth,&nbsp;1&nbsp;=&nbsp;noisy/broadband).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;duration:&nbsp;Duration&nbsp;of&nbsp;the&nbsp;event&nbsp;in&nbsp;seconds.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;timestamp:&nbsp;Unix&nbsp;timestamp&nbsp;of&nbsp;when&nbsp;the&nbsp;event&nbsp;was&nbsp;detected.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;description:&nbsp;A&nbsp;short&nbsp;structural&nbsp;description&nbsp;of&nbsp;the&nbsp;sound's<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;features&nbsp;(not&nbsp;a&nbsp;sentence&nbsp;template&nbsp;—&nbsp;this&nbsp;is&nbsp;metadata<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;the&nbsp;language&nbsp;engine&nbsp;to&nbsp;compose&nbsp;from).<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="SoundEvent-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="SoundEvent-__init__"><strong>__init__</strong></a>(self, sound_type: 'str', confidence: 'float', loudness: 'float', brightness: 'float', noisiness: 'float', duration: 'float', timestamp: 'float', description: 'str' = '') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="SoundEvent-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>emotional_valence</strong></dt>
+<dd><span class="code">Rough&nbsp;emotional&nbsp;valence&nbsp;of&nbsp;the&nbsp;sound.<br>
+&nbsp;<br>
+Positive&nbsp;for&nbsp;music/nature,&nbsp;negative&nbsp;for&nbsp;impact/noise.<br>
+This&nbsp;is&nbsp;a&nbsp;structural&nbsp;signal,&nbsp;not&nbsp;a&nbsp;hardcoded&nbsp;response&nbsp;—<br>
+its&nbsp;cognition&nbsp;decides&nbsp;how&nbsp;to&nbsp;actually&nbsp;feel&nbsp;about&nbsp;it.</span></dd>
+</dl>
+<dl><dt><strong>is_silence</strong></dt>
+<dd><span class="code">True&nbsp;if&nbsp;this&nbsp;is&nbsp;a&nbsp;silence&nbsp;event.</span></dd>
+</dl>
+<dl><dt><strong>is_sudden</strong></dt>
+<dd><span class="code">True&nbsp;if&nbsp;this&nbsp;is&nbsp;a&nbsp;sudden/impact&nbsp;sound&nbsp;(startle-relevant).</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'brightness': 'float', 'confidence': 'float', 'description': 'str', 'duration': 'float', 'loudness': 'float', 'noisiness': 'float', 'sound_type': 'str', 'timestamp': 'float'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'brightness': Field(name='brightness',type='float',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD), 'confidence': Field(name='confidence',type='float',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD), 'description': Field(name='description',type='str',default='',d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'duration': Field(name='duration',type='float',default=&lt;data...appingproxy({}),kw_only=False,_field_type=_FIELD), 'loudness': Field(name='loudness',type='float',default=&lt;data...appingproxy({}),kw_only=False,_field_type=_FIELD), 'noisiness': Field(name='noisiness',type='float',default=&lt;dat...appingproxy({}),kw_only=False,_field_type=_FIELD), 'sound_type': Field(name='sound_type',type='str',default=&lt;data...appingproxy({}),kw_only=False,_field_type=_FIELD), 'timestamp': Field(name='timestamp',type='float',default=&lt;dat...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('sound_type', 'confidence', 'loudness', 'brightness', 'noisiness', 'duration', 'timestamp', 'description')</dl>
+
+<dl><dt><strong>description</strong> = ''</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="TrainingExample">class <strong>TrainingExample</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#TrainingExample">TrainingExample</a>(vtc_vector:&nbsp;'list[float]',&nbsp;concept_name:&nbsp;'str',&nbsp;timestamp:&nbsp;'float',&nbsp;correct:&nbsp;'bool'&nbsp;=&nbsp;True)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;single&nbsp;visual&nbsp;teaching&nbsp;example.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="TrainingExample-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="TrainingExample-__init__"><strong>__init__</strong></a>(self, vtc_vector: 'list[float]', concept_name: 'str', timestamp: 'float', correct: 'bool' = True) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="TrainingExample-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'concept_name': 'str', 'correct': 'bool', 'timestamp': 'float', 'vtc_vector': 'list[float]'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'concept_name': Field(name='concept_name',type='str',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD), 'correct': Field(name='correct',type='bool',default=True,de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'timestamp': Field(name='timestamp',type='float',default=&lt;dat...appingproxy({}),kw_only=False,_field_type=_FIELD), 'vtc_vector': Field(name='vtc_vector',type='list[float]',defau...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('vtc_vector', 'concept_name', 'timestamp', 'correct')</dl>
+
+<dl><dt><strong>correct</strong> = True</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="VTCFeatureSpace">class <strong>VTCFeatureSpace</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#VTCFeatureSpace">VTCFeatureSpace</a>(input_dim:&nbsp;'int'&nbsp;=&nbsp;64,&nbsp;n_components:&nbsp;'int'&nbsp;=&nbsp;32,&nbsp;forgetting_factor:&nbsp;'float'&nbsp;=&nbsp;0.99)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Ventral&nbsp;temporal&nbsp;cortex&nbsp;—&nbsp;axis-based&nbsp;feature&nbsp;space.<br>
+&nbsp;<br>
+PCA&nbsp;of&nbsp;V4&nbsp;activations&nbsp;creates&nbsp;a&nbsp;low-dimensional&nbsp;feature&nbsp;space<br>
+whose&nbsp;axes&nbsp;capture&nbsp;the&nbsp;principal&nbsp;variations&nbsp;in&nbsp;mid-level&nbsp;visual<br>
+features.&nbsp;This&nbsp;mirrors&nbsp;the&nbsp;axis-based&nbsp;organization&nbsp;reported&nbsp;for<br>
+primate&nbsp;inferotemporal&nbsp;cortex&nbsp;(Bao&nbsp;et&nbsp;al.,&nbsp;2020,&nbsp;Nature&nbsp;—&nbsp;a&nbsp;map<br>
+of&nbsp;<a href="builtins.html#object">object</a>&nbsp;space):&nbsp;neurons&nbsp;are&nbsp;organized&nbsp;along&nbsp;feature&nbsp;dimensions<br>
+(shape,&nbsp;texture,&nbsp;color,&nbsp;curvature),&nbsp;and&nbsp;the&nbsp;space&nbsp;is&nbsp;where<br>
+objects&nbsp;cluster&nbsp;by&nbsp;category.<br>
+&nbsp;<br>
+The&nbsp;space&nbsp;is&nbsp;learned&nbsp;incrementally&nbsp;—&nbsp;each&nbsp;new&nbsp;image&nbsp;updates&nbsp;the<br>
+PCA&nbsp;basis&nbsp;via&nbsp;incremental&nbsp;PCA.&nbsp;This&nbsp;mirrors&nbsp;how&nbsp;the&nbsp;visual&nbsp;system<br>
+refines&nbsp;its&nbsp;feature&nbsp;space&nbsp;through&nbsp;experience.<br>
+&nbsp;<br>
+The&nbsp;output&nbsp;is&nbsp;a&nbsp;fixed-dimensional&nbsp;vector&nbsp;(vtc_vector)&nbsp;that&nbsp;serves<br>
+as&nbsp;the&nbsp;input&nbsp;to&nbsp;the&nbsp;MTL&nbsp;bridge.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="VTCFeatureSpace-__init__"><strong>__init__</strong></a>(self, input_dim: 'int' = 64, n_components: 'int' = 32, forgetting_factor: 'float' = 0.99) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;VTC&nbsp;feature&nbsp;space.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;input_dim:&nbsp;dimensionality&nbsp;of&nbsp;V4&nbsp;latent&nbsp;vectors.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;n_components:&nbsp;number&nbsp;of&nbsp;PCA&nbsp;components&nbsp;(VTC&nbsp;axes).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;forgetting_factor:&nbsp;EMA&nbsp;forgetting&nbsp;factor&nbsp;for&nbsp;incremental<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;updates&nbsp;(0.99&nbsp;=&nbsp;slow&nbsp;adaptation,&nbsp;preserves&nbsp;long-term<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;structure&nbsp;while&nbsp;allowing&nbsp;gradual&nbsp;refinement).</span></dd></dl>
+
+<dl><dt><a name="VTCFeatureSpace-load"><strong>load</strong></a>(self, path: 'Path' = PosixPath('/home/mindyrenee/.local/share/genesis/visual_cortex/vtc_space.npz')) -&gt; 'bool'</dt><dd><span class="code">Load&nbsp;VTC&nbsp;PCA&nbsp;state&nbsp;from&nbsp;disk.&nbsp;Returns&nbsp;True&nbsp;if&nbsp;loaded.</span></dd></dl>
+
+<dl><dt><a name="VTCFeatureSpace-process"><strong>process</strong></a>(self, v4_latents: 'np.ndarray', learn: 'bool' = True) -&gt; 'np.ndarray'</dt><dd><span class="code">Project&nbsp;V4&nbsp;activations&nbsp;into&nbsp;the&nbsp;VTC&nbsp;feature&nbsp;space.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;v4_latents:&nbsp;(n_v4_units,&nbsp;n_v4_features)&nbsp;V4&nbsp;latent&nbsp;activations.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;learn:&nbsp;if&nbsp;True,&nbsp;update&nbsp;the&nbsp;PCA&nbsp;basis.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;vtc_vector:&nbsp;(n_components,)&nbsp;—&nbsp;the&nbsp;visual&nbsp;feature&nbsp;vector<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;in&nbsp;VTC&nbsp;space.&nbsp;This&nbsp;is&nbsp;a&nbsp;global&nbsp;descriptor&nbsp;of&nbsp;the&nbsp;image,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;computed&nbsp;as&nbsp;the&nbsp;mean&nbsp;V4&nbsp;activation&nbsp;projected&nbsp;through&nbsp;PCA.</span></dd></dl>
+
+<dl><dt><a name="VTCFeatureSpace-save"><strong>save</strong></a>(self, path: 'Path' = PosixPath('/home/mindyrenee/.local/share/genesis/visual_cortex/vtc_space.npz')) -&gt; 'None'</dt><dd><span class="code">Save&nbsp;VTC&nbsp;PCA&nbsp;state&nbsp;to&nbsp;disk.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>COCO_CLASSES</strong> = ['person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat', 'traffic light', 'fire hydrant', 'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep', 'cow', ...]<br>
+<strong>__all__</strong> = ['COCO_CLASSES', 'AuditoryCortex', 'DetectedObject', 'MemoryBridge', 'ObjectRecognizer', 'SoundEvent', 'TrainingExample', 'VTCFeatureSpace']</td></tr></table>
+</body></html>

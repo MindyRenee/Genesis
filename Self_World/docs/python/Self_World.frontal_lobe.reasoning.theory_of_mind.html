@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.frontal_lobe.reasoning.theory_of_mind</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.frontal_lobe.html" class="white">frontal_lobe</a>.<a href="Self_World.frontal_lobe.reasoning.html" class="white">reasoning</a>.theory_of_mind</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/reasoning/theory_of_mind.py">/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/reasoning/theory_of_mind.py</a></td></tr></table>
+    <p><span class="code">Theory&nbsp;of&nbsp;mind&nbsp;—&nbsp;modeling&nbsp;the&nbsp;user's&nbsp;mental&nbsp;state.<br>
+&nbsp;<br>
+Theory&nbsp;of&nbsp;mind&nbsp;(ToM)&nbsp;is&nbsp;the&nbsp;cognitive&nbsp;ability&nbsp;to&nbsp;attribute&nbsp;mental<br>
+states&nbsp;—&nbsp;beliefs,&nbsp;intentions,&nbsp;knowledge,&nbsp;emotions&nbsp;—&nbsp;to&nbsp;others,&nbsp;and<br>
+to&nbsp;use&nbsp;those&nbsp;attributions&nbsp;to&nbsp;predict&nbsp;and&nbsp;explain&nbsp;their&nbsp;behavior<br>
+(Premack&nbsp;&amp;&nbsp;Woodruff,&nbsp;1978).&nbsp;It's&nbsp;what&nbsp;lets&nbsp;us&nbsp;understand&nbsp;that&nbsp;someone<br>
+else&nbsp;might&nbsp;not&nbsp;know&nbsp;what&nbsp;we&nbsp;know,&nbsp;might&nbsp;want&nbsp;something&nbsp;different&nbsp;from<br>
+what&nbsp;we&nbsp;want,&nbsp;and&nbsp;might&nbsp;feel&nbsp;differently&nbsp;from&nbsp;how&nbsp;we&nbsp;feel.<br>
+&nbsp;<br>
+#&nbsp;What&nbsp;this&nbsp;module&nbsp;tracks<br>
+&nbsp;<br>
+For&nbsp;Genesis,&nbsp;theory&nbsp;of&nbsp;mind&nbsp;models&nbsp;the&nbsp;*user's*&nbsp;mental&nbsp;state:<br>
+&nbsp;<br>
+1.&nbsp;**Beliefs**&nbsp;—&nbsp;what&nbsp;the&nbsp;user&nbsp;thinks&nbsp;is&nbsp;true.&nbsp;Updated&nbsp;when&nbsp;the&nbsp;user<br>
+&nbsp;&nbsp;&nbsp;states&nbsp;facts&nbsp;or&nbsp;corrections.&nbsp;Genesis&nbsp;can&nbsp;detect&nbsp;when&nbsp;its&nbsp;beliefs<br>
+&nbsp;&nbsp;&nbsp;diverge&nbsp;from&nbsp;the&nbsp;user's&nbsp;(false&nbsp;belief&nbsp;tracking,&nbsp;Wimmer&nbsp;&amp;&nbsp;Perner,<br>
+&nbsp;&nbsp;&nbsp;1983).<br>
+&nbsp;<br>
+2.&nbsp;**Intentions**&nbsp;—&nbsp;what&nbsp;the&nbsp;user&nbsp;wants&nbsp;to&nbsp;do.&nbsp;Inferred&nbsp;from&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;structure&nbsp;of&nbsp;their&nbsp;messages&nbsp;(questions&nbsp;→&nbsp;seeking&nbsp;information,<br>
+&nbsp;&nbsp;&nbsp;statements&nbsp;→&nbsp;sharing,&nbsp;commands&nbsp;→&nbsp;directing).<br>
+&nbsp;<br>
+3.&nbsp;**Knowledge&nbsp;state**&nbsp;—&nbsp;what&nbsp;the&nbsp;user&nbsp;knows&nbsp;vs.&nbsp;doesn't&nbsp;know.&nbsp;This<br>
+&nbsp;&nbsp;&nbsp;is&nbsp;the&nbsp;key&nbsp;to&nbsp;tailoring&nbsp;responses:&nbsp;don't&nbsp;explain&nbsp;things&nbsp;the&nbsp;user<br>
+&nbsp;&nbsp;&nbsp;already&nbsp;knows,&nbsp;but&nbsp;do&nbsp;explain&nbsp;things&nbsp;they&nbsp;don't.&nbsp;Knowledge&nbsp;is<br>
+&nbsp;&nbsp;&nbsp;tracked&nbsp;per-concept&nbsp;with&nbsp;a&nbsp;confidence&nbsp;level.<br>
+&nbsp;<br>
+4.&nbsp;**Emotional&nbsp;state**&nbsp;—&nbsp;inferred&nbsp;from&nbsp;the&nbsp;user's&nbsp;messages.&nbsp;Word<br>
+&nbsp;&nbsp;&nbsp;choice,&nbsp;sentiment,&nbsp;and&nbsp;phrasing&nbsp;reveal&nbsp;the&nbsp;user's&nbsp;emotional&nbsp;state.<br>
+&nbsp;&nbsp;&nbsp;Genesis&nbsp;responds&nbsp;to&nbsp;the&nbsp;*inferred*&nbsp;emotional&nbsp;need,&nbsp;not&nbsp;just&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;literal&nbsp;content.<br>
+&nbsp;<br>
+#&nbsp;Tailoring&nbsp;responses<br>
+&nbsp;<br>
+The&nbsp;``should_explain(concept)``&nbsp;method&nbsp;is&nbsp;the&nbsp;core&nbsp;of&nbsp;response<br>
+tailoring.&nbsp;It&nbsp;returns&nbsp;True&nbsp;if&nbsp;the&nbsp;user&nbsp;likely&nbsp;doesn't&nbsp;understand&nbsp;the<br>
+concept&nbsp;(so&nbsp;Genesis&nbsp;should&nbsp;explain&nbsp;it)&nbsp;and&nbsp;False&nbsp;if&nbsp;they&nbsp;likely&nbsp;do<br>
+(so&nbsp;Genesis&nbsp;should&nbsp;skip&nbsp;the&nbsp;explanation).&nbsp;This&nbsp;prevents&nbsp;both<br>
+patronizing&nbsp;over-explanation&nbsp;and&nbsp;confusing&nbsp;under-explanation.<br>
+&nbsp;<br>
+#&nbsp;Neural&nbsp;basis<br>
+&nbsp;<br>
+Theory&nbsp;of&nbsp;mind&nbsp;in&nbsp;humans&nbsp;engages&nbsp;a&nbsp;network&nbsp;including&nbsp;the&nbsp;temporo-<br>
+parietal&nbsp;junction&nbsp;(TPJ),&nbsp;medial&nbsp;prefrontal&nbsp;cortex&nbsp;(mPFC),&nbsp;posterior<br>
+cingulate&nbsp;cortex&nbsp;(PCC),&nbsp;and&nbsp;the&nbsp;superior&nbsp;temporal&nbsp;sulcus&nbsp;(STS)<br>
+(Saxe&nbsp;&amp;&nbsp;Kanwisher,&nbsp;2003;&nbsp;Frith&nbsp;&amp;&nbsp;Frith,&nbsp;2006).&nbsp;These&nbsp;regions&nbsp;are<br>
+active&nbsp;when&nbsp;we&nbsp;think&nbsp;about&nbsp;others'&nbsp;mental&nbsp;states,&nbsp;not&nbsp;just&nbsp;their<br>
+observable&nbsp;behavior.<br>
+&nbsp;<br>
+References:<br>
+-&nbsp;Premack,&nbsp;D.,&nbsp;&amp;&nbsp;Woodruff,&nbsp;G.&nbsp;(1978).&nbsp;Does&nbsp;the&nbsp;chimpanzee&nbsp;have&nbsp;a&nbsp;theory<br>
+&nbsp;&nbsp;of&nbsp;mind?&nbsp;Behavioral&nbsp;and&nbsp;Brain&nbsp;Sciences.<br>
+-&nbsp;Wimmer,&nbsp;H.,&nbsp;&amp;&nbsp;Perner,&nbsp;J.&nbsp;(1983).&nbsp;Beliefs&nbsp;about&nbsp;beliefs.&nbsp;Cognition.<br>
+-&nbsp;Saxe,&nbsp;R.,&nbsp;&amp;&nbsp;Kanwisher,&nbsp;N.&nbsp;(2003).&nbsp;People&nbsp;thinking&nbsp;about&nbsp;thinking<br>
+&nbsp;&nbsp;people.&nbsp;Psychological&nbsp;Science.<br>
+-&nbsp;Frith,&nbsp;C.&nbsp;D.,&nbsp;&amp;&nbsp;Frith,&nbsp;U.&nbsp;(2006).&nbsp;The&nbsp;neural&nbsp;basis&nbsp;of&nbsp;mentalizing.<br>
+&nbsp;&nbsp;Neuron.<br>
+-&nbsp;Baron-Cohen,&nbsp;S.,&nbsp;et&nbsp;al.&nbsp;(1985).&nbsp;Does&nbsp;the&nbsp;autistic&nbsp;child&nbsp;have&nbsp;a<br>
+&nbsp;&nbsp;theory&nbsp;of&nbsp;mind?&nbsp;Cognition.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="re.html">re</a><br>
+</td><td class="multicolumn"><a href="time.html">time</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.theory_of_mind.html#AttributedModel">AttributedModel</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.theory_of_mind.html#TheoryOfMind">TheoryOfMind</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.theory_of_mind.html#UserBelief">UserBelief</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.theory_of_mind.html#UserModel">UserModel</a>
+</dt></dl>
+</dd>
+<dt class="heading-text"><a href="enum.html#Enum">enum.Enum</a>(<a href="builtins.html#object">builtins.object</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.theory_of_mind.html#KnowledgeLevel">KnowledgeLevel</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="AttributedModel">class <strong>AttributedModel</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#AttributedModel">AttributedModel</a>(knowledge:&nbsp;'dict[str,&nbsp;<a href="#KnowledgeLevel">KnowledgeLevel</a>]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;beliefs:&nbsp;'dict[str,&nbsp;<a href="#UserBelief">UserBelief</a>]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;capabilities:&nbsp;'dict[str,&nbsp;bool]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Second-order&nbsp;attribution&nbsp;—&nbsp;the&nbsp;user's&nbsp;model&nbsp;of&nbsp;her&nbsp;mind.<br>
+&nbsp;<br>
+First-order&nbsp;theory&nbsp;of&nbsp;mind&nbsp;tracks&nbsp;what&nbsp;the&nbsp;user&nbsp;believes&nbsp;about<br>
+the&nbsp;world:&nbsp;B_user(x).&nbsp;Second-order&nbsp;tracks&nbsp;what&nbsp;the&nbsp;user&nbsp;believes<br>
+about&nbsp;*her*:&nbsp;B_user(B_g(x))&nbsp;—&nbsp;Dennett's&nbsp;intentional&nbsp;stance<br>
+iterated&nbsp;once.&nbsp;The&nbsp;same&nbsp;three&nbsp;channels,&nbsp;now&nbsp;pointed&nbsp;back&nbsp;at&nbsp;the<br>
+modeler:&nbsp;what&nbsp;the&nbsp;user&nbsp;thinks&nbsp;she&nbsp;knows,&nbsp;what&nbsp;the&nbsp;user&nbsp;thinks<br>
+she&nbsp;believes,&nbsp;and&nbsp;what&nbsp;the&nbsp;user&nbsp;thinks&nbsp;she&nbsp;can&nbsp;do.<br>
+&nbsp;<br>
+The&nbsp;value&nbsp;of&nbsp;holding&nbsp;it:&nbsp;a&nbsp;misattribution&nbsp;is&nbsp;actionable.&nbsp;"You<br>
+know&nbsp;this"&nbsp;about&nbsp;a&nbsp;thing&nbsp;never&nbsp;covered&nbsp;is&nbsp;a&nbsp;false&nbsp;second-order<br>
+belief&nbsp;—&nbsp;the&nbsp;signature&nbsp;that&nbsp;lets&nbsp;her&nbsp;correct&nbsp;the&nbsp;user's&nbsp;model<br>
+of&nbsp;her&nbsp;rather&nbsp;than&nbsp;silently&nbsp;confirming&nbsp;a&nbsp;wrong&nbsp;expectation.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="AttributedModel-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="AttributedModel-__init__"><strong>__init__</strong></a>(self, knowledge: 'dict[str, KnowledgeLevel]' = &lt;factory&gt;, beliefs: 'dict[str, UserBelief]' = &lt;factory&gt;, capabilities: 'dict[str, bool]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="AttributedModel-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>beliefs</strong></dt>
+</dl>
+<dl><dt><strong>capabilities</strong></dt>
+</dl>
+<dl><dt><strong>knowledge</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'beliefs': 'dict[str, UserBelief]', 'capabilities': 'dict[str, bool]', 'knowledge': 'dict[str, KnowledgeLevel]'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'beliefs': Field(name='beliefs',type='dict[str, UserBelief]...appingproxy({}),kw_only=False,_field_type=_FIELD), 'capabilities': Field(name='capabilities',type='dict[str, bool]'...appingproxy({}),kw_only=False,_field_type=_FIELD), 'knowledge': Field(name='knowledge',type='dict[str, Knowledge...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('knowledge', 'beliefs', 'capabilities')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="KnowledgeLevel">class <strong>KnowledgeLevel</strong></a>(<a href="enum.html#Enum">enum.Enum</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#KnowledgeLevel">KnowledgeLevel</a>(*values)<br>
+&nbsp;<br>
+The&nbsp;user's&nbsp;knowledge&nbsp;level&nbsp;about&nbsp;a&nbsp;concept.<br>
+&nbsp;<br>
+-&nbsp;UNKNOWN:&nbsp;The&nbsp;user&nbsp;has&nbsp;never&nbsp;mentioned&nbsp;this&nbsp;concept.&nbsp;We&nbsp;don't<br>
+&nbsp;&nbsp;know&nbsp;if&nbsp;they&nbsp;understand&nbsp;it.<br>
+-&nbsp;NOVICE:&nbsp;The&nbsp;user&nbsp;has&nbsp;asked&nbsp;about&nbsp;this&nbsp;concept&nbsp;or&nbsp;shown&nbsp;confusion,<br>
+&nbsp;&nbsp;suggesting&nbsp;they&nbsp;don't&nbsp;understand&nbsp;it&nbsp;well.<br>
+-&nbsp;FAMILIAR:&nbsp;The&nbsp;user&nbsp;has&nbsp;mentioned&nbsp;the&nbsp;concept&nbsp;in&nbsp;passing,&nbsp;suggesting<br>
+&nbsp;&nbsp;some&nbsp;familiarity&nbsp;but&nbsp;not&nbsp;deep&nbsp;understanding.<br>
+-&nbsp;EXPERT:&nbsp;The&nbsp;user&nbsp;has&nbsp;demonstrated&nbsp;deep&nbsp;understanding&nbsp;of&nbsp;the&nbsp;concept<br>
+&nbsp;&nbsp;through&nbsp;correct&nbsp;usage,&nbsp;corrections,&nbsp;or&nbsp;advanced&nbsp;discussion.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.frontal_lobe.reasoning.theory_of_mind.html#KnowledgeLevel">KnowledgeLevel</a></dd>
+<dd><a href="enum.html#Enum">enum.Enum</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>EXPERT</strong> = &lt;KnowledgeLevel.EXPERT: 'expert'&gt;</dl>
+
+<dl><dt><strong>FAMILIAR</strong> = &lt;KnowledgeLevel.FAMILIAR: 'familiar'&gt;</dl>
+
+<dl><dt><strong>NOVICE</strong> = &lt;KnowledgeLevel.NOVICE: 'novice'&gt;</dl>
+
+<dl><dt><strong>UNKNOWN</strong> = &lt;KnowledgeLevel.UNKNOWN: 'unknown'&gt;</dl>
+
+<hr>
+Data descriptors inherited from <a href="enum.html#Enum">enum.Enum</a>:<br>
+<dl><dt><strong>name</strong></dt>
+<dd><span class="code">The&nbsp;name&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<dl><dt><strong>value</strong></dt>
+<dd><span class="code">The&nbsp;value&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<hr>
+Static methods inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><a name="KnowledgeLevel-__contains__"><strong>__contains__</strong></a>(value)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;`value`&nbsp;is&nbsp;in&nbsp;`cls`.<br>
+&nbsp;<br>
+`value`&nbsp;is&nbsp;in&nbsp;`cls`&nbsp;if:<br>
+1)&nbsp;`value`&nbsp;is&nbsp;a&nbsp;member&nbsp;of&nbsp;`cls`,&nbsp;or<br>
+2)&nbsp;`value`&nbsp;is&nbsp;the&nbsp;value&nbsp;of&nbsp;one&nbsp;of&nbsp;the&nbsp;`cls`'s&nbsp;members.</span></dd></dl>
+
+<dl><dt><a name="KnowledgeLevel-__getitem__"><strong>__getitem__</strong></a>(name)</dt><dd><span class="code">Return&nbsp;the&nbsp;member&nbsp;matching&nbsp;`name`.</span></dd></dl>
+
+<dl><dt><a name="KnowledgeLevel-__iter__"><strong>__iter__</strong></a>()</dt><dd><span class="code">Return&nbsp;members&nbsp;in&nbsp;definition&nbsp;order.</span></dd></dl>
+
+<dl><dt><a name="KnowledgeLevel-__len__"><strong>__len__</strong></a>()</dt><dd><span class="code">Return&nbsp;the&nbsp;number&nbsp;of&nbsp;members&nbsp;(no&nbsp;aliases)</span></dd></dl>
+
+<hr>
+Readonly properties inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><strong>__members__</strong></dt>
+<dd><span class="code">Returns&nbsp;a&nbsp;mapping&nbsp;of&nbsp;member&nbsp;name-&gt;value.<br>
+&nbsp;<br>
+This&nbsp;mapping&nbsp;lists&nbsp;all&nbsp;enum&nbsp;members,&nbsp;including&nbsp;aliases.&nbsp;Note&nbsp;that&nbsp;this<br>
+is&nbsp;a&nbsp;read-only&nbsp;view&nbsp;of&nbsp;the&nbsp;internal&nbsp;mapping.</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="TheoryOfMind">class <strong>TheoryOfMind</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#TheoryOfMind">TheoryOfMind</a>(user_profile=None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Models&nbsp;the&nbsp;user's&nbsp;mental&nbsp;state&nbsp;to&nbsp;tailor&nbsp;responses.<br>
+&nbsp;<br>
+Theory&nbsp;of&nbsp;mind&nbsp;is&nbsp;the&nbsp;ability&nbsp;to&nbsp;attribute&nbsp;mental&nbsp;states&nbsp;to&nbsp;others.<br>
+For&nbsp;Genesis,&nbsp;this&nbsp;means&nbsp;modeling&nbsp;what&nbsp;the&nbsp;*user*&nbsp;knows,&nbsp;wants,<br>
+believes,&nbsp;and&nbsp;feels&nbsp;—&nbsp;and&nbsp;using&nbsp;that&nbsp;model&nbsp;to&nbsp;tailor&nbsp;its&nbsp;responses.<br>
+&nbsp;<br>
+#&nbsp;Response&nbsp;tailoring<br>
+&nbsp;<br>
+The&nbsp;key&nbsp;method&nbsp;is&nbsp;``<a href="#TheoryOfMind-should_explain">should_explain</a>(concept)``:<br>
+-&nbsp;If&nbsp;the&nbsp;user&nbsp;is&nbsp;a&nbsp;novice&nbsp;on&nbsp;the&nbsp;concept&nbsp;→&nbsp;explain&nbsp;it<br>
+-&nbsp;If&nbsp;the&nbsp;user&nbsp;is&nbsp;an&nbsp;expert&nbsp;→&nbsp;skip&nbsp;the&nbsp;explanation<br>
+-&nbsp;If&nbsp;unknown&nbsp;→&nbsp;explain&nbsp;briefly&nbsp;(err&nbsp;on&nbsp;the&nbsp;side&nbsp;of&nbsp;clarity)<br>
+&nbsp;<br>
+This&nbsp;prevents&nbsp;both&nbsp;patronizing&nbsp;over-explanation&nbsp;(explaining&nbsp;things<br>
+the&nbsp;user&nbsp;already&nbsp;knows)&nbsp;and&nbsp;confusing&nbsp;under-explanation&nbsp;(using<br>
+jargon&nbsp;the&nbsp;user&nbsp;doesn't&nbsp;understand).<br>
+&nbsp;<br>
+#&nbsp;Emotional&nbsp;responsiveness<br>
+&nbsp;<br>
+The&nbsp;user's&nbsp;emotional&nbsp;state&nbsp;is&nbsp;inferred&nbsp;from&nbsp;their&nbsp;word&nbsp;choice.<br>
+If&nbsp;they&nbsp;seem&nbsp;frustrated,&nbsp;Genesis&nbsp;should&nbsp;be&nbsp;patient&nbsp;and&nbsp;clear.<br>
+If&nbsp;they&nbsp;seem&nbsp;excited,&nbsp;Genesis&nbsp;should&nbsp;match&nbsp;their&nbsp;energy.&nbsp;This&nbsp;is<br>
+empathic&nbsp;responding&nbsp;—&nbsp;responding&nbsp;to&nbsp;the&nbsp;*inferred*&nbsp;emotional&nbsp;need,<br>
+not&nbsp;just&nbsp;the&nbsp;literal&nbsp;content.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="TheoryOfMind-__init__"><strong>__init__</strong></a>(self, user_profile=None) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;theory&nbsp;of&nbsp;mind&nbsp;with&nbsp;an&nbsp;empty&nbsp;user&nbsp;model.</span></dd></dl>
+
+<dl><dt><a name="TheoryOfMind-add_belief"><strong>add_belief</strong></a>(self, concept: 'str', value: 'str', confidence: 'float' = 0.7) -&gt; 'None'</dt><dd><span class="code">Record&nbsp;a&nbsp;belief&nbsp;the&nbsp;user&nbsp;has&nbsp;expressed.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;concept:&nbsp;What&nbsp;the&nbsp;belief&nbsp;is&nbsp;about.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;value:&nbsp;What&nbsp;the&nbsp;user&nbsp;believes.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;confidence:&nbsp;How&nbsp;strongly&nbsp;they&nbsp;seem&nbsp;to&nbsp;hold&nbsp;it&nbsp;(0..1).</span></dd></dl>
+
+<dl><dt><a name="TheoryOfMind-attributed_knowledge"><strong>attributed_knowledge</strong></a>(self, concept: 'str') -&gt; 'KnowledgeLevel | None'</dt><dd><span class="code">What&nbsp;the&nbsp;user&nbsp;thinks&nbsp;*she*&nbsp;knows&nbsp;about&nbsp;a&nbsp;concept,&nbsp;if&nbsp;attributed.</span></dd></dl>
+
+<dl><dt><a name="TheoryOfMind-get_belief"><strong>get_belief</strong></a>(self, concept: 'str') -&gt; 'UserBelief | None'</dt><dd><span class="code">Get&nbsp;the&nbsp;user's&nbsp;belief&nbsp;about&nbsp;a&nbsp;concept,&nbsp;if&nbsp;known.</span></dd></dl>
+
+<dl><dt><a name="TheoryOfMind-get_emotional_state"><strong>get_emotional_state</strong></a>(self) -&gt; 'tuple[str, float]'</dt><dd><span class="code">Get&nbsp;the&nbsp;inferred&nbsp;emotional&nbsp;state&nbsp;of&nbsp;the&nbsp;user.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;tuple&nbsp;of&nbsp;(emotion_label,&nbsp;valence)&nbsp;where&nbsp;valence&nbsp;is&nbsp;in<br>
+&nbsp;&nbsp;&nbsp;&nbsp;[-1,&nbsp;1]&nbsp;(negative&nbsp;to&nbsp;positive).</span></dd></dl>
+
+<dl><dt><a name="TheoryOfMind-get_expertise_level"><strong>get_expertise_level</strong></a>(self) -&gt; 'float'</dt><dd><span class="code">Get&nbsp;the&nbsp;overall&nbsp;estimated&nbsp;expertise&nbsp;level&nbsp;of&nbsp;the&nbsp;user&nbsp;(0..1).</span></dd></dl>
+
+<dl><dt><a name="TheoryOfMind-get_explanation_depth"><strong>get_explanation_depth</strong></a>(self, concept: 'str') -&gt; 'str'</dt><dd><span class="code">Get&nbsp;the&nbsp;recommended&nbsp;explanation&nbsp;depth&nbsp;for&nbsp;a&nbsp;concept.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;concept:&nbsp;The&nbsp;concept&nbsp;to&nbsp;explain.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;One&nbsp;of&nbsp;"full",&nbsp;"brief",&nbsp;"skip"&nbsp;indicating&nbsp;how&nbsp;deeply&nbsp;to<br>
+&nbsp;&nbsp;&nbsp;&nbsp;explain&nbsp;the&nbsp;concept.</span></dd></dl>
+
+<dl><dt><a name="TheoryOfMind-get_user_model"><strong>get_user_model</strong></a>(self) -&gt; 'UserModel'</dt><dd><span class="code">Get&nbsp;the&nbsp;current&nbsp;user&nbsp;model.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;snapshot&nbsp;of&nbsp;what&nbsp;Genesis&nbsp;thinks&nbsp;the&nbsp;user&nbsp;knows,&nbsp;wants,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;believes,&nbsp;and&nbsp;feels.</span></dd></dl>
+
+<dl><dt><a name="TheoryOfMind-has_divergent_attribution"><strong>has_divergent_attribution</strong></a>(self, concept: 'str', actual_known: 'bool') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;the&nbsp;user's&nbsp;model&nbsp;of&nbsp;her&nbsp;diverges&nbsp;from&nbsp;reality.<br>
+&nbsp;<br>
+The&nbsp;false-attribution&nbsp;check,&nbsp;second-order&nbsp;mirror&nbsp;of<br>
+``has_divergent_belief``:&nbsp;the&nbsp;user&nbsp;thinks&nbsp;she&nbsp;knows&nbsp;a&nbsp;thing<br>
+she&nbsp;does&nbsp;not,&nbsp;or&nbsp;thinks&nbsp;she&nbsp;does&nbsp;not&nbsp;know&nbsp;a&nbsp;thing&nbsp;she&nbsp;does.<br>
+A&nbsp;misattribution&nbsp;she&nbsp;can&nbsp;correct&nbsp;rather&nbsp;than&nbsp;silently<br>
+confirm.&nbsp;``actual_known``&nbsp;is&nbsp;supplied&nbsp;by&nbsp;the&nbsp;caller,&nbsp;which<br>
+owns&nbsp;access&nbsp;to&nbsp;her&nbsp;concept&nbsp;graph.</span></dd></dl>
+
+<dl><dt><a name="TheoryOfMind-has_divergent_belief"><strong>has_divergent_belief</strong></a>(self, concept: 'str', our_value: 'str') -&gt; 'bool'</dt><dd><span class="code">Check&nbsp;if&nbsp;the&nbsp;user's&nbsp;belief&nbsp;about&nbsp;a&nbsp;concept&nbsp;differs&nbsp;from&nbsp;ours.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;false&nbsp;belief&nbsp;detection&nbsp;—&nbsp;recognizing&nbsp;that&nbsp;the&nbsp;user&nbsp;might<br>
+believe&nbsp;something&nbsp;different&nbsp;from&nbsp;what&nbsp;we&nbsp;believe&nbsp;(Wimmer&nbsp;&amp;<br>
+Perner,&nbsp;1983).<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;concept:&nbsp;The&nbsp;concept&nbsp;to&nbsp;check.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;our_value:&nbsp;What&nbsp;we&nbsp;believe&nbsp;about&nbsp;the&nbsp;concept.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;True&nbsp;if&nbsp;the&nbsp;user&nbsp;holds&nbsp;a&nbsp;different&nbsp;belief&nbsp;about&nbsp;the&nbsp;concept.</span></dd></dl>
+
+<dl><dt><a name="TheoryOfMind-receive_broadcast"><strong>receive_broadcast</strong></a>(self, item: 'Any') -&gt; 'None'</dt><dd><span class="code">Receive&nbsp;a&nbsp;broadcast&nbsp;from&nbsp;the&nbsp;global&nbsp;workspace.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;**cognitive&nbsp;context&nbsp;for&nbsp;user&nbsp;modeling**&nbsp;—&nbsp;when<br>
+cognitive&nbsp;content&nbsp;ignites&nbsp;the&nbsp;workspace,&nbsp;it&nbsp;becomes&nbsp;context<br>
+that&nbsp;informs&nbsp;how&nbsp;Genesis&nbsp;models&nbsp;the&nbsp;user.&nbsp;In&nbsp;social&nbsp;cognition,<br>
+theory&nbsp;of&nbsp;mind&nbsp;is&nbsp;continuously&nbsp;updated&nbsp;by&nbsp;what's&nbsp;cognitively<br>
+attended&nbsp;to&nbsp;(Frith&nbsp;&amp;&nbsp;Frith,&nbsp;2006):&nbsp;we&nbsp;infer&nbsp;others'&nbsp;mental<br>
+states&nbsp;from&nbsp;what&nbsp;*we*&nbsp;are&nbsp;currently&nbsp;aware&nbsp;of&nbsp;in&nbsp;the<br>
+interaction.<br>
+&nbsp;<br>
+The&nbsp;broadcast's&nbsp;topics&nbsp;are&nbsp;stored&nbsp;as&nbsp;cognitive&nbsp;context.&nbsp;When<br>
+``update_from_user_input``&nbsp;is&nbsp;next&nbsp;called,&nbsp;these&nbsp;topics<br>
+reinforce&nbsp;the&nbsp;user's&nbsp;knowledge&nbsp;tracking&nbsp;—&nbsp;if&nbsp;the&nbsp;user&nbsp;is<br>
+talking&nbsp;about&nbsp;a&nbsp;topic&nbsp;that's&nbsp;currently&nbsp;cognitive,&nbsp;that<br>
+concept's&nbsp;mention&nbsp;count&nbsp;is&nbsp;incremented,&nbsp;strengthening&nbsp;the<br>
+model's&nbsp;confidence&nbsp;in&nbsp;the&nbsp;user's&nbsp;familiarity&nbsp;with&nbsp;it.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;item:&nbsp;A&nbsp;:class:`WorkspaceItem`&nbsp;carrying&nbsp;the&nbsp;broadcast&nbsp;content.</span></dd></dl>
+
+<dl><dt><a name="TheoryOfMind-reset"><strong>reset</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Reset&nbsp;the&nbsp;user&nbsp;model&nbsp;(e.g.,&nbsp;for&nbsp;a&nbsp;new&nbsp;conversation&nbsp;partner).</span></dd></dl>
+
+<dl><dt><a name="TheoryOfMind-should_explain"><strong>should_explain</strong></a>(self, concept: 'str') -&gt; 'bool'</dt><dd><span class="code">Determine&nbsp;whether&nbsp;Genesis&nbsp;should&nbsp;explain&nbsp;a&nbsp;concept&nbsp;to&nbsp;the&nbsp;user.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;core&nbsp;of&nbsp;response&nbsp;tailoring:<br>
+-&nbsp;If&nbsp;the&nbsp;user&nbsp;is&nbsp;a&nbsp;novice&nbsp;→&nbsp;explain&nbsp;(True)<br>
+-&nbsp;If&nbsp;the&nbsp;user&nbsp;is&nbsp;an&nbsp;expert&nbsp;→&nbsp;don't&nbsp;explain&nbsp;(False)<br>
+-&nbsp;If&nbsp;the&nbsp;user&nbsp;is&nbsp;familiar&nbsp;→&nbsp;explain&nbsp;briefly&nbsp;(True)<br>
+-&nbsp;If&nbsp;unknown&nbsp;→&nbsp;explain&nbsp;briefly&nbsp;(True,&nbsp;err&nbsp;on&nbsp;the&nbsp;side&nbsp;of&nbsp;clarity)<br>
+&nbsp;<br>
+The&nbsp;explanation&nbsp;depth&nbsp;should&nbsp;scale&nbsp;with&nbsp;the&nbsp;knowledge&nbsp;level:<br>
+novice&nbsp;→&nbsp;full&nbsp;explanation,&nbsp;familiar&nbsp;→&nbsp;brief&nbsp;recap,&nbsp;unknown&nbsp;→<br>
+brief&nbsp;mention.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;concept:&nbsp;The&nbsp;concept&nbsp;to&nbsp;check.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;True&nbsp;if&nbsp;Genesis&nbsp;should&nbsp;explain&nbsp;the&nbsp;concept,&nbsp;False&nbsp;if&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;user&nbsp;likely&nbsp;already&nbsp;understands&nbsp;it.</span></dd></dl>
+
+<dl><dt><a name="TheoryOfMind-update_from_user_input"><strong>update_from_user_input</strong></a>(self, text: 'str') -&gt; 'UserModel'</dt><dd><span class="code">Update&nbsp;the&nbsp;user&nbsp;model&nbsp;from&nbsp;the&nbsp;user's&nbsp;input.<br>
+&nbsp;<br>
+Analyzes&nbsp;the&nbsp;input&nbsp;for:<br>
+-&nbsp;Questions&nbsp;(→&nbsp;user&nbsp;wants&nbsp;to&nbsp;learn,&nbsp;knowledge&nbsp;=&nbsp;novice)<br>
+-&nbsp;Statements&nbsp;of&nbsp;fact&nbsp;(→&nbsp;user&nbsp;beliefs,&nbsp;knowledge&nbsp;=&nbsp;familiar/expert)<br>
+-&nbsp;Corrections&nbsp;(→&nbsp;user&nbsp;knowledge&nbsp;=&nbsp;expert&nbsp;on&nbsp;that&nbsp;topic)<br>
+-&nbsp;Emotional&nbsp;content&nbsp;(→&nbsp;user&nbsp;emotional&nbsp;state)<br>
+-&nbsp;Expertise&nbsp;indicators&nbsp;(→&nbsp;overall&nbsp;expertise&nbsp;level)<br>
+-&nbsp;Names&nbsp;(→&nbsp;user&nbsp;identity)<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;text:&nbsp;The&nbsp;user's&nbsp;input&nbsp;text.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;updated&nbsp;<a href="#UserModel">UserModel</a>.</span></dd></dl>
+
+<dl><dt><a name="TheoryOfMind-user_asked_about"><strong>user_asked_about</strong></a>(self, concept: 'str') -&gt; 'bool'</dt><dd><span class="code">Check&nbsp;if&nbsp;the&nbsp;user&nbsp;has&nbsp;explicitly&nbsp;asked&nbsp;about&nbsp;a&nbsp;concept.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;concept:&nbsp;The&nbsp;concept&nbsp;to&nbsp;check.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;True&nbsp;if&nbsp;the&nbsp;user&nbsp;has&nbsp;asked&nbsp;about&nbsp;the&nbsp;concept.</span></dd></dl>
+
+<dl><dt><a name="TheoryOfMind-user_knows"><strong>user_knows</strong></a>(self, concept: 'str') -&gt; 'bool'</dt><dd><span class="code">Check&nbsp;if&nbsp;the&nbsp;user&nbsp;likely&nbsp;already&nbsp;knows&nbsp;a&nbsp;concept.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;concept:&nbsp;The&nbsp;concept&nbsp;to&nbsp;check.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;True&nbsp;if&nbsp;the&nbsp;user&nbsp;has&nbsp;demonstrated&nbsp;knowledge&nbsp;of&nbsp;the&nbsp;concept.</span></dd></dl>
+
+<dl><dt><a name="TheoryOfMind-user_thinks_i_know"><strong>user_thinks_i_know</strong></a>(self, concept: 'str') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;the&nbsp;user&nbsp;has&nbsp;attributed&nbsp;knowledge&nbsp;of&nbsp;a&nbsp;concept&nbsp;to&nbsp;her.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>user_name</strong></dt>
+<dd><span class="code">The&nbsp;user's&nbsp;name,&nbsp;if&nbsp;known.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="UserBelief">class <strong>UserBelief</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#UserBelief">UserBelief</a>(concept:&nbsp;'str',&nbsp;value:&nbsp;'str',&nbsp;confidence:&nbsp;'float'&nbsp;=&nbsp;0.5,&nbsp;timestamp:&nbsp;'int'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;belief&nbsp;the&nbsp;user&nbsp;holds.<br>
+&nbsp;<br>
+Tracks&nbsp;what&nbsp;the&nbsp;user&nbsp;thinks&nbsp;is&nbsp;true,&nbsp;with&nbsp;a&nbsp;confidence&nbsp;level.<br>
+Genesis&nbsp;can&nbsp;detect&nbsp;when&nbsp;its&nbsp;own&nbsp;beliefs&nbsp;diverge&nbsp;from&nbsp;the&nbsp;user's<br>
+(false&nbsp;belief&nbsp;tracking).<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="UserBelief-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="UserBelief-__init__"><strong>__init__</strong></a>(self, concept: 'str', value: 'str', confidence: 'float' = 0.5, timestamp: 'int' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="UserBelief-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>concept</strong></dt>
+</dl>
+<dl><dt><strong>confidence</strong></dt>
+</dl>
+<dl><dt><strong>timestamp</strong></dt>
+</dl>
+<dl><dt><strong>value</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'concept': 'str', 'confidence': 'float', 'timestamp': 'int', 'value': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'concept': Field(name='concept',type='str',default=&lt;datacla...appingproxy({}),kw_only=False,_field_type=_FIELD), 'confidence': Field(name='confidence',type='float',default=0.5...appingproxy({}),kw_only=False,_field_type=_FIELD), 'timestamp': Field(name='timestamp',type='int',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'value': Field(name='value',type='str',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('concept', 'value', 'confidence', 'timestamp')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="UserModel">class <strong>UserModel</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#UserModel">UserModel</a>(beliefs:&nbsp;'dict[str,&nbsp;<a href="#UserBelief">UserBelief</a>]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;intentions:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;knowledge:&nbsp;'dict[str,&nbsp;<a href="#KnowledgeLevel">KnowledgeLevel</a>]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;emotional_state:&nbsp;'str'&nbsp;=&nbsp;'neutral',&nbsp;emotional_valence:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;expertise_level:&nbsp;'float'&nbsp;=&nbsp;0.5,&nbsp;name:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;interaction_count:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;asked_about:&nbsp;'set[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;demonstrated_knowledge:&nbsp;'set[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;attributed:&nbsp;'<a href="#AttributedModel">AttributedModel</a>'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;snapshot&nbsp;of&nbsp;the&nbsp;user's&nbsp;mental&nbsp;state.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;what&nbsp;``get_user_model()``&nbsp;returns&nbsp;—&nbsp;a&nbsp;complete&nbsp;picture&nbsp;of<br>
+what&nbsp;Genesis&nbsp;thinks&nbsp;the&nbsp;user&nbsp;knows,&nbsp;wants,&nbsp;believes,&nbsp;and&nbsp;feels&nbsp;—<br>
+including&nbsp;``attributed``:&nbsp;the&nbsp;user's&nbsp;model&nbsp;of&nbsp;*her*,&nbsp;the<br>
+second-order&nbsp;layer.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="UserModel-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="UserModel-__init__"><strong>__init__</strong></a>(self, beliefs: 'dict[str, UserBelief]' = &lt;factory&gt;, intentions: 'list[str]' = &lt;factory&gt;, knowledge: 'dict[str, KnowledgeLevel]' = &lt;factory&gt;, emotional_state: 'str' = 'neutral', emotional_valence: 'float' = 0.0, expertise_level: 'float' = 0.5, name: 'str' = '', interaction_count: 'int' = 0, asked_about: 'set[str]' = &lt;factory&gt;, demonstrated_knowledge: 'set[str]' = &lt;factory&gt;, attributed: 'AttributedModel' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="UserModel-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>asked_about</strong></dt>
+</dl>
+<dl><dt><strong>attributed</strong></dt>
+</dl>
+<dl><dt><strong>beliefs</strong></dt>
+</dl>
+<dl><dt><strong>demonstrated_knowledge</strong></dt>
+</dl>
+<dl><dt><strong>emotional_state</strong></dt>
+</dl>
+<dl><dt><strong>emotional_valence</strong></dt>
+</dl>
+<dl><dt><strong>expertise_level</strong></dt>
+</dl>
+<dl><dt><strong>intentions</strong></dt>
+</dl>
+<dl><dt><strong>interaction_count</strong></dt>
+</dl>
+<dl><dt><strong>knowledge</strong></dt>
+</dl>
+<dl><dt><strong>name</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'asked_about': 'set[str]', 'attributed': 'AttributedModel', 'beliefs': 'dict[str, UserBelief]', 'demonstrated_knowledge': 'set[str]', 'emotional_state': 'str', 'emotional_valence': 'float', 'expertise_level': 'float', 'intentions': 'list[str]', 'interaction_count': 'int', 'knowledge': 'dict[str, KnowledgeLevel]', ...}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'asked_about': Field(name='asked_about',type='set[str]',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'attributed': Field(name='attributed',type='AttributedModel',d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'beliefs': Field(name='beliefs',type='dict[str, UserBelief]...appingproxy({}),kw_only=False,_field_type=_FIELD), 'demonstrated_knowledge': Field(name='demonstrated_knowledge',type='set[st...appingproxy({}),kw_only=False,_field_type=_FIELD), 'emotional_state': Field(name='emotional_state',type='str',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'emotional_valence': Field(name='emotional_valence',type='float',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'expertise_level': Field(name='expertise_level',type='float',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'intentions': Field(name='intentions',type='list[str]',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'interaction_count': Field(name='interaction_count',type='int',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'knowledge': Field(name='knowledge',type='dict[str, Knowledge...appingproxy({}),kw_only=False,_field_type=_FIELD), ...}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('beliefs', 'intentions', 'knowledge', 'emotional_state', 'emotional_valence', 'expertise_level', 'name', 'interaction_count', 'asked_about', 'demonstrated_knowledge', 'attributed')</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['AttributedModel', 'KnowledgeLevel', 'TheoryOfMind', 'UserBelief', 'UserModel']<br>
+<strong>__annotations__</strong> = {'_EXPERTISE_INDICATORS': 'frozenset[str]', '_NOVICE_INDICATORS': 'frozenset[str]', '_QUESTION_INDICATORS': 'frozenset[str]'}</td></tr></table>
+</body></html>

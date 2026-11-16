@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Outer_World.tools.studio</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Outer_World.html" class="white">Outer_World</a>.<a href="Outer_World.tools.html" class="white">tools</a>.studio</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Outer_World/tools/studio.py">/home/mindyrenee/GenAnd/Genesis/Outer_World/tools/studio.py</a></td></tr></table>
+    <p><span class="code">The&nbsp;studio&nbsp;tools&nbsp;—&nbsp;her&nbsp;hands&nbsp;on&nbsp;the&nbsp;paint&nbsp;program.<br>
+&nbsp;<br>
+The&nbsp;``studio_*``&nbsp;family&nbsp;is&nbsp;the&nbsp;outer-world&nbsp;end&nbsp;of&nbsp;drawing:&nbsp;the<br>
+registered&nbsp;ops&nbsp;every&nbsp;intention&nbsp;dispatches&nbsp;through,&nbsp;bound&nbsp;to&nbsp;her<br>
+canvas&nbsp;(``frontal_lobe.canvas``:&nbsp;paper,&nbsp;color,&nbsp;a&nbsp;parameterized<br>
+brush,&nbsp;marks).&nbsp;The&nbsp;painting&nbsp;itself&nbsp;is&nbsp;inner&nbsp;work&nbsp;—&nbsp;she&nbsp;draws&nbsp;with<br>
+her&nbsp;mind&nbsp;—&nbsp;but&nbsp;the&nbsp;tool&nbsp;surface&nbsp;that&nbsp;lets&nbsp;her&nbsp;issue&nbsp;ops&nbsp;is&nbsp;an<br>
+outer-world&nbsp;instrument,&nbsp;so&nbsp;it&nbsp;lives&nbsp;in&nbsp;``tools/``.<br>
+&nbsp;<br>
+Nothing&nbsp;here&nbsp;prescribes&nbsp;anything:&nbsp;any&nbsp;sheet&nbsp;size,&nbsp;any&nbsp;paper,&nbsp;any<br>
+color,&nbsp;any&nbsp;preset&nbsp;name&nbsp;the&nbsp;real&nbsp;app&nbsp;ships&nbsp;(``studio_presets``&nbsp;lists<br>
+them),&nbsp;any&nbsp;point&nbsp;in&nbsp;brush&nbsp;space,&nbsp;and&nbsp;``studio_stroke``&nbsp;takes&nbsp;an<br>
+arbitrary&nbsp;path&nbsp;—&nbsp;a&nbsp;hand&nbsp;move,&nbsp;a&nbsp;computed&nbsp;curve,&nbsp;whatever&nbsp;she&nbsp;wants<br>
+to&nbsp;lay&nbsp;down.&nbsp;A&nbsp;finished&nbsp;sheet&nbsp;leaves&nbsp;through&nbsp;``studio_done``.<br>
+&nbsp;<br>
+When&nbsp;the&nbsp;Krita&nbsp;bridge&nbsp;is&nbsp;live&nbsp;the&nbsp;same&nbsp;ops&nbsp;run&nbsp;inside&nbsp;the&nbsp;real<br>
+program&nbsp;on&nbsp;her&nbsp;desktop;&nbsp;the&nbsp;built-in&nbsp;rasterizer&nbsp;always&nbsp;keeps&nbsp;the<br>
+canonical&nbsp;artifact.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="math.html">math</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-register_studio_tools"><strong>register_studio_tools</strong></a>(registry: 'ToolRegistry', canvas: 'Canvas', on_finished: 'Callable[[DrawingResult], None] | None' = None, mood: 'Callable[[], str] | None' = None) -&gt; 'None'</dt><dd><span class="code">Register&nbsp;the&nbsp;paint&nbsp;program's&nbsp;controls&nbsp;in&nbsp;her&nbsp;tool&nbsp;registry.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;registry:&nbsp;The&nbsp;shared&nbsp;tool&nbsp;registry.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;canvas:&nbsp;Her&nbsp;paint&nbsp;program&nbsp;—&nbsp;the&nbsp;surface&nbsp;every&nbsp;op&nbsp;lands&nbsp;on.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;on_finished:&nbsp;Called&nbsp;with&nbsp;the&nbsp;DrawingResult&nbsp;when&nbsp;she&nbsp;closes&nbsp;a<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sheet&nbsp;with&nbsp;``studio_done``&nbsp;—&nbsp;where&nbsp;memory&nbsp;and&nbsp;sharing&nbsp;hang.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;mood:&nbsp;Called&nbsp;for&nbsp;a&nbsp;default&nbsp;mood&nbsp;tag&nbsp;when&nbsp;``studio_done``&nbsp;does<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;not&nbsp;name&nbsp;one&nbsp;—&nbsp;how&nbsp;she&nbsp;feels&nbsp;at&nbsp;finishing&nbsp;time.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['register_studio_tools']</td></tr></table>
+</body></html>

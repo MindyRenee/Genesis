@@ -1,0 +1,54 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Developmental competence of the HPA axis."><title>genesis::daemon::hpa_development - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-203241e4.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="genesis" data-themes="" data-resource-suffix="" data-rustdoc-version="1.100.0 (0ef1bc386 2026-11-09)" data-channel="1.100.0" data-search-js="search-b167f383.js" data-stringdex-js="stringdex-b5109af9.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../../static.files/main-1814ead3.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-9f56287d.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module hpa_development</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../genesis/index.html">genesis</a><span class="version">0.2.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module hpa_<wbr>development</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#why-this-is-a-curve-and-not-a-ramp" title="Why this is a curve and not a ramp">Why this is a curve and not a ramp</a></li></ul><h3><a href="#constants">Module Items</a></h3><ul class="block"><li><a href="#constants" title="Constants">Constants</a></li><li><a href="#functions" title="Functions">Functions</a></li></ul></section><div id="rustdoc-modnav"><h2><a href="../index.html">In genesis::<wbr>daemon</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../index.html">genesis</a>::<wbr><a href="../index.html">daemon</a></div><h1>Module <span>hpa_<wbr>development</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/genesis/daemon/hpa_development.rs.html#1-205">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Developmental competence of the HPA axis.</p>
+<h3 id="why-this-is-a-curve-and-not-a-ramp"><a class="doc-anchor" href="#why-this-is-a-curve-and-not-a-ramp">§</a>Why this is a curve and not a ramp</h3>
+<p>The stress-hyporesponsive period (SHRP) is real and worth modelling: a
+neonatal window in which the adrenocortical axis fails to mount a
+glucocorticoid response to stress, protecting the developing brain
+from cortisol’s neurotoxic effects on synaptogenesis. In rodents it
+runs from postnatal day 4 to 14 (Schmidt et al., 2003; Levine,
+2005). In humans the equivalent is thought to fall between roughly
+6 and 12 months, possibly to 15 months, and its precise end depends
+on the quality of care the infant receives — poor care ends it
+earlier (Gunnar &amp; Donzella, 2002; Gunnar &amp; Cheatham, 2003).</p>
+<p>The thing this must not become is a permanent ramp. The previous
+implementation computed competence as <code>ltm_episode_count / 10_000</code>,
+which meant cortisol was exactly zero until 10,000 lifetime
+episodes and the axis was only fully online in the system’s final
+developmental phase. Three things are wrong with that:</p>
+<ol>
+<li>
+<p><strong>It is not a biological quantity.</strong> The SHRP is defined in
+postnatal days, not episodic memory. A system that stores
+memories does not thereby have a stress axis, and one that
+stores many does not thereby become adult in a biologically
+meaningful way.</p>
+</li>
+<li>
+<p><strong>It disabled the primary mediator of allostatic load.</strong>
+McEwen’s construct names cortisol, epinephrine and
+norepinephrine as the primary mediators. If cortisol cannot
+exist for 10,000 episodes, then a measure built on the stress
+axis cannot see stress — and the system is blind precisely
+where the framework says the cost is greatest, because early
+experience is when a developing mind is most vulnerable.</p>
+</li>
+<li>
+<p><strong>The real trajectory is not monotone.</strong> After the SHRP the
+axis over-responds. Across the peripubertal period HPA
+responses are “exaggerated relative to adults, both in terms
+of ACTH and glucocorticoid release” (PMC4867107), with a
+documented lag in negative feedback — the adolescent animal
+takes longer both to mount and to recover a response. A
+single ramp from 0 to 1 cannot represent that shape.</p>
+</li>
+</ol>
+<p>So the developmental curve here is hyporesponsive early, crosses
+into full adult competence, and passes through a transient
+amplification before settling. That is the shape the literature
+actually describes, and it is expressed against elapsed lifetime
+(the clock the SHRP is defined in) rather than against a count of
+stored episodes.</p>
+</div></details><h2 id="constants" class="section-header">Constants<a href="#constants" class="anchor">§</a></h2><dl class="item-table"><dt><a class="constant" href="constant.ADULT_EPISODE_COUNT.html" title="constant genesis::daemon::hpa_development::ADULT_EPISODE_COUNT">ADULT_<wbr>EPISODE_<wbr>COUNT</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Experience at which development is complete.</dd><dt><a class="constant" href="constant.DEVELOPMENT_SPAN_SECS.html" title="constant genesis::daemon::hpa_development::DEVELOPMENT_SPAN_SECS">DEVELOPMENT_<wbr>SPAN_<wbr>SECS</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Wall-clock span over which elapsed time alone can carry
+development forward, in seconds (~2 years).</dd><dt><a class="constant" href="constant.MAX_COMPETENCE.html" title="constant genesis::daemon::hpa_development::MAX_COMPETENCE">MAX_<wbr>COMPETENCE</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Upper bound on competence. Above 1.0 only during the peripubertal
+window, where the axis is documented to over-respond; a bound is
+kept so a corrupted input cannot drive ACTH arbitrarily high.</dd><dt><a class="constant" href="constant.PERIPUBERTAL_CENTRE.html" title="constant genesis::daemon::hpa_development::PERIPUBERTAL_CENTRE">PERIPUBERTAL_<wbr>CENTRE</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Centre of the peripubertal amplification, as a fraction of
+developmental progress.</dd><dt><a class="constant" href="constant.PERIPUBERTAL_GAIN.html" title="constant genesis::daemon::hpa_development::PERIPUBERTAL_GAIN">PERIPUBERTAL_<wbr>GAIN</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Peak amplification of the axis during the peripubertal window.</dd><dt><a class="constant" href="constant.PERIPUBERTAL_WIDTH.html" title="constant genesis::daemon::hpa_development::PERIPUBERTAL_WIDTH">PERIPUBERTAL_<wbr>WIDTH</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Half-width of the peripubertal amplification.</dd><dt><a class="constant" href="constant.SHRP_FRACTION.html" title="constant genesis::daemon::hpa_development::SHRP_FRACTION">SHRP_<wbr>FRACTION</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Fraction of development spent in the SHRP.</dd></dl><h2 id="functions" class="section-header">Functions<a href="#functions" class="anchor">§</a></h2><dl class="item-table"><dt><a class="fn" href="fn.hpa_competence.html" title="fn genesis::daemon::hpa_development::hpa_competence">hpa_<wbr>competence</a></dt><dd>Competence of the HPA axis at a given developmental point.</dd><dt><a class="fn" href="fn.smoothstep.html" title="fn genesis::daemon::hpa_development::smoothstep">smoothstep</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Smoothstep from <code>edge0</code> to <code>edge1</code>, clamped outside.</dd></dl></section></div></main></body></html>

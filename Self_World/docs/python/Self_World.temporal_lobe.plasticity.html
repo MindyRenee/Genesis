@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.temporal_lobe.plasticity</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.temporal_lobe.html" class="white">temporal_lobe</a>.plasticity</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/plasticity.py">/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/plasticity.py</a></td></tr></table>
+    <p><span class="code">Hebbian&nbsp;plasticity&nbsp;—&nbsp;the&nbsp;embedding&nbsp;space&nbsp;as&nbsp;a&nbsp;dynamical&nbsp;system.<br>
+&nbsp;<br>
+The&nbsp;embedding&nbsp;store&nbsp;gives&nbsp;Genesis&nbsp;a&nbsp;static&nbsp;latent&nbsp;space:&nbsp;vectors&nbsp;are<br>
+computed&nbsp;once&nbsp;at&nbsp;load&nbsp;time&nbsp;and&nbsp;never&nbsp;change.&nbsp;This&nbsp;module&nbsp;makes&nbsp;the<br>
+latent&nbsp;space&nbsp;*plastic*&nbsp;—&nbsp;it&nbsp;evolves&nbsp;with&nbsp;experience&nbsp;through&nbsp;Hebbian<br>
+learning.<br>
+&nbsp;<br>
+The&nbsp;core&nbsp;principle&nbsp;is&nbsp;Hebb's&nbsp;rule:&nbsp;"cells&nbsp;that&nbsp;fire&nbsp;together&nbsp;wire<br>
+together."&nbsp;When&nbsp;two&nbsp;concepts&nbsp;co-occur&nbsp;in&nbsp;conversation,&nbsp;their&nbsp;vectors<br>
+move&nbsp;closer&nbsp;in&nbsp;embedding&nbsp;space.&nbsp;When&nbsp;concepts&nbsp;contradict&nbsp;each&nbsp;other,<br>
+their&nbsp;vectors&nbsp;move&nbsp;apart.&nbsp;Over&nbsp;time,&nbsp;the&nbsp;embedding&nbsp;reflects&nbsp;not&nbsp;just<br>
+the&nbsp;graph&nbsp;structure&nbsp;(captured&nbsp;by&nbsp;the&nbsp;spectral&nbsp;component)&nbsp;or&nbsp;text<br>
+similarity&nbsp;(captured&nbsp;by&nbsp;TF-IDF),&nbsp;but&nbsp;the&nbsp;actual&nbsp;*usage&nbsp;patterns*&nbsp;—<br>
+which&nbsp;concepts&nbsp;Genesis&nbsp;has&nbsp;actually&nbsp;encountered&nbsp;together.<br>
+&nbsp;<br>
+Mathematics<br>
+-----------<br>
+The&nbsp;update&nbsp;rule&nbsp;is&nbsp;a&nbsp;discrete-time&nbsp;dynamical&nbsp;system&nbsp;on&nbsp;the&nbsp;concept<br>
+vectors.&nbsp;For&nbsp;two&nbsp;co-occurring&nbsp;concepts&nbsp;i&nbsp;and&nbsp;j:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;v_i&nbsp;+=&nbsp;lr(t)&nbsp;*&nbsp;(v_j&nbsp;-&nbsp;v_i)&nbsp;*&nbsp;strength<br>
+&nbsp;&nbsp;&nbsp;&nbsp;v_j&nbsp;+=&nbsp;lr(t)&nbsp;*&nbsp;(v_i&nbsp;-&nbsp;v_j)&nbsp;*&nbsp;strength<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;heat&nbsp;equation&nbsp;on&nbsp;the&nbsp;graph&nbsp;—&nbsp;a&nbsp;diffusion&nbsp;process&nbsp;where<br>
+vectors&nbsp;flow&nbsp;toward&nbsp;their&nbsp;neighbors.&nbsp;The&nbsp;fixed&nbsp;point&nbsp;is&nbsp;v_i&nbsp;=&nbsp;v_j<br>
+(complete&nbsp;convergence),&nbsp;but&nbsp;the&nbsp;learning&nbsp;rate&nbsp;decreases&nbsp;over&nbsp;time<br>
+following&nbsp;the&nbsp;Robbins-Monro&nbsp;conditions&nbsp;from&nbsp;stochastic&nbsp;approximation<br>
+theory:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;lr(t)&nbsp;=&nbsp;base_lr&nbsp;/&nbsp;(1&nbsp;+&nbsp;t&nbsp;/&nbsp;decay)<br>
+&nbsp;<br>
+This&nbsp;ensures:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Σ&nbsp;lr(t)&nbsp;=&nbsp;∞&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(infinite&nbsp;total&nbsp;adaptation)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Σ&nbsp;lr(t)²&nbsp;&lt;&nbsp;∞&nbsp;&nbsp;&nbsp;&nbsp;(vanishing&nbsp;variance&nbsp;—&nbsp;convergence)<br>
+&nbsp;<br>
+For&nbsp;repulsion&nbsp;(contradicts),&nbsp;the&nbsp;sign&nbsp;flips:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;v_i&nbsp;-=&nbsp;lr(t)&nbsp;*&nbsp;(v_j&nbsp;-&nbsp;v_i)&nbsp;*&nbsp;strength<br>
+&nbsp;<br>
+The&nbsp;fixed&nbsp;point&nbsp;is&nbsp;v_i&nbsp;=&nbsp;-v_j&nbsp;(maximum&nbsp;cosine&nbsp;distance&nbsp;for&nbsp;normalized<br>
+vectors).<br>
+&nbsp;<br>
+Only&nbsp;the&nbsp;TF-IDF&nbsp;and&nbsp;GloVe&nbsp;components&nbsp;are&nbsp;updated&nbsp;—&nbsp;the&nbsp;spectral<br>
+component&nbsp;is&nbsp;derived&nbsp;from&nbsp;graph&nbsp;structure&nbsp;and&nbsp;is&nbsp;refreshed&nbsp;separately<br>
+during&nbsp;sleep&nbsp;(by&nbsp;the&nbsp;edge&nbsp;proposer).&nbsp;This&nbsp;separation&nbsp;keeps&nbsp;the<br>
+structural&nbsp;and&nbsp;experiential&nbsp;signals&nbsp;distinct.<br>
+&nbsp;<br>
+Brain&nbsp;analogue<br>
+--------------<br>
+This&nbsp;mirrors&nbsp;cortical&nbsp;plasticity.&nbsp;The&nbsp;initial&nbsp;embedding&nbsp;(spectral&nbsp;+<br>
+TF-IDF)&nbsp;is&nbsp;like&nbsp;the&nbsp;genetic&nbsp;wiring&nbsp;of&nbsp;cortical&nbsp;columns&nbsp;—&nbsp;it&nbsp;provides<br>
+structure.&nbsp;Hebbian&nbsp;adaptation&nbsp;is&nbsp;like&nbsp;experience-dependent&nbsp;plasticity<br>
+—&nbsp;repeated&nbsp;co-activation&nbsp;strengthens&nbsp;pathways.&nbsp;Sleep&nbsp;consolidation<br>
+is&nbsp;like&nbsp;slow-wave&nbsp;sleep&nbsp;—&nbsp;larger&nbsp;updates&nbsp;that&nbsp;consolidate&nbsp;the&nbsp;day's<br>
+patterns&nbsp;into&nbsp;long-term&nbsp;structure.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="numpy.html">numpy</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.plasticity.html#HebbianPlasticity">HebbianPlasticity</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="HebbianPlasticity">class <strong>HebbianPlasticity</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#HebbianPlasticity">HebbianPlasticity</a>(embeddings:&nbsp;'EmbeddingStore',&nbsp;network:&nbsp;'ConceptNetwork')&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Hebbian&nbsp;learning&nbsp;engine&nbsp;for&nbsp;the&nbsp;embedding&nbsp;space.<br>
+&nbsp;<br>
+Tracks&nbsp;concept&nbsp;co-occurrences&nbsp;during&nbsp;conversation&nbsp;and&nbsp;applies<br>
+Hebbian&nbsp;updates&nbsp;to&nbsp;the&nbsp;embedding&nbsp;vectors.&nbsp;Waking&nbsp;updates&nbsp;are<br>
+small&nbsp;(gentle&nbsp;adaptation&nbsp;during&nbsp;conversation).&nbsp;Sleep&nbsp;updates<br>
+are&nbsp;larger&nbsp;(consolidation&nbsp;of&nbsp;the&nbsp;day's&nbsp;patterns).<br>
+&nbsp;<br>
+Thread-safe.&nbsp;All&nbsp;updates&nbsp;are&nbsp;protected&nbsp;by&nbsp;a&nbsp;lock.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="HebbianPlasticity-__init__"><strong>__init__</strong></a>(self, embeddings: 'EmbeddingStore', network: 'ConceptNetwork') -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;plasticity&nbsp;engine&nbsp;with&nbsp;an&nbsp;embedding&nbsp;store&nbsp;and&nbsp;concept&nbsp;network.</span></dd></dl>
+
+<dl><dt><a name="HebbianPlasticity-apply_edge_plasticity"><strong>apply_edge_plasticity</strong></a>(self, co_occurrences: 'list[tuple[str, str, float]] | None' = None, learning_rate: 'float' = 0.01, decay_rate: 'float' = 0.001) -&gt; 'dict[str, int]'</dt><dd><span class="code">Apply&nbsp;Hebbian&nbsp;plasticity&nbsp;to&nbsp;edge&nbsp;weights&nbsp;in&nbsp;the&nbsp;concept&nbsp;graph.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;graph-level&nbsp;Hebbian&nbsp;learning,&nbsp;distinct&nbsp;from&nbsp;the&nbsp;embedding-<br>
+level&nbsp;learning&nbsp;in&nbsp;``apply_waking_update``&nbsp;/&nbsp;``apply_sleep_consolidation``.<br>
+While&nbsp;those&nbsp;methods&nbsp;move&nbsp;concept&nbsp;vectors&nbsp;in&nbsp;latent&nbsp;space,&nbsp;this<br>
+method&nbsp;adjusts&nbsp;the&nbsp;actual&nbsp;edge&nbsp;weights&nbsp;in&nbsp;the&nbsp;concept&nbsp;network.<br>
+&nbsp;<br>
+**Hebbian&nbsp;strengthening**:&nbsp;When&nbsp;two&nbsp;concepts&nbsp;co-occur&nbsp;and&nbsp;there's<br>
+already&nbsp;an&nbsp;edge&nbsp;between&nbsp;them,&nbsp;the&nbsp;edge&nbsp;weight&nbsp;increases.&nbsp;"Cells<br>
+that&nbsp;fire&nbsp;together&nbsp;wire&nbsp;together"&nbsp;—&nbsp;the&nbsp;connection&nbsp;gets&nbsp;stronger.<br>
+&nbsp;<br>
+**Homeostatic&nbsp;decay**:&nbsp;All&nbsp;edges&nbsp;decay&nbsp;slightly&nbsp;each&nbsp;cycle.&nbsp;This<br>
+is&nbsp;synaptic&nbsp;homeostasis&nbsp;(SHY&nbsp;hypothesis,&nbsp;Tononi&nbsp;&amp;&nbsp;Cirelli,&nbsp;2006):<br>
+the&nbsp;brain&nbsp;renormalizes&nbsp;synaptic&nbsp;strength&nbsp;during&nbsp;sleep&nbsp;to&nbsp;prevent<br>
+saturation.&nbsp;Without&nbsp;decay,&nbsp;frequently-used&nbsp;edges&nbsp;would&nbsp;max&nbsp;out<br>
+and&nbsp;rare&nbsp;but&nbsp;important&nbsp;edges&nbsp;would&nbsp;be&nbsp;indistinguishable&nbsp;from<br>
+unused&nbsp;ones.<br>
+&nbsp;<br>
+**Origin&nbsp;protection**:&nbsp;Edges&nbsp;from&nbsp;explicit&nbsp;teaching&nbsp;(origin=<br>
+"stated",&nbsp;"cognition_lesson",&nbsp;etc.)&nbsp;are&nbsp;protected&nbsp;from&nbsp;decay<br>
+—&nbsp;they&nbsp;represent&nbsp;deliberate&nbsp;instruction,&nbsp;not&nbsp;incidental&nbsp;learning.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;co_occurrences:&nbsp;List&nbsp;of&nbsp;(concept_a,&nbsp;concept_b,&nbsp;strength)&nbsp;tuples.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;If&nbsp;None,&nbsp;uses&nbsp;the&nbsp;buffered&nbsp;co-occurrences.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;learning_rate:&nbsp;How&nbsp;much&nbsp;co-occurrence&nbsp;strengthens&nbsp;edges&nbsp;(0-1).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;decay_rate:&nbsp;How&nbsp;much&nbsp;all&nbsp;edges&nbsp;decay&nbsp;per&nbsp;cycle&nbsp;(0-1).<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Dict&nbsp;with&nbsp;counts:&nbsp;'strengthened',&nbsp;'weakened',&nbsp;'decayed'.</span></dd></dl>
+
+<dl><dt><a name="HebbianPlasticity-apply_sleep_consolidation"><strong>apply_sleep_consolidation</strong></a>(self) -&gt; 'dict[str, int]'</dt><dd><span class="code">Apply&nbsp;larger&nbsp;Hebbian&nbsp;updates&nbsp;during&nbsp;sleep.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;consolidation&nbsp;phase.&nbsp;It:<br>
+1.&nbsp;Applies&nbsp;larger&nbsp;updates&nbsp;from&nbsp;all&nbsp;buffered&nbsp;co-occurrences<br>
+2.&nbsp;Applies&nbsp;graph-structure-based&nbsp;attraction&nbsp;(SIMILAR_TO,&nbsp;IS_A,&nbsp;etc.)<br>
+3.&nbsp;Applies&nbsp;graph-structure-based&nbsp;repulsion&nbsp;(CONTRADICTS)<br>
+4.&nbsp;Clears&nbsp;the&nbsp;co-occurrence&nbsp;buffer<br>
+5.&nbsp;Re-normalizes&nbsp;the&nbsp;concept&nbsp;matrix<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Dict&nbsp;with&nbsp;counts:&nbsp;'co_occurrence',&nbsp;'graph_attracted',<br>
+&nbsp;&nbsp;&nbsp;&nbsp;'graph_repelled',&nbsp;'total'.</span></dd></dl>
+
+<dl><dt><a name="HebbianPlasticity-apply_waking_update"><strong>apply_waking_update</strong></a>(self) -&gt; 'int'</dt><dd><span class="code">Apply&nbsp;small&nbsp;Hebbian&nbsp;updates&nbsp;from&nbsp;recent&nbsp;co-occurrences.<br>
+&nbsp;<br>
+Called&nbsp;after&nbsp;each&nbsp;conversation&nbsp;turn.&nbsp;Uses&nbsp;a&nbsp;small&nbsp;learning<br>
+rate&nbsp;for&nbsp;gentle&nbsp;adaptation.&nbsp;Does&nbsp;not&nbsp;clear&nbsp;the&nbsp;buffer&nbsp;—<br>
+co-occurrences&nbsp;accumulate&nbsp;until&nbsp;sleep&nbsp;consolidation.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Number&nbsp;of&nbsp;vector&nbsp;pairs&nbsp;updated.</span></dd></dl>
+
+<dl><dt><a name="HebbianPlasticity-get_modulator"><strong>get_modulator</strong></a>(self) -&gt; 'float'</dt><dd><span class="code">Return&nbsp;the&nbsp;current&nbsp;signed&nbsp;third-factor&nbsp;signal.</span></dd></dl>
+
+<dl><dt><a name="HebbianPlasticity-get_statistics"><strong>get_statistics</strong></a>(self) -&gt; 'dict[str, int | float]'</dt><dd><span class="code">Return&nbsp;statistics&nbsp;about&nbsp;the&nbsp;plasticity&nbsp;engine.</span></dd></dl>
+
+<dl><dt><a name="HebbianPlasticity-load_state"><strong>load_state</strong></a>(self, state: 'dict[str, int]') -&gt; 'None'</dt><dd><span class="code">Restore&nbsp;plasticity&nbsp;state&nbsp;from&nbsp;persisted&nbsp;data.</span></dd></dl>
+
+<dl><dt><a name="HebbianPlasticity-record_co_occurrence"><strong>record_co_occurrence</strong></a>(self, concept_a: 'str', concept_b: 'str', strength: 'float' = 1.0) -&gt; 'None'</dt><dd><span class="code">Record&nbsp;that&nbsp;two&nbsp;concepts&nbsp;co-occurred&nbsp;in&nbsp;conversation.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;called&nbsp;during&nbsp;conversation&nbsp;turns.&nbsp;The&nbsp;co-occurrences<br>
+are&nbsp;buffered&nbsp;and&nbsp;applied&nbsp;as&nbsp;Hebbian&nbsp;updates.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;concept_a:&nbsp;First&nbsp;concept.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;concept_b:&nbsp;Second&nbsp;concept.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;strength:&nbsp;Co-occurrence&nbsp;strength&nbsp;(0-1).</span></dd></dl>
+
+<dl><dt><a name="HebbianPlasticity-record_co_occurrences"><strong>record_co_occurrences</strong></a>(self, concepts: 'list[str]', strength: 'float' = 1.0) -&gt; 'None'</dt><dd><span class="code">Record&nbsp;all&nbsp;pairwise&nbsp;co-occurrences&nbsp;within&nbsp;a&nbsp;set&nbsp;of&nbsp;concepts.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;main&nbsp;entry&nbsp;point&nbsp;during&nbsp;conversation.&nbsp;When&nbsp;a&nbsp;set<br>
+of&nbsp;concepts&nbsp;is&nbsp;activated&nbsp;together&nbsp;(e.g.,&nbsp;topics&nbsp;in&nbsp;a&nbsp;user<br>
+message,&nbsp;concepts&nbsp;in&nbsp;a&nbsp;response),&nbsp;all&nbsp;pairs&nbsp;are&nbsp;recorded.</span></dd></dl>
+
+<dl><dt><a name="HebbianPlasticity-save_state"><strong>save_state</strong></a>(self) -&gt; 'dict[str, int]'</dt><dd><span class="code">Serialize&nbsp;plasticity&nbsp;state&nbsp;for&nbsp;persistence.<br>
+&nbsp;<br>
+The&nbsp;update&nbsp;counters&nbsp;control&nbsp;the&nbsp;Robbins-Monro&nbsp;learning&nbsp;rate<br>
+decay.&nbsp;Without&nbsp;persisting&nbsp;them,&nbsp;the&nbsp;learning&nbsp;rate&nbsp;resets&nbsp;to<br>
+the&nbsp;maximum&nbsp;on&nbsp;every&nbsp;restart,&nbsp;which&nbsp;could&nbsp;destabilize&nbsp;vectors<br>
+that&nbsp;were&nbsp;carefully&nbsp;tuned&nbsp;over&nbsp;many&nbsp;sessions.</span></dd></dl>
+
+<dl><dt><a name="HebbianPlasticity-set_modulator"><strong>set_modulator</strong></a>(self, modulator: 'float') -&gt; 'None'</dt><dd><span class="code">Set&nbsp;the&nbsp;finite&nbsp;signed&nbsp;dopamine&nbsp;third-factor&nbsp;signal.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>CO_OCCURRENCE_CROSS</strong> = 0.6</dl>
+
+<dl><dt><strong>CO_OCCURRENCE_RESPONSE</strong> = 0.8</dl>
+
+<dl><dt><strong>CO_OCCURRENCE_USER</strong> = 1.0</dl>
+
+<dl><dt><strong>EDGE_ATTRACTION</strong> = {&lt;RelationType.SIMILAR_TO: 'similar_to'&gt;: 0.8, &lt;RelationType.IS_A: 'is_a'&gt;: 0.6, &lt;RelationType.RELATED_TO: 'related_to'&gt;: 0.4, &lt;RelationType.EMERGES_FROM: 'emerges_from'&gt;: 0.5, &lt;RelationType.DEPENDS_ON: 'depends_on'&gt;: 0.5, &lt;RelationType.ENABLES: 'enables'&gt;: 0.4, &lt;RelationType.PART_OF: 'part_of'&gt;: 0.6, &lt;RelationType.CREATES: 'creates'&gt;: 0.3}</dl>
+
+<dl><dt><strong>EDGE_REPULSION</strong> = {&lt;RelationType.CONTRADICTS: 'contradicts'&gt;: 0.7}</dl>
+
+<dl><dt><strong>SLEEP_LR</strong> = 0.015</dl>
+
+<dl><dt><strong>SLEEP_LR_DECAY</strong> = 50000</dl>
+
+<dl><dt><strong>WAKING_LR</strong> = 0.002</dl>
+
+<dl><dt><strong>WAKING_LR_DECAY</strong> = 500</dl>
+
+<dl><dt><strong>__annotations__</strong> = {'EDGE_ATTRACTION': 'ClassVar[dict]', 'EDGE_REPULSION': 'ClassVar[dict]'}</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['HebbianPlasticity']</td></tr></table>
+</body></html>

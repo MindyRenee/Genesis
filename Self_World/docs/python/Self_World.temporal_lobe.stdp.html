@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.temporal_lobe.stdp</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.temporal_lobe.html" class="white">temporal_lobe</a>.stdp</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/stdp.py">/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/stdp.py</a></td></tr></table>
+    <p><span class="code">Spike-Timing-Dependent&nbsp;Plasticity&nbsp;(<a href="#STDP">STDP</a>).<br>
+&nbsp;<br>
+<a href="#STDP">STDP</a>&nbsp;is&nbsp;a&nbsp;timing-dependent&nbsp;synaptic&nbsp;learning&nbsp;rule.&nbsp;The&nbsp;plastic&nbsp;target<br>
+is&nbsp;synaptic&nbsp;efficacy:&nbsp;the&nbsp;strength&nbsp;of&nbsp;a&nbsp;directed&nbsp;connection&nbsp;from&nbsp;an<br>
+active&nbsp;pre-unit&nbsp;to&nbsp;an&nbsp;active&nbsp;post-unit.&nbsp;It&nbsp;is&nbsp;intentionally&nbsp;separate<br>
+from&nbsp;Genesis's&nbsp;semantic&nbsp;graph&nbsp;and&nbsp;embedding&nbsp;representation.<br>
+&nbsp;<br>
+For&nbsp;Δt&nbsp;=&nbsp;t_post&nbsp;−&nbsp;t_pre:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Δt&nbsp;&gt;&nbsp;0&nbsp;→&nbsp;LTP&nbsp;(pre&nbsp;before&nbsp;post)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Δt&nbsp;&lt;&nbsp;0&nbsp;→&nbsp;LTD&nbsp;(post&nbsp;before&nbsp;pre)<br>
+&nbsp;<br>
+The&nbsp;timing&nbsp;rule&nbsp;is&nbsp;followed&nbsp;by&nbsp;a&nbsp;three-factor&nbsp;neuromodulatory&nbsp;gate.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="numpy.html">numpy</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.stdp.html#STDP">STDP</a>
+</dt><dt class="heading-text"><a href="Self_World.temporal_lobe.stdp.html#SpikeEvent">SpikeEvent</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="STDP">class <strong>STDP</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#STDP">STDP</a>(synapses:&nbsp;'SynapticStore&nbsp;|&nbsp;Any',&nbsp;network:&nbsp;'ConceptNetwork',&nbsp;*,&nbsp;tau_plus:&nbsp;'float'&nbsp;=&nbsp;20.0,&nbsp;tau_minus:&nbsp;'float'&nbsp;=&nbsp;20.0,&nbsp;a_plus:&nbsp;'float'&nbsp;=&nbsp;0.01,&nbsp;a_minus:&nbsp;'float'&nbsp;=&nbsp;0.012,&nbsp;learning_rate:&nbsp;'float'&nbsp;=&nbsp;0.002,&nbsp;window_ms:&nbsp;'float'&nbsp;=&nbsp;40.0,&nbsp;defer_updates:&nbsp;'bool'&nbsp;=&nbsp;False,&nbsp;eligibility_tau_ms:&nbsp;'float'&nbsp;=&nbsp;2000.0)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Timing-dependent&nbsp;plasticity&nbsp;over&nbsp;Genesis's&nbsp;synaptic&nbsp;substrate.<br>
+&nbsp;<br>
+Concepts&nbsp;are&nbsp;the&nbsp;current&nbsp;computational&nbsp;units&nbsp;that&nbsp;emit&nbsp;activation<br>
+events.&nbsp;<a href="#STDP">STDP</a>&nbsp;does&nbsp;not&nbsp;alter&nbsp;their&nbsp;semantic&nbsp;embeddings&nbsp;or&nbsp;typed&nbsp;graph<br>
+relationships.&nbsp;It&nbsp;changes&nbsp;only&nbsp;the&nbsp;independent&nbsp;directed&nbsp;synaptic<br>
+efficacy&nbsp;stored&nbsp;by&nbsp;``SynapticStore``.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="STDP-__init__"><strong>__init__</strong></a>(self, synapses: 'SynapticStore | Any', network: 'ConceptNetwork', *, tau_plus: 'float' = 20.0, tau_minus: 'float' = 20.0, a_plus: 'float' = 0.01, a_minus: 'float' = 0.012, learning_rate: 'float' = 0.002, window_ms: 'float' = 40.0, defer_updates: 'bool' = False, eligibility_tau_ms: 'float' = 2000.0) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="STDP-apply_updates"><strong>apply_updates</strong></a>(self, time_ms: 'float | None' = None) -&gt; 'dict[str, int]'</dt><dd><span class="code">Apply&nbsp;all&nbsp;buffered&nbsp;timing-dependent&nbsp;synaptic&nbsp;updates.</span></dd></dl>
+
+<dl><dt><a name="STDP-clear_history"><strong>clear_history</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Clear&nbsp;transient&nbsp;spike&nbsp;timing&nbsp;history&nbsp;and&nbsp;pending&nbsp;updates.</span></dd></dl>
+
+<dl><dt><a name="STDP-compute_stdp_window"><strong>compute_stdp_window</strong></a>(self, delta_t: 'float') -&gt; 'float'</dt><dd><span class="code">Return&nbsp;the&nbsp;signed&nbsp;timing-dependent&nbsp;plasticity&nbsp;magnitude.</span></dd></dl>
+
+<dl><dt><a name="STDP-get_modulator"><strong>get_modulator</strong></a>(self) -&gt; 'float'</dt><dd><span class="code">Return&nbsp;the&nbsp;current&nbsp;third-factor&nbsp;signal.</span></dd></dl>
+
+<dl><dt><a name="STDP-get_statistics"><strong>get_statistics</strong></a>(self) -&gt; 'dict[str, int | float]'</dt><dd><span class="code">Return&nbsp;<a href="#STDP">STDP</a>&nbsp;activity&nbsp;and&nbsp;plasticity&nbsp;statistics.</span></dd></dl>
+
+<dl><dt><a name="STDP-get_synaptic_weight"><strong>get_synaptic_weight</strong></a>(self, pre: 'str', post: 'str') -&gt; 'float'</dt><dd><span class="code">Return&nbsp;learned&nbsp;efficacy&nbsp;of&nbsp;the&nbsp;directed&nbsp;pre→post&nbsp;connection.</span></dd></dl>
+
+<dl><dt><a name="STDP-load_state"><strong>load_state</strong></a>(self, state: 'dict[str, object]') -&gt; 'None'</dt><dd><span class="code">Restore&nbsp;persistent&nbsp;synaptic&nbsp;efficacy.</span></dd></dl>
+
+<dl><dt><a name="STDP-record_spike"><strong>record_spike</strong></a>(self, concept: 'str', time_ms: 'float') -&gt; 'None'</dt><dd><span class="code">Record&nbsp;an&nbsp;activation&nbsp;and&nbsp;form&nbsp;<a href="#STDP">STDP</a>&nbsp;pairs&nbsp;with&nbsp;recent&nbsp;activations.<br>
+&nbsp;<br>
+Implements&nbsp;bidirectional&nbsp;all-to-all&nbsp;<a href="#STDP">STDP</a>&nbsp;(Bi&nbsp;&amp;&nbsp;Poo,&nbsp;1998;&nbsp;Markram<br>
+et&nbsp;al.,&nbsp;1997):&nbsp;for&nbsp;each&nbsp;prior&nbsp;spike&nbsp;of&nbsp;another&nbsp;unit&nbsp;at<br>
+``other_time``,&nbsp;the&nbsp;ordered&nbsp;pair&nbsp;(other&nbsp;→&nbsp;concept)&nbsp;potentiates<br>
+with&nbsp;Δt&nbsp;=&nbsp;time_ms&nbsp;−&nbsp;other_time&nbsp;≥&nbsp;0,&nbsp;while&nbsp;the&nbsp;reverse&nbsp;ordered<br>
+pair&nbsp;(concept&nbsp;→&nbsp;other)&nbsp;depresses&nbsp;with&nbsp;Δt&nbsp;=&nbsp;other_time&nbsp;−&nbsp;time_ms<br>
+≤&nbsp;0.&nbsp;Forward&nbsp;time&nbsp;therefore&nbsp;strengthens&nbsp;the&nbsp;causal&nbsp;direction<br>
+(pre-before-post,&nbsp;LTP)&nbsp;and&nbsp;weakens&nbsp;the&nbsp;acausal&nbsp;direction<br>
+(post-before-pre,&nbsp;LTD),&nbsp;as&nbsp;required&nbsp;for&nbsp;temporally&nbsp;asymmetric<br>
+Hebbian&nbsp;plasticity.</span></dd></dl>
+
+<dl><dt><a name="STDP-record_spikes"><strong>record_spikes</strong></a>(self, concepts: 'list[str]', time_ms: 'float') -&gt; 'None'</dt><dd><span class="code">Record&nbsp;simultaneous&nbsp;activations&nbsp;for&nbsp;multiple&nbsp;units.</span></dd></dl>
+
+<dl><dt><a name="STDP-renormalize"><strong>renormalize</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Compatibility&nbsp;no-op;&nbsp;synaptic&nbsp;efficacy&nbsp;is&nbsp;already&nbsp;bounded&nbsp;to&nbsp;[0,&nbsp;1].</span></dd></dl>
+
+<dl><dt><a name="STDP-save_state"><strong>save_state</strong></a>(self) -&gt; 'dict[str, object]'</dt><dd><span class="code">Serialize&nbsp;persistent&nbsp;synaptic&nbsp;efficacy&nbsp;and&nbsp;timing&nbsp;parameters.</span></dd></dl>
+
+<dl><dt><a name="STDP-set_modulator"><strong>set_modulator</strong></a>(self, modulator: 'float') -&gt; 'None'</dt><dd><span class="code">Set&nbsp;the&nbsp;third-factor&nbsp;neuromodulatory&nbsp;signal.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>A_MINUS</strong> = 0.012</dl>
+
+<dl><dt><strong>A_PLUS</strong> = 0.01</dl>
+
+<dl><dt><strong>LEARNING_RATE</strong> = 0.002</dl>
+
+<dl><dt><strong>TAU_MINUS</strong> = 20.0</dl>
+
+<dl><dt><strong>TAU_PLUS</strong> = 20.0</dl>
+
+<dl><dt><strong>WINDOW_MS</strong> = 40.0</dl>
+
+<dl><dt><strong>__annotations__</strong> = {'A_MINUS': 'float', 'A_PLUS': 'float', 'LEARNING_RATE': 'float', 'TAU_MINUS': 'float', 'TAU_PLUS': 'float', 'WINDOW_MS': 'float'}</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SpikeEvent">class <strong>SpikeEvent</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SpikeEvent">SpikeEvent</a>(concept:&nbsp;'str',&nbsp;time_ms:&nbsp;'float')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;logical&nbsp;activation&nbsp;event&nbsp;used&nbsp;as&nbsp;a&nbsp;pre/post&nbsp;timing&nbsp;signal.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="SpikeEvent-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="SpikeEvent-__init__"><strong>__init__</strong></a>(self, concept: 'str', time_ms: 'float') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="SpikeEvent-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>concept</strong></dt>
+</dl>
+<dl><dt><strong>time_ms</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'concept': 'str', 'time_ms': 'float'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'concept': Field(name='concept',type='str',default=&lt;datacla...appingproxy({}),kw_only=False,_field_type=_FIELD), 'time_ms': Field(name='time_ms',type='float',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('concept', 'time_ms')</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['STDP', 'SpikeEvent']</td></tr></table>
+</body></html>

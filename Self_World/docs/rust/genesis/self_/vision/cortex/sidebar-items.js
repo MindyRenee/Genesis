@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["CORTICAL_RATE","GABOR_FREQ","GABOR_SIGMA","NUM_ORIENTATIONS"],"fn":["gabor_kernel"],"struct":["GaborCortex","GaborKernel"]};

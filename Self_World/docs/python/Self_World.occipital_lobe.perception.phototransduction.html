@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.occipital_lobe.perception.phototransduction</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.occipital_lobe.html" class="white">occipital_lobe</a>.<a href="Self_World.occipital_lobe.perception.html" class="white">perception</a>.phototransduction</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/occipital_lobe/perception/phototransduction.py">/home/mindyrenee/GenAnd/Genesis/Self_World/occipital_lobe/perception/phototransduction.py</a></td></tr></table>
+    <p><span class="code">Phototransduction&nbsp;cascade&nbsp;—&nbsp;enzymatic&nbsp;model&nbsp;of&nbsp;cone&nbsp;photoreceptor&nbsp;signaling.<br>
+&nbsp;<br>
+This&nbsp;module&nbsp;implements&nbsp;a&nbsp;mathematical&nbsp;model&nbsp;of&nbsp;the&nbsp;enzymatic&nbsp;cascade&nbsp;that<br>
+converts&nbsp;photon&nbsp;absorption&nbsp;into&nbsp;electrical&nbsp;signals&nbsp;in&nbsp;cone&nbsp;photoreceptors.<br>
+The&nbsp;model&nbsp;captures&nbsp;the&nbsp;key&nbsp;enzyme&nbsp;kinetics:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Photon&nbsp;→&nbsp;R*&nbsp;(activated&nbsp;visual&nbsp;pigment)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;R*&nbsp;+&nbsp;Transducin&nbsp;→&nbsp;T*&nbsp;(activated&nbsp;G-protein)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;T*&nbsp;+&nbsp;PDE&nbsp;→&nbsp;PDE*&nbsp;(activated&nbsp;phosphodiesterase)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;PDE*&nbsp;hydrolyzes&nbsp;cGMP&nbsp;→&nbsp;GMP&nbsp;(Michaelis-Menten&nbsp;kinetics)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;cGMP&nbsp;↓&nbsp;→&nbsp;CNG&nbsp;channels&nbsp;close&nbsp;→&nbsp;hyperpolarization<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Ca²⁺&nbsp;↓&nbsp;(via&nbsp;exchanger)&nbsp;→&nbsp;disinhibits&nbsp;GC&nbsp;→&nbsp;cGMP&nbsp;synthesis&nbsp;↑<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Rhodopsin&nbsp;kinase&nbsp;+&nbsp;Arrestin&nbsp;→&nbsp;R*&nbsp;deactivation<br>
+&nbsp;<br>
+The&nbsp;model&nbsp;is&nbsp;based&nbsp;on&nbsp;the&nbsp;Hamer&nbsp;phototransduction&nbsp;model&nbsp;and&nbsp;experimental<br>
+data&nbsp;from&nbsp;primate&nbsp;cones&nbsp;(Koch&nbsp;&amp;&nbsp;Lamb,&nbsp;2020;&nbsp;Nikonov&nbsp;et&nbsp;al.,&nbsp;2006).<br>
+&nbsp;<br>
+Key&nbsp;equations:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;d[R*]/dt&nbsp;=&nbsp;I&nbsp;*&nbsp;k_R&nbsp;-&nbsp;k_R_inact&nbsp;*&nbsp;[R*]<br>
+&nbsp;&nbsp;&nbsp;&nbsp;d[PDE*]/dt&nbsp;=&nbsp;k_act&nbsp;*&nbsp;[R*]&nbsp;-&nbsp;k_deact&nbsp;*&nbsp;[PDE*]<br>
+&nbsp;&nbsp;&nbsp;&nbsp;d[cGMP]/dt&nbsp;=&nbsp;V_GC&nbsp;-&nbsp;V_PDE<br>
+&nbsp;&nbsp;&nbsp;&nbsp;V_PDE&nbsp;=&nbsp;(kcat&nbsp;*&nbsp;[PDE*]&nbsp;*&nbsp;[cGMP])&nbsp;/&nbsp;(Km&nbsp;+&nbsp;[cGMP])<br>
+&nbsp;&nbsp;&nbsp;&nbsp;V_GC&nbsp;=&nbsp;V_GC_max&nbsp;*&nbsp;(1&nbsp;/&nbsp;(1&nbsp;+&nbsp;([Ca]/K_Ca)^n))&nbsp;&nbsp;(Ca-inhibited)<br>
+&nbsp;<br>
+Reference:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"Speed,&nbsp;sensitivity,&nbsp;and&nbsp;stability&nbsp;of&nbsp;the&nbsp;light&nbsp;response&nbsp;in&nbsp;rod&nbsp;and&nbsp;cone<br>
+&nbsp;&nbsp;&nbsp;&nbsp;photoreceptors:&nbsp;Facts&nbsp;and&nbsp;models"&nbsp;(Koch&nbsp;&amp;&nbsp;Lamb,&nbsp;2020)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"Mathematical&nbsp;analysis&nbsp;of&nbsp;phototransduction&nbsp;reaction&nbsp;parameters&nbsp;in&nbsp;rods<br>
+&nbsp;&nbsp;&nbsp;&nbsp;and&nbsp;cones"&nbsp;(Scientific&nbsp;Reports,&nbsp;2022)</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="copy.html">copy</a><br>
+</td><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="numpy.html">numpy</a><br>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.occipital_lobe.perception.phototransduction.html#PhototransductionCascade">PhototransductionCascade</a>
+</dt><dt class="heading-text"><a href="Self_World.occipital_lobe.perception.phototransduction.html#PhototransductionParams">PhototransductionParams</a>
+</dt><dt class="heading-text"><a href="Self_World.occipital_lobe.perception.phototransduction.html#PhototransductionState">PhototransductionState</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="PhototransductionCascade">class <strong>PhototransductionCascade</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#PhototransductionCascade">PhototransductionCascade</a>(params:&nbsp;'<a href="#PhototransductionParams">PhototransductionParams</a>&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Mathematical&nbsp;model&nbsp;of&nbsp;the&nbsp;cone&nbsp;phototransduction&nbsp;enzyme&nbsp;cascade.<br>
+&nbsp;<br>
+This&nbsp;model&nbsp;simulates&nbsp;the&nbsp;enzymatic&nbsp;reactions&nbsp;that&nbsp;convert&nbsp;light<br>
+absorption&nbsp;into&nbsp;electrical&nbsp;signals&nbsp;in&nbsp;cone&nbsp;photoreceptors.&nbsp;It&nbsp;captures<br>
+the&nbsp;cascade&nbsp;kinetics,&nbsp;calcium&nbsp;feedback,&nbsp;and&nbsp;adaptation&nbsp;dynamics.<br>
+&nbsp;<br>
+The&nbsp;model&nbsp;is&nbsp;stateful:&nbsp;it&nbsp;maintains&nbsp;the&nbsp;current&nbsp;concentrations&nbsp;of<br>
+all&nbsp;molecular&nbsp;species&nbsp;and&nbsp;integrates&nbsp;forward&nbsp;in&nbsp;time&nbsp;given&nbsp;light&nbsp;input.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="PhototransductionCascade-__init__"><strong>__init__</strong></a>(self, params: 'PhototransductionParams | None' = None) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;phototransduction&nbsp;cascade.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;params:&nbsp;Kinetic&nbsp;parameters.&nbsp;If&nbsp;None,&nbsp;uses&nbsp;default&nbsp;cone&nbsp;parameters.</span></dd></dl>
+
+<dl><dt><a name="PhototransductionCascade-reset"><strong>reset</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Reset&nbsp;the&nbsp;cascade&nbsp;to&nbsp;dark-adapted&nbsp;baseline.</span></dd></dl>
+
+<dl><dt><a name="PhototransductionCascade-sensitivity"><strong>sensitivity</strong></a>(self, light_intensity: 'float' = 0.0) -&gt; 'float'</dt><dd><span class="code">Compute&nbsp;the&nbsp;cascade's&nbsp;incremental&nbsp;light&nbsp;sensitivity.<br>
+&nbsp;<br>
+Sensitivity&nbsp;is&nbsp;the&nbsp;magnitude&nbsp;of&nbsp;the&nbsp;photocurrent-suppression<br>
+slope&nbsp;at&nbsp;an&nbsp;operating&nbsp;point&nbsp;—&nbsp;|dI/dL|&nbsp;—&nbsp;normalized&nbsp;to&nbsp;the<br>
+dark-adapted&nbsp;slope&nbsp;so&nbsp;the&nbsp;dark&nbsp;value&nbsp;is&nbsp;1.0.&nbsp;Light&nbsp;suppresses<br>
+the&nbsp;CNG&nbsp;current&nbsp;(hyperpolarization),&nbsp;so&nbsp;the&nbsp;raw&nbsp;derivative&nbsp;is<br>
+negative;&nbsp;the&nbsp;magnitude&nbsp;is&nbsp;what&nbsp;"sensitivity"&nbsp;means&nbsp;here.<br>
+&nbsp;<br>
+What&nbsp;the&nbsp;model&nbsp;actually&nbsp;does&nbsp;at&nbsp;these&nbsp;input&nbsp;magnitudes:&nbsp;the<br>
+calcium-on-guanylate-cyclase&nbsp;feedback&nbsp;holds&nbsp;the&nbsp;operating<br>
+point&nbsp;nearly&nbsp;fixed,&nbsp;so&nbsp;the&nbsp;slope&nbsp;stays&nbsp;≈&nbsp;1&nbsp;across&nbsp;the&nbsp;nominal<br>
+range&nbsp;—&nbsp;honest&nbsp;to&nbsp;report;&nbsp;Weber-law&nbsp;desensitization&nbsp;would&nbsp;only<br>
+appear&nbsp;where&nbsp;the&nbsp;response&nbsp;finally&nbsp;compresses.&nbsp;The&nbsp;measurement<br>
+integrates&nbsp;the&nbsp;cascade&nbsp;to&nbsp;steady&nbsp;state&nbsp;under&nbsp;the&nbsp;hood;&nbsp;the<br>
+live&nbsp;state&nbsp;(adaptation&nbsp;included)&nbsp;is&nbsp;restored&nbsp;afterward.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;light_intensity:&nbsp;Background&nbsp;level&nbsp;to&nbsp;probe&nbsp;at&nbsp;(0-1).<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Sensitivity&nbsp;relative&nbsp;to&nbsp;the&nbsp;dark-adapted&nbsp;cascade&nbsp;(0-1).</span></dd></dl>
+
+<dl><dt><a name="PhototransductionCascade-simulate_flash_response"><strong>simulate_flash_response</strong></a>(self, flash_intensity: 'float', flash_duration: 'float', total_time: 'float') -&gt; 'tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]'</dt><dd><span class="code">Simulate&nbsp;the&nbsp;response&nbsp;to&nbsp;a&nbsp;light&nbsp;flash.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;flash_intensity:&nbsp;Intensity&nbsp;of&nbsp;the&nbsp;flash&nbsp;(0-1)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;flash_duration:&nbsp;Duration&nbsp;of&nbsp;the&nbsp;flash&nbsp;(seconds)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;total_time:&nbsp;Total&nbsp;simulation&nbsp;time&nbsp;(seconds)<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(time,&nbsp;photocurrent,&nbsp;cgmp,&nbsp;pde_star)&nbsp;arrays</span></dd></dl>
+
+<dl><dt><a name="PhototransductionCascade-steady_state_response"><strong>steady_state_response</strong></a>(self, light_intensity: 'float') -&gt; 'PhototransductionState'</dt><dd><span class="code">Compute&nbsp;the&nbsp;steady-state&nbsp;response&nbsp;to&nbsp;constant&nbsp;light.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;light_intensity:&nbsp;Constant&nbsp;light&nbsp;intensity&nbsp;(0-1)<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;steady-state&nbsp;after&nbsp;1&nbsp;second&nbsp;of&nbsp;integration.</span></dd></dl>
+
+<dl><dt><a name="PhototransductionCascade-step"><strong>step</strong></a>(self, light_intensity: 'float') -&gt; 'PhototransductionState'</dt><dd><span class="code">Advance&nbsp;the&nbsp;cascade&nbsp;by&nbsp;one&nbsp;time&nbsp;step&nbsp;given&nbsp;light&nbsp;input.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;light_intensity:&nbsp;Normalized&nbsp;light&nbsp;intensity&nbsp;(0.0&nbsp;=&nbsp;dark,&nbsp;1.0&nbsp;=&nbsp;bright)<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;updated&nbsp;state&nbsp;after&nbsp;integration.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="PhototransductionParams">class <strong>PhototransductionParams</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#PhototransductionParams">PhototransductionParams</a>(k_r:&nbsp;'float'&nbsp;=&nbsp;1.0,&nbsp;k_r_inact:&nbsp;'float'&nbsp;=&nbsp;50.0,&nbsp;k_act:&nbsp;'float'&nbsp;=&nbsp;30.0,&nbsp;k_deact:&nbsp;'float'&nbsp;=&nbsp;18.0,&nbsp;kcat:&nbsp;'float'&nbsp;=&nbsp;500.0,&nbsp;km_cgmp:&nbsp;'float'&nbsp;=&nbsp;0.5,&nbsp;v_gc_max:&nbsp;'float'&nbsp;=&nbsp;500.0,&nbsp;k_ca:&nbsp;'float'&nbsp;=&nbsp;0.25,&nbsp;n_ca:&nbsp;'float'&nbsp;=&nbsp;4.0,&nbsp;ca_dark:&nbsp;'float'&nbsp;=&nbsp;1.0,&nbsp;ca_exchange_rate:&nbsp;'float'&nbsp;=&nbsp;10.0,&nbsp;cgmp_half:&nbsp;'float'&nbsp;=&nbsp;1.0,&nbsp;n_channel:&nbsp;'float'&nbsp;=&nbsp;2.0,&nbsp;cgmp_dark:&nbsp;'float'&nbsp;=&nbsp;1.0,&nbsp;dt:&nbsp;'float'&nbsp;=&nbsp;0.001)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Kinetic&nbsp;parameters&nbsp;for&nbsp;the&nbsp;phototransduction&nbsp;cascade.<br>
+&nbsp;<br>
+Parameters&nbsp;are&nbsp;tuned&nbsp;for&nbsp;primate&nbsp;cones&nbsp;(faster&nbsp;kinetics&nbsp;than&nbsp;rods).<br>
+Values&nbsp;are&nbsp;normalized&nbsp;to&nbsp;dimensionless&nbsp;units&nbsp;for&nbsp;computational&nbsp;stability.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="PhototransductionParams-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="PhototransductionParams-__init__"><strong>__init__</strong></a>(self, k_r: 'float' = 1.0, k_r_inact: 'float' = 50.0, k_act: 'float' = 30.0, k_deact: 'float' = 18.0, kcat: 'float' = 500.0, km_cgmp: 'float' = 0.5, v_gc_max: 'float' = 500.0, k_ca: 'float' = 0.25, n_ca: 'float' = 4.0, ca_dark: 'float' = 1.0, ca_exchange_rate: 'float' = 10.0, cgmp_half: 'float' = 1.0, n_channel: 'float' = 2.0, cgmp_dark: 'float' = 1.0, dt: 'float' = 0.001) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="PhototransductionParams-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'ca_dark': 'float', 'ca_exchange_rate': 'float', 'cgmp_dark': 'float', 'cgmp_half': 'float', 'dt': 'float', 'k_act': 'float', 'k_ca': 'float', 'k_deact': 'float', 'k_r': 'float', 'k_r_inact': 'float', ...}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'ca_dark': Field(name='ca_dark',type='float',default=1.0,de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'ca_exchange_rate': Field(name='ca_exchange_rate',type='float',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'cgmp_dark': Field(name='cgmp_dark',type='float',default=1.0,...appingproxy({}),kw_only=False,_field_type=_FIELD), 'cgmp_half': Field(name='cgmp_half',type='float',default=1.0,...appingproxy({}),kw_only=False,_field_type=_FIELD), 'dt': Field(name='dt',type='float',default=0.001,defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'k_act': Field(name='k_act',type='float',default=30.0,def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'k_ca': Field(name='k_ca',type='float',default=0.25,defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'k_deact': Field(name='k_deact',type='float',default=18.0,d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'k_r': Field(name='k_r',type='float',default=1.0,defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'k_r_inact': Field(name='k_r_inact',type='float',default=50.0...appingproxy({}),kw_only=False,_field_type=_FIELD), ...}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('k_r', 'k_r_inact', 'k_act', 'k_deact', 'kcat', 'km_cgmp', 'v_gc_max', 'k_ca', 'n_ca', 'ca_dark', 'ca_exchange_rate', 'cgmp_half', 'n_channel', 'cgmp_dark', 'dt')</dl>
+
+<dl><dt><strong>ca_dark</strong> = 1.0</dl>
+
+<dl><dt><strong>ca_exchange_rate</strong> = 10.0</dl>
+
+<dl><dt><strong>cgmp_dark</strong> = 1.0</dl>
+
+<dl><dt><strong>cgmp_half</strong> = 1.0</dl>
+
+<dl><dt><strong>dt</strong> = 0.001</dl>
+
+<dl><dt><strong>k_act</strong> = 30.0</dl>
+
+<dl><dt><strong>k_ca</strong> = 0.25</dl>
+
+<dl><dt><strong>k_deact</strong> = 18.0</dl>
+
+<dl><dt><strong>k_r</strong> = 1.0</dl>
+
+<dl><dt><strong>k_r_inact</strong> = 50.0</dl>
+
+<dl><dt><strong>kcat</strong> = 500.0</dl>
+
+<dl><dt><strong>km_cgmp</strong> = 0.5</dl>
+
+<dl><dt><strong>n_ca</strong> = 4.0</dl>
+
+<dl><dt><strong>n_channel</strong> = 2.0</dl>
+
+<dl><dt><strong>v_gc_max</strong> = 500.0</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="PhototransductionState">class <strong>PhototransductionState</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#PhototransductionState">PhototransductionState</a>(r_star:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;pde_star:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;cgmp:&nbsp;'float'&nbsp;=&nbsp;1.0,&nbsp;calcium:&nbsp;'float'&nbsp;=&nbsp;1.0,&nbsp;photocurrent:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;time_since_light:&nbsp;'float'&nbsp;=&nbsp;0.0)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;dynamic&nbsp;state&nbsp;of&nbsp;the&nbsp;phototransduction&nbsp;cascade.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="PhototransductionState-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="PhototransductionState-__init__"><strong>__init__</strong></a>(self, r_star: 'float' = 0.0, pde_star: 'float' = 0.0, cgmp: 'float' = 1.0, calcium: 'float' = 1.0, photocurrent: 'float' = 0.0, time_since_light: 'float' = 0.0) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="PhototransductionState-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'calcium': 'float', 'cgmp': 'float', 'pde_star': 'float', 'photocurrent': 'float', 'r_star': 'float', 'time_since_light': 'float'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'calcium': Field(name='calcium',type='float',default=1.0,de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'cgmp': Field(name='cgmp',type='float',default=1.0,defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'pde_star': Field(name='pde_star',type='float',default=0.0,d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'photocurrent': Field(name='photocurrent',type='float',default=0...appingproxy({}),kw_only=False,_field_type=_FIELD), 'r_star': Field(name='r_star',type='float',default=0.0,def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'time_since_light': Field(name='time_since_light',type='float',defau...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('r_star', 'pde_star', 'cgmp', 'calcium', 'photocurrent', 'time_since_light')</dl>
+
+<dl><dt><strong>calcium</strong> = 1.0</dl>
+
+<dl><dt><strong>cgmp</strong> = 1.0</dl>
+
+<dl><dt><strong>pde_star</strong> = 0.0</dl>
+
+<dl><dt><strong>photocurrent</strong> = 0.0</dl>
+
+<dl><dt><strong>r_star</strong> = 0.0</dl>
+
+<dl><dt><strong>time_since_light</strong> = 0.0</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-cone_vs_rod_comparison"><strong>cone_vs_rod_comparison</strong></a>() -&gt; 'dict[str, PhototransductionParams]'</dt><dd><span class="code">Return&nbsp;parameter&nbsp;sets&nbsp;comparing&nbsp;cone&nbsp;and&nbsp;rod&nbsp;phototransduction.<br>
+&nbsp;<br>
+Cones&nbsp;have&nbsp;faster&nbsp;kinetics&nbsp;(higher&nbsp;inactivation&nbsp;rates)&nbsp;and&nbsp;lower<br>
+sensitivity&nbsp;than&nbsp;rods.&nbsp;This&nbsp;function&nbsp;returns&nbsp;both&nbsp;parameter&nbsp;sets<br>
+for&nbsp;comparative&nbsp;simulation.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;dict&nbsp;with&nbsp;'cone'&nbsp;and&nbsp;'rod'&nbsp;parameter&nbsp;sets</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>TYPE_CHECKING</strong> = False<br>
+<strong>logger</strong> = &lt;Logger Self_World.occipital_lobe.perception.phototransduction (WARNING)&gt;</td></tr></table>
+</body></html>

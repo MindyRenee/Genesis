@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.frontal_lobe.prosody</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.frontal_lobe.html" class="white">frontal_lobe</a>.prosody</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/prosody.py">/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/prosody.py</a></td></tr></table>
+    <p><span class="code">Prosody&nbsp;modeling&nbsp;—&nbsp;rhythm,&nbsp;pacing,&nbsp;emphasis,&nbsp;and&nbsp;intonation.<br>
+&nbsp;<br>
+Prosody&nbsp;is&nbsp;the&nbsp;suprasegmental&nbsp;layer&nbsp;of&nbsp;speech:&nbsp;the&nbsp;patterns&nbsp;of&nbsp;stress,<br>
+rhythm,&nbsp;intonation,&nbsp;and&nbsp;pacing&nbsp;that&nbsp;carry&nbsp;meaning&nbsp;beyond&nbsp;the&nbsp;words<br>
+themselves.&nbsp;In&nbsp;spoken&nbsp;language,&nbsp;prosody&nbsp;disambiguates&nbsp;syntax,&nbsp;conveys<br>
+emotion,&nbsp;and&nbsp;signals&nbsp;discourse&nbsp;structure&nbsp;(Cutler,&nbsp;Dahan&nbsp;&amp;&nbsp;van&nbsp;Donselaar,<br>
+1997).&nbsp;In&nbsp;written&nbsp;language,&nbsp;prosodic&nbsp;markers&nbsp;—&nbsp;emphasis,&nbsp;pauses,<br>
+punctuation&nbsp;rhythm&nbsp;—&nbsp;serve&nbsp;an&nbsp;analogous&nbsp;role,&nbsp;helping&nbsp;the&nbsp;reader<br>
+reconstruct&nbsp;the&nbsp;intended&nbsp;delivery.<br>
+&nbsp;<br>
+This&nbsp;module&nbsp;provides:<br>
+&nbsp;<br>
+1.&nbsp;**<a href="#ProsodyPattern">ProsodyPattern</a>**&nbsp;—&nbsp;a&nbsp;dataclass&nbsp;capturing&nbsp;the&nbsp;prosodic&nbsp;properties<br>
+&nbsp;&nbsp;&nbsp;of&nbsp;an&nbsp;utterance&nbsp;(rhythm,&nbsp;pacing,&nbsp;emphasis,&nbsp;pauses,&nbsp;intonation,<br>
+&nbsp;&nbsp;&nbsp;stress).<br>
+2.&nbsp;**<a href="#ProsodyGenerator">ProsodyGenerator</a>**&nbsp;—&nbsp;maps&nbsp;an&nbsp;emotional&nbsp;state&nbsp;(valence&nbsp;+&nbsp;arousal)<br>
+&nbsp;&nbsp;&nbsp;to&nbsp;an&nbsp;appropriate&nbsp;<a href="#ProsodyPattern">ProsodyPattern</a>,&nbsp;following&nbsp;the&nbsp;dimensional&nbsp;theory<br>
+&nbsp;&nbsp;&nbsp;of&nbsp;affect&nbsp;(Russell,&nbsp;1980):<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;High&nbsp;arousal&nbsp;→&nbsp;faster&nbsp;pacing,&nbsp;more&nbsp;emphasis,&nbsp;staccato&nbsp;rhythm<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;Low&nbsp;arousal&nbsp;→&nbsp;slower&nbsp;pacing,&nbsp;flowing&nbsp;rhythm,&nbsp;longer&nbsp;pauses<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;Positive&nbsp;valence&nbsp;→&nbsp;rising&nbsp;intonation,&nbsp;lighter&nbsp;stress<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;Negative&nbsp;valence&nbsp;→&nbsp;falling&nbsp;intonation,&nbsp;heavier&nbsp;stress<br>
+&nbsp;<br>
+The&nbsp;generator&nbsp;also&nbsp;applies&nbsp;prosodic&nbsp;markers&nbsp;to&nbsp;text&nbsp;via&nbsp;``apply()``,<br>
+inserting&nbsp;emphasis&nbsp;markers&nbsp;(\*word\*),&nbsp;pause&nbsp;indicators&nbsp;(...),&nbsp;and<br>
+adjusting&nbsp;punctuation&nbsp;to&nbsp;reflect&nbsp;the&nbsp;pattern.<br>
+&nbsp;<br>
+#&nbsp;References<br>
+&nbsp;<br>
+-&nbsp;Cutler,&nbsp;A.,&nbsp;Dahan,&nbsp;D.,&nbsp;&amp;&nbsp;van&nbsp;Donselaar,&nbsp;W.&nbsp;(1997).&nbsp;Prosody&nbsp;in&nbsp;the<br>
+&nbsp;&nbsp;comprehension&nbsp;of&nbsp;spoken&nbsp;language:&nbsp;A&nbsp;literature&nbsp;review.&nbsp;*Language<br>
+&nbsp;&nbsp;and&nbsp;Speech*,&nbsp;40(2),&nbsp;141–201.<br>
+-&nbsp;Russell,&nbsp;J.&nbsp;A.&nbsp;(1980).&nbsp;A&nbsp;circumplex&nbsp;model&nbsp;of&nbsp;affect.&nbsp;*Journal&nbsp;of<br>
+&nbsp;&nbsp;Personality&nbsp;and&nbsp;Social&nbsp;Psychology*,&nbsp;39(6),&nbsp;1161–1178.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="re.html">re</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.frontal_lobe.prosody.html#ProsodyGenerator">ProsodyGenerator</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.prosody.html#ProsodyPattern">ProsodyPattern</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ProsodyGenerator">class <strong>ProsodyGenerator</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code">Generate&nbsp;prosody&nbsp;patterns&nbsp;from&nbsp;emotional&nbsp;state.<br>
+&nbsp;<br>
+Maps&nbsp;the&nbsp;two-dimensional&nbsp;affective&nbsp;space&nbsp;(valence&nbsp;×&nbsp;arousal)&nbsp;to<br>
+prosodic&nbsp;properties.&nbsp;The&nbsp;mapping&nbsp;follows&nbsp;established&nbsp;findings&nbsp;in<br>
+vocal&nbsp;emotion&nbsp;expression:<br>
+&nbsp;<br>
+-&nbsp;**Arousal**&nbsp;primarily&nbsp;controls&nbsp;tempo&nbsp;and&nbsp;rhythm.&nbsp;High&nbsp;arousal<br>
+&nbsp;&nbsp;(excitement,&nbsp;anxiety)&nbsp;speeds&nbsp;up&nbsp;delivery&nbsp;and&nbsp;produces&nbsp;staccato<br>
+&nbsp;&nbsp;or&nbsp;rapid&nbsp;rhythms.&nbsp;Low&nbsp;arousal&nbsp;(calm,&nbsp;sadness)&nbsp;slows&nbsp;delivery<br>
+&nbsp;&nbsp;and&nbsp;produces&nbsp;flowing&nbsp;or&nbsp;measured&nbsp;rhythms&nbsp;with&nbsp;longer&nbsp;pauses.<br>
+-&nbsp;**Valence**&nbsp;primarily&nbsp;controls&nbsp;intonation&nbsp;and&nbsp;stress.&nbsp;Positive<br>
+&nbsp;&nbsp;valence&nbsp;produces&nbsp;rising&nbsp;intonation&nbsp;(enthusiasm,&nbsp;engagement)&nbsp;and<br>
+&nbsp;&nbsp;lighter&nbsp;stress.&nbsp;Negative&nbsp;valence&nbsp;produces&nbsp;falling&nbsp;intonation<br>
+&nbsp;&nbsp;(finality,&nbsp;resignation)&nbsp;and&nbsp;heavier&nbsp;stress&nbsp;patterns.<br>
+&nbsp;<br>
+The&nbsp;generator&nbsp;is&nbsp;deterministic&nbsp;given&nbsp;the&nbsp;same&nbsp;inputs&nbsp;—&nbsp;no<br>
+randomness&nbsp;—&nbsp;so&nbsp;prosody&nbsp;is&nbsp;a&nbsp;faithful&nbsp;reflection&nbsp;of&nbsp;emotional<br>
+state&nbsp;rather&nbsp;than&nbsp;noise.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ProsodyGenerator-apply"><strong>apply</strong></a>(self, text: 'str', prosody: 'ProsodyPattern', *, apply_intonation: 'bool' = True) -&gt; 'str'</dt><dd><span class="code">Apply&nbsp;prosodic&nbsp;markers&nbsp;to&nbsp;text.<br>
+&nbsp;<br>
+Inserts&nbsp;emphasis&nbsp;markers&nbsp;(\*word\*),&nbsp;pause&nbsp;indicators&nbsp;(...),<br>
+and&nbsp;adjusts&nbsp;punctuation&nbsp;to&nbsp;reflect&nbsp;the&nbsp;prosody&nbsp;pattern.<br>
+&nbsp;<br>
+-&nbsp;Emphasis&nbsp;words&nbsp;are&nbsp;wrapped&nbsp;in&nbsp;asterisks:&nbsp;*word*<br>
+-&nbsp;Pause&nbsp;positions&nbsp;insert&nbsp;an&nbsp;ellipsis&nbsp;(...)&nbsp;at&nbsp;the&nbsp;word&nbsp;boundary<br>
+-&nbsp;Rising&nbsp;intonation&nbsp;adds&nbsp;a&nbsp;trailing&nbsp;question&nbsp;mark&nbsp;if&nbsp;the&nbsp;text<br>
+&nbsp;&nbsp;ends&nbsp;with&nbsp;a&nbsp;period&nbsp;(uncertainty&nbsp;/&nbsp;engagement)<br>
+-&nbsp;Falling&nbsp;intonation&nbsp;is&nbsp;reinforced&nbsp;with&nbsp;a&nbsp;period&nbsp;(already<br>
+&nbsp;&nbsp;the&nbsp;default&nbsp;for&nbsp;statements)<br>
+-&nbsp;Staccato&nbsp;rhythm&nbsp;inserts&nbsp;brief&nbsp;pauses&nbsp;between&nbsp;short&nbsp;phrases<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;text:&nbsp;The&nbsp;input&nbsp;text&nbsp;to&nbsp;mark&nbsp;up.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;prosody:&nbsp;The&nbsp;prosody&nbsp;pattern&nbsp;to&nbsp;apply.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;apply_intonation:&nbsp;If&nbsp;False,&nbsp;skip&nbsp;the&nbsp;intonation&nbsp;contour<br>
+&nbsp;&nbsp;&nbsp;&nbsp;adjustment&nbsp;(e.g.&nbsp;``.``&nbsp;→&nbsp;``?``).&nbsp;The&nbsp;intonation&nbsp;is&nbsp;still<br>
+&nbsp;&nbsp;&nbsp;&nbsp;stored&nbsp;in&nbsp;the&nbsp;``<a href="#ProsodyPattern">ProsodyPattern</a>``&nbsp;for&nbsp;introspection,&nbsp;but&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;text's&nbsp;sentence&nbsp;type&nbsp;is&nbsp;not&nbsp;changed.&nbsp;This&nbsp;is&nbsp;useful&nbsp;when<br>
+&nbsp;&nbsp;&nbsp;&nbsp;prosody&nbsp;is&nbsp;applied&nbsp;as&nbsp;an&nbsp;additive&nbsp;layer&nbsp;on&nbsp;top&nbsp;of&nbsp;already-<br>
+&nbsp;&nbsp;&nbsp;&nbsp;composed&nbsp;text&nbsp;whose&nbsp;sentence&nbsp;type&nbsp;should&nbsp;be&nbsp;preserved.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Text&nbsp;with&nbsp;prosodic&nbsp;markers&nbsp;inserted.</span></dd></dl>
+
+<dl><dt><a name="ProsodyGenerator-generate"><strong>generate</strong></a>(self, emotion_label: 'str', valence: 'float', arousal: 'float') -&gt; 'ProsodyPattern'</dt><dd><span class="code">Generate&nbsp;a&nbsp;prosody&nbsp;pattern&nbsp;from&nbsp;an&nbsp;emotional&nbsp;state.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;emotion_label:&nbsp;The&nbsp;named&nbsp;emotional&nbsp;state&nbsp;(e.g.&nbsp;"excited",<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"calm",&nbsp;"anxious").&nbsp;Used&nbsp;for&nbsp;rhythm&nbsp;selection&nbsp;and<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;emphasis&nbsp;heuristics.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;valence:&nbsp;The&nbsp;valence&nbsp;axis,&nbsp;typically&nbsp;-1.0&nbsp;to&nbsp;+1.0.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Positive&nbsp;=&nbsp;pleasant,&nbsp;negative&nbsp;=&nbsp;unpleasant.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;arousal:&nbsp;The&nbsp;arousal&nbsp;axis,&nbsp;typically&nbsp;0.0&nbsp;to&nbsp;1.0.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;High&nbsp;=&nbsp;activated,&nbsp;low&nbsp;=&nbsp;deactivated.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;<a href="#ProsodyPattern">ProsodyPattern</a>&nbsp;shaped&nbsp;by&nbsp;the&nbsp;emotional&nbsp;state.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ProsodyPattern">class <strong>ProsodyPattern</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ProsodyPattern">ProsodyPattern</a>(rhythm:&nbsp;'str'&nbsp;=&nbsp;'natural',&nbsp;pacing:&nbsp;'float'&nbsp;=&nbsp;1.0,&nbsp;emphasis_words:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;pause_positions:&nbsp;'list[int]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;intonation:&nbsp;'str'&nbsp;=&nbsp;'neutral',&nbsp;stress_pattern:&nbsp;'str'&nbsp;=&nbsp;'default')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;prosodic&nbsp;properties&nbsp;of&nbsp;an&nbsp;utteration.<br>
+&nbsp;<br>
+Prosody&nbsp;operates&nbsp;above&nbsp;the&nbsp;level&nbsp;of&nbsp;individual&nbsp;phonemes&nbsp;—&nbsp;it's&nbsp;the<br>
+"music"&nbsp;of&nbsp;speech:&nbsp;rhythm,&nbsp;tempo,&nbsp;loudness,&nbsp;pitch&nbsp;contour,&nbsp;and<br>
+pausing.&nbsp;This&nbsp;dataclass&nbsp;captures&nbsp;those&nbsp;properties&nbsp;in&nbsp;a&nbsp;form&nbsp;that<br>
+language&nbsp;engines&nbsp;can&nbsp;use&nbsp;to&nbsp;shape&nbsp;generated&nbsp;text.<br>
+&nbsp;<br>
+Fields:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;rhythm:&nbsp;The&nbsp;overall&nbsp;rhythmic&nbsp;quality&nbsp;—&nbsp;"natural"&nbsp;(default),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"staccato"&nbsp;(short,&nbsp;detached&nbsp;units),&nbsp;"flowing"&nbsp;(smooth,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;connected),&nbsp;"measured"&nbsp;(deliberate,&nbsp;even),&nbsp;"rapid"&nbsp;(fast,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;urgent).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;pacing:&nbsp;Words&nbsp;per&nbsp;minute&nbsp;relative&nbsp;to&nbsp;a&nbsp;baseline&nbsp;of&nbsp;1.0.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;0.5&nbsp;=&nbsp;slow,&nbsp;1.0&nbsp;=&nbsp;normal,&nbsp;1.5&nbsp;=&nbsp;fast.&nbsp;This&nbsp;is&nbsp;a&nbsp;multiplier,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;not&nbsp;an&nbsp;absolute&nbsp;rate.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;emphasis_words:&nbsp;Words&nbsp;to&nbsp;emphasize&nbsp;(stressed&nbsp;in&nbsp;delivery).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;In&nbsp;written&nbsp;output&nbsp;these&nbsp;are&nbsp;typically&nbsp;marked&nbsp;with<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;asterisks.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;pause_positions:&nbsp;Word&nbsp;indices&nbsp;(0-based)&nbsp;where&nbsp;pauses&nbsp;occur.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;pause&nbsp;after&nbsp;word&nbsp;*i*&nbsp;means&nbsp;the&nbsp;reader&nbsp;should&nbsp;break<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;before&nbsp;word&nbsp;*i+1*.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;intonation:&nbsp;The&nbsp;pitch&nbsp;contour&nbsp;of&nbsp;the&nbsp;utterance&nbsp;—&nbsp;"neutral"<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(default),&nbsp;"rising"&nbsp;(questions,&nbsp;uncertainty,&nbsp;enthusiasm),<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"falling"&nbsp;(statements,&nbsp;finality,&nbsp;sadness),&nbsp;"level"&nbsp;(flat,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;monotone,&nbsp;detachment).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;stress_pattern:&nbsp;The&nbsp;metrical&nbsp;stress&nbsp;pattern&nbsp;—&nbsp;"default"<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(natural&nbsp;language&nbsp;stress),&nbsp;"trochaic"&nbsp;(stressed-unstressed,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;as&nbsp;in&nbsp;"table,&nbsp;"happy"),&nbsp;"iambic"&nbsp;(unstressed-stressed,&nbsp;as<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;in&nbsp;"agree",&nbsp;"behind").<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ProsodyPattern-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="ProsodyPattern-__init__"><strong>__init__</strong></a>(self, rhythm: 'str' = 'natural', pacing: 'float' = 1.0, emphasis_words: 'list[str]' = &lt;factory&gt;, pause_positions: 'list[int]' = &lt;factory&gt;, intonation: 'str' = 'neutral', stress_pattern: 'str' = 'default') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="ProsodyPattern-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>emphasis_words</strong></dt>
+</dl>
+<dl><dt><strong>intonation</strong></dt>
+</dl>
+<dl><dt><strong>pacing</strong></dt>
+</dl>
+<dl><dt><strong>pause_positions</strong></dt>
+</dl>
+<dl><dt><strong>rhythm</strong></dt>
+</dl>
+<dl><dt><strong>stress_pattern</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'emphasis_words': 'list[str]', 'intonation': 'str', 'pacing': 'float', 'pause_positions': 'list[int]', 'rhythm': 'str', 'stress_pattern': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'emphasis_words': Field(name='emphasis_words',type='list[str]',def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'intonation': Field(name='intonation',type='str',default='neut...appingproxy({}),kw_only=False,_field_type=_FIELD), 'pacing': Field(name='pacing',type='float',default=1.0,def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'pause_positions': Field(name='pause_positions',type='list[int]',de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'rhythm': Field(name='rhythm',type='str',default='natural'...appingproxy({}),kw_only=False,_field_type=_FIELD), 'stress_pattern': Field(name='stress_pattern',type='str',default='...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('rhythm', 'pacing', 'emphasis_words', 'pause_positions', 'intonation', 'stress_pattern')</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['ProsodyGenerator', 'ProsodyPattern']</td></tr></table>
+</body></html>

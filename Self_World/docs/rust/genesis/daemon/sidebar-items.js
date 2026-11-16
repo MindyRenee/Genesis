@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["active_inference","adaptive","association","consolidation","continuity","cpufreq","dyadic_model","field_probe","gamma","hpa_development","interoception","ipc","maxwell","optic_nerve","rtc_wake","rtkit","tensor_slab","tick"]};

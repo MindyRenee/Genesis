@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.journal</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.journal</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/journal.py">/home/mindyrenee/GenAnd/Genesis/Self_World/journal.py</a></td></tr></table>
+    <p><span class="code">Cognitive&nbsp;journal&nbsp;—&nbsp;a&nbsp;durable&nbsp;append-only&nbsp;record&nbsp;of&nbsp;inner&nbsp;life.<br>
+&nbsp;<br>
+Genesis's&nbsp;spontaneous&nbsp;thoughts,&nbsp;dream&nbsp;content,&nbsp;volition&nbsp;actions,&nbsp;and<br>
+runtime&nbsp;errors&nbsp;are&nbsp;produced&nbsp;in&nbsp;background&nbsp;threads&nbsp;and&nbsp;held&nbsp;in&nbsp;bounded<br>
+in-memory&nbsp;deques&nbsp;—&nbsp;when&nbsp;the&nbsp;process&nbsp;exits&nbsp;(or&nbsp;a&nbsp;deque&nbsp;rolls&nbsp;over),&nbsp;they<br>
+are&nbsp;gone.&nbsp;The&nbsp;journal&nbsp;is&nbsp;the&nbsp;black&nbsp;box:&nbsp;every&nbsp;event&nbsp;emitted&nbsp;through<br>
+``Mind._emit_live_thought``&nbsp;is&nbsp;appended&nbsp;to&nbsp;``cognitive_journal.jsonl``<br>
+in&nbsp;the&nbsp;data&nbsp;dir,&nbsp;one&nbsp;JSON&nbsp;<a href="builtins.html#object">object</a>&nbsp;per&nbsp;line,&nbsp;so&nbsp;what&nbsp;it&nbsp;thought,&nbsp;dreamt,<br>
+did,&nbsp;and&nbsp;hit&nbsp;survives&nbsp;restarts&nbsp;and&nbsp;can&nbsp;be&nbsp;correlated&nbsp;with&nbsp;later<br>
+failures.<br>
+&nbsp;<br>
+##&nbsp;Event&nbsp;schema<br>
+&nbsp;<br>
+Each&nbsp;line&nbsp;is&nbsp;a&nbsp;JSON&nbsp;<a href="builtins.html#object">object</a>::<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;{"ts":&nbsp;1758…,&nbsp;"kind":&nbsp;"dream",&nbsp;"text":&nbsp;"…",&nbsp;"trigger":&nbsp;"rem",&nbsp;…}<br>
+&nbsp;<br>
+-&nbsp;``ts``&nbsp;—&nbsp;Unix&nbsp;timestamp&nbsp;in&nbsp;milliseconds<br>
+-&nbsp;``kind``&nbsp;—&nbsp;the&nbsp;emitted&nbsp;event&nbsp;kind&nbsp;(``thought``,&nbsp;``dream``,<br>
+&nbsp;&nbsp;``learning``,&nbsp;``sleep``,&nbsp;``error``,&nbsp;…;&nbsp;train-of-thought<br>
+&nbsp;&nbsp;steps&nbsp;carry&nbsp;a&nbsp;``:N``&nbsp;suffix)<br>
+-&nbsp;``text``&nbsp;—&nbsp;the&nbsp;composed&nbsp;content&nbsp;(emergent&nbsp;language,&nbsp;recorded&nbsp;as<br>
+&nbsp;&nbsp;generated&nbsp;—&nbsp;the&nbsp;journal&nbsp;never&nbsp;invents&nbsp;words&nbsp;for&nbsp;it)<br>
+-&nbsp;extra&nbsp;fields&nbsp;—&nbsp;thought&nbsp;metadata&nbsp;(``trigger``,&nbsp;``chain_id``,<br>
+&nbsp;&nbsp;``is_lucid``)&nbsp;or&nbsp;error&nbsp;metadata&nbsp;(``site``)<br>
+&nbsp;<br>
+##&nbsp;Failure&nbsp;discipline<br>
+&nbsp;<br>
+The&nbsp;journal&nbsp;must&nbsp;never&nbsp;crash&nbsp;its&nbsp;mind:&nbsp;``record``&nbsp;swallows&nbsp;its&nbsp;own<br>
+errors&nbsp;to&nbsp;a&nbsp;debug&nbsp;log.&nbsp;When&nbsp;the&nbsp;file&nbsp;exceeds&nbsp;``_MAX_BYTES``&nbsp;it&nbsp;is<br>
+rotated,&nbsp;keeping&nbsp;``_GENERATIONS``&nbsp;previous&nbsp;files<br>
+(``cognitive_journal.1.jsonl``&nbsp;…&nbsp;``.N.jsonl``)&nbsp;so&nbsp;a&nbsp;long-lived&nbsp;mind<br>
+cannot&nbsp;fill&nbsp;the&nbsp;disk.&nbsp;More&nbsp;than&nbsp;one&nbsp;generation&nbsp;is&nbsp;kept&nbsp;because&nbsp;a&nbsp;single<br>
+backup&nbsp;is&nbsp;overwritten&nbsp;by&nbsp;the&nbsp;*next*&nbsp;rotation:&nbsp;a&nbsp;burst&nbsp;of&nbsp;errors&nbsp;early<br>
+in&nbsp;a&nbsp;long&nbsp;session&nbsp;could&nbsp;be&nbsp;replaced&nbsp;before&nbsp;anyone&nbsp;had&nbsp;looked&nbsp;at&nbsp;it,<br>
+which&nbsp;is&nbsp;exactly&nbsp;when&nbsp;the&nbsp;record&nbsp;matters&nbsp;most.<br>
+&nbsp;<br>
+``record_error``&nbsp;is&nbsp;a&nbsp;module-level&nbsp;convenience&nbsp;for&nbsp;catch&nbsp;sites&nbsp;in<br>
+subsystems&nbsp;that&nbsp;hold&nbsp;no&nbsp;Mind&nbsp;reference&nbsp;(spatial&nbsp;practice&nbsp;persistence,<br>
+the&nbsp;volition&nbsp;action&nbsp;boundary).&nbsp;It&nbsp;writes&nbsp;to&nbsp;whichever&nbsp;journal&nbsp;``Mind``<br>
+activated&nbsp;at&nbsp;init&nbsp;and&nbsp;no-ops&nbsp;when&nbsp;none&nbsp;is&nbsp;active.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="json.html">json</a><br>
+</td><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="time.html">time</a><br>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.journal.html#CognitiveJournal">CognitiveJournal</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="CognitiveJournal">class <strong>CognitiveJournal</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#CognitiveJournal">CognitiveJournal</a>(data_dir:&nbsp;'str&nbsp;|&nbsp;Path')&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Append-only&nbsp;JSONL&nbsp;journal&nbsp;for&nbsp;cognitive&nbsp;events.<br>
+&nbsp;<br>
+A&nbsp;single&nbsp;background&nbsp;file&nbsp;handle&nbsp;is&nbsp;shared&nbsp;by&nbsp;every&nbsp;producer&nbsp;thread;<br>
+``record``&nbsp;serializes&nbsp;one&nbsp;JSON&nbsp;line&nbsp;under&nbsp;a&nbsp;lock.&nbsp;The&nbsp;file&nbsp;is&nbsp;opened<br>
+line-buffered&nbsp;so&nbsp;each&nbsp;event&nbsp;is&nbsp;flushed&nbsp;to&nbsp;the&nbsp;OS&nbsp;immediately&nbsp;—<br>
+readable&nbsp;by&nbsp;``tail&nbsp;-f``&nbsp;and&nbsp;durable&nbsp;across&nbsp;process&nbsp;exit.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="CognitiveJournal-__init__"><strong>__init__</strong></a>(self, data_dir: 'str | Path') -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="CognitiveJournal-close"><strong>close</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Flush&nbsp;and&nbsp;close&nbsp;the&nbsp;journal.&nbsp;Subsequent&nbsp;records&nbsp;are&nbsp;dropped.</span></dd></dl>
+
+<dl><dt><a name="CognitiveJournal-record"><strong>record</strong></a>(self, kind: 'str', content: 'str', **fields: 'object') -&gt; 'None'</dt><dd><span class="code">Append&nbsp;one&nbsp;event&nbsp;line.&nbsp;Never&nbsp;raises.</span></dd></dl>
+
+<dl><dt><a name="CognitiveJournal-record_error"><strong>record_error</strong></a>(self, site: 'str', exc: 'BaseException') -&gt; 'None'</dt><dd><span class="code">Append&nbsp;an&nbsp;error&nbsp;event&nbsp;for&nbsp;an&nbsp;exception&nbsp;a&nbsp;subsystem&nbsp;swallowed.</span></dd></dl>
+
+<dl><dt><a name="CognitiveJournal-tail"><strong>tail</strong></a>(self, n: 'int') -&gt; 'list[dict]'</dt><dd><span class="code">Return&nbsp;the&nbsp;last&nbsp;``n``&nbsp;journaled&nbsp;events,&nbsp;oldest&nbsp;first.<br>
+&nbsp;<br>
+The&nbsp;journal&nbsp;is&nbsp;otherwise&nbsp;write-only:&nbsp;events&nbsp;go&nbsp;in&nbsp;for<br>
+durability&nbsp;and&nbsp;debugging&nbsp;but&nbsp;nothing&nbsp;reads&nbsp;them&nbsp;back.&nbsp;A&nbsp;tail<br>
+reader&nbsp;lets&nbsp;``/thoughts``&nbsp;reflect&nbsp;the&nbsp;full&nbsp;live&nbsp;stream&nbsp;—<br>
+volition&nbsp;actions,&nbsp;learning,&nbsp;listening&nbsp;—&nbsp;not&nbsp;just&nbsp;the&nbsp;subset<br>
+inner_life&nbsp;keeps&nbsp;in&nbsp;its&nbsp;own&nbsp;deque.&nbsp;Reads&nbsp;only&nbsp;the&nbsp;file's&nbsp;tail<br>
+so&nbsp;a&nbsp;multi-hundred-MB&nbsp;journal&nbsp;costs&nbsp;the&nbsp;same&nbsp;as&nbsp;a&nbsp;fresh&nbsp;one.<br>
+Malformed&nbsp;lines&nbsp;are&nbsp;skipped;&nbsp;any&nbsp;failure&nbsp;returns&nbsp;an&nbsp;empty<br>
+list&nbsp;rather&nbsp;than&nbsp;breaking&nbsp;the&nbsp;status&nbsp;command.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>path</strong></dt>
+<dd><span class="code">Where&nbsp;events&nbsp;are&nbsp;being&nbsp;written.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-record_error"><strong>record_error</strong></a>(site: 'str', exc: 'BaseException') -&gt; 'None'</dt><dd><span class="code">Record&nbsp;a&nbsp;swallowed&nbsp;exception&nbsp;to&nbsp;the&nbsp;active&nbsp;journal,&nbsp;if&nbsp;any.</span></dd></dl>
+ <dl><dt><a name="-record_event"><strong>record_event</strong></a>(kind: 'str', content: 'str', **fields: 'object') -&gt; 'None'</dt><dd><span class="code">Record&nbsp;a&nbsp;state&nbsp;transition&nbsp;to&nbsp;the&nbsp;active&nbsp;journal,&nbsp;if&nbsp;any.<br>
+&nbsp;<br>
+The&nbsp;companion&nbsp;to&nbsp;:func:`record_error`&nbsp;for&nbsp;the&nbsp;other&nbsp;kind&nbsp;of<br>
+currently-invisible&nbsp;event:&nbsp;not&nbsp;a&nbsp;swallowed&nbsp;failure&nbsp;but&nbsp;an<br>
+unrecorded&nbsp;*change*.&nbsp;Transitions&nbsp;matter&nbsp;precisely&nbsp;because&nbsp;nothing<br>
+else&nbsp;records&nbsp;them&nbsp;—&nbsp;a&nbsp;sleep&nbsp;that&nbsp;consolidates&nbsp;nothing&nbsp;still<br>
+happened,&nbsp;and&nbsp;without&nbsp;this&nbsp;the&nbsp;number&nbsp;and&nbsp;duration&nbsp;of&nbsp;sleep<br>
+episodes&nbsp;cannot&nbsp;be&nbsp;reconstructed&nbsp;from&nbsp;any&nbsp;durable&nbsp;state.</span></dd></dl>
+ <dl><dt><a name="-set_active"><strong>set_active</strong></a>(journal: 'CognitiveJournal | None') -&gt; 'None'</dt><dd><span class="code">Set&nbsp;the&nbsp;process-wide&nbsp;journal&nbsp;that&nbsp;module-level&nbsp;helpers&nbsp;write&nbsp;to.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>JOURNAL_FILENAME</strong> = 'cognitive_journal.jsonl'<br>
+<strong>__annotations__</strong> = {'_active': 'CognitiveJournal | None'}<br>
+<strong>logger</strong> = &lt;Logger Self_World.journal (WARNING)&gt;</td></tr></table>
+</body></html>

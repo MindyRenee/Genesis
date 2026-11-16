@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Inner_World.memory.spaced_repetition</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Inner_World.html" class="white">Inner_World</a>.<a href="Inner_World.memory.html" class="white">memory</a>.spaced_repetition</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Inner_World/memory/spaced_repetition.py">/home/mindyrenee/GenAnd/Genesis/Inner_World/memory/spaced_repetition.py</a></td></tr></table>
+    <p><span class="code">Spaced&nbsp;repetition&nbsp;scheduler&nbsp;—&nbsp;when&nbsp;to&nbsp;review&nbsp;what.<br>
+&nbsp;<br>
+Spaced&nbsp;repetition&nbsp;exploits&nbsp;the&nbsp;*spacing&nbsp;effect*&nbsp;(Ebbinghaus,&nbsp;1885):<br>
+information&nbsp;is&nbsp;retained&nbsp;better&nbsp;when&nbsp;reviews&nbsp;are&nbsp;spread&nbsp;out&nbsp;over<br>
+expanding&nbsp;intervals&nbsp;rather&nbsp;than&nbsp;massed&nbsp;together.&nbsp;The&nbsp;brain's&nbsp;memory<br>
+trace&nbsp;decays&nbsp;following&nbsp;a&nbsp;forgetting&nbsp;curve,&nbsp;and&nbsp;each&nbsp;successful<br>
+review&nbsp;*stabilizes*&nbsp;the&nbsp;memory,&nbsp;lengthening&nbsp;the&nbsp;time&nbsp;until&nbsp;the&nbsp;next<br>
+review&nbsp;is&nbsp;needed.<br>
+&nbsp;<br>
+#&nbsp;The&nbsp;forgetting&nbsp;curve<br>
+&nbsp;<br>
+Ebbinghaus's&nbsp;forgetting&nbsp;curve&nbsp;models&nbsp;memory&nbsp;retention&nbsp;as&nbsp;exponential<br>
+decay:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;R(t)&nbsp;=&nbsp;exp(−t&nbsp;/&nbsp;S)<br>
+&nbsp;<br>
+where&nbsp;R&nbsp;is&nbsp;the&nbsp;retention&nbsp;probability,&nbsp;t&nbsp;is&nbsp;the&nbsp;time&nbsp;since&nbsp;last<br>
+review,&nbsp;and&nbsp;S&nbsp;is&nbsp;the&nbsp;*memory&nbsp;stability*&nbsp;(how&nbsp;slowly&nbsp;the&nbsp;trace<br>
+decays).&nbsp;Each&nbsp;successful&nbsp;review&nbsp;increases&nbsp;S,&nbsp;pushing&nbsp;the&nbsp;curve<br>
+flatter&nbsp;and&nbsp;the&nbsp;next&nbsp;review&nbsp;further&nbsp;out.&nbsp;A&nbsp;failed&nbsp;review&nbsp;resets&nbsp;S<br>
+to&nbsp;a&nbsp;low&nbsp;value&nbsp;—&nbsp;the&nbsp;memory&nbsp;needs&nbsp;to&nbsp;be&nbsp;rebuilt.<br>
+&nbsp;<br>
+#&nbsp;Expanding&nbsp;intervals<br>
+&nbsp;<br>
+After&nbsp;each&nbsp;successful&nbsp;review,&nbsp;the&nbsp;next&nbsp;interval&nbsp;grows:<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;S_{n+1}&nbsp;=&nbsp;S_n&nbsp;×&nbsp;ease_factor<br>
+&nbsp;<br>
+where&nbsp;the&nbsp;ease&nbsp;factor&nbsp;reflects&nbsp;how&nbsp;easy&nbsp;the&nbsp;concept&nbsp;was&nbsp;to&nbsp;recall<br>
+(success&nbsp;→&nbsp;larger&nbsp;intervals,&nbsp;struggle&nbsp;→&nbsp;smaller).&nbsp;This&nbsp;produces&nbsp;the<br>
+expanding&nbsp;review&nbsp;schedule&nbsp;used&nbsp;by&nbsp;systems&nbsp;like&nbsp;Anki&nbsp;and&nbsp;SuperMemo<br>
+(Wozniak,&nbsp;1995).<br>
+&nbsp;<br>
+#&nbsp;Priority<br>
+&nbsp;<br>
+Not&nbsp;all&nbsp;concepts&nbsp;are&nbsp;equally&nbsp;worth&nbsp;reviewing.&nbsp;Priority&nbsp;combines:<br>
+&nbsp;<br>
+-&nbsp;**Urgency**:&nbsp;how&nbsp;soon&nbsp;until&nbsp;the&nbsp;concept&nbsp;is&nbsp;forgotten<br>
+&nbsp;&nbsp;(1&nbsp;−&nbsp;R(t)).&nbsp;A&nbsp;concept&nbsp;about&nbsp;to&nbsp;be&nbsp;forgotten&nbsp;is&nbsp;urgent.<br>
+-&nbsp;**Importance**:&nbsp;how&nbsp;central&nbsp;the&nbsp;concept&nbsp;is&nbsp;in&nbsp;the&nbsp;network<br>
+&nbsp;&nbsp;(degree&nbsp;centrality&nbsp;—&nbsp;hub&nbsp;concepts&nbsp;matter&nbsp;more).<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;priority&nbsp;=&nbsp;urgency&nbsp;×&nbsp;importance<br>
+&nbsp;<br>
+This&nbsp;integrates&nbsp;with&nbsp;the&nbsp;concept&nbsp;network&nbsp;to&nbsp;identify&nbsp;which&nbsp;concepts<br>
+need&nbsp;review&nbsp;and&nbsp;how&nbsp;important&nbsp;they&nbsp;are.<br>
+&nbsp;<br>
+References:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Ebbinghaus&nbsp;(1885):&nbsp;Memory:&nbsp;A&nbsp;Contribution&nbsp;to&nbsp;Experimental<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Psychology.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Wozniak&nbsp;(1995):&nbsp;Optimization&nbsp;of&nbsp;learning:&nbsp;SuperMemo.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;Cepeda&nbsp;et&nbsp;al.&nbsp;(2006):&nbsp;Distributed&nbsp;practice&nbsp;in&nbsp;verbal&nbsp;recall.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Psychological&nbsp;Bulletin,&nbsp;132(3),&nbsp;354-380.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="math.html">math</a><br>
+</td><td class="multicolumn"><a href="time.html">time</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Inner_World.memory.spaced_repetition.html#ReviewRecord">ReviewRecord</a>
+</dt><dt class="heading-text"><a href="Inner_World.memory.spaced_repetition.html#SpacedRepetitionScheduler">SpacedRepetitionScheduler</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ReviewRecord">class <strong>ReviewRecord</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ReviewRecord">ReviewRecord</a>(concept:&nbsp;'str',&nbsp;stability:&nbsp;'float',&nbsp;review_count:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;success_count:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;last_review:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;ease_factor:&nbsp;'float'&nbsp;=&nbsp;2.5)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Per-concept&nbsp;spaced&nbsp;repetition&nbsp;state.<br>
+&nbsp;<br>
+Attributes:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;concept:&nbsp;The&nbsp;concept&nbsp;being&nbsp;tracked.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;stability:&nbsp;Memory&nbsp;stability&nbsp;S&nbsp;(seconds).&nbsp;Higher&nbsp;=&nbsp;decays<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;slower.&nbsp;Starts&nbsp;at&nbsp;a&nbsp;default&nbsp;and&nbsp;grows&nbsp;with&nbsp;successful<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;reviews.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;review_count:&nbsp;Total&nbsp;number&nbsp;of&nbsp;reviews.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;success_count:&nbsp;Number&nbsp;of&nbsp;successful&nbsp;(recalled)&nbsp;reviews.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;last_review:&nbsp;Timestamp&nbsp;(seconds)&nbsp;of&nbsp;the&nbsp;last&nbsp;review,&nbsp;or&nbsp;0<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;never&nbsp;reviewed.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ease_factor:&nbsp;Multiplier&nbsp;for&nbsp;the&nbsp;next&nbsp;interval&nbsp;(≥1.3&nbsp;per<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SuperMemo&nbsp;convention).<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ReviewRecord-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="ReviewRecord-__init__"><strong>__init__</strong></a>(self, concept: 'str', stability: 'float', review_count: 'int' = 0, success_count: 'int' = 0, last_review: 'float' = 0.0, ease_factor: 'float' = 2.5) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="ReviewRecord-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>concept</strong></dt>
+</dl>
+<dl><dt><strong>ease_factor</strong></dt>
+</dl>
+<dl><dt><strong>last_review</strong></dt>
+</dl>
+<dl><dt><strong>review_count</strong></dt>
+</dl>
+<dl><dt><strong>stability</strong></dt>
+</dl>
+<dl><dt><strong>success_count</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'concept': 'str', 'ease_factor': 'float', 'last_review': 'float', 'review_count': 'int', 'stability': 'float', 'success_count': 'int'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'concept': Field(name='concept',type='str',default=&lt;datacla...appingproxy({}),kw_only=False,_field_type=_FIELD), 'ease_factor': Field(name='ease_factor',type='float',default=2....appingproxy({}),kw_only=False,_field_type=_FIELD), 'last_review': Field(name='last_review',type='float',default=0....appingproxy({}),kw_only=False,_field_type=_FIELD), 'review_count': Field(name='review_count',type='int',default=0,d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'stability': Field(name='stability',type='float',default=&lt;dat...appingproxy({}),kw_only=False,_field_type=_FIELD), 'success_count': Field(name='success_count',type='int',default=0,...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('concept', 'stability', 'review_count', 'success_count', 'last_review', 'ease_factor')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SpacedRepetitionScheduler">class <strong>SpacedRepetitionScheduler</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SpacedRepetitionScheduler">SpacedRepetitionScheduler</a>(network:&nbsp;'ConceptNetwork',&nbsp;*,&nbsp;default_stability:&nbsp;'float'&nbsp;=&nbsp;86400.0,&nbsp;min_stability:&nbsp;'float'&nbsp;=&nbsp;300.0,&nbsp;min_ease:&nbsp;'float'&nbsp;=&nbsp;1.3,&nbsp;retention_threshold:&nbsp;'float'&nbsp;=&nbsp;0.7)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Schedules&nbsp;concept&nbsp;reviews&nbsp;using&nbsp;spaced&nbsp;repetition.<br>
+&nbsp;<br>
+Tracks&nbsp;last&nbsp;access&nbsp;time&nbsp;and&nbsp;memory&nbsp;stability&nbsp;for&nbsp;each&nbsp;concept,<br>
+computes&nbsp;retention&nbsp;via&nbsp;the&nbsp;Ebbinghaus&nbsp;forgetting&nbsp;curve,&nbsp;and<br>
+prioritizes&nbsp;reviews&nbsp;by&nbsp;urgency&nbsp;×&nbsp;importance.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;network:&nbsp;The&nbsp;concept&nbsp;network&nbsp;(used&nbsp;for&nbsp;importance&nbsp;via&nbsp;degree<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;centrality).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;default_stability:&nbsp;Initial&nbsp;memory&nbsp;stability&nbsp;for&nbsp;a&nbsp;new&nbsp;concept<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(seconds).&nbsp;Default&nbsp;1&nbsp;day&nbsp;(86400&nbsp;s).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;min_stability:&nbsp;Minimum&nbsp;stability&nbsp;after&nbsp;a&nbsp;failed&nbsp;review.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;min_ease:&nbsp;Minimum&nbsp;ease&nbsp;factor&nbsp;(prevents&nbsp;intervals&nbsp;from<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;shrinking&nbsp;too&nbsp;fast).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;retention_threshold:&nbsp;The&nbsp;retention&nbsp;level&nbsp;below&nbsp;which&nbsp;a<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;concept&nbsp;is&nbsp;considered&nbsp;due&nbsp;for&nbsp;review&nbsp;(default&nbsp;0.7).<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="SpacedRepetitionScheduler-__init__"><strong>__init__</strong></a>(self, network: 'ConceptNetwork', *, default_stability: 'float' = 86400.0, min_stability: 'float' = 300.0, min_ease: 'float' = 1.3, retention_threshold: 'float' = 0.7) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;spaced&nbsp;repetition&nbsp;scheduler.</span></dd></dl>
+
+<dl><dt><a name="SpacedRepetitionScheduler-get_next_review"><strong>get_next_review</strong></a>(self, now: 'float | None' = None) -&gt; 'str | None'</dt><dd><span class="code">Get&nbsp;the&nbsp;single&nbsp;most&nbsp;urgent&nbsp;concept&nbsp;to&nbsp;review&nbsp;next.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;now:&nbsp;Optional&nbsp;current&nbsp;timestamp&nbsp;(seconds).<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;concept&nbsp;ID&nbsp;most&nbsp;due&nbsp;for&nbsp;review,&nbsp;or&nbsp;None&nbsp;if&nbsp;nothing<br>
+&nbsp;&nbsp;&nbsp;&nbsp;is&nbsp;due.</span></dd></dl>
+
+<dl><dt><a name="SpacedRepetitionScheduler-get_review_schedule"><strong>get_review_schedule</strong></a>(self, limit: 'int' = 20, now: 'float | None' = None) -&gt; 'list[tuple[str, float]]'</dt><dd><span class="code">Get&nbsp;the&nbsp;concepts&nbsp;most&nbsp;due&nbsp;for&nbsp;review,&nbsp;sorted&nbsp;by&nbsp;priority.<br>
+&nbsp;<br>
+Only&nbsp;concepts&nbsp;whose&nbsp;retention&nbsp;has&nbsp;dropped&nbsp;below&nbsp;the<br>
+retention&nbsp;threshold&nbsp;are&nbsp;included&nbsp;(they&nbsp;are&nbsp;"due").<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;limit:&nbsp;Maximum&nbsp;number&nbsp;of&nbsp;concepts&nbsp;to&nbsp;return.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;now:&nbsp;Optional&nbsp;current&nbsp;timestamp&nbsp;(seconds).<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;list&nbsp;of&nbsp;(concept,&nbsp;urgency)&nbsp;tuples,&nbsp;sorted&nbsp;by&nbsp;priority<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(urgency&nbsp;×&nbsp;importance)&nbsp;descending.</span></dd></dl>
+
+<dl><dt><a name="SpacedRepetitionScheduler-get_statistics"><strong>get_statistics</strong></a>(self) -&gt; 'dict[str, int | float]'</dt><dd><span class="code">Return&nbsp;statistics&nbsp;about&nbsp;the&nbsp;scheduler.</span></dd></dl>
+
+<dl><dt><a name="SpacedRepetitionScheduler-importance"><strong>importance</strong></a>(self, concept: 'str') -&gt; 'float'</dt><dd><span class="code">How&nbsp;important&nbsp;is&nbsp;a&nbsp;concept&nbsp;(network&nbsp;centrality).<br>
+&nbsp;<br>
+Uses&nbsp;degree&nbsp;centrality:&nbsp;the&nbsp;fraction&nbsp;of&nbsp;the&nbsp;network&nbsp;that<br>
+this&nbsp;concept&nbsp;connects&nbsp;to.&nbsp;Hub&nbsp;concepts&nbsp;(many&nbsp;edges)&nbsp;are&nbsp;more<br>
+important&nbsp;to&nbsp;keep&nbsp;fresh&nbsp;because&nbsp;forgetting&nbsp;them&nbsp;disrupts&nbsp;more<br>
+of&nbsp;the&nbsp;knowledge&nbsp;graph.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;concept:&nbsp;The&nbsp;concept&nbsp;to&nbsp;query.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Importance&nbsp;in&nbsp;[0,&nbsp;1].</span></dd></dl>
+
+<dl><dt><a name="SpacedRepetitionScheduler-next_interval"><strong>next_interval</strong></a>(self, concept: 'str') -&gt; 'float'</dt><dd><span class="code">The&nbsp;scheduled&nbsp;time&nbsp;until&nbsp;the&nbsp;next&nbsp;review&nbsp;(seconds).<br>
+&nbsp;<br>
+Based&nbsp;on&nbsp;current&nbsp;stability&nbsp;and&nbsp;the&nbsp;retention&nbsp;threshold:<br>
+the&nbsp;interval&nbsp;at&nbsp;which&nbsp;retention&nbsp;drops&nbsp;to&nbsp;the&nbsp;threshold.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;t&nbsp;=&nbsp;−S&nbsp;×&nbsp;ln(threshold)<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;concept:&nbsp;The&nbsp;concept&nbsp;to&nbsp;query.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Seconds&nbsp;until&nbsp;the&nbsp;next&nbsp;review&nbsp;is&nbsp;due&nbsp;(from&nbsp;now).&nbsp;Returns<br>
+&nbsp;&nbsp;&nbsp;&nbsp;0&nbsp;if&nbsp;already&nbsp;due.</span></dd></dl>
+
+<dl><dt><a name="SpacedRepetitionScheduler-priority"><strong>priority</strong></a>(self, concept: 'str', now: 'float | None' = None) -&gt; 'float'</dt><dd><span class="code">Review&nbsp;priority&nbsp;=&nbsp;urgency&nbsp;×&nbsp;importance.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;concept:&nbsp;The&nbsp;concept&nbsp;to&nbsp;query.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;now:&nbsp;Optional&nbsp;current&nbsp;timestamp&nbsp;(seconds).<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Priority&nbsp;score&nbsp;in&nbsp;[0,&nbsp;1].</span></dd></dl>
+
+<dl><dt><a name="SpacedRepetitionScheduler-record_review"><strong>record_review</strong></a>(self, concept: 'str', success: 'bool') -&gt; 'None'</dt><dd><span class="code">Record&nbsp;a&nbsp;review&nbsp;outcome&nbsp;for&nbsp;a&nbsp;concept.<br>
+&nbsp;<br>
+On&nbsp;success:&nbsp;stability&nbsp;grows&nbsp;by&nbsp;the&nbsp;ease&nbsp;factor&nbsp;(expanding<br>
+interval),&nbsp;and&nbsp;the&nbsp;ease&nbsp;factor&nbsp;increases&nbsp;slightly.&nbsp;On<br>
+failure:&nbsp;stability&nbsp;resets&nbsp;to&nbsp;the&nbsp;minimum,&nbsp;and&nbsp;the&nbsp;ease<br>
+factor&nbsp;decreases.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;concept:&nbsp;The&nbsp;concept&nbsp;reviewed.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;success:&nbsp;Whether&nbsp;the&nbsp;review&nbsp;was&nbsp;successful&nbsp;(recalled).</span></dd></dl>
+
+<dl><dt><a name="SpacedRepetitionScheduler-retention"><strong>retention</strong></a>(self, concept: 'str', now: 'float | None' = None) -&gt; 'float'</dt><dd><span class="code">Compute&nbsp;current&nbsp;retention&nbsp;for&nbsp;a&nbsp;concept.<br>
+&nbsp;<br>
+Uses&nbsp;the&nbsp;Ebbinghaus&nbsp;forgetting&nbsp;curve:&nbsp;R(t)&nbsp;=&nbsp;exp(−t&nbsp;/&nbsp;S),<br>
+where&nbsp;t&nbsp;is&nbsp;the&nbsp;time&nbsp;since&nbsp;last&nbsp;review&nbsp;and&nbsp;S&nbsp;is&nbsp;the&nbsp;memory<br>
+stability.&nbsp;A&nbsp;concept&nbsp;never&nbsp;reviewed&nbsp;has&nbsp;retention&nbsp;0.0<br>
+(completely&nbsp;unknown).<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;concept:&nbsp;The&nbsp;concept&nbsp;to&nbsp;query.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;now:&nbsp;Optional&nbsp;current&nbsp;timestamp&nbsp;(seconds).&nbsp;Defaults&nbsp;to<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;time.time().<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Retention&nbsp;probability&nbsp;in&nbsp;[0,&nbsp;1].</span></dd></dl>
+
+<dl><dt><a name="SpacedRepetitionScheduler-set_consolidation_state"><strong>set_consolidation_state</strong></a>(self, consolidation_weight: 'float', phase: 'str | None' = None) -&gt; 'None'</dt><dd><span class="code">Set&nbsp;the&nbsp;body's&nbsp;consolidation&nbsp;drive&nbsp;and&nbsp;sleep-phase&nbsp;window.<br>
+&nbsp;<br>
+``consolidation_weight``&nbsp;is&nbsp;the&nbsp;body's&nbsp;cortisol+ACh-derived<br>
+mode&nbsp;weight&nbsp;in&nbsp;[0,1]&nbsp;(0.5&nbsp;neutral&nbsp;→&nbsp;gain&nbsp;1.0);&nbsp;``phase``&nbsp;is&nbsp;the<br>
+emergent&nbsp;mental&nbsp;phase&nbsp;name&nbsp;—&nbsp;"nrem"&nbsp;opens&nbsp;the&nbsp;full&nbsp;SWS&nbsp;replay<br>
+window,&nbsp;waking&nbsp;phases&nbsp;attenuate&nbsp;it.&nbsp;The&nbsp;replay&nbsp;gain&nbsp;scales<br>
+both&nbsp;how&nbsp;strongly&nbsp;reviews&nbsp;restore&nbsp;activation&nbsp;and&nbsp;how&nbsp;due&nbsp;items<br>
+rank&nbsp;in&nbsp;the&nbsp;schedule.</span></dd></dl>
+
+<dl><dt><a name="SpacedRepetitionScheduler-urgency"><strong>urgency</strong></a>(self, concept: 'str', now: 'float | None' = None) -&gt; 'float'</dt><dd><span class="code">How&nbsp;urgent&nbsp;is&nbsp;reviewing&nbsp;this&nbsp;concept?<br>
+&nbsp;<br>
+Urgency&nbsp;=&nbsp;1&nbsp;−&nbsp;retention.&nbsp;A&nbsp;concept&nbsp;about&nbsp;to&nbsp;be&nbsp;forgotten<br>
+(low&nbsp;retention)&nbsp;is&nbsp;urgent;&nbsp;a&nbsp;freshly&nbsp;reviewed&nbsp;concept&nbsp;is&nbsp;not.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;concept:&nbsp;The&nbsp;concept&nbsp;to&nbsp;query.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;now:&nbsp;Optional&nbsp;current&nbsp;timestamp&nbsp;(seconds).<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Urgency&nbsp;in&nbsp;[0,&nbsp;1].</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>replay_gain</strong></dt>
+<dd><span class="code">Current&nbsp;consolidation-phase&nbsp;replay&nbsp;gain.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>DEFAULT_STABILITY</strong> = 86400.0</dl>
+
+<dl><dt><strong>EASE_BUMP</strong> = 0.1</dl>
+
+<dl><dt><strong>EASE_PENALTY</strong> = 0.2</dl>
+
+<dl><dt><strong>MAX_RECORDS</strong> = 5000</dl>
+
+<dl><dt><strong>MAX_STABILITY</strong> = 604800.0</dl>
+
+<dl><dt><strong>MIN_EASE</strong> = 1.3</dl>
+
+<dl><dt><strong>MIN_STABILITY</strong> = 300.0</dl>
+
+<dl><dt><strong>RETENTION_THRESHOLD</strong> = 0.7</dl>
+
+<dl><dt><strong>__annotations__</strong> = {'DEFAULT_STABILITY': 'float', 'EASE_BUMP': 'float', 'EASE_PENALTY': 'float', 'MAX_RECORDS': 'int', 'MAX_STABILITY': 'float', 'MIN_EASE': 'float', 'MIN_STABILITY': 'float', 'RETENTION_THRESHOLD': 'float', '_PHASE_REPLAY': 'ClassVar[dict[str, float]]'}</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['ReviewRecord', 'SpacedRepetitionScheduler']</td></tr></table>
+</body></html>

@@ -1,0 +1,92 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Genesis core state — the single memory-mapped structure that holds Genesis’s entire runtime state."><title>genesis::state::core_state - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-203241e4.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="genesis" data-themes="" data-resource-suffix="" data-rustdoc-version="1.100.0 (0ef1bc386 2026-11-09)" data-channel="1.100.0" data-search-js="search-b167f383.js" data-stringdex-js="stringdex-b5109af9.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../../static.files/main-1814ead3.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-9f56287d.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module core_state</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../genesis/index.html">genesis</a><span class="version">0.2.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module core_<wbr>state</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#schema-v5-layout-3480-bytes" title="Schema v5 layout (3480 bytes)">Schema v5 layout (3480 bytes)</a></li><li><a href="#whats-new-in-v3" title="What’s new in v3">What’s new in v3</a></li><li><a href="#whats-new-in-v31" title="What’s new in v3.1">What’s new in v3.1</a></li></ul><h3><a href="#structs">Module Items</a></h3><ul class="block"><li><a href="#structs" title="Structs">Structs</a></li><li><a href="#enums" title="Enums">Enums</a></li><li><a href="#constants" title="Constants">Constants</a></li><li><a href="#statics" title="Statics">Statics</a></li><li><a href="#functions" title="Functions">Functions</a></li></ul></section><div id="rustdoc-modnav"><h2><a href="../index.html">In genesis::<wbr>state</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../index.html">genesis</a>::<wbr><a href="../index.html">state</a></div><h1>Module <span>core_<wbr>state</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/genesis/state/core_state.rs.html#1-867">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Genesis core state — the single memory-mapped structure that holds
+Genesis’s entire runtime state.</p>
+<p>This is the hub of the brain. Every module reads from and writes to
+this structure. It is designed to be:</p>
+<ul>
+<li><strong>Memory-mapped</strong>: lives in a single contiguous file, mmap’d into
+all Genesis processes.</li>
+<li><strong>Fixed-size</strong>: no heap allocations, no pointers, no variable-length
+data. The entire struct is <code>#[repr(C)]</code> with a stable binary layout.</li>
+<li><strong>Lock-free readable</strong>: uses a sequence lock in the header so
+readers never block writers and vice versa.</li>
+<li><strong>Versioned</strong>: magic bytes + schema version detect format mismatches.</li>
+<li><strong>Checksummed</strong>: CRC32 detects corruption from crashes mid-write.</li>
+</ul>
+<h3 id="schema-v5-layout-3480-bytes"><a class="doc-anchor" href="#schema-v5-layout-3480-bytes">§</a>Schema v5 layout (3480 bytes)</h3><div class="example-wrap"><pre class="language-text"><code>offset  field             type                size
+------  -----             ----                ----
+  0     header            CoreStateHeader      56
+ 56     neurochemicals    NeurochemicalVector 2416
+2472    zones             ActiveZones          96
+2568    memory            MemoryPointers      120
+2688    manifest          RuntimeManifest     536
+3224    sleep_network     SleepState           64
+3288    ions              IonState            124
+3412    checksum          u32                   4
+3416    inference_signals InferenceSignals      64
+3480    TOTAL                                  3480 bytes</code></pre></div>
+<p>Schema v5 inserted the sleep-wake network ahead of <code>ions</code>. Schema
+v4 had inserted <code>ions</code> ahead of the checksum, so both v3 and v4
+files are decoded through their byte-exact legacy types and widened
+rather than reinterpreted in place. The sleep network and ion block
+sit <em>inside</em> the CRC32 region because they are authoritative state,
+not derived: dropping them would reset the body’s sleep pressure or
+the cell’s resting state on every restart.</p>
+<p>That’s ~3.4 KB — fits in a single 4 KB page with room to spare.</p>
+<p>The tail is <code>inference_signals</code>, sized to exactly
+<code>size_of::&lt;InferenceSignals&gt;()</code> so that adding a signal field
+cannot shift anything else. Such a growth is a <em>size</em> migration,
+not a version one: see <a href="struct.GenesisCoreState.html#method.migrate_layout" title="method genesis::state::core_state::GenesisCoreState::migrate_layout"><code>GenesisCoreState::migrate_layout</code></a>.</p>
+<h3 id="whats-new-in-v3"><a class="doc-anchor" href="#whats-new-in-v3">§</a>What’s new in v3</h3>
+<ul>
+<li><strong>6 new neurochemicals</strong>: endocannabinoids (retrograde signaling),
+vasopressin (social bonding, HPA axis), CRH (upstream HPA trigger),
+orexin (hypocretin, arousal promotion), epinephrine (adrenaline,
+fast stress response), melatonin (circadian sleep hormone).
+Total: 18 chemicals (up from 12).</li>
+<li><strong>Receptor subtype modeling</strong>: D1/D2 for dopamine, 5-HT1A/5-HT2A
+for serotonin, with subtype-specific sensitivities.</li>
+<li><strong>Split receptor adaptation</strong>: desensitization (fast,
+phosphorylation-based) and internalization (slow, membrane removal)
+as separate mechanisms.</li>
+<li><strong>Allosteric modulation</strong>: GABA-A allosteric site for
+benzodiazepine-like enhancement.</li>
+<li><strong>Region-specific serotonin→dopamine coupling</strong>: striatum (5-HT2A,
+inhibitory) vs PFC (5-HT1A, facilitatory) vs default (average).</li>
+<li><strong>GABA disinhibition</strong>: high GABA + high ACh disinhibits glutamate.</li>
+<li><strong>BDNF recovery after stress</strong>: serotonin-driven BDNF recovery when
+cortisol drops.</li>
+<li><strong>Hard clamps</strong>: cortisol max 0.80, NE max 0.90 (safety mechanism).</li>
+<li><strong>Customizable tick parameters</strong>: NeuroTickParams struct with
+tick_with_params() method.</li>
+<li><strong>Increased restoring force</strong>: 20% (up from 10%) for faster
+recovery from chronic stress.</li>
+<li><strong>Version migration</strong>: migrate_state() framework for v2→v3 upgrades.</li>
+</ul>
+<h3 id="whats-new-in-v31"><a class="doc-anchor" href="#whats-new-in-v31">§</a>What’s new in v3.1</h3>
+<ul>
+<li><strong>HPA axis cascade</strong>: CRH → ACTH → cortisol with time delays and
+negative feedback, replacing direct cortisol manipulation.</li>
+<li><strong>Tonic/phasic distinction</strong>: tonic_level and phasic_level fields
+model sustained vs burst-firing neurotransmission. For dopamine,
+tonic activates D2 (high-affinity) and phasic activates D1
+(low-affinity). For serotonin, tonic activates 5-HT1A and phasic
+activates 5-HT2A.</li>
+<li><strong>Vesicular pool depletion</strong>: impulses deplete the vesicular pool,
+causing synaptic depression when the pool is low. Synthesis and
+reuptake slowly replenish it.</li>
+<li><strong>Narcolepsy modeling</strong>: low orexin (&lt;0.10) causes sudden
+histamine drops, modeling cataplexy/sleep attacks.</li>
+<li><strong>Improved valence equation</strong>: adds NE, endorphin, glutamate
+excess, and DA×SRT nonlinear synergy terms.</li>
+<li><strong>Improved arousal equation</strong>: adds orexin and epinephrine,
+weights adenosine more heavily for sleep pressure, and models
+the bistable sleep-wake flip-flop with hysteresis.</li>
+</ul>
+</div></details><h2 id="structs" class="section-header">Structs<a href="#structs" class="anchor">§</a></h2><dl class="item-table"><dt><a class="struct" href="struct.GenesisCoreState.html" title="struct genesis::state::core_state::GenesisCoreState">Genesis<wbr>Core<wbr>State</a></dt><dd>The complete Genesis core state.</dd></dl><h2 id="enums" class="section-header">Enums<a href="#enums" class="anchor">§</a></h2><dl class="item-table"><dt><a class="enum" href="enum.CoreStateError.html" title="enum genesis::state::core_state::CoreStateError">Core<wbr>State<wbr>Error</a></dt><dd>Errors that can occur when verifying the core state.</dd></dl><h2 id="constants" class="section-header">Constants<a href="#constants" class="anchor">§</a></h2><dl class="item-table"><dt><a class="constant" href="constant.CRC32_POLY.html" title="constant genesis::state::core_state::CRC32_POLY">CRC32_<wbr>POLY</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>CRC32 polynomial (IEEE 802.3 — same as zlib / PNG).</dd><dt><a class="constant" href="constant.LEGACY_SIZE.html" title="constant genesis::state::core_state::LEGACY_SIZE">LEGACY_<wbr>SIZE</a></dt><dd>The struct size under schema v3 before <a href="../inference/struct.InferenceSignals.html" title="struct genesis::state::inference::InferenceSignals"><code>InferenceSignals</code></a> gained
+<code>policy_authority</code> — that field took the reserve from 60 to 64 bytes
+and the struct from 3288 to 3296.</dd><dt><a class="constant" href="constant.RESERVED_BYTES.html" title="constant genesis::state::core_state::RESERVED_BYTES">RESERVED_<wbr>BYTES</a></dt><dd>Size of the <a href="../inference/struct.InferenceSignals.html" title="struct genesis::state::inference::InferenceSignals"><code>InferenceSignals</code></a> tail. The field began as the
+schema-v3 reserved region (which let it grow without a version
+bump), and it still occupies exactly 64 bytes at the end of the
+struct.</dd></dl><h2 id="statics" class="section-header">Statics<a href="#statics" class="anchor">§</a></h2><dl class="item-table"><dt><a class="static" href="static.CRC32_TABLE.html" title="static genesis::state::core_state::CRC32_TABLE">CRC32_<wbr>TABLE</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>Pre-computed CRC32 table for fast lookup (8x faster than bit-by-bit).
+Built once at startup from the polynomial.</dd></dl><h2 id="functions" class="section-header">Functions<a href="#functions" class="anchor">§</a></h2><dl class="item-table"><dt><a class="fn" href="fn.crc32_ieee.html" title="fn genesis::state::core_state::crc32_ieee">crc32_<wbr>ieee</a></dt><dd>CRC32 (IEEE) of <code>bytes</code>, with the same table as the core state
+checksum. Shared so sidecar files carry the same integrity check.</dd></dl></section></div></main></body></html>

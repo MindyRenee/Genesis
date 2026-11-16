@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.frontal_lobe.reasoning.critical_thinking</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.frontal_lobe.html" class="white">frontal_lobe</a>.<a href="Self_World.frontal_lobe.reasoning.html" class="white">reasoning</a>.critical_thinking</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/reasoning/critical_thinking.py">/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/reasoning/critical_thinking.py</a></td></tr></table>
+    <p><span class="code">Critical&nbsp;thinking&nbsp;—&nbsp;epistemic&nbsp;evaluation&nbsp;of&nbsp;claims&nbsp;and&nbsp;evidence.<br>
+&nbsp;<br>
+Genesis&nbsp;could&nbsp;reason&nbsp;about&nbsp;concepts&nbsp;(deductive,&nbsp;abductive,&nbsp;analogical,<br>
+causal)&nbsp;and&nbsp;form&nbsp;hypotheses,&nbsp;but&nbsp;it&nbsp;had&nbsp;no&nbsp;way&nbsp;to&nbsp;evaluate&nbsp;whether&nbsp;a<br>
+claim&nbsp;is&nbsp;*well-supported*.&nbsp;The&nbsp;reasoning&nbsp;engine&nbsp;produces&nbsp;conclusions;<br>
+nothing&nbsp;checks&nbsp;whether&nbsp;those&nbsp;conclusions&nbsp;rest&nbsp;on&nbsp;good&nbsp;evidence,&nbsp;whether<br>
+the&nbsp;evidence&nbsp;comes&nbsp;from&nbsp;credible&nbsp;sources,&nbsp;or&nbsp;whether&nbsp;disconfirming<br>
+evidence&nbsp;exists&nbsp;that&nbsp;should&nbsp;lower&nbsp;confidence.<br>
+&nbsp;<br>
+This&nbsp;module&nbsp;closes&nbsp;that&nbsp;gap&nbsp;with&nbsp;a&nbsp;**critical&nbsp;thinking&nbsp;engine**&nbsp;that<br>
+applies&nbsp;epistemic&nbsp;scrutiny&nbsp;to&nbsp;reasoning&nbsp;results&nbsp;before&nbsp;they&nbsp;reach&nbsp;the<br>
+answer&nbsp;composer.&nbsp;It's&nbsp;the&nbsp;difference&nbsp;between&nbsp;"I&nbsp;can&nbsp;produce&nbsp;a&nbsp;conclusion"<br>
+and&nbsp;"I&nbsp;can&nbsp;judge&nbsp;whether&nbsp;my&nbsp;conclusion&nbsp;is&nbsp;justified."<br>
+&nbsp;<br>
+##&nbsp;What&nbsp;it&nbsp;does<br>
+&nbsp;<br>
+1.&nbsp;**Evidence&nbsp;quality&nbsp;assessment**:&nbsp;for&nbsp;each&nbsp;reasoning&nbsp;result,&nbsp;evaluate<br>
+&nbsp;&nbsp;&nbsp;the&nbsp;supporting&nbsp;evidence&nbsp;—&nbsp;how&nbsp;many&nbsp;independent&nbsp;sources&nbsp;support&nbsp;it,<br>
+&nbsp;&nbsp;&nbsp;what&nbsp;is&nbsp;their&nbsp;reliability,&nbsp;and&nbsp;how&nbsp;strong&nbsp;are&nbsp;the&nbsp;edges.<br>
+&nbsp;<br>
+2.&nbsp;**Source&nbsp;credibility&nbsp;weighting**:&nbsp;edges&nbsp;from&nbsp;high-reliability&nbsp;sources<br>
+&nbsp;&nbsp;&nbsp;(official&nbsp;docs,&nbsp;dictionaries)&nbsp;count&nbsp;more&nbsp;than&nbsp;edges&nbsp;from&nbsp;low-<br>
+&nbsp;&nbsp;&nbsp;reliability&nbsp;sources&nbsp;(Wikipedia,&nbsp;conversation).&nbsp;The&nbsp;existing<br>
+&nbsp;&nbsp;&nbsp;``SOURCE_RELIABILITY``&nbsp;hierarchy&nbsp;is&nbsp;finally&nbsp;propagated&nbsp;into<br>
+&nbsp;&nbsp;&nbsp;epistemic&nbsp;evaluation.<br>
+&nbsp;<br>
+3.&nbsp;**Disconfirmation&nbsp;search**:&nbsp;for&nbsp;each&nbsp;conclusion,&nbsp;search&nbsp;for&nbsp;edges<br>
+&nbsp;&nbsp;&nbsp;that&nbsp;would&nbsp;contradict&nbsp;it&nbsp;(OPPOSITE_OF,&nbsp;CONTRADICTS,&nbsp;PREVENTS&nbsp;when<br>
+&nbsp;&nbsp;&nbsp;the&nbsp;conclusion&nbsp;asserts&nbsp;ENABLES,&nbsp;etc.).&nbsp;Disconfirming&nbsp;evidence&nbsp;lowers<br>
+&nbsp;&nbsp;&nbsp;confidence.<br>
+&nbsp;<br>
+4.&nbsp;**Fallacy&nbsp;detection**:&nbsp;flag&nbsp;common&nbsp;reasoning&nbsp;fallacies:<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;**Hasty&nbsp;generalization**:&nbsp;a&nbsp;hypothesis&nbsp;from&nbsp;a&nbsp;single&nbsp;weak&nbsp;path<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;**Circular&nbsp;reasoning**:&nbsp;A→B→A&nbsp;chains&nbsp;in&nbsp;the&nbsp;evidence<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;**Unsupported&nbsp;assertion**:&nbsp;a&nbsp;claim&nbsp;with&nbsp;no&nbsp;evidence&nbsp;edges<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;**Confirmation&nbsp;bias**:&nbsp;only&nbsp;supporting&nbsp;evidence&nbsp;found,&nbsp;no<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;disconfirmation&nbsp;search&nbsp;was&nbsp;performed<br>
+&nbsp;<br>
+5.&nbsp;**Confidence&nbsp;revision**:&nbsp;produce&nbsp;a&nbsp;revised&nbsp;confidence&nbsp;that&nbsp;combines<br>
+&nbsp;&nbsp;&nbsp;the&nbsp;original&nbsp;reasoning&nbsp;confidence&nbsp;with&nbsp;the&nbsp;evidence&nbsp;quality<br>
+&nbsp;&nbsp;&nbsp;assessment.&nbsp;Well-supported&nbsp;conclusions&nbsp;keep&nbsp;or&nbsp;gain&nbsp;confidence;<br>
+&nbsp;&nbsp;&nbsp;poorly-supported&nbsp;conclusions&nbsp;lose&nbsp;it.<br>
+&nbsp;<br>
+6.&nbsp;**Critical&nbsp;assessment**:&nbsp;return&nbsp;a&nbsp;``<a href="#CriticalAssessment">CriticalAssessment</a>``&nbsp;with&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;revised&nbsp;confidence,&nbsp;evidence&nbsp;quality&nbsp;score,&nbsp;disconfirmation&nbsp;count,<br>
+&nbsp;&nbsp;&nbsp;fallacies&nbsp;detected,&nbsp;and&nbsp;a&nbsp;recommendation&nbsp;(accept,&nbsp;hedge,&nbsp;reject,<br>
+&nbsp;&nbsp;&nbsp;investigate&nbsp;further).<br>
+&nbsp;<br>
+##&nbsp;Integration<br>
+&nbsp;<br>
+The&nbsp;engine&nbsp;is&nbsp;wired&nbsp;into&nbsp;the&nbsp;frontal&nbsp;region&nbsp;as<br>
+``self.<strong>brain</strong>.frontal.critical_thinking``&nbsp;and&nbsp;invoked&nbsp;on&nbsp;reasoning&nbsp;results<br>
+before&nbsp;they&nbsp;reach&nbsp;the&nbsp;answer&nbsp;composer.&nbsp;Results&nbsp;that&nbsp;fail&nbsp;critical<br>
+scrutiny&nbsp;have&nbsp;their&nbsp;confidence&nbsp;downgraded&nbsp;and&nbsp;are&nbsp;flagged&nbsp;with<br>
+fallacies,&nbsp;so&nbsp;Genesis&nbsp;hedges&nbsp;or&nbsp;investigates&nbsp;rather&nbsp;than&nbsp;asserting<br>
+uncertain&nbsp;claims.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.critical_thinking.html#CriticalAssessment">CriticalAssessment</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.critical_thinking.html#CriticalThinker">CriticalThinker</a>
+</dt><dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.critical_thinking.html#EvidenceItem">EvidenceItem</a>
+</dt></dl>
+</dd>
+<dt class="heading-text"><a href="enum.html#Enum">enum.Enum</a>(<a href="builtins.html#object">builtins.object</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.frontal_lobe.reasoning.critical_thinking.html#AssessmentRecommendation">AssessmentRecommendation</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="AssessmentRecommendation">class <strong>AssessmentRecommendation</strong></a>(<a href="enum.html#Enum">enum.Enum</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#AssessmentRecommendation">AssessmentRecommendation</a>(*values)<br>
+&nbsp;<br>
+What&nbsp;Genesis&nbsp;should&nbsp;do&nbsp;with&nbsp;a&nbsp;critically-assessed&nbsp;claim.<br>
+&nbsp;<br>
+-&nbsp;ACCEPT:&nbsp;the&nbsp;claim&nbsp;is&nbsp;well-supported;&nbsp;assert&nbsp;it&nbsp;confidently.<br>
+-&nbsp;HEDGE:&nbsp;the&nbsp;claim&nbsp;has&nbsp;some&nbsp;support&nbsp;but&nbsp;also&nbsp;concerns;&nbsp;express<br>
+&nbsp;&nbsp;uncertainty.<br>
+-&nbsp;REJECT:&nbsp;the&nbsp;claim&nbsp;is&nbsp;contradicted&nbsp;or&nbsp;fallacious;&nbsp;don't&nbsp;assert&nbsp;it.<br>
+-&nbsp;INVESTIGATE:&nbsp;the&nbsp;claim&nbsp;lacks&nbsp;sufficient&nbsp;evidence;&nbsp;seek&nbsp;more<br>
+&nbsp;&nbsp;information&nbsp;before&nbsp;asserting.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.frontal_lobe.reasoning.critical_thinking.html#AssessmentRecommendation">AssessmentRecommendation</a></dd>
+<dd><a href="enum.html#Enum">enum.Enum</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>ACCEPT</strong> = &lt;AssessmentRecommendation.ACCEPT: 'accept'&gt;</dl>
+
+<dl><dt><strong>HEDGE</strong> = &lt;AssessmentRecommendation.HEDGE: 'hedge'&gt;</dl>
+
+<dl><dt><strong>INVESTIGATE</strong> = &lt;AssessmentRecommendation.INVESTIGATE: 'investigate'&gt;</dl>
+
+<dl><dt><strong>REJECT</strong> = &lt;AssessmentRecommendation.REJECT: 'reject'&gt;</dl>
+
+<hr>
+Data descriptors inherited from <a href="enum.html#Enum">enum.Enum</a>:<br>
+<dl><dt><strong>name</strong></dt>
+<dd><span class="code">The&nbsp;name&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<dl><dt><strong>value</strong></dt>
+<dd><span class="code">The&nbsp;value&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<hr>
+Static methods inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><a name="AssessmentRecommendation-__contains__"><strong>__contains__</strong></a>(value)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;`value`&nbsp;is&nbsp;in&nbsp;`cls`.<br>
+&nbsp;<br>
+`value`&nbsp;is&nbsp;in&nbsp;`cls`&nbsp;if:<br>
+1)&nbsp;`value`&nbsp;is&nbsp;a&nbsp;member&nbsp;of&nbsp;`cls`,&nbsp;or<br>
+2)&nbsp;`value`&nbsp;is&nbsp;the&nbsp;value&nbsp;of&nbsp;one&nbsp;of&nbsp;the&nbsp;`cls`'s&nbsp;members.</span></dd></dl>
+
+<dl><dt><a name="AssessmentRecommendation-__getitem__"><strong>__getitem__</strong></a>(name)</dt><dd><span class="code">Return&nbsp;the&nbsp;member&nbsp;matching&nbsp;`name`.</span></dd></dl>
+
+<dl><dt><a name="AssessmentRecommendation-__iter__"><strong>__iter__</strong></a>()</dt><dd><span class="code">Return&nbsp;members&nbsp;in&nbsp;definition&nbsp;order.</span></dd></dl>
+
+<dl><dt><a name="AssessmentRecommendation-__len__"><strong>__len__</strong></a>()</dt><dd><span class="code">Return&nbsp;the&nbsp;number&nbsp;of&nbsp;members&nbsp;(no&nbsp;aliases)</span></dd></dl>
+
+<hr>
+Readonly properties inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><strong>__members__</strong></dt>
+<dd><span class="code">Returns&nbsp;a&nbsp;mapping&nbsp;of&nbsp;member&nbsp;name-&gt;value.<br>
+&nbsp;<br>
+This&nbsp;mapping&nbsp;lists&nbsp;all&nbsp;enum&nbsp;members,&nbsp;including&nbsp;aliases.&nbsp;Note&nbsp;that&nbsp;this<br>
+is&nbsp;a&nbsp;read-only&nbsp;view&nbsp;of&nbsp;the&nbsp;internal&nbsp;mapping.</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="CriticalAssessment">class <strong>CriticalAssessment</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#CriticalAssessment">CriticalAssessment</a>(original_confidence:&nbsp;'float',&nbsp;revised_confidence:&nbsp;'float',&nbsp;evidence_quality:&nbsp;'float',&nbsp;supporting_evidence:&nbsp;'list[<a href="#EvidenceItem">EvidenceItem</a>]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;disconfirming_evidence:&nbsp;'list[<a href="#EvidenceItem">EvidenceItem</a>]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;fallacies:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;recommendation:&nbsp;'<a href="#AssessmentRecommendation">AssessmentRecommendation</a>'&nbsp;=&nbsp;&amp;lt;<a href="#AssessmentRecommendation">AssessmentRecommendation</a>.INVESTIGATE:&nbsp;'investigate'&amp;gt;,&nbsp;notes:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;result&nbsp;of&nbsp;critically&nbsp;evaluating&nbsp;a&nbsp;reasoning&nbsp;result.<br>
+&nbsp;<br>
+Contains&nbsp;the&nbsp;revised&nbsp;confidence,&nbsp;evidence&nbsp;quality&nbsp;assessment,<br>
+disconfirmation&nbsp;analysis,&nbsp;fallacy&nbsp;flags,&nbsp;and&nbsp;a&nbsp;recommendation&nbsp;for<br>
+how&nbsp;Genesis&nbsp;should&nbsp;handle&nbsp;the&nbsp;claim.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="CriticalAssessment-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="CriticalAssessment-__init__"><strong>__init__</strong></a>(self, original_confidence: 'float', revised_confidence: 'float', evidence_quality: 'float', supporting_evidence: 'list[EvidenceItem]' = &lt;factory&gt;, disconfirming_evidence: 'list[EvidenceItem]' = &lt;factory&gt;, fallacies: 'list[str]' = &lt;factory&gt;, recommendation: 'AssessmentRecommendation' = &lt;AssessmentRecommendation.INVESTIGATE: 'investigate'&gt;, notes: 'list[str]' = &lt;factory&gt;) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="CriticalAssessment-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="CriticalAssessment-describe"><strong>describe</strong></a>(self) -&gt; 'str'</dt><dd><span class="code">Human-readable&nbsp;summary&nbsp;of&nbsp;the&nbsp;assessment.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>confidence_delta</strong></dt>
+<dd><span class="code">How&nbsp;much&nbsp;the&nbsp;confidence&nbsp;changed&nbsp;after&nbsp;critical&nbsp;evaluation.</span></dd>
+</dl>
+<dl><dt><strong>is_downgraded</strong></dt>
+<dd><span class="code">Whether&nbsp;the&nbsp;assessment&nbsp;lowered&nbsp;the&nbsp;confidence.</span></dd>
+</dl>
+<dl><dt><strong>is_upgraded</strong></dt>
+<dd><span class="code">Whether&nbsp;the&nbsp;assessment&nbsp;raised&nbsp;the&nbsp;confidence.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>disconfirming_evidence</strong></dt>
+</dl>
+<dl><dt><strong>evidence_quality</strong></dt>
+</dl>
+<dl><dt><strong>fallacies</strong></dt>
+</dl>
+<dl><dt><strong>notes</strong></dt>
+</dl>
+<dl><dt><strong>original_confidence</strong></dt>
+</dl>
+<dl><dt><strong>recommendation</strong></dt>
+</dl>
+<dl><dt><strong>revised_confidence</strong></dt>
+</dl>
+<dl><dt><strong>supporting_evidence</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'disconfirming_evidence': 'list[EvidenceItem]', 'evidence_quality': 'float', 'fallacies': 'list[str]', 'notes': 'list[str]', 'original_confidence': 'float', 'recommendation': 'AssessmentRecommendation', 'revised_confidence': 'float', 'supporting_evidence': 'list[EvidenceItem]'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'disconfirming_evidence': Field(name='disconfirming_evidence',type='list[E...appingproxy({}),kw_only=False,_field_type=_FIELD), 'evidence_quality': Field(name='evidence_quality',type='float',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'fallacies': Field(name='fallacies',type='list[str]',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'notes': Field(name='notes',type='list[str]',default=&lt;dat...appingproxy({}),kw_only=False,_field_type=_FIELD), 'original_confidence': Field(name='original_confidence',type='float',de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'recommendation': Field(name='recommendation',type='AssessmentReco...appingproxy({}),kw_only=False,_field_type=_FIELD), 'revised_confidence': Field(name='revised_confidence',type='float',def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'supporting_evidence': Field(name='supporting_evidence',type='list[Evid...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('original_confidence', 'revised_confidence', 'evidence_quality', 'supporting_evidence', 'disconfirming_evidence', 'fallacies', 'recommendation', 'notes')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="CriticalThinker">class <strong>CriticalThinker</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#CriticalThinker">CriticalThinker</a>(network:&nbsp;'ConceptNetwork')&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Epistemic&nbsp;evaluation&nbsp;of&nbsp;claims&nbsp;and&nbsp;evidence.<br>
+&nbsp;<br>
+Given&nbsp;a&nbsp;reasoning&nbsp;result&nbsp;(a&nbsp;conclusion&nbsp;with&nbsp;evidence),&nbsp;the&nbsp;engine<br>
+evaluates&nbsp;whether&nbsp;the&nbsp;conclusion&nbsp;is&nbsp;well-supported&nbsp;by&nbsp;assessing<br>
+evidence&nbsp;quality,&nbsp;searching&nbsp;for&nbsp;disconfirming&nbsp;evidence,&nbsp;detecting<br>
+fallacies,&nbsp;and&nbsp;revising&nbsp;confidence&nbsp;accordingly.<br>
+&nbsp;<br>
+Usage::<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;critic&nbsp;=&nbsp;<a href="#CriticalThinker">CriticalThinker</a>(network)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;assessment&nbsp;=&nbsp;critic.<a href="#CriticalThinker-evaluate">evaluate</a>(reasoning_result)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;assessment.recommendation&nbsp;==&nbsp;<a href="#AssessmentRecommendation">AssessmentRecommendation</a>.REJECT:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;Don't&nbsp;assert&nbsp;this&nbsp;claim<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;...<br>
+&nbsp;&nbsp;&nbsp;&nbsp;revised_confidence&nbsp;=&nbsp;assessment.revised_confidence<br>
+&nbsp;<br>
+The&nbsp;engine&nbsp;is&nbsp;stateless&nbsp;across&nbsp;calls&nbsp;(it&nbsp;reads&nbsp;the&nbsp;network;&nbsp;it<br>
+doesn't&nbsp;modify&nbsp;it).&nbsp;Assessment&nbsp;history&nbsp;is&nbsp;retained&nbsp;for&nbsp;introspection.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="CriticalThinker-__init__"><strong>__init__</strong></a>(self, network: 'ConceptNetwork') -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;with&nbsp;a&nbsp;concept&nbsp;network&nbsp;to&nbsp;evaluate&nbsp;against.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;network:&nbsp;The&nbsp;concept&nbsp;network&nbsp;—&nbsp;the&nbsp;evidence&nbsp;base.</span></dd></dl>
+
+<dl><dt><a name="CriticalThinker-evaluate"><strong>evaluate</strong></a>(self, result: 'ReasoningResult') -&gt; 'CriticalAssessment'</dt><dd><span class="code">Critically&nbsp;evaluate&nbsp;a&nbsp;reasoning&nbsp;result.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;main&nbsp;entry&nbsp;point.&nbsp;Given&nbsp;a&nbsp;conclusion&nbsp;with&nbsp;evidence,<br>
+the&nbsp;engine:<br>
+1.&nbsp;Gathers&nbsp;supporting&nbsp;evidence&nbsp;from&nbsp;the&nbsp;network.<br>
+2.&nbsp;Searches&nbsp;for&nbsp;disconfirming&nbsp;evidence.<br>
+3.&nbsp;Detects&nbsp;fallacies&nbsp;in&nbsp;the&nbsp;reasoning.<br>
+4.&nbsp;Revises&nbsp;confidence&nbsp;based&nbsp;on&nbsp;evidence&nbsp;quality.<br>
+5.&nbsp;Recommends&nbsp;how&nbsp;to&nbsp;handle&nbsp;the&nbsp;claim.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;result:&nbsp;The&nbsp;reasoning&nbsp;result&nbsp;to&nbsp;evaluate.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;<a href="#CriticalAssessment">CriticalAssessment</a>&nbsp;with&nbsp;revised&nbsp;confidence&nbsp;and&nbsp;recommendation.</span></dd></dl>
+
+<dl><dt><a name="CriticalThinker-evaluate_batch"><strong>evaluate_batch</strong></a>(self, results: 'list[ReasoningResult]') -&gt; 'list[tuple[ReasoningResult, CriticalAssessment]]'</dt><dd><span class="code">Evaluate&nbsp;a&nbsp;batch&nbsp;of&nbsp;reasoning&nbsp;results.<br>
+&nbsp;<br>
+Returns&nbsp;the&nbsp;original&nbsp;results&nbsp;paired&nbsp;with&nbsp;their&nbsp;assessments,<br>
+with&nbsp;revised&nbsp;confidence&nbsp;applied&nbsp;to&nbsp;the&nbsp;results.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;results:&nbsp;The&nbsp;reasoning&nbsp;results&nbsp;to&nbsp;evaluate.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;List&nbsp;of&nbsp;(result,&nbsp;assessment)&nbsp;tuples.&nbsp;The&nbsp;result's&nbsp;confidence<br>
+&nbsp;&nbsp;&nbsp;&nbsp;is&nbsp;replaced&nbsp;with&nbsp;the&nbsp;revised&nbsp;confidence.</span></dd></dl>
+
+<dl><dt><a name="CriticalThinker-restore_from_dict"><strong>restore_from_dict</strong></a>(self, data: 'dict[str, object]') -&gt; 'None'</dt><dd><span class="code">Restore&nbsp;state&nbsp;from&nbsp;persistence.</span></dd></dl>
+
+<dl><dt><a name="CriticalThinker-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict[str, object]'</dt><dd><span class="code">Serialize&nbsp;state&nbsp;for&nbsp;persistence.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>assessments</strong></dt>
+<dd><span class="code">All&nbsp;assessments&nbsp;ever&nbsp;produced&nbsp;(copy).</span></dd>
+</dl>
+<dl><dt><strong>downgraded_count</strong></dt>
+<dd><span class="code">Total&nbsp;claims&nbsp;downgraded&nbsp;by&nbsp;critical&nbsp;evaluation.</span></dd>
+</dl>
+<dl><dt><strong>fallacy_count</strong></dt>
+<dd><span class="code">Total&nbsp;fallacies&nbsp;detected.</span></dd>
+</dl>
+<dl><dt><strong>rejected_count</strong></dt>
+<dd><span class="code">Total&nbsp;claims&nbsp;rejected&nbsp;by&nbsp;critical&nbsp;evaluation.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="EvidenceItem">class <strong>EvidenceItem</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#EvidenceItem">EvidenceItem</a>(source_concept:&nbsp;'str',&nbsp;relation:&nbsp;'str',&nbsp;target_concept:&nbsp;'str',&nbsp;raw_weight:&nbsp;'float',&nbsp;source_reliability:&nbsp;'float',&nbsp;origin:&nbsp;'str',&nbsp;supports:&nbsp;'bool'&nbsp;=&nbsp;True)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;single&nbsp;piece&nbsp;of&nbsp;evidence&nbsp;for&nbsp;or&nbsp;against&nbsp;a&nbsp;claim.<br>
+&nbsp;<br>
+An&nbsp;evidence&nbsp;item&nbsp;is&nbsp;an&nbsp;edge&nbsp;in&nbsp;the&nbsp;concept&nbsp;network&nbsp;that&nbsp;supports<br>
+or&nbsp;contradicts&nbsp;a&nbsp;conclusion.&nbsp;Its&nbsp;weight&nbsp;is&nbsp;adjusted&nbsp;by&nbsp;the&nbsp;source<br>
+reliability&nbsp;of&nbsp;its&nbsp;origin.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="EvidenceItem-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="EvidenceItem-__init__"><strong>__init__</strong></a>(self, source_concept: 'str', relation: 'str', target_concept: 'str', raw_weight: 'float', source_reliability: 'float', origin: 'str', supports: 'bool' = True) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="EvidenceItem-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>adjusted_weight</strong></dt>
+<dd><span class="code">Evidence&nbsp;weight&nbsp;adjusted&nbsp;by&nbsp;source&nbsp;reliability.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>origin</strong></dt>
+</dl>
+<dl><dt><strong>raw_weight</strong></dt>
+</dl>
+<dl><dt><strong>relation</strong></dt>
+</dl>
+<dl><dt><strong>source_concept</strong></dt>
+</dl>
+<dl><dt><strong>source_reliability</strong></dt>
+</dl>
+<dl><dt><strong>supports</strong></dt>
+</dl>
+<dl><dt><strong>target_concept</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'origin': 'str', 'raw_weight': 'float', 'relation': 'str', 'source_concept': 'str', 'source_reliability': 'float', 'supports': 'bool', 'target_concept': 'str'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'origin': Field(name='origin',type='str',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD), 'raw_weight': Field(name='raw_weight',type='float',default=&lt;da...appingproxy({}),kw_only=False,_field_type=_FIELD), 'relation': Field(name='relation',type='str',default=&lt;datacl...appingproxy({}),kw_only=False,_field_type=_FIELD), 'source_concept': Field(name='source_concept',type='str',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD), 'source_reliability': Field(name='source_reliability',type='float',def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'supports': Field(name='supports',type='bool',default=True,d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'target_concept': Field(name='target_concept',type='str',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('source_concept', 'relation', 'target_concept', 'raw_weight', 'source_reliability', 'origin', 'supports')</dl>
+
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['AssessmentRecommendation', 'CriticalAssessment', 'CriticalThinker', 'EvidenceItem']<br>
+<strong>__annotations__</strong> = {'_CONTRADICTION_PAIRS': 'dict[RelationType, set[RelationType]]', '_SOURCE_RELIABILITY': 'dict[str, float]'}</td></tr></table>
+</body></html>
