@@ -16,6 +16,7 @@ import subprocess
 import threading
 import time
 from collections import deque
+from pathlib import Path
 from typing import Any, cast
 
 from genesis_client.swallow import note_swallowed
@@ -214,16 +215,31 @@ class _Browser:
                 "--disable-dev-shm-usage",
                 # A persistent profile that saves anything would else
                 # block on the desktop keyring's unlock prompt — there is
-                # no one to answer it on her screen.
+                # no one to answer it on her screen. basic stores the
+                # profile's secrets profile-side so they survive
+                # relaunches; --use-mock-keychain would discard the key
+                # per launch and orphan every stored token.
                 "--password-store=basic",
-                "--use-mock-keychain",
                 # Her profile never syncs outward to a Google account.
                 "--disable-sync",
                 f"--window-size={window_size}",
                 f"--user-data-dir={self._profile}",
+                # Always open one real page — with no URL a profile
+                # that restores its last session lists zero targets
+                # on /json and the attach below never finds a page.
+                "about:blank",
             ]
             if headless:
                 args.insert(1, "--headless=new")
+        # A Chrome that died uncleanly leaves Singleton{Lock,Socket,
+        # Cookie} behind; the next launch then forwards to a dead
+        # process and exits before opening the debug port. They are
+        # recreated on every launch — stale ones are safe to drop.
+        for stale in ("SingletonLock", "SingletonSocket", "SingletonCookie"):
+            try:
+                (Path(self._profile) / stale).unlink(missing_ok=True)
+            except OSError:
+                pass
         # One pipe for both streams — the browser writes its
         # "listening on ws://..." line to stdout, its diagnostics to
         # stderr; merging keeps the reader a single tail. text=True:
