@@ -40,9 +40,9 @@ checkout's&nbsp;repo&nbsp;root&nbsp;and&nbsp;the&nbsp;package&nbsp;root&nbsp;are
 so&nbsp;the&nbsp;resolution&nbsp;is:<br>
 &nbsp;<br>
 1.&nbsp;``GENESIS_ROOT``&nbsp;—&nbsp;explicit&nbsp;override&nbsp;for&nbsp;unusual&nbsp;layouts.<br>
-2.&nbsp;:func:`package_root`&nbsp;—&nbsp;in&nbsp;a&nbsp;checkout&nbsp;that&nbsp;is&nbsp;the&nbsp;repo&nbsp;root;&nbsp;in&nbsp;a<br>
-&nbsp;&nbsp;&nbsp;non-editable&nbsp;install&nbsp;it&nbsp;is&nbsp;``site-packages``,&nbsp;where&nbsp;the<br>
-&nbsp;&nbsp;&nbsp;installed&nbsp;packages&nbsp;are&nbsp;the&nbsp;code.</span></dd></dl>
+2.&nbsp;:func:`package_root`&nbsp;—&nbsp;the&nbsp;repo&nbsp;root&nbsp;on&nbsp;a&nbsp;checkout;&nbsp;the&nbsp;world<br>
+&nbsp;&nbsp;&nbsp;roots&nbsp;reach&nbsp;sys.path&nbsp;via&nbsp;``genesis_worlds.pth``,&nbsp;never&nbsp;an<br>
+&nbsp;&nbsp;&nbsp;installed&nbsp;package.</span></dd></dl>
  <dl><dt><a name="-package_root"><strong>package_root</strong></a>() -&gt; 'Path'</dt><dd><span class="code">The&nbsp;directory&nbsp;holding&nbsp;the&nbsp;top-level&nbsp;packages.<br>
 &nbsp;<br>
 In&nbsp;a&nbsp;checkout&nbsp;this&nbsp;is&nbsp;the&nbsp;repository&nbsp;root:&nbsp;its&nbsp;children&nbsp;are&nbsp;the<br>

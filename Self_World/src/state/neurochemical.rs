@@ -2362,7 +2362,12 @@ impl NeurochemicalVector {
         // Without the network, the Wilson-Cowan equation is used, unchanged.
         let arousal_target = match network {
             Some(net) => {
-                crate::state::sanitize::finite_or(0.12 + 0.55 * net.lc + 0.25 * net.rem, 0.0)
+                // Align arousal with sleep-wake network threshold:
+                // LC at SLEEP_THRESHOLD (4.0 Hz / 6.0 Hz = 0.667) should
+                // produce arousal above DROWSY_AROUSAL_GATE (0.52).
+                // Formula: 0.15 + 0.65 * lc + 0.25 * rem
+                // At lc=0.667: arousal = 0.15 + 0.65*0.667 = 0.58 > 0.52 ✓
+                crate::state::sanitize::finite_or(0.15 + 0.65 * net.lc + 0.25 * net.rem, 0.0)
             }
             None => crate::state::sanitize::finite_or(sigmoid(total_input), 0.0),
         };

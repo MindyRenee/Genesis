@@ -364,9 +364,7 @@ def test_retina_launches_before_the_daemon(tmp_path):
     daemon = Mock()
     daemon.pid = 4242
     mind = Mock()
-    start_daemon = Mock(
-        side_effect=lambda *a, **k: calls.append("daemon") or daemon
-    )
+    start_daemon = Mock(side_effect=lambda *a, **k: calls.append("daemon") or daemon)
     with (
         patch.dict(os.environ, {"GENESIS_WAKE": "1"}),
         patch.multiple(

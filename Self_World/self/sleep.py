@@ -273,7 +273,6 @@ class SleepMixin:
             return stage is SleepStage.N1
         return self.inner_life.current_hypnagogic is not None
 
-
     @property
     def thalamic_gate_closed(self) -> bool:
         """Whether the sensory relay is shut to routine input.
@@ -316,7 +315,6 @@ class SleepMixin:
             self._last_wake_attempt > 0.0
             and time.time() - self._last_wake_attempt < WAKE_DESYNC_SETTLE_SECONDS
         )
-
 
     def _on_sleep_stage_transition(self, stage: SleepStage, dt: float) -> None:
         """Handle a sleep-stage transition during the ultradian cycle.

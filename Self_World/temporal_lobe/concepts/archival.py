@@ -582,9 +582,7 @@ class ArchivalMixin:
             new_tgt = win if edge.target == lose else edge.target
             if new_src == new_tgt:
                 continue
-            self.add_edge(
-                new_src, new_tgt, edge.relation, weight=edge.weight, origin=edge.origin
-            )
+            self.add_edge(new_src, new_tgt, edge.relation, weight=edge.weight, origin=edge.origin)
 
         # Absorb the loser's names — the merged surface form still
         # resolves to the winner, which is the point of the merge.

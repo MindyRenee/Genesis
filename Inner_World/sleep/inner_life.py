@@ -1575,8 +1575,8 @@ class InnerLife:
         try:
             # Assess brain waves from the neuro summary so dream
             # synthesis intensity scales with the actual brain state
-            # (REM = theta-dominant → more synthesis; NREM deep =
-            # delta-dominant → less synthesis).
+            # (REM = beta/gamma-dominant waking-like activity → more synthesis;
+            # NREM deep = delta-dominant → less synthesis).
             waves = None
             if summary is not None:
                 try:

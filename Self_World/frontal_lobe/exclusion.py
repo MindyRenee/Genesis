@@ -295,9 +295,7 @@ class OptionSpace:
         transferred: dict[Hashable, float] = {}
         if self.exclusive and freed < 1.0:
             after = self.posterior()
-            transferred = {
-                o: after[o] - before[o] for o in after
-            }
+            transferred = {o: after[o] - before[o] for o in after}
         if not self._live:
             self._falsified = True
         return Elimination(hit, transferred, self.resolved, self._falsified)

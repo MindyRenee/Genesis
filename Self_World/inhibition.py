@@ -480,6 +480,14 @@ class NeuromodulatoryGate:
         return self._inner.is_set()
 
     def wait(self, timeout: float | None = None) -> bool:
+        """Wait for the neuromodulatory gate to be set.
+
+        Args:
+            timeout: Maximum time to wait in seconds. None waits indefinitely.
+
+        Returns:
+            True if the gate was set, False if timeout elapsed.
+        """
         return self._inner.wait(timeout)
 
     def stats(self, now: float | None = None) -> dict[str, float]:
@@ -514,6 +522,14 @@ class ThalamicRelay:
         _register(self)
 
     def wait(self, timeout: float | None = None) -> bool:
+        """Wait for the thalamic relay to be notified.
+
+        Args:
+            timeout: Maximum time to wait in seconds. None waits indefinitely.
+
+        Returns:
+            True if notified, False if timeout elapsed.
+        """
         self._waiting += 1
         try:
             return self._inner.wait(timeout)
@@ -521,6 +537,15 @@ class ThalamicRelay:
             self._waiting -= 1
 
     def wait_for(self, predicate: Callable[[], bool], timeout: float | None = None) -> bool:
+        """Wait for the thalamic relay to be notified while checking a predicate.
+
+        Args:
+            predicate: Callable that returns True when the condition is met.
+            timeout: Maximum time to wait in seconds. None waits indefinitely.
+
+        Returns:
+            True if the predicate became True, False if timeout elapsed.
+        """
         self._waiting += 1
         try:
             return self._inner.wait_for(predicate, timeout)

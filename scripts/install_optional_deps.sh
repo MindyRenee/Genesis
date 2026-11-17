@@ -226,25 +226,34 @@ elif [ "$VERIFY_ONLY" -eq 0 ]; then
     fi
 fi
 
-# Arcade games — the official ARC-AGI-3 toolkit (arc_agi + arcengine)
-# plus the local Game Arena shelf (game-arena pulls pyspiel, the same
-# engine Kaggle's arena evaluates on). All wheels; a failed install
-# is a warn — the arcade closes, the rest of her world is unaffected.
+# Arcade games — the official ARC-AGI-3 toolkit (arc_agi + arcengine),
+# open-spiel (provides pyspiel, the same engine Kaggle's arena
+# evaluates on), and the arena harness itself (game-arena,
+# kaggle-environments): the substrate she is to be wired into as a
+# player. The harness's LLM-client deps are pruned afterwards —
+# litellm/openai/anthropic/google-genai/tiktoken/tokenizers/
+# transformers exist to drive API models, and she IS the model; her
+# seat needs no client. All wheels; a failed install is a warn —
+# the arcade closes, the rest of her world is unaffected.
 # Downloaded game files land in <data_dir>/arcade/environment_files
 # (GENESIS_ARC_MODE=normal plays locally; =offline needs no network).
 if "$PY" -c "import arc_agi, arcengine, pyspiel" >/dev/null 2>&1; then
     ok "arcade toolkits present (ARC-AGI-3 + arena)"
 elif [ "$VERIFY_ONLY" -eq 0 ]; then
     if "$PY" -m pip install --only-binary=:all: \
-        arc-agi game-arena kaggle-environments; then
+        arc-agi open-spiel game-arena kaggle-environments; then
         ok "arcade toolkits installed"
     elif "$PY" -m pip install --user --only-binary=:all: \
         --break-system-packages \
-        arc-agi game-arena kaggle-environments; then
+        arc-agi open-spiel game-arena kaggle-environments; then
         ok "arcade toolkits installed (user site)"
     else
         warn "arcade toolkit install failed — the arcade stays closed"
     fi
+    # Prune the harness's LLM-client deps — she IS the model.
+    "$PY" -m pip uninstall -y --quiet \
+        litellm openai anthropic google-genai tiktoken tokenizers transformers 2>/dev/null
+    ok "LLM-client deps pruned (her seat needs no client)"
 fi
 
 # ─────────────────────────────────────────────────────────────────

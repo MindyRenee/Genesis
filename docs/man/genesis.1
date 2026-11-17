@@ -243,47 +243,6 @@ There is no pin file and no
 .IR XDG_DATA_HOME
 step.
 
-.SH DEVELOPMENT
-Before committing changes, run the required checks to ensure code quality:
-.RS
-.PP
-.nf
-.ft CR
-.RS
-\fBcargo fmt --check\fR
-.br
-\fBcargo clippy --all-targets -- -D warnings\fR
-.br
-\fBcargo test --release\fR
-.br
-\fBruff check\fR
-.br
-\fBpython3 -m pyflakes Self_World/ Inner_World/ Outer_World/ scripts/*.py\fR
-.br
-\fBpython3 -m mypy Self_World/ Inner_World/ Outer_World/ --ignore-missing-imports\fR
-.br
-\fBPYTHONPATH=Self_World:Inner_World:Outer_World:. python3 -m pytest tests/python/ -q -o addopts=''\fR
-.RE
-.PP
-These mirror the CI workflow in
-.IR .github/workflows/ci.yml .
-If they drift, CI is correct.
-.PP
-To regenerate documentation after changes:
-.RS
-.PP
-.nf
-.ft CR
-.RS
-\fB./scripts/gen_docs.sh\fR
-.RE
-.PP
-This updates
-.IR docs/rust/
-(Rust docs via cargo doc) and
-.IR docs/python/
-(Python docs via pydoc).
-.PP
 .SH PACKAGED INSTALL
 .BR scripts/install.sh
 installs to

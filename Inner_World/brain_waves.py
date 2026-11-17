@@ -2733,8 +2733,8 @@ def _drowsy_phase_powers(
         }
 
     anchor_high = _anchor(0.35, 0.32, 0.06)  # cortical arousal 0.50
-    anchor_mid = _anchor(0.12, 0.45, 0.22)  # 0.30
-    anchor_low = _anchor(0.08, 0.25, 0.45)  # 0.15
+    anchor_mid = _anchor(0.12, 0.45, 0.10)  # 0.30 - delta minimal in N1
+    anchor_low = _anchor(0.08, 0.25, 0.35)  # 0.15 - delta only at deep drowsy edge
 
     if arousal >= 0.50:
         powers = dict(anchor_high)
@@ -2853,42 +2853,42 @@ def _sleep_phase_powers(
         stage = _sleep_stage_from_summary(summary)
     if stage is SleepStage.REM:
         # REM ("paradoxical sleep"): the cortical and hippocampal
-        # networks run at full waking metabolic intensity. Theta
-        # (sawtooth, 4–8 Hz) is the dominant background rhythm and
-        # is hippocampus-predominant; alpha intrudes intermittently
-        # (infraslow envelope, see _step); beta and gamma fire at
-        # the same intensity as during waking cognitive work
-        # (Bergel et al., 2021 — REM has the highest brain-wide
-        # energy expenditure, driven by theta-gamma activity).
-        # The mind is asleep and muscles are silent, but the
-        # neuronal metabolic state is that of active wake — the
-        # "paradox" of paradoxical sleep.
+        # networks run at full waking metabolic intensity. Beta and
+        # gamma fire at the same intensity as during waking cognitive
+        # work (Bergel et al., 2021 — REM has the highest brain-wide
+        # energy expenditure). Theta (sawtooth, 4–8 Hz) is present
+        # in the hippocampus but is secondary to the waking-like
+        # beta/gamma activity. Alpha intrudes intermittently on the
+        # infraslow envelope. The mind is asleep and muscles are
+        # silent, but the neuronal metabolic state is that of active
+        # wake — the "paradox" of paradoxical sleep.
         powers = {
             BrainWave.INFRASLOW: 0.03,
-            BrainWave.DELTA: 0.06,
-            BrainWave.THETA: 0.40,
+            BrainWave.DELTA: 0.05,
+            BrainWave.THETA: 0.25,
             BrainWave.ALPHA: 0.10,
             BrainWave.SIGMA: 0.00,
-            BrainWave.BETA1: 0.06,
-            BrainWave.BETA2: 0.16,
-            BrainWave.BETA3: 0.07,
-            BrainWave.GAMMA: 0.16,
+            BrainWave.BETA1: 0.10,
+            BrainWave.BETA2: 0.20,
+            BrainWave.BETA3: 0.10,
+            BrainWave.GAMMA: 0.20,
             BrainWave.EPSILON: 0.00,
         }
-        label = "theta"
+        label = "gamma"
         description = (
-            "REM sleep — sawtooth hippocampal theta dominant, "
-            "intermittent alpha flashes, beta and gamma firing at "
-            "waking metabolic intensity, vivid emotional dreaming"
+            "REM sleep — waking-like beta/gamma activity with "
+            "hippocampal sawtooth theta, vivid emotional dreaming"
         )
     elif stage is SleepStage.N1:
-        # N1: the lightest NREM stage — mixed theta/alpha,
-        # low voltage, the transition into sleep.
+        # N1: the lightest NREM stage — alpha dropout (the hallmark of
+        # sleep onset), replaced by low-voltage mixed theta (4-7 Hz).
+        # Alpha disappears as the occipital cortex quiets; theta rises
+        # on the frontocentral midline. This is the Hori A3/B1 transition.
         powers = {
             BrainWave.INFRASLOW: 0.05,
-            BrainWave.DELTA: 0.15,
-            BrainWave.THETA: 0.35,
-            BrainWave.ALPHA: 0.22,
+            BrainWave.DELTA: 0.10,
+            BrainWave.THETA: 0.45,
+            BrainWave.ALPHA: 0.08,
             BrainWave.SIGMA: 0.05,
             BrainWave.BETA1: 0.04,
             BrainWave.BETA2: 0.04,
@@ -2897,17 +2897,17 @@ def _sleep_phase_powers(
             BrainWave.EPSILON: 0.00,
         }
         label = "theta"
-        description = "light sleep, drifting between wake and sleep"
+        description = "light sleep, alpha fading into theta"
     elif stage is SleepStage.N2:
-        # N2: theta/delta background punctuated by sleep spindles
-        # (12-16 Hz sigma, modelled here as elevated sigma band)
-        # and K-complexes. The workhorse of memory consolidation.
+        # N2: theta background with sleep spindles (12-16 Hz sigma)
+        # and K-complexes. Delta is minimal in N2 — it only becomes
+        # dominant in N3. The workhorse of memory consolidation.
         powers = {
             BrainWave.INFRASLOW: 0.05,
-            BrainWave.DELTA: 0.20,
-            BrainWave.THETA: 0.25,
-            BrainWave.ALPHA: 0.12,
-            BrainWave.SIGMA: 0.20,
+            BrainWave.DELTA: 0.08,
+            BrainWave.THETA: 0.35,
+            BrainWave.ALPHA: 0.10,
+            BrainWave.SIGMA: 0.25,
             BrainWave.BETA1: 0.05,
             BrainWave.BETA2: 0.05,
             BrainWave.BETA3: 0.03,
@@ -2966,17 +2966,15 @@ def _waking_phase_powers(
         label = "alpha"
         description = "reflective, filtering out noise to find what matters"
     elif alertness > 0.35:
-        # Bordering N1 — alpha fragmenting, theta rising.
-        # This is the drowsiness index: the alpha/theta ratio
-        # in this band sits near 1.2, the wake/N1 border.
-        # Below 0.35, resolve_waking_drowsy routes this to the
-        # drowsy signature entirely.
-        theta_boost = consolidation_w * 0.18
-        alpha_power = max(0.0, 0.36 - consolidation_w * 0.10)
+        # Bordering N1 — alpha still dominant, theta beginning to rise.
+        # This should be clearly waking, not drowsy - alpha should remain
+        # dominant until the actual drowsy threshold (0.35) is crossed.
+        theta_boost = consolidation_w * 0.10
+        alpha_power = 0.32 + (0.55 - alertness) * 0.3
         powers = {
             BrainWave.INFRASLOW: 0.05,
-            BrainWave.DELTA: 0.08,
-            BrainWave.THETA: 0.20 + theta_boost,
+            BrainWave.DELTA: 0.02,
+            BrainWave.THETA: 0.15 + theta_boost,
             BrainWave.ALPHA: alpha_power,
             BrainWave.SIGMA: 0.00,
             BrainWave.BETA1: 0.04,
@@ -2985,15 +2983,9 @@ def _waking_phase_powers(
             BrainWave.GAMMA: 0.03,
             BrainWave.EPSILON: 0.00,
         }
-        # Label follows the dominant band in this borderline band.
-        if powers[BrainWave.ALPHA] >= powers[BrainWave.THETA]:
-            label = "alpha"
-            description = (
-                "alpha holding with theta creeping in — the wake/N1 border, filtering easing"
-            )
-        else:
-            label = "theta"
-            description = "theta overtaking fragmenting alpha — N1 onset, drifting toward sleep"
+        # Alpha should always dominate in this band - it's still waking.
+        label = "alpha"
+        description = "reflective, filtering out noise to find what matters"
     else:
         # Alertness <= 0.35 is resolved to the drowsy signature
         # before this branch is reached — deltas down-regulating

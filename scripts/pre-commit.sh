@@ -6,8 +6,9 @@
 #   cp scripts/pre-commit.sh .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
 #
 # Checks:
-#   1. Rust: cargo clippy (warnings are errors)
-#   2. Python: ruff check + pyflakes + mypy
+#   1. Docs: regenerate from source (gen_docs.sh)
+#   2. Rust: cargo clippy (warnings are errors)
+#   3. Python: ruff check + pyflakes + mypy
 #
 # Staged files only would be ideal, but the substrate is small enough
 # that full-repo checks run in under 5 seconds.
@@ -24,7 +25,21 @@ else
 fi
 cd "$REPO_ROOT"
 
+# Use venv python if available, else system python
+if [ -x ".venv/bin/python" ]; then
+    PYTHON=".venv/bin/python"
+else
+    PYTHON="python3"
+fi
+
 SKIPPED=0
+
+# ─── Documentation ─────────────────────────────────────────────
+echo "📚 Regenerating documentation..."
+if ! bash "$SCRIPT_DIR/gen_docs.sh" >/dev/null 2>&1; then
+    echo "❌ Documentation generation failed."
+    exit 1
+fi
 
 # ─── Rust ──────────────────────────────────────────────────────
 if command -v cargo >/dev/null 2>&1 && cargo metadata --no-deps --format-version 1 >/dev/null 2>&1; then
@@ -56,8 +71,8 @@ else
     SKIPPED=1
 fi
 
-if python3 -m pyflakes --version >/dev/null 2>&1; then
-    if ! pyflakes_out="$(python3 -m pyflakes $PY_DEPS scripts/*.py 2>&1)"; then
+if "$PYTHON" -m pyflakes --version >/dev/null 2>&1; then
+    if ! pyflakes_out="$("$PYTHON" -m pyflakes $PY_DEPS scripts/*.py 2>&1)"; then
         echo "❌ pyflakes found issues."
         echo "$pyflakes_out"
         exit 1
@@ -67,8 +82,8 @@ else
     SKIPPED=1
 fi
 
-if python3 -m mypy --version >/dev/null 2>&1; then
-    if ! mypy_out="$(python3 -m mypy $PY_DEPS --ignore-missing-imports 2>&1)"; then
+if "$PYTHON" -m mypy --version >/dev/null 2>&1; then
+    if ! mypy_out="$("$PYTHON" -m mypy $PY_DEPS --ignore-missing-imports 2>&1)"; then
         echo "❌ mypy found type errors."
         echo "$mypy_out"
         exit 1

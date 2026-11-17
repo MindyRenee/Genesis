@@ -1136,8 +1136,7 @@ class FrontalLobe:
         realized = [
             c
             for c in self.exclusion.posterior()
-            if isinstance(c, str)
-            and re.search(rf"\b{re.escape(c)}\b", user_input, re.IGNORECASE)
+            if isinstance(c, str) and re.search(rf"\b{re.escape(c)}\b", user_input, re.IGNORECASE)
         ]
         if not realized:
             self.exclusion.reset()
@@ -1146,9 +1145,7 @@ class FrontalLobe:
             return
         obs = self.exclusion.observe(realized[0])
         try:
-            self.working_memory.central_executive.direct_attention(
-                {}, [str(obs.resolved)]
-            )
+            self.working_memory.central_executive.direct_attention({}, [str(obs.resolved)])
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "frontal_lobe.prefrontal._resolve_referent_space",
@@ -2193,7 +2190,7 @@ class FrontalLobe:
             # without inventing metric content the theory lacks.
             self.exclusion.reset()
             for rank, entity in enumerate(entities):
-                self.exclusion.entertain(entity, 0.5 ** rank)
+                self.exclusion.entertain(entity, 0.5**rank)
             return Thought(
                 content="reference",
                 intent="unknown",

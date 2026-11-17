@@ -700,9 +700,7 @@ class TheoryOfMind:
             content = belief_match.group(1).strip()
             if content and len(content) <= 80:
                 for t in topics or ["self"]:
-                    att.beliefs[t] = UserBelief(
-                        concept=t, value=content, confidence=0.6
-                    )
+                    att.beliefs[t] = UserBelief(concept=t, value=content, confidence=0.6)
         if self._ATTRIB_CANT.search(lower):
             for t in topics:
                 att.capabilities[t] = False

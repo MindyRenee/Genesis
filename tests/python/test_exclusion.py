@@ -155,7 +155,7 @@ def test_clarification_observes_and_binds() -> None:
     """'Alice did X to Bob' — 'I meant Bob' resolves and binds."""
     lobe = _lobe()
     for rank, e in enumerate(["Alice", "Bob"]):
-        lobe.exclusion.entertain(e, 0.5 ** rank)
+        lobe.exclusion.entertain(e, 0.5**rank)
     lobe._resolve_referent_space("I meant Bob")
     assert lobe.exclusion.resolved == "Bob"
     assert lobe.working_memory.central_executive.focus == "Bob"

@@ -35,8 +35,6 @@ if TYPE_CHECKING:
 __all__ = ["register_studio_tools"]
 
 
-
-
 def _num(value: Any, default: float | None = None) -> float | None:
     """Parse a number from a string or numeric kwarg; default if blank."""
     if value is None or (isinstance(value, str) and not value.strip()):
@@ -122,8 +120,11 @@ def register_studio_tools(
         return "studio offline — no painting surface (Cairo is missing)"
 
     def sheet(
-        width: Any = 640, height: Any = 480,
-        r: Any = 250, g: Any = 250, b: Any = 248,
+        width: Any = 640,
+        height: Any = 480,
+        r: Any = 250,
+        g: Any = 250,
+        b: Any = 248,
     ) -> str:
         w = int(_num(width, 640) or 640)
         h = int(_num(height, 480) or 480)
@@ -176,8 +177,10 @@ def register_studio_tools(
 
     def line(x1: Any = 0, y1: Any = 0, x2: Any = 0, y2: Any = 0) -> str:
         canvas.line(
-            _num(x1, 0.0) or 0.0, _num(y1, 0.0) or 0.0,
-            _num(x2, 0.0) or 0.0, _num(y2, 0.0) or 0.0,
+            _num(x1, 0.0) or 0.0,
+            _num(y1, 0.0) or 0.0,
+            _num(x2, 0.0) or 0.0,
+            _num(y2, 0.0) or 0.0,
         )
         return "line down"
 
@@ -232,8 +235,7 @@ def register_studio_tools(
         ),
         (
             "studio_sheet",
-            "Lay out a fresh sheet: width, height, paper r/g/b — any "
-            "size and any ground color.",
+            "Lay out a fresh sheet: width, height, paper r/g/b — any size and any ground color.",
             sheet,
         ),
         (
@@ -279,8 +281,7 @@ def register_studio_tools(
         ),
         (
             "studio_done",
-            "Finish the sheet — save it, remember it, share it. "
-            "description and mood optional.",
+            "Finish the sheet — save it, remember it, share it. description and mood optional.",
             done,
         ),
     )

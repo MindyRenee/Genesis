@@ -12,12 +12,14 @@
     <p><span class="code">Her&nbsp;manual&nbsp;—&nbsp;the&nbsp;man&nbsp;pages&nbsp;that&nbsp;describe&nbsp;what&nbsp;she&nbsp;is.<br>
 &nbsp;<br>
 Genesis's&nbsp;man&nbsp;pages&nbsp;(``genesis.1``,&nbsp;``genesis-cli.1``,<br>
-``genesis-daemon.8``,&nbsp;``genesis-math.7``,&nbsp;``genesis-tools.7``,<br>
-``genesis-browser.7``,&nbsp;``genesis-arcade.7``)&nbsp;are&nbsp;part&nbsp;of&nbsp;her&nbsp;—&nbsp;how<br>
-the&nbsp;machine,&nbsp;and&nbsp;she&nbsp;herself,&nbsp;knows&nbsp;what&nbsp;she&nbsp;is.&nbsp;The&nbsp;versioned<br>
-sources&nbsp;in&nbsp;``docs/man/``&nbsp;are&nbsp;canonical;&nbsp;the&nbsp;installed&nbsp;copies&nbsp;under<br>
-``~/.local/share/man``&nbsp;are&nbsp;what&nbsp;``man``&nbsp;—&nbsp;and&nbsp;her&nbsp;``man_page``&nbsp;tool&nbsp;—<br>
-actually&nbsp;reads.<br>
+``genesis-daemon.8``,&nbsp;``genesis-retina.1``,&nbsp;``genesis-tools.7``)<br>
+are&nbsp;part&nbsp;of&nbsp;her&nbsp;—&nbsp;how&nbsp;the&nbsp;machine,&nbsp;and&nbsp;she&nbsp;herself,&nbsp;knows&nbsp;what&nbsp;she<br>
+is.&nbsp;The&nbsp;versioned&nbsp;sources&nbsp;in&nbsp;``docs/man/``&nbsp;are&nbsp;canonical;&nbsp;the<br>
+installed&nbsp;copies&nbsp;under&nbsp;``~/.local/share/man``&nbsp;are&nbsp;what&nbsp;``man``&nbsp;—<br>
+and&nbsp;her&nbsp;``man_page``&nbsp;tool&nbsp;—&nbsp;actually&nbsp;reads.&nbsp;Subsystem&nbsp;internals&nbsp;are<br>
+not&nbsp;man&nbsp;pages:&nbsp;they&nbsp;are&nbsp;generated&nbsp;docs&nbsp;under&nbsp;``Self_World/docs/``<br>
+(rustdoc&nbsp;+&nbsp;pydoc&nbsp;via&nbsp;``scripts/gen_docs.sh``),&nbsp;so&nbsp;they&nbsp;cannot<br>
+drift&nbsp;from&nbsp;the&nbsp;code&nbsp;they&nbsp;describe.<br>
 &nbsp;<br>
 ``<a href="#-sync">sync</a>()``&nbsp;keeps&nbsp;the&nbsp;two&nbsp;equal:&nbsp;each&nbsp;versioned&nbsp;source&nbsp;flows&nbsp;to&nbsp;the<br>
 installed&nbsp;dir,&nbsp;and&nbsp;installed&nbsp;``genesis*``&nbsp;pages&nbsp;with&nbsp;no&nbsp;source&nbsp;are<br>

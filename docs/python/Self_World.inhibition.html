@@ -290,7 +290,13 @@ is&nbsp;exactly&nbsp;what&nbsp;LC-NE&nbsp;does&nbsp;(Aston-Jones&nbsp;&amp;&nbsp
 
 <dl><dt><a name="NeuromodulatoryGate-stats"><strong>stats</strong></a>(self, now: 'float | None' = None) -&gt; 'dict[str, float]'</dt></dl>
 
-<dl><dt><a name="NeuromodulatoryGate-wait"><strong>wait</strong></a>(self, timeout: 'float | None' = None) -&gt; 'bool'</dt></dl>
+<dl><dt><a name="NeuromodulatoryGate-wait"><strong>wait</strong></a>(self, timeout: 'float | None' = None) -&gt; 'bool'</dt><dd><span class="code">Wait&nbsp;for&nbsp;the&nbsp;neuromodulatory&nbsp;gate&nbsp;to&nbsp;be&nbsp;set.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;timeout:&nbsp;Maximum&nbsp;time&nbsp;to&nbsp;wait&nbsp;in&nbsp;seconds.&nbsp;None&nbsp;waits&nbsp;indefinitely.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;True&nbsp;if&nbsp;the&nbsp;gate&nbsp;was&nbsp;set,&nbsp;False&nbsp;if&nbsp;timeout&nbsp;elapsed.</span></dd></dl>
 
 <hr>
 Data descriptors defined here:<br>
@@ -402,7 +408,7 @@ is&nbsp;the&nbsp;disinhibitory&nbsp;signal&nbsp;that&nbsp;lets&nbsp;one&nbsp;(or
 <td class="singlecolumn">Methods defined here:<br>
 <dl><dt><a name="ThalamicRelay-__enter__"><strong>__enter__</strong></a>(self) -&gt; 'ThalamicRelay'</dt></dl>
 
-<dl><dt><a name="ThalamicRelay-__exit__"><strong>__exit__</strong></a>(self, *exc: 'object') -&gt; 'Any'</dt></dl>
+<dl><dt><a name="ThalamicRelay-__exit__"><strong>__exit__</strong></a>(self, exc_type: 'type[BaseException] | None', exc_val: 'BaseException | None', exc_tb: 'TracebackType | None') -&gt; 'Any'</dt></dl>
 
 <dl><dt><a name="ThalamicRelay-__getattr__"><strong>__getattr__</strong></a>(self, name: 'str') -&gt; 'Any'</dt></dl>
 
@@ -418,9 +424,22 @@ is&nbsp;the&nbsp;disinhibitory&nbsp;signal&nbsp;that&nbsp;lets&nbsp;one&nbsp;(or
 
 <dl><dt><a name="ThalamicRelay-stats"><strong>stats</strong></a>(self, now: 'float | None' = None) -&gt; 'dict[str, float]'</dt></dl>
 
-<dl><dt><a name="ThalamicRelay-wait"><strong>wait</strong></a>(self, timeout: 'float | None' = None) -&gt; 'bool'</dt></dl>
+<dl><dt><a name="ThalamicRelay-wait"><strong>wait</strong></a>(self, timeout: 'float | None' = None) -&gt; 'bool'</dt><dd><span class="code">Wait&nbsp;for&nbsp;the&nbsp;thalamic&nbsp;relay&nbsp;to&nbsp;be&nbsp;notified.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;timeout:&nbsp;Maximum&nbsp;time&nbsp;to&nbsp;wait&nbsp;in&nbsp;seconds.&nbsp;None&nbsp;waits&nbsp;indefinitely.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;True&nbsp;if&nbsp;notified,&nbsp;False&nbsp;if&nbsp;timeout&nbsp;elapsed.</span></dd></dl>
 
-<dl><dt><a name="ThalamicRelay-wait_for"><strong>wait_for</strong></a>(self, predicate: 'Callable[[], bool]', timeout: 'float | None' = None) -&gt; 'bool'</dt></dl>
+<dl><dt><a name="ThalamicRelay-wait_for"><strong>wait_for</strong></a>(self, predicate: 'Callable[[], bool]', timeout: 'float | None' = None) -&gt; 'bool'</dt><dd><span class="code">Wait&nbsp;for&nbsp;the&nbsp;thalamic&nbsp;relay&nbsp;to&nbsp;be&nbsp;notified&nbsp;while&nbsp;checking&nbsp;a&nbsp;predicate.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;predicate:&nbsp;Callable&nbsp;that&nbsp;returns&nbsp;True&nbsp;when&nbsp;the&nbsp;condition&nbsp;is&nbsp;met.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;timeout:&nbsp;Maximum&nbsp;time&nbsp;to&nbsp;wait&nbsp;in&nbsp;seconds.&nbsp;None&nbsp;waits&nbsp;indefinitely.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;True&nbsp;if&nbsp;the&nbsp;predicate&nbsp;became&nbsp;True,&nbsp;False&nbsp;if&nbsp;timeout&nbsp;elapsed.</span></dd></dl>
 
 <dl><dt><a name="ThalamicRelay-waiting"><strong>waiting</strong></a>(self) -&gt; 'int'</dt><dd><span class="code">Relay&nbsp;cells&nbsp;currently&nbsp;held&nbsp;by&nbsp;the&nbsp;reticular&nbsp;gate.</span></dd></dl>
 
