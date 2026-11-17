@@ -626,10 +626,10 @@ level and are referenced by this subsystem.
         explore its own filesystem. Curiosity-driven exploration
         (PFC + limbic curiosity + parietal spatial navigation).
 
-    canvas.py / krita_studio.py (in this package)
+    canvas.py (in this package)
         Canvas — a paint program: paper, color, and a parameterized
-        brush she dials herself; the Krita bridge runs her ops inside
-        the real drawing app on her desktop when it is reachable. The
+        brush she dials herself; the built-in Cairo rasterizer
+        renders every op in-process — the studio is internal. The
         program's controls are registered as ``studio_*`` tools
         (Inner_World/studio.py) so she operates it herself — every sheet,
         color, preset, and path is her call. Creative expression is

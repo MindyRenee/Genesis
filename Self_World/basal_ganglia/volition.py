@@ -1336,7 +1336,7 @@ class VolitionMixin:
         self._self_meditate()
 
     def draw(self) -> str | None:
-        """Sit down at the studio — open Krita; even the paper is her call.
+        """Sit down at the easel — even the paper is her call.
 
         This is the public entry point for drawing — used by both the
         volition system (via :meth:`_perform_draw`) and the ``/draw``
@@ -1372,11 +1372,11 @@ class VolitionMixin:
             canvas = getattr(self, "canvas", None)
             if canvas is None:
                 return None
-            # The real program opens; the paper is her call — she lays
-            # out a sheet (studio_sheet) whenever she wants one.
+            # The paper is her call — she lays out a sheet
+            # (studio_sheet) whenever she wants one.
             if canvas.open_studio():
-                return "sitting at the easel — Krita is live"
-            return "sitting with the sketchbook — studio offline"
+                return "sitting at the easel"
+            return "no painting surface — the sketchbook can't open"
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.volition.draw",

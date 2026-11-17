@@ -19,15 +19,9 @@ utensil&nbsp;is&nbsp;a&nbsp;point&nbsp;in&nbsp;that&nbsp;space),&nbsp;and&nbsp;o
 strokes,&nbsp;shapes,&nbsp;fills,&nbsp;erasure.&nbsp;Nothing&nbsp;here&nbsp;decides&nbsp;what&nbsp;gets<br>
 drawn;&nbsp;that&nbsp;is&nbsp;entirely&nbsp;hers.<br>
 &nbsp;<br>
-Two&nbsp;surfaces&nbsp;do&nbsp;the&nbsp;work:<br>
-&nbsp;<br>
--&nbsp;A&nbsp;built-in&nbsp;rasterizer&nbsp;(Cairo)&nbsp;that&nbsp;executes&nbsp;every&nbsp;operation<br>
-&nbsp;&nbsp;in-process,&nbsp;so&nbsp;painting&nbsp;always&nbsp;works&nbsp;—&nbsp;headless&nbsp;hosts,&nbsp;tests,<br>
-&nbsp;&nbsp;Krita&nbsp;not&nbsp;installed.&nbsp;This&nbsp;is&nbsp;the&nbsp;canonical&nbsp;artifact:&nbsp;``save``<br>
-&nbsp;&nbsp;composites&nbsp;the&nbsp;paper&nbsp;layer&nbsp;and&nbsp;the&nbsp;paint&nbsp;layer&nbsp;into&nbsp;a&nbsp;WebP.<br>
--&nbsp;A&nbsp;Krita&nbsp;bridge&nbsp;(``krita_studio``)&nbsp;that&nbsp;mirrors&nbsp;the&nbsp;same&nbsp;ops&nbsp;into&nbsp;a<br>
-&nbsp;&nbsp;running&nbsp;Krita&nbsp;—&nbsp;the&nbsp;real&nbsp;drawing&nbsp;program&nbsp;on&nbsp;her&nbsp;computer&nbsp;—&nbsp;when&nbsp;it<br>
-&nbsp;&nbsp;is&nbsp;reachable.&nbsp;Krita&nbsp;is&nbsp;best-effort:&nbsp;its&nbsp;absence&nbsp;never&nbsp;blocks&nbsp;her.<br>
+The&nbsp;whole&nbsp;program&nbsp;is&nbsp;internal:&nbsp;a&nbsp;built-in&nbsp;rasterizer&nbsp;(Cairo)&nbsp;executes<br>
+every&nbsp;operation&nbsp;in-process.&nbsp;``save``&nbsp;composites&nbsp;the&nbsp;paper&nbsp;layer&nbsp;and<br>
+the&nbsp;paint&nbsp;layer&nbsp;into&nbsp;a&nbsp;WebP&nbsp;—&nbsp;the&nbsp;canonical&nbsp;artifact.<br>
 &nbsp;<br>
 Each&nbsp;finished&nbsp;drawing&nbsp;is&nbsp;remembered&nbsp;in&nbsp;``style_profile.json``&nbsp;—&nbsp;which<br>
 tools,&nbsp;colors,&nbsp;and&nbsp;gestures&nbsp;she&nbsp;used&nbsp;—&nbsp;so&nbsp;she&nbsp;can&nbsp;recall&nbsp;her&nbsp;art,<br>
@@ -126,28 +120,26 @@ Data and other attributes defined here:<br>
 <td class="section-title" colspan=3>&nbsp;<br><a name="Canvas">class <strong>Canvas</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
     
 <tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
-<td class="decor title-decor" colspan=2><span class="code"><a href="#Canvas">Canvas</a>(data_dir:&nbsp;'str&nbsp;|&nbsp;Path&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;seed:&nbsp;'int&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;use_krita:&nbsp;'bool'&nbsp;=&nbsp;True)&nbsp;-&amp;gt;&nbsp;'None'<br>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Canvas">Canvas</a>(data_dir:&nbsp;'str&nbsp;|&nbsp;Path&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;seed:&nbsp;'int&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
 &nbsp;<br>
 Genesis's&nbsp;paint&nbsp;program&nbsp;—&nbsp;paper,&nbsp;color,&nbsp;and&nbsp;utensils.<br>
 &nbsp;<br>
 She&nbsp;drives&nbsp;it&nbsp;with&nbsp;operations:&nbsp;``new_sheet``,&nbsp;``set_color``,<br>
 ``pick_tool``,&nbsp;``stroke``,&nbsp;``ellipse``/``rect``/``polygon``,<br>
-``fill``,&nbsp;``clear``,&nbsp;and&nbsp;``finish``&nbsp;to&nbsp;keep&nbsp;the&nbsp;result.&nbsp;When&nbsp;a<br>
-Krita&nbsp;bridge&nbsp;is&nbsp;live&nbsp;the&nbsp;same&nbsp;ops&nbsp;are&nbsp;mirrored&nbsp;into&nbsp;a&nbsp;real&nbsp;Krita<br>
-document;&nbsp;otherwise&nbsp;the&nbsp;built-in&nbsp;rasterizer&nbsp;is&nbsp;the&nbsp;paper.<br>
+``fill``,&nbsp;``clear``,&nbsp;and&nbsp;``finish``&nbsp;to&nbsp;keep&nbsp;the&nbsp;result.&nbsp;The<br>
+built-in&nbsp;rasterizer&nbsp;is&nbsp;the&nbsp;paper&nbsp;—&nbsp;the&nbsp;studio&nbsp;is&nbsp;internal.<br>
 &nbsp;<br>
 The&nbsp;program&nbsp;keeps&nbsp;a&nbsp;small&nbsp;memory&nbsp;of&nbsp;what&nbsp;she&nbsp;has&nbsp;made&nbsp;—<br>
 ``style_profile.json``&nbsp;in&nbsp;the&nbsp;drawings&nbsp;directory&nbsp;—&nbsp;so&nbsp;she&nbsp;can<br>
 notice&nbsp;what&nbsp;she&nbsp;keeps&nbsp;reaching&nbsp;for.<br>&nbsp;</span></td></tr>
 <tr><td>&nbsp;</td>
 <td class="singlecolumn">Methods defined here:<br>
-<dl><dt><a name="Canvas-__init__"><strong>__init__</strong></a>(self, data_dir: 'str | Path | None' = None, seed: 'int | None' = None, use_krita: 'bool' = True) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;program.<br>
+<dl><dt><a name="Canvas-__init__"><strong>__init__</strong></a>(self, data_dir: 'str | Path | None' = None, seed: 'int | None' = None) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;program.<br>
 &nbsp;<br>
 Args:<br>
 &nbsp;&nbsp;&nbsp;&nbsp;data_dir:&nbsp;Directory&nbsp;where&nbsp;drawings&nbsp;(and&nbsp;her&nbsp;art&nbsp;history)<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;are&nbsp;persisted.&nbsp;If&nbsp;None,&nbsp;nothing&nbsp;can&nbsp;be&nbsp;saved.<br>
-&nbsp;&nbsp;&nbsp;&nbsp;seed:&nbsp;Optional&nbsp;RNG&nbsp;seed&nbsp;for&nbsp;reproducible&nbsp;mark&nbsp;texture.<br>
-&nbsp;&nbsp;&nbsp;&nbsp;use_krita:&nbsp;Mirror&nbsp;ops&nbsp;into&nbsp;a&nbsp;running&nbsp;Krita&nbsp;when&nbsp;reachable.</span></dd></dl>
+&nbsp;&nbsp;&nbsp;&nbsp;seed:&nbsp;Optional&nbsp;RNG&nbsp;seed&nbsp;for&nbsp;reproducible&nbsp;mark&nbsp;texture.</span></dd></dl>
 
 <dl><dt><a name="Canvas-clear"><strong>clear</strong></a>(self) -&gt; 'None'</dt></dl>
 
@@ -169,12 +161,11 @@ her&nbsp;tools&nbsp;—&nbsp;so&nbsp;only&nbsp;labels&nbsp;that&nbsp;actually&nb
 
 <dl><dt><a name="Canvas-new_sheet"><strong>new_sheet</strong></a>(self, width: 'int' = 640, height: 'int' = 480, paper: 'tuple[int, int, int]' = (250, 250, 248)) -&gt; 'bool'</dt><dd><span class="code">Lay&nbsp;out&nbsp;a&nbsp;fresh&nbsp;sheet.&nbsp;Returns&nbsp;False&nbsp;when&nbsp;no&nbsp;backend&nbsp;can&nbsp;draw.</span></dd></dl>
 
-<dl><dt><a name="Canvas-open_studio"><strong>open_studio</strong></a>(self, timeout: 'float' = 20.0, launch: 'bool' = True) -&gt; 'bool'</dt><dd><span class="code">Bring&nbsp;up&nbsp;the&nbsp;real&nbsp;program&nbsp;—&nbsp;launch&nbsp;Krita&nbsp;and&nbsp;connect&nbsp;the&nbsp;bridge.<br>
+<dl><dt><a name="Canvas-open_studio"><strong>open_studio</strong></a>(self) -&gt; 'bool'</dt><dd><span class="code">The&nbsp;studio&nbsp;is&nbsp;internal&nbsp;—&nbsp;sitting&nbsp;down&nbsp;confirms&nbsp;a&nbsp;surface&nbsp;exists.<br>
 &nbsp;<br>
-Krita&nbsp;is&nbsp;her&nbsp;painting&nbsp;surface&nbsp;when&nbsp;it&nbsp;is&nbsp;reachable;&nbsp;the<br>
-built-in&nbsp;rasterizer&nbsp;still&nbsp;records&nbsp;the&nbsp;same&nbsp;ops&nbsp;in&nbsp;parallel&nbsp;so<br>
-the&nbsp;artifact&nbsp;is&nbsp;never&nbsp;lost.&nbsp;Returns&nbsp;True&nbsp;when&nbsp;a&nbsp;live&nbsp;studio<br>
-answered.</span></dd></dl>
+There&nbsp;is&nbsp;no&nbsp;external&nbsp;program&nbsp;to&nbsp;launch;&nbsp;the&nbsp;rasterizer&nbsp;is&nbsp;the<br>
+paper.&nbsp;Returns&nbsp;False&nbsp;only&nbsp;when&nbsp;Cairo&nbsp;is&nbsp;missing&nbsp;and&nbsp;no&nbsp;sheet<br>
+can&nbsp;be&nbsp;laid&nbsp;out&nbsp;at&nbsp;all.</span></dd></dl>
 
 <dl><dt><a name="Canvas-pick_tool"><strong>pick_tool</strong></a>(self, tool: 'str', size: 'float | None' = None) -&gt; 'None'</dt><dd><span class="code">Take&nbsp;up&nbsp;what&nbsp;she&nbsp;calls&nbsp;``tool``&nbsp;—&nbsp;her&nbsp;label,&nbsp;her&nbsp;settings.</span></dd></dl>
 
@@ -190,7 +181,11 @@ answered.</span></dd></dl>
 
 <dl><dt><a name="Canvas-stroke"><strong>stroke</strong></a>(self, points: 'list[tuple[float, float]]') -&gt; 'None'</dt></dl>
 
-<dl><dt><a name="Canvas-studio_presets"><strong>studio_presets</strong></a>(self, query: 'str' = '') -&gt; 'list[str] | None'</dt><dd><span class="code">The&nbsp;real&nbsp;app's&nbsp;preset&nbsp;names&nbsp;—&nbsp;every&nbsp;tool&nbsp;Krita&nbsp;ships.</span></dd></dl>
+<dl><dt><a name="Canvas-studio_presets"><strong>studio_presets</strong></a>(self, query: 'str' = '') -&gt; 'list[str]'</dt><dd><span class="code">The&nbsp;tools&nbsp;she&nbsp;has&nbsp;reached&nbsp;for&nbsp;—&nbsp;her&nbsp;vocabulary,&nbsp;not&nbsp;a&nbsp;menu.<br>
+&nbsp;<br>
+There&nbsp;is&nbsp;no&nbsp;built-in&nbsp;utensil&nbsp;list:&nbsp;a&nbsp;tool&nbsp;is&nbsp;whatever&nbsp;name&nbsp;she<br>
+gives&nbsp;the&nbsp;brush&nbsp;she&nbsp;dialed.&nbsp;This&nbsp;returns&nbsp;the&nbsp;labels&nbsp;she&nbsp;has<br>
+actually&nbsp;used&nbsp;before,&nbsp;optionally&nbsp;filtered&nbsp;by&nbsp;``query``.</span></dd></dl>
 
 <dl><dt><a name="Canvas-tool_recency"><strong>tool_recency</strong></a>(self, now: 'float | None' = None) -&gt; 'dict[str, float]'</dt><dd><span class="code">Seconds&nbsp;since&nbsp;each&nbsp;tool&nbsp;name&nbsp;was&nbsp;last&nbsp;used.<br>
 &nbsp;<br>
@@ -266,8 +261,7 @@ One&nbsp;sheet&nbsp;of&nbsp;paper&nbsp;—&nbsp;the&nbsp;rasterizing&nbsp;backen
 &nbsp;<br>
 A&nbsp;paper&nbsp;layer&nbsp;holds&nbsp;the&nbsp;sheet&nbsp;color;&nbsp;a&nbsp;transparent&nbsp;paint&nbsp;layer<br>
 holds&nbsp;her&nbsp;marks.&nbsp;The&nbsp;eraser&nbsp;clears&nbsp;paint&nbsp;to&nbsp;reveal&nbsp;the&nbsp;paper.<br>
-Every&nbsp;operation&nbsp;maps&nbsp;to&nbsp;one&nbsp;method;&nbsp;the&nbsp;Krita&nbsp;backend&nbsp;mirrors&nbsp;the<br>
-same&nbsp;ops&nbsp;into&nbsp;the&nbsp;running&nbsp;application&nbsp;when&nbsp;it&nbsp;is&nbsp;connected.<br>&nbsp;</span></td></tr>
+Every&nbsp;operation&nbsp;maps&nbsp;to&nbsp;one&nbsp;method.<br>&nbsp;</span></td></tr>
 <tr><td>&nbsp;</td>
 <td class="singlecolumn">Methods defined here:<br>
 <dl><dt><a name="PaintSheet-__init__"><strong>__init__</strong></a>(self, width: 'int' = 640, height: 'int' = 480, paper: 'tuple[int, int, int]' = (250, 250, 248), rng: 'np.random.Generator | None' = None) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
@@ -286,8 +280,7 @@ the&nbsp;contiguous&nbsp;region&nbsp;on&nbsp;the&nbsp;paint&nbsp;layer.</span></
 <dl><dt><a name="PaintSheet-pick_tool"><strong>pick_tool</strong></a>(self, tool: 'str', size: 'float | None' = None) -&gt; 'None'</dt><dd><span class="code">Pick&nbsp;up&nbsp;what&nbsp;she&nbsp;calls&nbsp;``tool``.<br>
 &nbsp;<br>
 The&nbsp;name&nbsp;is&nbsp;hers&nbsp;—&nbsp;a&nbsp;label,&nbsp;not&nbsp;a&nbsp;menu.&nbsp;Nothing&nbsp;here&nbsp;overrides<br>
-the&nbsp;brush&nbsp;she&nbsp;dialed;&nbsp;a&nbsp;Krita&nbsp;backend&nbsp;resolves&nbsp;the&nbsp;name<br>
-against&nbsp;that&nbsp;app's&nbsp;real&nbsp;presets.&nbsp;``size``&nbsp;is&nbsp;the&nbsp;one&nbsp;thing&nbsp;a<br>
+the&nbsp;brush&nbsp;she&nbsp;dialed.&nbsp;``size``&nbsp;is&nbsp;the&nbsp;one&nbsp;thing&nbsp;a<br>
 human&nbsp;always&nbsp;reaches&nbsp;for&nbsp;alongside&nbsp;the&nbsp;utensil,&nbsp;so&nbsp;it&nbsp;is<br>
 honored&nbsp;directly.</span></dd></dl>
 

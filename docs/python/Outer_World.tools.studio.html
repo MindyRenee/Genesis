@@ -19,14 +19,15 @@ her&nbsp;mind&nbsp;—&nbsp;but&nbsp;the&nbsp;tool&nbsp;surface&nbsp;that&nbsp;l
 outer-world&nbsp;instrument,&nbsp;so&nbsp;it&nbsp;lives&nbsp;in&nbsp;``tools/``.<br>
 &nbsp;<br>
 Nothing&nbsp;here&nbsp;prescribes&nbsp;anything:&nbsp;any&nbsp;sheet&nbsp;size,&nbsp;any&nbsp;paper,&nbsp;any<br>
-color,&nbsp;any&nbsp;preset&nbsp;name&nbsp;the&nbsp;real&nbsp;app&nbsp;ships&nbsp;(``studio_presets``&nbsp;lists<br>
-them),&nbsp;any&nbsp;point&nbsp;in&nbsp;brush&nbsp;space,&nbsp;and&nbsp;``studio_stroke``&nbsp;takes&nbsp;an<br>
-arbitrary&nbsp;path&nbsp;—&nbsp;a&nbsp;hand&nbsp;move,&nbsp;a&nbsp;computed&nbsp;curve,&nbsp;whatever&nbsp;she&nbsp;wants<br>
-to&nbsp;lay&nbsp;down.&nbsp;A&nbsp;finished&nbsp;sheet&nbsp;leaves&nbsp;through&nbsp;``studio_done``.<br>
+color,&nbsp;any&nbsp;tool&nbsp;name&nbsp;she&nbsp;gives&nbsp;the&nbsp;brush&nbsp;she&nbsp;dialed<br>
+(``studio_presets``&nbsp;lists&nbsp;the&nbsp;ones&nbsp;she&nbsp;has&nbsp;used&nbsp;before),&nbsp;any&nbsp;point<br>
+in&nbsp;brush&nbsp;space,&nbsp;and&nbsp;``studio_stroke``&nbsp;takes&nbsp;an&nbsp;arbitrary&nbsp;path&nbsp;—&nbsp;a<br>
+hand&nbsp;move,&nbsp;a&nbsp;computed&nbsp;curve,&nbsp;whatever&nbsp;she&nbsp;wants&nbsp;to&nbsp;lay&nbsp;down.&nbsp;A<br>
+finished&nbsp;sheet&nbsp;leaves&nbsp;through&nbsp;``studio_done``.<br>
 &nbsp;<br>
-When&nbsp;the&nbsp;Krita&nbsp;bridge&nbsp;is&nbsp;live&nbsp;the&nbsp;same&nbsp;ops&nbsp;run&nbsp;inside&nbsp;the&nbsp;real<br>
-program&nbsp;on&nbsp;her&nbsp;desktop;&nbsp;the&nbsp;built-in&nbsp;rasterizer&nbsp;always&nbsp;keeps&nbsp;the<br>
-canonical&nbsp;artifact.</span></p>
+The&nbsp;rasterizer&nbsp;is&nbsp;internal&nbsp;—&nbsp;every&nbsp;op&nbsp;lands&nbsp;on&nbsp;her&nbsp;sheet&nbsp;in-process<br>
+and&nbsp;``studio_done``&nbsp;writes&nbsp;the&nbsp;finished&nbsp;piece&nbsp;to&nbsp;her&nbsp;drawings<br>
+directory.</span></p>
 <p>
 <table class="section">
 <tr class="decor pkg-content-decor heading-text">

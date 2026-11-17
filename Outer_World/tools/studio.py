@@ -8,14 +8,15 @@ her mind — but the tool surface that lets her issue ops is an
 outer-world instrument, so it lives in ``tools/``.
 
 Nothing here prescribes anything: any sheet size, any paper, any
-color, any preset name the real app ships (``studio_presets`` lists
-them), any point in brush space, and ``studio_stroke`` takes an
-arbitrary path — a hand move, a computed curve, whatever she wants
-to lay down. A finished sheet leaves through ``studio_done``.
+color, any tool name she gives the brush she dialed
+(``studio_presets`` lists the ones she has used before), any point
+in brush space, and ``studio_stroke`` takes an arbitrary path — a
+hand move, a computed curve, whatever she wants to lay down. A
+finished sheet leaves through ``studio_done``.
 
-When the Krita bridge is live the same ops run inside the real
-program on her desktop; the built-in rasterizer always keeps the
-canonical artifact.
+The rasterizer is internal — every op lands on her sheet in-process
+and ``studio_done`` writes the finished piece to her drawings
+directory.
 """
 
 from __future__ import annotations
@@ -117,8 +118,8 @@ def register_studio_tools(
 
     def open_() -> str:
         if canvas.open_studio():
-            return "studio live — Krita is up and listening"
-        return "studio offline — painting on the internal sheet only"
+            return "studio live — the internal sheet is up"
+        return "studio offline — no painting surface (Cairo is missing)"
 
     def sheet(
         width: Any = 640, height: Any = 480,
@@ -207,12 +208,12 @@ def register_studio_tools(
 
     def presets(query: Any = "") -> str:
         names = canvas.studio_presets(query=str(query))
-        if names is None:
-            raise RuntimeError("studio offline — Krita is not answering")
-        return "\n".join(names) if names else "no presets match"
+        if names:
+            return "\n".join(names)
+        return "no tools in memory — name any utensil, dial it with studio_brush"
 
     def done(description: Any = "", mood: Any = "") -> str:
-        if canvas.sheet is None and canvas._studio() is None:
+        if canvas.sheet is None:
             raise RuntimeError("no sheet to finish")
         m = str(mood).strip() or (mood_fn() if mood_fn else "")
         result = canvas.finish(description=str(description).strip(), mood=m)
@@ -225,8 +226,8 @@ def register_studio_tools(
     tools = (
         (
             "studio_open",
-            "Open the studio — launch Krita and connect the live bridge. "
-            "The program also always paints on its internal sheet.",
+            "Open the studio — sit down at the easel. The painting "
+            "surface is internal; this just confirms it is up.",
             open_,
         ),
         (
@@ -242,8 +243,9 @@ def register_studio_tools(
         ),
         (
             "studio_tool",
-            "Take up a tool by name — any Krita preset (studio_presets "
-            "lists them) or her own label. size optional.",
+            "Take up a tool by name — her own label, anything she "
+            "calls it (studio_presets lists names she has used). "
+            "size optional.",
             tool,
         ),
         (
@@ -271,8 +273,8 @@ def register_studio_tools(
         ("studio_clear", "Wipe the sheet back to bare paper.", clear),
         (
             "studio_presets",
-            "List the real app's tool presets — every utensil Krita "
-            "ships. query filters by substring.",
+            "List the tool names she has reached for — her own "
+            "vocabulary. query filters by substring.",
             presets,
         ),
         (

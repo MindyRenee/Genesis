@@ -2,8 +2,8 @@
 
 The contract under test: the medium is open. Any color, any brush
 parameters, any tool label, any mark — nothing prescribes what she
-can draw. Krita mirroring is strictly optional; the built-in
-rasterizer is the canonical surface.
+can draw. The built-in rasterizer is the only surface — the
+canonical artifact.
 """
 
 import json
@@ -22,7 +22,6 @@ def _sheet(**kw) -> PaintSheet:
 
 
 def _canvas(tmp_path, **kw) -> Canvas:
-    kw.setdefault("use_krita", False)
     return Canvas(data_dir=tmp_path / "drawings", seed=7, **kw)
 
 
@@ -218,7 +217,7 @@ class TestCanvasSession:
         assert result.strokes >= 2
 
     def test_no_data_dir_returns_none(self):
-        canvas = Canvas(data_dir=None, use_krita=False)
+        canvas = Canvas(data_dir=None)
         canvas.new_sheet()
         canvas.stroke([(1, 1), (50, 50)])
         assert canvas.finish() is None
@@ -361,20 +360,27 @@ class TestStudioTools:
         assert not result.success
 
 
-# ── Backend optionality ───────────────────────────────────────────
+# ── The internal surface ──────────────────────────────────────────
 
 
 class TestBackends:
-    def test_krita_absent_still_paints(self, tmp_path):
-        canvas = _canvas(tmp_path, use_krita=True)
-        canvas._krita_tried = True  # pretend connect already failed
-        canvas._krita = None
+    def test_paints_and_finishes(self, tmp_path):
+        canvas = _canvas(tmp_path)
         canvas.new_sheet()
         canvas.set_color(255, 0, 0)
         canvas.stroke([(10, 10), (150, 150)])
         assert canvas.finish() is not None
 
-    def test_mirror_noop_without_bridge(self, tmp_path):
+    def test_open_studio_reflects_surface(self, tmp_path):
         canvas = _canvas(tmp_path)
-        canvas._use_krita = False
-        canvas._mirror("anything")  # must not raise or connect
+        assert canvas.open_studio() is canvas_module._CAIRO_AVAILABLE
+
+    def test_presets_are_her_vocabulary(self, tmp_path):
+        canvas = _canvas(tmp_path)
+        assert canvas.studio_presets() == []
+        canvas.new_sheet()
+        canvas.pick_tool("charcoal")
+        canvas.finish()
+        assert canvas.studio_presets() == ["charcoal"]
+        assert canvas.studio_presets(query="char") == ["charcoal"]
+        assert canvas.studio_presets(query="oil") == []

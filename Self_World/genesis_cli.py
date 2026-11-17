@@ -1706,7 +1706,7 @@ def _cmd_nap(mind: Mind, rest: str) -> str:
 def _cmd_draw(mind: Mind, rest: str) -> str:
     """Ask Genesis to sit down at her studio.
 
-    Opens Krita (her real drawing surface); even the paper is her
+    Opens her studio (the internal sheet); even the paper is her
     call — what she makes and when she finishes are hers, through
     the studio_* tools, and the piece lands in her drawings
     directory when she closes the sheet.

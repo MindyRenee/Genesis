@@ -84,27 +84,25 @@ else degrades.
 
 .SS The studio
 \fIOuter_World/tools/studio.py\fR registers the paint program's controls
-as the \fBstudio_*\fR family: \fBstudio_open\fR (launch Krita and
-connect the live bridge), \fBstudio_sheet\fR (any size and paper),
-\fBstudio_color\fR (any RGBA), \fBstudio_tool\fR (any Krita preset
-name or her own label), \fBstudio_brush\fR (size, opacity, hardness,
+as the \fBstudio_*\fR family: \fBstudio_open\fR (sit down at the
+easel \(em the surface is internal), \fBstudio_sheet\fR (any size
+and paper),
+\fBstudio_color\fR (any RGBA), \fBstudio_tool\fR (any name she gives
+the brush she dialed), \fBstudio_brush\fR (size, opacity, hardness,
 scatter, texture, erase, blend), \fBstudio_stroke\fR (any point path
 \(em a hand move and a computed curve are the same op, and
 \fIlabel\fR names the gesture in her art history),
 \fBstudio_line\fR, \fBstudio_shape\fR (ellipse, rect, polygon),
 \fBstudio_fill\fR, \fBstudio_clear\fR, \fBstudio_presets\fR
-(enumerate the real app's toolbox), and \fBstudio_done\fR (finish
-the sheet \(em save it, remember it, share it). No fixed gesture
-vocabulary, color sectors, or tool menus: she issues the ops, so
-what gets drawn is her decision. Krita
-.RI ( Self_World/frontal_lobe/krita_studio.py )
-executes the same ops on a live document with real brushes when it
-is running; the built-in rasterizer
+(list the tool names she has reached for), and \fBstudio_done\fR
+(finish the sheet \(em save it, remember it, share it). No fixed
+gesture vocabulary, color sectors, or tool menus: she issues the
+ops, so what gets drawn is her decision. The built-in rasterizer
 .RI ( Self_World/frontal_lobe/canvas.py )
-always paints the canonical artifact. The queue accepts op files
-written out of process, so scripts she makes with
-\fBwrite_file\fR/\fBrun_shell\fR can drive the studio alongside the
-client.
+executes every op in-process \(em the studio is internal, the
+canonical artifact is the saved WebP. Scripts she makes with
+\fBwrite_file\fR/\fBrun_shell\fR can drive the same canvas module
+alongside the client.
 
 .SS The outer world
 Her workstation's other half is \fIworkstation.environment.OuterEnvironment\fR:
@@ -249,7 +247,8 @@ Registered from \fIOuter_World/tools/studio.py\fR; full description under
 \fBThe studio\fR above.
 .TP
 .B studio_open
-Open the studio: launch Krita and connect the live bridge.
+Open the studio: sit down at the easel \(em confirms the internal
+surface is up.
 .TP
 .BR studio_sheet " \fI[width] [height] [r] [g] [b]\fR"
 Lay out a fresh sheet \(em any size, any paper color.
@@ -258,7 +257,7 @@ Lay out a fresh sheet \(em any size, any paper color.
 Dip the utensil in any RGBA color.
 .TP
 .BR studio_tool " \fItool [size]\fR"
-Take up a tool by name \(em any Krita preset or her own label.
+Take up a tool by name \(em her own label; there is no fixed menu.
 .TP
 .BR studio_brush " \fI[size] [opacity] [hardness] [scatter] [texture] [erase] [blend]\fR"
 Dial any point in brush space.
@@ -307,20 +306,13 @@ What a tool returns: \fIsuccess\fR plus \fIoutput\fR, or an
 The flat \fIToolRegistry\fR dispatch table holding every tool she
 can call; \fIrun(name, **kwargs)\fR executes one.
 .TP
-.B Bridge
-The live link to a real program \(em the Krita studio bridge
-writes ops to a queue the in-process plugin executes on a real
-document, then acknowledges.
-.TP
 .B Preset
-A named utensil configuration in the real program (a Krita brush
-preset): tip shape, texture, dynamics \(em everything a saved
-brush is.
+A tool name she has used before \(em her own label for a point in
+brush space, not a fixed menu (\fBstudio_presets\fR lists them).
 .TP
 .B Rasterizer
 The built-in renderer that turns her ops into pixels on the
-internal sheet \(em the canonical artifact even when the real
-program is absent.
+internal sheet \(em the canonical artifact.
 .TP
 .B uinput
 The kernel facility for synthetic input devices \(em her
@@ -384,10 +376,6 @@ The outer world her acts land in.
 .TP
 .I Outer_World/tools/studio.py
 The \fBstudio_*\fR tool family \(em her hands on the paint program.
-.TP
-.I Self_World/frontal_lobe/krita_studio.py
-The Krita bridge and embedded plugin; the live surface the studio
-ops mirror into.
 
 .SH SEE ALSO
 .BR genesis (1),

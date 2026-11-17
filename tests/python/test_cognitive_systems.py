@@ -3829,7 +3829,7 @@ def test_perform_draw_sits_at_the_easel() -> None:
     from basal_ganglia.volition import VolitionMixin
 
     holder, posts, said, _emitted, acted = _draw_holder()
-    holder.draw = lambda: "sitting at the easel — Krita is live"
+    holder.draw = lambda: "sitting at the easel"
     VolitionMixin._perform_draw(holder)
     assert acted == [("sat down to draw", "opened her studio")]
     assert posts == [] and said == []
@@ -3856,9 +3856,9 @@ def test_draw_command_sits_at_the_easel() -> None:
 
     holder, _posts, _said, _emitted, _acted = _draw_holder()
     holder.canvas = SimpleNamespace(open_studio=lambda: True)
-    assert VolitionMixin.draw(holder) == "sitting at the easel — Krita is live"
+    assert VolitionMixin.draw(holder) == "sitting at the easel"
     holder.canvas = SimpleNamespace(open_studio=lambda: False)
-    assert VolitionMixin.draw(holder) == "sitting with the sketchbook — studio offline"
+    assert VolitionMixin.draw(holder) == "no painting surface — the sketchbook can't open"
 
 
 def test_announce_creation_posts_composed_words() -> None:

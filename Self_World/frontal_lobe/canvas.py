@@ -8,15 +8,9 @@ utensil is a point in that space), and operations that apply them —
 strokes, shapes, fills, erasure. Nothing here decides what gets
 drawn; that is entirely hers.
 
-Two surfaces do the work:
-
-- A built-in rasterizer (Cairo) that executes every operation
-  in-process, so painting always works — headless hosts, tests,
-  Krita not installed. This is the canonical artifact: ``save``
-  composites the paper layer and the paint layer into a WebP.
-- A Krita bridge (``krita_studio``) that mirrors the same ops into a
-  running Krita — the real drawing program on her computer — when it
-  is reachable. Krita is best-effort: its absence never blocks her.
+The whole program is internal: a built-in rasterizer (Cairo) executes
+every operation in-process. ``save`` composites the paper layer and
+the paint layer into a WebP — the canonical artifact.
 
 Each finished drawing is remembered in ``style_profile.json`` — which
 tools, colors, and gestures she used — so she can recall her art,
@@ -41,9 +35,8 @@ from typing import TYPE_CHECKING
 try:
     import cairo
 except ImportError:  # pragma: no cover - platform without Cairo
-    # Cairo is the built-in rasterizer. Without it the program still
-    # runs when a Krita bridge is reachable; otherwise draw() returns
-    # None with a warning.
+    # Cairo is the rasterizer — without it there is no surface and
+    # new_sheet() returns False with a warning.
     cairo = None  # type: ignore[assignment]
 
 try:
@@ -57,8 +50,6 @@ from PIL import Image
 
 if TYPE_CHECKING:
     from limbic_system.emotion import EmotionalState
-
-    from frontal_lobe.krita_studio import KritaStudio
 
 __all__ = [
     "Brush",
@@ -118,8 +109,7 @@ class Brush:
 # and every point in that space is a different implement. She dials
 # parameters with ``set_brush``; when she says ``pick_tool("pencil")``
 # the name is *her* label for what she is holding, never a setting
-# menu (on a Krita backend it also resolves that app's own presets —
-# the same way naming works when the program is real).
+# menu.
 
 
 @dataclass
@@ -142,8 +132,7 @@ class PaintSheet:
 
     A paper layer holds the sheet color; a transparent paint layer
     holds her marks. The eraser clears paint to reveal the paper.
-    Every operation maps to one method; the Krita backend mirrors the
-    same ops into the running application when it is connected.
+    Every operation maps to one method.
     """
 
     def __init__(
@@ -212,8 +201,7 @@ class PaintSheet:
         """Pick up what she calls ``tool``.
 
         The name is hers — a label, not a menu. Nothing here overrides
-        the brush she dialed; a Krita backend resolves the name
-        against that app's real presets. ``size`` is the one thing a
+        the brush she dialed. ``size`` is the one thing a
         human always reaches for alongside the utensil, so it is
         honored directly.
         """
@@ -468,9 +456,8 @@ class Canvas:
 
     She drives it with operations: ``new_sheet``, ``set_color``,
     ``pick_tool``, ``stroke``, ``ellipse``/``rect``/``polygon``,
-    ``fill``, ``clear``, and ``finish`` to keep the result. When a
-    Krita bridge is live the same ops are mirrored into a real Krita
-    document; otherwise the built-in rasterizer is the paper.
+    ``fill``, ``clear``, and ``finish`` to keep the result. The
+    built-in rasterizer is the paper — the studio is internal.
 
     The program keeps a small memory of what she has made —
     ``style_profile.json`` in the drawings directory — so she can
@@ -484,7 +471,6 @@ class Canvas:
         self,
         data_dir: str | Path | None = None,
         seed: int | None = None,
-        use_krita: bool = True,
     ) -> None:
         """Initialize the program.
 
@@ -492,75 +478,38 @@ class Canvas:
             data_dir: Directory where drawings (and her art history)
                 are persisted. If None, nothing can be saved.
             seed: Optional RNG seed for reproducible mark texture.
-            use_krita: Mirror ops into a running Krita when reachable.
         """
         self._data_dir = Path(data_dir) if data_dir else None
         self._rng = np.random.default_rng(seed=seed if seed is not None else int(time.time()))
         self._history = self._load_history()
         self._sheet: PaintSheet | None = None
         self._op_log: list[dict] = []
-        self._krita: KritaStudio | None = None
-        self._krita_tried = False
-        self._use_krita = use_krita
         self.width = _SHEET_WIDTH
         self.height = _SHEET_HEIGHT
 
-    # ── Krita bridge ──────────────────────────────────────────────
+    # ── The studio ────────────────────────────────────────────────
 
-    def _studio(self) -> KritaStudio | None:
-        """The Krita bridge — connected lazily, never required."""
-        if not self._use_krita:
-            return None
-        if self._krita is None and not self._krita_tried:
-            self._krita_tried = True
-            try:
-                from frontal_lobe.krita_studio import KritaStudio
+    def open_studio(self) -> bool:
+        """The studio is internal — sitting down confirms a surface exists.
 
-                studio = KritaStudio()
-                if studio.connect(timeout=2.0):
-                    self._krita = studio
-            except Exception as e:  # noqa: BLE001
-                logger.debug("krita bridge unavailable: %s", e)
-        return self._krita
-
-    def _mirror(self, op: str, **args) -> None:
-        """Forward an op to Krita when the bridge is live."""
-        studio = self._studio()
-        if studio is not None:
-            studio.send(op, **args)
-
-    def open_studio(self, timeout: float = 20.0, launch: bool = True) -> bool:
-        """Bring up the real program — launch Krita and connect the bridge.
-
-        Krita is her painting surface when it is reachable; the
-        built-in rasterizer still records the same ops in parallel so
-        the artifact is never lost. Returns True when a live studio
-        answered.
+        There is no external program to launch; the rasterizer is the
+        paper. Returns False only when Cairo is missing and no sheet
+        can be laid out at all.
         """
-        if not self._use_krita:
-            return False
-        try:
-            from frontal_lobe.krita_studio import KritaStudio
+        return _CAIRO_AVAILABLE
 
-            studio = self._krita or KritaStudio()
-            if studio.connect(timeout=timeout, launch=launch):
-                self._krita = studio
-                self._krita_tried = True
-                return True
-        except Exception as e:  # noqa: BLE001
-            logger.debug("studio open failed: %s", e)
-        return False
+    def studio_presets(self, query: str = "") -> list[str]:
+        """The tools she has reached for — her vocabulary, not a menu.
 
-    def studio_presets(self, query: str = "") -> list[str] | None:
-        """The real app's preset names — every tool Krita ships."""
-        studio = self._studio()
-        if studio is None:
-            return None
-        try:
-            return studio.presets(query=query)
-        except Exception as e:  # noqa: BLE001
-            logger.debug("preset query failed: %s", e)
-            return None
+        There is no built-in utensil list: a tool is whatever name she
+        gives the brush she dialed. This returns the labels she has
+        actually used before, optionally filtered by ``query``.
+        """
+        names = sorted(self._label_recency("tools"))
+        if query:
+            q = query.lower()
+            names = [n for n in names if q in n.lower()]
+        return names
 
     # ── Art history ───────────────────────────────────────────────
 
@@ -662,18 +611,15 @@ class Canvas:
         paper: tuple[int, int, int] = (250, 250, 248),
     ) -> bool:
         """Lay out a fresh sheet. Returns False when no backend can draw."""
-        if not _CAIRO_AVAILABLE and self._studio() is None:
+        if not _CAIRO_AVAILABLE:
             if not getattr(self, "_warned", False):
-                logger.warning(
-                    "no painting surface available — Cairo is missing and Krita is not reachable."
-                )
+                logger.warning("no painting surface available — Cairo is missing.")
                 self._warned = True
             return False
-        self._sheet = PaintSheet(width, height, paper, self._rng) if _CAIRO_AVAILABLE else None
+        self._sheet = PaintSheet(width, height, paper, self._rng)
         self.width = width
         self.height = height
         self._op_log = []
-        self._mirror("new", width=width, height=height, paper=list(paper))
         return True
 
     @property
@@ -685,14 +631,12 @@ class Canvas:
         self._op_log.append({"op": "color", "rgb": (r, g, b), "a": a})
         if self._sheet is not None:
             self._sheet.set_color(r, g, b, a)
-        self._mirror("color", r=r, g=g, b=b, a=a)
 
     def pick_tool(self, tool: str, size: float | None = None) -> None:
         """Take up what she calls ``tool`` — her label, her settings."""
         self._op_log.append({"op": "tool", "tool": tool, "size": size})
         if self._sheet is not None:
             self._sheet.pick_tool(tool, size)
-        self._mirror("tool", tool=tool, size=size or 0)
 
     def set_brush(
         self,
@@ -719,16 +663,6 @@ class Canvas:
         )
         if self._sheet is not None:
             self._sheet.set_brush(size, opacity, hardness, scatter, texture, erase, blend)
-        self._mirror(
-            "brush",
-            size=size or 0,
-            opacity=opacity or 0,
-            hardness=hardness or 0,
-            scatter=scatter or 0,
-            texture=texture or 0,
-            erase=bool(erase),
-            blend=blend or "",
-        )
 
     def stroke(self, points: list[tuple[float, float]]) -> None:
         if not points:
@@ -736,7 +670,6 @@ class Canvas:
         self._op_log.append({"op": "stroke", "n": len(points)})
         if self._sheet is not None:
             self._sheet.stroke(points)
-        self._mirror("stroke", points=[[round(x, 1), round(y, 1)] for x, y in points])
 
     def line(self, x1: float, y1: float, x2: float, y2: float) -> None:
         self.stroke([(x1, y1), (x2, y2)])
@@ -745,13 +678,11 @@ class Canvas:
         self._op_log.append({"op": "ellipse", "fill": fill})
         if self._sheet is not None:
             self._sheet.ellipse(x, y, w, h, fill)
-        self._mirror("ellipse", x=x, y=y, w=w, h=h, fill=fill)
 
     def rect(self, x: float, y: float, w: float, h: float, fill: bool = False) -> None:
         self._op_log.append({"op": "rect", "fill": fill})
         if self._sheet is not None:
             self._sheet.rect(x, y, w, h, fill)
-        self._mirror("rect", x=x, y=y, w=w, h=h, fill=fill)
 
     def polygon(self, points: list[tuple[float, float]], fill: bool = False) -> None:
         if len(points) < 3:
@@ -759,19 +690,16 @@ class Canvas:
         self._op_log.append({"op": "polygon", "fill": fill})
         if self._sheet is not None:
             self._sheet.polygon(points, fill)
-        self._mirror("polygon", points=points, fill=fill)
 
     def fill(self, x: float, y: float) -> None:
         self._op_log.append({"op": "fill", "at": (x, y)})
         if self._sheet is not None:
             self._sheet.fill(x, y)
-        self._mirror("fill", x=x, y=y)
 
     def clear(self) -> None:
         self._op_log.append({"op": "clear"})
         if self._sheet is not None:
             self._sheet.clear()
-        self._mirror("clear")
 
     def finish(
         self,
@@ -815,13 +743,6 @@ class Canvas:
             )
             self._prune_old_drawings()
             filepath = str(path)
-        else:
-            studio = self._studio()
-            if studio is not None and self._data_dir is not None:
-                self._data_dir.mkdir(parents=True, exist_ok=True)
-                path = self._data_dir / f"drawing_{int(timestamp)}.png"
-                if studio.export(str(path)):
-                    filepath = str(path)
 
         result = DrawingResult(
             filepath=filepath,
