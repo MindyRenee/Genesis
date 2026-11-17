@@ -108,10 +108,10 @@ _QUEUE_MAX = 512
 _DRAIN_DEADLINE = 5.0
 # Backoff ceiling (seconds) for transient network/5xx failures.
 _BACKOFF_CAP = 60.0
-# Consecutive transient failures after which the feed disables itself.
-# A dead webhook must not cost the session a churning poster thread —
-# without a cap, the queue can never drain.
-_FAILURE_DISABLE = 20
+# Consecutive transient failures after which the outage is announced
+# once. Transient failures never disable the feed — retries continue
+# at the backoff cap until the channel answers.
+_OUTAGE_NOTICE = 20
 # Seconds the poster waits after the first queued line for more of the
 # same kind to arrive, so a burst coalesces into one message.
 _COALESCE_WINDOW = 0.15
@@ -366,6 +366,10 @@ class DiscordFeed:
         self._closing = False
         self._disabled = False
         self._fail_streak = 0
+        # True once a transient outage has been announced — one
+        # "unreachable" notice per outage, and one "restored" when a
+        # post lands again, instead of a line per failed attempt.
+        self._outage = False
         # Who ``user``-kind words are attributed to. The session mirror
         # sets this from the user profile once the mind is up; until
         # then the channel's human reads as plain "you".
@@ -568,6 +572,9 @@ class DiscordFeed:
                 _, author, caption, png = batch
                 ok, retry_after, permanent = self._post_live(caption, author, png, bound)
             if ok:
+                if self._outage:
+                    logger.info("[discord] Webhook reachable again — feed restored.")
+                    self._outage = False
                 backoff = 0.0
                 self._fail_streak = 0
             elif permanent:
@@ -577,15 +584,19 @@ class DiscordFeed:
                 return
             else:
                 self._fail_streak += 1
-                if self._fail_streak >= _FAILURE_DISABLE:
-                    with self._cond:
-                        self._disabled = True
+                # A transient failure is the network, not the webhook —
+                # a wifi roam or DNS stall outlasts any fixed retry
+                # count, so the feed never disables on it. Retry at
+                # the backoff cap until the channel answers; the
+                # bounded queue sheds oldest lines meanwhile. Only a
+                # rejected post (4xx above) kills the session feed —
+                # that cannot heal.
+                if self._fail_streak >= _OUTAGE_NOTICE and not self._outage:
+                    self._outage = True
                     logger.info(
-                        "[discord] Webhook unreachable after "
-                        f"{_FAILURE_DISABLE} attempts — feed disabled "
-                        "for this session."
+                        "[discord] Webhook unreachable — posts queue "
+                        "and keep retrying until the channel answers."
                     )
-                    return
                 backoff = (
                     min(_BACKOFF_CAP, retry_after)
                     if retry_after is not None
