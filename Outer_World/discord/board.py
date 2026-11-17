@@ -11,10 +11,10 @@ either climbs or it doesn't.
 The card is written for the people who wander in, not for the
 operator who knows the internals: rows are labeled in plain words
 (mood, memory, wants — never ``F``, ``allo``, ``stm``), and the
-second line always says whether she's listening, since that's the
-first thing a visitor wants to know. The full legend lives on the
-guide card (``discord.guide``) — the board names things, it does
-not explain them.
+meta row carries her ear state so a reader can tell whether
+writing here reaches her. The full legend — and "how do I talk to
+her" — lives on the guide card (``discord.guide``): the board
+names things, it does not spend rows explaining them.
 
 This is a *view*, not an organ: it renders state the body and mind
 already produce and hands the text to the feed. It owns no rhythm —
@@ -200,29 +200,9 @@ class ChannelBoard:
             lines[0] += " · daemon unreachable"
         else:
             lines[0] += f" · {core.phase_name}"
-        lines.extend(self._visitor_lines(sleeping))
-        if core is not None:
             self._core_lines(core, lines)
         self._footer_lines(core, lines)
         return "```\n" + "\n".join(lines) + "\n```"
-
-    def _visitor_lines(self, sleeping: bool) -> list[str]:
-        """The lines a stranger needs first: can she hear me, and
-        where does one learn what all this means."""
-        channel = getattr(getattr(self._h, "world", None), "channel", None)
-        ear = channel.ear if channel is not None else "off"
-        if sleeping:
-            talk = "sleeping — she can't hear you"
-        elif ear == "on":
-            talk = "listening — say hi here"
-        elif ear == "deaf":
-            talk = "she can't hear right now"
-        else:
-            talk = "she can't hear this channel"
-        lines = [talk]
-        if getattr(getattr(channel, "feed", None), "info_feed", None) is not None:
-            lines.append("the info channel explains this")
-        return lines
 
     def _core_lines(self, core, lines: list[str]) -> None:
         """Board rows sourced from the daemon's CoreState."""
@@ -441,9 +421,12 @@ class ChannelBoard:
             int(time.time() - getattr(h, "_session_started_at", time.time())),
         )
         hours, minutes = divmod(up_s // 60, 60)
+        channel = getattr(getattr(h, "world", None), "channel", None)
+        ear = channel.ear if channel is not None else "off"
         meta_bits = [
             f"up {hours}h{minutes:02d}m",
             f"{getattr(h, '_interaction_count', 0)} chats",
+            f"ear {ear}",
         ]
         if core is not None:
             # Freshness and continuity proofs: the raw 5 Hz body
