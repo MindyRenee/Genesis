@@ -796,8 +796,12 @@ impl TickLoop {
                 state.neurochemicals.apply_impulse(id, magnitude, now_ms);
             }
 
-            // Recompute derived state after all impulses
-            state.neurochemicals.recompute_derived();
+            // Recompute derived state after all impulses — against the
+            // network's populations, so the readout stays on the body's
+            // own switch rather than the chemistry-only fallback.
+            state.neurochemicals.recompute_derived_with_network(
+                crate::state::sleep_network::levels(&state.sleep_network),
+            );
             state.sync_neurochemistry_to_state();
 
             // Write inference signals to the core state
@@ -1569,7 +1573,9 @@ impl TickLoop {
                 let id = crate::state::neurochemical::NeurochemicalId::from_u8(chem_id);
                 state.neurochemicals.apply_impulse(id, magnitude, now_ms);
             }
-            state.neurochemicals.recompute_derived();
+            state.neurochemicals.recompute_derived_with_network(
+                crate::state::sleep_network::levels(&state.sleep_network),
+            );
             state.sync_neurochemistry_to_state();
             self.inference_engine.update_signals(
                 &mut state.inference_signals,

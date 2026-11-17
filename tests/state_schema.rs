@@ -736,6 +736,43 @@ fn test_emergent_phase_drowsy() {
 }
 
 #[test]
+fn test_emergent_phase_drowsy_on_arousal_alone() {
+    use genesis::state::neurochemical::NetworkLevels;
+    // Drowsiness is a state of the arousal systems, not of the
+    // accounting: adenosine stays under the conjunct's gate, so the
+    // arousal collapse alone must carry the classification — orexin
+    // dropout, sensory quiet, a bare metabolic trough all land on
+    // the same axis. Requiring adenosine to corroborate left the
+    // phase claiming Active at N1 depth. The network drives the
+    // arousal target the way the live daemon does; LC near-silent
+    // puts the smoothed readout deep in the N1 band.
+    let params = NeuroTickParams {
+        maturation_level: 1.0,
+        network_levels: Some(NetworkLevels {
+            lc: 0.10,
+            vlpo: 0.50,
+            rem: 0.0,
+        }),
+        ..Default::default()
+    };
+    let mut vec = NeurochemicalVector::new(0);
+    for _ in 0..8 {
+        vec.tick_with_params(&params);
+    }
+    assert!(
+        vec.arousal < genesis::state::neurochemical::N1_AROUSAL_GATE,
+        "arousal must sit in the N1 band for this test: {}",
+        vec.arousal
+    );
+    let adn = vec.get(NeurochemicalId::Adenosine).unwrap().level;
+    assert!(
+        adn < genesis::state::neurochemical::DROWSY_ADENOSINE_GATE,
+        "adenosine {adn} must stay under the conjunct so the N1 path is what fires"
+    );
+    assert_eq!(vec.phase(), MentalPhase::Drowsy);
+}
+
+#[test]
 fn test_emergent_phase_overwhelmed() {
     let mut vec = NeurochemicalVector::new(0);
     // Everything maxed
@@ -2513,7 +2550,9 @@ fn test_wake_recovery_restores_depleted_neurochemicals() {
     // Apply wake recovery.
     // SAFETY: single-threaded test — no concurrent writers.
     unsafe { state.write_begin(0) };
-    state.neurochemicals.wake_recovery();
+    state.neurochemicals.wake_recovery(
+        genesis::state::sleep_network::levels(&state.sleep_network),
+    );
     state.write_end();
 
     let bdnf_after = state
@@ -2583,7 +2622,9 @@ fn test_wake_recovery_resensitizes_receptors() {
     // Apply wake recovery.
     // SAFETY: single-threaded test — no concurrent writers.
     unsafe { state.write_begin(0) };
-    state.neurochemicals.wake_recovery();
+    state.neurochemicals.wake_recovery(
+        genesis::state::sleep_network::levels(&state.sleep_network),
+    );
     state.write_end();
 
     let bdnf = state.neurochemicals.get(NeurochemicalId::BDNF).unwrap();
@@ -2645,7 +2686,9 @@ fn test_wake_recovery_skipped_when_cortisol_high() {
     // Apply wake recovery — should be skipped.
     // SAFETY: single-threaded test — no concurrent writers.
     unsafe { state.write_begin(0) };
-    state.neurochemicals.wake_recovery();
+    state.neurochemicals.wake_recovery(
+        genesis::state::sleep_network::levels(&state.sleep_network),
+    );
     state.write_end();
 
     let bdnf_after = state

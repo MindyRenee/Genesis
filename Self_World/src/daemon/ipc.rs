@@ -3431,7 +3431,13 @@ pub fn default_handler<L: LtmAccess>(
                 state
                     .neurochemicals
                     .apply_impulse(chem_id_enum, magnitude, now);
-                state.neurochemicals.recompute_derived();
+                // The impulse changed chemistry; the arousal readout
+                // still belongs to the sleep-wake populations — the
+                // chemistry-only fallback would drag the body's own
+                // axis off its switch on every impulse.
+                state.neurochemicals.recompute_derived_with_network(
+                    crate::state::sleep_network::levels(&state.sleep_network),
+                );
                 state.sync_neurochemistry_to_state();
             }) {
                 Ok(()) => vec![1],

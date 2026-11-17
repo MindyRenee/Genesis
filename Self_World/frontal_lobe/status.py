@@ -380,12 +380,12 @@ class StatusMixin:
 
         Outside sleep it resolves the other direction of the same
         problem: a waking phase carrying N1-level arousal is pre-sleep.
-        The daemon only enters its Drowsy phase on an *adenosine*
-        conjunct, and NeuroSummary carries no adenosine, so there is a
-        window — right after a cold start, or when arousal dips before
-        the sleep gate — where the phase reads active/alert while the
-        neurochemistry plainly reads drowsy. Reporting that as "active"
-        is what made her say she felt sluggish while nominally awake.
+        The daemon's classifier now enters Drowsy on that arousal
+        band alone, so this read passes through whenever the body is
+        current — it stays on as the backstop for a snapshot from a
+        daemon that predates the N1 path, where the phase can still
+        read active/alert at N1 depth. Reporting that as "active" is
+        what made her say she felt sluggish while nominally awake.
         Resolving it here rather than in each consumer keeps emotion,
         brain waves, and sleep gating reading the same phase.
         """

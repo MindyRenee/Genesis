@@ -693,6 +693,29 @@ pub const DROWSY_AROUSAL_GATE: f32 = 0.52;
 /// testing arousal at all.
 pub const DROWSY_AROUSAL_STAY: f32 = 0.56;
 
+/// Arousal level at or below which the waking descent has passed
+/// drowsy onset into the N1 band — pre-sleep on the arousal axis
+/// alone, no adenosine conjunct.
+///
+/// Arousal is the wake systems' own readout, so the deep-descent band
+/// is definitional rather than diagnostic: whatever suppressed it —
+/// orexin dropout, sensory quiet, a bare metabolic trough — a readout
+/// this low IS drowsiness. Requiring adenosine to corroborate let the
+/// phase claim Active while every downstream read (waves, emotion, the
+/// channel board) could see the body nodding off. This is the same
+/// boundary the mind's wave model applies (``N1_THETA_ALERTNESS``) —
+/// the line where a generic waking read is pre-sleep, and it sits at
+/// the floor of the measured wakeful envelope (~0.33) so only a real
+/// descent crosses it.
+pub const N1_AROUSAL_GATE: f32 = 0.35;
+
+/// Arousal bound for staying drowsy once entered on the N1 path.
+///
+/// A small margin above the enter gate, in the same style as
+/// [`DROWSY_AROUSAL_STAY`]: a genuine arousal recovery should release
+/// the state, a borderline reading should not chatter it.
+pub const N1_AROUSAL_STAY: f32 = 0.40;
+
 /// Fraction of a delivered impulse that is drawn from the vesicular
 /// pool.
 ///
@@ -2466,7 +2489,11 @@ impl NeurochemicalVector {
     /// Stress hormones (cortisol, CRH) are NOT boosted — they have no
     /// homeostatic set-point and should stay at zero when there is no
     /// stressor.
-    pub fn wake_recovery(&mut self) {
+    ///
+    /// `network` is the sleep-wake populations' current levels — the
+    /// recompute after the boost must read arousal off the body's own
+    /// switch, not the chemistry-only fallback.
+    pub fn wake_recovery(&mut self, network: NetworkLevels) {
         let cort = self.chemicals[NeurochemicalId::Cortisol as usize].level;
         // Only recover if there is no ongoing stress. The gate is the
         // stress-phase boundary — cortisol's reachable envelope tops
@@ -2523,13 +2550,24 @@ impl NeurochemicalVector {
         }
         // Recompute derived fields (effective levels, arousal, valence,
         // plasticity_gate, phase) from the boosted levels and
-        // resensitized receptors.
-        self.recompute_derived();
+        // resensitized receptors, on the body's own arousal readout.
+        self.recompute_derived_with_network(network);
     }
 
     /// Recompute all derived fields using the default tick time scale.
     pub fn recompute_derived(&mut self) {
         self.recompute_derived_with_dt(1.0, None);
+    }
+
+    /// Recompute all derived fields the way a live body must read them:
+    /// cortical arousal follows the sleep-wake network's populations
+    /// (LC for waking activation, REM-on for REM), not the Wilson-Cowan
+    /// fallback. Callers that recompute after an out-of-tick impulse
+    /// (inference feedback, dyadic impulses) must pass the network
+    /// through here — the plain `recompute_derived` would drag the
+    /// arousal readout off the body's own switch every call.
+    pub fn recompute_derived_with_network(&mut self, network: NetworkLevels) {
+        self.recompute_derived_with_dt(1.0, Some(network));
     }
 
     /// Compute the emergent mental phase from the current neurochemical
@@ -2763,7 +2801,19 @@ impl NeurochemicalVector {
         } else {
             DROWSY_AROUSAL_GATE
         };
-        if adn > drowsy_adn && self.arousal < drowsy_arousal {
+        // The adenosine conjunct names the usual descent — pressure
+        // high, arousal falling through its gate. The N1 path names
+        // the state the conjunct can't see: arousal already in the
+        // deep-descent band on its own. The wake systems' readout
+        // *is* the drowsiness at that depth — asking adenosine to
+        // corroborate it is what let the phase claim Active while
+        // the body's own axis said otherwise.
+        let n1_arousal = if current == MentalPhase::Drowsy {
+            N1_AROUSAL_STAY
+        } else {
+            N1_AROUSAL_GATE
+        };
+        if (adn > drowsy_adn && self.arousal < drowsy_arousal) || self.arousal < n1_arousal {
             return MentalPhase::Drowsy;
         }
 

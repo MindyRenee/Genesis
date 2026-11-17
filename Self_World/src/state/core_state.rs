@@ -433,8 +433,11 @@ impl GenesisCoreState {
                 self.header.version = SCHEMA_VERSION;
                 self.header.state_size = Self::SIZE as u32;
 
-                // Recompute derived fields and checksum
-                self.neurochemicals.recompute_derived();
+                // Recompute derived fields and checksum — on the
+                // network's own arousal readout, same as live ticks.
+                self.neurochemicals.recompute_derived_with_network(
+                    super::sleep_network::levels(&self.sleep_network),
+                );
                 self.sync_neurochemistry_to_state();
                 self.checksum = self.compute_checksum();
 

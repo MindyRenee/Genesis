@@ -666,7 +666,9 @@ impl MmapState {
         snapshot
             .neurochemicals
             .set_circadian_phase(local_phase_of_day(open_now_ms));
-        snapshot.neurochemicals.recompute_derived();
+        snapshot.neurochemicals.recompute_derived_with_network(
+            crate::state::sleep_network::levels(&snapshot.sleep_network),
+        );
         snapshot.header.last_updated = open_now_ms;
         snapshot.checksum = snapshot.compute_checksum();
         // SAFETY: `ptr` is the live MAP_SHARED mapping of

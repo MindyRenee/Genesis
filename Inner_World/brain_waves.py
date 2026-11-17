@@ -300,13 +300,14 @@ def _receptor_response(drive: float, hi_headroom: float, lo_headroom: float) -> 
 def resolve_waking_drowsy(phase: int, arousal: float) -> int:
     """Resolve a waking phase against arousal (pure; unit-testable).
 
-    The daemon reports Drowsy only once sleep pressure (adenosine)
-    joins low arousal, but the wave model reads drowsiness from
-    arousal alone. A generic waking label (active/alert — the two
-    phases rendered through the alertness-driven wave branch) with
-    arousal inside the N1-like theta band is pre-sleep whatever
-    adenosine says: return PHASE_DROWSY so phase, waves, emotion,
-    and learning agree. Anything else passes through unchanged.
+    The daemon's classifier now enters Drowsy on the N1 arousal band
+    itself, so on a current body this read is a pass-through. It stays
+    as the backstop for a stale or older daemon whose waking label
+    (active/alert — the two phases rendered through the alertness-
+    driven wave branch) can still pair with arousal inside the N1-like
+    theta band, which is pre-sleep whatever adenosine says: return
+    PHASE_DROWSY so phase, waves, emotion, and learning agree.
+    Anything else passes through unchanged.
     """
     if phase in (PHASE_ACTIVE, PHASE_ALERT) and arousal <= N1_THETA_ALERTNESS:
         return PHASE_DROWSY
