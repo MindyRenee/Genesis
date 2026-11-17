@@ -661,7 +661,7 @@ def run_privileged(
 
 
 def web_search(query: str, limit: int = 5) -> ToolResult:
-    """Search the web (DuckDuckGo) for a query.
+    """Search the web through her real browser for a query.
 
     Returns up to ``limit`` result URLs, filtered through the
     adult/malware content blocklist. Read-only — no data is sent

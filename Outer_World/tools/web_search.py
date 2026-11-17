@@ -642,7 +642,7 @@ _SEARCH_ENGINES: tuple[tuple[str, str], ...] = (
 # that walled rather than pretending there were no results.
 _WALL_RE = re.compile(
     r"captcha|consent|/sorry/|unusual traffic|challenge-platform|"
-    r"verify you are|are you a robot|bot detection|access denied",
+    r"verify you are|are you a robot|bot detection|access denied|forbidden",
     re.IGNORECASE,
 )
 
@@ -653,16 +653,38 @@ _WALL_RE = re.compile(
 _LINKS_JS = """JSON.stringify((() => {
   const root = h => h.replace(/^www\\./, '').split('.').slice(-2).join('.');
   const here = root(location.hostname);
+  // Engines wrap outbound results in same-host redirect URLs — the
+  // real destination rides in a query param, sometimes base64'd
+  // (bing's u=a1…, ddg's uddg=, google's /url?q=). Unwrap first so a
+  // result is judged on where it lands, not where the engine bounces.
+  const dest = href => {
+    try {
+      const p = new URL(href).searchParams;
+      for (const k of ['u', 'uddg', 'url', 'rurl', 'target', 'q']) {
+        const v = p.get(k);
+        if (!v) continue;
+        let u = v;
+        if (/^a1/i.test(v)) {
+          try {
+            u = atob(v.slice(2).replace(/-/g, '+').replace(/_/g, '/'));
+          } catch (e) { continue; }
+        }
+        if (/^https?:\\/\\//.test(u)) return u;
+      }
+    } catch (e) {}
+    return href;
+  };
   const seen = new Set(); const links = [];
   for (const a of document.querySelectorAll('a[href^="http"]')) {
     if (a.closest('nav, header, footer, script, style,'
         + ' [role="navigation"], [role="banner"], [role="contentinfo"]')) continue;
     const t = (a.innerText || a.textContent || '').trim().slice(0, 300);
     if (t.length < 8) continue;
-    try { if (root(new URL(a.href).hostname) === here) continue; } catch (e) { continue; }
-    if (seen.has(a.href)) continue;
-    seen.add(a.href);
-    links.push({u: a.href, t});
+    const u = dest(a.href);
+    try { if (root(new URL(u).hostname) === here) continue; } catch (e) { continue; }
+    if (seen.has(u)) continue;
+    seen.add(u);
+    links.push({u, t});
   }
   return {title: document.title || '', url: location.href, links};
 })())"""
@@ -740,7 +762,15 @@ def _browser_search(query: str, limit: int) -> list[WebSearchResult] | None:
                 url = template.format(q=urllib.parse.quote_plus(query), n=max(limit, 10))
                 browser.navigate(url)
                 _browser_wait_ready(browser, url.split("?")[0])
-                title, landed, hits = _page_links(browser)
+                title, landed, hits = "", "", []
+                # readyState lies the other way too: results render
+                # after it flips. Poll for links — an engine that
+                # stays empty for ~6s really had nothing to say.
+                for _ in range(15):
+                    title, landed, hits = _page_links(browser)
+                    if hits or _WALL_RE.search(f"{title} {landed}"):
+                        break
+                    time.sleep(0.4)
                 if _WALL_RE.search(f"{title} {landed}"):
                     walled.append(f"{name} (wall)")
                     continue

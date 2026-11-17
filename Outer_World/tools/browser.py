@@ -28,6 +28,12 @@ from genesis_client.threads import named_thread
 _BROWSER_BINS = (
     "firefox",
     "firefox-esr",
+    "google-chrome",
+    "google-chrome-stable",
+    "chromium",
+    "chromium-browser",
+    "microsoft-edge",
+    "brave-browser",
 )
 
 # Where her browser keeps itself: a persistent profile under her
