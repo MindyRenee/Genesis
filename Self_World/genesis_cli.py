@@ -3118,6 +3118,7 @@ def _run_interactive_loop(
     voice: Voice,
     thought_collector: ThoughtCollector,
     shutting_down: NeuromodulatoryGate,
+    self_directed: bool = False,
 ) -> None:
     """Run the main interactive read/respond loop until shutdown."""
     out_lock = InhibitoryGate()
@@ -3156,6 +3157,15 @@ def _run_interactive_loop(
             state.suppress_thoughts = False
             if user_input is None:
                 logger.info("")
+                if not self_directed:
+                    break
+                # Self-directed: a closed or finished console is not a
+                # command to die — she directs herself, the prompt was
+                # optional. Wait on the shutdown flag the way resident
+                # mode does; the thought ticker keeps printing and
+                # external stops still tear down.
+                while not shutting_down.is_set():
+                    shutting_down.wait(5.0)
                 break
             if not user_input:
                 continue
@@ -3845,7 +3855,13 @@ def _run_after_mind_start(
             _print_thoughts(thoughts)
     else:
         # ── Interactive loop ──
-        _run_interactive_loop(mind, voice, thought_collector, shutting_down)
+        _run_interactive_loop(
+            mind,
+            voice,
+            thought_collector,
+            shutting_down,
+            self_directed=getattr(args, "self_directed", False),
+        )
     return voice, ambient_listener, auditory_cortex
 
 

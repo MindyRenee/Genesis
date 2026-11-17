@@ -10,6 +10,8 @@
 #        ./genesis wake       (the same, spelled out)
 #        ./genesis --stop     (stop a running Genesis)
 #        ./genesis --offline  (wake in offline mode)
+#        ./genesis --self-directed  (volition and tools live, worker loops off)
+#        ./genesis --headless (resident mode, no prompt)
 # Flags combine with the verb in any order: ./genesis wake --offline
 #
 # Optional: put a Discord channel webhook URL in .genesis-discord
@@ -250,11 +252,15 @@ _is_running() {
 # (which would otherwise try to START Genesis instead of stopping it).
 WANT_STOP=0
 OFFLINE_ARG=""
+SELF_DIRECTED_ARG=""
+HEADLESS_ARG=""
 for arg in "$@"; do
     case "$arg" in
         wake)      : ;;  # the explicit verb — starting is the default act
         --stop)    WANT_STOP=1 ;;
         --offline) OFFLINE_ARG="--offline" ;;
+        --self-directed) SELF_DIRECTED_ARG="--self-directed" ;;
+        --headless) HEADLESS_ARG="--headless" ;;
         *) echo "  Unknown argument: $arg" >&2; exit 2 ;;
     esac
 done
@@ -357,4 +363,4 @@ if [ ! -x "$VENV_PY" ]; then
     echo "[genesis] $VENV_PY not found — run scripts/install.sh first"
     exit 1
 fi
-PYTHONPATH="$PWD/Self_World:$PWD/Inner_World:$PWD/Outer_World:$PWD:${PYTHONPATH:-}" "$VENV_PY" Self_World/genesis_cli.py --data-dir "$DATA_DIR" ${OFFLINE_ARG:+$OFFLINE_ARG}
+PYTHONPATH="$PWD/Self_World:$PWD/Inner_World:$PWD/Outer_World:$PWD:${PYTHONPATH:-}" "$VENV_PY" Self_World/genesis_cli.py --data-dir "$DATA_DIR" ${OFFLINE_ARG:+$OFFLINE_ARG} ${SELF_DIRECTED_ARG:+$SELF_DIRECTED_ARG} ${HEADLESS_ARG:+$HEADLESS_ARG}
