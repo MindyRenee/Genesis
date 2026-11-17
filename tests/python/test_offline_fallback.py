@@ -52,7 +52,7 @@ def test_cache_miss_returns_none(tmp_path: Path) -> None:
 
 
 def test_cache_skips_empty_content(tmp_path: Path) -> None:
-    """Results with empty content are not cached (DDG results need fetching)."""
+    """Results with empty content are not cached (search results need fetching)."""
     cache = SourceCache(tmp_path / "cache")
     result = SourceResult(
         url="https://example.com",

@@ -3,7 +3,7 @@
 This is its continuous inner life. When it's idle (no conversation),
 it follows its curiosity: picks a topic it's curious about, queries
 its source registry (local man pages and WordNet, then the Wikipedia
-API with a DuckDuckGo Lite fallback), reads the content, extracts
+API with a web-search fallback through her browser), reads the content, extracts
 concepts and relationships, and stores what it learned as memories.
 
 This is not a web crawler. It doesn't index the internet. It reads
@@ -871,7 +871,7 @@ class AutonomousLearner:
         # delegates to — not here.
         # Multi-source knowledge registry — replaces search-engine scraping.
         # Queries local man pages and WordNet, then the Wikipedia API and
-        # DuckDuckGo Lite (fallback) instead of scraping Bing/Google.
+        # her browser's web search (fallback) instead of scraping.
         #
         # When a data_dir is provided, the registry gets a disk cache
         # (genesis_data/source_cache/) so anything Genesis learns online
@@ -1352,7 +1352,7 @@ class AutonomousLearner:
                 if is_offline:
                     continue
                 # Fetch the page content now. The open web means
-                # DDG-discovered pages are accessible. This is slower
+                # search-discovered pages are accessible. This is slower
                 # than pre-fetched content but necessary for topics
                 # Wikipedia doesn't cover.
                 try:
@@ -2203,7 +2203,7 @@ class AutonomousLearner:
             return
 
         # When offline, skip results that need network fetching (direct
-        # sources and DDG return URLs with empty content). Only process
+        # sources and web search return URLs with empty content). Only process
         # results that already have content (Wikipedia, WordNet, cache).
         is_offline = self._sources.last_query_offline
 

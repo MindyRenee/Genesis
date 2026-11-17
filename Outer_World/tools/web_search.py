@@ -5,9 +5,9 @@ wants — in conversation, for fun, to learn. It is a read-only capability:
 it can search, fetch pages, and read content, but cannot submit forms,
 post data, or modify anything online.
 
-Search and browsing run through her real browser: Firefox driven
-over WebDriver BiDi (the Chromium family over CDP serves hosts
-without it), so JavaScript-heavy pages render and search behaves
+Search and browsing run through her real browser: Chrome driven
+over CDP (Firefox over WebDriver BiDi serves hosts without it), so
+JavaScript-heavy pages render and search behaves
 like it does for a person. Plain-HTML fetches still take the
 lightweight urllib path first; the browser is the fallback for thin
 or failed pages. With no browser there is no search — an honest
@@ -630,9 +630,8 @@ def _browser_wait_ready(browser, url: str = "", accept: tuple[str, ...] = ()) ->
 # none is privileged. ``GENESIS_SEARCH_ENGINE`` pins a single engine —
 # a name from this table or a literal ``{q}`` template of her own.
 _SEARCH_ENGINES: tuple[tuple[str, str], ...] = (
-    ("google", "https://www.google.com/search?q={q}&num={n}"),
-    ("bing", "https://www.bing.com/search?q={q}&count={n}"),
     ("brave", "https://search.brave.com/search?q={q}"),
+    ("google", "https://www.google.com/search?q={q}&num={n}"),
     ("mojeek", "https://www.mojeek.com/search?q={q}"),
 )
 
@@ -762,7 +761,7 @@ def _browser_search(query: str, limit: int) -> list[WebSearchResult] | None:
                 url = template.format(q=urllib.parse.quote_plus(query), n=max(limit, 10))
                 browser.navigate(url)
                 _browser_wait_ready(browser, url.split("?")[0])
-                title, landed, hits = "", "", []
+                title, landed, hits = "", "", []  # type: tuple[str, str, list[dict[str, str]]]
                 # readyState lies the other way too: results render
                 # after it flips. Poll for links — an engine that
                 # stays empty for ~6s really had nothing to say.

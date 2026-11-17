@@ -24,8 +24,8 @@ The registry has both local and online tiers:
    - Returns structured article content (not HTML scraping)
    - Provides article summaries, full content, and related links
 
-4. **DuckDuckGo Lite** (online — discovery fallback)
-   - Lightweight, privacy-respecting search
+4. **Web search** (online — discovery fallback, her real browser)
+   - The same engine rotation her ``web_search`` tool uses
    - Used only when Wikipedia doesn't cover a topic
    - Returns URLs for Genesis to fetch
 
@@ -320,7 +320,7 @@ class SourceCache:
 
 # Master switch for Wikipedia as a knowledge source. When False,
 # Genesis makes no Wikipedia API calls (search, fetch, or lead
-# images) — it learns from man pages, WordNet, DuckDuckGo, and its
+# images) — it learns from man pages, WordNet, web search, and its
 # disk cache instead. Cached Wikipedia articles remain readable
 # offline; this only stops new network fetches. Flip back to True to
 # re-enable — nothing is removed.
@@ -1343,76 +1343,56 @@ class PackageDocSource:
         return ""
 
 
-# ─── DuckDuckGo Lite (discovery fallback) ───────────────────────────
+# ─── Web search (discovery fallback — her own browser) ─────────────
 
-_DDG_LITE = "https://lite.duckduckgo.com/lite/"
-_URL_RE = re.compile(r'https?://[^\s<>"\']+')
+_SKIP_EXT = (
+    ".pdf",
+    ".jpg",
+    ".png",
+    ".gif",
+    ".css",
+    ".js",
+    ".dtd",
+    ".xml",
+    ".rss",
+    ".json",
+    ".ico",
+    ".svg",
+    ".woff",
+    ".woff2",
+)
 
 
-def _duckduckgo_search(topic: str, limit: int = 5) -> list[str]:
-    """Search DuckDuckGo Lite for URLs about a topic.
+def _web_search_urls(topic: str, limit: int = 5) -> list[str]:
+    """Search the web for URLs about a topic — through her real browser.
 
-    DuckDuckGo Lite is a lightweight, privacy-respecting search
-    interface that works well with automated requests. No API key
-    needed. Used as a fallback when Wikipedia doesn't cover a topic.
-
-    Returns URLs from trusted domains (.edu, .org, .gov).
+    Delegates to ``tools.web_search``: the same engine rotation and
+    content blocklist her ``web_search`` tool uses, so discovery and
+    deliberate search behave identically. Trusted domains
+    (.edu, .org, .gov) sort first; the rest of the wider web follows.
     """
-    data = urllib.parse.urlencode({"q": topic, "kl": "us-en"}).encode()
     try:
-        req = urllib.request.Request(
-            _DDG_LITE,
-            data=data,
-            headers={
-                "User-Agent": USER_AGENT,
-                "Content-Type": "application/x-www-form-urlencoded",
-            },
-        )
-        with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
-            html = resp.read(_MAX_RESPONSE_BYTES + 1).decode("utf-8", errors="ignore")
+        from tools.web_search import search
 
-        urls = _URL_RE.findall(html)
-        # Filter to trusted domains and deduplicate
-        seen: set[str] = set()
-        trusted: list[str] = []
-        for url in urls:
-            url = url.split("&")[0]  # strip tracking params
-            if url in seen:
-                continue
-            domain = urllib.parse.urlparse(url).netloc.lower()
-            if any(domain.endswith(d) for d in (".edu", ".org", ".gov")):
-                # Skip non-content URLs
-                if not any(
-                    skip in url.lower()
-                    for skip in (
-                        ".pdf",
-                        ".jpg",
-                        ".png",
-                        ".gif",
-                        ".css",
-                        ".js",
-                        ".dtd",
-                        ".xml",
-                        ".rss",
-                        ".json",
-                        ".ico",
-                        ".svg",
-                        ".woff",
-                        ".woff2",
-                        "duckduckgo",
-                    )
-                ):
-                    seen.add(url)
-                    trusted.append(url)
-            if len(trusted) >= limit:
-                break
-        return trusted
-    except (OSError, ValueError, RuntimeError) as e:
+        hits = search(topic, limit=max(limit * 3, 15))
+    except Exception as e:  # noqa: BLE001 — browser path may be down
         note_swallowed(
-            "tools.source_registry._duckduckgo_search",
+            "tools.source_registry._web_search_urls",
             e,
         )
         return []
+
+    seen: set[str] = set()
+    trusted: list[str] = []
+    rest: list[str] = []
+    for hit in hits:
+        url = hit.url.split("&")[0]  # strip tracking params
+        if url in seen or any(url.lower().endswith(e) for e in _SKIP_EXT):
+            continue
+        seen.add(url)
+        domain = urllib.parse.urlparse(url).netloc.lower()
+        (trusted if any(domain.endswith(d) for d in (".edu", ".org", ".gov")) else rest).append(url)
+    return (trusted + rest)[:limit]
 
 
 # ─── GitHub (read-only public code search) ──────────────────────────
@@ -1626,7 +1606,7 @@ class SourceRegistry:
     1. Local Linux man pages (reference — no network, always available)
     2. WordNet (local lexical database — no network, always available)
     3. Wikipedia API (online — structured content, broad coverage)
-    4. DuckDuckGo Lite (online — discovery fallback for uncovered topics)
+    4. Web search (online — discovery fallback for uncovered topics)
 
     When online, every successful fetch is cached to disk. When offline
     (or when online sources return nothing), the registry falls back to:
@@ -1697,7 +1677,7 @@ class SourceRegistry:
         self._force_offline = force_offline
         self._last_query_offline = force_offline
         # Remote hold — a closed-book state, not a connectivity
-        # reading. While held, remote tiers (Wikipedia, DuckDuckGo)
+        # reading. While held, remote tiers (Wikipedia, web search)
         # are skipped but is_offline stays honest: she still feels
         # connected, the book is just closed. Used by game-mode
         # competition so nothing is fetched mid-run.
@@ -1735,7 +1715,7 @@ class SourceRegistry:
         1. Local Linux man pages (reference — no network, always available)
         2. WordNet (local dictionary — no network, always available)
         3. Wikipedia API (online — structured content, broad coverage)
-        4. DuckDuckGo Lite (online — discovery fallback)
+        4. Web search (online — discovery fallback)
         5. Disk cache (offline fallback — re-read learned content)
         """
         results: list[SourceResult] = []
@@ -1779,16 +1759,16 @@ class SourceRegistry:
                             if r.source_name == "wikipedia":
                                 self._cache.put(r, topic)
 
-            # 2. DuckDuckGo Lite — discovery fallback for topics that
+            # 2. Web search — discovery fallback for topics that
             #    Wikipedia didn't cover. Returns URLs that the learner
             #    fetches and parses. This opens the wider web: any topic
             #    it's curious about can be discovered, not just
             #    encyclopedia articles.
             if len(results) < max_results:
-                self._query_duckduckgo(topic, max_results, results)
-                # DDG results have empty content (caller fetches), so
+                self._query_web_search(topic, max_results, results)
+                # Search results have empty content (caller fetches), so
                 # they don't count as "got content" for offline tracking.
-                if any(r.source_name == "duckduckgo" for r in results):
+                if any(r.source_name == "web_search" for r in results):
                     online_got_content = True
 
         # Track whether we're likely offline: no online content at all
@@ -1830,10 +1810,10 @@ class SourceRegistry:
                     self._cache.put(result, topic)
         return got_content
 
-    def _query_duckduckgo(self, topic: str, max_results: int, results: list[SourceResult]) -> None:
-        """Fallback DuckDuckGo Lite search for discovery."""
-        ddg_urls = _duckduckgo_search(topic, limit=max_results - len(results))
-        for url in ddg_urls:
+    def _query_web_search(self, topic: str, max_results: int, results: list[SourceResult]) -> None:
+        """Fallback web search for discovery — her real browser."""
+        urls = _web_search_urls(topic, limit=max_results - len(results))
+        for url in urls:
             if len(results) >= max_results:
                 break
             results.append(
@@ -1841,7 +1821,7 @@ class SourceRegistry:
                     url=url,
                     title=f"discovered: {url}",
                     content="",  # caller will fetch
-                    source_name="duckduckgo",
+                    source_name="web_search",
                 )
             )
 

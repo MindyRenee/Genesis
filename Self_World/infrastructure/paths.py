@@ -40,9 +40,9 @@ def code_root() -> Path:
     so the resolution is:
 
     1. ``GENESIS_ROOT`` — explicit override for unusual layouts.
-    2. :func:`package_root` — in a checkout that is the repo root; in a
-       non-editable install it is ``site-packages``, where the
-       installed packages are the code.
+    2. :func:`package_root` — the repo root on a checkout; the world
+       roots reach sys.path via ``genesis_worlds.pth``, never an
+       installed package.
     """
     env = os.environ.get("GENESIS_ROOT")
     if env:

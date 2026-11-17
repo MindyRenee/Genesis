@@ -21,19 +21,20 @@ from typing import Any, cast
 from genesis_client.swallow import note_swallowed
 from genesis_client.threads import named_thread
 
-# Her internet browser, resolved per host: Firefox is the browser
-# she is given — driven over WebDriver BiDi; the Chromium builds
-# serve hosts without it, driven over CDP. ``GENESIS_BROWSER`` pins
-# an override (a name on PATH or an absolute path).
+# Her internet browser, resolved per host: regular Chrome is the
+# browser she is given — driven over CDP, which also gives her real
+# synthesized input. Firefox serves hosts without it, driven over
+# WebDriver BiDi. ``GENESIS_BROWSER`` pins an override (a name on
+# PATH or an absolute path).
 _BROWSER_BINS = (
-    "firefox",
-    "firefox-esr",
     "google-chrome",
     "google-chrome-stable",
     "chromium",
     "chromium-browser",
     "microsoft-edge",
     "brave-browser",
+    "firefox",
+    "firefox-esr",
 )
 
 # Where her browser keeps itself: a persistent profile under her
@@ -80,6 +81,11 @@ def _browser_profile(purpose: str) -> str:
     separate because Chrome itself requires it: two instances on
     one user-data dir don't coexist — the second forwards to the
     first and exits.
+
+    The profile may carry a signed-in Google session belonging to
+    the machine's owner — deliberately provisioned so engines stop
+    treating her as anonymous bot traffic. Her web presence then
+    runs under that account name, not a dedicated one of her own.
     """
     if purpose not in _BROWSER_PURPOSES:
         raise ValueError(f"unknown browser purpose {purpose!r}")

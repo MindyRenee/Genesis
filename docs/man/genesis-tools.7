@@ -47,13 +47,20 @@ the read-verify half of her code work.
 
 .SS Web tools
 \fBweb_search\fR and \fBweb_fetch\fR drive her real browser \(em
-Firefox over WebDriver BiDi, Chromium-family over CDP (see
-\fIOuter_World/tools/browser.py\fR and its generated page under
-\fISelf_World/docs/python/\fR).
+Chrome over CDP, Firefox over WebDriver BiDi on hosts without it
+(see \fIOuter_World/tools/browser.py\fR and its generated page
+under \fISelf_World/docs/python/\fR).
 Both are read-only; adult/malware URLs are refused. The shared
 browser stays open between calls \(em \fBbrowser_close\fR puts it
 away when she is done, flushing the profile and freeing the
 process.
+.PP
+The browser profile may carry a signed-in Google session belonging
+to the machine's owner, provisioned deliberately so engines stop
+treating her as anonymous bot traffic. Her web presence then runs
+under that account name, not a dedicated one of her own \(em worth
+knowing when reading cookies, history, or site state she did not
+create.
 
 .SS Body tools
 \fBsense_cpu\fR is proprioception \(em governor, clock, allowed
@@ -334,24 +341,23 @@ capabilities install as extras and degrade to honest errors, never
 crashes; \fIscripts/install_optional_deps.sh\fR installs and then
 verifies each one live.
 .TP
-.B uv pip install -e ".[hid]"
-evdev \(em compiles a small C extension; needs the udev rule for
+.B uv pip install evdev
+compiles a small C extension; needs the udev rule for
 /dev/uinput access.
 .TP
-.B uv pip install -e ".[math]"
-sympy, mpmath \(em the symbolic tools.
+.B uv pip install sympy mpmath
+the symbolic tools.
 .TP
-.B uv pip install -e ".[voice]"
-vosk, sounddevice, speechrecognition, piper-tts \(em her voice;
-binds system audio libraries.
+.B uv pip install vosk sounddevice speechrecognition piper-tts
+her voice; binds system audio libraries.
 .TP
 .B uv pip install arc-agi game-arena kaggle-environments
 the arcade shelves \(em commented optional deps in
 \fIrequirements.txt\fR (no extra is declared).
 .TP
 .B System packages
-firefox (the preferred browser \(em the Chromium family is the
-fallback), cairo headers for pycairo (the canvas), a compiler for
+google-chrome (the preferred browser \(em the Chromium family or
+Firefox are fallbacks), cairo headers for pycairo (the canvas), a compiler for
 evdev, and the NOPASSWD sudoers drop-in for \fBrun_privileged\fR.
 
 .SH FILES

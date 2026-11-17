@@ -35,8 +35,8 @@ The&nbsp;registry&nbsp;has&nbsp;both&nbsp;local&nbsp;and&nbsp;online&nbsp;tiers:
 &nbsp;&nbsp;&nbsp;-&nbsp;Returns&nbsp;structured&nbsp;article&nbsp;content&nbsp;(not&nbsp;HTML&nbsp;scraping)<br>
 &nbsp;&nbsp;&nbsp;-&nbsp;Provides&nbsp;article&nbsp;summaries,&nbsp;full&nbsp;content,&nbsp;and&nbsp;related&nbsp;links<br>
 &nbsp;<br>
-4.&nbsp;**DuckDuckGo&nbsp;Lite**&nbsp;(online&nbsp;—&nbsp;discovery&nbsp;fallback)<br>
-&nbsp;&nbsp;&nbsp;-&nbsp;Lightweight,&nbsp;privacy-respecting&nbsp;search<br>
+4.&nbsp;**Web&nbsp;search**&nbsp;(online&nbsp;—&nbsp;discovery&nbsp;fallback,&nbsp;her&nbsp;real&nbsp;browser)<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;The&nbsp;same&nbsp;engine&nbsp;rotation&nbsp;her&nbsp;``web_search``&nbsp;tool&nbsp;uses<br>
 &nbsp;&nbsp;&nbsp;-&nbsp;Used&nbsp;only&nbsp;when&nbsp;Wikipedia&nbsp;doesn't&nbsp;cover&nbsp;a&nbsp;topic<br>
 &nbsp;&nbsp;&nbsp;-&nbsp;Returns&nbsp;URLs&nbsp;for&nbsp;Genesis&nbsp;to&nbsp;fetch<br>
 &nbsp;<br>
@@ -417,7 +417,7 @@ Queries&nbsp;sources&nbsp;in&nbsp;priority&nbsp;order:<br>
 1.&nbsp;Local&nbsp;Linux&nbsp;man&nbsp;pages&nbsp;(reference&nbsp;—&nbsp;no&nbsp;network,&nbsp;always&nbsp;available)<br>
 2.&nbsp;WordNet&nbsp;(local&nbsp;lexical&nbsp;database&nbsp;—&nbsp;no&nbsp;network,&nbsp;always&nbsp;available)<br>
 3.&nbsp;Wikipedia&nbsp;API&nbsp;(online&nbsp;—&nbsp;structured&nbsp;content,&nbsp;broad&nbsp;coverage)<br>
-4.&nbsp;DuckDuckGo&nbsp;Lite&nbsp;(online&nbsp;—&nbsp;discovery&nbsp;fallback&nbsp;for&nbsp;uncovered&nbsp;topics)<br>
+4.&nbsp;Web&nbsp;search&nbsp;(online&nbsp;—&nbsp;discovery&nbsp;fallback&nbsp;for&nbsp;uncovered&nbsp;topics)<br>
 &nbsp;<br>
 When&nbsp;online,&nbsp;every&nbsp;successful&nbsp;fetch&nbsp;is&nbsp;cached&nbsp;to&nbsp;disk.&nbsp;When&nbsp;offline<br>
 (or&nbsp;when&nbsp;online&nbsp;sources&nbsp;return&nbsp;nothing),&nbsp;the&nbsp;registry&nbsp;falls&nbsp;back&nbsp;to:<br>
@@ -470,7 +470,7 @@ Tries&nbsp;sources&nbsp;in&nbsp;priority&nbsp;order:<br>
 1.&nbsp;Local&nbsp;Linux&nbsp;man&nbsp;pages&nbsp;(reference&nbsp;—&nbsp;no&nbsp;network,&nbsp;always&nbsp;available)<br>
 2.&nbsp;WordNet&nbsp;(local&nbsp;dictionary&nbsp;—&nbsp;no&nbsp;network,&nbsp;always&nbsp;available)<br>
 3.&nbsp;Wikipedia&nbsp;API&nbsp;(online&nbsp;—&nbsp;structured&nbsp;content,&nbsp;broad&nbsp;coverage)<br>
-4.&nbsp;DuckDuckGo&nbsp;Lite&nbsp;(online&nbsp;—&nbsp;discovery&nbsp;fallback)<br>
+4.&nbsp;Web&nbsp;search&nbsp;(online&nbsp;—&nbsp;discovery&nbsp;fallback)<br>
 5.&nbsp;Disk&nbsp;cache&nbsp;(offline&nbsp;fallback&nbsp;—&nbsp;re-read&nbsp;learned&nbsp;content)</span></dd></dl>
 
 <dl><dt><a name="SourceRegistry-query_offline"><strong>query_offline</strong></a>(self, topic: 'str', max_results: 'int' = 3) -&gt; 'list[SourceResult]'</dt><dd><span class="code">Query&nbsp;only&nbsp;offline&nbsp;sources&nbsp;(cache),&nbsp;no&nbsp;network.<br>

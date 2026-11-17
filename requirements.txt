@@ -11,10 +11,13 @@ nltk
 scipy
 orjson
 psutil
+# Unicode-aware regex (\\p{L} classes) — a hard import in
+# temporal_lobe/concepts/classify.py and Inner_World/memory/semantic.py.
+regex
 
 # Symbolic mathematics is an optional capability: symbolic.py imports
 # sympy lazily and degrades without it. Listed in requirements-dev.txt
-# so dev/CI still exercises it, or install the "math" extra.
+# so dev/CI still exercises it, or install by name: sympy mpmath.
 # Image processing (visual cortex + canvas)
 Pillow
 opencv-python-headless
@@ -41,13 +44,20 @@ pytest
 # needs write access to /dev/uinput — see scripts/genesis-uinput.rules.
 #   evdev
 
-# Optional: official ARC-AGI-3 games (worlds/games/official.py) plus
-# the local Game Arena shelf (worlds/games/arena.py — game-arena
-# pulls pyspiel, the engine Kaggle's arena evaluates on). ARC imports
-# lazily; needs ARC_API_KEY from https://three.arcprize.org for full
-# online access (anonymous offers fewer; the arena shelf is local and
-# needs no key). arc-agi 0.9.9 was the last release validated
-# against her; newer releases should be checked before relying on them.
+# Optional: official ARC-AGI-3 games (Outer_World/games/official.py)
+# plus the local Game Arena shelf (Outer_World/games/arena.py —
+# open-spiel provides pyspiel, the engine Kaggle's arena evaluates
+# on) and the arena harness itself (game-arena, kaggle-environments)
+# — the substrate she is to be wired into as a player. The harness's
+# LLM-client deps (litellm, openai, anthropic, google-genai,
+# tiktoken, tokenizers, transformers) are deliberately pruned
+# post-install: she IS the model, her seat needs no API client.
+# ARC imports lazily; needs ARC_API_KEY from
+# https://three.arcprize.org for full online access (anonymous offers
+# fewer; the arena shelf is local and needs no key). arc-agi 0.9.9
+# was the last release validated against her; newer releases should
+# be checked before relying on them.
 #   arc-agi
+#   open-spiel
 #   game-arena
 #   kaggle-environments

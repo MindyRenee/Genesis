@@ -6,13 +6,13 @@
 #   scripts/install.sh --uninstall   remove the install (her data stays)
 #
 # Layout:
-#   ~/.local/lib/genesis/venv/    python env, genesis-cognitive (editable)
+#   ~/.local/lib/genesis/venv/    python env — world roots via .pth
 #   ~/.local/lib/genesis/venv/bin/genesis-daemon
 #   ~/.local/bin/genesis          PATH-visible launcher
 #   ~/.config/genesis/agent.env   deployed environment (Discord webhook, etc.)
 #   ~/.config/systemd/user/genesis.service
 #
-# The install is editable: the packages resolve to this checkout, so
+# The world roots resolve to this checkout via genesis_worlds.pth, so
 # the install is bound to the repo path — move the checkout and re-run
 # this script. Her state is never touched: the data dir resolves the
 # same way genesis resolves it (~/.local/share/genesis).
@@ -83,26 +83,18 @@ done
 
 # ── 2. Python environment ───────────────────────────────────────────
 # --system-site-packages: the host already has the heavy runtime deps
-# (numpy, cv2, cairo…); the venv only needs the package + entry point.
+# (numpy, cv2, cairo…). Her code is not a package — the venv only
+# needs the world roots on sys.path, recorded below.
 if [ ! -x "$VENV/bin/python" ]; then
     say "Creating venv at $VENV"
     python3 -m venv --system-site-packages "$VENV"
 fi
 
-say "Installing genesis-cognitive (editable — code stays this checkout)"
-if ! "$VENV/bin/python" -m pip install -e "$REPO" 2>/dev/null; then
-    # Offline or old toolchain: use the host's setuptools directly.
-    say "Isolated build failed; retrying with --no-build-isolation"
-    "$VENV/bin/python" -m pip install -e "$REPO" --no-build-isolation
-fi
-
-# The editable install maps packages only; the loose modules at each
-# world's root (genesis_cli, brain_waves, mind, …) are single files,
-# not packages, so pip metadata never reaches them. The three worlds
-# are sys.path roots by design — record them as such in the venv so
-# every interpreter on it (console script, tests, REPL) resolves the
-# whole tree without an ambient PYTHONPATH. Uninstall removes the
-# venv wholesale, taking this with it.
+# The three worlds are sys.path roots by design — record them as
+# such in the venv so every interpreter on it (tests, REPL, tools
+# spawning python) resolves the whole tree without an ambient
+# PYTHONPATH. Uninstall removes the venv wholesale, taking this
+# with it.
 SITE_PKGS="$("$VENV/bin/python" -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')"
 {
     printf '%s\n' "$REPO/Self_World"
@@ -110,14 +102,14 @@ SITE_PKGS="$("$VENV/bin/python" -c 'import sysconfig; print(sysconfig.get_paths(
     printf '%s\n' "$REPO/Outer_World"
 } > "$SITE_PKGS/genesis_worlds.pth"
 
-# Ship the binaries next to the interpreter — the CLI's packaged-install
-# lookup (venv/bin). Editable installs also find target/release first;
-# these copies keep the venv self-contained.
+# Ship the binaries next to the interpreter — the CLI's
+# packaged-install lookup (venv/bin). These copies keep the venv
+# self-contained.
 cp "$REPO/target/release/genesis-daemon" "$VENV/bin/"
 cp "$REPO/target/release/genesis-retina" "$VENV/bin/"
 
 mkdir -p "$USER_BIN"
-ln -sf "$VENV/bin/genesis" "$USER_BIN/genesis"
+ln -sf "$REPO/genesis" "$USER_BIN/genesis"
 say "Launcher: $USER_BIN/genesis"
 
 # ── 3. Deployed environment ─────────────────────────────────────────
