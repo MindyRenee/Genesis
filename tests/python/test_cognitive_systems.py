@@ -4204,34 +4204,73 @@ def _board_holder(**overrides):
 
 
 def test_channel_board_shows_live_vitals() -> None:
-    """The board is instrument readout: phase, affect, waves, the
-    inference block's free energy and tick counter, chemistry,
-    memory tallies, uptime, ear — every field a real reading."""
+    """The board is instrument readout labeled for strangers: phase,
+    mood, waves, the inference block's state and tick counter,
+    chemistry, memory tallies, uptime — every field a real reading
+    under a plain-words name."""
     holder, boards = _board_holder()
     holder._update_channel_board(1000.0)
     assert len(boards) == 1
     text = boards[0]
     assert text.startswith("```") and text.endswith("```")
     assert "genesis · awake · active · calm" in text
+    # The visitor lines — can she hear me, and where do I learn more.
+    assert "listening — say hi here" in text
     assert "β1 0.40" in text and "θ 0.20" in text
-    assert "F 0.412" in text and "prec 0.71" in text
-    assert "1,842,203" in text
-    assert "da 0.51" in text and "cort 0.02" in text
-    assert "stm 41" in text and "ltm 1,832" in text
-    assert "ear on" in text
-    assert "hb 36,412" in text and "id 8841" in text and "age 0." in text
+    assert "mostly   beta1 12-15 Hz" in text
+    assert "mood     +0.21" in text and "energy 0.44" in text and "balance 0.52" in text
+    assert "focus 0.71" in text and "confusion 0.412" in text
+    assert "surprise 0.031" in text and "stress 0.18" in text and "knows world 0.62" in text
+    assert "thoughts 1,842,203" in text
+    assert "reward 0.51" in text and "stress 0.02" in text and "sleepy 0.07" in text
+    assert "short 41" in text and "long 1,832" in text
+    assert "hb 36,412" in text and "id 8841" in text and "fresh 0." in text
     # Her words belong on their own cards — the instrument board must
     # not squeeze them into a clipped monospace status row.
     assert "a passing idea" not in text
-    # frequency, field, cell, proof, growth, drive — the physics and
+    # machine, power, cell, research, growth, wants — the physics and
     # the math, not narration
-    assert "beta1 12-15 Hz" in text
-    assert "carrier 13.7 Hz" in text and "coh 0.83" in text
-    assert "Vm -64.2 mV" in text and "atp 0.77" in text
+    assert "machine  13.7 Hz" in text and "steady 0.83" in text
+    assert "1.2M ops/s" in text
+    assert "power    24.3 W" in text
+    assert "volts -64.2 mV" in text and "energy 0.77" in text
     assert "1 open" in text and "1 verified" in text and "1 refuted" in text
     assert "#a1b2c3d4e5" in text
-    assert "214 concepts" in text and "388 edges" in text and "plast 0.61" in text
-    assert "research 0.62" in text and "draw 0.41" in text
+    assert "214 ideas" in text and "388 links" in text and "learning 0.61" in text
+    assert "wants    research 0.62" in text and "draw 0.41" in text
+
+
+def test_channel_board_talk_line_follows_the_ear() -> None:
+    """The second line tells a visitor whether writing here reaches
+    her: listening, deaf, no ear, or asleep."""
+    from types import SimpleNamespace
+
+    holder, boards = _board_holder()
+    holder._update_channel_board(1000.0)
+    assert "listening — say hi here" in boards[0]
+    assert "info channel explains" not in boards[0]
+
+    holder, boards = _board_holder()
+    holder.world.channel.ear = "deaf"
+    holder._update_channel_board(1000.0)
+    assert "she can't hear right now" in boards[0]
+
+    holder, boards = _board_holder()
+    holder.world.channel.ear = "off"
+    holder._update_channel_board(1000.0)
+    assert "she can't hear this channel" in boards[0]
+
+    holder, boards = _board_holder(_is_sleeping=True)
+    holder._update_channel_board(1000.0)
+    assert "sleeping — she can't hear you" in boards[0]
+
+    # A configured info page earns a pointer line; without one the
+    # board names things but doesn't advertise a legend that doesn't
+    # exist.
+    holder, boards = _board_holder()
+    holder.world.channel.feed.info_feed = SimpleNamespace()
+    holder._update_channel_board(1000.0)
+    assert "the info channel explains this" in boards[0]
 
 
 def test_channel_board_degrades_without_channels() -> None:
@@ -4250,9 +4289,9 @@ def test_channel_board_degrades_without_channels() -> None:
     holder.volition = SimpleNamespace(state=dict)
     holder._update_channel_board(1000.0)
     text = boards[0]
-    assert "field    probe off" in text
-    assert "cell " not in text and "proof " not in text and "drive " not in text
-    assert "grow     0 concepts" in text and "plast 0.61" in text
+    assert "machine  probe off" in text
+    assert "cell " not in text and "research " not in text and "wants " not in text
+    assert "learned  0 ideas" in text and "learning 0.61" in text
 
 
 def test_channel_board_paces_fixed_cadence() -> None:

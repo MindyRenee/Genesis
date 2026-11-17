@@ -120,6 +120,14 @@ if [ ! -f "$AGENT_CONF/agent.env" ]; then
             webhook="$(head -n1 "$REPO/.genesis-discord" | tr -d '[:space:]')"
             [ -n "$webhook" ] && printf 'GENESIS_DISCORD_WEBHOOK=%s\n' "$webhook"
         fi
+        if [ -f "$REPO/.genesis-discord-inner" ]; then
+            webhook="$(head -n1 "$REPO/.genesis-discord-inner" | tr -d '[:space:]')"
+            [ -n "$webhook" ] && printf 'GENESIS_DISCORD_INNER_WEBHOOK=%s\n' "$webhook"
+        fi
+        if [ -f "$REPO/.genesis-discord-info" ]; then
+            webhook="$(head -n1 "$REPO/.genesis-discord-info" | tr -d '[:space:]')"
+            [ -n "$webhook" ] && printf 'GENESIS_DISCORD_INFO_WEBHOOK=%s\n' "$webhook"
+        fi
         if [ -f "$REPO/.genesis-discord-bot" ]; then
             token="$(head -n1 "$REPO/.genesis-discord-bot" | tr -d '[:space:]')"
             [ -n "$token" ] && printf 'GENESIS_DISCORD_BOT_TOKEN=%s\n' "$token"

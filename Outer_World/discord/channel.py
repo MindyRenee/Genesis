@@ -18,7 +18,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from discord.feed import DiscordFeed, DiscordListener
+from infrastructure.config import default_data_dir
+
+from discord.feed import KIND_GUIDE, DiscordFeed, DiscordListener
+from discord.guide import guide_text, load_guide_message_id
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -67,7 +70,31 @@ class Channel:
         feed = DiscordFeed.from_env()
         if feed is None:
             return None
-        return cls(feed)
+        channel = cls(feed)
+        channel.post_guide()
+        return channel
+
+    def post_guide(self) -> None:
+        """Publish the "what is this channel" card for newcomers.
+
+        With a dedicated info page (``GENESIS_DISCORD_INFO_WEBHOOK``)
+        the guide is that channel's one maintained message — seeded
+        with the id saved from a previous boot so the card is edited,
+        not reposted (``discord.board`` re-saves the id once the
+        poster reports it). Without an info page it posts once to her
+        channel — it scrolls with the session, but the explanation
+        still reaches anyone watching the page open.
+        """
+        feed = self.feed
+        info = getattr(feed, "info_feed", None)
+        text = guide_text(inner_channel=getattr(feed, "inner_feed", None) is not None)
+        if info is not None:
+            saved = load_guide_message_id(default_data_dir())
+            if saved:
+                info.live_message_id = saved
+            info.update_live_text(text)
+        else:
+            feed.post(text, kind=KIND_GUIDE)
 
     def _deliver(self, author: str, content: str, message: dict) -> None:
         """The ear heard a public message — hand it to the world.

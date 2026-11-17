@@ -21,6 +21,11 @@ Three channels exist, each on its own webhook:
   part of the conversation. Unset, they stay on the main channel.
 - ``GENESIS_DISCORD_PULSE_WEBHOOK`` — an opt-in ops telemetry feed
   driven by ``scripts/discord_pulse.py``.
+- ``GENESIS_DISCORD_INFO_WEBHOOK`` — optional: a read-only info page.
+  When set, the "about this channel" card (``discord.guide``) is kept
+  there as one maintained message, so the explanation never scrolls
+  away. Unset, the guide posts once to the shared channel at page
+  open.
 
 A webhook can only *post* — it cannot read the channel. Hearing the
 public needs a bot identity: ``DiscordListener`` (below) polls the
@@ -82,6 +87,10 @@ _WEBHOOK_ENV = "GENESIS_DISCORD_WEBHOOK"
 # world and live apart from it. Unset, inner life stays on the main
 # page under its purple card — the mirror stays whole.
 _INNER_WEBHOOK_ENV = "GENESIS_DISCORD_INNER_WEBHOOK"
+# Optional third page — a read-only info channel holding the guide
+# card (who she is, how to talk to her, how to read the status
+# card). One maintained message rather than a post that scrolls off.
+_INFO_WEBHOOK_ENV = "GENESIS_DISCORD_INFO_WEBHOOK"
 _BOT_TOKEN_ENV = "GENESIS_DISCORD_BOT_TOKEN"
 _API = "https://discord.com/api/v10"
 
@@ -119,6 +128,7 @@ KIND_USER = "user"  # you> — the human's own input
 KIND_SYSTEM = "session"  # everything else the terminal shows
 KIND_BOARD = "board"  # the self-editing vitals card
 KIND_PULSE = "pulse"  # ops telemetry (separate webhook)
+KIND_GUIDE = "guide"  # the "what is this channel" explainer card
 
 # kind → (embed color, default username). A kind's color is the
 # message's left bar; the username is who the words are attributed
@@ -134,6 +144,7 @@ _KIND_STYLE: dict[str, tuple[int | None, str | None]] = {
     KIND_SYSTEM: (0x4F545C, "session"),  # muted grey — terminal noise
     KIND_BOARD: (0x57F287, None),  # green — the instrument card
     KIND_PULSE: (0xFAA61A, None),  # amber — ops telemetry
+    KIND_GUIDE: (0x3498DB, "about genesis"),  # light blue — orientation
 }
 
 # genesis~ tags that are her *voice reaching out* — the same set the
@@ -341,10 +352,15 @@ class DiscordFeed:
         *,
         post_interval: float = _POST_INTERVAL,
         queue_max: int = _QUEUE_MAX,
+        live_kind: str = KIND_BOARD,
     ) -> None:
         self._url = webhook_url
         self._post_interval = post_interval
         self._queue_max = queue_max
+        # Which card identity the maintained message wears — the
+        # instrument board by default; the info feed's single live
+        # message is the guide card instead.
+        self._live_kind = live_kind
         self._queue: deque[tuple] = deque()
         self._cond = ThalamicRelay()
         self._closing = False
@@ -358,6 +374,9 @@ class DiscordFeed:
         # post_line routes ``inner``-kind lines there. None keeps the
         # whole mirror on this channel.
         self.inner_feed: DiscordFeed | None = None
+        # The info page, when a third webhook is configured — the
+        # guide card lives there as one maintained message.
+        self.info_feed: DiscordFeed | None = None
         # Set at the drain deadline — in-flight requests poll it so a
         # wedged urlopen expires *with* the flush grace, not after.
         self._abandon = NeuromodulatoryGate()
@@ -366,6 +385,17 @@ class DiscordFeed:
         self._live_id: str | None = None
         self._thread = named_thread("discord-feed", self._run, comm="g-disc-feed")
         self._thread.start()
+
+    @property
+    def live_message_id(self) -> str | None:
+        """The maintained message's id, once the poster has created it."""
+        return self._live_id
+
+    @live_message_id.setter
+    def live_message_id(self, message_id: str | None) -> None:
+        """Seed the maintained-message id — e.g. one saved from a
+        previous boot so a card is edited, not reposted."""
+        self._live_id = message_id
 
     @classmethod
     def from_env(cls) -> DiscordFeed | None:
@@ -389,6 +419,13 @@ class DiscordFeed:
             logger.info(
                 f"[discord] Inner page enabled ({_INNER_WEBHOOK_ENV}) — "
                 "her thoughts and dreams post apart from the shared channel."
+            )
+        info_url = os.environ.get(_INFO_WEBHOOK_ENV, "").strip()
+        if info_url:
+            feed.info_feed = cls(info_url, live_kind=KIND_GUIDE)
+            logger.info(
+                f"[discord] Info page enabled ({_INFO_WEBHOOK_ENV}) — "
+                "the channel guide lives there as one maintained card."
             )
         return feed
 
@@ -714,7 +751,7 @@ class DiscordFeed:
         # Same card treatment as the text board — the frame rides
         # inside the instrument-colored embed, not as a bare upload.
         embed: dict[str, object] = {
-            "color": _KIND_STYLE[KIND_BOARD][0],
+            "color": _KIND_STYLE[self._live_kind][0],
             "image": {"url": "attachment://board.png"},
         }
         if caption:
@@ -762,7 +799,7 @@ class DiscordFeed:
         failure drops the id and re-creates.
         """
         payload: dict[str, object] = {
-            "embeds": [{"description": text, "color": _KIND_STYLE[KIND_BOARD][0]}],
+            "embeds": [{"description": text, "color": _KIND_STYLE[self._live_kind][0]}],
             "allowed_mentions": {"parse": []},
         }
         if self._live_id:
@@ -840,6 +877,8 @@ class DiscordFeed:
             # The inner page is hers too — it drains inside the same
             # teardown grace rather than outliving the session.
             self.inner_feed.close()
+        if self.info_feed is not None:
+            self.info_feed.close()
         with self._cond:
             self._closing = True
             self._cond.notify_all()

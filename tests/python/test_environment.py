@@ -313,6 +313,73 @@ def test_channel_from_env_no_webhook(monkeypatch):
     assert Channel.from_env() is None
 
 
+class _StubFeed:
+    """The feed surface post_guide touches — posts and live text."""
+
+    def __init__(self):
+        self.posts: list[tuple] = []
+        self.live: list[str] = []
+        self.inner_feed = None
+        self.info_feed = None
+        self.live_message_id = None
+        self._url = "https://example.invalid/wh"
+
+    def post(self, text, author=None, kind="speech"):
+        self.posts.append((kind, text))
+
+    def update_live_text(self, text, author=None):
+        self.live.append(text)
+
+
+def test_channel_guide_posts_to_her_page():
+    """No info page → the guide posts once to her own channel, as the
+    guide kind — the explanation still reaches a newcomer."""
+    from discord.channel import Channel
+
+    feed = _StubFeed()
+    channel = Channel(feed, listener=None)
+    channel.post_guide()
+    assert len(feed.posts) == 1
+    kind, text = feed.posts[0]
+    assert kind == "guide"
+    assert "genesis's place" in text and "talking to her" in text
+
+
+def test_channel_guide_lives_on_info_page():
+    """An info page keeps the guide as its one maintained card —
+    seeded with the saved message id so a reboot edits, not reposts."""
+    from discord.channel import Channel
+
+    feed = _StubFeed()
+    feed.info_feed = _StubFeed()
+    channel = Channel(feed, listener=None)
+    channel.post_guide()
+    assert feed.posts == []
+    assert len(feed.info_feed.live) == 1
+    assert "a note about this page" in feed.info_feed.live[0]
+
+
+def test_channel_guide_notes_inner_page():
+    """When her inner life has its own channel, the guide says so —
+    thoughts and dreams aren't here, they're there."""
+    from discord.channel import Channel
+
+    feed = _StubFeed()
+    feed.inner_feed = _StubFeed()
+    channel = Channel(feed, listener=None)
+    channel.post_guide()
+    assert "the inner channel" in feed.posts[0][1]
+
+
+def test_guide_message_id_roundtrip(tmp_path):
+    """The info card's message id survives a reboot — saved, loaded."""
+    from discord.guide import load_guide_message_id, note_guide_message_id
+
+    assert load_guide_message_id(tmp_path) is None
+    note_guide_message_id(tmp_path, "12345")
+    assert load_guide_message_id(tmp_path) == "12345"
+
+
 def test_perceive_records_percept():
     """Non-speech percepts are recorded with their salience."""
     world = _make_world()

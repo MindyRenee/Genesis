@@ -119,6 +119,12 @@ Optional webhook URL for a second channel — her inner world's own
 page. When set, genesis~ thoughts and dreams post there instead of
 the shared channel.
 .TP
+.B GENESIS_DISCORD_INFO_WEBHOOK
+Optional webhook URL for a third channel — a read-only info page.
+When set, the "about this page" card (who she is, how to talk to
+her, how to read the status card) is kept there as one maintained
+message instead of posting once to the shared channel.
+.TP
 .B GENESIS_DISCORD_BOT_TOKEN
 Bot token that lets her \fIread\fR the public channel (a webhook is
 write-only).
@@ -150,8 +156,9 @@ Explicit source-tree override for unusual install layouts (see
 The only override of the canonical data directory,
 .IR ~/.local/share/genesis .
 .TP
-.IR .genesis-discord ", " .genesis-discord-bot
-Uncommitted files holding the webhook and bot token, so secrets stay
+.IR .genesis-discord ", " .genesis-discord-bot ", " .genesis-discord-inner ", "
+.IR .genesis-discord-info
+Uncommitted files holding the webhooks and bot token, so secrets stay
 out of the repo and shell history.
 .TP
 .IR $DATA_DIR/.project_root

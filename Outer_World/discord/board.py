@@ -8,6 +8,14 @@ they already post as their own readable cards. Nothing is composed —
 the board's honesty is that it can't flatter itself: the tick count
 either climbs or it doesn't.
 
+The card is written for the people who wander in, not for the
+operator who knows the internals: rows are labeled in plain words
+(mood, memory, wants — never ``F``, ``allo``, ``stm``), and the
+second line always says whether she's listening, since that's the
+first thing a visitor wants to know. The full legend lives on the
+guide card (``discord.guide``) — the board names things, it does
+not explain them.
+
 This is a *view*, not an organ: it renders state the body and mind
 already produce and hands the text to the feed. It owns no rhythm —
 ``update`` is driven by the world's tick and rate-limited to
@@ -21,6 +29,7 @@ from __future__ import annotations
 
 import logging
 import time
+from pathlib import Path
 from typing import Any
 
 from genesis_client.swallow import note_swallowed
@@ -41,14 +50,16 @@ _BOARD_WAVES = (
     ("gamma", "γ"),
 )
 # The chemistry channels an observer reads as regulation: reward,
-# mood, vigilance, stress, sleep pressure, sleep onset.
+# mood, vigilance, stress, sleep pressure, sleep onset. The left
+# word is what the row calls it on the card — plain names a reader
+# already owns.
 _BOARD_CHEMS = (
-    ("da", "dopamine"),
-    ("5ht", "serotonin"),
-    ("ne", "norepinephrine"),
-    ("cort", "cortisol"),
-    ("aden", "adenosine"),
-    ("mel", "melatonin"),
+    ("reward", "dopamine"),
+    ("calm", "serotonin"),
+    ("alert", "norepinephrine"),
+    ("stress", "cortisol"),
+    ("tired", "adenosine"),
+    ("sleepy", "melatonin"),
 )
 # Dominant-band frequency ranges (Hz) — the wave labels carry their
 # physical scale, not just a name.
@@ -71,14 +82,14 @@ _BOARD_WAVE_HZ = {
 # becomes indented continuation lines under the same label column;
 # readings are never clipped, only reflowed.
 _BOARD_WIDTH = 36
-# Width of the label column every board row shares ("waves    ").
+# Width of the label column every board row shares ("mood     ").
 _BOARD_LABEL = 9
 
 
 def _board_pack(label: str, bits: list[str]) -> list[str]:
     """Pack one labeled row of readings into ≤_BOARD_WIDTH lines.
 
-    `bits` are self-contained readings ("δ 0.09", "F 0.412") joined
+    `bits` are self-contained readings ("δ 0.09", "short 41") joined
     by single spaces; the first line carries the label, continuations
     indent under the value column. A single bit wider than the value
     column still gets its own line — the row goes long rather than
@@ -113,6 +124,16 @@ def _board_power(v: float) -> str:
     return f"{v:.2f}"
 
 
+def _board_rate(v: float) -> str:
+    """A big per-second rate in the compact form people actually
+    read — ``1,204,882`` is noise on a phone; ``1.2M`` is a number."""
+    if v >= 1_000_000:
+        return f"{v / 1e6:.1f}M"
+    if v >= 1_000:
+        return f"{v / 1e3:.1f}K"
+    return f"{v:.0f}"
+
+
 class ChannelBoard:
     """Her page's instrument card — renders vitals, posts via the feed.
 
@@ -126,6 +147,7 @@ class ChannelBoard:
     def __init__(self, host: Any) -> None:
         self._h = host
         self._next_board_at = 0.0
+        self._guide_id_saved = False
 
     def update(self, now: float) -> None:
         """Push the card to her channel on a fixed cadence."""
@@ -138,6 +160,32 @@ class ChannelBoard:
             feed.update_live_text(self.board_text())
         except Exception as e:  # noqa: BLE001
             note_swallowed("discord.board.update", e)
+        self._save_guide_id(feed)
+
+    def _save_guide_id(self, feed: Any) -> None:
+        """Persist the info card's message id once the poster reports it.
+
+        The guide posts at page-open time but the feed assigns its
+        message id asynchronously on the poster thread; the board's
+        cadence is the convenient place to notice the id arriving and
+        write it down, so the next boot edits the same card instead
+        of stacking a fresh one on the info page.
+        """
+        if self._guide_id_saved:
+            return
+        info = getattr(feed, "info_feed", None)
+        mid = getattr(info, "live_message_id", None) if info is not None else None
+        if not mid:
+            return
+        try:
+            from discord.guide import note_guide_message_id
+
+            data_dir = getattr(self._h, "data_dir", None)
+            if data_dir:
+                note_guide_message_id(Path(data_dir), str(mid))
+            self._guide_id_saved = True
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("discord.board.guide_id", e)
 
     def board_text(self) -> str:
         """Render the card — her vitals, not her voice."""
@@ -152,9 +200,29 @@ class ChannelBoard:
             lines[0] += " · daemon unreachable"
         else:
             lines[0] += f" · {core.phase_name}"
+        lines.extend(self._visitor_lines(sleeping))
+        if core is not None:
             self._core_lines(core, lines)
         self._footer_lines(core, lines)
         return "```\n" + "\n".join(lines) + "\n```"
+
+    def _visitor_lines(self, sleeping: bool) -> list[str]:
+        """The lines a stranger needs first: can she hear me, and
+        where does one learn what all this means."""
+        channel = getattr(getattr(self._h, "world", None), "channel", None)
+        ear = channel.ear if channel is not None else "off"
+        if sleeping:
+            talk = "sleeping — she can't hear you"
+        elif ear == "on":
+            talk = "listening — say hi here"
+        elif ear == "deaf":
+            talk = "she can't hear right now"
+        else:
+            talk = "she can't hear this channel"
+        lines = [talk]
+        if getattr(getattr(channel, "feed", None), "info_feed", None) is not None:
+            lines.append("the info channel explains this")
+        return lines
 
     def _core_lines(self, core, lines: list[str]) -> None:
         """Board rows sourced from the daemon's CoreState."""
@@ -178,20 +246,20 @@ class ChannelBoard:
                 if w.value == name
             ]
             if bits:
-                lines.extend(_board_pack("waves", bits))
+                lines.extend(_board_pack("brain", bits))
                 dominant = getattr(waves, "dominant", None)
                 if dominant is not None:
                     hz = _BOARD_WAVE_HZ.get(dominant.value, "?")
-                    lines.append(f"dom      {dominant.value} {hz} Hz")
+                    lines.append(f"mostly   {dominant.value} {hz} Hz")
         except Exception as e:  # noqa: BLE001
             logger.debug(f"brain_waves failed on board line: {e}")
         lines.extend(
             _board_pack(
-                "affect",
+                "mood",
                 [
-                    f"v {core.valence:+.2f}",
-                    f"a {core.arousal:.2f}",
-                    f"tone {core.global_tone:.2f}",
+                    f"{core.valence:+.2f}",
+                    f"energy {core.arousal:.2f}",
+                    f"balance {core.global_tone:.2f}",
                 ],
             )
         )
@@ -199,17 +267,17 @@ class ChannelBoard:
         if inf is not None:
             lines.extend(
                 _board_pack(
-                    "infer",
+                    "mind",
                     [
-                        f"F {inf.free_energy:.3f}",
-                        f"prec {inf.precision:.2f}",
-                        f"surp {inf.surprise_ema:.3f}",
-                        f"allo {inf.allostasis_load:.2f}",
-                        f"model {inf.model_maturity:.2f}",
+                        f"focus {inf.precision:.2f}",
+                        f"confusion {inf.free_energy:.3f}",
+                        f"surprise {inf.surprise_ema:.3f}",
+                        f"stress {inf.allostasis_load:.2f}",
+                        f"knows world {inf.model_maturity:.2f}",
                     ],
                 )
             )
-            lines.append(f"tick     {inf.inference_tick_count:,}")
+            lines.append(f"thoughts {inf.inference_tick_count:,}")
         chem = core.chemicals or {}
         bits = [f"{short} {chem[name]:.2f}" for short, name in _BOARD_CHEMS if name in chem]
         if bits:
@@ -221,7 +289,9 @@ class ChannelBoard:
             stm_live = h.client.get_memory_stats().stm_count
         except Exception:  # noqa: BLE001
             stm_live = core.stm_count
-        lines.extend(_board_pack("mem", [f"stm {stm_live}", f"ltm {core.ltm_episode_count:,}"]))
+        lines.extend(
+            _board_pack("memory", [f"short {stm_live}", f"long {core.ltm_episode_count:,}"])
+        )
 
     def _field_lines(self, lines: list[str]) -> None:
         """Rows for the substrate's measured physical life.
@@ -238,39 +308,39 @@ class ChannelBoard:
         except Exception:  # noqa: BLE001
             probe = None
         if probe is None:
-            lines.append("field    probe off")
+            lines.append("machine  probe off")
             return
         field_bits = [
-            f"carrier {probe.carrier_freq:.1f} Hz",
-            f"thru {probe.throughput_mean:,.0f} it/s",
-            f"jit {probe.jitter_cv:.2f}",
+            f"{probe.carrier_freq:.1f} Hz",
+            f"{_board_rate(probe.throughput_mean)} ops/s",
+            f"jitter {probe.jitter_cv:.2f}",
             f"irq {probe.irq_rate:,.0f}/s",
         ]
         if probe.carrier_coherence is not None:
-            field_bits.append(f"coh {probe.carrier_coherence:.2f}")
-        lines.extend(_board_pack("field", field_bits))
+            field_bits.append(f"steady {probe.carrier_coherence:.2f}")
+        lines.extend(_board_pack("machine", field_bits))
         elec_bits = []
         if probe.power_watts is not None:
-            elec_bits.append(f"pwr {probe.power_watts:.1f} W")
+            elec_bits.append(f"{probe.power_watts:.1f} W")
         if probe.rail_volts is not None:
             elec_bits.append(f"{probe.rail_volts:.2f} V")
         if probe.supply_amps is not None:
             elec_bits.append(f"{probe.supply_amps:.2f} A")
         if probe.power_coherence is not None:
-            elec_bits.append(f"pcoh {probe.power_coherence:.2f}")
+            elec_bits.append(f"steady {probe.power_coherence:.2f}")
         if elec_bits:
-            lines.extend(_board_pack("elec", elec_bits))
+            lines.extend(_board_pack("power", elec_bits))
         # The radio sense — the room's RF environment: WLAN
         # field strength + traffic flux, Bluetooth HCI event
         # flux. None-gated like everything else — absent radios
         # print nothing.
         rf_bits = []
         if probe.rf_rssi_dbm is not None:
-            rf_bits.append(f"rssi {probe.rf_rssi_dbm:.0f} dBm")
+            rf_bits.append(f"wifi {probe.rf_rssi_dbm:.0f} dBm")
         if probe.rf_noise_dbm is not None:
-            rf_bits.append(f"n {probe.rf_noise_dbm:.0f}")
+            rf_bits.append(f"noise {probe.rf_noise_dbm:.0f}")
         if probe.rf_bytes_s is not None:
-            rf_bits.append(f"{probe.rf_bytes_s:,.0f} B/s")
+            rf_bits.append(f"data {_board_rate(probe.rf_bytes_s)} B/s")
         if probe.bt_events_s is not None:
             rf_bits.append(f"bt {probe.bt_events_s:.0f} ev/s")
         if probe.bt_rssi_dbm is not None:
@@ -283,15 +353,15 @@ class ChannelBoard:
             )
             rf_bits.append(f"strain {strain:.1f}/s")
         if probe.rf_tx_mbps is not None:
-            rf_bits.append(f"{probe.rf_tx_mbps:.0f} Mbps")
+            rf_bits.append(f"tx {probe.rf_tx_mbps:.0f} Mbps")
         if rf_bits:
-            lines.extend(_board_pack("rf", rf_bits))
+            lines.extend(_board_pack("radio", rf_bits))
 
     def _cell_line(self, lines: list[str]) -> None:
         """The cell's modeled electrochemical state — the ion model's
         membrane potential is a Nernst-model quantity (simulated),
         not a measured rail; the real rail, when a sensor reports
-        it, is on the elec line above."""
+        it, is on the power line above."""
         h = self._h
         try:
             ions = h.client.get_ion_summary()
@@ -299,11 +369,11 @@ class ChannelBoard:
                 _board_pack(
                     "cell",
                     [
-                        f"Vm {ions.membrane_potential_mv:+.1f} mV",
-                        f"I {ions.net_membrane_current:.2f}",
-                        f"exc {ions.excitability:.2f}",
-                        f"grad {ions.gradient_integrity:.2f}",
-                        f"atp {ions.atp_availability:.2f}",
+                        f"volts {ions.membrane_potential_mv:+.1f} mV",
+                        f"flow {ions.net_membrane_current:.2f}",
+                        f"fire {ions.excitability:.2f}",
+                        f"gradient {ions.gradient_integrity:.2f}",
+                        f"energy {ions.atp_availability:.2f}",
                     ],
                 )
             )
@@ -339,18 +409,18 @@ class ChannelBoard:
             digest = getattr(bench, "digest", lambda: "")()
             if digest:
                 proof_bits.append(f"#{digest}")
-            lines.extend(_board_pack("proof", proof_bits))
+            lines.extend(_board_pack("research", proof_bits))
         # Growth she can be measured by — concept tally, edge tally,
         # and the plasticity gate that throttles learning.
         try:
             net = h.network
-            grow_bits = [f"{net.size} concepts", f"{net.edge_count} edges"]
+            grow_bits = [f"{net.size} ideas", f"{net.edge_count} links"]
             archive = getattr(net, "archive_size", 0)
             if archive:
                 grow_bits.append(f"{archive} archived")
             if core is not None:
-                grow_bits.append(f"plast {core.plasticity_gate:.2f}")
-            lines.extend(_board_pack("grow", grow_bits))
+                grow_bits.append(f"learning {core.plasticity_gate:.2f}")
+            lines.extend(_board_pack("learned", grow_bits))
         except Exception as e:  # noqa: BLE001
             logger.debug(f"growth row failed on board line: {e}")
         # The cause — which drives are pulling at her right now.
@@ -363,7 +433,7 @@ class ChannelBoard:
             )
             top = [f"{name} {value:.2f}" for name, value in urges[:3] if value > 0.01]
             if top:
-                lines.extend(_board_pack("drive", top))
+                lines.extend(_board_pack("wants", top))
         except Exception as e:  # noqa: BLE001
             logger.debug(f"drive row failed on board line: {e}")
         up_s = max(
@@ -371,12 +441,9 @@ class ChannelBoard:
             int(time.time() - getattr(h, "_session_started_at", time.time())),
         )
         hours, minutes = divmod(up_s // 60, 60)
-        channel = getattr(getattr(h, "world", None), "channel", None)
-        ear = channel.ear if channel is not None else "off"
         meta_bits = [
             f"up {hours}h{minutes:02d}m",
-            f"conv {getattr(h, '_interaction_count', 0)}",
-            f"ear {ear}",
+            f"{getattr(h, '_interaction_count', 0)} chats",
         ]
         if core is not None:
             # Freshness and continuity proofs: the raw 5 Hz body
@@ -386,7 +453,7 @@ class ChannelBoard:
             age_ms = max(0.0, time.time() * 1000 - core.last_updated)
             meta_bits += [
                 f"hb {core.heartbeat:,}",
-                f"age {age_ms / 1000:.1f}s",
+                f"fresh {age_ms / 1000:.1f}s",
                 f"id {core.instance_id}",
             ]
         lines.extend(_board_pack("meta", meta_bits))
