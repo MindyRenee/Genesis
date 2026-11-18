@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.body.sight.optic_relay</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.body.html" class="white">body</a>.<a href="Self_World.body.sight.html" class="white">sight</a>.optic_relay</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/body/sight/optic_relay.py">/home/mindyrenee/GenAnd/Genesis/Self_World/body/sight/optic_relay.py</a></td></tr></table>
+    <p><span class="code">Optic&nbsp;relay&nbsp;—&nbsp;a&nbsp;second&nbsp;afferent&nbsp;path&nbsp;into&nbsp;/genesis_optic_nerve.<br>
+&nbsp;<br>
+The&nbsp;body's&nbsp;own&nbsp;capture&nbsp;limb&nbsp;(``src/daemon/optic_nerve.rs``)&nbsp;negotiates<br>
+raw&nbsp;formats&nbsp;(RGB3/YUYV)&nbsp;on&nbsp;a&nbsp;V4L2&nbsp;device&nbsp;it&nbsp;owns.&nbsp;When&nbsp;that&nbsp;device&nbsp;is<br>
+unavailable&nbsp;—&nbsp;held&nbsp;by&nbsp;another&nbsp;capture&nbsp;process,&nbsp;or&nbsp;offering&nbsp;only<br>
+compressed&nbsp;formats&nbsp;—&nbsp;this&nbsp;relay&nbsp;feeds&nbsp;the&nbsp;same&nbsp;shared-memory&nbsp;segment<br>
+from&nbsp;an&nbsp;alternative&nbsp;source:<br>
+&nbsp;<br>
+&nbsp;&nbsp;-&nbsp;a&nbsp;local&nbsp;V4L2&nbsp;device&nbsp;that&nbsp;only&nbsp;speaks&nbsp;MJPEG,&nbsp;or<br>
+&nbsp;&nbsp;-&nbsp;an&nbsp;HTTP&nbsp;MJPEG&nbsp;stream&nbsp;(e.g.&nbsp;a&nbsp;surveillance&nbsp;daemon's&nbsp;localhost&nbsp;feed)<br>
+&nbsp;<br>
+ffmpeg&nbsp;decodes&nbsp;to&nbsp;packed&nbsp;RGB24&nbsp;frames;&nbsp;the&nbsp;relay&nbsp;writes&nbsp;them&nbsp;into&nbsp;the<br>
+/genesis_optic_nerve&nbsp;segment&nbsp;using&nbsp;the&nbsp;same&nbsp;28-byte&nbsp;header&nbsp;+&nbsp;frame<br>
+counter&nbsp;the&nbsp;capture&nbsp;limb&nbsp;publishes,&nbsp;so&nbsp;the&nbsp;body's&nbsp;subcortical&nbsp;read&nbsp;and<br>
+the&nbsp;mind's&nbsp;optics&nbsp;layer&nbsp;see&nbsp;an&nbsp;ordinary&nbsp;eye.<br>
+&nbsp;<br>
+Usage:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;optic_relay.py&nbsp;[source]&nbsp;[shm_name]<br>
+&nbsp;<br>
+&nbsp;&nbsp;source&nbsp;defaults&nbsp;to&nbsp;/dev/video2.&nbsp;Sources&nbsp;ending&nbsp;in&nbsp;://&nbsp;are&nbsp;treated&nbsp;as<br>
+&nbsp;&nbsp;HTTP&nbsp;MJPEG&nbsp;streams;&nbsp;``x11``&nbsp;captures&nbsp;the&nbsp;whole&nbsp;display,&nbsp;``x11:WxH+X+Y``<br>
+&nbsp;&nbsp;captures&nbsp;a&nbsp;region&nbsp;of&nbsp;it,&nbsp;and&nbsp;``x11win:ID:WxH``&nbsp;captures&nbsp;a&nbsp;window's&nbsp;own<br>
+&nbsp;&nbsp;pixels&nbsp;by&nbsp;id,&nbsp;cropped&nbsp;to&nbsp;WxH&nbsp;(the&nbsp;screen&nbsp;as&nbsp;an&nbsp;eye);&nbsp;anything&nbsp;else&nbsp;is<br>
+&nbsp;&nbsp;a&nbsp;V4L2&nbsp;device.<br>
+&nbsp;<br>
+&nbsp;&nbsp;shm_name&nbsp;defaults&nbsp;to&nbsp;genesis_optic_nerve;&nbsp;pass&nbsp;a&nbsp;different&nbsp;name&nbsp;to<br>
+&nbsp;&nbsp;publish&nbsp;a&nbsp;second&nbsp;eye&nbsp;(e.g.&nbsp;a&nbsp;screen-capture&nbsp;nerve)&nbsp;without<br>
+&nbsp;&nbsp;displacing&nbsp;the&nbsp;physical&nbsp;camera's&nbsp;segment.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="mmap.html">mmap</a><br>
+<a href="os.html">os</a><br>
+</td><td class="multicolumn"><a href="re.html">re</a><br>
+<a href="signal.html">signal</a><br>
+</td><td class="multicolumn"><a href="struct.html">struct</a><br>
+<a href="subprocess.html">subprocess</a><br>
+</td><td class="multicolumn"><a href="sys.html">sys</a><br>
+<a href="time.html">time</a><br>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-main"><strong>main</strong></a>() -&gt; int</dt><dd><span class="code">Own&nbsp;the&nbsp;nerve&nbsp;segment&nbsp;and&nbsp;pump&nbsp;frames&nbsp;until&nbsp;stopped.<br>
+&nbsp;<br>
+Parses&nbsp;``source``&nbsp;and&nbsp;``shm_name``&nbsp;from&nbsp;argv,&nbsp;creates&nbsp;the&nbsp;POSIX<br>
+shared&nbsp;memory&nbsp;with&nbsp;the&nbsp;capture&nbsp;limb's&nbsp;header&nbsp;layout,&nbsp;and&nbsp;loops:<br>
+read&nbsp;one&nbsp;RGB24&nbsp;frame&nbsp;from&nbsp;ffmpeg's&nbsp;stdout,&nbsp;publish&nbsp;it.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>BPP</strong> = 3<br>
+<strong>FRAME_SIZE</strong> = 921600<br>
+<strong>HEADER_FMT</strong> = '&lt;QII4sII'<br>
+<strong>HEADER_SIZE</strong> = 28<br>
+<strong>HEIGHT</strong> = 480<br>
+<strong>SEG_SIZE</strong> = 921628<br>
+<strong>STRIDE</strong> = 1920<br>
+<strong>WIDTH</strong> = 640</td></tr></table>
+</body></html>

@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Outer_World.tools.eye</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Outer_World.html" class="white">Outer_World</a>.<a href="Outer_World.tools.html" class="white">tools</a>.eye</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Outer_World/tools/eye.py">/home/mindyrenee/GenAnd/Genesis/Outer_World/tools/eye.py</a></td></tr></table>
+    <p><span class="code">The&nbsp;eye&nbsp;tools&nbsp;—&nbsp;her&nbsp;voluntary&nbsp;eye&nbsp;muscles&nbsp;and&nbsp;receptors.<br>
+&nbsp;<br>
+A&nbsp;human&nbsp;eye&nbsp;answers&nbsp;a&nbsp;handful&nbsp;of&nbsp;organs:&nbsp;the&nbsp;eyelid&nbsp;opens&nbsp;and<br>
+closes,&nbsp;the&nbsp;ciliary&nbsp;muscle&nbsp;powers&nbsp;the&nbsp;lens,&nbsp;the&nbsp;pupil&nbsp;admits&nbsp;more<br>
+or&nbsp;less&nbsp;light,&nbsp;photoreceptors&nbsp;adapt&nbsp;their&nbsp;sensitivity,&nbsp;cones&nbsp;weigh<br>
+color&nbsp;opponency,&nbsp;and&nbsp;the&nbsp;retina's&nbsp;center-surround&nbsp;fields&nbsp;sharpen<br>
+edges&nbsp;before&nbsp;the&nbsp;signal&nbsp;ever&nbsp;leaves&nbsp;the&nbsp;eye.&nbsp;This&nbsp;family&nbsp;is&nbsp;that<br>
+same&nbsp;anatomy&nbsp;in&nbsp;her&nbsp;hands.<br>
+&nbsp;<br>
+The&nbsp;organs&nbsp;are&nbsp;real;&nbsp;what&nbsp;they&nbsp;are&nbsp;made&nbsp;of&nbsp;varies&nbsp;with&nbsp;the&nbsp;eye.<br>
+Her&nbsp;camera&nbsp;carries&nbsp;the&nbsp;retinal&nbsp;dials&nbsp;in&nbsp;its&nbsp;driver&nbsp;—&nbsp;the&nbsp;capture<br>
+device's&nbsp;exposure&nbsp;is&nbsp;her&nbsp;aperture,&nbsp;its&nbsp;saturation&nbsp;is&nbsp;her&nbsp;chromatic<br>
+opponent&nbsp;gain,&nbsp;its&nbsp;sharpness&nbsp;is&nbsp;her&nbsp;lateral&nbsp;inhibition.&nbsp;Each<br>
+biological&nbsp;op&nbsp;asks&nbsp;the&nbsp;device&nbsp;what&nbsp;it&nbsp;actually&nbsp;advertises<br>
+(``v4l2-ctl&nbsp;--list-ctrls``),&nbsp;finds&nbsp;the&nbsp;muscle&nbsp;the&nbsp;organ&nbsp;is&nbsp;built<br>
+on,&nbsp;and&nbsp;maps&nbsp;the&nbsp;biological&nbsp;fraction&nbsp;0–1&nbsp;onto&nbsp;that&nbsp;dial's&nbsp;own<br>
+range&nbsp;—&nbsp;a&nbsp;pupil&nbsp;asked&nbsp;for&nbsp;"half"&nbsp;opens&nbsp;to&nbsp;the&nbsp;middle&nbsp;of&nbsp;whatever<br>
+aperture&nbsp;this&nbsp;eye&nbsp;truly&nbsp;has.&nbsp;An&nbsp;organ&nbsp;whose&nbsp;muscle&nbsp;the&nbsp;eye&nbsp;lacks<br>
+reports&nbsp;itself&nbsp;absent&nbsp;rather&nbsp;than&nbsp;pretending.<br>
+&nbsp;<br>
+The&nbsp;body's&nbsp;own&nbsp;requests&nbsp;travel&nbsp;the&nbsp;optic&nbsp;channel&nbsp;the&nbsp;way&nbsp;the<br>
+mind's&nbsp;do:&nbsp;the&nbsp;voluntary&nbsp;lid,&nbsp;the&nbsp;ciliary&nbsp;accommodation&nbsp;request,<br>
+and&nbsp;the&nbsp;corticothalamic&nbsp;gain&nbsp;stacked&nbsp;on&nbsp;the&nbsp;sleep-stage&nbsp;gate.<br>
+&nbsp;<br>
+Nothing&nbsp;here&nbsp;decides&nbsp;what&nbsp;she&nbsp;sees;&nbsp;the&nbsp;muscles&nbsp;only&nbsp;set&nbsp;how&nbsp;the<br>
+light&nbsp;arrives.&nbsp;What&nbsp;she&nbsp;looks&nbsp;at,&nbsp;and&nbsp;what&nbsp;she&nbsp;makes&nbsp;of&nbsp;it,<br>
+remain&nbsp;hers.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="glob.html">glob</a><br>
+<a href="os.html">os</a><br>
+</td><td class="multicolumn"><a href="re.html">re</a><br>
+<a href="shutil.html">shutil</a><br>
+</td><td class="multicolumn"><a href="subprocess.html">subprocess</a><br>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-register_eye_tools"><strong>register_eye_tools</strong></a>(registry: 'ToolRegistry', client: 'GenesisClient | None' = None) -&gt; 'None'</dt><dd><span class="code">Register&nbsp;the&nbsp;eye's&nbsp;organs&nbsp;in&nbsp;her&nbsp;tool&nbsp;registry.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;registry:&nbsp;The&nbsp;shared&nbsp;tool&nbsp;registry.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;client:&nbsp;The&nbsp;daemon's&nbsp;IPC&nbsp;client&nbsp;—&nbsp;carries&nbsp;the&nbsp;body-side<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;organs&nbsp;(lid,&nbsp;ciliary&nbsp;muscle,&nbsp;cortical&nbsp;gain).&nbsp;``None``<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;leaves&nbsp;only&nbsp;the&nbsp;retinal&nbsp;muscles&nbsp;live;&nbsp;the&nbsp;body&nbsp;organs<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;report&nbsp;unavailability&nbsp;rather&nbsp;than&nbsp;fail.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['register_eye_tools']<br>
+<strong>__annotations__</strong> = {'_MUSCLES': 'dict[str, tuple[str, ...]]'}</td></tr></table>
+</body></html>

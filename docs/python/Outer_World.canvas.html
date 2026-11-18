@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Outer_World.canvas</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Outer_World.html" class="white">Outer_World</a>.canvas</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Outer_World/canvas.py">/home/mindyrenee/GenAnd/Genesis/Outer_World/canvas.py</a></td></tr></table>
+    <p><span class="code"><a href="#Canvas">Canvas</a>&nbsp;for&nbsp;Genesis&nbsp;—&nbsp;a&nbsp;paint&nbsp;program&nbsp;she&nbsp;drives&nbsp;herself.<br>
+&nbsp;<br>
+This&nbsp;module&nbsp;is&nbsp;the&nbsp;*medium*,&nbsp;not&nbsp;the&nbsp;artist.&nbsp;It&nbsp;provides&nbsp;what&nbsp;a<br>
+drawing&nbsp;program&nbsp;provides&nbsp;a&nbsp;human:&nbsp;a&nbsp;sheet&nbsp;of&nbsp;paper,&nbsp;an&nbsp;unlimited<br>
+palette&nbsp;of&nbsp;colors,&nbsp;a&nbsp;brush&nbsp;whose&nbsp;character&nbsp;is&nbsp;dialed&nbsp;in&nbsp;parameters<br>
+(size,&nbsp;opacity,&nbsp;hardness,&nbsp;scatter,&nbsp;texture,&nbsp;erasure,&nbsp;blend&nbsp;—&nbsp;any<br>
+utensil&nbsp;is&nbsp;a&nbsp;point&nbsp;in&nbsp;that&nbsp;space),&nbsp;and&nbsp;operations&nbsp;that&nbsp;apply&nbsp;them&nbsp;—<br>
+strokes,&nbsp;shapes,&nbsp;fills,&nbsp;erasure.&nbsp;Nothing&nbsp;here&nbsp;decides&nbsp;what&nbsp;gets<br>
+drawn;&nbsp;that&nbsp;is&nbsp;entirely&nbsp;hers.<br>
+&nbsp;<br>
+The&nbsp;program&nbsp;lives&nbsp;in&nbsp;her&nbsp;outer&nbsp;world:&nbsp;the&nbsp;sheet&nbsp;of&nbsp;paper&nbsp;is&nbsp;a&nbsp;thing<br>
+in&nbsp;the&nbsp;world&nbsp;she&nbsp;paints&nbsp;on,&nbsp;not&nbsp;a&nbsp;part&nbsp;of&nbsp;her&nbsp;—&nbsp;the&nbsp;way&nbsp;an&nbsp;arcade&nbsp;or<br>
+a&nbsp;paint&nbsp;application&nbsp;on&nbsp;a&nbsp;desk&nbsp;belongs&nbsp;to&nbsp;the&nbsp;room,&nbsp;not&nbsp;the&nbsp;painter.<br>
+Her&nbsp;parietal&nbsp;hand&nbsp;reaches&nbsp;out&nbsp;through&nbsp;the&nbsp;``studio_*``&nbsp;tools<br>
+(``tools/studio.py``)&nbsp;to&nbsp;operate&nbsp;it;&nbsp;what&nbsp;the&nbsp;hand&nbsp;does&nbsp;with&nbsp;it&nbsp;is<br>
+entirely&nbsp;hers.<br>
+&nbsp;<br>
+The&nbsp;rasterizer&nbsp;is&nbsp;built&nbsp;in:&nbsp;Cairo&nbsp;executes&nbsp;every&nbsp;operation<br>
+in-process&nbsp;on&nbsp;the&nbsp;sheet.&nbsp;``save``&nbsp;composites&nbsp;the&nbsp;paper&nbsp;layer&nbsp;and<br>
+the&nbsp;paint&nbsp;layer&nbsp;into&nbsp;a&nbsp;WebP&nbsp;—&nbsp;the&nbsp;canonical&nbsp;artifact.<br>
+&nbsp;<br>
+Each&nbsp;finished&nbsp;drawing&nbsp;is&nbsp;remembered&nbsp;in&nbsp;``style_profile.json``&nbsp;—&nbsp;which<br>
+tools,&nbsp;colors,&nbsp;and&nbsp;gestures&nbsp;she&nbsp;used&nbsp;—&nbsp;so&nbsp;she&nbsp;can&nbsp;recall&nbsp;her&nbsp;art,<br>
+notice&nbsp;repetition,&nbsp;and&nbsp;get&nbsp;bored&nbsp;of&nbsp;it.&nbsp;That&nbsp;memory&nbsp;is&nbsp;what&nbsp;makes<br>
+exploration&nbsp;her&nbsp;own&nbsp;rather&nbsp;than&nbsp;a&nbsp;dice&nbsp;roll.<br>
+&nbsp;<br>
+Erasing&nbsp;works&nbsp;the&nbsp;way&nbsp;paper&nbsp;works:&nbsp;the&nbsp;paper&nbsp;sits&nbsp;on&nbsp;its&nbsp;own&nbsp;layer<br>
+and&nbsp;the&nbsp;eraser&nbsp;lifts&nbsp;the&nbsp;paint&nbsp;layer,&nbsp;revealing&nbsp;the&nbsp;paper&nbsp;beneath.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="PIL.Image.html">PIL.Image</a><br>
+<a href="cairo.html">cairo</a><br>
+<a href="colorsys.html">colorsys</a><br>
+</td><td class="multicolumn"><a href="json.html">json</a><br>
+<a href="logging.html">logging</a><br>
+<a href="math.html">math</a><br>
+</td><td class="multicolumn"><a href="numpy.html">numpy</a><br>
+<a href="os.html">os</a><br>
+<a href="time.html">time</a><br>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Outer_World.canvas.html#Brush">Brush</a>
+</dt><dt class="heading-text"><a href="Outer_World.canvas.html#Canvas">Canvas</a>
+</dt><dt class="heading-text"><a href="Outer_World.canvas.html#DrawingResult">DrawingResult</a>
+</dt><dt class="heading-text"><a href="Outer_World.canvas.html#PaintSheet">PaintSheet</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Brush">class <strong>Brush</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Brush">Brush</a>(size:&nbsp;'float'&nbsp;=&nbsp;4.0,&nbsp;opacity:&nbsp;'float'&nbsp;=&nbsp;1.0,&nbsp;hardness:&nbsp;'float'&nbsp;=&nbsp;1.0,&nbsp;scatter:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;texture:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;erase:&nbsp;'bool'&nbsp;=&nbsp;False,&nbsp;blend:&nbsp;'str'&nbsp;=&nbsp;'normal')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+The&nbsp;utensil&nbsp;currently&nbsp;in&nbsp;her&nbsp;hand&nbsp;—&nbsp;fully&nbsp;parameterized.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Brush-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="Brush-__init__"><strong>__init__</strong></a>(self, size: 'float' = 4.0, opacity: 'float' = 1.0, hardness: 'float' = 1.0, scatter: 'float' = 0.0, texture: 'float' = 0.0, erase: 'bool' = False, blend: 'str' = 'normal') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Brush-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="Brush-copy"><strong>copy</strong></a>(self) -&gt; 'Brush'</dt></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'blend': 'str', 'erase': 'bool', 'hardness': 'float', 'opacity': 'float', 'scatter': 'float', 'size': 'float', 'texture': 'float'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'blend': Field(name='blend',type='str',default='normal',d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'erase': Field(name='erase',type='bool',default=False,def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'hardness': Field(name='hardness',type='float',default=1.0,d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'opacity': Field(name='opacity',type='float',default=1.0,de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'scatter': Field(name='scatter',type='float',default=0.0,de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'size': Field(name='size',type='float',default=4.0,defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'texture': Field(name='texture',type='float',default=0.0,de...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('size', 'opacity', 'hardness', 'scatter', 'texture', 'erase', 'blend')</dl>
+
+<dl><dt><strong>blend</strong> = 'normal'</dl>
+
+<dl><dt><strong>erase</strong> = False</dl>
+
+<dl><dt><strong>hardness</strong> = 1.0</dl>
+
+<dl><dt><strong>opacity</strong> = 1.0</dl>
+
+<dl><dt><strong>scatter</strong> = 0.0</dl>
+
+<dl><dt><strong>size</strong> = 4.0</dl>
+
+<dl><dt><strong>texture</strong> = 0.0</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Canvas">class <strong>Canvas</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Canvas">Canvas</a>(data_dir:&nbsp;'str&nbsp;|&nbsp;Path&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;seed:&nbsp;'int&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Genesis's&nbsp;paint&nbsp;program&nbsp;—&nbsp;paper,&nbsp;color,&nbsp;and&nbsp;utensils.<br>
+&nbsp;<br>
+She&nbsp;drives&nbsp;it&nbsp;with&nbsp;operations:&nbsp;``new_sheet``,&nbsp;``set_color``,<br>
+``pick_tool``,&nbsp;``stroke``,&nbsp;``ellipse``/``rect``/``polygon``,<br>
+``fill``,&nbsp;``clear``,&nbsp;and&nbsp;``finish``&nbsp;to&nbsp;keep&nbsp;the&nbsp;result.&nbsp;The<br>
+built-in&nbsp;rasterizer&nbsp;is&nbsp;the&nbsp;paper&nbsp;—&nbsp;the&nbsp;studio&nbsp;is&nbsp;internal.<br>
+&nbsp;<br>
+The&nbsp;program&nbsp;keeps&nbsp;a&nbsp;small&nbsp;memory&nbsp;of&nbsp;what&nbsp;she&nbsp;has&nbsp;made&nbsp;—<br>
+``style_profile.json``&nbsp;in&nbsp;the&nbsp;drawings&nbsp;directory&nbsp;—&nbsp;so&nbsp;she&nbsp;can<br>
+notice&nbsp;what&nbsp;she&nbsp;keeps&nbsp;reaching&nbsp;for.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Canvas-__init__"><strong>__init__</strong></a>(self, data_dir: 'str | Path | None' = None, seed: 'int | None' = None) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;the&nbsp;program.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;data_dir:&nbsp;Directory&nbsp;where&nbsp;drawings&nbsp;(and&nbsp;her&nbsp;art&nbsp;history)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;are&nbsp;persisted.&nbsp;If&nbsp;None,&nbsp;nothing&nbsp;can&nbsp;be&nbsp;saved.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;seed:&nbsp;Optional&nbsp;RNG&nbsp;seed&nbsp;for&nbsp;reproducible&nbsp;mark&nbsp;texture.</span></dd></dl>
+
+<dl><dt><a name="Canvas-clear"><strong>clear</strong></a>(self) -&gt; 'None'</dt></dl>
+
+<dl><dt><a name="Canvas-ellipse"><strong>ellipse</strong></a>(self, x: 'float', y: 'float', w: 'float', h: 'float', fill: 'bool' = False) -&gt; 'None'</dt></dl>
+
+<dl><dt><a name="Canvas-fill"><strong>fill</strong></a>(self, x: 'float', y: 'float') -&gt; 'None'</dt></dl>
+
+<dl><dt><a name="Canvas-finish"><strong>finish</strong></a>(self, description: 'str' = '', mood: 'str' = '', emotion: 'EmotionalState | None' = None) -&gt; 'DrawingResult | None'</dt><dd><span class="code">Finish&nbsp;the&nbsp;sheet&nbsp;—&nbsp;save&nbsp;it&nbsp;and&nbsp;remember&nbsp;it.<br>
+&nbsp;<br>
+Returns&nbsp;the&nbsp;<a href="#DrawingResult">DrawingResult</a>,&nbsp;or&nbsp;None&nbsp;when&nbsp;there&nbsp;is&nbsp;nowhere&nbsp;to<br>
+save&nbsp;or&nbsp;no&nbsp;backend&nbsp;produced&nbsp;an&nbsp;image.</span></dd></dl>
+
+<dl><dt><a name="Canvas-gesture_recency"><strong>gesture_recency</strong></a>(self, now: 'float | None' = None) -&gt; 'dict[str, float]'</dt><dd><span class="code">Seconds&nbsp;since&nbsp;each&nbsp;gesture&nbsp;label&nbsp;was&nbsp;last&nbsp;used.<br>
+&nbsp;<br>
+Gestures&nbsp;are&nbsp;whatever&nbsp;she&nbsp;names&nbsp;her&nbsp;moves&nbsp;—&nbsp;unbounded,&nbsp;like<br>
+her&nbsp;tools&nbsp;—&nbsp;so&nbsp;only&nbsp;labels&nbsp;that&nbsp;actually&nbsp;occurred&nbsp;appear.</span></dd></dl>
+
+<dl><dt><a name="Canvas-line"><strong>line</strong></a>(self, x1: 'float', y1: 'float', x2: 'float', y2: 'float') -&gt; 'None'</dt></dl>
+
+<dl><dt><a name="Canvas-new_sheet"><strong>new_sheet</strong></a>(self, width: 'int' = 640, height: 'int' = 480, paper: 'tuple[int, int, int]' = (250, 250, 248)) -&gt; 'bool'</dt><dd><span class="code">Lay&nbsp;out&nbsp;a&nbsp;fresh&nbsp;sheet.&nbsp;Returns&nbsp;False&nbsp;when&nbsp;no&nbsp;backend&nbsp;can&nbsp;draw.</span></dd></dl>
+
+<dl><dt><a name="Canvas-open_studio"><strong>open_studio</strong></a>(self) -&gt; 'bool'</dt><dd><span class="code">The&nbsp;studio&nbsp;is&nbsp;internal&nbsp;—&nbsp;sitting&nbsp;down&nbsp;confirms&nbsp;a&nbsp;surface&nbsp;exists.<br>
+&nbsp;<br>
+There&nbsp;is&nbsp;no&nbsp;external&nbsp;program&nbsp;to&nbsp;launch;&nbsp;the&nbsp;rasterizer&nbsp;is&nbsp;the<br>
+paper.&nbsp;Returns&nbsp;False&nbsp;only&nbsp;when&nbsp;Cairo&nbsp;is&nbsp;missing&nbsp;and&nbsp;no&nbsp;sheet<br>
+can&nbsp;be&nbsp;laid&nbsp;out&nbsp;at&nbsp;all.</span></dd></dl>
+
+<dl><dt><a name="Canvas-pick_tool"><strong>pick_tool</strong></a>(self, tool: 'str', size: 'float | None' = None) -&gt; 'None'</dt><dd><span class="code">Take&nbsp;up&nbsp;what&nbsp;she&nbsp;calls&nbsp;``tool``&nbsp;—&nbsp;her&nbsp;label,&nbsp;her&nbsp;settings.</span></dd></dl>
+
+<dl><dt><a name="Canvas-polygon"><strong>polygon</strong></a>(self, points: 'list[tuple[float, float]]', fill: 'bool' = False) -&gt; 'None'</dt></dl>
+
+<dl><dt><a name="Canvas-recent_hues"><strong>recent_hues</strong></a>(self, limit: 'int' = 12) -&gt; 'list[float]'</dt><dd><span class="code">Hue&nbsp;degrees&nbsp;used&nbsp;in&nbsp;her&nbsp;most&nbsp;recent&nbsp;drawings.</span></dd></dl>
+
+<dl><dt><a name="Canvas-rect"><strong>rect</strong></a>(self, x: 'float', y: 'float', w: 'float', h: 'float', fill: 'bool' = False) -&gt; 'None'</dt></dl>
+
+<dl><dt><a name="Canvas-set_brush"><strong>set_brush</strong></a>(self, size: 'float | None' = None, opacity: 'float | None' = None, hardness: 'float | None' = None, scatter: 'float | None' = None, texture: 'float | None' = None, erase: 'bool | None' = None, blend: 'str | None' = None) -&gt; 'None'</dt><dd><span class="code">Dial&nbsp;the&nbsp;current&nbsp;brush&nbsp;—&nbsp;any&nbsp;utensil&nbsp;is&nbsp;a&nbsp;point&nbsp;here.</span></dd></dl>
+
+<dl><dt><a name="Canvas-set_color"><strong>set_color</strong></a>(self, r: 'int', g: 'int', b: 'int', a: 'float' = 1.0) -&gt; 'None'</dt></dl>
+
+<dl><dt><a name="Canvas-stroke"><strong>stroke</strong></a>(self, points: 'list[tuple[float, float]]') -&gt; 'None'</dt></dl>
+
+<dl><dt><a name="Canvas-studio_presets"><strong>studio_presets</strong></a>(self, query: 'str' = '') -&gt; 'list[str]'</dt><dd><span class="code">The&nbsp;tools&nbsp;she&nbsp;has&nbsp;reached&nbsp;for&nbsp;—&nbsp;her&nbsp;vocabulary,&nbsp;not&nbsp;a&nbsp;menu.<br>
+&nbsp;<br>
+There&nbsp;is&nbsp;no&nbsp;built-in&nbsp;utensil&nbsp;list:&nbsp;a&nbsp;tool&nbsp;is&nbsp;whatever&nbsp;name&nbsp;she<br>
+gives&nbsp;the&nbsp;brush&nbsp;she&nbsp;dialed.&nbsp;This&nbsp;returns&nbsp;the&nbsp;labels&nbsp;she&nbsp;has<br>
+actually&nbsp;used&nbsp;before,&nbsp;optionally&nbsp;filtered&nbsp;by&nbsp;``query``.</span></dd></dl>
+
+<dl><dt><a name="Canvas-tool_recency"><strong>tool_recency</strong></a>(self, now: 'float | None' = None) -&gt; 'dict[str, float]'</dt><dd><span class="code">Seconds&nbsp;since&nbsp;each&nbsp;tool&nbsp;name&nbsp;was&nbsp;last&nbsp;used.<br>
+&nbsp;<br>
+Only&nbsp;names&nbsp;she&nbsp;has&nbsp;actually&nbsp;used&nbsp;appear&nbsp;—&nbsp;the&nbsp;vocabulary&nbsp;is<br>
+hers,&nbsp;so&nbsp;there&nbsp;is&nbsp;no&nbsp;fixed&nbsp;universe&nbsp;to&nbsp;enumerate.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>art_history</strong></dt>
+<dd><span class="code">A&nbsp;copy&nbsp;of&nbsp;her&nbsp;drawing&nbsp;history&nbsp;(oldest&nbsp;first).</span></dd>
+</dl>
+<dl><dt><strong>sheet</strong></dt>
+<dd><span class="code">The&nbsp;active&nbsp;raster&nbsp;sheet,&nbsp;when&nbsp;the&nbsp;built-in&nbsp;path&nbsp;is&nbsp;in&nbsp;use.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="DrawingResult">class <strong>DrawingResult</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#DrawingResult">DrawingResult</a>(filepath:&nbsp;'str',&nbsp;width:&nbsp;'int',&nbsp;height:&nbsp;'int',&nbsp;description:&nbsp;'str',&nbsp;timestamp:&nbsp;'float',&nbsp;mood:&nbsp;'str'&nbsp;=&nbsp;'',&nbsp;tools_used:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;colors_used:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;strokes:&nbsp;'int'&nbsp;=&nbsp;0)&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;finished&nbsp;drawing&nbsp;—&nbsp;what&nbsp;she&nbsp;made&nbsp;and&nbsp;how&nbsp;she&nbsp;made&nbsp;it.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="DrawingResult-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="DrawingResult-__init__"><strong>__init__</strong></a>(self, filepath: 'str', width: 'int', height: 'int', description: 'str', timestamp: 'float', mood: 'str' = '', tools_used: 'list[str]' = &lt;factory&gt;, colors_used: 'list[str]' = &lt;factory&gt;, strokes: 'int' = 0) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="DrawingResult-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'colors_used': 'list[str]', 'description': 'str', 'filepath': 'str', 'height': 'int', 'mood': 'str', 'strokes': 'int', 'timestamp': 'float', 'tools_used': 'list[str]', 'width': 'int'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'colors_used': Field(name='colors_used',type='list[str]',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'description': Field(name='description',type='str',default=&lt;dat...appingproxy({}),kw_only=False,_field_type=_FIELD), 'filepath': Field(name='filepath',type='str',default=&lt;datacl...appingproxy({}),kw_only=False,_field_type=_FIELD), 'height': Field(name='height',type='int',default=&lt;dataclas...appingproxy({}),kw_only=False,_field_type=_FIELD), 'mood': Field(name='mood',type='str',default='',default_...appingproxy({}),kw_only=False,_field_type=_FIELD), 'strokes': Field(name='strokes',type='int',default=0,defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'timestamp': Field(name='timestamp',type='float',default=&lt;dat...appingproxy({}),kw_only=False,_field_type=_FIELD), 'tools_used': Field(name='tools_used',type='list[str]',default...appingproxy({}),kw_only=False,_field_type=_FIELD), 'width': Field(name='width',type='int',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
+
+<dl><dt><strong>__hash__</strong> = None</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('filepath', 'width', 'height', 'description', 'timestamp', 'mood', 'tools_used', 'colors_used', 'strokes')</dl>
+
+<dl><dt><strong>mood</strong> = ''</dl>
+
+<dl><dt><strong>strokes</strong> = 0</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="PaintSheet">class <strong>PaintSheet</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#PaintSheet">PaintSheet</a>(width:&nbsp;'int'&nbsp;=&nbsp;640,&nbsp;height:&nbsp;'int'&nbsp;=&nbsp;480,&nbsp;paper:&nbsp;'tuple[int,&nbsp;int,&nbsp;int]'&nbsp;=&nbsp;(250,&nbsp;250,&nbsp;248),&nbsp;rng:&nbsp;'np.random.Generator&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+One&nbsp;sheet&nbsp;of&nbsp;paper&nbsp;—&nbsp;the&nbsp;rasterizing&nbsp;backend.<br>
+&nbsp;<br>
+A&nbsp;paper&nbsp;layer&nbsp;holds&nbsp;the&nbsp;sheet&nbsp;color;&nbsp;a&nbsp;transparent&nbsp;paint&nbsp;layer<br>
+holds&nbsp;her&nbsp;marks.&nbsp;The&nbsp;eraser&nbsp;clears&nbsp;paint&nbsp;to&nbsp;reveal&nbsp;the&nbsp;paper.<br>
+Every&nbsp;operation&nbsp;maps&nbsp;to&nbsp;one&nbsp;method.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="PaintSheet-__init__"><strong>__init__</strong></a>(self, width: 'int' = 640, height: 'int' = 480, paper: 'tuple[int, int, int]' = (250, 250, 248), rng: 'np.random.Generator | None' = None) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="PaintSheet-clear"><strong>clear</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Wipe&nbsp;the&nbsp;paint&nbsp;layer&nbsp;—&nbsp;back&nbsp;to&nbsp;bare&nbsp;paper.</span></dd></dl>
+
+<dl><dt><a name="PaintSheet-ellipse"><strong>ellipse</strong></a>(self, x: 'float', y: 'float', w: 'float', h: 'float', fill: 'bool' = False) -&gt; 'None'</dt><dd><span class="code">An&nbsp;ellipse&nbsp;(or&nbsp;circle)&nbsp;inscribed&nbsp;in&nbsp;the&nbsp;given&nbsp;rect.</span></dd></dl>
+
+<dl><dt><a name="PaintSheet-fill"><strong>fill</strong></a>(self, x: 'float', y: 'float', tolerance: 'float' = 24.0) -&gt; 'bool'</dt><dd><span class="code">Flood-fill&nbsp;the&nbsp;region&nbsp;under&nbsp;(x,&nbsp;y)&nbsp;with&nbsp;the&nbsp;current&nbsp;color.<br>
+&nbsp;<br>
+The&nbsp;fill&nbsp;sees&nbsp;the&nbsp;composite&nbsp;—&nbsp;paper&nbsp;plus&nbsp;paint&nbsp;—&nbsp;and&nbsp;repaints<br>
+the&nbsp;contiguous&nbsp;region&nbsp;on&nbsp;the&nbsp;paint&nbsp;layer.</span></dd></dl>
+
+<dl><dt><a name="PaintSheet-line"><strong>line</strong></a>(self, x1: 'float', y1: 'float', x2: 'float', y2: 'float') -&gt; 'None'</dt><dd><span class="code">A&nbsp;straight&nbsp;stroke&nbsp;between&nbsp;two&nbsp;points.</span></dd></dl>
+
+<dl><dt><a name="PaintSheet-pick_tool"><strong>pick_tool</strong></a>(self, tool: 'str', size: 'float | None' = None) -&gt; 'None'</dt><dd><span class="code">Pick&nbsp;up&nbsp;what&nbsp;she&nbsp;calls&nbsp;``tool``.<br>
+&nbsp;<br>
+The&nbsp;name&nbsp;is&nbsp;hers&nbsp;—&nbsp;a&nbsp;label,&nbsp;not&nbsp;a&nbsp;menu.&nbsp;Nothing&nbsp;here&nbsp;overrides<br>
+the&nbsp;brush&nbsp;she&nbsp;dialed.&nbsp;``size``&nbsp;is&nbsp;the&nbsp;one&nbsp;thing&nbsp;a<br>
+human&nbsp;always&nbsp;reaches&nbsp;for&nbsp;alongside&nbsp;the&nbsp;utensil,&nbsp;so&nbsp;it&nbsp;is<br>
+honored&nbsp;directly.</span></dd></dl>
+
+<dl><dt><a name="PaintSheet-polygon"><strong>polygon</strong></a>(self, points: 'list[tuple[float, float]]', fill: 'bool' = False) -&gt; 'None'</dt><dd><span class="code">A&nbsp;closed&nbsp;polygon&nbsp;through&nbsp;``points``,&nbsp;outlined&nbsp;or&nbsp;filled.</span></dd></dl>
+
+<dl><dt><a name="PaintSheet-rect"><strong>rect</strong></a>(self, x: 'float', y: 'float', w: 'float', h: 'float', fill: 'bool' = False) -&gt; 'None'</dt><dd><span class="code">A&nbsp;rectangle,&nbsp;outlined&nbsp;or&nbsp;filled.</span></dd></dl>
+
+<dl><dt><a name="PaintSheet-set_brush"><strong>set_brush</strong></a>(self, size: 'float | None' = None, opacity: 'float | None' = None, hardness: 'float | None' = None, scatter: 'float | None' = None, texture: 'float | None' = None, erase: 'bool | None' = None, blend: 'str | None' = None) -&gt; 'None'</dt><dd><span class="code">Dial&nbsp;the&nbsp;utensil&nbsp;directly&nbsp;—&nbsp;every&nbsp;parameter&nbsp;is&nbsp;hers&nbsp;to&nbsp;set.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;the&nbsp;fully&nbsp;open&nbsp;path:&nbsp;any&nbsp;mark&nbsp;character&nbsp;is&nbsp;a&nbsp;point&nbsp;in<br>
+this&nbsp;space.&nbsp;Named&nbsp;tools&nbsp;are&nbsp;only&nbsp;aliases&nbsp;over&nbsp;these&nbsp;settings.</span></dd></dl>
+
+<dl><dt><a name="PaintSheet-set_color"><strong>set_color</strong></a>(self, r: 'int', g: 'int', b: 'int', a: 'float' = 1.0) -&gt; 'None'</dt><dd><span class="code">Dip&nbsp;the&nbsp;utensil&nbsp;in&nbsp;a&nbsp;color&nbsp;—&nbsp;any&nbsp;RGB&nbsp;+&nbsp;opacity.</span></dd></dl>
+
+<dl><dt><a name="PaintSheet-stroke"><strong>stroke</strong></a>(self, points: 'list[tuple[float, float]]') -&gt; 'None'</dt><dd><span class="code">Draw&nbsp;one&nbsp;stroke&nbsp;through&nbsp;``points``&nbsp;with&nbsp;the&nbsp;current&nbsp;brush.</span></dd></dl>
+
+<dl><dt><a name="PaintSheet-to_image"><strong>to_image</strong></a>(self) -&gt; 'Image.Image'</dt><dd><span class="code">The&nbsp;finished&nbsp;sheet&nbsp;as&nbsp;a&nbsp;PIL&nbsp;image.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['Brush', 'Canvas', 'DrawingResult', 'PaintSheet']</td></tr></table>
+</body></html>

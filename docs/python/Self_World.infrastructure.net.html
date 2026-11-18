@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.infrastructure.net</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.infrastructure.html" class="white">infrastructure</a>.net</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/infrastructure/net.py">/home/mindyrenee/GenAnd/Genesis/Self_World/infrastructure/net.py</a></td></tr></table>
+    <p><span class="code">Net&nbsp;—&nbsp;bounded&nbsp;HTTP&nbsp;plumbing&nbsp;the&nbsp;body&nbsp;and&nbsp;the&nbsp;transports&nbsp;share.<br>
+&nbsp;<br>
+The&nbsp;Discord&nbsp;ear&nbsp;(``body.hearing.discord_ear``)&nbsp;and&nbsp;the&nbsp;Discord&nbsp;poster<br>
+(``discord.feed``)&nbsp;both&nbsp;talk&nbsp;to&nbsp;the&nbsp;same&nbsp;API;&nbsp;the&nbsp;plumbing&nbsp;that&nbsp;keeps<br>
+those&nbsp;calls&nbsp;from&nbsp;wedging&nbsp;lives&nbsp;here&nbsp;so&nbsp;the&nbsp;ear&nbsp;never&nbsp;has&nbsp;to&nbsp;reach<br>
+into&nbsp;the&nbsp;outer&nbsp;world&nbsp;for&nbsp;it.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="json.html">json</a><br>
+</td><td class="multicolumn"><a href="queue.html">queue</a><br>
+</td><td class="multicolumn"><a href="time.html">time</a><br>
+</td><td class="multicolumn"><a href="urllib.html">urllib</a><br>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-bounded_urlopen"><strong>bounded_urlopen</strong></a>(req: 'urllib.request.Request', timeout: 'float', stop: 'NeuromodulatoryGate | None' = None) -&gt; 'addinfourl'</dt><dd><span class="code">urlopen&nbsp;with&nbsp;a&nbsp;wall-clock&nbsp;bound&nbsp;that&nbsp;also&nbsp;covers&nbsp;DNS.<br>
+&nbsp;<br>
+urllib's&nbsp;``timeout``&nbsp;bounds&nbsp;connect/read&nbsp;but&nbsp;NOT&nbsp;``getaddrinfo``&nbsp;—<br>
+a&nbsp;blackholed&nbsp;resolver&nbsp;can&nbsp;hang&nbsp;the&nbsp;call&nbsp;indefinitely&nbsp;(observed&nbsp;at<br>
+shutdown:&nbsp;``discord-feed``&nbsp;parked&nbsp;in&nbsp;``getaddrinfo``&nbsp;outlived&nbsp;the<br>
+teardown&nbsp;join).&nbsp;The&nbsp;request&nbsp;runs&nbsp;on&nbsp;a&nbsp;daemon&nbsp;helper&nbsp;thread;&nbsp;after<br>
+``timeout``&nbsp;the&nbsp;caller&nbsp;abandons&nbsp;it&nbsp;and&nbsp;the&nbsp;orphan&nbsp;finishes&nbsp;whenever<br>
+DNS&nbsp;returns&nbsp;—&nbsp;it&nbsp;is&nbsp;a&nbsp;daemon,&nbsp;so&nbsp;it&nbsp;can&nbsp;never&nbsp;block&nbsp;process&nbsp;exit.<br>
+&nbsp;<br>
+``stop``&nbsp;cuts&nbsp;the&nbsp;wait&nbsp;short:&nbsp;``box.get``&nbsp;is&nbsp;polled&nbsp;in&nbsp;small<br>
+slices,&nbsp;so&nbsp;a&nbsp;set&nbsp;event&nbsp;abandons&nbsp;the&nbsp;request&nbsp;immediately&nbsp;instead<br>
+of&nbsp;parking&nbsp;the&nbsp;caller&nbsp;for&nbsp;the&nbsp;rest&nbsp;of&nbsp;``timeout``.</span></dd></dl>
+ <dl><dt><a name="-parse_retry_after"><strong>parse_retry_after</strong></a>(error: 'urllib.error.HTTPError') -&gt; 'float | None'</dt><dd><span class="code">Extract&nbsp;the&nbsp;server's&nbsp;retry_after&nbsp;seconds&nbsp;from&nbsp;a&nbsp;429&nbsp;response.</span></dd></dl>
+</td></tr></table>
+</body></html>

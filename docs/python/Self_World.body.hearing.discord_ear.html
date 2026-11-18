@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.body.hearing.discord_ear</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.body.html" class="white">body</a>.<a href="Self_World.body.hearing.html" class="white">hearing</a>.discord_ear</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/body/hearing/discord_ear.py">/home/mindyrenee/GenAnd/Genesis/Self_World/body/hearing/discord_ear.py</a></td></tr></table>
+    <p><span class="code">Discord&nbsp;ear&nbsp;—&nbsp;the&nbsp;afferent&nbsp;nerve&nbsp;of&nbsp;her&nbsp;public&nbsp;channel.<br>
+&nbsp;<br>
+The&nbsp;channel&nbsp;itself&nbsp;—&nbsp;*her&nbsp;page*,&nbsp;a&nbsp;place&nbsp;in&nbsp;the&nbsp;outer&nbsp;world&nbsp;—&nbsp;is<br>
+``discord.channel.Channel``;&nbsp;the&nbsp;outbound&nbsp;transport&nbsp;is<br>
+``discord.feed``.&nbsp;This&nbsp;module&nbsp;is&nbsp;the&nbsp;inbound&nbsp;half:&nbsp;a&nbsp;webhook&nbsp;is<br>
+write-only,&nbsp;so&nbsp;hearing&nbsp;the&nbsp;public&nbsp;needs&nbsp;a&nbsp;bot&nbsp;identity<br>
+(``Authorization:&nbsp;Bot&nbsp;…``)&nbsp;reading&nbsp;history,&nbsp;and&nbsp;that&nbsp;read&nbsp;loop&nbsp;is&nbsp;an<br>
+organ&nbsp;of&nbsp;the&nbsp;body,&nbsp;not&nbsp;part&nbsp;of&nbsp;the&nbsp;page.&nbsp;The&nbsp;ear&nbsp;lives&nbsp;in&nbsp;self&nbsp;—<br>
+it&nbsp;listens&nbsp;outward,&nbsp;but&nbsp;it&nbsp;is&nbsp;hers.<br>
+&nbsp;<br>
+Each&nbsp;poll&nbsp;fetches&nbsp;messages&nbsp;after&nbsp;the&nbsp;last&nbsp;seen&nbsp;snowflake;<br>
+webhook-authored&nbsp;posts&nbsp;(her&nbsp;own&nbsp;shares&nbsp;and&nbsp;the&nbsp;whole&nbsp;mirror)&nbsp;are<br>
+skipped&nbsp;—&nbsp;hearing&nbsp;herself&nbsp;would&nbsp;be&nbsp;a&nbsp;feedback&nbsp;loop&nbsp;—&nbsp;and&nbsp;so&nbsp;are<br>
+other&nbsp;bots.<br>
+&nbsp;<br>
+Failure&nbsp;isolation&nbsp;mirrors&nbsp;the&nbsp;feed's:&nbsp;transient&nbsp;errors&nbsp;log&nbsp;and&nbsp;keep<br>
+listening;&nbsp;a&nbsp;permanent&nbsp;auth&nbsp;failure&nbsp;(401/403)&nbsp;deafens&nbsp;the&nbsp;ear&nbsp;for<br>
+the&nbsp;session.&nbsp;Nothing&nbsp;here&nbsp;raises&nbsp;into&nbsp;Genesis.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="json.html">json</a><br>
+</td><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="os.html">os</a><br>
+</td><td class="multicolumn"><a href="urllib.html">urllib</a><br>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.body.hearing.discord_ear.html#DiscordListener">DiscordListener</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="DiscordListener">class <strong>DiscordListener</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#DiscordListener">DiscordListener</a>(token:&nbsp;'str',&nbsp;webhook_url:&nbsp;'str',&nbsp;on_message,&nbsp;*,&nbsp;poll_interval:&nbsp;'float'&nbsp;=&nbsp;15.0)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Her&nbsp;ear&nbsp;on&nbsp;the&nbsp;channel&nbsp;—&nbsp;polls&nbsp;for&nbsp;what&nbsp;the&nbsp;public&nbsp;says.<br>
+&nbsp;<br>
+Needs&nbsp;``GENESIS_DISCORD_BOT_TOKEN``&nbsp;plus&nbsp;the&nbsp;channel's&nbsp;webhook<br>
+URL&nbsp;(the&nbsp;channel&nbsp;id&nbsp;resolves&nbsp;from&nbsp;the&nbsp;webhook&nbsp;<a href="builtins.html#object">object</a>&nbsp;on&nbsp;the&nbsp;ear's<br>
+own&nbsp;thread,&nbsp;so&nbsp;construction&nbsp;never&nbsp;blocks&nbsp;on&nbsp;the&nbsp;network).&nbsp;Without<br>
+either,&nbsp;no&nbsp;ear&nbsp;exists&nbsp;—&nbsp;her&nbsp;channel&nbsp;stays&nbsp;write-only,&nbsp;exactly&nbsp;as<br>
+before&nbsp;webhooks&nbsp;could&nbsp;be&nbsp;heard&nbsp;at&nbsp;all.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="DiscordListener-__init__"><strong>__init__</strong></a>(self, token: 'str', webhook_url: 'str', on_message, *, poll_interval: 'float' = 15.0) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="DiscordListener-start"><strong>start</strong></a>(self) -&gt; 'None'</dt></dl>
+
+<dl><dt><a name="DiscordListener-stop"><strong>stop</strong></a>(self) -&gt; 'None'</dt></dl>
+
+<hr>
+Class methods defined here:<br>
+<dl><dt><a name="DiscordListener-from_feed"><strong>from_feed</strong></a>(feed, on_message) -&gt; 'DiscordListener | None'</dt><dd><span class="code">Build&nbsp;an&nbsp;ear&nbsp;on&nbsp;the&nbsp;channel&nbsp;``feed``&nbsp;posts&nbsp;to.<br>
+&nbsp;<br>
+``feed``&nbsp;is&nbsp;duck-typed&nbsp;—&nbsp;the&nbsp;ear&nbsp;lives&nbsp;in&nbsp;the&nbsp;body&nbsp;and&nbsp;must<br>
+not&nbsp;reach&nbsp;into&nbsp;the&nbsp;outer&nbsp;world&nbsp;for&nbsp;a&nbsp;type;&nbsp;all&nbsp;it&nbsp;needs&nbsp;is<br>
+the&nbsp;webhook&nbsp;URL&nbsp;the&nbsp;feed&nbsp;was&nbsp;built&nbsp;with.&nbsp;Returns&nbsp;None&nbsp;without<br>
+a&nbsp;bot&nbsp;token&nbsp;or&nbsp;a&nbsp;URL&nbsp;—&nbsp;no&nbsp;ear&nbsp;exists&nbsp;then,&nbsp;same&nbsp;as&nbsp;before.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>logger</strong> = &lt;Logger Self_World.body.hearing.discord_ear (WARNING)&gt;</td></tr></table>
+</body></html>
