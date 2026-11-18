@@ -309,8 +309,7 @@ def test_dream_generators_are_only_flagged_by_their_callers() -> None:
 
     il._generate_dream(emotion, summary)
 
-    with il._thoughts_lock:
-        dreams = list(il._thoughts)
+    dreams = list(il._thoughts)
     if not dreams:
         pytest.skip("dream generation is probabilistic; nothing to assert")
     for d in dreams:
@@ -541,8 +540,7 @@ def test_dream_chain_walks_past_its_anchor(monkeypatch) -> None:
     for step in range(4):
         il._advance_dream_chain(now + step)
 
-    with il._thoughts_lock:
-        topics = [t.metadata.get("topic") for t in il._thoughts]
+    topics = [t.metadata.get("topic") for t in il._thoughts]
 
     assert len(topics) >= 2, f"chain too short to observe a walk: {topics}"
     assert not all(t == "alpha" for t in topics), (
