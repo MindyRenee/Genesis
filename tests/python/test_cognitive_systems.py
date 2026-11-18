@@ -3760,7 +3760,7 @@ def test_draw_posts_art_with_her_caption(tmp_path) -> None:
     her composed description as its caption, and the same words
     echoing locally as a public share."""
     from basal_ganglia.volition import VolitionMixin
-    from frontal_lobe.canvas import DrawingResult
+    from canvas import DrawingResult
 
     png = tmp_path / "drawing_1.png"
     png.write_bytes(b"\x89PNG fake")
@@ -3785,7 +3785,7 @@ def test_draw_posts_bare_image_when_speechless(tmp_path) -> None:
     hers whether or not she can describe it; silence is about her
     words, not her work."""
     from basal_ganglia.volition import VolitionMixin
-    from frontal_lobe.canvas import DrawingResult
+    from canvas import DrawingResult
 
     png = tmp_path / "drawing_2.png"
     png.write_bytes(b"\x89PNG fake")
@@ -3806,7 +3806,7 @@ def test_draw_without_feed_still_speaks() -> None:
     """No webhook → no image post, but the share still lands in her
     terminal feed — the channel is silent, she is not."""
     from basal_ganglia.volition import VolitionMixin
-    from frontal_lobe.canvas import DrawingResult
+    from canvas import DrawingResult
 
     result = DrawingResult(
         filepath="/nonexistent/drawing.png",
@@ -4000,6 +4000,9 @@ def _channel_holder(**overrides):
     holder._running = True
     holder._hear_channel = lambda a, c, m: VolitionMixin._hear_channel(holder, a, c, m)
     holder._channel_addressed = lambda t, m: VolitionMixin._channel_addressed(holder, t, m)
+    holder._learn_channel_alias = lambda p, a, t: VolitionMixin._learn_channel_alias(
+        holder, p, a, t
+    )
     # The page the world owns — the broadcast holder's feed stub.
     channel = holder.world.channel
     world = OuterEnvironment(
@@ -4013,12 +4016,14 @@ def _channel_holder(**overrides):
 
 def test_hear_channel_perceives_public_speech() -> None:
     """A stranger's message is heard — world record, journal,
-    workspace — but not replied to: it didn't address her."""
+    workspace — and answered: her page is her space, so a guest
+    speaking in it is speaking to her, name or no name."""
     _holder, posts, world, emitted, calls = _channel_holder()
     world._channel_heard("amy", "just watching", {"id": "1"})
     assert _heard_speech(world) == ["amy: just watching"]
-    assert emitted == [("heard", "amy: just watching")]
-    assert posts == [] and calls == []
+    assert emitted[-1] == ("broadcast", "her answer")
+    assert calls == ["(public channel) amy: just watching"]
+    assert posts == [("her answer", "Genesis")]
 
 
 def test_hear_channel_replies_when_addressed() -> None:
@@ -4048,14 +4053,17 @@ def test_hear_channel_reply_to_her_post_addresses_her() -> None:
     assert posts == [("her answer", "Genesis")]
 
 
-def test_hear_channel_reply_pacing() -> None:
-    """A second addressed message inside the window is still heard —
-    it just isn't answered twice."""
+def test_hear_channel_every_guest_gets_a_turn() -> None:
+    """Back-to-back guest messages each earn their own response turn —
+    no pacing gate: a human host answers everyone, not just the first."""
     _holder, posts, world, _emitted, calls = _channel_holder()
     world._channel_heard("amy", "genesis are you there?", {"id": "1"})
     world._channel_heard("amy", "genesis did you hear me?", {"id": "2"})
-    assert calls == ["(public channel) amy: genesis are you there?"]
-    assert posts == [("her answer", "Genesis")]
+    assert calls == [
+        "(public channel) amy: genesis are you there?",
+        "(public channel) amy: genesis did you hear me?",
+    ]
+    assert posts == [("her answer", "Genesis"), ("her answer", "Genesis")]
     assert len(_heard_speech(world)) == 2
 
 
@@ -4065,6 +4073,64 @@ def test_hear_channel_sleep_gates_hearing() -> None:
     _holder, posts, world, emitted, calls = _channel_holder(_is_sleeping=True)
     world._channel_heard("amy", "genesis wake up", {"id": "1"})
     assert _heard_speech(world) == [] and emitted == [] and posts == [] and calls == []
+
+
+def test_hear_channel_known_alias_marks_her() -> None:
+    """A handle the profile knows is attributed to her — the turn's
+    speaker label carries her name, the way vision reports 'faces:
+    mindy'."""
+    from user_profile import UserProfile
+
+    profile = UserProfile()
+    profile.add_alias("mindybeatty")
+    _holder, _posts, world, _emitted, calls = _channel_holder(user_profile=profile)
+    world._channel_heard("mindybeatty", "hi genesis", {"id": "1"})
+    assert calls == ["(public channel) mindybeatty (Mindy): hi genesis"]
+
+
+def test_hear_channel_claim_learns_alias() -> None:
+    """A speaker claiming her name teaches the profile their handle —
+    'it's Mindy' from mindybeatty records the alias, attributes this
+    turn to her, and keeps recognizing it next message."""
+    from user_profile import UserProfile
+
+    profile = UserProfile()
+    _holder, _posts, world, _emitted, calls = _channel_holder(user_profile=profile)
+    world._channel_heard("mindybeatty", "it's Mindy", {"id": "1"})
+    assert profile.is_user("mindybeatty")
+    assert calls == ["(public channel) mindybeatty (Mindy): it's Mindy"]
+    world._channel_heard("mindybeatty", "still me", {"id": "2"})
+    assert calls[-1] == "(public channel) mindybeatty (Mindy): still me"
+
+
+def test_hear_channel_equation_learns_alias() -> None:
+    """'Mindy is the same as mindybeatty' from mindybeatty aliases the
+    speaker's own handle — the equation's other side must be the
+    speaker."""
+    from user_profile import UserProfile
+
+    profile = UserProfile()
+    _holder, _posts, world, _emitted, _calls = _channel_holder(user_profile=profile)
+    world._channel_heard("mindybeatty", "Mindy=mindybeatty", {"id": "1"})
+    world._channel_heard("mindybeatty", "Mindy is the same as mindybeatty", {"id": "2"})
+    assert profile.is_user("mindybeatty")
+
+
+def test_hear_channel_equation_cannot_alias_a_third_party() -> None:
+    """An equation whose other side is not the speaker's handle learns
+    nothing — 'Mindy is the same as mindybeatty' from amy must not
+    alias amy."""
+    from user_profile import UserProfile
+
+    profile = UserProfile()
+    _holder, _posts, world, _emitted, calls = _channel_holder(user_profile=profile)
+    world._channel_heard("amy", "Mindy is the same as mindybeatty", {"id": "1"})
+    world._channel_heard("amy", "Mindy is bob", {"id": "2"})
+    assert not profile.is_user("amy")
+    assert calls == [
+        "(public channel) amy: Mindy is the same as mindybeatty",
+        "(public channel) amy: Mindy is bob",
+    ]
 
 
 # ═══════════════════════════════════════════════════════════════════

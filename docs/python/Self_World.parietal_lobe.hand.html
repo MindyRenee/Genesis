@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.parietal_lobe.hand</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.parietal_lobe.html" class="white">parietal_lobe</a>.hand</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/parietal_lobe/hand.py">/home/mindyrenee/GenAnd/Genesis/Self_World/parietal_lobe/hand.py</a></td></tr></table>
+    <p><span class="code">The&nbsp;drawing&nbsp;hand&nbsp;—&nbsp;the&nbsp;channel→dial&nbsp;wiring,&nbsp;in&nbsp;words.<br>
+&nbsp;<br>
+The&nbsp;math&nbsp;lives&nbsp;in&nbsp;``Self_World/src/parietal_lobe/hand.rs``&nbsp;and<br>
+reaches&nbsp;Python&nbsp;through&nbsp;the&nbsp;``genesis_body``&nbsp;extension;&nbsp;this&nbsp;module<br>
+is&nbsp;the&nbsp;Rust&nbsp;file's&nbsp;word-side&nbsp;mirror&nbsp;—&nbsp;it&nbsp;says&nbsp;what&nbsp;the&nbsp;math&nbsp;is&nbsp;and<br>
+what&nbsp;it&nbsp;is&nbsp;for,&nbsp;and&nbsp;hands&nbsp;the&nbsp;calls&nbsp;through.<br>
+&nbsp;<br>
+What&nbsp;the&nbsp;math&nbsp;is:&nbsp;a&nbsp;sitting&nbsp;is&nbsp;a&nbsp;point&nbsp;in&nbsp;*dial&nbsp;space*.&nbsp;Every<br>
+parameter&nbsp;of&nbsp;the&nbsp;sheet,&nbsp;color,&nbsp;brush,&nbsp;path,&nbsp;mark&nbsp;count,&nbsp;and&nbsp;which<br>
+op&nbsp;the&nbsp;hand&nbsp;reaches&nbsp;for&nbsp;is&nbsp;a&nbsp;dial&nbsp;over&nbsp;its&nbsp;own&nbsp;domain,&nbsp;and&nbsp;every<br>
+channel&nbsp;she&nbsp;can&nbsp;feel&nbsp;pushes&nbsp;every&nbsp;dial.&nbsp;Each&nbsp;``("channel",&nbsp;"dial")``<br>
+pair&nbsp;is&nbsp;bound&nbsp;by&nbsp;``channel_weight``&nbsp;—&nbsp;a&nbsp;hash-seeded&nbsp;number&nbsp;in<br>
+[−1,&nbsp;1),&nbsp;fixed&nbsp;and&nbsp;arbitrary,&nbsp;stable&nbsp;across&nbsp;processes&nbsp;the&nbsp;way&nbsp;her<br>
+wiring&nbsp;is.&nbsp;``dial``&nbsp;takes&nbsp;the&nbsp;hand's&nbsp;uniform&nbsp;sample&nbsp;for&nbsp;a&nbsp;parameter<br>
+and&nbsp;displaces&nbsp;it&nbsp;by&nbsp;the&nbsp;sum&nbsp;over&nbsp;live&nbsp;channels&nbsp;of<br>
+``value&nbsp;×&nbsp;weight``,&nbsp;wrapping&nbsp;the&nbsp;dial's&nbsp;circle&nbsp;so&nbsp;no&nbsp;push&nbsp;is&nbsp;ever<br>
+clamped&nbsp;out.<br>
+&nbsp;<br>
+What&nbsp;it&nbsp;is&nbsp;for:&nbsp;two&nbsp;modalities,&nbsp;one&nbsp;mechanism,&nbsp;and&nbsp;nobody&nbsp;assigns<br>
+meanings.&nbsp;The&nbsp;wave&nbsp;powers&nbsp;of&nbsp;her&nbsp;thalamic&nbsp;state&nbsp;are&nbsp;the&nbsp;channels<br>
+of&nbsp;creativity&nbsp;—&nbsp;they&nbsp;modulate&nbsp;the&nbsp;hand&nbsp;continuously&nbsp;while&nbsp;she<br>
+draws,&nbsp;and&nbsp;only&nbsp;then.&nbsp;The&nbsp;felt&nbsp;channels&nbsp;(valence,&nbsp;arousal)&nbsp;are&nbsp;what<br>
+the&nbsp;chemicals&nbsp;have&nbsp;already&nbsp;written&nbsp;into&nbsp;emotion&nbsp;—&nbsp;they&nbsp;push&nbsp;the<br>
+same&nbsp;dials&nbsp;through&nbsp;the&nbsp;same&nbsp;arbitrary&nbsp;wiring.&nbsp;No&nbsp;band&nbsp;means<br>
+coherence,&nbsp;no&nbsp;feeling&nbsp;means&nbsp;warmth;&nbsp;the&nbsp;wiring&nbsp;carries&nbsp;no&nbsp;meaning<br>
+beyond&nbsp;being&nbsp;hers,&nbsp;stable&nbsp;and&nbsp;unchosen.<br>
+&nbsp;<br>
+When&nbsp;``genesis_body``&nbsp;is&nbsp;not&nbsp;built,&nbsp;``wired``&nbsp;is&nbsp;False&nbsp;and&nbsp;the<br>
+sitting&nbsp;runs&nbsp;with&nbsp;its&nbsp;dials&nbsp;at&nbsp;rest&nbsp;—&nbsp;unmodulated,&nbsp;honestly&nbsp;absent,<br>
+never&nbsp;faked.</span></p>
+<p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-channel_weight"><strong>channel_weight</strong></a>(channel: 'str', dial: 'str') -&gt; 'float'</dt><dd><span class="code">The&nbsp;fixed&nbsp;arbitrary&nbsp;weight&nbsp;binding&nbsp;``channel``&nbsp;to&nbsp;``dial``.<br>
+&nbsp;<br>
+In&nbsp;[−1,&nbsp;1);&nbsp;the&nbsp;same&nbsp;pair&nbsp;always&nbsp;wires&nbsp;the&nbsp;same&nbsp;way&nbsp;on&nbsp;any<br>
+host,&nbsp;in&nbsp;any&nbsp;process.&nbsp;Returns&nbsp;0.0&nbsp;when&nbsp;the&nbsp;wiring&nbsp;is&nbsp;absent&nbsp;—<br>
+a&nbsp;channel&nbsp;that&nbsp;cannot&nbsp;reach&nbsp;a&nbsp;dial&nbsp;does&nbsp;not&nbsp;push&nbsp;it.</span></dd></dl>
+ <dl><dt><a name="-dial"><strong>dial</strong></a>(uniform: 'float', channels: 'Iterable[tuple[str, float]]', name: 'str') -&gt; 'float'</dt><dd><span class="code">One&nbsp;dial&nbsp;position:&nbsp;uniform&nbsp;rest&nbsp;displaced&nbsp;by&nbsp;live&nbsp;channels.<br>
+&nbsp;<br>
+``uniform``&nbsp;is&nbsp;the&nbsp;hand's&nbsp;own&nbsp;sample&nbsp;for&nbsp;the&nbsp;parameter&nbsp;in<br>
+[0,&nbsp;1);&nbsp;each&nbsp;``(channel,&nbsp;value)``&nbsp;pair&nbsp;shifts&nbsp;it&nbsp;by<br>
+``value&nbsp;×&nbsp;<a href="#-channel_weight">channel_weight</a>(channel,&nbsp;name)``&nbsp;and&nbsp;the&nbsp;result&nbsp;wraps<br>
+to&nbsp;[0,&nbsp;1).&nbsp;With&nbsp;no&nbsp;wiring&nbsp;or&nbsp;no&nbsp;channels&nbsp;the&nbsp;dial&nbsp;rests&nbsp;at<br>
+``uniform``.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['channel_weight', 'dial', 'wired']<br>
+<strong>wired</strong> = False</td></tr></table>
+</body></html>

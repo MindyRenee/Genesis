@@ -34,7 +34,17 @@ of LTM. Sleep compression retires low-salience episodes to the
 archive, where they stay retrievable by ID but leave every
 associative index; this reaches them when the active set has
 no answer. Request and response are identical to FIND_SIMILAR.
-Additive: PROTOCOL_VERSION is unaffected.</dd><dt><a class="constant" href="constant.GET_BODY_CONTROL.html" title="constant genesis::daemon::ipc::cmd::GET_BODY_CONTROL">GET_<wbr>BODY_<wbr>CONTROL</a></dt><dd>Get the body control state — what Genesis is doing to its body
+Additive: PROTOCOL_VERSION is unaffected.</dd><dt><a class="constant" href="constant.FORGET_SWEEP.html" title="constant genesis::daemon::ipc::cmd::FORGET_SWEEP">FORGET_<wbr>SWEEP</a></dt><dd>Gentle forgetting — the sleep-side housekeeping sweep.
+Request: <code>[u8 mode]</code> — 0 = dry-run report (nothing is
+deleted), 1 = sweep (prune episodes whose traces have decayed
+past reach of any retrieval cue, then physically compact the
+store to reclaim their bytes). Response:
+<code>[u32 count][u64 bytes]</code> — for a dry run, the number of
+forgettable episodes and the estimated bytes their payloads
+occupy; for a sweep, the number forgotten and the bytes
+actually reclaimed. The mind decides when housekeeping runs;
+the body decides what is unreachable. Additive:
+PROTOCOL_VERSION is unaffected.</dd><dt><a class="constant" href="constant.GET_BODY_CONTROL.html" title="constant genesis::daemon::ipc::cmd::GET_BODY_CONTROL">GET_<wbr>BODY_<wbr>CONTROL</a></dt><dd>Get the body control state — what Genesis is doing to its body
 (CPU frequency policy, scheduling priorities, I/O priority,
 thermal cap status). This is how the cognitive mind knows what
 its neurochemistry is driving. Response: BodyControlState.</dd><dt><a class="constant" href="constant.GET_BODY_STATE.html" title="constant genesis::daemon::ipc::cmd::GET_BODY_STATE">GET_<wbr>BODY_<wbr>STATE</a></dt><dd>Get the interoceptive body state — CPU temperature, frequency,

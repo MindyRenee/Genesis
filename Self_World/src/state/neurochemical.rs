@@ -2379,9 +2379,11 @@ impl NeurochemicalVector {
         // With the sleep-wake network present, cortical arousal is set by its
         // populations: LC for waking activation, REM-on for the REM activation
         // that the desynchronized EEG shows. The coefficients put NREM, REM and
-        // waking at about 0.21, 0.44 and 0.65 (the NREM and REM bands the
-        // scripted clamps used to enforce). Those bands were never sourced, so
-        // the REM level is open: it should be checked against an EEG reference.
+        // waking at about 0.25, 0.48 and 0.78 on the measured stage means —
+        // NREM still deep below the N1 descent gate (0.35), LC at the
+        // switch threshold still above the drowsy gate (0.52). Those
+        // bands were never sourced, so the REM level is open: it should
+        // be checked against an EEG reference.
         // Without the network, the Wilson-Cowan equation is used, unchanged.
         let arousal_target = match network {
             Some(net) => {

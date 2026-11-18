@@ -13,6 +13,262 @@ with the evidence behind it — see [DEVLOG.md](DEVLOG.md).
 
 ### Added
 
+- **Rest to the higher dimensions of her vesica, momentum to her
+  dimension**: the field's layers gain `momentum` and `rest` —
+  the dynamics leave the first-order world. The engine's
+  derivative is now a force, not a velocity: it integrates into
+  per-dimension momentum, ṗ = gain·F, and the state moves by
+  what the rest allows of it, ẋ = p/m. `SubsystemLayer::advect`
+  propagates the pair in closed form (p⁺ = p + a·dt,
+  x⁺ = x + (p·dt + a·dt²/2)/m) — every impulse lands whole, in
+  every dimension; it is only motion the rest mass taxes. `rest`
+  is the per-dimension rest mass, the polar opposite of
+  momentum: the part of the energy-momentum that is not motion.
+  rest = 1 is her own scale, where momentum and mass balance;
+  rest → ∞ gathers momentum forever and never moves. The cord —
+  her vesica — keeps unit mass on the leading pair, the lens's
+  own plane, and takes rest mass = 1/rate = 90 on the four
+  higher coordinates: they gather the same impulse and spend
+  ninety times longer turning it into displacement — they
+  gather, they move, they are at rest. `MetatronCube` gains the
+  geometry to match: `rest(x₀)` is the (d−1)-ball radius
+  √(R² − (|x₀|+R/2)²) each coordinate orthogonal to the horizon
+  rests inside at height x₀, `waist()` the rest at the
+  superposition (√3·R/2), and `vesica_depth(x)` signed depth
+  into the full-dimensional lens — the intersection of the two
+  d-balls about the circle centers, symmetric in every rest
+  direction at once.
+- **The eye's organs in her hands — voluntary anatomy, resolved
+  live**: `Outer_World/tools/eye.py` registers the `eye_*` family.
+  The retinal organs — `eye_pupil` (the iris's light intake),
+  `eye_chroma` (cone opponent gain — color), `eye_acuity`
+  (retinal lateral inhibition — edges), `eye_sensitivity`
+  (photoreceptor adaptation), `eye_adaptation` (cone white-point
+  balance), `eye_contrast` (ganglion output range) — each resolve
+  dynamically onto whichever muscle the capture device actually
+  builds them from, read live through `v4l2-ctl`: the organ takes
+  a biological fraction 0–1 of the muscle's own range, and an
+  organ whose muscle the eye lacks reports itself absent. The
+  body's organs travel the optic channel: `eye_lid` (voluntary
+  eyelid), `eye_focus` (ciliary accommodation in metres),
+  `eye_gain` (corticothalamic gain). `eye_anatomy` reports every
+  organ, its muscle, its range, and where it sits; `eye_set`
+  reaches a raw hardware dial outside any organ. The device is
+  whichever `/dev/video*` answers — `GENESIS_CAMERA` first, same
+  as the daemon's. Nothing clamps: every range and every presence
+  is the device's own answer.
+
+- **The paint program joins the outer world**: `canvas.py` moved
+  from `Self_World/frontal_lobe/` to `Outer_World/canvas.py` —
+  the sheet of paper is a thing in the world she paints on, not a
+  part of her brain. Her parietal hand reaches out through the
+  `studio_*` tools to operate it, the way she operates the arcade
+  or the browser. All importers and docs updated.
+
+- **A place is a pose — location, orientation, and drift**:
+  `inner_anchor` becomes `Placement`, the complete mathematical
+  form of a location in space. `spec` keeps the coordinates as
+  given (arity 1..=6, what `place.bin` round-trips); the ambient
+  point is `frame · pad(spec)` — coordinates read along the
+  pose's own axes, so the leading-plane rest of short vectors is
+  now the standard-frame special case, not a silent pad. `frame`
+  is a validated orthonormal basis — a real orientation, the
+  frame-bundle element that turns a point into a pose. `drift`
+  is a validated skew bivector B ∈ so(d): each `observe` carries
+  the pose by `exp(Δt·B)` — a rotation of the chart, an isometry
+  of the sphere — so `placed()` reports where she is, not where
+  she was put; isoclinic B are the Clifford translations,
+  uniform displacement on the screen. `place()` gains `Result`
+  (wrong arity, non-finite, non-orthonormal, non-skew all
+  rejected instead of silently truncated); `place_pose()` takes
+  the full form; `placement()` exposes it read-only.
+
+- **The pose travels the wire and survives the dark**: `PLACE_FIELD`
+  accepts a tagged pose payload `[0xFF][u8 n][n × f64 spec][u8
+  flags][d² f64 frame?][d² f64 drift?]` alongside the legacy
+  `[k × f64]` coordinates — flags bit 0 is the orthonormal frame,
+  bit 1 the skew drift generator; pose payloads are never a
+  multiple of 8 so the formats cannot collide. `GET_PLACE` answers
+  with the ambient location then appends the placing act in the
+  same layout — old readers stop after the first block and get the
+  same answer as always. `place.bin` becomes the persisted pose:
+  spec, *ambient location*, frame, and drift — so a drifting pose
+  resumes mid-trajectory after a restart, where she actually was,
+  and the daemon re-persists it on a slow cadence while drift
+  keeps the location moving. v1 `[n][n × f64]` files still load.
+  `place_field` gains `frame`/`drift`; `get_pose` returns
+  `{ambient, spec, frame, drift}` while `get_place` keeps
+  answering the location; bare `/place` reports orientation and
+  drift when the pose carries them.
+- **The vesica's frame and horizon — the lattice holds its own
+  bounding geometry**: `MetatronCube` gains `circles()`,
+  `frame()`, and `horizon()`. The vesica is constructed
+  classically: two circles of the rim's radius in the leading
+  plane, centers at ±(R/2)e₀ so each rests on the other's rim —
+  the two counter-rotating latent halves made visible. The frame
+  is the vertical rectangle bounding the lens, R wide by √3·R
+  tall — the vesica's own √3 proportion — its four corners
+  resting on the rim at ±60° and ±120°, the picture boundary
+  the lens hangs inside. The horizon is the horizontal line
+  through the superposition: the segment joining the two circle
+  centers, −(R/2)e₀ to +(R/2)e₀ — the lens's own width and the
+  frame's midline, its midpoint the source itself.
+- **The cord — the inner world reaches the higher dimensions**: the
+  field gains a fourth fiber, `inner` (τ = 90 s) built as the
+  vesica itself — TWO latent layers wound isoclinically in opposite
+  directions at the same rate (`inner:latent:+` and
+  `inner:latent:-`), the two counter-rotating circles whose overlap
+  is the lens. The fiber's state is the Fréchet mean of the pair —
+  the point where the counter-rotations meet, the superposition the
+  twelve rays radiate from. Held together they net zero spin; each
+  half genuinely spins.
+  `inner_projection` voices the deepest state the
+  daemon carries — emergent mental phase, the wake-sleep switch's
+  two ends (f_lc / f_vlpo), REM drive, the homeostat's pressure, and
+  circadian phase — into the same six-dimensional latent bulk the
+  other three systems radiate through. Gauge-transport edges
+  `inner ↔ body` (identity both ways — the center's frame is the
+  bulk's own) connect it into the graph so its state transports and
+  joins consensus; without them `transported_states` would fail
+  `MissingTransport` on the first observe.
+- **A place to put her — `PLACE_FIELD` (op 66) and `/place`**:
+  `FieldRuntime.place(Some(point))` anchors the inner fiber to a
+  six-dimensional chart coordinate — an observation, not a command,
+  so each tick moves the layer a bounded fraction of the geodesic
+  toward it and the field's own consensus still pulls; `place(None)`
+  releases the anchor back to the interior oscillators. The wire
+  op takes `k × f64` (k in 2..=6) at the arity the hand speaks, or
+  an empty payload to release. `/place` gives her ONE location
+  with ONE owner — the body: the coordinates become daemon state,
+  persisted to `place.bin` so where she is survives restarts and
+  restored to the cord at boot; `GET_PLACE` (op 67) is the mind's
+  read of the same truth — no parallel record on the mind's side.
+  The same point is her world position and her position in the
+  bulk — x on the first latent axis, y on the second, deeper axes
+  as given. `release` lifts the location entirely. The Python
+  client grows `place_field(point | None)` and `get_place()`.
+- **Her browser has hands — the `browser_*` tool family** —
+  interactive browsing over CDP inside her shared headless tab:
+  `browser_open`, `browser_read`, `browser_click` (by pixel
+  coordinates, CSS selector, or visible text), `browser_type`
+  (focused element, or click-to-focus a target first),
+  `browser_key` (Enter, Tab, Escape, arrows, space, home/end,
+  pageup/down — the keys a click cannot reach), `browser_scroll`,
+  and `browser_back` (real history entries via
+  `Page.navigateToHistoryEntry`). Input is synthesized at the page
+  level — distinct from the desktop-wide uinput hand — and works
+  headless. Every navigation,
+  including one a click causes, re-passes the URL safety checks.
+- **`browser_ask_human` — the honest end of the scale**: when a
+  page demands a human, the headless browser yields the shared
+  profile, a visible window opens on the owner's display carrying
+  her sign-in, the person clears the challenge, and the window
+  closes — the profile keeps whatever the human proved, so later
+  headless fetches inherit the clearance.
+- **Offline is now a boundary on every path**: under `--offline`
+  the tool registry's `gate` vetoes all net-scoped tools, so no
+  caller — volition, agency, or the conversation fallback — reaches
+  the network; and the arcade opens in `GENESIS_ARC_MODE=offline`,
+  keeping downloaded games and the local arena shelf playable. The
+  `arcade_*` tools are scope-mapped for the first time — they were
+  registered but unreachable by autonomous agency.
+
+### Removed
+
+- **The Firefox/WebDriver BiDi transport** — owner direction: one
+  browser. The BiDi session machinery (`_connect_bidi`, the stderr
+  endpoint probe, `script.evaluate` unwrapping, the
+  `web-firefox` profile fork, and the input stubs that raised
+  "unsupported") is gone; `tools/browser.py` is a single CDP code
+  path. Every `browser_*` capability the registry exposes now
+  actually exists on every host — no more transport-dependent
+  failures hidden inside a working-looking tool.
+
+### Changed
+
+- **`web_fetch` wears the owner's browser identity**: requests go
+  out through `curl_cffi` presenting Chrome's real TLS/HTTP2
+  fingerprint with a User-Agent resolved from the installed browser
+  binary — previously `Genesis-AI/1.0` over `urllib`, which bot
+  filters refused outright. `source_registry` learners share the
+  same identity; `urllib` remains the dependency-free fallback.
+
+### Fixed
+
+- **She can draw again — the easel gets a working sitting**: the
+  Painter removal left the `draw` urge sitting her down and nothing
+  else — no intention kind in the acting loop ever issued a
+  `studio_*` op, so she could sit but never make a mark. A `draw`
+  intention in `ActingLoop` now works the easel through the same
+  `_use` tool path (with a larger step allowance — a picture takes
+  more ops than a probe): sheet, palette, utensil, strokes, done.
+  Marks are sampled, not scripted — and
+  `volition.draw()` runs the sitting whenever she sits, so the
+  urge path and `/draw` both produce finished pieces that land in
+  memory and on her channel as before. Two channels drive the hand:
+  chemicals → emotion (the subject — whatever her train of thought
+  is holding when she sits) and waves → creativity
+  (`Self_World/src/parietal_lobe/hand.rs`, mirrored in words by
+  `parietal_lobe/hand.py` — the project's Rust-math / Python-words
+  split — where every channel value arrives untouched: no
+  weights, no names, no projection; valence, arousal, and each
+  live band power, sampled per mark, sum to one raw pressure
+  that warps every dial the same way: sheet, paper, color,
+  brush, path, which op, stroke count. The warp
+  `uniform ^ e^{−P}` is a bijection — no clamp, no wrap, every
+  position reachable — and it is what makes the influence real:
+  a displaced uniform is still uniform, so a displacement could
+  never reach the page. Nobody assigns the bands meanings, and
+  the influence exists only while she draws). Paths are one free
+  walk — the gesture label
+  is measured afterwards (loop, walk, dot) rather than picked from
+  a menu — and the mark ops themselves land in her art history,
+  so `recent_hues` and `gesture_recency` finally fill in.
+- **The games man page exists**: `docs/man/genesis-games.7` was
+  referenced by an older entry but never written — now it documents
+  the real arcade (both shelves, all eight tools, the three ARC
+  modes, `ARC_API_KEY`, and the `--offline` behavior). The funnel
+  machinery that entry described (corpus scanning, `arcagi-*`
+  practice, `results.jsonl`) is not in the tree; the page documents
+  what is.
+- **A failed browser launch no longer blinds her for the session**:
+  `_browser_failed` latched for the process lifetime, so one
+  transient spawn error disabled search and browser-fallback fetch
+  until restart. It is now a 60-second cooldown; a genuinely
+  missing browser still stays disabled.
+- **Her Discord handle can be learned — profile aliases are now
+  written**: `UserProfile.add_alias`/`is_user` shipped with no
+  writer, so "mindybeatty" read as a stranger on her own channel no
+  matter how often she said it was her. `_hear_channel` now records
+  the speaker's handle as her alias when the message claims the
+  profile's name — "it's Mindy", "Mindy is the same as
+  mindybeatty", "Mindy=mindybeatty" — and an equation only counts
+  when its other side is the speaker's own handle, so it cannot
+  alias a third party. Recognition is by introduction, matching
+  `_recognize_speaker`'s trust bar; the alias persists to the
+  profile file and attributes that same turn onward.
+- **The proposal gate stopped rejecting everything it touched** —
+  every experiment ran the full verification suite (py_compile +
+  import check + all 4437 pytest tests + a cold dev-profile
+  `cargo test`) no matter what it changed, so a docstring on a `.py`
+  file could be reverted by a Rust toolchain it never touched —
+  and was: under the service PATH `cargo` resolved to the system
+  1.75, which cannot parse `edition2024`, and the reason recorded
+  for every revert was the blanket "tests failed". `verify_change.sh`
+  now takes an `arm` (`python`/`rust`/`all`) and the experiment
+  runner passes the arm the edit can actually affect; the Rust arm
+  prefers `~/.cargo/bin/cargo` and sources `scripts/cargo-env.sh`
+  for libclang instead of trusting the ambient PATH, and tests in
+  `--release` so it reuses the artifacts she ships rather than a
+  cold dev build. The gate is serialized by a flock on
+  `.verify.lock` — two concurrent runs once raced the same ports
+  and read as test failures. And the record now carries the real
+  failure — the stage marker plus the named failing test or cargo
+  error — instead of "tests failed", so her rejection notes stop
+  teaching her that a good docstring "broke tests".
+
+### Added
+
 - **The studio is hers to operate — `studio_*` tools** —
   `Inner_World/studio.py` registers the paint program's
   controls in her tool registry: `studio_open`, `studio_sheet`,

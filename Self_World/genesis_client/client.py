@@ -96,6 +96,7 @@ from .protocol import (
     EMOTIONAL_TAG_SIZE,
     FIND_SIMILAR,
     FIND_SIMILAR_ARCHIVED,
+    FORGET_SWEEP,
     GET_BODY_CONTROL,
     GET_BODY_STATE,
     GET_FIELD_PROBE,
@@ -108,6 +109,7 @@ from .protocol import (
     GET_NEURO_SUMMARY,
     GET_OPTIC_STATE,
     GET_PHASE,
+    GET_PLACE,
     GET_PLASTICITY_PROFILE,
     GET_PROCESS_HEALTH,
     GET_RECENT_EPISODES,
@@ -129,6 +131,7 @@ from .protocol import (
     MODULE_STATUS_RUNNING,
     NEURO_IMPULSE,
     PING,
+    PLACE_FIELD,
     PROTOCOL_VERSION,
     PUT_TENSOR,
     READ_SENSORS,
@@ -179,6 +182,7 @@ from .types import (
     FieldProbeSignature,
     FieldState,
     FoldMargins,
+    ForgetSweepReport,
     InferenceSummary,
     IonSummary,
     MemoryStats,
@@ -194,6 +198,7 @@ from .types import (
     SubsystemReport,
     ZoneTransitions,
     unpack_archived_episodes,
+    unpack_forget_sweep,
     unpack_recent_episodes,
     unpack_similar_results,
 )
@@ -1073,6 +1078,130 @@ class GenesisClient:
             return False
         return bool(resp) and resp[0] == 1
 
+    _PLACE_POSE_TAG = 0xFF
+    _PLACE_DIMENSION = 6
+
+    def place_field(
+        self,
+        point: list[float] | tuple[float, ...] | None,
+        *,
+        frame: list[list[float]] | None = None,
+        drift: list[list[float]] | None = None,
+        timeout: float | None = None,
+    ) -> bool:
+        """Place her — the one place, owned by the body.
+
+        ``point`` is one to six coordinates of her position, stored
+        exactly as given: a 2-vector is her place read in a plane,
+        and the same point rests in the latent bulk's leading
+        coordinate plane (x on the first axis, y on the second).
+        ``frame`` is an optional 6×6 orthonormal basis — the pose's
+        orientation, the axes the coordinates are read along.
+        ``drift`` is an optional 6×6 skew-symmetric generator — a
+        bivector in so(6) whose exponential flow carries the pose
+        each tick: location and orientation moving together. The
+        body persists the whole pose — where and how she is
+        survives restarts, because her place is body state, not a
+        note the mind keeps. The anchor is an observation, not a
+        command: each tick moves the inner fiber a bounded fraction
+        of the geodesic toward it. ``None`` releases the location —
+        the interior oscillators resume speaking for themselves.
+
+        Returns ``False`` when the daemon predates the command — an
+        absent channel, never silent.
+        """
+        if point is None:
+            payload = b""
+        elif frame is None and drift is None:
+            payload = b"".join(struct.pack("<d", float(c)) for c in point)
+        else:
+            d = self._PLACE_DIMENSION
+            payload = bytes([self._PLACE_POSE_TAG, len(point)])
+            payload += b"".join(struct.pack("<d", float(c)) for c in point)
+            flags = (frame is not None) | ((drift is not None) << 1)
+            payload += bytes([flags])
+            for mat in (frame, drift):
+                if mat is None:
+                    continue
+                if len(mat) != d or any(len(r) != d for r in mat):
+                    return False
+                for row in mat:
+                    for v in row:
+                        payload += struct.pack("<d", float(v))
+        try:
+            resp = self._request(PLACE_FIELD, payload, timeout=timeout)
+        except (ConnectionError, OSError, ProtocolError):
+            return False
+        return bool(resp) and resp[0] == 1
+
+    def get_place(self, *, timeout: float | None = None) -> list[float] | None:
+        """Where she is — the body's own answer.
+
+        The pose's current ambient location — under drift this is
+        not the placed coordinates; it moves. ``None`` when she is
+        nowhere in particular (or the daemon could not answer — an
+        absent channel, never a fabricated position).
+        """
+        pose = self.get_pose(timeout=timeout)
+        return None if pose is None else pose["ambient"]
+
+    def get_pose(self, *, timeout: float | None = None) -> dict | None:
+        """The full placed pose — the body's whole answer.
+
+        ``{ambient, spec, frame, drift}``: the current ambient
+        location (six coordinates, moving under drift), the spec
+        coordinates at the arity they were given, and the optional
+        6×6 orientation frame and skew drift generator (``None``
+        when the placing hand gave neither). ``None`` when she is
+        nowhere in particular or the daemon could not answer; when
+        the daemon predates the pose block, ``spec``, ``frame``,
+        and ``drift`` stay ``None`` while ``ambient`` still
+        answers.
+        """
+        try:
+            resp = self._request(GET_PLACE, b"", timeout=timeout)
+        except (ConnectionError, OSError, ProtocolError):
+            return None
+        if not resp or resp[0] == 0:
+            return None
+        n = resp[0]
+        if len(resp) < 1 + n * 8:
+            return None
+        ambient = [struct.unpack("<d", resp[1 + i * 8 : 1 + i * 8 + 8])[0] for i in range(n)]
+        pose = {"ambient": ambient, "spec": None, "frame": None, "drift": None}
+        tail = resp[1 + n * 8 :]
+        if len(tail) < 2:
+            return pose
+        k = tail[0]
+        if len(tail) < 1 + k * 8 + 1:
+            return pose
+        spec = [struct.unpack("<d", tail[1 + i * 8 : 1 + i * 8 + 8])[0] for i in range(k)]
+        flags = tail[1 + k * 8]
+        off = 1 + k * 8 + 1
+        d = self._PLACE_DIMENSION
+        mats = []
+        for present in (flags & 1, flags & 2):
+            if not present:
+                mats.append(None)
+                continue
+            need = off + d * d * 8
+            if len(tail) < need:
+                return pose
+            mats.append(
+                [
+                    [
+                        struct.unpack(
+                            "<d", tail[off + (r * d + c) * 8 : off + (r * d + c) * 8 + 8]
+                        )[0]
+                        for c in range(d)
+                    ]
+                    for r in range(d)
+                ]
+            )
+            off = need
+        pose["spec"], pose["frame"], pose["drift"] = spec, mats[0], mats[1]
+        return pose
+
     def set_cognitive_pid(self, pid: int, *, timeout: float | None = None) -> bool:
         """Tell the body which process is its cognitive mind.
 
@@ -1669,6 +1798,36 @@ class GenesisClient:
         payload = _U64.pack(episode_id)
         resp = self._request(DELETE_EPISODE, payload, timeout=timeout)
         return bool(resp and resp[0] == 1)
+
+    def forget_faded(
+        self, *, dry_run: bool = True, timeout: float | None = None
+    ) -> ForgetSweepReport:
+        """Gentle forgetting — release what no cue can still reach.
+
+        The body's retrieval traces decay by a power law; episodes
+        whose activation has fallen below the reach of even a maximal
+        cue are functionally dismantled. In sweep mode the daemon
+        releases them and physically compacts the store so the bytes
+        are actually reclaimed. In dry-run mode nothing is touched —
+        the report is only a preview, the way the mind looks before
+        it lets go.
+
+        The natural place for the sweep is sleep: housekeeping runs
+        offline, alongside the compression pass, never during
+        conversation.
+
+        Args:
+            dry_run: True (default) reports candidates and their
+                footprint without deleting; False performs the prune
+                and compaction for real.
+
+        Returns:
+            ForgetSweepReport — episodes counted (forgettable for a
+            dry run, forgotten for a sweep) and bytes (estimated for
+            a dry run, actually reclaimed for a sweep).
+        """
+        resp = self._request(FORGET_SWEEP, bytes([0 if dry_run else 1]), timeout=timeout)
+        return unpack_forget_sweep(resp)
 
     def search_archived(
         self,

@@ -53,6 +53,7 @@ use flate2::Compression;
 use flate2::read::ZlibDecoder;
 use flate2::write::ZlibEncoder;
 
+use crate::store::forgetting::{self, TraceStore};
 use crate::store::sdr::{
     BundleStore, LOGHD_N, code_to_expected_activation, encode_episode, episode_id_to_code,
 };
@@ -98,6 +99,12 @@ pub const MAX_COMPRESSED_SIZE: usize = 320 * 1024;
 /// without outranking genuinely high-salience memories in the
 /// retention cap.
 pub const RECONSOLIDATION_SALIENCE_FLOOR: f32 = 0.65;
+
+/// Source module ID for dreaming — mirrors `_DREAM_MODULE = 9` in
+/// `Inner_World/sleep/compression.py` and the `dreaming` entry of the
+/// client's `SOURCE_MODULES` map. Dream-sourced episodes are preserved
+/// from autonomous forgetting even when they arrive unflagged.
+const SOURCE_MODULE_DREAM: u8 = 9;
 
 // ─────────────────────────────────────────────────────────────────
 //  Index entry (same layout as v1 — 64 bytes)
@@ -548,6 +555,12 @@ pub struct LtmStore {
     /// meta entries at `open` (archived connections may legitimately
     /// re-form) and maintained on every meta store.
     meta_hashes: HashSet<u64>,
+    /// Rehearsal/access traces — the forgetting module's sidecar.
+    /// Every encoding and every cognitive retrieval leaves a trace;
+    /// the power-law decay of those traces is what `forgetting`
+    /// measures. Kept out of `.meta` so the frozen 64-byte index row
+    /// never changes.
+    traces: TraceStore,
 }
 
 unsafe impl Send for LtmStore {}
@@ -617,6 +630,8 @@ impl LtmStore {
             .map_err(LtmError::Io)?;
         data_file.sync_all().map_err(LtmError::Io)?;
 
+        let traces = TraceStore::open_or_create(&base).map_err(LtmError::Io)?;
+
         Ok(Self {
             bundles,
             meta_file,
@@ -627,12 +642,19 @@ impl LtmStore {
             meta_header,
             base_path: base,
             meta_hashes: HashSet::new(),
+            traces,
         })
     }
 
     /// Open an existing LTM store.
     pub fn open(base_path: impl AsRef<Path>) -> Result<Self, LtmError> {
         let base = base_path.as_ref().to_path_buf();
+
+        // Finish or clean up a compaction that was interrupted before
+        // it completed. The journal marks the point after which the
+        // staged files were durable, so redoing the renames is safe.
+        Self::recover_compaction(&base);
+
         let bundles_path = base.with_extension("bundles");
         let meta_path = base.with_extension("meta");
         let dat_path = base.with_extension("dat");
@@ -869,6 +891,13 @@ impl LtmStore {
             .map(|e| e.association_hash)
             .collect();
 
+        // Check the trace ledger's existence *before* open_or_create
+        // makes the file — an absent sidecar means this store's access
+        // history is unknowable (first run after the forgetting
+        // subsystem arrived, or a deleted/corrupt ledger).
+        let traces_existed = base.with_extension("traces").exists();
+        let traces = TraceStore::open_or_create(&base).map_err(LtmError::Io)?;
+
         let mut reconciled_store = Self {
             bundles,
             meta_file,
@@ -877,6 +906,7 @@ impl LtmStore {
             id_to_idx,
             active_ids,
             meta_hashes,
+            traces,
             meta_header: IndexHeader {
                 episode_count: active_count,
                 next_episode_id: reconciled_next,
@@ -887,6 +917,28 @@ impl LtmStore {
         // Write the reconciled header back to disk so the next open
         // sees consistent values.
         reconciled_store.write_meta_header()?;
+
+        // Missing ledger: seed every surviving memory with a single
+        // fresh-ink trace stamped now — a mass reconsolidation event.
+        // Without this, a memory she retrieved yesterday but encoded
+        // long ago would wear its encoding age alone and could be
+        // pruned at the very next sweep. Data loss must fail toward
+        // retention, never deletion; from here real activity rebuilds
+        // the ledger and honest fading resumes.
+        if !traces_existed {
+            let now = wall_now_ms();
+            for entry in &reconciled_store.entries {
+                if entry.is_deleted() {
+                    continue;
+                }
+                if let Err(e) = reconciled_store
+                    .traces
+                    .record_encoding(entry.episode_id, now)
+                {
+                    eprintln!("[ltm] trace seeding failed for {}: {e}", entry.episode_id);
+                }
+            }
+        }
 
         // Rebuild the bundle store when its episode_count is much
         // higher than the number of real (non-meta) episodes, or when
@@ -1380,6 +1432,13 @@ impl LtmStore {
         // not just bookkeeping ones.
         self.meta_hashes.insert(assoc_hash);
 
+        // The encoding trace — forgetting's first presentation.
+        // Best-effort: a lost record just reads as the same default
+        // the absent-record path already computes.
+        if let Err(e) = self.traces.record_encoding(episode_id, timestamp) {
+            eprintln!("[ltm] could not record encoding trace for {episode_id}: {e}");
+        }
+
         Ok(episode_id)
     }
 
@@ -1441,7 +1500,27 @@ impl LtmStore {
     /// insights and association chains that reference archived episodes
     /// still resolve, preserving memory integrity across sleep
     /// compression cycles.
+    ///
+    /// Retrieval is rehearsal — the opposite of forgetting. Every
+    /// episode the mind actually reaches for adds a trace, pushing its
+    /// accessibility boundary outward. Maintenance reads (unbundling,
+    /// bundle rebuilds) go through [`Self::retrieve_raw`] so the
+    /// janitor's broom never counts as a rehearsal.
     pub fn retrieve(&mut self, episode_id: u64) -> Result<Episode, LtmError> {
+        let episode = self.retrieve_raw(episode_id)?;
+        if let Err(e) = self.traces.touch(episode_id, wall_now_ms()) {
+            eprintln!("[ltm] could not record rehearsal for {episode_id}: {e}");
+        }
+        Ok(episode)
+    }
+
+    /// Read an episode's payload without rehearsing it.
+    ///
+    /// For the store's own bookkeeping — subtracting an SDR during
+    /// archive/delete, re-encoding during bundle rebuilds. Reading a
+    /// memory to maintain the shelves it sits on is not the mind
+    /// remembering it, so no trace is added.
+    fn retrieve_raw(&mut self, episode_id: u64) -> Result<Episode, LtmError> {
         let idx = *self
             .id_to_idx
             .get(&episode_id)
@@ -1551,7 +1630,31 @@ impl LtmStore {
     ///
     /// Uses the LogHD bundle store for SDR-based similarity matching.
     /// Returns up to `limit` results sorted by distance (ascending).
+    ///
+    /// Forgetting applies: candidates whose trace activation a cue of
+    /// this strength can no longer reach are filtered before ranking.
+    /// This convenience form measures decay from the store's own
+    /// newest timestamp with neutral dopamine — the explicit form is
+    /// [`Self::find_similar_at`].
     pub fn find_similar(&self, query: &str, limit: usize) -> Vec<(u64, u32, &IndexEntry)> {
+        self.find_similar_at(
+            query,
+            limit,
+            self.reference_now_ms(),
+            forgetting::DA_BASELINE,
+        )
+    }
+
+    /// `find_similar` with an explicit clock and dopamine level — the
+    /// form the daemon calls, so decay is measured against the body's
+    /// time and the forgetting gate responds to live chemistry.
+    pub fn find_similar_at(
+        &self,
+        query: &str,
+        limit: usize,
+        now_ms: u64,
+        dopamine: f64,
+    ) -> Vec<(u64, u32, &IndexEntry)> {
         // Encode query as SDR (content only — no emotional/temporal
         // context for a text query)
         let query_sdr = crate::store::sdr::encode_content(query);
@@ -1612,6 +1715,31 @@ impl LtmStore {
             scored.push((id, dist_sq, entry));
         }
 
+        // The forgetting gate. The bundle distance has no natural
+        // similarity scale, so the cue strength is normalized against
+        // this query's own spread: the best candidate simulates
+        // sim = 1 (a perfect cue), the worst sim = 0. A degenerate
+        // spread (max 0 or non-finite) means every candidate is
+        // equidistant — a uniform perfect cue, and the gate still
+        // applies.
+        let query_hash = simhash(query);
+        let max_raw = scored.iter().map(|(_, d, _)| *d).fold(0.0f32, f32::max);
+        let spread_ok = max_raw > 0.0 && max_raw.is_finite();
+        scored.retain(|(id, dist, entry)| {
+            let cue = if spread_ok {
+                1.0 - (dist / max_raw) as f64
+            } else {
+                1.0
+            };
+            let base = forgetting::base_level(
+                self.traces.get(*id, entry.timestamp),
+                entry.timestamp,
+                entry.salience,
+                now_ms,
+            );
+            forgetting::is_accessible(base, cue, *id, query_hash, dopamine)
+        });
+
         // Sort by f32 distance (ascending) before converting to u32,
         // so the ordering is determined by full-precision distances.
         scored.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
@@ -1651,7 +1779,36 @@ impl LtmStore {
     /// of how many episodes are stored.
     ///
     /// Returns up to `limit` results sorted by Hamming distance (ascending).
+    ///
+    /// Forgetting applies — see [`Self::find_similar`]. This
+    /// convenience form measures decay from the store's newest
+    /// timestamp with neutral dopamine; the daemon calls
+    /// [`Self::find_similar_hash_at`] with the body's clock and live
+    /// dopamine instead.
     pub fn find_similar_hash(&self, query: &str, limit: usize) -> Vec<(u64, u32, &IndexEntry)> {
+        self.find_similar_hash_at(
+            query,
+            limit,
+            self.reference_now_ms(),
+            forgetting::DA_BASELINE,
+        )
+    }
+
+    /// `find_similar_hash` with an explicit clock and dopamine level.
+    ///
+    /// Each candidate's cue strength is `1 − dist/64` — a SimHash
+    /// match is a continuum from a perfect reminder (dist 0) to
+    /// anti-correlation (dist 64). Candidates whose base-level
+    /// activation plus this cue no longer reaches the retrieval
+    /// threshold are forgotten *for this probe*: retrieval fades with
+    /// time while the trace itself persists for pruning to release.
+    pub fn find_similar_hash_at(
+        &self,
+        query: &str,
+        limit: usize,
+        now_ms: u64,
+        dopamine: f64,
+    ) -> Vec<(u64, u32, &IndexEntry)> {
         let query_hash = simhash(query);
 
         let mut scored: Vec<(u64, u32, &IndexEntry)> = Vec::new();
@@ -1669,6 +1826,16 @@ impl LtmStore {
             }
 
             let dist = entry.hash_distance(query_hash);
+            let cue = 1.0 - f64::from(dist) / 64.0;
+            let base = forgetting::base_level(
+                self.traces.get(id, entry.timestamp),
+                entry.timestamp,
+                entry.salience,
+                now_ms,
+            );
+            if !forgetting::is_accessible(base, cue, id, query_hash, dopamine) {
+                continue;
+            }
             scored.push((id, dist, entry));
         }
 
@@ -1692,11 +1859,44 @@ impl LtmStore {
     /// where their slots remain.
     ///
     /// Returns up to `limit` results sorted by Hamming distance (ascending).
+    ///
+    /// The forgetting gate applies to the cold tier exactly as it does
+    /// to the active one — a faded archived memory is still reachable
+    /// by a strong-enough cue, and a memory past the point where even
+    /// a perfect cue fails is a prune candidate, not a resident.
+    /// Convenience form; the daemon calls
+    /// [`Self::find_similar_archived_at`] with live clock/dopamine.
     pub fn find_similar_archived(&self, query: &str, limit: usize) -> Vec<(u64, u32, &IndexEntry)> {
+        self.find_similar_archived_at(
+            query,
+            limit,
+            self.reference_now_ms(),
+            forgetting::DA_BASELINE,
+        )
+    }
+
+    /// `find_similar_archived` with an explicit clock and dopamine.
+    pub fn find_similar_archived_at(
+        &self,
+        query: &str,
+        limit: usize,
+        now_ms: u64,
+        dopamine: f64,
+    ) -> Vec<(u64, u32, &IndexEntry)> {
         let query_hash = simhash(query);
         let mut scored: Vec<(u64, u32, &IndexEntry)> = Vec::new();
         for entry in &self.entries {
             if entry.is_deleted() || entry.is_meta_memory() || !entry.is_archived() {
+                continue;
+            }
+            let cue = 1.0 - f64::from(entry.hash_distance(query_hash)) / 64.0;
+            let base = forgetting::base_level(
+                self.traces.get(entry.episode_id, entry.timestamp),
+                entry.timestamp,
+                entry.salience,
+                now_ms,
+            );
+            if !forgetting::is_accessible(base, cue, entry.episode_id, query_hash, dopamine) {
                 continue;
             }
             scored.push((entry.episode_id, entry.hash_distance(query_hash), entry));
@@ -1771,6 +1971,394 @@ impl LtmStore {
         results
     }
 
+    /// The clock the convenience retrieval paths measure decay
+    /// against: the store's own newest entry. Fading is always
+    /// relative to the last thing she remembered — a store queried
+    /// along its own timeline never reads as more stale than it is.
+    /// (The daemon never uses this; it passes the body's wall clock
+    /// through the `_at` variants.) An empty store reads wall time.
+    fn reference_now_ms(&self) -> u64 {
+        self.entries
+            .iter()
+            .map(|e| e.timestamp)
+            .max()
+            .unwrap_or_else(wall_now_ms)
+    }
+
+    /// The base-level activation of a single episode right now —
+    /// how far above or below the retrieval boundary its trace sits.
+    /// Negative values are already unreachable by ordinary cues;
+    /// below `FORGET_BOUND` they are unreachable by any cue.
+    pub fn activation_of(&self, episode_id: u64, now_ms: u64) -> Option<f64> {
+        let &idx = self.id_to_idx.get(&episode_id)?;
+        let entry = &self.entries[idx];
+        if entry.is_deleted() {
+            return None;
+        }
+        Some(forgetting::base_level(
+            self.traces.get(episode_id, entry.timestamp),
+            entry.timestamp,
+            entry.salience,
+            now_ms,
+        ))
+    }
+
+    /// The episodes whose traces have decayed past the point where
+    /// any retrieval cue could reach them — the functionally
+    /// dismantled, not merely the faded.
+    ///
+    /// Returns `(episode_id, base_level)` pairs. The predicate is
+    /// conservative by construction: a memory must fail even a
+    /// maximal-similarity cue *and* be older than the age floor
+    /// before it appears here. Rehearsal (any `retrieve`) or a
+    /// strong encoding salience keeps a memory well clear of this
+    /// list for a long time.
+    pub fn faded_candidates(&self, now_ms: u64) -> Vec<(u64, f64)> {
+        let mut faded = Vec::new();
+        for entry in &self.entries {
+            // The body's autonomous sweep governs only the plain
+            // active episodic tier. The excluded classes all carry
+            // their own retention authority:
+            //   deleted  — already gone.
+            //   archived — she chose cold storage; the mind's release
+            //              verdict (release_fn → delete_episode) owns
+            //              this tier, and it shrinks via compact only
+            //              under her say-so.
+            //   meta     — association bridges and dream insights:
+            //              the cortical residue that *justifies* the
+            //              forgetting. Deleting the residue would
+            //              erase the record of why things were lost.
+            //   dream    — the mind's policy preserves dreaming-module
+            //              episodes even if one arrives unflagged.
+            if entry.is_deleted()
+                || entry.is_archived()
+                || entry.is_meta_memory()
+                || entry.source_module == SOURCE_MODULE_DREAM
+            {
+                continue;
+            }
+            let base = forgetting::base_level(
+                self.traces.get(entry.episode_id, entry.timestamp),
+                entry.timestamp,
+                entry.salience,
+                now_ms,
+            );
+            let age_days = (now_ms.saturating_sub(entry.timestamp) as f64) / forgetting::DAY_MS;
+            if forgetting::should_forget(base, age_days) {
+                faded.push((entry.episode_id, base));
+            }
+        }
+        faded
+    }
+
+    /// Estimated bytes a compaction would reclaim right now — the
+    /// `.meta` row, length prefix, and payload of every deleted
+    /// entry still occupying the files. Deletion frees nothing until
+    /// the files are rewritten; this is the honest report of what a
+    /// sweep would actually save.
+    pub fn reclaimable_bytes(&self) -> u64 {
+        self.entries
+            .iter()
+            .filter(|e| e.is_deleted())
+            .map(|e| INDEX_ENTRY_SIZE as u64 + 4 + u64::from(e.compressed_len))
+            .sum()
+    }
+
+    /// The on-disk footprint of a live episode: its `.meta` row plus
+    /// its `.dat` record (length prefix + compressed payload).
+    /// Returns 0 for unknown or already-deleted entries.
+    pub fn entry_storage_bytes(&self, episode_id: u64) -> u64 {
+        self.id_to_idx
+            .get(&episode_id)
+            .filter(|&&idx| !self.entries[idx].is_deleted())
+            .map(|&idx| INDEX_ENTRY_SIZE as u64 + 4 + u64::from(self.entries[idx].compressed_len))
+            .unwrap_or(0)
+    }
+
+    /// Gentle forgetting's release step: delete every episode whose
+    /// trace has decayed past reach of any cue.
+    ///
+    /// Like its biological counterpart this runs offline — sleep, not
+    /// conversation. The cohort is released through the bulk
+    /// [`Self::delete_many`] path, so each episode's SDR leaves the
+    /// superposition and its flag lands on disk exactly as a manual
+    /// deletion would. Storage is only reclaimed by the
+    /// [`Self::compact`] pass that follows.
+    ///
+    /// Returns the number of episodes forgotten.
+    pub fn prune_faded(&mut self, now_ms: u64) -> Result<u64, LtmError> {
+        let candidates: Vec<u64> = self
+            .faded_candidates(now_ms)
+            .into_iter()
+            .map(|(id, _)| id)
+            .collect();
+        Ok(u64::from(self.delete_many(&candidates)?))
+    }
+
+    /// Physically reclaim the space of deleted episodes.
+    ///
+    /// The store's `.meta` and `.dat` files are append-only, so
+    /// `delete`/`prune_faded` mark entries gone without shrinking
+    /// anything — like synapses tagged for elimination but not yet
+    /// cleared. Compaction is the microglial pass: it copies every
+    /// surviving episode into fresh staged files, atomically swaps
+    /// them over the originals, rebuilds the bundle superposition
+    /// without the dead weight, and drops the stale trace records.
+    ///
+    /// Crash safety: staged files are fully synced before the
+    /// journal `*.compacting` is written; on open, a lingering
+    /// journal means the swap was interrupted and is redone. A crash
+    /// before the journal leaves the original files untouched.
+    ///
+    /// Returns the number of bytes reclaimed across `.meta` + `.dat`.
+    pub fn compact(&mut self) -> Result<u64, LtmError> {
+        // Nothing tagged for release → nothing to clear. Rewriting
+        // the whole store for zero reclaimable bytes would be pure
+        // churn.
+        if self.reclaimable_bytes() == 0 {
+            return Ok(0);
+        }
+        let meta_path = self.base_path.with_extension("meta");
+        let dat_path = self.base_path.with_extension("dat");
+        let old_meta_len = std::fs::metadata(&meta_path).map_err(LtmError::Io)?.len();
+        let old_dat_len = std::fs::metadata(&dat_path).map_err(LtmError::Io)?.len();
+
+        let stage_dir = self.base_path.with_extension(format!(
+            "compact-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos(),
+        ));
+        std::fs::create_dir(&stage_dir).map_err(LtmError::Io)?;
+
+        // `live_entries` survives the closure: after the swap these
+        // are exactly the rows the new `.meta` file holds, in order —
+        // the in-memory indices are rebuilt from them directly, no
+        // re-read needed (and no second LtmStore, which could not
+        // take the sole-mapper flock while this one holds it).
+        let result: Result<Vec<IndexEntry>, LtmError> = (|| {
+            let stage_base = stage_dir.join("ltm");
+            let stage_meta_path = stage_base.with_extension("meta");
+            let stage_dat_path = stage_base.with_extension("dat");
+
+            let mut stage_meta = OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create_new(true)
+                .open(&stage_meta_path)
+                .map_err(LtmError::Io)?;
+            let mut stage_dat = OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create_new(true)
+                .open(&stage_dat_path)
+                .map_err(LtmError::Io)?;
+
+            // Data header first — payloads follow it, mirroring the
+            // live file's layout exactly.
+            let data_header = DataHeader::new();
+            // SAFETY: repr(C), Copy, primitive fields; 16 bytes.
+            let data_header_bytes = unsafe {
+                std::slice::from_raw_parts(
+                    &data_header as *const DataHeader as *const u8,
+                    core::mem::size_of::<DataHeader>(),
+                )
+            };
+            stage_dat
+                .write_all(data_header_bytes)
+                .map_err(LtmError::Io)?;
+
+            // Copy each surviving entry's payload verbatim — the
+            // bytes are already compressed, only their offsets move.
+            let mut live_entries: Vec<IndexEntry> = Vec::new();
+            let mut new_offset = core::mem::size_of::<DataHeader>() as u64;
+            for entry in &self.entries {
+                if entry.is_deleted() {
+                    continue;
+                }
+                let mut record = *entry;
+                let span = 4u64 + u64::from(entry.compressed_len);
+                let mut buf = vec![0u8; span as usize];
+                self.data_file
+                    .seek(SeekFrom::Start(entry.data_offset))
+                    .map_err(LtmError::Io)?;
+                self.data_file.read_exact(&mut buf).map_err(LtmError::Io)?;
+                stage_dat
+                    .seek(SeekFrom::Start(new_offset))
+                    .map_err(LtmError::Io)?;
+                stage_dat.write_all(&buf).map_err(LtmError::Io)?;
+                record.data_offset = new_offset;
+                new_offset += span;
+                live_entries.push(record);
+            }
+
+            // The staged dat header's next_write_offset is the file's
+            // true end — writes at offset 8, after the payloads so a
+            // staged file is never self-inconsistent.
+            stage_dat.seek(SeekFrom::Start(8)).map_err(LtmError::Io)?;
+            stage_dat
+                .write_all(&new_offset.to_le_bytes())
+                .map_err(LtmError::Io)?;
+            stage_dat.sync_all().map_err(LtmError::Io)?;
+
+            // Metadata header: episode_count counts the active tier
+            // (live and non-archived), matching the convention
+            // `archive`/`delete` maintain. next_episode_id is
+            // preserved — compacting must never recycle an ID.
+            let live_active = live_entries.iter().filter(|e| !e.is_archived()).count() as u32;
+            let stage_header = IndexHeader {
+                episode_count: live_active,
+                next_episode_id: self.meta_header.next_episode_id,
+                ..IndexHeader::new(DEFAULT_INDEX_CAPACITY)
+            };
+            // SAFETY: repr(C), Copy, primitive fields; 64 bytes.
+            let stage_header_bytes = unsafe {
+                std::slice::from_raw_parts(
+                    &stage_header as *const IndexHeader as *const u8,
+                    core::mem::size_of::<IndexHeader>(),
+                )
+            };
+            stage_meta
+                .write_all(stage_header_bytes)
+                .map_err(LtmError::Io)?;
+            for entry in &live_entries {
+                // SAFETY: `entry` is a valid IndexEntry; the slice is
+                // exactly INDEX_ENTRY_SIZE of its representation.
+                let entry_bytes = unsafe {
+                    std::slice::from_raw_parts(
+                        entry as *const IndexEntry as *const u8,
+                        INDEX_ENTRY_SIZE,
+                    )
+                };
+                stage_meta.write_all(entry_bytes).map_err(LtmError::Io)?;
+            }
+            stage_meta.sync_all().map_err(LtmError::Io)?;
+            drop(stage_meta);
+            drop(stage_dat);
+
+            // Commit point: the journal marks "staged files are
+            // durable, the swap may begin". `open` replays this
+            // section if the journal is still present.
+            let journal_path = self.base_path.with_extension("compacting");
+            std::fs::write(&journal_path, stage_dir.to_string_lossy().as_bytes())
+                .map_err(LtmError::Io)?;
+            let parent = self
+                .base_path
+                .parent()
+                .filter(|p| !p.as_os_str().is_empty())
+                .unwrap_or(Path::new("."));
+            std::fs::File::open(parent)
+                .and_then(|dir| dir.sync_all())
+                .map_err(LtmError::Io)?;
+
+            std::fs::rename(&stage_dat_path, &dat_path).map_err(LtmError::Io)?;
+            std::fs::rename(&stage_meta_path, &meta_path).map_err(LtmError::Io)?;
+
+            std::fs::remove_file(&journal_path).map_err(LtmError::Io)?;
+            let _ = std::fs::remove_dir_all(&stage_dir);
+            std::fs::File::open(parent)
+                .and_then(|dir| dir.sync_all())
+                .map_err(LtmError::Io)?;
+            Ok(live_entries)
+        })();
+        let live_entries = match result {
+            Ok(entries) => entries,
+            Err(error) => {
+                // Pre-commit failure: originals untouched. If the
+                // journal was written, leave it — open() finishes
+                // the swap.
+                if !self.base_path.with_extension("compacting").exists() {
+                    let _ = std::fs::remove_dir_all(&stage_dir);
+                }
+                return Err(error);
+            }
+        };
+
+        // Refresh state in place. A full `Self::open` cannot run here
+        // — this store holds the bundle file's sole-mapper flock —
+        // but it isn't needed: `live_entries` IS the new .meta file,
+        // so the indices rebuild from it directly. The file handles
+        // reopen against the renamed inodes; the old handles (and the
+        // old inode, now unlinked) close on drop.
+        self.meta_file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&meta_path)
+            .map_err(LtmError::Io)?;
+        self.data_file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&dat_path)
+            .map_err(LtmError::Io)?;
+
+        self.entries = live_entries;
+        self.id_to_idx.clear();
+        self.active_ids.clear();
+        for (idx, entry) in self.entries.iter().enumerate() {
+            self.id_to_idx.insert(entry.episode_id, idx);
+            if !entry.is_archived() {
+                self.active_ids.push(entry.episode_id);
+            }
+        }
+        self.meta_header.episode_count = self.active_ids.len() as u32;
+        self.meta_hashes = self
+            .active_ids
+            .iter()
+            .filter_map(|id| self.id_to_idx.get(id))
+            .map(|&idx| self.entries[idx].association_hash)
+            .collect();
+
+        // The bundle superposition still carries pruned SDRs —
+        // rebuild it from the survivors, then drop their traces.
+        self.rebuild_bundles()?;
+        let live: HashSet<u64> = self.id_to_idx.keys().copied().collect();
+        self.traces.retain(&live).map_err(LtmError::Io)?;
+
+        let new_meta_len = std::fs::metadata(&meta_path).map_err(LtmError::Io)?.len();
+        let new_dat_len = std::fs::metadata(&dat_path).map_err(LtmError::Io)?.len();
+        Ok((old_meta_len + old_dat_len).saturating_sub(new_meta_len + new_dat_len))
+    }
+
+    /// Recover from an interrupted compaction. If the journal
+    /// `*.compacting` exists, the staged files were already durable —
+    /// complete the renames and clear the journal. Orphaned stage
+    /// directories (crash before the journal) are swept too.
+    fn recover_compaction(base: &Path) {
+        let journal_path = base.with_extension("compacting");
+        if journal_path.exists() {
+            if let Ok(stage_name) = std::fs::read_to_string(&journal_path) {
+                let stage_base = Path::new(stage_name.trim()).join("ltm");
+                for ext in ["dat", "meta"] {
+                    let staged = stage_base.with_extension(ext);
+                    if staged.exists() {
+                        if let Err(e) = std::fs::rename(&staged, base.with_extension(ext)) {
+                            eprintln!("[ltm] compaction recovery rename failed: {e}");
+                        }
+                    }
+                }
+            }
+            let _ = std::fs::remove_file(&journal_path);
+        }
+        // Sweep leftover stage directories — ours or an earlier
+        // crashed process's. They are pre-commit garbage either way.
+        if let Some(parent) = base.parent()
+            && let Ok(read_dir) = std::fs::read_dir(parent)
+        {
+            let prefix = base
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            for dir_entry in read_dir.flatten() {
+                let name = dir_entry.file_name().to_string_lossy().into_owned();
+                if name.starts_with(&format!("{prefix}.compact-")) && dir_entry.path().is_dir() {
+                    let _ = std::fs::remove_dir_all(dir_entry.path());
+                }
+            }
+        }
+    }
+
     /// Soft-delete an episode.
     pub fn delete(&mut self, episode_id: u64) -> Result<(), LtmError> {
         let idx = *self
@@ -1786,7 +2374,7 @@ impl LtmStore {
         // active set).
         let unbundle_episode =
             if !self.entries[idx].is_meta_memory() && !self.entries[idx].is_archived() {
-                self.retrieve(episode_id).ok()
+                self.retrieve_raw(episode_id).ok()
             } else {
                 None
             };
@@ -1824,8 +2412,82 @@ impl LtmStore {
         }
         self.id_to_idx.remove(&episode_id);
         self.active_ids.retain(|id| *id != episode_id);
+        self.traces.remove(episode_id);
 
         Ok(())
+    }
+
+    /// Delete many episodes in one pass — the bulk form of
+    /// [`Self::delete`], mirroring [`Self::archive_many`].
+    ///
+    /// Per-episode work is identical (flags byte, unbundle, index
+    /// removal) but the metadata header is written and fsynced once
+    /// for the whole batch — the difference between seconds and
+    /// minutes when a forgetting sweep releases a large cohort at
+    /// once. Unknown, already-deleted, and already-archived-but-deleted
+    /// IDs are skipped. Returns the number deleted.
+    pub fn delete_many(&mut self, ids: &[u64]) -> Result<u32, LtmError> {
+        let mut deleted_ids: HashSet<u64> = HashSet::with_capacity(ids.len());
+        for &episode_id in ids {
+            let Some(&idx) = self.id_to_idx.get(&episode_id) else {
+                continue;
+            };
+            if self.entries[idx].is_deleted() {
+                continue;
+            }
+
+            // Read the payload while still readable so its SDR can be
+            // subtracted — same ordering as `delete`. Maintenance read:
+            // no rehearsal.
+            let unbundle_episode =
+                if !self.entries[idx].is_meta_memory() && !self.entries[idx].is_archived() {
+                    self.retrieve_raw(episode_id).ok()
+                } else {
+                    None
+                };
+
+            // Flags byte at offset 60 within each 64-byte entry.
+            let flags_offset = 64 + (idx as u64 * INDEX_ENTRY_SIZE as u64) + 60;
+            self.meta_file
+                .seek(SeekFrom::Start(flags_offset))
+                .map_err(LtmError::Io)?;
+            self.meta_file
+                .write_all(&[self.entries[idx].flags | IndexEntry::DELETED_FLAG])
+                .map_err(LtmError::Io)?;
+            self.entries[idx].mark_deleted();
+
+            if let Some(episode) = unbundle_episode {
+                self.unbundle(episode_id, &episode);
+            }
+            deleted_ids.insert(episode_id);
+        }
+
+        if deleted_ids.is_empty() {
+            return Ok(0);
+        }
+
+        let previous_count = self.meta_header.episode_count;
+        let active_lost = deleted_ids
+            .iter()
+            .filter(|id| {
+                self.id_to_idx
+                    .get(id)
+                    .is_some_and(|&idx| !self.entries[idx].is_archived())
+            })
+            .count() as u32;
+        self.meta_header.episode_count = previous_count.saturating_sub(active_lost);
+        if let Err(error) = self.write_meta_header() {
+            self.meta_header.episode_count = previous_count;
+            return Err(error);
+        }
+
+        for &id in &deleted_ids {
+            self.id_to_idx.remove(&id);
+            self.traces.remove(id);
+        }
+        self.active_ids.retain(|id| !deleted_ids.contains(id));
+
+        Ok(deleted_ids.len() as u32)
     }
 
     /// Archive an episode.
@@ -1879,7 +2541,7 @@ impl LtmStore {
         // Meta-memories were never bundled. A failed read leaves
         // bounded drift, which the open() tolerance absorbs.
         if !self.entries[idx].is_meta_memory() {
-            match self.retrieve(episode_id) {
+            match self.retrieve_raw(episode_id) {
                 Ok(episode) => self.unbundle(episode_id, &episode),
                 Err(e) => eprintln!("[ltm] could not unbundle archived episode {episode_id}: {e}"),
             }
@@ -1994,7 +2656,7 @@ impl LtmStore {
             // Subtract the SDR contribution for real episodes —
             // meta-memories were never bundled, same as `archive`.
             if !self.entries[idx].is_meta_memory()
-                && let Ok(episode) = self.retrieve(episode_id)
+                && let Ok(episode) = self.retrieve_raw(episode_id)
             {
                 self.unbundle(episode_id, &episode);
             }
@@ -2189,7 +2851,10 @@ impl LtmStore {
 
         let mut results = Vec::with_capacity(candidate_ids.len());
         for id in candidate_ids {
-            if let Ok(ep) = self.retrieve(id) {
+            // Maintenance enumeration — reading every episode to
+            // process it must not rehearse every episode, or nothing
+            // could ever fade.
+            if let Ok(ep) = self.retrieve_raw(id) {
                 results.push(ep);
             }
         }
@@ -2217,7 +2882,10 @@ impl LtmStore {
         let page: Vec<u64> = ids[start..end].to_vec();
         let mut results = Vec::with_capacity(page.len());
         for id in page {
-            if let Ok(ep) = self.retrieve(id) {
+            // Compression's enumeration is maintenance, not recall —
+            // `retrieve_raw` so the sweep does not refresh the very
+            // traces it exists to measure.
+            if let Ok(ep) = self.retrieve_raw(id) {
                 results.push(ep);
             }
         }
@@ -2240,10 +2908,11 @@ impl LtmStore {
 
     /// Sync everything to disk.
     ///
-    /// This fsyncs the metadata file, data file, and bundle store.
-    /// The order is: data file first (so the payload is durable),
-    /// then meta file (so the index entries pointing to the payload
-    /// are durable), then bundles (the SDR associative index).
+    /// This fsyncs the metadata file, data file, bundle store, and
+    /// rehearsal traces. The order is: data file first (so the
+    /// payload is durable), then meta file (so the index entries
+    /// pointing to the payload are durable), then bundles (the SDR
+    /// associative index), then traces (the forgetting sidecar).
     /// This ordering ensures that if a crash occurs between syncs,
     /// we never have an index entry pointing to a non-existent
     /// data record — the data is always at least as durable as
@@ -2252,6 +2921,7 @@ impl LtmStore {
         self.data_file.sync_all().map_err(LtmError::Io)?;
         self.meta_file.sync_all().map_err(LtmError::Io)?;
         self.bundles.sync().map_err(LtmError::Io)?;
+        self.traces.sync().map_err(LtmError::Io)?;
         Ok(())
     }
 
@@ -2323,7 +2993,9 @@ impl LtmStore {
             // Read the episode payload to get the text and full
             // emotional tag. The index entry only has the compact
             // 4-element tag; the full 12-element tag is in the payload.
-            let episode = self.retrieve(id)?;
+            // `retrieve_raw`: rebuilding the index is maintenance, not
+            // rehearsal — it must not refresh the forgetting traces.
+            let episode = self.retrieve_raw(id)?;
             real_episodes.push(RealEpisode {
                 episode_id: id,
                 timestamp: episode.timestamp,
@@ -2392,6 +3064,16 @@ impl LtmStore {
 // ─────────────────────────────────────────────────────────────────
 //  Compression helpers (same as v1)
 // ─────────────────────────────────────────────────────────────────
+
+/// Wall-clock milliseconds since the Unix epoch — the body's own
+/// clock for measuring trace decay, local to the store so `store`
+/// stays free of daemon dependencies.
+fn wall_now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
 
 fn compress(data: &[u8]) -> Result<Vec<u8>, LtmError> {
     let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());

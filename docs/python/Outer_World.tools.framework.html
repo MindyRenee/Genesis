@@ -148,6 +148,16 @@ Returns&nbsp;a&nbsp;JSON-safe&nbsp;summary&nbsp;in&nbsp;``data["analysis"]``:&nb
 symbols,&nbsp;call&nbsp;edges,&nbsp;cyclomatic&nbsp;complexity,&nbsp;imports.&nbsp;When<br>
 ``symbol``&nbsp;is&nbsp;given,&nbsp;``data["impact"]``&nbsp;reports&nbsp;the&nbsp;transitive<br>
 dependents&nbsp;—&nbsp;the&nbsp;change-propagation&nbsp;surface.</span></dd></dl>
+ <dl><dt><a name="-browser_ask_human"><strong>browser_ask_human</strong></a>(url: 'str', timeout: 'int' = 120) -&gt; 'ToolResult'</dt><dd><span class="code">Show&nbsp;a&nbsp;page&nbsp;on&nbsp;the&nbsp;owner's&nbsp;screen&nbsp;and&nbsp;wait&nbsp;for&nbsp;them&nbsp;to&nbsp;clear<br>
+its&nbsp;human&nbsp;check&nbsp;—&nbsp;captcha,&nbsp;consent&nbsp;wall,&nbsp;"verify&nbsp;you&nbsp;are&nbsp;human".<br>
+&nbsp;<br>
+The&nbsp;headless&nbsp;browser&nbsp;yields&nbsp;the&nbsp;shared&nbsp;profile,&nbsp;the&nbsp;visible<br>
+window&nbsp;carries&nbsp;her&nbsp;sign-in,&nbsp;and&nbsp;whatever&nbsp;the&nbsp;person&nbsp;clears<br>
+persists&nbsp;profile-side&nbsp;—&nbsp;headless&nbsp;fetches&nbsp;inherit&nbsp;the&nbsp;clearance.</span></dd></dl>
+ <dl><dt><a name="-browser_back"><strong>browser_back</strong></a>() -&gt; 'ToolResult'</dt><dd><span class="code">Back&nbsp;one&nbsp;history&nbsp;entry&nbsp;in&nbsp;her&nbsp;tab;&nbsp;returns&nbsp;the&nbsp;page&nbsp;she&nbsp;lands&nbsp;on.</span></dd></dl>
+ <dl><dt><a name="-browser_click"><strong>browser_click</strong></a>(x: 'float' = -1, y: 'float' = -1, text: 'str' = '', selector: 'str' = '') -&gt; 'ToolResult'</dt><dd><span class="code">Click&nbsp;in&nbsp;her&nbsp;tab&nbsp;—&nbsp;at&nbsp;``x,y``&nbsp;page&nbsp;coordinates,&nbsp;a&nbsp;CSS<br>
+``selector``,&nbsp;or&nbsp;the&nbsp;element&nbsp;whose&nbsp;visible&nbsp;text&nbsp;contains&nbsp;``text``.<br>
+Clicks&nbsp;can&nbsp;navigate;&nbsp;the&nbsp;landing&nbsp;URL&nbsp;is&nbsp;safety-checked&nbsp;too.</span></dd></dl>
  <dl><dt><a name="-browser_close"><strong>browser_close</strong></a>() -&gt; 'ToolResult'</dt><dd><span class="code">Close&nbsp;her&nbsp;shared&nbsp;web&nbsp;browser&nbsp;—&nbsp;hers&nbsp;to&nbsp;put&nbsp;away&nbsp;when&nbsp;done.<br>
 &nbsp;<br>
 ``web_search``&nbsp;and&nbsp;``web_fetch``&nbsp;share&nbsp;one&nbsp;browser&nbsp;that&nbsp;stays<br>
@@ -161,6 +171,20 @@ her&nbsp;responsibility,&nbsp;like&nbsp;putting&nbsp;a&nbsp;tool&nbsp;back&nbsp;
 Closing&nbsp;asks&nbsp;the&nbsp;browser&nbsp;to&nbsp;stop&nbsp;—&nbsp;it&nbsp;flushes&nbsp;history&nbsp;and&nbsp;site<br>
 state&nbsp;to&nbsp;the&nbsp;profile&nbsp;first,&nbsp;so&nbsp;nothing&nbsp;she&nbsp;learned&nbsp;is&nbsp;lost.<br>
 Reversible:&nbsp;the&nbsp;next&nbsp;search&nbsp;or&nbsp;fetch&nbsp;opens&nbsp;a&nbsp;fresh&nbsp;one.</span></dd></dl>
+ <dl><dt><a name="-browser_key"><strong>browser_key</strong></a>(key: 'str') -&gt; 'ToolResult'</dt><dd><span class="code">Press&nbsp;one&nbsp;named&nbsp;key&nbsp;in&nbsp;her&nbsp;tab&nbsp;—&nbsp;enter,&nbsp;tab,&nbsp;escape,&nbsp;backspace,<br>
+delete,&nbsp;space,&nbsp;the&nbsp;arrows,&nbsp;home,&nbsp;end,&nbsp;pageup,&nbsp;pagedown.&nbsp;The&nbsp;keys<br>
+a&nbsp;click&nbsp;can't&nbsp;reach:&nbsp;Enter&nbsp;submits,&nbsp;Tab&nbsp;moves&nbsp;focus.</span></dd></dl>
+ <dl><dt><a name="-browser_open"><strong>browser_open</strong></a>(url: 'str') -&gt; 'ToolResult'</dt><dd><span class="code">Open&nbsp;a&nbsp;URL&nbsp;in&nbsp;her&nbsp;browser&nbsp;tab.<br>
+&nbsp;<br>
+Returns&nbsp;the&nbsp;page's&nbsp;title,&nbsp;landed&nbsp;URL,&nbsp;and&nbsp;interactive&nbsp;elements<br>
+(links,&nbsp;buttons,&nbsp;inputs&nbsp;with&nbsp;click&nbsp;coordinates)&nbsp;—&nbsp;the&nbsp;controls<br>
+browser_click&nbsp;and&nbsp;browser_type&nbsp;act&nbsp;on.&nbsp;Same&nbsp;content&nbsp;rules&nbsp;as<br>
+web_fetch:&nbsp;adult/malware&nbsp;URLs&nbsp;and&nbsp;private&nbsp;addresses&nbsp;are&nbsp;refused.</span></dd></dl>
+ <dl><dt><a name="-browser_read"><strong>browser_read</strong></a>() -&gt; 'ToolResult'</dt><dd><span class="code">Read&nbsp;the&nbsp;tab's&nbsp;current&nbsp;state&nbsp;—&nbsp;title,&nbsp;URL,&nbsp;interactive&nbsp;elements.</span></dd></dl>
+ <dl><dt><a name="-browser_scroll"><strong>browser_scroll</strong></a>(dy: 'int' = 600) -&gt; 'ToolResult'</dt><dd><span class="code">Scroll&nbsp;her&nbsp;tab&nbsp;—&nbsp;positive&nbsp;down,&nbsp;negative&nbsp;up.</span></dd></dl>
+ <dl><dt><a name="-browser_type"><strong>browser_type</strong></a>(text: 'str', x: 'float' = -1, y: 'float' = -1, target: 'str' = '', selector: 'str' = '') -&gt; 'ToolResult'</dt><dd><span class="code">Type&nbsp;``text``&nbsp;in&nbsp;her&nbsp;tab&nbsp;—&nbsp;into&nbsp;the&nbsp;focused&nbsp;element,&nbsp;or&nbsp;into<br>
+the&nbsp;element&nbsp;found&nbsp;by&nbsp;``x,y``/``selector``/visible&nbsp;``target``&nbsp;text<br>
+(clicked&nbsp;first&nbsp;to&nbsp;focus&nbsp;it).</span></dd></dl>
  <dl><dt><a name="-compile_python_file"><strong>compile_python_file</strong></a>(path: 'str', project_root: 'str' = '.') -&gt; 'ToolResult'</dt><dd><span class="code">Compile&nbsp;a&nbsp;Python&nbsp;source&nbsp;file&nbsp;under&nbsp;`project_root`&nbsp;without&nbsp;executing&nbsp;it.</span></dd></dl>
  <dl><dt><a name="-concept_lookup"><strong>concept_lookup</strong></a>(concept: 'str', network: 'Any') -&gt; 'ToolResult'</dt><dd><span class="code">Look&nbsp;up&nbsp;a&nbsp;concept&nbsp;in&nbsp;the&nbsp;knowledge&nbsp;network&nbsp;and&nbsp;summarise&nbsp;it.</span></dd></dl>
  <dl><dt><a name="-delete_file"><strong>delete_file</strong></a>(path: 'str', project_root: 'str' = '.') -&gt; 'ToolResult'</dt><dd><span class="code">Delete&nbsp;a&nbsp;file&nbsp;under&nbsp;`project_root`.&nbsp;Refuses&nbsp;to&nbsp;delete&nbsp;directories.</span></dd></dl>

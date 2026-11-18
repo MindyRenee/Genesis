@@ -2,10 +2,10 @@
 
 The ``studio_*`` family is the outer-world end of drawing: the
 registered ops every intention dispatches through, bound to her
-canvas (``frontal_lobe.canvas``: paper, color, a parameterized
-brush, marks). The painting itself is inner work — she draws with
-her mind — but the tool surface that lets her issue ops is an
-outer-world instrument, so it lives in ``tools/``.
+canvas (``canvas``: paper, color, a parameterized brush, marks).
+The paint program lives in her outer world — it is an instrument
+in the world, not a part of her — and so does the tool surface
+that lets her issue ops, in ``tools/``.
 
 Nothing here prescribes anything: any sheet size, any paper, any
 color, any tool name she gives the brush she dialed
@@ -28,7 +28,7 @@ from typing import TYPE_CHECKING, Any
 from tools.framework import Tool, ToolResult
 
 if TYPE_CHECKING:
-    from frontal_lobe.canvas import Canvas, DrawingResult
+    from canvas import Canvas, DrawingResult
 
     from tools.framework import ToolRegistry
 

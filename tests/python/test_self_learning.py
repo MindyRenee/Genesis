@@ -1457,6 +1457,61 @@ class TestHeuristicExperimentAuditLog:
         assert experiment.reverted_count >= 1
         assert experiment.applied_count == 0
 
+    def test_verify_gate_is_scoped_to_the_change_arm(self, experiment, engine, temp_project):
+        """The gate gets the arm the edit can affect — a Python edit
+        must not face the cargo suite (a toolchain failure there once
+        reverted every proposal regardless of content)."""
+        verify_script = temp_project / "scripts" / "verify_change.sh"
+        # Record argv, then pass — the experiment applies either way.
+        verify_script.write_text('#!/usr/bin/env bash\necho "$@" > "$1/.verify_args"\nexit 0\n')
+        verify_script.chmod(0o755)
+
+        record = experiment.run_experiment(
+            file_path="Self_World/frontal_lobe/autonomous.py",
+            original_code='_CONCEPT_RE = re.compile(r"\\b([a-z]+)\\b")',
+            proposed_code='_CONCEPT_RE = re.compile(r"\\b([a-z_]+)\\b")',
+            description="python edit",
+        )
+        assert record.status == "applied"
+        args = (temp_project / ".verify_args").read_text().split()
+        assert args[-1] == "python"
+
+        rust_file = temp_project / "Self_World" / "src" / "field" / "mod.rs"
+        rust_file.parent.mkdir(parents=True, exist_ok=True)
+        rust_file.write_text("fn a() -> i32 { 1 }\n")
+        record = experiment.run_experiment(
+            file_path="Self_World/src/field/mod.rs",
+            original_code="fn a() -> i32 { 1 }",
+            proposed_code="fn a() -> i32 { 2 }",
+            description="rust edit",
+        )
+        assert record.status == "applied"
+        args = (temp_project / ".verify_args").read_text().split()
+        assert args[-1] == "rust"
+
+    def test_verify_failure_record_names_the_stage(self, experiment, engine, temp_project):
+        """A gate failure lands in the record with the stage's own
+        output — not the blanket "tests failed" that taught nothing."""
+        verify_script = temp_project / "scripts" / "verify_change.sh"
+        verify_script.write_text(
+            "#!/usr/bin/env bash\n"
+            'echo "FAILED tests/python/test_x.py::test_y - assert 1 == 2"\n'
+            'echo "[verify] x pytest failed" >&2\n'
+            "exit 2\n"
+        )
+        verify_script.chmod(0o755)
+
+        record = experiment.run_experiment(
+            file_path="Self_World/frontal_lobe/autonomous.py",
+            original_code='_CONCEPT_RE = re.compile(r"\\b([a-z]+)\\b")',
+            proposed_code='_CONCEPT_RE = re.compile(r"\\b([a-z_]+)\\b")',
+            description="record the real failure",
+        )
+        assert record.status == "reverted"
+        assert "verification gate" in record.reason
+        assert "pytest" in record.reason
+        assert "test_x.py::test_y" in record.reason
+
 
 class TestHeuristicExperimentPersistence:
     """Tests for experiment history persistence."""

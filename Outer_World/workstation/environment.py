@@ -285,6 +285,12 @@ class OuterEnvironment:
         self.on_channel_speech = on_channel_speech
         if self.channel is not None:
             self.channel.on_speech = self._channel_heard
+            # Sleep is a closed relay, not deafness: the ear holds its
+            # cursor while she's under so the public's words are
+            # waiting in order when she wakes.
+            listener = getattr(self.channel, "listener", None)
+            if listener is not None:
+                listener.is_awake = lambda: not self._asleep()
         # Her instrument card — a ``ChannelBoard`` the mind attaches
         # after construction (it reads the whole mind, which does not
         # exist yet here). None until then.

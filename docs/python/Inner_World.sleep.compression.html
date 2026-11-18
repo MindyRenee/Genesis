@@ -196,6 +196,11 @@ ripples,&nbsp;not&nbsp;one&nbsp;dump.&nbsp;Each&nbsp;step&nbsp;is&nbsp;self-comm
 -&nbsp;**prune_ltm**&nbsp;—&nbsp;releases&nbsp;archived&nbsp;engrams&nbsp;the&nbsp;memory&nbsp;system<br>
 &nbsp;&nbsp;itself&nbsp;reports&nbsp;dead.&nbsp;Runs&nbsp;only&nbsp;when&nbsp;a&nbsp;``release_fn``&nbsp;is<br>
 &nbsp;&nbsp;supplied:&nbsp;forgetting&nbsp;is&nbsp;her&nbsp;verdict,&nbsp;not&nbsp;the&nbsp;compressor's.<br>
+-&nbsp;**forget_ltm**&nbsp;—&nbsp;the&nbsp;body's&nbsp;own&nbsp;sweep:&nbsp;releases&nbsp;episodes<br>
+&nbsp;&nbsp;whose&nbsp;retrieval&nbsp;traces&nbsp;have&nbsp;decayed&nbsp;past&nbsp;the&nbsp;reach&nbsp;of&nbsp;any<br>
+&nbsp;&nbsp;cue,&nbsp;then&nbsp;physically&nbsp;compacts&nbsp;the&nbsp;store&nbsp;so&nbsp;the&nbsp;bytes&nbsp;are<br>
+&nbsp;&nbsp;actually&nbsp;reclaimed.&nbsp;Follows&nbsp;prune_ltm&nbsp;so&nbsp;a&nbsp;single<br>
+&nbsp;&nbsp;compaction&nbsp;clears&nbsp;both&nbsp;verdicts'&nbsp;dead.<br>
 -&nbsp;**save**&nbsp;—&nbsp;VQ&nbsp;codebook&nbsp;+&nbsp;holographic&nbsp;graph,&nbsp;plus&nbsp;the<br>
 &nbsp;&nbsp;periodic&nbsp;holographic&nbsp;rebuild.<br>
 &nbsp;<br>

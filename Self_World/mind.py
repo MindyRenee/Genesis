@@ -40,11 +40,11 @@ from typing import TYPE_CHECKING, ClassVar
 
 from brain_waves import BrainWave, add_brain_wave_drive, add_stimulus
 from brainstem.brainstem import Brainstem
+from canvas import Canvas
 from cerebellum.cerebellum import Cerebellum
 from discord.board import ChannelBoard
 from discord.feed import DiscordFeed
 from frontal_lobe.autonomous import AutonomousLearner
-from frontal_lobe.canvas import Canvas
 from frontal_lobe.prefrontal import FrontalLobe
 from genesis_client import GenesisClient
 from genesis_client.protocol import CHEM_ACETYLCHOLINE
@@ -199,9 +199,10 @@ class Mind(
         # connectivity probe never opens a socket, and the thalamic
         # gate shuts with sleep onset instead of holding N1 open.
         self._headless = headless
-        # Self-directed mode keeps volition and synchronous tools live.
-        # Cognitive subsystems are always metronome-advanced state, not
-        # workers; this mode additionally keeps process resurrection off.
+        # Self-directed mode keeps volition, synchronous tools, and
+        # inner life live. Cognitive subsystems are always
+        # metronome-advanced state, not workers; this mode leaves the
+        # learner and regulator loops closed.
         self._self_directed = self_directed
         self.client = GenesisClient(socket_path)
         # Her page — the public channel that lives in her outer world.
@@ -462,6 +463,7 @@ class Mind(
             offline=self._offline,
             get_emotion=self.feel,
             get_agency_topic=self.inner_life.pop_agency_topic,
+            get_waves=self.brain_waves,
             on_event=lambda desc: self.world.it_acted(desc),
             on_store_memory=self._learner_store_memory,
             on_neuro_impulse=self._learner_neuro_impulse,
@@ -516,6 +518,14 @@ class Mind(
         # her vitals, posted to her page); the metronome only ticks
         # the world, never composes for it.
         self.world.board = ChannelBoard(self)
+        # Rest defers the ear, it doesn't deafen it: while she rests
+        # (sleep, meditation, drift — the full is_resting set, broader
+        # than the world's sleep gate alone) the listener holds its
+        # cursor so a guest's words wait at the door and arrive in
+        # order when she surfaces.
+        listener = getattr(getattr(self.world, "channel", None), "listener", None)
+        if listener is not None:
+            listener.is_awake = lambda: not self.is_resting
         # The arcade — games offered in her world (official ARC-AGI-3
         # API plus the local Kaggle Game Arena shelf). She chooses when
         # to play; boards and moves flow back through the world into
@@ -529,11 +539,36 @@ class Mind(
             games=default_games(
                 environments_dir=os.path.join(self.data_dir, "arcade", "environment_files"),
                 recordings_dir=os.path.join(self.data_dir, "arcade", "recordings"),
+                # Offline mode makes the whole arcade local: only the
+                # downloaded official games and the arena shelf, no
+                # catalogue fetch or scorecard sync.
+                mode="offline" if self._offline else None,
             ),
             voice=lambda text: self._emit_live_thought("play", text),
             image_dir=os.path.join(self.data_dir, "arcade"),
         )
         arcade.register_tools(get_tools())
+
+        # Offline is a boundary on every path, not only the acting
+        # loop: net-scoped tools are vetoed at the registry itself so
+        # no caller — volition, agency, or a conversation fallback —
+        # reaches the network in offline mode.
+        if self._offline:
+            _NET_TOOLS = {
+                "web_search",
+                "web_fetch",
+                "browser_open",
+                "browser_read",
+                "browser_click",
+                "browser_type",
+                "browser_key",
+                "browser_scroll",
+                "browser_back",
+                "browser_ask_human",
+            }
+            get_tools().gate = lambda intent: (
+                "offline" if intent.split(" ", 1)[0] in _NET_TOOLS else None
+            )
 
         # The cardiac control center — the medullary organ that reads
         # the body's carrier pulse (daemon field probe), drives
@@ -553,7 +588,6 @@ class Mind(
         # public says there reaches cognition through
         # ``world._channel_heard`` → ``self._hear_channel``.
         self._last_broadcast_seed: str | None = None
-        self._last_channel_reply = 0.0
 
     def _init_identity(self) -> None:
         """Create emergent identity and developmental tracker."""
@@ -836,6 +870,15 @@ class Mind(
             on_finished=self._on_drawing_finished,
             mood=self._studio_mood,
         )
+
+        # The eye's dials — the camera's hardware controls
+        # (v4l2-ctl) and the body's optic requests (lid, focus,
+        # cortical gain) land in her hands the same way the easel's
+        # did. What she sees stays hers; these only set how the
+        # light arrives.
+        from tools.eye import register_eye_tools
+
+        register_eye_tools(get_tools(), client=self.client)
 
         # Volition — internal urges that decide when it acts on itself.
         # It acts when the urge to bug-scan, study its own code, or seek

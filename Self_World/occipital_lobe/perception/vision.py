@@ -61,6 +61,16 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 import numpy as np
+from body.sight.optic_nerve import (
+    NAME as _OPTIC_NERVE_NAME,
+)
+from body.sight.optic_nerve import (
+    SCREEN_NAME as _SCREEN_NERVE_NAME,
+)
+from body.sight.optic_nerve import (
+    OpticNerve,
+    latest_frame,
+)
 from genesis_client.protocol import (
     CHEM_ACETYLCHOLINE,
     CHEM_DOPAMINE,
@@ -69,16 +79,6 @@ from genesis_client.protocol import (
     EMOTIONAL_TAG_SIZE,
 )
 from genesis_client.swallow import note_swallowed
-from optic_nerve import (
-    NAME as _OPTIC_NERVE_NAME,
-)
-from optic_nerve import (
-    SCREEN_NAME as _SCREEN_NERVE_NAME,
-)
-from optic_nerve import (
-    OpticNerve,
-    latest_frame,
-)
 from temporal_lobe import DetectedObject, ObjectRecognizer
 from temporal_lobe.concepts import RelationType
 

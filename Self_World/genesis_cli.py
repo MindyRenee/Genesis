@@ -183,7 +183,7 @@ DEFAULT_DAEMON_SOCKET = "genesis.sock"
 # might match unrelated user processes.
 _PID_FILE_CLI = "genesis_cli.pid"
 _PID_FILE_DAEMON = "genesis_daemon.pid"
-# The screen-capture nerve — a relay (scripts/optic_relay.py) publishing
+# The screen-capture nerve — a relay (body/sight/optic_relay.py) publishing
 # the display into its own optic-nerve-style segment
 # (optic_nerve.SCREEN_NAME), her second eye.
 _PID_FILE_SCREEN_NERVE = "genesis_screen_nerve.pid"
@@ -406,14 +406,14 @@ def _screen_nerve_script() -> str | None:
     """The optic relay script, wherever this layout keeps the tree."""
     from infrastructure.paths import code_root
 
-    script = code_root() / "Self_World" / "optic_relay.py"
+    script = code_root() / "Self_World" / "body" / "sight" / "optic_relay.py"
     return str(script) if script.exists() else None
 
 
 def _start_screen_nerve(data_dir: str) -> subprocess.Popen | _AdoptedDaemon | None:
     """Launch the screen-capture nerve — her second eye.
 
-    The relay (``scripts/optic_relay.py``) publishes the X display into
+    The relay (``body/sight/optic_relay.py``) publishes the X display into
     its own optic-nerve-style segment; the mind reads it through
     ``Vision.see(nerve="screen")``. It degrades silently to None when
     there is no display, no ffmpeg, or no script — a dark second eye is
@@ -1220,6 +1220,54 @@ def _cmd_world(mind: Mind, rest: str) -> str:
     return f"\n  genesis> {mind.world_status()}\n"
 
 
+def _cmd_place(mind: Mind, rest: str) -> str:
+    """Give Genesis a location — one place, owned by her body.
+
+    ``/place x y`` sets the location: the coordinates go to the
+    daemon through ``PLACE_FIELD`` and become the body's own state —
+    persisted in ``place.bin`` so where she is survives restarts,
+    and reported back through ``GET_PLACE`` as her ambient position
+    (under drift, where she is — not where she was put). The
+    same point is her position in the ordinary world and her
+    position in the bulk: x on the first latent axis, y on the
+    second, deeper axes as given (up to six). ``/place release``
+    lifts the location. Bare ``/place`` asks the body where she is.
+    """
+    args = rest.split()
+    if not args:
+        pose = mind.client.get_pose()
+        if pose is None:
+            return (
+                "\n  genesis> nowhere in particular — interior "
+                "speaking for itself\n           usage: /place x y "
+                "[z ... up to 6]  |  /place release\n"
+            )
+        out = f"\n  genesis> she is at {pose['ambient']}"
+        if pose["frame"] is not None:
+            out += "\n           oriented — she faces her own axes"
+        if pose["drift"] is not None:
+            out += "\n           drifting — the place itself moves"
+        return out + "\n"
+
+    if args == ["release"]:
+        if mind.client.place_field(None):
+            return "\n  genesis> released — her interior speaks for itself again\n"
+        return "\n  [error] the body didn't answer (daemon unreachable)\n"
+
+    try:
+        coords = [float(a) for a in args]
+    except ValueError:
+        return "\n  usage: /place x y [z ... up to 6]  |  /place release\n"
+    if not all(math.isfinite(c) for c in coords):
+        return "\n  [error] a location must be finite numbers\n"
+    if not 2 <= len(coords) <= 6:
+        return "\n  a location is 2 to 6 coordinates — one place, one owner\n"
+
+    if not mind.client.place_field(coords):
+        return "\n  [error] the body didn't answer (daemon unreachable or predates PLACE_FIELD)\n"
+    return f"\n  genesis> she is at {coords} — the cord carries the same point up, tick by tick\n"
+
+
 def _cmd_arcade(mind: Mind, rest: str) -> str:
     """Show the arcade in her world — games offered and what she remembers."""
     return f"\n  genesis> {mind.arcade_status()}\n"
@@ -1526,7 +1574,7 @@ def _cmd_register_face(mind: Mind, rest: str) -> str:
         return f"\n  genesis> {result}\n"
 
     # Capture a frame and register
-    from optic_nerve import latest_frame
+    from body.sight.optic_nerve import latest_frame
 
     frame = latest_frame(copy=True)
     if frame is None:
@@ -2005,6 +2053,7 @@ _COMMAND_HANDLERS: dict[str, Callable[[Mind, str], str]] = {
     "/learning": _cmd_learning,
     "/thoughts": _cmd_thoughts,
     "/world": _cmd_world,
+    "/place": _cmd_place,
     "/arcade": _cmd_arcade,
     "/regulate": _cmd_regulate,
     "/dreams": _cmd_dreams,
@@ -2323,8 +2372,8 @@ def _parse_cli_args() -> argparse.Namespace:
     parser.add_argument(
         "--self-directed",
         action="store_true",
-        help="Keep volition and synchronous capabilities live; cognition "
-        "is metronome-advanced and no cognitive workers are spawned.",
+        help="Keep volition, synchronous capabilities, and inner life "
+        "live; the learner and regulator loops stay closed.",
     )
     parser.add_argument(
         "--stop",
@@ -3660,7 +3709,8 @@ def main() -> int:
             self_directed = getattr(args, "self_directed", False) is True
             if self_directed:
                 print(
-                    "[genesis] Self-directed mode — volition and tools active.",
+                    "[genesis] Self-directed mode — volition, tools, and "
+                    "inner life active; learner/regulator loops off.",
                     file=sys.stderr,
                 )
             mind = Mind(
@@ -3686,14 +3736,13 @@ def main() -> int:
                 # the body resurrects around its persisted state and
                 # the mind re-inhabits it — the eye re-opens with the
                 # body, its capture limb inside the daemon — for as
-                # long as the mind lives. In self-directed mode the
-                # handles are still registered for teardown, but the
-                # resurrection worker stays off.
+                # long as the mind lives. Self-directed mode leaves the
+                # resurrection worker on: directing herself is no reason
+                # to go without a body that heals.
                 rebirth = _Rebirth(data_dir, daemon_socket, shutting_down)
                 rebirth.set_children(daemon=daemon_proc)
                 rebirth.set_mind(mind)
-                if not self_directed:
-                    rebirth.start()
+                rebirth.start()
                 # Her second eye — the display itself, published as its
                 # own nerve segment. Absent a display it stays dark and
                 # the watcher simply never opens it.

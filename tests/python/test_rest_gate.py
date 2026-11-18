@@ -115,7 +115,6 @@ def test_channel_hearing_paused_while_resting():
     mind.respond = lambda text: responded.append(text) or "answer"
     mind._channel_addressed = lambda text, msg: True
     mind._running = True
-    mind._last_channel_reply = 0.0
     mind._public_share = lambda text: None
     mind._hear_channel("someone", "hey genesis", {})
     assert emitted == [] and responded == []

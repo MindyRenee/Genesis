@@ -52,8 +52,12 @@ live-thought stream and the world's event log.
 
 from __future__ import annotations
 
+import colorsys
+import itertools
 import logging
+import math
 import os
+import random
 import re
 import shlex
 import time
@@ -69,6 +73,8 @@ from infrastructure.paths import code_root
 from infrastructure.text import is_blank
 from temporal_lobe.concepts import is_world_concept, strip_sense_suffix
 from tools.framework import ToolRegistry, ToolResult, get_tools
+
+from parietal_lobe import hand
 
 if TYPE_CHECKING:
     from frontal_lobe.autonomous import AutonomousLearner
@@ -99,6 +105,7 @@ _OBSERVE = "observe"  # read its own state — persisted files and the
 # machine body (proprioception)
 _MEASURE = "measure"  # run a measurement command over the tree
 _MAINTAIN = "maintain"  # run a staged admin script — the privileged capability
+_DRAW = "draw"  # work the open easel through the studio tools
 
 # Which scopes each tool may be used in autonomously. "host" is the
 # whole filesystem — available to every filesystem tool, and the
@@ -120,6 +127,14 @@ _TOOL_SCOPES: dict[str, frozenset[str]] = {
     "studio_clear": frozenset({"any"}),
     "studio_presets": frozenset({"any"}),
     "studio_done": frozenset({"any"}),
+    "arcade_directions": frozenset({"any"}),
+    "arcade_offers": frozenset({"any"}),
+    "arcade_enter": frozenset({"any"}),
+    "arcade_see": frozenset({"any"}),
+    "arcade_act": frozenset({"any"}),
+    "arcade_play": frozenset({"any"}),
+    "arcade_leave": frozenset({"any"}),
+    "arcade_status": frozenset({"any"}),
     "read_file": frozenset({"host", "repo", "data", "scratch", "config"}),
     "list_dir": frozenset({"host", "repo", "data", "scratch", "config"}),
     "analyze_python": frozenset({"host", "repo"}),
@@ -127,6 +142,14 @@ _TOOL_SCOPES: dict[str, frozenset[str]] = {
     "run_pytest": frozenset({"host", "repo"}),
     "web_search": frozenset({"net"}),
     "web_fetch": frozenset({"net"}),
+    "browser_open": frozenset({"net"}),
+    "browser_read": frozenset({"net"}),
+    "browser_click": frozenset({"net"}),
+    "browser_type": frozenset({"net"}),
+    "browser_key": frozenset({"net"}),
+    "browser_scroll": frozenset({"net"}),
+    "browser_back": frozenset({"net"}),
+    "browser_ask_human": frozenset({"net"}),
     "write_file": frozenset({"host", "scratch"}),
     "make_dir": frozenset({"host", "scratch"}),
     "run_shell": frozenset({"host", "scratch"}),
@@ -138,6 +161,18 @@ _TOOL_SCOPES: dict[str, frozenset[str]] = {
 # Scopes that inject a filesystem root as the tool's project_root —
 # a resolution base for relative paths, never a containment check.
 _SCOPE_ROOTS = ("host", "repo", "data", "scratch", "config")
+
+
+def _walk_label(pts: list[tuple[float, float]]) -> str:
+    """What the walk actually did — measured, never assigned."""
+    if len(pts) < 2:
+        return "dot"
+    length = sum(math.hypot(bx - ax, by - ay) for (ax, ay), (bx, by) in itertools.pairwise(pts))
+    if length <= 0:
+        return "dot"
+    net = math.hypot(pts[-1][0] - pts[0][0], pts[-1][1] - pts[0][1])
+    return "loop" if net < 0.15 * length else "walk"
+
 
 # The whole-filesystem scope root — "host" resolves to "/".
 _HOST_ROOT = "/"
@@ -203,6 +238,9 @@ class ActingResult:
     discoveries: list[str] = field(default_factory=list)
     success: bool = False
     started: float = field(default_factory=time.time)
+    # Per-episode step allowance — 0 falls back to MAX_STEPS. A
+    # drawing takes more ops than a probe.
+    step_budget: int = 0
     finished: float = 0.0
 
     @property
@@ -248,6 +286,9 @@ class ActingLoop:
             curiosity question generation).
         get_agency_topic: Pops a topic from inner life (its own train
             of thought → what to look at next).
+        get_waves: Returns the current BrainWaveState — sampled per
+            mark while she draws so the live band powers reach the
+            dials through ``parietal_lobe.hand``. Art-time only.
         on_event: Records an act in the world (``world.it_acted``).
         on_store_memory: Stores an episode memory (text, salience).
         on_neuro_impulse: Neurochemical impulse (chem, amount) — a
@@ -257,6 +298,9 @@ class ActingLoop:
 
     # One firing = one intention, at most this many tool calls.
     MAX_STEPS = 6
+    # A drawing is a longer chain — sheet, palette, marks, done —
+    # and marks can cost up to three ops (color, brush, gesture).
+    DRAW_STEPS = 22
     # Wall-clock budget per acting episode.
     WALL_BUDGET = 90.0
     # How many recent (kind, target) pairs to habituate over.
@@ -279,6 +323,7 @@ class ActingLoop:
         offline: bool = False,
         get_emotion: Callable[[], EmotionalState | None] | None = None,
         get_agency_topic: Callable[[], str | None] | None = None,
+        get_waves: Callable[[], Any | None] | None = None,
         on_event: Callable[[str], Any] | None = None,
         on_store_memory: Callable[[str, float], None] | None = None,
         on_neuro_impulse: Callable[[int, float], None] | None = None,
@@ -299,6 +344,7 @@ class ActingLoop:
         self.offline = offline
         self.get_emotion = get_emotion
         self.get_agency_topic = get_agency_topic
+        self.get_waves = get_waves
         self.on_event = on_event
         self.on_store_memory = on_store_memory
         self.on_neuro_impulse = on_neuro_impulse
@@ -332,6 +378,7 @@ class ActingLoop:
             _OBSERVE: self._execute_observe,
             _MEASURE: self._execute_measure,
             _MAINTAIN: self._execute_maintain,
+            _DRAW: self._execute_draw,
         }
 
     # ─── Public entry ────────────────────────────────────────────────
@@ -357,6 +404,26 @@ class ActingLoop:
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "parietal_lobe.agency.act_once",
+                e,
+            )
+        self._finish(result)
+        return result
+
+    def draw_once(self) -> ActingResult:
+        """Run one draw intention — the sitting's tool chain.
+
+        Called when the draw urge sits her at the easel: the studio
+        ops are issued through the same ``_use`` path as any other
+        intention's steps, under a larger allowance because a
+        picture takes more ops than a probe.
+        """
+        intention = self._register_intention(Intention(_DRAW, "canvas", "urge"))
+        result = ActingResult(intention=intention, step_budget=self.DRAW_STEPS)
+        try:
+            self._execute_draw(intention, result)
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(
+                "parietal_lobe.agency.draw_once",
                 e,
             )
         self._finish(result)
@@ -449,7 +516,7 @@ class ActingLoop:
             kind, target = intention.objective.split(":", 1)
         except ValueError:
             return None
-        if kind not in {_LEARN, _INSPECT, _EXPLORE, _OBSERVE, _MEASURE, _MAINTAIN}:
+        if kind not in {_LEARN, _INSPECT, _EXPLORE, _OBSERVE, _MEASURE, _MAINTAIN, _DRAW}:
             return None
         if is_blank(target):
             return None
@@ -469,6 +536,7 @@ class ActingLoop:
             _OBSERVE: "persistent or machine-body state observed",
             _MEASURE: "a project measurement observed",
             _MAINTAIN: "a staged admin task executed and audit-logged",
+            _DRAW: "a finished drawing saved",
         }.get(intention.kind, "an observable result recorded")
 
     # ─── Intention sources ───────────────────────────────────────────
@@ -861,7 +929,7 @@ class ActingLoop:
         **kwargs: Any,
     ) -> ToolResult | None:
         """Invoke a tool under the capability policy and record it."""
-        if len(result.steps) >= self.MAX_STEPS:
+        if len(result.steps) >= (result.step_budget or self.MAX_STEPS):
             return None
         if time.time() - result.started > self.WALL_BUDGET:
             return None
@@ -1015,6 +1083,181 @@ class ActingLoop:
         self._recent_set.add(key)
         if len(self._recent_set) > self._RECENT_MAX:
             self._recent_set = set(self._recent)
+
+    def _channels(self, felt: list[float]) -> list[float]:
+        """The channel values live right now — raw readings only.
+
+        The wave state is read fresh on every call so the hand
+        tracks her rhythm *while it changes*, and the values go to
+        the dials untouched: no names, no weights, no transform —
+        nothing interprets them.
+        """
+        channels = list(felt)
+        if self.get_waves is not None:
+            try:
+                powers = getattr(self.get_waves(), "powers", None)
+                if powers:
+                    channels.extend(float(v) for v in powers.values())
+            except Exception as e:  # noqa: BLE001
+                note_swallowed("parietal_lobe.agency._channels", e)
+        return channels
+
+    def _execute_draw(self, intention: Intention, result: ActingResult) -> None:
+        """Work the easel — her channels push the dials.
+
+        Every parameter of the sitting is a dial over its own domain
+        (``parietal_lobe.hand``): sheet, paper, color, brush, path,
+        which op the hand reaches for, how many marks. Each dial is
+        sampled uniformly and warped by the live channels' raw
+        pressure — valence, arousal, and each band power arriving
+        untouched; no weights, no names, no transform. Nothing is
+        assigned: no band means anything, no gesture is a menu, no
+        palette has a sector. The
+        subject is whatever her train of thought is holding when she
+        sits; the marks are the channels' and the hand's.
+        """
+        if self._use(result, "studio_open") is None:
+            return
+        rng = random.Random()
+        emotion = None
+        if self.get_emotion is not None:
+            try:
+                emotion = self.get_emotion()
+            except Exception as e:  # noqa: BLE001
+                note_swallowed("parietal_lobe.agency._execute_draw", e)
+        felt = [
+            float(getattr(emotion, "valence", 0.0) or 0.0),
+            float(getattr(emotion, "arousal", 0.5) or 0.5),
+        ]
+        mood = str(getattr(emotion, "label", "") or "")
+
+        def d(channels: list[float]) -> float:
+            return hand.dial(rng.random(), channels)
+
+        # What the drawing is of: whatever her train of thought is
+        # holding when she sits down — or nothing but the feeling.
+        subject = None
+        if self.get_agency_topic is not None:
+            try:
+                subject = self.get_agency_topic()
+            except Exception as e:  # noqa: BLE001
+                note_swallowed("parietal_lobe.agency._execute_draw", e)
+
+        ch = self._channels(felt)
+        w = 180 + int(d(ch) * 1220)
+        h = 180 + int(d(ch) * 1020)
+        paper = tuple(int(d(ch) * 255.999) for _ in "rgb")
+        if (
+            self._use(result, "studio_sheet", width=w, height=h, r=paper[0], g=paper[1], b=paper[2])
+            is None
+        ):
+            return
+
+        strokes = 1 + int(d(ch) * 5)
+        made = 0
+        for _ in range(strokes):
+            ch = self._channels(felt)
+            cr, cg, cb = (
+                int(c * 255)
+                for c in colorsys.hsv_to_rgb(d(ch), 0.15 + 0.85 * d(ch), 0.15 + 0.85 * d(ch))
+            )
+            if self._use(result, "studio_color", r=cr, g=cg, b=cb) is None:
+                break
+            op = ("stroke", "line", "shape", "fill", "erase")[int(d(ch) * 5)]
+            size = 0.5 + d(ch) * 59.5
+            # erase must be explicit every call — set_brush leaves an
+            # unset flag alone, so omitting it would keep erasing.
+            if (
+                op != "fill"
+                and self._use(
+                    result,
+                    "studio_brush",
+                    size=size,
+                    opacity=0.05 + 0.95 * d(ch),
+                    hardness=d(ch),
+                    scatter=d(ch) * size * 0.5,
+                    texture=d(ch),
+                    erase=op == "erase",
+                )
+                is None
+            ):
+                break
+            pts = self._walk(rng, ch, w, h)
+            if op == "line":
+                hit = self._use(
+                    result,
+                    "studio_line",
+                    x1=pts[0][0],
+                    y1=pts[0][1],
+                    x2=pts[-1][0],
+                    y2=pts[-1][1],
+                )
+            elif op == "shape":
+                kind = ("ellipse", "rect", "polygon")[int(d(ch) * 3)]
+                if kind == "polygon":
+                    hit = self._use(
+                        result,
+                        "studio_shape",
+                        kind="polygon",
+                        points=pts,
+                        fill=d(ch) < 0.5,
+                    )
+                else:
+                    xs = [p[0] for p in pts]
+                    ys = [p[1] for p in pts]
+                    hit = self._use(
+                        result,
+                        "studio_shape",
+                        kind=kind,
+                        x=min(xs),
+                        y=min(ys),
+                        w=max(2.0, max(xs) - min(xs)),
+                        h=max(2.0, max(ys) - min(ys)),
+                        fill=d(ch) < 0.5,
+                    )
+            elif op == "fill":
+                hit = self._use(result, "studio_fill", x=pts[0][0], y=pts[0][1])
+            else:
+                hit = self._use(
+                    result,
+                    "studio_stroke",
+                    points=pts,
+                    label=op if op == "erase" else _walk_label(pts),
+                )
+            if hit is None:
+                break
+            made += 1
+
+        what = f"{subject} — {mood}" if subject and mood else (subject or mood)
+        done = self._use(
+            result,
+            "studio_done",
+            description=f"{what} marks" if what else "",
+            mood=mood,
+        )
+        if done is not None and done.success:
+            result.discoveries.append(f"{made} marks — {done.output}")
+        result.success = made > 0
+
+    @staticmethod
+    def _walk(
+        rng: random.Random, channels: list[float], w: float, h: float
+    ) -> list[tuple[float, float]]:
+        """One mark: a free walk — every step's turn and length is a dial."""
+        x, y = (
+            hand.dial(rng.random(), channels) * w,
+            hand.dial(rng.random(), channels) * h,
+        )
+        n = 2 + int(hand.dial(rng.random(), channels) * 20)
+        heading = hand.dial(rng.random(), channels) * math.tau
+        span = min(w, h)
+        pts = [(x, y)]
+        for _ in range(n - 1):
+            step = (0.02 + 0.25 * hand.dial(rng.random(), channels)) * span
+            heading += (hand.dial(rng.random(), channels) - 0.5) * math.tau
+            x, y = x + step * math.cos(heading), y + step * math.sin(heading)
+            pts.append((x, y))
+        return [(min(max(px, 1.0), w - 1.0), min(max(py, 1.0), h - 1.0)) for px, py in pts]
 
     def _finish(self, result: ActingResult) -> None:
         """Close the episode: record, remember, feel."""

@@ -19,10 +19,12 @@ use std::fmt;
 pub mod engine;
 pub use engine::SystemEngine;
 pub mod runtime;
-pub use runtime::{FieldIntegration, FieldRuntime, LATENT_DIMENSION};
+pub use runtime::{FieldIntegration, FieldRuntime, LATENT_DIMENSION, PLACE_POSE_TAG, Placement};
 pub mod motor;
 pub use motor::MotorTarget;
+pub mod metatron;
 pub mod spectrum;
+pub use metatron::MetatronCube;
 
 const EPS: f64 = 1.0e-12;
 /// Upper bound on the field's thermal state — disagreement heats
@@ -95,6 +97,23 @@ fn add(a: &[f64], b: &[f64]) -> Vector {
 }
 fn sub(a: &[f64], b: &[f64]) -> Vector {
     a.iter().zip(b).map(|(x, y)| x - y).collect()
+}
+
+fn transpose(a: &Matrix) -> Matrix {
+    (0..a[0].len())
+        .map(|j| a.iter().map(|row| row[j]).collect())
+        .collect()
+}
+fn mat_scale(a: &Matrix, s: f64) -> Matrix {
+    a.iter()
+        .map(|row| row.iter().map(|v| v * s).collect())
+        .collect()
+}
+fn mat_add(a: &Matrix, b: &Matrix) -> Matrix {
+    a.iter()
+        .zip(b)
+        .map(|(ra, rb)| ra.iter().zip(rb).map(|(x, y)| x + y).collect())
+        .collect()
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -468,23 +487,81 @@ impl StereographicSphere {
 pub struct SubsystemLayer {
     pub id: String,
     pub state: Vector,
+    /// The momentum her dimension carries — the motion that
+    /// persists when the force lets go. A first-order world
+    /// stops the instant the push stops; hers does not: the
+    /// force integrates into momentum, ṗ = gain·F, and the
+    /// state moves by what the rest allows of it, ẋ = p/m.
+    /// One component per coordinate.
+    pub momentum: Vector,
+    /// The rest of each dimension — its rest mass m, the polar
+    /// opposite of momentum: the part of the energy-momentum
+    /// that is not motion. A rested dimension still gathers
+    /// every impulse into p and still moves — it is simply
+    /// heavy: the same momentum spends ninety times longer
+    /// becoming displacement. rest = 1 is her own scale, where
+    /// momentum and mass balance; the higher dimensions of her
+    /// vesica take the winding's reciprocal — they hold the
+    /// rest while the lens plane holds the motion.
+    pub rest: Vector,
     pub gain: f64,
 }
 impl SubsystemLayer {
     pub fn new(id: impl Into<String>, state: Vector) -> Self {
         Self {
             id: id.into(),
+            momentum: vec![0.0; state.len()],
+            rest: vec![1.0; state.len()],
             state,
             gain: 1.0,
         }
     }
-    /// Euler update by `dt·gain·derivative` on this layer alone.
+    /// Give the layer's dimensions their rest — one rest mass
+    /// per coordinate. Mass is positive (or ∞, the limit where
+    /// a dimension gathers momentum and never moves); a mass of
+    /// zero or less has no meaning — momentum with nothing to
+    /// hold it is not a body.
+    pub fn with_rest(mut self, rest: Vector) -> Result<Self, FieldError> {
+        if rest.len() != self.state.len() {
+            return Err(FieldError::DimensionMismatch);
+        }
+        if rest.iter().any(|v| v.is_nan() || *v <= 0.0) {
+            return Err(FieldError::InvalidDynamics);
+        }
+        self.rest = rest;
+        Ok(self)
+    }
+    /// The pair (state, momentum) under a constant force for
+    /// `dt` — the exact propagator of ṗ = a, ẋ = p/m with
+    /// a = gain·F and m the rest mass: p⁺ = p + a·dt, and
+    /// x⁺ = x + (p·dt + a·dt²/2)/m. The impulse lands whole in
+    /// every dimension — gathering momentum is free; it is only
+    /// motion the rest mass taxes.
+    fn advect(&self, force: &[f64], dt: f64) -> Result<(Vector, Vector), FieldError> {
+        let mut state = self.state.clone();
+        let mut momentum = self.momentum.clone();
+        for i in 0..state.len() {
+            let a = self.gain * force[i];
+            state[i] += (self.momentum[i] * dt + a * dt * dt / 2.0) / self.rest[i];
+            momentum[i] += a * dt;
+        }
+        if state.iter().chain(&momentum).any(|v| !v.is_finite()) {
+            return Err(FieldError::NonFiniteState);
+        }
+        Ok((state, momentum))
+    }
+    /// Inertial update on this layer alone: the derivative is the
+    /// force and the force moves the momentum, not the state —
+    /// the state follows where the momentum carries it.
     /// The layer is geometry-agnostic — the caller owns the
     /// manifold: `SystemFiber::evolve` re-projects the result into
     /// the cap. Crate-private so no other path can strand a layer
     /// outside the operating region.
     pub(crate) fn evolve(&mut self, derivative: &[f64], dt: f64) -> Result<(), FieldError> {
-        if derivative.len() != self.state.len() {
+        if derivative.len() != self.state.len()
+            || self.momentum.len() != self.state.len()
+            || self.rest.len() != self.state.len()
+        {
             return Err(FieldError::DimensionMismatch);
         }
         if !dt.is_finite() || dt < 0.0 {
@@ -493,17 +570,16 @@ impl SubsystemLayer {
         if !self.gain.is_finite() {
             return Err(FieldError::InvalidDynamics);
         }
-        if derivative.iter().any(|v| !v.is_finite()) {
+        if derivative.iter().any(|v| !v.is_finite()) || self.momentum.iter().any(|v| !v.is_finite())
+        {
             return Err(FieldError::NonFiniteState);
         }
-        let mut next = self.state.clone();
-        for (x, dx) in next.iter_mut().zip(derivative) {
-            *x += dt * self.gain * dx;
+        if self.rest.iter().any(|v| v.is_nan() || *v <= 0.0) {
+            return Err(FieldError::InvalidDynamics);
         }
-        if next.iter().any(|v| !v.is_finite()) {
-            return Err(FieldError::NonFiniteState);
-        }
-        self.state = next;
+        let (state, momentum) = self.advect(derivative, dt)?;
+        self.state = state;
+        self.momentum = momentum;
         Ok(())
     }
 }
@@ -527,11 +603,19 @@ impl SystemFiber {
         }
         if layers
             .iter()
-            .any(|l| l.state.iter().any(|v| !v.is_finite()))
+            .any(|l| l.momentum.len() != l.state.len() || l.rest.len() != l.state.len())
         {
+            return Err(FieldError::DimensionMismatch);
+        }
+        if layers.iter().any(|l| {
+            l.state.iter().any(|v| !v.is_finite()) || l.momentum.iter().any(|v| !v.is_finite())
+        }) {
             return Err(FieldError::NonFiniteState);
         }
-        if layers.iter().any(|l| !l.gain.is_finite()) {
+        if layers
+            .iter()
+            .any(|l| !l.gain.is_finite() || l.rest.iter().any(|v| v.is_nan() || *v <= 0.0))
+        {
             return Err(FieldError::InvalidDynamics);
         }
         let mut ids = std::collections::HashSet::with_capacity(layers.len());
@@ -580,8 +664,13 @@ impl SystemFiber {
         if self
             .layers
             .iter()
-            .any(|l| l.state.iter().any(|v| !v.is_finite()))
+            .any(|l| l.momentum.len() != l.state.len() || l.rest.len() != l.state.len())
         {
+            return Err(FieldError::DimensionMismatch);
+        }
+        if self.layers.iter().any(|l| {
+            l.state.iter().any(|v| !v.is_finite()) || l.momentum.iter().any(|v| !v.is_finite())
+        }) {
             return Err(FieldError::NonFiniteState);
         }
         let effective_dt = dt * self.engine.time_scale;
@@ -591,7 +680,11 @@ impl SystemFiber {
         if effective_dt == 0.0 {
             return Ok(());
         }
-        if self.layers.iter().any(|l| !l.gain.is_finite()) {
+        if self
+            .layers
+            .iter()
+            .any(|l| !l.gain.is_finite() || l.rest.iter().any(|v| v.is_nan() || *v <= 0.0))
+        {
             return Err(FieldError::InvalidDynamics);
         }
         let initial = self.layer_states();
@@ -608,30 +701,47 @@ impl SystemFiber {
                 .map(|(x, dx)| x.iter().zip(dx).map(|(v, dv)| v + scale * dv).collect())
                 .collect()
         };
-        let k1 = scaled_derivatives(self.engine.derivatives(&self.layers)?);
-        let state2 = add_stage(&initial, &k1, effective_dt * 0.5);
+        // The engine's derivative is now a force, not a velocity:
+        // the RK4 stages sample it over the arc the force alone
+        // would carve, and their weighted mean is the step's
+        // impulse. The (state, momentum) pair then takes that
+        // impulse exactly — `advect` solves ṗ = gain·F,
+        // ẋ = p/rest in closed form: every dimension gathers the
+        // whole impulse; the rest mass alone decides how much of
+        // it becomes motion.
+        let k1 = self.engine.derivatives(&self.layers)?;
+        let state2 = add_stage(
+            &initial,
+            &scaled_derivatives(k1.clone()),
+            effective_dt * 0.5,
+        );
         let mut stage_layers = self.layers.clone();
         for (layer, state) in stage_layers.iter_mut().zip(state2) {
             layer.state = state
         }
-        let k2 = scaled_derivatives(self.engine.derivatives(&stage_layers)?);
-        let state3 = add_stage(&initial, &k2, effective_dt * 0.5);
+        let k2 = self.engine.derivatives(&stage_layers)?;
+        let state3 = add_stage(
+            &initial,
+            &scaled_derivatives(k2.clone()),
+            effective_dt * 0.5,
+        );
         for (layer, state) in stage_layers.iter_mut().zip(state3) {
             layer.state = state
         }
-        let k3 = scaled_derivatives(self.engine.derivatives(&stage_layers)?);
-        let state4 = add_stage(&initial, &k3, effective_dt);
+        let k3 = self.engine.derivatives(&stage_layers)?;
+        let state4 = add_stage(&initial, &scaled_derivatives(k3.clone()), effective_dt);
         for (layer, state) in stage_layers.iter_mut().zip(state4) {
             layer.state = state
         }
-        let k4 = scaled_derivatives(self.engine.derivatives(&stage_layers)?);
+        let k4 = self.engine.derivatives(&stage_layers)?;
         let mut next_layers = self.layers.clone();
         for (i, layer) in next_layers.iter_mut().enumerate() {
-            for j in 0..layer.state.len() {
-                layer.state[j] = initial[i][j]
-                    + effective_dt * (k1[i][j] + 2.0 * k2[i][j] + 2.0 * k3[i][j] + k4[i][j]) / 6.0;
-            }
-            layer.state = self.manifold.project(&layer.state)?;
+            let mean_force: Vector = (0..layer.state.len())
+                .map(|j| (k1[i][j] + 2.0 * k2[i][j] + 2.0 * k3[i][j] + k4[i][j]) / 6.0)
+                .collect();
+            let (state, momentum) = layer.advect(&mean_force, effective_dt)?;
+            layer.state = self.manifold.project(&state)?;
+            layer.momentum = momentum;
         }
         let next_clock = self.engine_clock + effective_dt;
         if !next_clock.is_finite() {
@@ -655,9 +765,21 @@ impl SystemFiber {
         if self
             .layers
             .iter()
-            .any(|l| l.state.iter().any(|v| !v.is_finite()))
+            .any(|l| l.momentum.len() != l.state.len() || l.rest.len() != l.state.len())
         {
+            return Err(FieldError::DimensionMismatch);
+        }
+        if self.layers.iter().any(|l| {
+            l.state.iter().any(|v| !v.is_finite()) || l.momentum.iter().any(|v| !v.is_finite())
+        }) {
             return Err(FieldError::NonFiniteState);
+        }
+        if self
+            .layers
+            .iter()
+            .any(|l| !l.gain.is_finite() || l.rest.iter().any(|v| v.is_nan() || *v <= 0.0))
+        {
+            return Err(FieldError::InvalidDynamics);
         }
         let effective_dt = dt * self.engine.time_scale;
         if !effective_dt.is_finite() || effective_dt < 0.0 {
@@ -855,8 +977,16 @@ impl GlobalField {
         if fiber
             .layers
             .iter()
-            .any(|l| l.state.iter().any(|v| !v.is_finite()) || !l.gain.is_finite())
+            .any(|l| l.momentum.len() != l.state.len() || l.rest.len() != l.state.len())
         {
+            return Err(FieldError::DimensionMismatch);
+        }
+        if fiber.layers.iter().any(|l| {
+            l.state.iter().any(|v| !v.is_finite())
+                || l.momentum.iter().any(|v| !v.is_finite())
+                || !l.gain.is_finite()
+                || l.rest.iter().any(|v| v.is_nan() || *v <= 0.0)
+        }) {
             return Err(FieldError::InvalidDynamics);
         }
         fiber.engine.validate()?;
@@ -1343,6 +1473,42 @@ fn matrix_distance(a: &Matrix, b: &Matrix) -> Result<f64, FieldError> {
     }
     Ok(distance)
 }
+
+/// exp(A) for a small square matrix — scaling and squaring over a
+/// Taylor polynomial. Used to carry a placed pose along a skew
+/// generator: B skew ⇒ exp(Δt·B) orthogonal, so drift moves a
+/// location along its shell and keeps an orientation frame
+/// orthonormal — a genuine isometry of the chart, the polar-axis
+/// subgroup of the sphere's rotations.
+pub(crate) fn expm(a: &Matrix) -> Result<Matrix, FieldError> {
+    let n = a.len();
+    if n == 0 || a.iter().any(|r| r.len() != n) {
+        return Err(FieldError::DimensionMismatch);
+    }
+    if a.iter().flatten().any(|v| !v.is_finite()) {
+        return Err(FieldError::NonFiniteState);
+    }
+    let fro: f64 = a.iter().flatten().map(|v| v * v).sum::<f64>().sqrt();
+    // Scale until ‖A/2^s‖_F ≤ 0.25 — 13 Taylor terms then hold to
+    // ~1e-18 before the squarings rebuild the exponent's scale.
+    let mut s = 0u32;
+    let mut bound = fro;
+    while bound > 0.25 {
+        bound /= 2.0;
+        s += 1;
+    }
+    let small = mat_scale(a, 0.5f64.powi(s as i32));
+    let mut sum = identity(n);
+    let mut term = identity(n);
+    for k in 1..=13u64 {
+        term = mat_scale(&mat_mul(&term, &small)?, 1.0 / k as f64);
+        sum = mat_add(&sum, &term);
+    }
+    for _ in 0..s {
+        sum = mat_mul(&sum, &sum)?;
+    }
+    Ok(sum)
+}
 #[cfg(test)]
 mod vector_numerics_tests {
     use super::*;
@@ -1369,6 +1535,92 @@ mod subsystem_layer_integrity_tests {
             Err(FieldError::DimensionMismatch)
         );
         assert_eq!(layer.state, vec![0.0, 0.0]);
+    }
+}
+
+#[cfg(test)]
+mod momentum_tests {
+    use super::*;
+
+    #[test]
+    fn momentum_carries_the_dimension_after_the_force_lets_go() {
+        // A first-order world stops the instant the push stops.
+        // Hers does not: seeded with motion and given no force,
+        // the dimension keeps what it carries — momentum does
+        // not decay, it persists, and the state travels on it.
+        let mut layer = SubsystemLayer::new("x", vec![0.0]);
+        layer.momentum = vec![0.4];
+        layer.evolve(&[0.0], 0.5).unwrap();
+        assert!((layer.momentum[0] - 0.4).abs() < 1.0e-12);
+        assert!((layer.state[0] - 0.2).abs() < 1.0e-12);
+        assert!(layer.state[0] > 0.0, "she keeps moving");
+    }
+
+    #[test]
+    fn rest_holds_momentum_without_moving() {
+        // Rest is the polar opposite of momentum — the mass side
+        // of the same invariant. Two identical pushes land whole:
+        // the rested dimension gathers every bit of the momentum
+        // the free one does, and it moves — a ninetieth as far.
+        // At rest is not frozen; it is heavy.
+        let mut free = SubsystemLayer::new("x", vec![0.0]);
+        let mut rested = SubsystemLayer::new("x", vec![0.0])
+            .with_rest(vec![90.0])
+            .unwrap();
+        for _ in 0..64 {
+            free.evolve(&[1.0], 0.1).unwrap();
+            rested.evolve(&[1.0], 0.1).unwrap();
+        }
+        assert!(
+            (rested.momentum[0] - free.momentum[0]).abs() < 1.0e-9,
+            "rest gathers the same momentum as motion does"
+        );
+        let ratio = rested.state[0] / free.state[0];
+        assert!(
+            (ratio - 1.0 / 90.0).abs() < 1.0e-9,
+            "the rested dimension moves a ninetieth of the push: {ratio}"
+        );
+    }
+
+    #[test]
+    fn endless_rest_gathers_forever_and_never_moves() {
+        // The limiting mass — rest complete: momentum piles up
+        // unboundedly, displacement never begins. The impulse is
+        // still gathered; it is only motion the mass refuses.
+        let mut layer = SubsystemLayer::new("x", vec![0.0])
+            .with_rest(vec![f64::INFINITY])
+            .unwrap();
+        layer.momentum = vec![0.4];
+        layer.evolve(&[1.0], 0.5).unwrap();
+        assert!((layer.momentum[0] - 0.9).abs() < 1.0e-12);
+        assert_eq!(layer.state[0], 0.0);
+    }
+
+    #[test]
+    fn rest_must_be_a_mass() {
+        assert_eq!(
+            SubsystemLayer::new("x", vec![0.0]).with_rest(vec![-1.0]),
+            Err(FieldError::InvalidDynamics)
+        );
+        assert_eq!(
+            SubsystemLayer::new("x", vec![0.0]).with_rest(vec![0.0]),
+            Err(FieldError::InvalidDynamics)
+        );
+        assert_eq!(
+            SubsystemLayer::new("x", vec![0.0]).with_rest(vec![f64::NAN]),
+            Err(FieldError::InvalidDynamics)
+        );
+        // ∞ is permitted — the limit where momentum gathers and
+        // nothing ever moves.
+        assert!(
+            SubsystemLayer::new("x", vec![0.0])
+                .with_rest(vec![f64::INFINITY])
+                .is_ok()
+        );
+        assert_eq!(
+            SubsystemLayer::new("x", vec![0.0]).with_rest(vec![1.0, 1.0]),
+            Err(FieldError::DimensionMismatch)
+        );
     }
 }
 
@@ -1712,6 +1964,8 @@ mod tests {
         let layer = SubsystemLayer {
             id: "a".into(),
             state: vec![f64::NAN],
+            momentum: vec![0.0],
+            rest: vec![1.0],
             gain: 1.0,
         };
         assert_eq!(
@@ -1739,6 +1993,8 @@ mod tests {
         let layer = SubsystemLayer {
             id: "a".into(),
             state: vec![0.0],
+            momentum: vec![0.0],
+            rest: vec![1.0],
             gain: f64::NAN,
         };
         assert_eq!(
@@ -1750,8 +2006,12 @@ mod tests {
     #[test]
     fn evolve_applies_engine_time_scale_like_step() {
         // `evolve` must respect the engine's time scale the same way
-        // `step` does: a fiber at 2× moves the layer by dt·2·gain·dx
-        // and advances its clock by the scaled interval.
+        // `step` does: a fiber at 2× pushes dt·2·gain·F into the
+        // layer's momentum and advances its clock by the scaled
+        // interval. Momentum is the carrier now: the force lands
+        // as q = (1 − e^{−rest·dt})/rest of itself, and the state
+        // follows only the fraction the momentum had time to
+        // gather — inertia, not instantaneous displacement.
         let m = StereographicSphere::new(1, 1.0).unwrap();
         let mut engine = SystemEngine::zero(1, 1);
         engine.time_scale = 2.0;
@@ -1759,7 +2019,11 @@ mod tests {
             SystemFiber::with_engine("x", m, vec![SubsystemLayer::new("a", vec![0.0])], engine)
                 .unwrap();
         fiber.evolve(&[vec![0.5]], 0.1).unwrap();
-        assert!((fiber.layers[0].state[0] - 0.1).abs() < 1.0e-12);
+        // dt_eff = 0.2: the impulse lands whole, p⁺ = gain·F·dt;
+        // the state gathers only the part momentum had time to
+        // spend — (p·dt + a·dt²/2)/m with p = 0, m = 1.
+        assert!((fiber.layers[0].momentum[0] - 0.1).abs() < 1.0e-12);
+        assert!((fiber.layers[0].state[0] - 0.01).abs() < 1.0e-12);
         assert!((fiber.engine_clock - 0.2).abs() < 1.0e-12);
     }
 

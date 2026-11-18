@@ -10,6 +10,7 @@ thalamus, cerebellum, basal_ganglia).
     config.py                Runtime configuration for the mind.
     narrative.py             The self-story over time.
     notifications.py         Subcognitive -> cognitive notification queue.
+    net.py                   Bounded HTTP plumbing (body + transports).
     vq_codebook.py           Compression of the concept embedding space.
     wordnet_dictionary.py    Lexical-semantic reference.
     _npz_io.py               Atomic, pickle-free .npz artifact writes.

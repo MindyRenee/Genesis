@@ -197,6 +197,7 @@ _FILE_MODULE = {
     "concept_learner.py": MODULE_LANGUAGE,
     "conversation.py": MODULE_LANGUAGE,
     "discord.feed.py": MODULE_SENSORY,
+    "discord_ear.py": MODULE_SENSORY,
     "dual.py": MODULE_MEMORY,
     "emotional_regulator.py": MODULE_EMOTION,
     "emotion.py": MODULE_EMOTION,

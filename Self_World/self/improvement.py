@@ -55,9 +55,10 @@ staging copy: the system is her workspace. Two paths land changes:
   the full test suite, reverting on any failure.
 - **Experiments** — everything else, including Rust. A proposal's
   ``original_code`` → ``proposed_code`` edit lands on the live file
-  (with a ``.pre_experiment`` backup beside it), then the full
-  verification gate runs: ``py_compile`` + module import + pytest +
-  cargo test. A passing gate marks the proposal applied; a failure
+  (with a ``.pre_experiment`` backup beside it), then the
+  verification gate runs the arm the change can affect:
+  ``py_compile`` + module import + pytest for Python edits, cargo
+  test for Rust edits. A passing gate marks the proposal applied; a failure
   restores the file and the proposal is rejected with notes teaching
   what went wrong. The verification gate is the arbiter of which
   changes land — pending proposals run through it automatically; the
@@ -1589,8 +1590,9 @@ class HeuristicExperiment:
     2. **Apply**: write the change into the live source file, with a
        ``.pre_experiment`` backup beside it — her source tree is her
        workspace; there is no staging copy.
-    3. **Verify**: run the verification gate (py_compile + module
-       import + pytest + cargo test) against the live tree.
+    3. **Verify**: run the verification gate against the live tree —
+       the Python arm (py_compile + module import + pytest) for .py
+       edits, the Rust arm (cargo test) for .rs edits.
     4. **Commit or revert**: if all checks pass the change stays —
        taking effect on her next start, like any other edit. If any
        check fails the file is restored from the backup content, and
@@ -1967,21 +1969,27 @@ class HeuristicExperiment:
                     self.engine.record_experiment(record)
                     return record
 
-            # Verify: the full gate against the live tree — py_compile all,
-            # module imports, pytest, and cargo test. The live crate builds
-            # into its own target/ cache, so a Rust experiment costs an
-            # incremental build rather than a cold one.
-            if not self._run_verify_script(
+            # Verify: the gate against the live tree, scoped to the arm
+            # the change can actually affect — a Python edit runs
+            # py_compile all + imports + pytest; a Rust edit runs cargo
+            # test. Running the wrong arm once reverted every proposal
+            # on toolchain failures unrelated to the change. The live
+            # crate builds into its own target/ cache, so a Rust
+            # experiment costs an incremental build rather than a cold
+            # one.
+            verify_failure = self._run_verify_script(
                 python_dir=self.project_root,
                 rust_dir=self.project_root,
+                arm="rust" if is_rust else "python",
                 timeout=self._RUST_VERIFY_TIMEOUT_S if is_rust else self._VERIFY_TIMEOUT_S,
-            ):
+            )
+            if verify_failure is not None:
                 self._revert(live_file, source)
                 record = ExperimentRecord(
                     file_path=file_path,
                     description=description,
                     status="reverted",
-                    reason="verification gate failed (tests failed)",
+                    reason=f"verification gate failed: {verify_failure}",
                 )
                 self.engine.record_experiment(record)
                 return record
@@ -2002,19 +2010,29 @@ class HeuristicExperiment:
         self,
         python_dir: str | None = None,
         rust_dir: str | None = None,
+        arm: str = "all",
         timeout: float = _VERIFY_TIMEOUT_S,
-    ) -> bool:
-        """Run the verification script. Returns True if all checks pass.
+    ) -> str | None:
+        """Run the verification script.
+
+        Returns ``None`` if all checks pass, otherwise a short
+        description of what failed — the stage name plus the tail of
+        the gate's own output. The reason lands in the experiment
+        record and the proposal's rejection notes, where an honest
+        "pytest failed: <which test>" teaches something and the old
+        blanket "tests failed" taught nothing.
 
         ``python_dir``/``rust_dir`` select the trees under test — the
-        live tree in both arms, since edits land in place now.
+        live tree in both arms, since edits land in place now. ``arm``
+        scopes the gate: ``python`` skips the cargo suite, ``rust``
+        skips the Python steps, ``all`` runs everything.
         """
         if not os.path.exists(self._verify_script):
             logger.warning(f"Verify script not found: {self._verify_script}")
-            return False
+            return f"verify script not found: {self._verify_script}"
         command = ["bash", self._verify_script]
         if python_dir is not None:
-            command += [python_dir, rust_dir or "."]
+            command += [python_dir, rust_dir or ".", arm]
         try:
             env = dict(os.environ)
             # The gate must run under the interpreter the mind itself
@@ -2027,26 +2045,50 @@ class HeuristicExperiment:
                 text=True,
                 env=env,
                 # The verify script runs the full Python suite (~5
-                # min, includes the end-to-end daemon test) and the
-                # full cargo test suite. A 300s timeout
-                # could never complete a healthy run, so every
+                # min, includes the end-to-end daemon test). A 300s
+                # timeout could never complete a healthy run, so every
                 # experiment was falsely reverted. 900s gives ~2x
                 # headroom over the measured healthy runtime; the
                 # rust arm's cold-build allowance is its own constant.
                 timeout=timeout,
             )
             if result.returncode != 0:
-                logger.warning(
-                    f"Verification failed (exit {result.returncode}): {result.stderr[:200]}"
-                )
-                return False
-            return True
+                detail = self._verify_failure_detail(result)
+                logger.warning(f"Verification failed (exit {result.returncode}): {detail}")
+                return f"exit {result.returncode} — {detail}"
+            return None
         except subprocess.TimeoutExpired:
-            logger.warning("Verification timed out (15 min)")
-            return False
+            logger.warning(f"Verification timed out ({timeout:.0f}s)")
+            return f"timed out after {timeout:.0f}s"
         except OSError as e:
             logger.warning(f"Could not run verify script: {e}")
-            return False
+            return f"could not run verify script: {e}"
+
+    @staticmethod
+    def _verify_failure_detail(result: subprocess.CompletedProcess) -> str:
+        """Extract which gate stage failed and why from a verify run.
+
+        The script prints ``[verify] x <stage>`` to stderr on failure;
+        pytest/cargo diagnostics go to stdout. Combine the stage marker
+        with the tail of stdout so the record names the actual failing
+        tests instead of the old blanket "tests failed".
+        """
+        stage = ""
+        for line in result.stderr.splitlines():
+            if "✗" in line or " x " in line or "failed" in line.lower():
+                stage = line.strip()
+                break
+        # Strip ANSI colour codes so the reason reads clean in records.
+        stage = re.sub(r"\x1b\[[0-9;]*m", "", stage)
+        out_lines = [ln.strip() for ln in result.stdout.splitlines() if ln.strip()]
+        # Prefer the named failures (pytest "FAILED ..." / cargo
+        # "error[...]" lines) over the closing summary when they exist.
+        named = [ln for ln in out_lines if ln.startswith(("FAILED", "ERROR", "error"))]
+        tail_lines = named if named else out_lines[-3:]
+        tail = " | ".join(tail_lines)[-400:]
+        if stage and tail:
+            return f"{stage} — {tail}"
+        return stage or tail or "no output"
 
     @staticmethod
     def _revert(path: Path, original_content: str) -> None:

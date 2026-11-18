@@ -348,7 +348,7 @@ MODULE ORGANIZATION
 
 Top-level modules referenced by this subsystem:
 
-    (genesis_client/) optic_nerve.py
+    (body/sight/) optic_nerve.py
         OpticNerve — zero-copy access to the body's optic-nerve
         shared-memory frame feed. The nerve carries what the eye
         captured — the daemon owns the camera itself — and hands it

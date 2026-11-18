@@ -65,6 +65,7 @@ __all__ = [
     "ERROR_VERSION_MISMATCH",
     "FIND_SIMILAR",
     "FIND_SIMILAR_ARCHIVED",
+    "FORGET_SWEEP",
     "GET_BODY_CONTROL",
     "GET_BODY_STATE",
     "GET_DYADIC_STATE",
@@ -78,6 +79,7 @@ __all__ = [
     "GET_NEURO_SUMMARY",
     "GET_OPTIC_STATE",
     "GET_PHASE",
+    "GET_PLACE",
     "GET_PLASTICITY_PROFILE",
     "GET_PROCESS_HEALTH",
     "GET_RECENT_EPISODES",
@@ -125,6 +127,7 @@ __all__ = [
     "PHASE_SLEEPING",
     "PHASE_STRESS",
     "PING",
+    "PLACE_FIELD",
     "PROTOCOL_VERSION",
     "PUT_TENSOR",
     "READ_SENSORS",
@@ -468,6 +471,44 @@ SET_FIELD_PULSE = 63
 # Additive: PROTOCOL_VERSION stays 3 — an older daemon rejects the
 # unknown opcode loudly rather than misparsing it.
 GET_STATE_SNAPSHOT = 64
+
+# Gentle forgetting — the sleep-side housekeeping sweep. The body's
+# retrieval traces decay by a power law; episodes whose activation has
+# fallen below the reach of any cue are released and the store is
+# physically compacted to reclaim their bytes.
+# Request:  [u8 mode] — 0 = dry-run report (nothing deleted),
+#                       1 = sweep (prune + compact).
+# Response: [u32 count][u64 bytes] — for a dry run, the number of
+#           forgettable episodes and the estimated bytes their
+#           payloads occupy; for a sweep, the number forgotten and the
+#           bytes actually reclaimed. The mind decides when
+#           housekeeping runs; the body decides what is unreachable.
+# Additive: PROTOCOL_VERSION stays 3.
+FORGET_SWEEP = 65
+
+#           PLACE_FIELD
+#           -----------
+# Place her — the ONE location, owned by the body. Request:
+# `[k × f64]` with k in 2..=6 — the coordinates of her position,
+# stored exactly as given and reported back at the same arity (a
+# 2-vector is her place read in a plane; the same point rests in
+# the bulk's leading coordinate plane). An empty payload releases
+# the location and hands the `inner` fiber's voice back to the
+# interior oscillators. The body remembers: the position persists
+# to place.bin in the data dir and is restored at boot. The anchor
+# is an observation, not a command: each tick moves the layer a
+# bounded fraction of the geodesic toward it. Response: [u8 ack].
+# Additive: PROTOCOL_VERSION stays 3.
+PLACE_FIELD = 66
+
+#           GET_PLACE
+#           ---------
+# Where she is — the body's answer, same truth the anchor holds.
+# Request: empty. Response: `[u8 n][n × f64]` — the placed
+# coordinates in the arity they were given (2..=6); `n = 0` means
+# she is nowhere in particular and her interior speaks for itself.
+# Additive: PROTOCOL_VERSION stays 3.
+GET_PLACE = 67
 
 # Which optional hardware sensors this machine actually has.
 # Response: [u16 mask] — a bitmask of SENSOR_* below. A set bit means

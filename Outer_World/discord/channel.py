@@ -2,10 +2,12 @@
 
 A Discord channel is a place in the world, not a part of the mind:
 the public gathers there, she posts there, and when a bot token
-exists she can hear it. The transports live in ``discord.feed``
-(the platform adapter — webhook out, bot-token polling in); this
-object is the world-facing thing — the page's lifecycle, its ear,
-and the door inbound speech comes through.
+exists she can hear it. The outbound transport lives in
+``discord.feed`` (the platform adapter — webhook out) and the ear in
+``body.hearing.discord_ear`` (bot-token polling in — the organ is the
+body's, it only listens outward); this object is the world-facing
+thing — the page's lifecycle, its ear, and the door inbound speech
+comes through.
 
 The channel owns no cognition: it delivers what it hears to
 ``on_speech`` (the OuterEnvironment registers its own handler — the
@@ -18,9 +20,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from body.hearing.discord_ear import DiscordListener
 from infrastructure.config import default_data_dir
 
-from discord.feed import KIND_GUIDE, DiscordFeed, DiscordListener
+from discord.feed import KIND_GUIDE, DiscordFeed
 from discord.guide import guide_text, load_guide_message_id
 
 if TYPE_CHECKING:

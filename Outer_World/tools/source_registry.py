@@ -60,7 +60,19 @@ from inhibition import InhibitoryGate
 logger = logging.getLogger(__name__)
 
 REQUEST_TIMEOUT = 2  # seconds — fail fast when sources are slow
-USER_AGENT = "Genesis-AI-Learner/1.0 (educational research)"
+
+
+def _user_agent() -> str:
+    """Her web identity — the machine's own browser UA.
+
+    Shared with ``tools.web_search`` so every request she makes —
+    learner fetch or page fetch — carries the owner's id rather
+    than a bot signature.
+    """
+    from tools.web_search import _user_agent as _ua
+
+    return _ua()
+
 
 # Cap on bytes read from any single HTTP response. A hostile or
 # misbehaving endpoint could otherwise stream arbitrarily within the
@@ -350,7 +362,7 @@ def _wikipedia_search(topic: str, limit: int = 3) -> list[str]:
     )
     url = f"{_WIKIPEDIA_API}?{params}"
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+        req = urllib.request.Request(url, headers={"User-Agent": _user_agent()})
         with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
             data = json.loads(resp.read(_MAX_RESPONSE_BYTES + 1).decode("utf-8", errors="ignore"))
         results = data.get("query", {}).get("search", [])
@@ -374,7 +386,7 @@ def _wikipedia_fetch(article_title: str) -> SourceResult | None:
     summary_url = _WIKIPEDIA_REST + urllib.parse.quote(article_title.replace(" ", "_"))
     summary = ""
     try:
-        req = urllib.request.Request(summary_url, headers={"User-Agent": USER_AGENT})
+        req = urllib.request.Request(summary_url, headers={"User-Agent": _user_agent()})
         with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
             data = json.loads(resp.read(_MAX_RESPONSE_BYTES + 1).decode("utf-8", errors="ignore"))
         summary = data.get("extract", "")
@@ -397,7 +409,7 @@ def _wikipedia_fetch(article_title: str) -> SourceResult | None:
     )
     url = f"{_WIKIPEDIA_API}?{params}"
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+        req = urllib.request.Request(url, headers={"User-Agent": _user_agent()})
         with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
             data = json.loads(resp.read(_MAX_RESPONSE_BYTES + 1).decode("utf-8", errors="ignore"))
         pages = data.get("query", {}).get("pages", {})
@@ -457,7 +469,7 @@ def wikipedia_lead_image(article_title: str, thumb_size: int = 320) -> bytes | N
     )
     url = f"{_WIKIPEDIA_API}?{params}"
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+        req = urllib.request.Request(url, headers={"User-Agent": _user_agent()})
         with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
             data = json.loads(resp.read(_MAX_RESPONSE_BYTES + 1).decode("utf-8", errors="ignore"))
         pages = data.get("query", {}).get("pages", {})
@@ -472,7 +484,7 @@ def wikipedia_lead_image(article_title: str, thumb_size: int = 320) -> bytes | N
             img_url = "https:" + img_url
         # Download the image bytes — capped; an oversized response is
         # discarded rather than returned as a truncated image.
-        req2 = urllib.request.Request(img_url, headers={"User-Agent": USER_AGENT})
+        req2 = urllib.request.Request(img_url, headers={"User-Agent": _user_agent()})
         with urllib.request.urlopen(req2, timeout=REQUEST_TIMEOUT) as resp2:
             img = resp2.read(_MAX_IMAGE_BYTES + 1)
         if len(img) > _MAX_IMAGE_BYTES:
@@ -1468,7 +1480,7 @@ class GitHubSource:
                 url,
                 headers={
                     "Accept": "application/vnd.github.v3+json",
-                    "User-Agent": "Genesis-AI/1.0 (autonomous learner)",
+                    "User-Agent": _user_agent(),
                 },
             )
             with urllib.request.urlopen(req, timeout=self._timeout) as resp:
@@ -1538,7 +1550,7 @@ class GitHubSource:
                 url,
                 headers={
                     "Accept": "application/vnd.github.v3.raw",
-                    "User-Agent": "Genesis-AI/1.0 (autonomous learner)",
+                    "User-Agent": _user_agent(),
                 },
             )
             with urllib.request.urlopen(req, timeout=self._timeout) as resp:
@@ -1576,7 +1588,7 @@ class GitHubSource:
                 url,
                 headers={
                     "Accept": "application/vnd.github.v3.raw",
-                    "User-Agent": "Genesis-AI/1.0 (autonomous learner)",
+                    "User-Agent": _user_agent(),
                 },
             )
             with urllib.request.urlopen(req, timeout=self._timeout) as resp:

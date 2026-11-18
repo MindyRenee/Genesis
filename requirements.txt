@@ -23,9 +23,10 @@ Pillow
 opencv-python-headless
 pycairo
 
-# Browser transport — WebDriver BiDi (Firefox) and Chrome DevTools
-# Protocol (Chromium) both ride one websocket session.
+# Browser transport — the Chrome DevTools Protocol session rides
+# one websocket.
 websockets
+curl_cffi
 
 # Test runner — runtime dep: her tools call it through
 # `sys.executable -m pytest` (project creation, proposal
@@ -54,9 +55,9 @@ pytest
 # post-install: she IS the model, her seat needs no API client.
 # ARC imports lazily; needs ARC_API_KEY from
 # https://three.arcprize.org for full online access (anonymous offers
-# fewer; the arena shelf is local and needs no key). arc-agi 0.9.9
-# was the last release validated against her; newer releases should
-# be checked before relying on them.
+# fewer; the arena shelf is local and needs no key). arc-agi 0.9.10
+# verified live — an official game opens, resets, and steps; newer
+# releases should still be checked before relying on them.
 #   arc-agi
 #   open-spiel
 #   game-arena

@@ -44,7 +44,7 @@ impl PyVision {
             )));
         }
         let field = RadianceField::from_rgb24(self.width, self.height, rgb24);
-        Ok(output_dict(py, self.inner.step(&field, dt))?)
+        output_dict(py, self.inner.step(&field, dt))
     }
 
     /// Step with no incident light — the dark-adapted eye. This is
@@ -52,7 +52,7 @@ impl PyVision {
     /// nothing (a real biological state, not a synthetic frame).
     fn step_dark<'py>(&mut self, py: Python<'py>, dt: f64) -> PyResult<Py<PyDict>> {
         let field = RadianceField::dark(self.width, self.height);
-        Ok(output_dict(py, self.inner.step(&field, dt))?)
+        output_dict(py, self.inner.step(&field, dt))
     }
 
     /// Voluntary lid set-point ∈ [0,1] — sleep drops it toward ~0.15.
@@ -79,6 +79,14 @@ impl PyVision {
     }
 }
 
+/// One dial position — `parietal_lobe::hand::dial` over the live
+/// channel values. The values arrive untouched: no weights, no
+/// projection — the pressure is their raw sum.
+#[pyfunction]
+fn hand_dial(uniform: f64, channels: Vec<f64>) -> f64 {
+    crate::parietal_lobe::hand::dial(uniform, &channels)
+}
+
 fn output_dict(py: Python<'_>, out: crate::self_::vision::VisionOutput) -> PyResult<Py<PyDict>> {
     let d = PyDict::new(py);
     d.set_item("mean_luminance", out.mean_luminance)?;
@@ -97,5 +105,6 @@ fn output_dict(py: Python<'_>, out: crate::self_::vision::VisionOutput) -> PyRes
 #[pymodule]
 fn genesis_body(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyVision>()?;
+    m.add_function(wrap_pyfunction!(hand_dial, m)?)?;
     Ok(())
 }

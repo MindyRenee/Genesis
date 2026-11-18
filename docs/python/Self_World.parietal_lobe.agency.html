@@ -65,12 +65,17 @@ live-thought&nbsp;stream&nbsp;and&nbsp;the&nbsp;world's&nbsp;event&nbsp;log.</sp
 <td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
     
 <tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
-<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="colorsys.html">colorsys</a><br>
+<a href="parietal_lobe.hand.html">parietal_lobe.hand</a><br>
+<a href="itertools.html">itertools</a><br>
+</td><td class="multicolumn"><a href="logging.html">logging</a><br>
+<a href="math.html">math</a><br>
 <a href="os.html">os</a><br>
-</td><td class="multicolumn"><a href="re.html">re</a><br>
+</td><td class="multicolumn"><a href="random.html">random</a><br>
+<a href="re.html">re</a><br>
 <a href="shlex.html">shlex</a><br>
 </td><td class="multicolumn"><a href="time.html">time</a><br>
-</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+</td></tr></table></td></tr></table><p>
 <table class="section">
 <tr class="decor index-decor heading-text">
 <td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
@@ -93,7 +98,7 @@ live-thought&nbsp;stream&nbsp;and&nbsp;the&nbsp;world's&nbsp;event&nbsp;log.</sp
 <td class="section-title" colspan=3>&nbsp;<br><a name="ActingLoop">class <strong>ActingLoop</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
     
 <tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
-<td class="decor title-decor" colspan=2><span class="code"><a href="#ActingLoop">ActingLoop</a>(network:&nbsp;'ConceptNetwork',&nbsp;curiosity:&nbsp;'Curiosity&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;learner:&nbsp;'AutonomousLearner&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;tools:&nbsp;'ToolRegistry&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;data_dir:&nbsp;'str'&nbsp;=&nbsp;'.',&nbsp;project_root:&nbsp;'str&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;offline:&nbsp;'bool'&nbsp;=&nbsp;False,&nbsp;get_emotion:&nbsp;'Callable[[],&nbsp;EmotionalState&nbsp;|&nbsp;None]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;get_agency_topic:&nbsp;'Callable[[],&nbsp;str&nbsp;|&nbsp;None]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;on_event:&nbsp;'Callable[[str],&nbsp;Any]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;on_store_memory:&nbsp;'Callable[[str,&nbsp;float],&nbsp;None]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;on_neuro_impulse:&nbsp;'Callable[[int,&nbsp;float],&nbsp;None]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;on_live_thought:&nbsp;'Callable[[str,&nbsp;str],&nbsp;None]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;executive:&nbsp;'ExecutiveFunction&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;config_dir:&nbsp;'str&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;get_internals:&nbsp;'Callable[[],&nbsp;dict[str,&nbsp;str]&nbsp;|&nbsp;None]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;get_thermally_capped:&nbsp;'Callable[[],&nbsp;bool]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ActingLoop">ActingLoop</a>(network:&nbsp;'ConceptNetwork',&nbsp;curiosity:&nbsp;'Curiosity&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;learner:&nbsp;'AutonomousLearner&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;tools:&nbsp;'ToolRegistry&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;data_dir:&nbsp;'str'&nbsp;=&nbsp;'.',&nbsp;project_root:&nbsp;'str&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;offline:&nbsp;'bool'&nbsp;=&nbsp;False,&nbsp;get_emotion:&nbsp;'Callable[[],&nbsp;EmotionalState&nbsp;|&nbsp;None]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;get_agency_topic:&nbsp;'Callable[[],&nbsp;str&nbsp;|&nbsp;None]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;get_waves:&nbsp;'Callable[[],&nbsp;Any&nbsp;|&nbsp;None]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;on_event:&nbsp;'Callable[[str],&nbsp;Any]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;on_store_memory:&nbsp;'Callable[[str,&nbsp;float],&nbsp;None]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;on_neuro_impulse:&nbsp;'Callable[[int,&nbsp;float],&nbsp;None]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;on_live_thought:&nbsp;'Callable[[str,&nbsp;str],&nbsp;None]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;executive:&nbsp;'ExecutiveFunction&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;config_dir:&nbsp;'str&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;get_internals:&nbsp;'Callable[[],&nbsp;dict[str,&nbsp;str]&nbsp;|&nbsp;None]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;get_thermally_capped:&nbsp;'Callable[[],&nbsp;bool]&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
 &nbsp;<br>
 Volition-driven&nbsp;tool&nbsp;use:&nbsp;propose&nbsp;an&nbsp;intention,&nbsp;act,&nbsp;observe.<br>
 &nbsp;<br>
@@ -124,6 +129,9 @@ Args:<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;curiosity&nbsp;question&nbsp;generation).<br>
 &nbsp;&nbsp;&nbsp;&nbsp;get_agency_topic:&nbsp;Pops&nbsp;a&nbsp;topic&nbsp;from&nbsp;inner&nbsp;life&nbsp;(its&nbsp;own&nbsp;train<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;of&nbsp;thought&nbsp;→&nbsp;what&nbsp;to&nbsp;look&nbsp;at&nbsp;next).<br>
+&nbsp;&nbsp;&nbsp;&nbsp;get_waves:&nbsp;Returns&nbsp;the&nbsp;current&nbsp;BrainWaveState&nbsp;—&nbsp;sampled&nbsp;per<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mark&nbsp;while&nbsp;she&nbsp;draws&nbsp;so&nbsp;the&nbsp;live&nbsp;band&nbsp;powers&nbsp;reach&nbsp;the<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;dials&nbsp;through&nbsp;``parietal_lobe.hand``.&nbsp;Art-time&nbsp;only.<br>
 &nbsp;&nbsp;&nbsp;&nbsp;on_event:&nbsp;Records&nbsp;an&nbsp;act&nbsp;in&nbsp;the&nbsp;world&nbsp;(``world.it_acted``).<br>
 &nbsp;&nbsp;&nbsp;&nbsp;on_store_memory:&nbsp;Stores&nbsp;an&nbsp;episode&nbsp;memory&nbsp;(text,&nbsp;salience).<br>
 &nbsp;&nbsp;&nbsp;&nbsp;on_neuro_impulse:&nbsp;Neurochemical&nbsp;impulse&nbsp;(chem,&nbsp;amount)&nbsp;—&nbsp;a<br>
@@ -131,9 +139,16 @@ Args:<br>
 &nbsp;&nbsp;&nbsp;&nbsp;on_live_thought:&nbsp;Emits&nbsp;action&nbsp;telemetry&nbsp;(kind,&nbsp;text).<br>&nbsp;</span></td></tr>
 <tr><td>&nbsp;</td>
 <td class="singlecolumn">Methods defined here:<br>
-<dl><dt><a name="ActingLoop-__init__"><strong>__init__</strong></a>(self, network: 'ConceptNetwork', curiosity: 'Curiosity | None' = None, learner: 'AutonomousLearner | None' = None, tools: 'ToolRegistry | None' = None, data_dir: 'str' = '.', project_root: 'str | None' = None, offline: 'bool' = False, get_emotion: 'Callable[[], EmotionalState | None] | None' = None, get_agency_topic: 'Callable[[], str | None] | None' = None, on_event: 'Callable[[str], Any] | None' = None, on_store_memory: 'Callable[[str, float], None] | None' = None, on_neuro_impulse: 'Callable[[int, float], None] | None' = None, on_live_thought: 'Callable[[str, str], None] | None' = None, executive: 'ExecutiveFunction | None' = None, config_dir: 'str | None' = None, get_internals: 'Callable[[], dict[str, str] | None] | None' = None, get_thermally_capped: 'Callable[[], bool] | None' = None) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+<dl><dt><a name="ActingLoop-__init__"><strong>__init__</strong></a>(self, network: 'ConceptNetwork', curiosity: 'Curiosity | None' = None, learner: 'AutonomousLearner | None' = None, tools: 'ToolRegistry | None' = None, data_dir: 'str' = '.', project_root: 'str | None' = None, offline: 'bool' = False, get_emotion: 'Callable[[], EmotionalState | None] | None' = None, get_agency_topic: 'Callable[[], str | None] | None' = None, get_waves: 'Callable[[], Any | None] | None' = None, on_event: 'Callable[[str], Any] | None' = None, on_store_memory: 'Callable[[str, float], None] | None' = None, on_neuro_impulse: 'Callable[[int, float], None] | None' = None, on_live_thought: 'Callable[[str, str], None] | None' = None, executive: 'ExecutiveFunction | None' = None, config_dir: 'str | None' = None, get_internals: 'Callable[[], dict[str, str] | None] | None' = None, get_thermally_capped: 'Callable[[], bool] | None' = None) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
 
 <dl><dt><a name="ActingLoop-act_once"><strong>act_once</strong></a>(self) -&gt; 'ActingResult | None'</dt><dd><span class="code">Let&nbsp;the&nbsp;executive&nbsp;select&nbsp;an&nbsp;objective,&nbsp;then&nbsp;execute&nbsp;it.</span></dd></dl>
+
+<dl><dt><a name="ActingLoop-draw_once"><strong>draw_once</strong></a>(self) -&gt; 'ActingResult'</dt><dd><span class="code">Run&nbsp;one&nbsp;draw&nbsp;intention&nbsp;—&nbsp;the&nbsp;sitting's&nbsp;tool&nbsp;chain.<br>
+&nbsp;<br>
+Called&nbsp;when&nbsp;the&nbsp;draw&nbsp;urge&nbsp;sits&nbsp;her&nbsp;at&nbsp;the&nbsp;easel:&nbsp;the&nbsp;studio<br>
+ops&nbsp;are&nbsp;issued&nbsp;through&nbsp;the&nbsp;same&nbsp;``_use``&nbsp;path&nbsp;as&nbsp;any&nbsp;other<br>
+intention's&nbsp;steps,&nbsp;under&nbsp;a&nbsp;larger&nbsp;allowance&nbsp;because&nbsp;a<br>
+picture&nbsp;takes&nbsp;more&nbsp;ops&nbsp;than&nbsp;a&nbsp;probe.</span></dd></dl>
 
 <dl><dt><a name="ActingLoop-propose"><strong>propose</strong></a>(self) -&gt; 'Intention | None'</dt><dd><span class="code">Form&nbsp;an&nbsp;intention&nbsp;from&nbsp;current&nbsp;state.<br>
 &nbsp;<br>
@@ -151,6 +166,8 @@ Data descriptors defined here:<br>
 </dl>
 <hr>
 Data and other attributes defined here:<br>
+<dl><dt><strong>DRAW_STEPS</strong> = 22</dl>
+
 <dl><dt><strong>MAX_STEPS</strong> = 6</dl>
 
 <dl><dt><strong>WALL_BUDGET</strong> = 90.0</dl>
@@ -161,14 +178,14 @@ Data and other attributes defined here:<br>
 <td class="section-title" colspan=3>&nbsp;<br><a name="ActingResult">class <strong>ActingResult</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
     
 <tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
-<td class="decor title-decor" colspan=2><span class="code"><a href="#ActingResult">ActingResult</a>(intention:&nbsp;'<a href="#Intention">Intention</a>',&nbsp;executive_intention:&nbsp;'ExecutiveIntention&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;steps:&nbsp;'list[<a href="#StepOutcome">StepOutcome</a>]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;discoveries:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;success:&nbsp;'bool'&nbsp;=&nbsp;False,&nbsp;started:&nbsp;'float'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;finished:&nbsp;'float'&nbsp;=&nbsp;0.0)&nbsp;-&amp;gt;&nbsp;None<br>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ActingResult">ActingResult</a>(intention:&nbsp;'<a href="#Intention">Intention</a>',&nbsp;executive_intention:&nbsp;'ExecutiveIntention&nbsp;|&nbsp;None'&nbsp;=&nbsp;None,&nbsp;steps:&nbsp;'list[<a href="#StepOutcome">StepOutcome</a>]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;discoveries:&nbsp;'list[str]'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;success:&nbsp;'bool'&nbsp;=&nbsp;False,&nbsp;started:&nbsp;'float'&nbsp;=&nbsp;&amp;lt;factory&amp;gt;,&nbsp;step_budget:&nbsp;'int'&nbsp;=&nbsp;0,&nbsp;finished:&nbsp;'float'&nbsp;=&nbsp;0.0)&nbsp;-&amp;gt;&nbsp;None<br>
 &nbsp;<br>
 The&nbsp;record&nbsp;of&nbsp;one&nbsp;acting&nbsp;episode.<br>&nbsp;</span></td></tr>
 <tr><td>&nbsp;</td>
 <td class="singlecolumn">Methods defined here:<br>
 <dl><dt><a name="ActingResult-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
 
-<dl><dt><a name="ActingResult-__init__"><strong>__init__</strong></a>(self, intention: 'Intention', executive_intention: 'ExecutiveIntention | None' = None, steps: 'list[StepOutcome]' = &lt;factory&gt;, discoveries: 'list[str]' = &lt;factory&gt;, success: 'bool' = False, started: 'float' = &lt;factory&gt;, finished: 'float' = 0.0) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+<dl><dt><a name="ActingResult-__init__"><strong>__init__</strong></a>(self, intention: 'Intention', executive_intention: 'ExecutiveIntention | None' = None, steps: 'list[StepOutcome]' = &lt;factory&gt;, discoveries: 'list[str]' = &lt;factory&gt;, success: 'bool' = False, started: 'float' = &lt;factory&gt;, step_budget: 'int' = 0, finished: 'float' = 0.0) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
 
 <dl><dt><a name="ActingResult-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
 
@@ -188,19 +205,21 @@ Data descriptors defined here:<br>
 </dl>
 <hr>
 Data and other attributes defined here:<br>
-<dl><dt><strong>__annotations__</strong> = {'discoveries': 'list[str]', 'executive_intention': 'ExecutiveIntention | None', 'finished': 'float', 'intention': 'Intention', 'started': 'float', 'steps': 'list[StepOutcome]', 'success': 'bool'}</dl>
+<dl><dt><strong>__annotations__</strong> = {'discoveries': 'list[str]', 'executive_intention': 'ExecutiveIntention | None', 'finished': 'float', 'intention': 'Intention', 'started': 'float', 'step_budget': 'int', 'steps': 'list[StepOutcome]', 'success': 'bool'}</dl>
 
-<dl><dt><strong>__dataclass_fields__</strong> = {'discoveries': Field(name='discoveries',type='list[str]',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'executive_intention': Field(name='executive_intention',type='Executive...appingproxy({}),kw_only=False,_field_type=_FIELD), 'finished': Field(name='finished',type='float',default=0.0,d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'intention': Field(name='intention',type='Intention',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'started': Field(name='started',type='float',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'steps': Field(name='steps',type='list[StepOutcome]',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'success': Field(name='success',type='bool',default=False,d...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+<dl><dt><strong>__dataclass_fields__</strong> = {'discoveries': Field(name='discoveries',type='list[str]',defaul...appingproxy({}),kw_only=False,_field_type=_FIELD), 'executive_intention': Field(name='executive_intention',type='Executive...appingproxy({}),kw_only=False,_field_type=_FIELD), 'finished': Field(name='finished',type='float',default=0.0,d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'intention': Field(name='intention',type='Intention',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'started': Field(name='started',type='float',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'step_budget': Field(name='step_budget',type='int',default=0,de...appingproxy({}),kw_only=False,_field_type=_FIELD), 'steps': Field(name='steps',type='list[StepOutcome]',defa...appingproxy({}),kw_only=False,_field_type=_FIELD), 'success': Field(name='success',type='bool',default=False,d...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
 
 <dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...rue,kw_only=False,slots=False,weakref_slot=False)</dl>
 
 <dl><dt><strong>__hash__</strong> = None</dl>
 
-<dl><dt><strong>__match_args__</strong> = ('intention', 'executive_intention', 'steps', 'discoveries', 'success', 'started', 'finished')</dl>
+<dl><dt><strong>__match_args__</strong> = ('intention', 'executive_intention', 'steps', 'discoveries', 'success', 'started', 'step_budget', 'finished')</dl>
 
 <dl><dt><strong>executive_intention</strong> = None</dl>
 
 <dl><dt><strong>finished</strong> = 0.0</dl>
+
+<dl><dt><strong>step_budget</strong> = 0</dl>
 
 <dl><dt><strong>success</strong> = False</dl>
 

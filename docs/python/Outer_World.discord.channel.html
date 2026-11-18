@@ -65,6 +65,16 @@ Args:<br>
 
 <dl><dt><a name="Channel-close"><strong>close</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Shut&nbsp;the&nbsp;page&nbsp;—&nbsp;ear&nbsp;first,&nbsp;then&nbsp;the&nbsp;poster's&nbsp;drain&nbsp;window.</span></dd></dl>
 
+<dl><dt><a name="Channel-post_guide"><strong>post_guide</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Publish&nbsp;the&nbsp;"what&nbsp;is&nbsp;this&nbsp;channel"&nbsp;card&nbsp;for&nbsp;newcomers.<br>
+&nbsp;<br>
+With&nbsp;a&nbsp;dedicated&nbsp;info&nbsp;page&nbsp;(``GENESIS_DISCORD_INFO_WEBHOOK``)<br>
+the&nbsp;guide&nbsp;is&nbsp;that&nbsp;channel's&nbsp;one&nbsp;maintained&nbsp;message&nbsp;—&nbsp;seeded<br>
+with&nbsp;the&nbsp;id&nbsp;saved&nbsp;from&nbsp;a&nbsp;previous&nbsp;boot&nbsp;so&nbsp;the&nbsp;card&nbsp;is&nbsp;edited,<br>
+not&nbsp;reposted&nbsp;(``discord.board``&nbsp;re-saves&nbsp;the&nbsp;id&nbsp;once&nbsp;the<br>
+poster&nbsp;reports&nbsp;it).&nbsp;Without&nbsp;an&nbsp;info&nbsp;page&nbsp;it&nbsp;posts&nbsp;once&nbsp;to&nbsp;her<br>
+channel&nbsp;—&nbsp;it&nbsp;scrolls&nbsp;with&nbsp;the&nbsp;session,&nbsp;but&nbsp;the&nbsp;explanation<br>
+still&nbsp;reaches&nbsp;anyone&nbsp;watching&nbsp;the&nbsp;page&nbsp;open.</span></dd></dl>
+
 <dl><dt><a name="Channel-start"><strong>start</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Open&nbsp;the&nbsp;ear&nbsp;—&nbsp;begin&nbsp;polling&nbsp;the&nbsp;channel&nbsp;for&nbsp;public&nbsp;speech.</span></dd></dl>
 
 <dl><dt><a name="Channel-stop"><strong>stop</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Close&nbsp;the&nbsp;ear&nbsp;—&nbsp;idempotent;&nbsp;the&nbsp;listener&nbsp;guards&nbsp;its&nbsp;own&nbsp;join.</span></dd></dl>

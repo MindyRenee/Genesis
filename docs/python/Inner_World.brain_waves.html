@@ -1032,13 +1032,14 @@ and&nbsp;accumulates&nbsp;temporal&nbsp;dynamics&nbsp;under&nbsp;its&nbsp;noise&
  <dl><dt><a name="-reset_wave_phase"><strong>reset_wave_phase</strong></a>(band: 'BrainWave', phase: 'float' = 0.0) -&gt; 'None'</dt><dd><span class="code">Snap&nbsp;a&nbsp;band's&nbsp;phase&nbsp;—&nbsp;the&nbsp;strong-transient&nbsp;reset.</span></dd></dl>
  <dl><dt><a name="-resolve_waking_drowsy"><strong>resolve_waking_drowsy</strong></a>(phase: 'int', arousal: 'float') -&gt; 'int'</dt><dd><span class="code">Resolve&nbsp;a&nbsp;waking&nbsp;phase&nbsp;against&nbsp;arousal&nbsp;(pure;&nbsp;unit-testable).<br>
 &nbsp;<br>
-The&nbsp;daemon&nbsp;reports&nbsp;Drowsy&nbsp;only&nbsp;once&nbsp;sleep&nbsp;pressure&nbsp;(adenosine)<br>
-joins&nbsp;low&nbsp;arousal,&nbsp;but&nbsp;the&nbsp;wave&nbsp;model&nbsp;reads&nbsp;drowsiness&nbsp;from<br>
-arousal&nbsp;alone.&nbsp;A&nbsp;generic&nbsp;waking&nbsp;label&nbsp;(active/alert&nbsp;—&nbsp;the&nbsp;two<br>
-phases&nbsp;rendered&nbsp;through&nbsp;the&nbsp;alertness-driven&nbsp;wave&nbsp;branch)&nbsp;with<br>
-arousal&nbsp;inside&nbsp;the&nbsp;N1-like&nbsp;theta&nbsp;band&nbsp;is&nbsp;pre-sleep&nbsp;whatever<br>
-adenosine&nbsp;says:&nbsp;return&nbsp;PHASE_DROWSY&nbsp;so&nbsp;phase,&nbsp;waves,&nbsp;emotion,<br>
-and&nbsp;learning&nbsp;agree.&nbsp;Anything&nbsp;else&nbsp;passes&nbsp;through&nbsp;unchanged.</span></dd></dl>
+The&nbsp;daemon's&nbsp;classifier&nbsp;now&nbsp;enters&nbsp;Drowsy&nbsp;on&nbsp;the&nbsp;N1&nbsp;arousal&nbsp;band<br>
+itself,&nbsp;so&nbsp;on&nbsp;a&nbsp;current&nbsp;body&nbsp;this&nbsp;read&nbsp;is&nbsp;a&nbsp;pass-through.&nbsp;It&nbsp;stays<br>
+as&nbsp;the&nbsp;backstop&nbsp;for&nbsp;a&nbsp;stale&nbsp;or&nbsp;older&nbsp;daemon&nbsp;whose&nbsp;waking&nbsp;label<br>
+(active/alert&nbsp;—&nbsp;the&nbsp;two&nbsp;phases&nbsp;rendered&nbsp;through&nbsp;the&nbsp;alertness-<br>
+driven&nbsp;wave&nbsp;branch)&nbsp;can&nbsp;still&nbsp;pair&nbsp;with&nbsp;arousal&nbsp;inside&nbsp;the&nbsp;N1-like<br>
+theta&nbsp;band,&nbsp;which&nbsp;is&nbsp;pre-sleep&nbsp;whatever&nbsp;adenosine&nbsp;says:&nbsp;return<br>
+PHASE_DROWSY&nbsp;so&nbsp;phase,&nbsp;waves,&nbsp;emotion,&nbsp;and&nbsp;learning&nbsp;agree.<br>
+Anything&nbsp;else&nbsp;passes&nbsp;through&nbsp;unchanged.</span></dd></dl>
  <dl><dt><a name="-wave_phase_of"><strong>wave_phase_of</strong></a>(band: 'BrainWave') -&gt; 'float'</dt><dd><span class="code">Current&nbsp;instantaneous&nbsp;phase&nbsp;of&nbsp;``band``&nbsp;(radians).</span></dd></dl>
 </td></tr></table><p>
 <table class="section">

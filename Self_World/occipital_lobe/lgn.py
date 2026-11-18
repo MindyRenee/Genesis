@@ -30,7 +30,7 @@ import numpy as np
 from occipital_lobe.color import cone_opponent
 
 if TYPE_CHECKING:
-    from optic_nerve import OpticNerve
+    from body.sight.optic_nerve import OpticNerve
 
 logger = logging.getLogger(__name__)
 

@@ -256,8 +256,8 @@ class TestScreenNerve:
         """A screen look must read ``genesis_screen_nerve`` — never the
         body's eye — and carry that provenance onto the scene."""
         import occipital_lobe.perception.vision as vision_mod
+        from body.sight.optic_nerve import SCREEN_NAME
         from occipital_lobe.perception.vision import Vision
-        from optic_nerve import SCREEN_NAME
 
         attached: list[str] = []
         monkeypatch.setattr(vision_mod, "OpticNerve", _AttachProbe(attached))

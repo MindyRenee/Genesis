@@ -1332,3 +1332,38 @@ def test_field_state_absent_is_none() -> None:
         "field.consensus": "0,0,0,0,0,0",
     }
     assert FieldState.from_internals(bad) is None
+
+
+def test_field_state_holographic_keys() -> None:
+    """The metatron readout — the center's image on the S⁵ screen, its
+    depth into the vesica cell, the field's coupling — parses when the
+    daemon publishes it and defaults to None on older internals maps."""
+    from genesis_client.types import FieldState
+
+    internals = {
+        "field.fibers": "3",
+        "field.disagreement": "0.034000",
+        "field.temperature": "0.120000",
+        "field.consensus_norm": "0.082000",
+        "field.consensus": "-0.010000,0.020000,0.000000,-0.030000,0.010000,0.005000",
+        "field.boundary": "-0.100000,0.200000,0.000000,-0.300000,0.100000,0.050000",
+        "field.superposition": "0.140000",
+        "field.coupling": "0.007000",
+    }
+    state = FieldState.from_internals(internals)
+    assert state is not None
+    assert state.boundary is not None and len(state.boundary) == 6
+    assert approx_equal(state.boundary[3], -0.3, 1e-6)
+    assert approx_equal(state.superposition, 0.14, 1e-6)
+    assert approx_equal(state.coupling, 0.007, 1e-6)
+
+    # An older daemon publishes none of the holographic keys — the
+    # readout still parses, the new channels just read absent.
+    del internals["field.boundary"]
+    del internals["field.superposition"]
+    del internals["field.coupling"]
+    state = FieldState.from_internals(internals)
+    assert state is not None
+    assert state.boundary is None
+    assert state.superposition is None
+    assert state.coupling is None

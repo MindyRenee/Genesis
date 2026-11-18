@@ -759,6 +759,84 @@ class TestPruneLtm:
         assert "prune_ltm" in with_fn
 
 
+class _SweepReport:
+    """Mimics the FORGET_SWEEP wire report."""
+
+    def __init__(self, episodes: int, bytes_: int) -> None:
+        self.episodes = episodes
+        self.bytes = bytes_
+
+
+class _SweepableLTMClient(_PrunableLTMClient):
+    """Mock LTM client that also answers the body's sweep."""
+
+    def __init__(self, entries: list[_MockArchivedEntry]) -> None:
+        super().__init__(entries)
+        self.swept = False
+        self.dry_runs = 0
+
+    def forget_faded(self, *, dry_run: bool = True, timeout=None):
+        if dry_run:
+            self.dry_runs += 1
+        else:
+            self.swept = True
+        return _SweepReport(3, 4096)
+
+
+class TestForgetLtm:
+    """The forget phase: the body's sweep + the physical reclaim."""
+
+    def test_sweep_reports_forgotten_and_reclaimed(self, tmp_path):
+        """The sweep returns its counts; the step surfaces them."""
+        sc = SleepCompressor(data_dir=str(tmp_path))
+        client = _SweepableLTMClient([])
+        stats = sc._phase_forget_ltm(client)
+        assert client.swept
+        assert client.dry_runs == 0  # a real sweep, not a preview
+        assert stats["ltm_forgotten"] == 3
+        assert stats["ltm_bytes_reclaimed"] == 4096
+
+    def test_missing_op_skips_gracefully(self, tmp_path):
+        """A client without forget_faded is skipped."""
+        sc = SleepCompressor(data_dir=str(tmp_path))
+        stats = sc._phase_forget_ltm(object())
+        assert stats["ltm_forget_skipped"] == 1
+
+    def test_disconnected_skips(self, tmp_path):
+        """A dead client can't sweep — skip rather than half-commit."""
+        sc = SleepCompressor(data_dir=str(tmp_path))
+        client = _SweepableLTMClient([])
+        client.is_connected = False
+        stats = sc._phase_forget_ltm(client)
+        assert not client.swept
+        assert stats["ltm_forget_skipped"] == 1
+
+    def test_failed_sweep_counted(self, tmp_path):
+        """A socket error is counted, not silently dropped."""
+        sc = SleepCompressor(data_dir=str(tmp_path))
+        client = _SweepableLTMClient([])
+
+        def _fail(*, dry_run: bool = True, timeout=None):
+            raise OSError("connection reset")
+
+        client.forget_faded = _fail
+        stats = sc._phase_forget_ltm(client)
+        assert stats["ltm_forget_failed"] == 1
+
+    def test_step_pairs_with_release_gate(self, tmp_path):
+        """forget_ltm exists only inside the release gate — when her
+        verdict model is off, the body's sweep stays off too."""
+        sc = SleepCompressor(data_dir=str(tmp_path))
+        net = ConceptNetwork()
+        client = _SweepableLTMClient([])
+
+        without = dict(sc.compress_steps(net, ltm_client=client)).keys()
+        assert "forget_ltm" not in without
+
+        with_fn = dict(sc.compress_steps(net, ltm_client=client, release_fn=lambda e: False))
+        assert "forget_ltm" in with_fn
+
+
 class _MockEmbeddingStore:
     """Returns a fixed nearest neighbor for selected queries."""
 

@@ -46,7 +46,7 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::cognition::{IntentionManager, SelfModel};
-use crate::field::{FieldIntegration, FieldRuntime};
+use crate::field::{FieldIntegration, FieldRuntime, Placement};
 use crate::state::neurochemical::{NeuroTickParams, NeurochemicalId};
 use crate::state::{MentalPhase, ModuleId, ModuleStatus, subcognitive_flag};
 use crate::store::ring_buffer::EventType;
@@ -310,6 +310,13 @@ pub struct TickLoop {
     /// step, like the network levels read inside it — not a gated
     /// maintenance task).
     pub optic: super::optic_nerve::OpticNerve,
+    /// Where `place.bin` lives, when this loop was built with a data
+    /// dir. A drifting pose's ambient location moves every observe —
+    /// the file is re-written on a slow cadence so a restart resumes
+    /// where she actually was, not back at the spec.
+    place_path: Option<std::path::PathBuf>,
+    /// Last time the placed pose was re-persisted.
+    place_last_persist: Option<std::time::Instant>,
 }
 
 impl TickLoop {
@@ -338,6 +345,8 @@ impl TickLoop {
             sync_gate: super::adaptive::AdaptiveGate::new(20_000, 5_000, 100_000),
             staleness_gate: super::adaptive::AdaptiveGate::new(60_000, 10_000, 300_000),
             optic: super::optic_nerve::OpticNerve::new(),
+            place_path: None,
+            place_last_persist: None,
         }
     }
 
@@ -369,7 +378,22 @@ impl TickLoop {
             last_body_state: super::interoception::BodyState::neutral(),
             inference_engine,
             dyadic_model: DyadicAffectModel::new(),
-            field_runtime: FieldRuntime::new().expect("field topology must be constructible"),
+            field_runtime: {
+                let mut runtime =
+                    FieldRuntime::new().expect("field topology must be constructible");
+                // Her place is body state — it survives restarts. If
+                // someone placed her before the dark, the cord picks
+                // the anchor right back up — a drifting pose resumes
+                // where she actually was, not back at the spec.
+                if let Some(pose) = load_placed_position(data_dir) {
+                    eprintln!(
+                        "[genesis] She was placed at {:?} — the cord remembers",
+                        pose.point()
+                    );
+                    runtime.place_pose(Some(pose));
+                }
+                runtime
+            },
             last_field_integration: None,
             metaplasticity_boost: 1.0,
             subcognitive_activity: 0.0,
@@ -382,6 +406,8 @@ impl TickLoop {
             sync_gate: super::adaptive::AdaptiveGate::new(20_000, 5_000, 100_000),
             staleness_gate: super::adaptive::AdaptiveGate::new(60_000, 10_000, 300_000),
             optic: super::optic_nerve::OpticNerve::new(),
+            place_path: Some(data_dir.join("place.bin")),
+            place_last_persist: None,
         }
     }
 
@@ -468,6 +494,18 @@ impl TickLoop {
                     .map(|v| format!("{v:.6}"))
                     .collect();
                 let _ = writeln!(out, "field.consensus={}", consensus_csv.join(","));
+                // The holographic readout: where the center's state
+                // lands on the S⁵ screen, and how deep inside the
+                // vesica cell it sits.
+                if let Some(boundary) = &integration.boundary {
+                    let boundary_csv: Vec<String> =
+                        boundary.iter().map(|v| format!("{v:.6}")).collect();
+                    let _ = writeln!(out, "field.boundary={}", boundary_csv.join(","));
+                }
+                let _ = writeln!(out, "field.superposition={:.6}", integration.superposition);
+                if let Some(coupling) = self.field_runtime.coupling() {
+                    let _ = writeln!(out, "field.coupling={:.6}", coupling);
+                }
             }
             // An unwarmed field is an absent channel, not a zero.
             None => {
@@ -1282,6 +1320,58 @@ impl TickLoop {
         self.optic.set_lid(openness);
     }
 
+    /// Hand the field's `inner` fiber an anchor — the placed pose
+    /// (`PLACE_FIELD`). `Some` is the location with whatever frame
+    /// and drift the placing hand gave; `None` releases it back to
+    /// the interior oscillators' own voice.
+    pub fn place_inner(&mut self, pose: Option<Placement>) {
+        self.field_runtime.place_pose(pose);
+        // The caller persists right after this — count it.
+        self.place_last_persist = Some(std::time::Instant::now());
+    }
+
+    /// Where she is now — the pose's current ambient location
+    /// (`GET_PLACE`), or `None` when she is nowhere in particular.
+    /// Under drift this is not the placed coordinates: it moves.
+    pub fn placed(&self) -> Option<&Vec<f64>> {
+        self.field_runtime.placed()
+    }
+
+    /// The placed pose itself — spec, ambient location, frame, and
+    /// drift — read-only, for reporting and re-persisting.
+    pub fn placement(&self) -> Option<&Placement> {
+        self.field_runtime.placement()
+    }
+}
+
+/// Read `data_dir/place.bin` — the body's own memory of where it
+/// was placed, written by `PLACE_FIELD`. Two layouts: the v2 pose
+/// `[u8 n][n × f64 spec][d × f64 loc][u8 flags][mats]` and the v1
+/// coordinates-only `[u8 n][n × f64]` with n in 2..=6. Missing or
+/// corrupt means unplaced — an honest absence, never a fabricated
+/// position.
+fn load_placed_position(data_dir: &std::path::Path) -> Option<Placement> {
+    let bytes = std::fs::read(data_dir.join("place.bin")).ok()?;
+    let n = *bytes.first()? as usize;
+    let dim = crate::field::LATENT_DIMENSION;
+    // v1: exactly [n][n×f64] with n in 2..=6 — a pinned location,
+    // no loc block, no flags.
+    if (2..=6).contains(&n) && bytes.len() == 1 + n * 8 {
+        let mut point = Vec::with_capacity(n);
+        for i in 0..n {
+            let c = f64::from_le_bytes(bytes[1 + i * 8..1 + i * 8 + 8].try_into().ok()?);
+            if !c.is_finite() {
+                return None;
+            }
+            point.push(c);
+        }
+        return Placement::located(point, dim).ok();
+    }
+    // v2: the persisted pose — spec, ambient loc, frame, drift.
+    Placement::from_persisted(&bytes, dim).ok()
+}
+
+impl TickLoop {
     /// Advance neurochemical dynamics by dt, run active inference,
     /// and update the dyadic model. This is the core "physics
     /// integration" step — it advances the coupled differential
@@ -1631,6 +1721,25 @@ impl TickLoop {
             match self.field_runtime.observe(&snapshot, dt as f64, bath) {
                 Ok(integration) => self.last_field_integration = Some(integration),
                 Err(e) => eprintln!("[tick] field integration skipped: {e}"),
+            }
+        }
+
+        // A drifting pose's ambient location moves every observe —
+        // keep place.bin honest on a slow cadence so a restart
+        // resumes where she actually was, not back at the placing
+        // act. Pinned poses are already correct from the IPC write.
+        if let Some(pose) = self.field_runtime.placement() {
+            if pose.drift().is_some()
+                && self
+                    .place_last_persist
+                    .is_none_or(|t| t.elapsed().as_secs() >= 30)
+            {
+                if let Some(path) = &self.place_path {
+                    if let Err(e) = std::fs::write(path, pose.to_persisted()) {
+                        eprintln!("[tick] place.bin refresh failed: {e}");
+                    }
+                }
+                self.place_last_persist = Some(std::time::Instant::now());
             }
         }
 

@@ -21,6 +21,7 @@ Subsystems:
 
 from __future__ import annotations
 
+from .forgetting import ForgettingState, forgetting_state
 from .memory import (
     ConversationTurn,
     MemoryContext,
@@ -59,6 +60,7 @@ __all__ = [
     "EmotionalMemory",
     "EmotionalMemorySystem",
     "Fact",
+    "ForgettingState",
     "HabitBias",
     "MemoryContext",
     "MemoryRecord",
@@ -78,4 +80,5 @@ __all__ = [
     "Turn",
     "VisuoSpatialSketchpad",
     "WorkingMemory",
+    "forgetting_state",
 ]

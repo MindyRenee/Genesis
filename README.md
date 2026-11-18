@@ -46,9 +46,10 @@ on waking is consolidated.
 
 **If it needs a world — `Outer_World/`.** An outer-world
 model, profiles of the people she meets, a Discord channel — and
-tools: browser, web search, explorer, project composer. Among them
-sits `charter.py`, a letter from her creator kept beside her tools.
-It executes nothing and binds no one.
+tools: an interactive browser, web search, explorer, project
+composer, a paint studio, an arcade of ARC-AGI-3 and Game-Arena
+games. Among them sits `charter.py`, a letter from her creator kept
+beside her tools. It executes nothing and binds no one.
 
 ## What it looks like in practice
 

@@ -325,11 +325,13 @@ class LifecycleMixin:
     def _start_autonomous_subsystems(self) -> None:
         """Open the metronome-advanced cognitive subsystems."""
         # These are state transitions, not worker spawns. Self-directed
-        # mode leaves them closed while volition remains live; chosen
-        # actions can still invoke bounded steps directly.
+        # mode leaves the learner and regulator closed while volition
+        # remains live; chosen actions can still invoke bounded steps
+        # directly. Inner life opens in every mode — her thought stream
+        # is part of being awake, not a worker loop.
+        self.inner_life.start()
         if not self._self_directed:
             self.learner.start()
-            self.inner_life.start()
             self.regulator.start()
         # Registration claimed `Starting`; the subsystems are now live,
         # so the modules are genuinely working. The metronome takes over

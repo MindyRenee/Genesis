@@ -17,8 +17,7 @@ it&nbsp;can&nbsp;search,&nbsp;fetch&nbsp;pages,&nbsp;and&nbsp;read&nbsp;content,
 post&nbsp;data,&nbsp;or&nbsp;modify&nbsp;anything&nbsp;online.<br>
 &nbsp;<br>
 Search&nbsp;and&nbsp;browsing&nbsp;run&nbsp;through&nbsp;her&nbsp;real&nbsp;browser:&nbsp;Chrome&nbsp;driven<br>
-over&nbsp;CDP&nbsp;(Firefox&nbsp;over&nbsp;WebDriver&nbsp;BiDi&nbsp;serves&nbsp;hosts&nbsp;without&nbsp;it),&nbsp;so<br>
-JavaScript-heavy&nbsp;pages&nbsp;render&nbsp;and&nbsp;search&nbsp;behaves<br>
+over&nbsp;CDP,&nbsp;so&nbsp;JavaScript-heavy&nbsp;pages&nbsp;render&nbsp;and&nbsp;search&nbsp;behaves<br>
 like&nbsp;it&nbsp;does&nbsp;for&nbsp;a&nbsp;person.&nbsp;Plain-HTML&nbsp;fetches&nbsp;still&nbsp;take&nbsp;the<br>
 lightweight&nbsp;urllib&nbsp;path&nbsp;first;&nbsp;the&nbsp;browser&nbsp;is&nbsp;the&nbsp;fallback&nbsp;for&nbsp;thin<br>
 or&nbsp;failed&nbsp;pages.&nbsp;With&nbsp;no&nbsp;browser&nbsp;there&nbsp;is&nbsp;no&nbsp;search&nbsp;—&nbsp;an&nbsp;honest<br>
@@ -50,7 +49,8 @@ from&nbsp;and&nbsp;composes&nbsp;with&nbsp;—&nbsp;it&nbsp;never&nbsp;recites&n
 </td><td class="multicolumn"><a href="re.html">re</a><br>
 <a href="socket.html">socket</a><br>
 <a href="ssl.html">ssl</a><br>
-</td><td class="multicolumn"><a href="time.html">time</a><br>
+</td><td class="multicolumn"><a href="subprocess.html">subprocess</a><br>
+<a href="time.html">time</a><br>
 <a href="urllib.html">urllib</a><br>
 </td></tr></table></td></tr></table><p>
 <table class="section">
@@ -159,7 +159,18 @@ Data and other attributes defined here:<br>
 <td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
     
 <tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
-<td class="singlecolumn"><dl><dt><a name="-fetch"><strong>fetch</strong></a>(url: 'str') -&gt; 'WebFetchResult | None'</dt><dd><span class="code">Fetch&nbsp;a&nbsp;web&nbsp;page&nbsp;and&nbsp;extract&nbsp;its&nbsp;readable&nbsp;text.<br>
+<td class="singlecolumn"><dl><dt><a name="-ask_human"><strong>ask_human</strong></a>(url: 'str', timeout: 'float' = 120) -&gt; 'dict | None'</dt><dd><span class="code">Put&nbsp;a&nbsp;walled&nbsp;page&nbsp;on&nbsp;the&nbsp;owner's&nbsp;screen&nbsp;and&nbsp;wait&nbsp;for&nbsp;a&nbsp;person<br>
+to&nbsp;clear&nbsp;it&nbsp;—&nbsp;captcha,&nbsp;consent,&nbsp;"verify&nbsp;you&nbsp;are&nbsp;human".<br>
+&nbsp;<br>
+The&nbsp;headless&nbsp;tab&nbsp;must&nbsp;yield&nbsp;the&nbsp;profile&nbsp;first:&nbsp;one&nbsp;Chrome&nbsp;owns&nbsp;a<br>
+user-data&nbsp;dir&nbsp;at&nbsp;a&nbsp;time,&nbsp;so&nbsp;it&nbsp;closes,&nbsp;the&nbsp;visible&nbsp;window&nbsp;opens<br>
+on&nbsp;the&nbsp;same&nbsp;profile&nbsp;(the&nbsp;owner's&nbsp;sign-in&nbsp;and&nbsp;cookies&nbsp;travel&nbsp;with<br>
+it),&nbsp;the&nbsp;human&nbsp;solves,&nbsp;and&nbsp;the&nbsp;window&nbsp;closes&nbsp;—&nbsp;the&nbsp;clearance<br>
+persists&nbsp;profile-side&nbsp;for&nbsp;the&nbsp;headless&nbsp;runs&nbsp;after.</span></dd></dl>
+ <dl><dt><a name="-click_at"><strong>click_at</strong></a>(x: 'float' = -1.0, y: 'float' = -1.0, text: 'str' = '', selector: 'str' = '') -&gt; 'dict | None'</dt><dd><span class="code">Click&nbsp;in&nbsp;her&nbsp;tab&nbsp;—&nbsp;at&nbsp;coordinates,&nbsp;a&nbsp;CSS&nbsp;selector,&nbsp;or&nbsp;the<br>
+element&nbsp;whose&nbsp;visible&nbsp;text&nbsp;matches.&nbsp;If&nbsp;the&nbsp;click&nbsp;navigates,&nbsp;the<br>
+landing&nbsp;URL&nbsp;is&nbsp;re-checked&nbsp;against&nbsp;the&nbsp;safety&nbsp;rules.</span></dd></dl>
+ <dl><dt><a name="-fetch"><strong>fetch</strong></a>(url: 'str') -&gt; 'WebFetchResult | None'</dt><dd><span class="code">Fetch&nbsp;a&nbsp;web&nbsp;page&nbsp;and&nbsp;extract&nbsp;its&nbsp;readable&nbsp;text.<br>
 &nbsp;<br>
 Read-only&nbsp;GET&nbsp;request.&nbsp;Refuses&nbsp;URLs&nbsp;on&nbsp;the&nbsp;adult/malware<br>
 blocklist.&nbsp;Only&nbsp;processes&nbsp;text/html&nbsp;and&nbsp;text/plain&nbsp;responses.<br>
@@ -171,11 +182,22 @@ Returns:<br>
 &nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;<a href="#WebFetchResult">WebFetchResult</a>&nbsp;with&nbsp;the&nbsp;page&nbsp;title&nbsp;and&nbsp;text&nbsp;content,<br>
 &nbsp;&nbsp;&nbsp;&nbsp;or&nbsp;None&nbsp;if&nbsp;the&nbsp;fetch&nbsp;failed,&nbsp;the&nbsp;URL&nbsp;is&nbsp;blocked,&nbsp;or&nbsp;the<br>
 &nbsp;&nbsp;&nbsp;&nbsp;content&nbsp;is&nbsp;too&nbsp;short.</span></dd></dl>
+ <dl><dt><a name="-go_back"><strong>go_back</strong></a>() -&gt; 'dict | None'</dt><dd><span class="code">Back&nbsp;one&nbsp;history&nbsp;entry;&nbsp;returns&nbsp;the&nbsp;page&nbsp;she&nbsp;lands&nbsp;on.<br>
+&nbsp;<br>
+Uses&nbsp;Page.navigateToHistoryEntry&nbsp;rather&nbsp;than&nbsp;evaluating<br>
+``history.back()``&nbsp;—&nbsp;an&nbsp;eval&nbsp;that&nbsp;navigates&nbsp;can&nbsp;destroy&nbsp;its&nbsp;own<br>
+execution&nbsp;context&nbsp;mid-call&nbsp;and&nbsp;come&nbsp;back&nbsp;as&nbsp;a&nbsp;CDP&nbsp;error.</span></dd></dl>
  <dl><dt><a name="-is_query_safe"><strong>is_query_safe</strong></a>(query: 'str') -&gt; 'bool'</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;a&nbsp;search&nbsp;query&nbsp;does&nbsp;not&nbsp;contain&nbsp;adult&nbsp;terms.</span></dd></dl>
  <dl><dt><a name="-is_url_safe"><strong>is_url_safe</strong></a>(url: 'str') -&gt; 'bool'</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;a&nbsp;URL&nbsp;is&nbsp;not&nbsp;on&nbsp;the&nbsp;adult/malware&nbsp;blocklist.<br>
 &nbsp;<br>
 This&nbsp;is&nbsp;a&nbsp;blocklist&nbsp;check,&nbsp;not&nbsp;a&nbsp;whitelist.&nbsp;The&nbsp;open&nbsp;web&nbsp;is<br>
 allowed&nbsp;by&nbsp;default;&nbsp;only&nbsp;known-bad&nbsp;domains&nbsp;are&nbsp;refused.</span></dd></dl>
+ <dl><dt><a name="-open_page"><strong>open_page</strong></a>(url: 'str') -&gt; 'dict | None'</dt><dd><span class="code">Navigate&nbsp;her&nbsp;tab&nbsp;to&nbsp;``url``;&nbsp;returns&nbsp;its&nbsp;state&nbsp;—&nbsp;title,&nbsp;landed<br>
+URL,&nbsp;and&nbsp;clickable/typable&nbsp;elements.&nbsp;Same&nbsp;safety&nbsp;rules&nbsp;as&nbsp;fetch.</span></dd></dl>
+ <dl><dt><a name="-press_key"><strong>press_key</strong></a>(name: 'str') -&gt; 'dict | None'</dt><dd><span class="code">Press&nbsp;one&nbsp;named&nbsp;key&nbsp;in&nbsp;her&nbsp;tab&nbsp;—&nbsp;Enter,&nbsp;Tab,&nbsp;Escape,&nbsp;arrows,<br>
+and&nbsp;friends:&nbsp;the&nbsp;keys&nbsp;a&nbsp;click&nbsp;can't&nbsp;reach.</span></dd></dl>
+ <dl><dt><a name="-read_page"><strong>read_page</strong></a>() -&gt; 'dict | None'</dt><dd><span class="code">The&nbsp;tab's&nbsp;current&nbsp;state&nbsp;—&nbsp;title,&nbsp;URL,&nbsp;interactive&nbsp;elements.</span></dd></dl>
+ <dl><dt><a name="-scroll_page"><strong>scroll_page</strong></a>(dy: 'float' = 600) -&gt; 'dict | None'</dt><dd><span class="code">Scroll&nbsp;her&nbsp;tab&nbsp;—&nbsp;positive&nbsp;down,&nbsp;negative&nbsp;up.</span></dd></dl>
  <dl><dt><a name="-search"><strong>search</strong></a>(query: 'str', limit: 'int' = 5) -&gt; 'list[WebSearchResult]'</dt><dd><span class="code">Search&nbsp;the&nbsp;web&nbsp;through&nbsp;her&nbsp;browser&nbsp;for&nbsp;a&nbsp;query.<br>
 &nbsp;<br>
 Returns&nbsp;up&nbsp;to&nbsp;``limit``&nbsp;results,&nbsp;filtered&nbsp;through&nbsp;the&nbsp;content<br>
@@ -200,6 +222,9 @@ Args:<br>
 &nbsp;<br>
 Returns:<br>
 &nbsp;&nbsp;&nbsp;&nbsp;A&nbsp;<a href="#WebFetchResult">WebFetchResult</a>&nbsp;for&nbsp;the&nbsp;first&nbsp;successfully&nbsp;fetched&nbsp;page.</span></dd></dl>
+ <dl><dt><a name="-type_text"><strong>type_text</strong></a>(text: 'str', x: 'float' = -1.0, y: 'float' = -1.0, target: 'str' = '', selector: 'str' = '') -&gt; 'dict | None'</dt><dd><span class="code">Type&nbsp;into&nbsp;her&nbsp;tab&nbsp;—&nbsp;into&nbsp;whatever&nbsp;has&nbsp;focus,&nbsp;or&nbsp;into&nbsp;the<br>
+element&nbsp;found&nbsp;by&nbsp;coords/selector/visible&nbsp;text&nbsp;(clicked&nbsp;first&nbsp;to<br>
+focus&nbsp;it,&nbsp;the&nbsp;way&nbsp;a&nbsp;person&nbsp;would).</span></dd></dl>
 </td></tr></table><p>
 <table class="section">
 <tr class="decor data-decor heading-text">
@@ -209,7 +234,6 @@ Returns:<br>
 <td class="singlecolumn"><strong>MAX_TEXT_LENGTH</strong> = 50000<br>
 <strong>REQUEST_TIMEOUT</strong> = 10<br>
 <strong>TYPE_CHECKING</strong> = False<br>
-<strong>USER_AGENT</strong> = 'Genesis-AI/1.0 (cognitive mind)'<br>
-<strong>__annotations__</strong> = {'_ADULT_QUERY_TERMS': 'frozenset[str]', '_BLOCKED_DOMAINS': 'frozenset[str]', '_LOCAL_HOSTNAMES': 'frozenset[str]', '_SEARCH_ENGINES': 'tuple[tuple[str, str], ...]', '_browser': '_Browser | None', '_ssl_ctx': 'ssl.SSLContext | None'}<br>
+<strong>__annotations__</strong> = {'_ADULT_QUERY_TERMS': 'frozenset[str]', '_BLOCKED_DOMAINS': 'frozenset[str]', '_LOCAL_HOSTNAMES': 'frozenset[str]', '_SEARCH_ENGINES': 'tuple[tuple[str, str], ...]', '_USER_AGENT': 'str | None', '_browser': '_Browser | None', '_ssl_ctx': 'ssl.SSLContext | None'}<br>
 <strong>logger</strong> = &lt;Logger Outer_World.tools.web_search (WARNING)&gt;</td></tr></table>
 </body></html>

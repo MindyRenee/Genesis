@@ -315,8 +315,8 @@ def test_startup_failure_still_shuts_down(tmp_path, failing_step):
     assert cleanup.call_args.args[1] is mind
 
 
-def test_self_directed_keeps_rebirth_watcher_stopped(tmp_path):
-    """Self-directed mode keeps process resurrection out of the session."""
+def test_self_directed_keeps_rebirth_watcher_running(tmp_path):
+    """Self-directed mode still resurrects the body around the mind."""
     daemon = Mock()
     daemon.pid = 4242
     mind = Mock()
@@ -351,7 +351,7 @@ def test_self_directed_keeps_rebirth_watcher_stopped(tmp_path):
         assert genesis_cli.main() == 0
 
     assert mind_ctor.call_args.kwargs["self_directed"] is True
-    rebirth.start.assert_not_called()
+    rebirth.start.assert_called_once_with()
 
 
 def test_retina_launches_before_the_daemon(tmp_path):

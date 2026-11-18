@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Outer_World.discord.guide</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Outer_World.html" class="white">Outer_World</a>.<a href="Outer_World.discord.html" class="white">discord</a>.guide</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Outer_World/discord/guide.py">/home/mindyrenee/GenAnd/Genesis/Outer_World/discord/guide.py</a></td></tr></table>
+    <p><span class="code">Channel&nbsp;guide&nbsp;—&nbsp;the&nbsp;"what&nbsp;am&nbsp;I&nbsp;looking&nbsp;at"&nbsp;card&nbsp;for&nbsp;her&nbsp;page.<br>
+&nbsp;<br>
+The&nbsp;status&nbsp;card&nbsp;is&nbsp;honest&nbsp;instrumentation,&nbsp;but&nbsp;instrumentation&nbsp;is<br>
+only&nbsp;readable&nbsp;once&nbsp;someone&nbsp;tells&nbsp;you&nbsp;what&nbsp;the&nbsp;dials&nbsp;mean.&nbsp;This<br>
+module&nbsp;composes&nbsp;that&nbsp;explanation:&nbsp;who&nbsp;she&nbsp;is,&nbsp;how&nbsp;to&nbsp;talk&nbsp;to&nbsp;her,<br>
+what&nbsp;the&nbsp;colors&nbsp;mean,&nbsp;and&nbsp;a&nbsp;plain-words&nbsp;legend&nbsp;for&nbsp;every&nbsp;row&nbsp;the<br>
+board&nbsp;shows.<br>
+&nbsp;<br>
+Where&nbsp;it&nbsp;lives:<br>
+&nbsp;<br>
+-&nbsp;With&nbsp;``GENESIS_DISCORD_INFO_WEBHOOK``&nbsp;set,&nbsp;it&nbsp;posts&nbsp;to&nbsp;that<br>
+&nbsp;&nbsp;dedicated&nbsp;info&nbsp;channel&nbsp;as&nbsp;one&nbsp;maintained&nbsp;message&nbsp;—&nbsp;edited,&nbsp;not<br>
+&nbsp;&nbsp;reposted,&nbsp;so&nbsp;it&nbsp;never&nbsp;scrolls&nbsp;away&nbsp;and&nbsp;never&nbsp;piles&nbsp;up.&nbsp;The<br>
+&nbsp;&nbsp;message&nbsp;id&nbsp;is&nbsp;persisted&nbsp;in&nbsp;the&nbsp;data&nbsp;dir<br>
+&nbsp;&nbsp;(``discord_guide_state.json``)&nbsp;so&nbsp;a&nbsp;reboot&nbsp;PATCHes&nbsp;the&nbsp;same&nbsp;card.<br>
+-&nbsp;Without&nbsp;it,&nbsp;the&nbsp;card&nbsp;posts&nbsp;once&nbsp;to&nbsp;the&nbsp;shared&nbsp;channel&nbsp;when&nbsp;her<br>
+&nbsp;&nbsp;page&nbsp;opens&nbsp;—&nbsp;it&nbsp;scrolls&nbsp;with&nbsp;the&nbsp;session,&nbsp;but&nbsp;a&nbsp;newcomer&nbsp;still<br>
+&nbsp;&nbsp;gets&nbsp;the&nbsp;explanation.<br>
+&nbsp;<br>
+The&nbsp;text&nbsp;is&nbsp;fixed,&nbsp;not&nbsp;narrated:&nbsp;like&nbsp;the&nbsp;board,&nbsp;it&nbsp;is&nbsp;a&nbsp;view&nbsp;—&nbsp;it<br>
+says&nbsp;the&nbsp;same&nbsp;true&nbsp;thing&nbsp;every&nbsp;time&nbsp;rather&nbsp;than&nbsp;flattering&nbsp;itself.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="json.html">json</a><br>
+</td><td class="multicolumn"><a href="logging.html">logging</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-guide_text"><strong>guide_text</strong></a>(*, inner_channel: 'bool' = False) -&gt; 'str'</dt><dd><span class="code">The&nbsp;explainer&nbsp;card&nbsp;—&nbsp;plain&nbsp;words,&nbsp;no&nbsp;assumed&nbsp;context.<br>
+&nbsp;<br>
+``inner_channel``&nbsp;notes&nbsp;when&nbsp;her&nbsp;inner&nbsp;life&nbsp;has&nbsp;its&nbsp;own&nbsp;page,&nbsp;so<br>
+the&nbsp;guide&nbsp;can&nbsp;point&nbsp;readers&nbsp;at&nbsp;it&nbsp;instead&nbsp;of&nbsp;implying&nbsp;thoughts<br>
+and&nbsp;dreams&nbsp;live&nbsp;here.</span></dd></dl>
+ <dl><dt><a name="-load_guide_message_id"><strong>load_guide_message_id</strong></a>(data_dir: 'Path') -&gt; 'str | None'</dt><dd><span class="code">The&nbsp;info&nbsp;card's&nbsp;message&nbsp;id&nbsp;saved&nbsp;from&nbsp;a&nbsp;previous&nbsp;boot,&nbsp;if&nbsp;any.</span></dd></dl>
+ <dl><dt><a name="-note_guide_message_id"><strong>note_guide_message_id</strong></a>(data_dir: 'Path', message_id: 'str') -&gt; 'None'</dt><dd><span class="code">Persist&nbsp;the&nbsp;info&nbsp;card's&nbsp;message&nbsp;id&nbsp;so&nbsp;the&nbsp;next&nbsp;boot&nbsp;edits&nbsp;it.</span></dd></dl>
+</td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['guide_text', 'load_guide_message_id', 'note_guide_message_id']</td></tr></table>
+</body></html>

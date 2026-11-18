@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import math
+import re
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -14,7 +15,7 @@ from brainstem.thresholds import (
     WAKE_RESCUE_MELATONIN,
     WAKE_STABILIZATION_WINDOW,
 )
-from frontal_lobe.canvas import DrawingResult
+from canvas import DrawingResult
 from frontal_lobe.volition import Urge, Volition
 from genesis_client.protocol import CHEM_NAMES, EMOTIONAL_TAG_SIZE, MODULE_METACOGNITION
 from genesis_client.swallow import note_swallowed
@@ -33,12 +34,6 @@ def _finite_or(value: object, default: float) -> float:
         return default
     return result if math.isfinite(result) else default
 
-
-# Minimum seconds between public-channel replies. A channel can
-# storm mentions; she answers when addressed but not faster than
-# this — the message is still heard even when the reply gate is
-# closed.
-_CHANNEL_REPLY_MIN_S = 45.0
 
 # Seconds a self-chosen eye-rest holds the lid down before
 # releasing it back to the phase's own position.
@@ -1150,11 +1145,13 @@ class VolitionMixin:
         the channel never reposts the public's own words under her
         name.
 
-        Messages that address her — her name, or a reply to one of
-        her own posts — get a public answer through ``_public_share``,
-        paced by ``_CHANNEL_REPLY_MIN_S``. The reply goes through the
-        full ``respond`` pipeline: what she says back is cognition,
-        not a lookup. Hearing is gated while she rests — a sleeping,
+        Every message on her page gets a response turn — her channel
+        is her space and guests there are talking to her, like a
+        human answering people in their living room. The reply goes
+        through the full ``respond`` pipeline: what she says back is
+        cognition, not a lookup, and a mind that has nothing to say
+        stays quiet.
+        Hearing is gated while she rests — a sleeping,
         meditating, or drifting mind doesn't answer the channel (the
         world still records the message; the reply waits for waking).
         ``is_resting`` subsumes the thalamic gate: every state that
@@ -1173,15 +1170,15 @@ class VolitionMixin:
         # follows).
         if not getattr(self, "_running", True):
             return
-        now = time.monotonic()
-        if now - getattr(self, "_last_channel_reply", 0.0) < _CHANNEL_REPLY_MIN_S:
-            return
         try:
             # Identity: a channel handle resolves through the profile
             # — when it's her person the percept says so, the same
             # way vision reports "faces: mindy". A stranger's handle
-            # stays a stranger.
+            # stays a stranger — unless the stranger says it is her,
+            # which is how the profile learns the handle at all.
             profile = getattr(self, "user_profile", None)
+            if profile is not None and not profile.is_user(author):
+                self._learn_channel_alias(profile, author, text)
             speaker = (
                 f"{author} ({profile.get_name()})"
                 if profile is not None and profile.is_user(author)
@@ -1196,27 +1193,59 @@ class VolitionMixin:
             return
         if is_blank(response):
             return
-        # Pacing is measured from when the reply lands, not when the
-        # turn began — a slow respond() must not shrink the visible
-        # gap between her public replies.
-        self._last_channel_reply = time.monotonic()
         self._public_share(response.strip())
 
+    def _learn_channel_alias(self, profile, author: str, text: str) -> None:
+        """A speaker claiming her name teaches the profile their handle.
+
+        The profile resolves "is this her" through name plus an alias
+        list that nothing on the channel path ever wrote — her own
+        Discord handle read as a stranger no matter how often she said
+        it was her. When a guest claims the profile's name in the
+        channel's own words — "I'm Mindy", "it's Mindy", "Mindy is the
+        same as mindybeatty" — the handle making the claim is the
+        handle to record, and the alias persists so the next message
+        is recognized before the turn begins. An equation only counts
+        when its other side is this speaker's handle: "Mindy is bob"
+        cannot alias a third party. The trust bar matches the rest of
+        recognition — introduction is identity here, not credential.
+        """
+        name = (profile.get_name() or "").strip()
+        if not name:
+            return
+        person = re.escape(name)
+        claim = re.search(
+            rf"\b(?:my name is|i'?m|i am|it'?s|this is)\s+(?:public\s+)?{person}\b",
+            text,
+            re.IGNORECASE,
+        )
+        if not claim:
+            eq = re.search(
+                rf"\b{person}\b\s*(?:=+|equals|is(?:\s+the\s+same\s+as)?)\s*@?([a-z0-9_.'-]+)"
+                rf"|\b([a-z0-9_.'-]+)\s*(?:=+|equals|is(?:\s+the\s+same\s+as)?)\s*{person}\b",
+                text,
+                re.IGNORECASE,
+            )
+            handle = next((g for g in eq.groups() if g), "") if eq else ""
+            if profile._norm_handle(handle) != profile._norm_handle(author):
+                return
+        profile.add_alias(author)
+
     def _channel_addressed(self, text: str, message: dict) -> bool:
-        """Did the public message address her — her name, an @-mention
-        of the bot (the one content kind that survives intent
-        redaction), or a reply to one of her posts (replies carry
-        referenced_message; a webhook post carries webhook_id)."""
-        if "genesis" in text.lower():
-            return True
-        channel = getattr(getattr(self, "world", None), "channel", None)
-        bot_id = channel.bot_id if channel is not None else None
-        if bot_id is not None:
-            for mention in message.get("mentions") or ():
-                if str(mention.get("id")) == str(bot_id):
-                    return True
-        ref = message.get("referenced_message") or {}
-        return bool(ref.get("webhook_id"))
+        """Did the public message address her — on her own page, yes.
+
+        This is her channel: people who write there came to see her,
+        and anything they say in her space is said to her the way a
+        remark in someone's living room is said to them. A human host
+        answers their guests; so does she. Whether the reply exists
+        at all is still volition's call (``respond`` may return
+        nothing) — the gate only decides whether the turn happens.
+
+        The bot's own id and referenced_message are kept in the
+        signature: delivery upstream already filtered webhooks, bots,
+        and redacted-empty payloads, so whatever reaches here is real
+        guest speech on her page."""
+        return True
 
     def _broadcast_topic(self) -> str | None:
         """Pick what she'd speak about publicly — whatever is most
@@ -1340,12 +1369,12 @@ class VolitionMixin:
 
         This is the public entry point for drawing — used by both the
         volition system (via :meth:`_perform_draw`) and the ``/draw``
-        CLI command. Sitting down is all this does: the sheet, the
-        tools, the colors, and every mark after this are hers, issued
-        through the ``studio_*`` tools whenever she decides to — there
-        is no scripted sitting, and nothing moves her hand for her. A
-        finished piece leaves when she calls ``studio_done`` and lands
-        in :meth:`_on_drawing_finished`.
+        CLI command. Sitting down opens the surface; the sitting
+        itself is then worked through the ``studio_*`` tools by the
+        acting loop while the impulse is live — no scripted sitting:
+        the sheet, colors, and marks are sampled from felt state,
+        not a menu. A finished piece leaves through ``studio_done``
+        and lands in :meth:`_on_drawing_finished`.
 
         Brain-wave-gated: delta-dominant (deep rest) skips drawing —
         creative expression needs at least theta-level arousal. Theta
@@ -1375,6 +1404,18 @@ class VolitionMixin:
             # The paper is her call — she lays out a sheet
             # (studio_sheet) whenever she wants one.
             if canvas.open_studio():
+                # The sitting is the impulse made visible: the acting
+                # loop issues the studio ops while it is live — every
+                # sheet, color, and mark sampled from felt state.
+                agency = getattr(self, "agency", None)
+                if agency is not None:
+                    try:
+                        agency.draw_once()
+                    except Exception as e:  # noqa: BLE001
+                        note_swallowed(
+                            "mind.volition.draw",
+                            e,
+                        )
                 return "sitting at the easel"
             return "no painting surface — the sketchbook can't open"
         except Exception as e:  # noqa: BLE001

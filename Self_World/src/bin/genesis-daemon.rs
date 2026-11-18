@@ -391,9 +391,9 @@ fn main() {
             .map(|d| d.as_millis() as u64)
             .unwrap_or(0);
         if let Err(e) = mmap.modify(now_ms, |state| {
-            state.neurochemicals.wake_recovery(
-                genesis::state::sleep_network::levels(&state.sleep_network),
-            );
+            state
+                .neurochemicals
+                .wake_recovery(genesis::state::sleep_network::levels(&state.sleep_network));
         }) {
             eprintln!("[genesis] WARNING: wake recovery failed: {e}");
         }

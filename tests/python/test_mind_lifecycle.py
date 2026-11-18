@@ -361,7 +361,7 @@ def test_self_directed_start_suppresses_cognitive_workers(tmp_path):
     mind._start_autonomous_subsystems()
 
     mind.learner.start.assert_not_called()
-    mind.inner_life.start.assert_not_called()
+    mind.inner_life.start.assert_called_once_with()
     mind.regulator.start.assert_not_called()
     assert mind.client.update_module_status.call_count == len(mind._registered_modules())
 

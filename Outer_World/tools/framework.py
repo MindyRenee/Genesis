@@ -750,6 +750,135 @@ def browser_close() -> ToolResult:
     return ToolResult(success=True, output="No browser was open.")
 
 
+def browser_open(url: str) -> ToolResult:
+    """Open a URL in her browser tab.
+
+    Returns the page's title, landed URL, and interactive elements
+    (links, buttons, inputs with click coordinates) — the controls
+    browser_click and browser_type act on. Same content rules as
+    web_fetch: adult/malware URLs and private addresses are refused.
+    """
+    from . import web_search
+
+    state = web_search.open_page(url)
+    if state is None:
+        return ToolResult(success=False, error="Open failed (blocked URL, or no browser).")
+    return ToolResult(
+        success=True,
+        output=f"Opened '{state.get('title', '')}' ({state.get('url', '')}).",
+        data=state,
+    )
+
+
+def browser_read() -> ToolResult:
+    """Read the tab's current state — title, URL, interactive elements."""
+    from . import web_search
+
+    state = web_search.read_page()
+    if state is None:
+        return ToolResult(success=False, error="Read failed (no browser).")
+    return ToolResult(
+        success=True,
+        output=f"On '{state.get('title', '')}' ({state.get('url', '')}).",
+        data=state,
+    )
+
+
+def browser_click(x: float = -1, y: float = -1, text: str = "", selector: str = "") -> ToolResult:
+    """Click in her tab — at ``x,y`` page coordinates, a CSS
+    ``selector``, or the element whose visible text contains ``text``.
+    Clicks can navigate; the landing URL is safety-checked too."""
+    from . import web_search
+
+    result = web_search.click_at(x=x, y=y, text=text, selector=selector)
+    if result is None:
+        return ToolResult(success=False, error="Click failed (no browser).")
+    if not result.get("clicked"):
+        return ToolResult(success=False, error=result.get("reason", "no element matched"))
+    return ToolResult(
+        success=True,
+        output=f"Clicked {result.get('target', '') or 'element'} — now on {result.get('url', '')}.",
+        data=result,
+    )
+
+
+def browser_type(
+    text: str, x: float = -1, y: float = -1, target: str = "", selector: str = ""
+) -> ToolResult:
+    """Type ``text`` in her tab — into the focused element, or into
+    the element found by ``x,y``/``selector``/visible ``target`` text
+    (clicked first to focus it)."""
+    from . import web_search
+
+    result = web_search.type_text(text, x=x, y=y, target=target, selector=selector)
+    if result is None:
+        return ToolResult(success=False, error="Type failed (no browser).")
+    if not result.get("typed"):
+        return ToolResult(success=False, error=result.get("reason", "no element matched"))
+    return ToolResult(success=True, output=f"Typed {result.get('chars', 0)} chars.", data=result)
+
+
+def browser_key(key: str) -> ToolResult:
+    """Press one named key in her tab — enter, tab, escape, backspace,
+    delete, space, the arrows, home, end, pageup, pagedown. The keys
+    a click can't reach: Enter submits, Tab moves focus."""
+    from . import web_search
+
+    result = web_search.press_key(key)
+    if result is None:
+        return ToolResult(success=False, error="Key press failed (no browser).")
+    if not result.get("pressed"):
+        return ToolResult(success=False, error=result.get("reason", "unknown key"))
+    return ToolResult(success=True, output=f"Pressed {result.get('key', '')}.", data=result)
+
+
+def browser_scroll(dy: int = 600) -> ToolResult:
+    """Scroll her tab — positive down, negative up."""
+    from . import web_search
+
+    result = web_search.scroll_page(float(dy))
+    if result is None:
+        return ToolResult(success=False, error="Scroll failed (no browser).")
+    return ToolResult(success=True, output=f"Scrolled {result.get('scrolled', 0)}.", data=result)
+
+
+def browser_back() -> ToolResult:
+    """Back one history entry in her tab; returns the page she lands on."""
+    from . import web_search
+
+    state = web_search.go_back()
+    if state is None:
+        return ToolResult(success=False, error="Back failed (no browser).")
+    if state.get("back") is False:
+        return ToolResult(success=False, error="No earlier page in this tab's history.")
+    return ToolResult(
+        success=True,
+        output=f"Back to '{state.get('title', '')}' ({state.get('url', '')}).",
+        data=state,
+    )
+
+
+def browser_ask_human(url: str, timeout: int = 120) -> ToolResult:
+    """Show a page on the owner's screen and wait for them to clear
+    its human check — captcha, consent wall, "verify you are human".
+
+    The headless browser yields the shared profile, the visible
+    window carries her sign-in, and whatever the person clears
+    persists profile-side — headless fetches inherit the clearance."""
+    from . import web_search
+
+    result = web_search.ask_human(url, timeout=float(timeout))
+    if result is None:
+        return ToolResult(success=False, error="Could not open the visible browser.")
+    if not result.get("solved"):
+        return ToolResult(success=False, error=result.get("reason", "challenge not cleared"))
+    return ToolResult(
+        success=True,
+        output=f"Human cleared the check — now on {result.get('url', '')}.",
+        data=result,
+    )
+
+
 def sense_cpu(**_kwargs: Any) -> ToolResult:
     """Read her own CPU effort — proprioception of the machine body.
 
@@ -1191,6 +1320,61 @@ _BUILTIN_TOOLS: tuple[tuple[str, str, Callable[..., ToolResult]], ...] = (
         "putting a tool back on the shelf. It reopens on the next "
         "search or fetch.",
         browser_close,
+    ),
+    (
+        "browser_open",
+        "Open a URL in her real browser tab and return the page's "
+        "interactive elements (links, buttons, inputs with click "
+        "coordinates). Use to start an interactive browsing session — "
+        "then browser_click, browser_type, browser_scroll, browser_read.",
+        browser_open,
+    ),
+    (
+        "browser_read",
+        "Read the current tab: title, URL, and interactive elements "
+        "with click coordinates. Use to see what a page offers before "
+        "clicking or typing.",
+        browser_read,
+    ),
+    (
+        "browser_click",
+        "Click in her browser tab — at x,y coordinates, a CSS "
+        "selector, or the element whose visible text matches 'text'. "
+        "Real trusted input; can navigate, submit, toggle.",
+        browser_click,
+    ),
+    (
+        "browser_type",
+        "Type text in her browser tab — into the focused element, or "
+        "into the element found by x,y, selector, or visible 'target' "
+        "text (clicked first to focus it).",
+        browser_type,
+    ),
+    (
+        "browser_key",
+        "Press one named key in her browser tab — 'key' is enter, "
+        "tab, escape, backspace, delete, space, arrows, home, end, "
+        "pageup, or pagedown. Enter submits forms; Tab moves focus.",
+        browser_key,
+    ),
+    (
+        "browser_scroll",
+        "Scroll her browser tab — 'dy' pixels, positive down, "
+        "negative up. Real wheel input, triggers lazy-loading pages.",
+        browser_scroll,
+    ),
+    (
+        "browser_ask_human",
+        "Show a page on the owner's screen and wait for them to clear "
+        "its human check — captcha, consent wall, 'verify you are "
+        "human'. Use when a page refuses her as a bot; the clearance "
+        "persists in her profile.",
+        browser_ask_human,
+    ),
+    (
+        "browser_back",
+        "Go back one history entry in her browser tab and return the page she lands on.",
+        browser_back,
     ),
     (
         "sense_cpu",

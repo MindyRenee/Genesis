@@ -16,6 +16,7 @@
 //! - **No external services**: no database daemon, no server process.
 //!   Just files on disk, mapped into memory.
 
+pub mod forgetting;
 pub mod ltm;
 pub mod mmap_state;
 pub mod ring_buffer;

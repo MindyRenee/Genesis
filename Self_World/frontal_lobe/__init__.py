@@ -626,16 +626,18 @@ level and are referenced by this subsystem.
         explore its own filesystem. Curiosity-driven exploration
         (PFC + limbic curiosity + parietal spatial navigation).
 
-    canvas.py (in this package)
-        Canvas — a paint program: paper, color, and a parameterized
-        brush she dials herself; the built-in Cairo rasterizer
-        renders every op in-process — the studio is internal. The
-        program's controls are registered as ``studio_*`` tools
-        (Inner_World/studio.py) so she operates it herself — every sheet,
-        color, preset, and path is her call. Creative expression is
-        prefrontal (DLPFC) + limbic (emotional drive, which moves
-        her the way feelings move a person) + occipital (visual
-        output). Multi-subsystem.
+    (Outer_World/) canvas.py
+        Canvas — her paint program: paper, color, and a
+        parameterized brush she dials herself. It lives in the outer
+        world — a paint application on her desk is a thing she uses,
+        not a part of her — so the module moved out of the mind.
+        The frontal lobe's part in drawing is creative planning
+        (DLPFC + limbic emotional drive + occipital visual
+        imagination); the program's controls are registered as
+        ``studio_*`` tools (Outer_World/tools/studio.py) and her
+        parietal hand reaches out through them to operate it —
+        every sheet, color, preset, and path is her call.
+        Multi-subsystem.
 
     (tools/) project_composer.py
         ProjectComposer — composes real Python from Genesis's concept

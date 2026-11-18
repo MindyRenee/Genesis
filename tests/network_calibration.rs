@@ -166,7 +166,14 @@ fn arousal_orders_the_stages_and_sits_in_the_bands() {
         n < r && r < w,
         "arousal ordering: NREM {n} REM {r} wake {w}"
     );
-    assert!(n <= 0.25, "NREM arousal {n} should be low");
+    // The retuned readout (0.15 + 0.65·lc + 0.25·rem) puts NREM at
+    // ~0.25 — the scripted-clamp band it replaced. The bound that
+    // carries physiology is the N1 descent gate: deep sleep must
+    // read below the line where a waking descent is already drowsy.
+    assert!(
+        n < genesis::state::neurochemical::N1_AROUSAL_GATE,
+        "NREM arousal {n} should sit below the N1 descent gate"
+    );
     assert!(
         (0.35..=0.55).contains(&r),
         "REM arousal {r} should be moderate"

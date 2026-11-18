@@ -5,6 +5,7 @@ build/
 # regenerate these locally; they are never committed.
 Cargo.lock
 uv.lock
+docs/rust/.lock
 __pycache__/
 *.pyc
 *.egg-info/
@@ -39,6 +40,8 @@ notebooks/correlates_*.json
 # parks beside each file it touches. Recovery data, not source.
 *.pre_experiment
 *.pre_workspace
+*.in_flight
+.verify.lock
 My Notes
 .vscode/
 

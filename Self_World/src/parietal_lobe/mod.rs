@@ -18,6 +18,10 @@
 //! - `tensor_slab` — the named multidimensional field store (`daemon::tensor_slab`)
 //!   through which spatial and motor fields are exchanged.
 
+/// The drawing hand — the channel→dial wiring that lets waves and
+/// feeling reach the easel without anyone assigning them meanings.
+pub mod hand;
+
 pub use crate::daemon::tensor_slab;
 pub use crate::field::motor;
 pub use crate::math;

@@ -11,9 +11,9 @@ import math
 import time
 from pathlib import Path
 
-import frontal_lobe.canvas as canvas_module
+import canvas as canvas_module
 import numpy as np
-from frontal_lobe.canvas import Canvas, PaintSheet
+from canvas import Canvas, PaintSheet
 
 
 def _sheet(**kw) -> PaintSheet:
@@ -236,8 +236,10 @@ class TestArtHistory:
         profile = tmp_path / "drawings" / "style_profile.json"
         data = json.loads(profile.read_text())
         assert data["drawings"][-1]["tools"] == ["glitter wand"]
-        assert data["drawings"][-1]["gestures"] == ["spiral"]
-        assert data["drawings"][-1]["hues"] == [212.0]
+        # Gestures record what she did: the tagged spiral plus the
+        # stroke op itself; hues record the tag plus the dipped color.
+        assert data["drawings"][-1]["gestures"] == ["spiral", "stroke"]
+        assert data["drawings"][-1]["hues"] == [160.0, 212.0]
 
         # A fresh Canvas over the same dir remembers it.
         other = _canvas(tmp_path)

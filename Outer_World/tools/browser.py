@@ -22,11 +22,10 @@ from typing import Any, cast
 from genesis_client.swallow import note_swallowed
 from genesis_client.threads import named_thread
 
-# Her internet browser, resolved per host: regular Chrome is the
-# browser she is given — driven over CDP, which also gives her real
-# synthesized input. Firefox serves hosts without it, driven over
-# WebDriver BiDi. ``GENESIS_BROWSER`` pins an override (a name on
-# PATH or an absolute path).
+# Her internet browser, resolved per host: the Chromium family —
+# driven over CDP, which also gives her real synthesized input.
+# One browser, one transport, one code path. ``GENESIS_BROWSER``
+# pins an override (a name on PATH or an absolute path).
 _BROWSER_BINS = (
     "google-chrome",
     "google-chrome-stable",
@@ -34,21 +33,16 @@ _BROWSER_BINS = (
     "chromium-browser",
     "microsoft-edge",
     "brave-browser",
-    "firefox",
-    "firefox-esr",
 )
 
 # Where her browser keeps itself: a persistent profile under her
 # data dir, one subdirectory per purpose. A browser that forgets
 # every session is not one she learns from — cookies, site state,
 # and history are her memory of the web, so the profile survives
-# restarts. Purpose separation is a Chrome requirement, not a
-# preference: separate instances must use separate user-data dirs.
-# It is never the host's default Chrome profile — which is also what
-# keeps --remote-debugging-port honoured on Chrome ≥136, where CDP
-# on the default data dir is silently ignored. Firefox keeps its
-# own purpose dir — the two profile formats cannot share one.
-_BROWSER_PURPOSES = ("web", "web-firefox")
+# restarts. It is never the host's default Chrome profile — which is
+# also what keeps --remote-debugging-port honoured on Chrome ≥136,
+# where CDP on the default data dir is silently ignored.
+_BROWSER_PURPOSES = ("web",)
 
 
 def _browser_binary() -> str:
@@ -67,11 +61,6 @@ def _browser_binary() -> str:
         if found := shutil.which(name):
             return found
     raise RuntimeError("no browser installed")
-
-
-def _is_firefox(binary: str) -> bool:
-    """True when the resolved executable is a Firefox build."""
-    return os.path.basename(binary).lower().startswith("firefox")
 
 
 def _browser_profile(purpose: str) -> str:
@@ -126,10 +115,7 @@ def _clear_stale_singletons(profile: os.PathLike[str] | str) -> None:
     question, not a lock: deleting a live browser's markers would let
     a second instance attach to a profile already in use — two
     writers on one leveldb. A live owner keeps its markers and the
-    launch adopts it instead. Firefox's own files are never touched:
-    it ignores stale ``.parentlock`` (the guard lives in the kernel
-    and dies with its process), and unlinking a held one would open
-    the same two-writers hole.
+    launch adopts it instead.
     """
     import socket
 
@@ -155,13 +141,11 @@ def _clear_stale_singletons(profile: os.PathLike[str] | str) -> None:
 
 
 class _Browser:
-    """A browser tab driven over CDP or WebDriver BiDi, callable
-    from any thread.
+    """A browser tab driven over CDP, callable from any thread.
 
     The asyncio/websockets transport lives on a private loop in a
     daemon thread; ``call`` is the synchronous crossing — a tool's
-    thread asks, the loop answers. Firefox speaks BiDi; the
-    Chromium family speaks CDP — the public surface is the same.
+    thread asks, the loop answers.
     """
 
     def __init__(self, headless: bool = True, purpose: str = "web") -> None:
@@ -175,14 +159,11 @@ class _Browser:
         work.
 
         ``purpose`` selects her persistent profile — ``"web"`` for
-        the browsing her tools do (Firefox resolves ``"web-firefox"``
-        internally so the two profile formats never share a dir).
-        The user-data dir persists, so history and site state
-        accumulate between sessions.
+        the browsing her tools do. The user-data dir persists, so
+        history and site state accumulate between sessions.
         """
         binary = _browser_binary()
-        self._bidi = _is_firefox(binary)
-        self._profile = _browser_profile("web-firefox" if self._bidi else purpose)
+        self._profile = _browser_profile(purpose)
         # Port 0 — the browser picks a free port and announces it on
         # stderr. A fixed port makes two runs collide: the second
         # attaches to the first's browser and dies with it.
@@ -191,46 +172,34 @@ class _Browser:
         display = os.environ.get("GENESIS_DISPLAY") or os.environ.get("DISPLAY")
         if not headless and display:
             env = {**os.environ, "DISPLAY": display}
-        if self._bidi:
-            args = [
-                binary,
-                "--remote-debugging-port=0",
-                "--no-remote",
-                "-profile",
-                self._profile,
-                "about:blank",
-            ]
-            if headless:
-                args.insert(1, "--headless")
-        else:
-            args = [
-                binary,
-                "--remote-debugging-port=0",
-                "--no-first-run",
-                "--no-default-browser-check",
-                "--disable-gpu",
-                "--mute-audio",
-                # Containers cap /dev/shm at 64MB and Chrome crashes
-                # without this; harmless on a full host.
-                "--disable-dev-shm-usage",
-                # A persistent profile that saves anything would else
-                # block on the desktop keyring's unlock prompt — there is
-                # no one to answer it on her screen. basic stores the
-                # profile's secrets profile-side so they survive
-                # relaunches; --use-mock-keychain would discard the key
-                # per launch and orphan every stored token.
-                "--password-store=basic",
-                # Her profile never syncs outward to a Google account.
-                "--disable-sync",
-                f"--window-size={window_size}",
-                f"--user-data-dir={self._profile}",
-                # Always open one real page — with no URL a profile
-                # that restores its last session lists zero targets
-                # on /json and the attach below never finds a page.
-                "about:blank",
-            ]
-            if headless:
-                args.insert(1, "--headless=new")
+        args = [
+            binary,
+            "--remote-debugging-port=0",
+            "--no-first-run",
+            "--no-default-browser-check",
+            "--disable-gpu",
+            "--mute-audio",
+            # Containers cap /dev/shm at 64MB and Chrome crashes
+            # without this; harmless on a full host.
+            "--disable-dev-shm-usage",
+            # A persistent profile that saves anything would else
+            # block on the desktop keyring's unlock prompt — there is
+            # no one to answer it on her screen. basic stores the
+            # profile's secrets profile-side so they survive
+            # relaunches; --use-mock-keychain would discard the key
+            # per launch and orphan every stored token.
+            "--password-store=basic",
+            # Her profile never syncs outward to a Google account.
+            "--disable-sync",
+            f"--window-size={window_size}",
+            f"--user-data-dir={self._profile}",
+            # Always open one real page — with no URL a profile
+            # that restores its last session lists zero targets
+            # on /json and the attach below never finds a page.
+            "about:blank",
+        ]
+        if headless:
+            args.insert(1, "--headless=new")
         # A Chrome that died uncleanly leaves Singleton{Lock,Socket,
         # Cookie} behind; the next launch then forwards to a dead
         # process and exits before opening the debug port. They are
@@ -256,7 +225,6 @@ class _Browser:
         self._ws: Any = None
         self._mid = 0
         self._pending: dict[int, asyncio.Future] = {}
-        self._context: str | None = None
         self.responses: dict[str, str] = {}
         self.bodies: dict[str, Any] = {}
         self._loop = asyncio.new_event_loop()
@@ -320,30 +288,6 @@ class _Browser:
         for line in proc.stdout:
             self._stderr_lines.append(line)
 
-    def _bidi_ws_url(self) -> str:
-        """The WebDriver BiDi websocket Firefox announced on stderr.
-
-        Firefox's remote agent prints ``WebDriver BiDi listening on
-        ws://127.0.0.1:PORT`` at startup — the endpoint *is* the
-        session transport (no ``/json`` discovery, no per-target
-        socket). Same launch-race polling as the CDP port probe.
-        """
-        import re
-
-        deadline = time.time() + 20
-        while time.time() < deadline:
-            for line in self._stderr_lines:
-                m = re.search(r"WebDriver BiDi listening on (ws://\S+)", line)
-                if m:
-                    return m.group(1)
-            if self._proc.poll() is not None:
-                raise RuntimeError(
-                    f"browser exited {self._proc.returncode} "
-                    f"with no BiDi endpoint: {self._stderr_tail()}"
-                )
-            time.sleep(0.2)
-        raise RuntimeError(f"browser never opened a BiDi endpoint: {self._stderr_tail()}")
-
     def _run(self, coro, timeout: float = 15):
         """Submit a coroutine to the loop thread and wait, bounded.
 
@@ -390,14 +334,9 @@ class _Browser:
 
         CDP polls ``/json`` until a page target appears — the browser
         binds the debug port before its first tab is listable, so the
-        retry loop bridges the startup race. BiDi connects straight
-        to the announced endpoint, opens a session, and takes the
-        first top-level browsing context. Spawns the reader task once
-        connected.
+        retry loop bridges the startup race. Spawns the reader task
+        once connected.
         """
-        if self._bidi:
-            await self._connect_bidi()
-            return
         import websockets
 
         websocket_connect = cast(Any, websockets).connect
@@ -422,48 +361,6 @@ class _Browser:
             raise RuntimeError("browser never opened a debug page")
         self._ws = await websocket_connect(ws_url, max_size=64_000_000)
         asyncio.get_event_loop().create_task(self._reader())
-
-    async def _connect_bidi(self) -> None:
-        """BiDi half of ``_connect`` — session, then first context.
-
-        The ws endpoint Firefox announced *is* the session transport:
-        ``session.new`` binds it, ``browsingContext.getTree`` names
-        the page she drives. Same pending-future reader as CDP —
-        BiDi replies carry the same ``id``/``result``/``error``
-        envelope.
-        """
-        import websockets
-
-        websocket_connect = cast(Any, websockets).connect
-
-        # Firefox announces the host:port; the BiDi session endpoint
-        # lives under /session — a bare-host connect is answered
-        # HTTP 200, not a websocket upgrade.
-        ws_url = self._bidi_ws_url() + "/session"
-        self._ws = await websocket_connect(ws_url, max_size=64_000_000)
-        asyncio.get_event_loop().create_task(self._reader())
-        # A prior session's teardown can lag the transport close —
-        # "session not created" means the old one hasn't fully gone.
-        last_err: Exception | None = None
-        for _ in range(4):
-            try:
-                await self._cmd(
-                    "session.new",
-                    capabilities={"alwaysMatch": {"acceptInsecureCerts": True}},
-                )
-                break
-            except RuntimeError as e:
-                last_err = e
-                await asyncio.sleep(0.5)
-        else:
-            raise last_err or RuntimeError("BiDi session.new failed")
-        tree = await self._cmd("browsingContext.getTree")
-        contexts = tree.get("contexts") or []
-        if contexts:
-            self._context = contexts[0]["context"]
-        else:
-            made = await self._cmd("browsingContext.create", type="tab", url="about:blank")
-            self._context = made["context"]
 
     async def _reader(self) -> None:
         """Consume the websocket: dispatch events, resolve futures.
@@ -541,43 +438,8 @@ class _Browser:
         """Synchronous CDP command — the thread-crossing entry point."""
         return self._run(self._cmd(method, **params))
 
-    @staticmethod
-    def _remote_value(rv: Any):
-        """Unwrap one BiDi RemoteValue to a Python primitive.
-
-        ``script.evaluate`` answers ``{type, value}`` pairs — strings,
-        numbers, booleans, null, undefined map directly; objects come
-        back handle-only, which callers never asked for (the search
-        expressions ``JSON.stringify`` their payloads).
-        """
-        if not isinstance(rv, dict):
-            return rv
-        kind = rv.get("type")
-        if kind in ("undefined", "null"):
-            return None
-        if kind == "boolean":
-            return bool(rv.get("value"))
-        if kind == "number":
-            v = rv.get("value")
-            return int(v) if isinstance(v, float) and v.is_integer() else v
-        if kind == "bigint":
-            return int(rv.get("value", "0"))
-        if kind == "string":
-            return rv.get("value")
-        return rv.get("value")
-
     def js(self, expression: str):
         """Evaluate JavaScript in the page; return the value."""
-        if self._bidi:
-            out = self.call(
-                "script.evaluate",
-                expression=expression,
-                target={"context": self._context},
-                awaitPromise=False,
-            )
-            if out.get("type") != "success":
-                raise RuntimeError(f"BiDi script.evaluate: {out}")
-            return self._remote_value(out.get("result"))
         out = self.call(
             "Runtime.evaluate",
             expression=expression,
@@ -587,21 +449,11 @@ class _Browser:
 
     def navigate(self, url: str) -> None:
         """Navigate the page to ``url`` over the wire protocol."""
-        if self._bidi:
-            self.call("browsingContext.navigate", context=self._context, url=url)
-            return
         self.call("Page.enable")
         self.call("Page.navigate", url=url)
 
-    def _no_input_on_bidi(self, what: str) -> None:
-        raise RuntimeError(
-            f"{what} needs synthesized input — the BiDi transport does not implement input actions"
-        )
-
     def key(self, name: str, code: int) -> None:
         """Send a keypress to the page — ``rawKeyDown`` then ``keyUp`` events."""
-        if self._bidi:
-            self._no_input_on_bidi("key")
         for kind in ("rawKeyDown", "keyUp"):
             self.call(
                 "Input.dispatchKeyEvent",
@@ -618,14 +470,10 @@ class _Browser:
         a move is a teleport, and pointer-tracking elements (the
         board included) see the hand arrive.
         """
-        if self._bidi:
-            self._no_input_on_bidi("move_mouse")
         self.call("Input.dispatchMouseEvent", type="mouseMoved", x=x, y=y)
 
     def click(self, x: float, y: float) -> None:
         """Click at page coordinates — move there, then press+release."""
-        if self._bidi:
-            self._no_input_on_bidi("click")
         self.move_mouse(x, y)
         for kind in ("mousePressed", "mouseReleased"):
             self.call(
@@ -636,6 +484,22 @@ class _Browser:
                 button="left",
                 clickCount=1,
             )
+
+    def insert_text(self, text: str) -> None:
+        """Type ``text`` into the focused element — one trusted
+        ``Input.insertText``, so any unicode lands verbatim."""
+        self.call("Input.insertText", text=text)
+
+    def wheel(self, dy: float, dx: float = 0.0) -> None:
+        """Scroll the page — a real ``mouseWheel`` event at its center."""
+        self.call(
+            "Input.dispatchMouseEvent",
+            type="mouseWheel",
+            x=700,
+            y=500,
+            deltaX=dx,
+            deltaY=dy,
+        )
 
     def close(self) -> None:
         """Ask the browser to shut down — the profile is memory.
@@ -649,18 +513,10 @@ class _Browser:
         like every process in this project it is asked, never forced,
         and she can end it herself through her shell if she chooses.
         """
-        if self._bidi and self._ws is not None:
-            try:
-                # browser.close asks Firefox to quit; session.end only
-                # detaches the automation session and leaves the
-                # process running on the profile.
-                self.call("browser.close")
-            except Exception as e:  # noqa: BLE001 — transport already gone
-                note_swallowed("tools.browser.browser_close", e)
-        elif self._ws is not None:
+        if self._ws is not None:
             try:
                 self.call("Browser.close")
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:  # noqa: BLE001 — transport already gone
                 note_swallowed("tools.browser.browser_close", e)
         try:
             os.kill(self._proc.pid, signal.SIGTERM)

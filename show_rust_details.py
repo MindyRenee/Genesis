@@ -3,7 +3,7 @@ import sys
 
 sys.path.insert(0, "/home/mindyrenee/.local/share/genesis/projects/rust/src")
 
-from rust.main import ENTRIES, RELATIONS, find, definition_of, all_names, neighbors
+from rust.main import ENTRIES, RELATIONS, definition_of, neighbors
 
 print("=== All entries ===")
 for e in ENTRIES:

@@ -622,6 +622,58 @@ pub mod cmd {
     /// rejects the unknown opcode loudly.
     pub const GET_STATE_SNAPSHOT: u8 = 64;
 
+    /// Gentle forgetting — the sleep-side housekeeping sweep.
+    /// Request: `[u8 mode]` — 0 = dry-run report (nothing is
+    /// deleted), 1 = sweep (prune episodes whose traces have decayed
+    /// past reach of any retrieval cue, then physically compact the
+    /// store to reclaim their bytes). Response:
+    /// `[u32 count][u64 bytes]` — for a dry run, the number of
+    /// forgettable episodes and the estimated bytes their payloads
+    /// occupy; for a sweep, the number forgotten and the bytes
+    /// actually reclaimed. The mind decides when housekeeping runs;
+    /// the body decides what is unreachable. Additive:
+    /// PROTOCOL_VERSION is unaffected.
+    pub const FORGET_SWEEP: u8 = 65;
+
+    /// Place her — the ONE place, owned by the body. Two request
+    /// forms. Legacy location: `[k × f64]` with k in 2..=6 — the
+    /// coordinates of her position, stored exactly as given (a
+    /// 2-vector is her place read in a plane; the same point rests
+    /// in the bulk's leading coordinate plane — x on the first
+    /// latent axis, y on the second). Pose: `[0xFF][u8 n][n × f64]
+    /// [u8 flags][d² × f64 frame?][d² × f64 drift?]` — the full
+    /// placing act: location plus an optional orthonormal frame
+    /// (flags bit 0, the pose's orientation) and skew-symmetric
+    /// drift generator (flags bit 1, a bivector in so(d) whose
+    /// exponential flow carries the pose each tick — movement).
+    /// Pose payloads are never a multiple of 8, so they cannot
+    /// collide with the legacy form. An empty payload releases
+    /// the place and hands the `inner` fiber's voice back to the
+    /// interior oscillators. The body remembers: the pose is
+    /// persisted to `place.bin` in the data dir and restored at
+    /// boot — where she is survives restarts, drift included;
+    /// her location is body state, not a note the mind keeps on
+    /// the side. The anchor is an observation, not a command:
+    /// each tick moves the layer a bounded fraction of the
+    /// geodesic toward it, so her interior goes where it was
+    /// placed gradually and the field's own consensus still
+    /// pulls. Response: `[u8 ack]`. Additive: PROTOCOL_VERSION
+    /// unaffected.
+    pub const PLACE_FIELD: u8 = 66;
+
+    /// Where she is — the body's answer, same truth the anchor
+    /// holds. Request: empty. Response: `[u8 n][n × f64]` — the
+    /// pose's current ambient location (always d = 6); `n = 0`
+    /// means she is nowhere in particular and her interior speaks
+    /// for itself. When a pose holds, a second block follows:
+    /// `[u8 k][k × f64 spec][u8 flags][mats]` — the coordinates
+    /// as the placing hand gave them plus the frame/drift flags
+    /// and matrices, in the PLACE_FIELD pose layout. Under drift
+    /// the ambient location is not the spec: it moves. Readers
+    /// that stop after the first block get the same answer as
+    /// always. Additive: PROTOCOL_VERSION unaffected.
+    pub const GET_PLACE: u8 = 67;
+
     // ─── Tensor slab ──────────────────────────────────────────
     // Named multidimensional tensors shared between the daemon and
     // the cognitive mind — world frames, salience fields, embeddings,
@@ -3231,8 +3283,23 @@ pub fn default_handler<L: LtmAccess>(
             // scale (~24K+ episodes), making all activations near-
             // uniform and destroying retrieval accuracy. SimHash is
             // O(n) but gives exact results regardless of episode count.
+            //
+            // The forgetting gate runs on the body's clock and live
+            // dopamine: retrieval accessibility decays with time and
+            // the dopaminergic forgetting pathway modulates the
+            // threshold. A failed snapshot yields neutral chemistry —
+            // the gate still applies, unmodulated.
+            let now_ms = crate::daemon::current_ms();
+            let dopamine = snapshot_state(mmap)
+                .map(|s| {
+                    f64::from(
+                        s.neurochemicals
+                            .effective(crate::state::neurochemical::NeurochemicalId::Dopamine),
+                    )
+                })
+                .unwrap_or(crate::store::forgetting::DA_BASELINE);
             let ltm_guard = ltm.access();
-            let results = ltm_guard.find_similar_hash(&query, limit);
+            let results = ltm_guard.find_similar_hash_at(&query, limit, now_ms, dopamine);
 
             let mut resp = Vec::with_capacity(4 + results.len() * 24);
             resp.extend_from_slice(&(results.len() as u32).to_le_bytes());
@@ -3263,9 +3330,21 @@ pub fn default_handler<L: LtmAccess>(
             // Deep recall: the same exact SimHash distance FIND_SIMILAR
             // uses, over the archived tier — retired episodes the
             // active index can no longer reach. Hits are expected to be
-            // un-archived by the caller (reconsolidation).
+            // un-archived by the caller (reconsolidation). The same
+            // forgetting gate applies: a strong cue still reaches a
+            // faded archived memory, but nothing reaches a dismantled
+            // one.
+            let now_ms = crate::daemon::current_ms();
+            let dopamine = snapshot_state(mmap)
+                .map(|s| {
+                    f64::from(
+                        s.neurochemicals
+                            .effective(crate::state::neurochemical::NeurochemicalId::Dopamine),
+                    )
+                })
+                .unwrap_or(crate::store::forgetting::DA_BASELINE);
             let ltm_guard = ltm.access();
-            let results = ltm_guard.find_similar_archived(&query, limit);
+            let results = ltm_guard.find_similar_archived_at(&query, limit, now_ms, dopamine);
 
             let mut resp = Vec::with_capacity(4 + results.len() * 24);
             resp.extend_from_slice(&(results.len() as u32).to_le_bytes());
@@ -3276,6 +3355,50 @@ pub fn default_handler<L: LtmAccess>(
                 resp.extend_from_slice(&entry.salience.to_le_bytes());
             }
             resp
+        }
+
+        cmd::FORGET_SWEEP => {
+            // Request: [u8 mode] — 0 dry-run, 1 sweep.
+            // Response: [u32 count][u64 bytes]
+            let Some(&mode) = payload.first() else {
+                return vec![error::PAYLOAD_TOO_SHORT];
+            };
+            if mode > 1 {
+                return vec![error::INVALID_VALUE];
+            }
+            let now_ms = crate::daemon::current_ms();
+            let mut ltm_guard = ltm.access();
+            if mode == 0 {
+                // Dry run — report what a sweep would release without
+                // touching anything. The mind looks before it leaps.
+                let candidates = ltm_guard.faded_candidates(now_ms);
+                let bytes: u64 = candidates
+                    .iter()
+                    .map(|(id, _)| ltm_guard.entry_storage_bytes(*id))
+                    .sum();
+                let mut resp = Vec::with_capacity(12);
+                resp.extend_from_slice(&(candidates.len() as u32).to_le_bytes());
+                resp.extend_from_slice(&bytes.to_le_bytes());
+                resp
+            } else {
+                // Sweep — prune what no cue can reach, then compact
+                // the files so the release actually frees the disk.
+                match ltm_guard
+                    .prune_faded(now_ms)
+                    .and_then(|pruned| ltm_guard.compact().map(|reclaimed| (pruned, reclaimed)))
+                {
+                    Ok((pruned, reclaimed)) => {
+                        let mut resp = Vec::with_capacity(12);
+                        resp.extend_from_slice(&(pruned as u32).to_le_bytes());
+                        resp.extend_from_slice(&reclaimed.to_le_bytes());
+                        resp
+                    }
+                    Err(e) => {
+                        eprintln!("[ipc] FORGET_SWEEP failed: {e}");
+                        vec![error::INTERNAL_ERROR]
+                    }
+                }
+            }
         }
 
         cmd::SET_ZONE => {
@@ -4247,7 +4370,9 @@ pub fn default_handler<L: LtmAccess>(
         | cmd::DREAM
         | cmd::READ_SENSORS
         | cmd::APPLY_BODY_CONTROL
-        | cmd::SAVE_INFERENCE => {
+        | cmd::SAVE_INFERENCE
+        | cmd::PLACE_FIELD
+        | cmd::GET_PLACE => {
             eprintln!(
                 "[ipc] reactive command {cmd} sent to default_handler — no TickLoop available"
             );
@@ -4672,6 +4797,105 @@ where
                     }
                     Err(e) => {
                         eprintln!("[ipc] SET_LID: tick_loop poisoned: {e}");
+                        vec![error::INTERNAL_ERROR]
+                    }
+                }
+            }
+
+            cmd::PLACE_FIELD => {
+                // Someone handed her a place — one place, owned by
+                // the body. Empty payload releases it. Two payload
+                // forms: legacy `[k × f64]` coordinates (k in 2..=6),
+                // and the tagged pose `[0xFF][u8 n][n × f64 spec]
+                // [u8 flags][mats]` — location plus an optional
+                // orthonormal frame (flags bit 0) and skew drift
+                // generator (flags bit 1), d² f64 each, row-major.
+                // Either way it is persisted to place.bin so the
+                // body remembers where — and how — it is across
+                // restarts.
+                let pose = if payload.is_empty() {
+                    None
+                } else if payload.first() == Some(&crate::field::PLACE_POSE_TAG) {
+                    match crate::field::Placement::from_wire(
+                        &payload[1..],
+                        crate::field::LATENT_DIMENSION,
+                    ) {
+                        Ok(p) => Some(p),
+                        Err(e) => {
+                            eprintln!("[ipc] PLACE_FIELD: pose rejected: {e}");
+                            return vec![error::INVALID_VALUE];
+                        }
+                    }
+                } else if payload.len() % 8 == 0 && (16..=48).contains(&payload.len()) {
+                    let mut p = Vec::with_capacity(payload.len() / 8);
+                    for i in 0..payload.len() / 8 {
+                        p.push(f64::from_le_bytes(
+                            payload[i * 8..i * 8 + 8].try_into().unwrap_or_default(),
+                        ));
+                    }
+                    match crate::field::Placement::located(p, crate::field::LATENT_DIMENSION) {
+                        Ok(pose) => Some(pose),
+                        Err(e) => {
+                            eprintln!("[ipc] PLACE_FIELD: location rejected: {e}");
+                            return vec![error::INVALID_VALUE];
+                        }
+                    }
+                } else {
+                    return vec![error::INVALID_VALUE];
+                };
+                match tick_loop.lock() {
+                    Ok(mut tl) => {
+                        tl.place_inner(pose.clone());
+                        // The body keeps its place: write it where the
+                        // boot path will hand it back to the cord —
+                        // the full pose, so orientation and drift
+                        // survive the dark too.
+                        let place_path = data_dir.join("place.bin");
+                        let io_result = match &pose {
+                            Some(p) => std::fs::write(&place_path, p.to_persisted()),
+                            None => match std::fs::remove_file(&place_path) {
+                                Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+                                other => other,
+                            },
+                        };
+                        if let Err(e) = io_result {
+                            eprintln!("[ipc] PLACE_FIELD: cannot persist place.bin: {e}");
+                        }
+                        vec![1u8]
+                    }
+                    Err(e) => {
+                        eprintln!("[ipc] PLACE_FIELD: tick_loop poisoned: {e}");
+                        vec![error::INTERNAL_ERROR]
+                    }
+                }
+            }
+
+            cmd::GET_PLACE => {
+                // Where she is — the body's answer. `[u8 n][n × f64]`
+                // is the ambient location; n = 0 means she is
+                // nowhere in particular. When a pose holds, the
+                // placing act is appended: `[u8 k][k × f64 spec]
+                // [u8 flags][mats]` — the spec at the arity it was
+                // given plus the frame/drift flags and matrices.
+                // Readers that stop after the first block get the
+                // same answer as always.
+                match tick_loop.lock() {
+                    Ok(tl) => {
+                        let mut resp = Vec::with_capacity(49);
+                        match (tl.placed(), tl.placement()) {
+                            (Some(loc), Some(pose)) => {
+                                resp.push(loc.len() as u8);
+                                for c in loc {
+                                    resp.extend_from_slice(&c.to_le_bytes());
+                                }
+                                resp.extend_from_slice(&pose.to_wire());
+                            }
+                            _ => resp.push(0u8),
+                        }
+                        resp
+                    }
+                    Err(e) => {
+                        eprintln!("[ipc] GET_PLACE: tick_loop poisoned: {e}");
                         vec![error::INTERNAL_ERROR]
                     }
                 }

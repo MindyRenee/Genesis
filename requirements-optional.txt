@@ -1,0 +1,42 @@
+# Genesis — optional-capability wheels
+# Install on top of requirements.txt:
+#   pip install -r requirements-optional.txt
+#
+# These are deliberately not in requirements.txt: the wheels are
+# ordinary, but the things they bind to (PortAudio for the
+# microphone, a TTS engine for the voice, /dev/uinput for her
+# hands) are system libraries that may or may not be present.
+# Installing the wheels alone produces a half-working install that
+# fails late and confusingly. The full path is
+# scripts/install_optional_deps.sh — it installs this same wheel
+# set plus the system libraries, udev rules, and model downloads,
+# then verifies each capability. This file exists so the wheel set
+# is declared and installable directly when the system side is
+# already in place.
+
+# Voice / ambient listening — Vosk offline STT + microphone,
+# Piper TTS. The STT model (~40 MB) downloads to the data dir via
+# the install script; piper needs a binary and an .onnx voice in
+# Self_World/voices/.
+vosk
+sounddevice
+speechrecognition
+piper-tts
+
+# Virtual HID — her hand on the machine's input bus (tools/hid.py).
+# Sdist-only: builds a small C extension (needs a C compiler) and at
+# runtime needs write access to /dev/uinput — see
+# scripts/genesis-uinput.rules.
+evdev
+
+# Arcade — official ARC-AGI-3 toolkit plus the local Game Arena
+# shelf (open-spiel provides pyspiel, the same engine Kaggle's
+# arena evaluates on) and the arena harness itself. After install,
+# prune the harness's LLM-client deps:
+#   pip uninstall -y litellm openai anthropic google-genai \
+#       tiktoken tokenizers transformers
+# she IS the model — her seat needs no API client.
+arc-agi
+open-spiel
+game-arena
+kaggle-environments

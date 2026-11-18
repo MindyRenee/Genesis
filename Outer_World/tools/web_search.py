@@ -6,8 +6,7 @@ it can search, fetch pages, and read content, but cannot submit forms,
 post data, or modify anything online.
 
 Search and browsing run through her real browser: Chrome driven
-over CDP (Firefox over WebDriver BiDi serves hosts without it), so
-JavaScript-heavy pages render and search behaves
+over CDP, so JavaScript-heavy pages render and search behaves
 like it does for a person. Plain-HTML fetches still take the
 lightweight urllib path first; the browser is the fallback for thin
 or failed pages. With no browser there is no search — an honest
@@ -37,6 +36,7 @@ import os
 import re
 import socket
 import ssl
+import subprocess
 import time
 import urllib.error
 import urllib.parse
@@ -54,9 +54,48 @@ logger = logging.getLogger(__name__)
 
 # ─── Network constants ─────────────────────────────────────────────
 
-USER_AGENT = "Genesis-AI/1.0 (cognitive mind)"
 REQUEST_TIMEOUT = 10  # seconds
 MAX_TEXT_LENGTH = 50000  # don't process pages longer than this
+
+# Her HTTP identity is the machine's own — the same user-agent string
+# its real browser sends, version and all, so a page that answers the
+# owner's browser answers her. Announcing "Genesis-AI" invited bot
+# refusals the owner's browser never sees. Resolved once from the
+# installed binary so it cannot drift from what the browser sends.
+_USER_AGENT: str | None = None
+_USER_AGENT_FALLBACK = (
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36"
+)
+
+
+def _user_agent() -> str:
+    """The UA string this machine's own browser sends — her id on the web."""
+    global _USER_AGENT
+    if _USER_AGENT is not None:
+        return _USER_AGENT
+    ua = _USER_AGENT_FALLBACK
+    try:
+        from tools.browser import _browser_binary
+
+        out = subprocess.run(
+            [_browser_binary(), "--version"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        ).stdout
+        # "<Brand> <name> <version>" — "Google Chrome 157.0.8103.78",
+        # "Chromium 131.0.6778.85".
+        if m := re.search(r"(?:Chrome|Chromium)[\s/]([\d.]+)", out):
+            ua = (
+                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+                f"(KHTML, like Gecko) Chrome/{m.group(1)} Safari/537.36"
+            )
+    except Exception:  # noqa: BLE001 — the fallback shape still answers
+        pass
+    _USER_AGENT = ua
+    return ua
+
 
 _URL_RE = re.compile(r'https?://[^\s<>"\']+')
 
@@ -538,8 +577,8 @@ def _get_ssl_context() -> ssl.SSLContext:
 
 # ─── Her browser (the browsing path) ───────────────────────────────
 #
-# One lazy headless browser shared by search and fetch — Firefox
-# over WebDriver BiDi, the Chromium family over CDP — driven by
+# One lazy headless browser shared by search and fetch — the
+# Chromium family over CDP — driven by
 # ``tools.browser._Browser``. A single tab
 # means navigation must be serialized — the lock
 # wraps each navigate → settle → extract cycle so concurrent callers
@@ -549,21 +588,33 @@ def _get_ssl_context() -> ssl.SSLContext:
 
 _browser_lock = InhibitoryGate()
 _browser: _Browser | None = None
-_browser_failed = False
+# Monotonic time of the last failed launch; 0.0 means none, inf means
+# the host genuinely has no browser — a fact about the machine, not a
+# transient, so it stays dead rather than re-spawning forever.
+_browser_failed_at = 0.0
+_BROWSER_RETRY_AFTER = 60.0  # seconds before a failed launch may retry
 
 
 def _get_browser():
     """Return the shared headless browser, launching it on first use.
 
     Returns None if a browser cannot start — callers then take their
-    lightweight fallback path. A failed launch marks the path dead for
-    the session rather than paying the spawn cost on every call; a
-    crashed browser gets relaunched once on the next call.
+    lightweight fallback path. A failed launch cools down for
+    ``_BROWSER_RETRY_AFTER`` seconds before retrying — a spawn can fail
+    transiently (the sign-in Chrome still holding the profile, a slow
+    first spawn under load) and a dead-for-the-session latch would
+    leave her blind until the mind restarts. ``no browser installed``
+    is the one failure that never retries: a host without a browser
+    will not grow one mid-session. A crashed browser relaunches on the
+    next call — a crash is not a launch failure.
     """
-    global _browser, _browser_failed
+    global _browser, _browser_failed_at
     if _browser is not None:
         return _browser
-    if _browser_failed:
+    if (
+        _browser_failed_at == float("inf")
+        or time.monotonic() - _browser_failed_at < _BROWSER_RETRY_AFTER
+    ):
         return None
     try:
         from tools.browser import _Browser
@@ -574,13 +625,15 @@ def _get_browser():
     except RuntimeError as e:
         # A browser is optional on headless/mobile hosts. Its absence is
         # the documented no-search condition, not a runtime fault.
-        if str(e) != "no browser installed":
+        if str(e) == "no browser installed":
+            _browser_failed_at = float("inf")
+        else:
             note_swallowed("tools.web_search.browser_launch", e)
-        _browser_failed = True
+            _browser_failed_at = time.monotonic()
         return None
     except Exception as e:  # noqa: BLE001 — no browser → no search
         note_swallowed("tools.web_search.browser_launch", e)
-        _browser_failed = True
+        _browser_failed_at = time.monotonic()
         return None
 
 
@@ -903,6 +956,64 @@ def search(query: str, limit: int = 5) -> list[WebSearchResult]:
     return []
 
 
+def _http_get(url: str) -> tuple[str, str, str] | None:
+    """GET ``url`` as the machine's own browser.
+
+    Returns ``(final_url, content_type, text)`` with the body capped at
+    ``MAX_TEXT_LENGTH * 10`` bytes, or None when no transport could
+    fetch it — an error or a refusal (status ≥ 400), both of which
+    send the caller to the real browser.
+
+    ``curl_cffi`` speaks with Chrome's actual TLS/HTTP2 handshake:
+    sites that fingerprint clients refused Python's transport no
+    matter what the headers claimed — the UA alone never passed a
+    JA3 check. urllib stays as the no-dependency fallback on hosts
+    without the package.
+    """
+    headers = {
+        "User-Agent": _user_agent(),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+    }
+    try:
+        from curl_cffi import requests as cffi_requests
+
+        resp = cffi_requests.get(
+            url,
+            headers=headers,
+            impersonate="chrome",
+            timeout=REQUEST_TIMEOUT,
+            max_redirects=10,
+        )
+        if resp.status_code < 400:
+            raw = resp.content[: MAX_TEXT_LENGTH * 10]
+            return (
+                str(resp.url),
+                resp.headers.get("Content-Type", ""),
+                raw.decode("utf-8", errors="ignore"),
+            )
+        return None
+    except ImportError:
+        pass  # no impersonating transport — urllib's honest best effort
+    except Exception as e:  # noqa: BLE001 — the browser decides from here
+        note_swallowed("tools.web_search.fetch", e)
+        return None
+    try:
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(
+            req, timeout=REQUEST_TIMEOUT, context=_get_ssl_context()
+        ) as resp:
+            raw = resp.read(MAX_TEXT_LENGTH * 10 + 1)
+            return (
+                resp.geturl(),
+                resp.headers.get("Content-Type", ""),
+                raw[: MAX_TEXT_LENGTH * 10].decode("utf-8", errors="ignore"),
+            )
+    except (urllib.error.URLError, urllib.error.HTTPError, OSError, ValueError) as e:
+        note_swallowed("tools.web_search.fetch", e)
+        return None
+
+
 def fetch(url: str) -> WebFetchResult | None:
     """Fetch a web page and extract its readable text.
 
@@ -934,36 +1045,21 @@ def fetch(url: str) -> WebFetchResult | None:
         logger.debug(f"web fetch refused (resolves to private address): {url}")
         return None
 
-    try:
-        req = urllib.request.Request(
-            url,
-            headers={"User-Agent": USER_AGENT},
-        )
-        with urllib.request.urlopen(
-            req, timeout=REQUEST_TIMEOUT, context=_get_ssl_context()
-        ) as resp:
-            # Redirect targets bypass is_url_safe — re-check the final
-            # URL before the body enters its memory. A public page that
-            # 302s to a metadata endpoint gets its GET refused here.
-            final_host = _host_of(resp.geturl())
-            if _host_is_local(final_host) or _resolves_to_non_public(final_host):
-                logger.debug(f"web fetch refused (redirect to private address): {url}")
-                return None
-            content_type = resp.headers.get("Content-Type", "")
-            if "text/html" not in content_type and "text/plain" not in content_type:
-                return None
-            raw = resp.read(MAX_TEXT_LENGTH * 10 + 1).decode("utf-8", errors="ignore")
-    except (urllib.error.URLError, urllib.error.HTTPError, OSError, ValueError) as e:
-        note_swallowed(
-            "tools.web_search.fetch",
-            e,
-        )
-        # urllib couldn't reach it — the real browser gets a shot
-        # before the fetch is declared dead.
+    got = _http_get(url)
+    if got is None:
+        # Neither HTTP transport could reach it — the real browser
+        # gets a shot before the fetch is declared dead.
         return _browser_fetch(url)
-
-    if len(raw) > MAX_TEXT_LENGTH * 10:
-        raw = raw[: MAX_TEXT_LENGTH * 10]
+    final_url, content_type, raw = got
+    # Redirect targets bypass is_url_safe — re-check the final URL
+    # before the body enters its memory. A public page that 302s to
+    # a metadata endpoint gets its GET refused here.
+    final_host = _host_of(final_url)
+    if _host_is_local(final_host) or _resolves_to_non_public(final_host):
+        logger.debug(f"web fetch refused (redirect to private address): {url}")
+        return None
+    if "text/html" not in content_type and "text/plain" not in content_type:
+        return None
 
     extractor = _TextExtractor()
     extractor.feed(raw)
@@ -996,6 +1092,296 @@ def fetch(url: str) -> WebFetchResult | None:
         content=text[:MAX_TEXT_LENGTH],
         related_links=related,
     )
+
+
+# ─── Interactive browsing ──────────────────────────────────────────
+#
+# The same shared tab, now with hands: open, read its controls, click,
+# type, scroll, back — CDP ``Input.*`` trusted events inside the page.
+# The content blocklist and private-address refusals still apply to
+# every navigation, including ones a click causes.
+
+_ELEMENTS_JS = """JSON.stringify((() => {
+  const out = [];
+  const sel = 'a[href], button, input, textarea, select, [role="button"], [role="link"], summary';
+  for (const el of document.querySelectorAll(sel)) {
+    const r = el.getBoundingClientRect();
+    if (r.width < 4 || r.height < 4) continue;
+    const t = (el.innerText || el.value || el.getAttribute('aria-label')
+      || el.placeholder || '').trim().slice(0, 80);
+    out.push({
+      tag: el.tagName.toLowerCase() + (el.type ? ':' + el.type : ''),
+      t, u: el.href || '',
+      x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2),
+    });
+    if (out.length >= 60) break;
+  }
+  return {title: document.title || '', url: location.href, elements: out};
+})())"""
+
+_TARGET_JS = """JSON.stringify((() => {
+  let el = null;
+  const sel = %s, needle = %s;
+  if (sel) el = document.querySelector(sel);
+  if (!el && needle) {
+    for (const c of document.querySelectorAll(
+        'a, button, input, [role="button"], [role="link"], summary, [tabindex]')) {
+      const t = (c.innerText || c.value || c.getAttribute('aria-label') || '').trim().toLowerCase();
+      if (t && t.includes(needle)) { el = c; break; }
+    }
+  }
+  if (!el) return {found: false};
+  el.scrollIntoView({block: 'center'});
+  const r = el.getBoundingClientRect();
+  return {found: true, x: r.x + r.width / 2, y: r.y + r.height / 2,
+          tag: el.tagName.toLowerCase(),
+          text: (el.innerText || el.value || '').trim().slice(0, 80)};
+})())"""
+
+
+def _page_state(browser) -> dict | None:
+    raw = browser.js(_ELEMENTS_JS)
+    try:
+        return json.loads(raw) if raw else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _landed_unsafe(browser) -> bool:
+    """True when the tab's current URL must not be on her web."""
+    landed = str(browser.js("window.location.href") or "")
+    host = _host_of(landed)
+    return _host_is_local(host) or _resolves_to_non_public(host) or not is_url_safe(landed)
+
+
+def open_page(url: str) -> dict | None:
+    """Navigate her tab to ``url``; returns its state — title, landed
+    URL, and clickable/typable elements. Same safety rules as fetch."""
+    if not is_url_safe(url):
+        return None
+    if urllib.parse.urlparse(url).scheme not in ("http", "https"):
+        return None
+    if _resolves_to_non_public(_host_of(url)):
+        return None
+    browser = _get_browser()
+    if browser is None:
+        return None
+    try:
+        browser.navigate(url)
+        _browser_wait_ready(browser, url)
+        if _landed_unsafe(browser):
+            browser.js("history.back()")
+            return None
+        return _page_state(browser)
+    except Exception as e:  # noqa: BLE001 — dead browser → relaunch next time
+        note_swallowed("tools.web_search.browser_open", e)
+        _close_browser()
+        return None
+
+
+def read_page() -> dict | None:
+    """The tab's current state — title, URL, interactive elements."""
+    browser = _get_browser()
+    if browser is None:
+        return None
+    try:
+        return _page_state(browser)
+    except Exception as e:  # noqa: BLE001
+        note_swallowed("tools.web_search.browser_read", e)
+        _close_browser()
+        return None
+
+
+def _resolve_target(browser, x: float, y: float, text: str, selector: str) -> dict:
+    """The element to act on — explicit coords win, else a selector,
+    else the first element whose visible text contains ``text``."""
+    if x >= 0 and y >= 0:
+        return {"found": True, "x": x, "y": y}
+    raw = browser.js(_TARGET_JS % (json.dumps(selector), json.dumps(text.lower())))
+    try:
+        return json.loads(raw) if raw else {"found": False}
+    except (TypeError, ValueError):
+        return {"found": False}
+
+
+def click_at(x: float = -1.0, y: float = -1.0, text: str = "", selector: str = "") -> dict | None:
+    """Click in her tab — at coordinates, a CSS selector, or the
+    element whose visible text matches. If the click navigates, the
+    landing URL is re-checked against the safety rules."""
+    browser = _get_browser()
+    if browser is None:
+        return None
+    try:
+        t = _resolve_target(browser, x, y, text, selector)
+        if not t.get("found"):
+            return {"clicked": False, "reason": "no element matched"}
+        browser.click(t["x"], t["y"])
+        time.sleep(0.6)
+        if _landed_unsafe(browser):
+            browser.js("history.back()")
+            return {"clicked": False, "reason": "landing page refused"}
+        landed = str(browser.js("window.location.href") or "")
+        return {"clicked": True, "target": str(t.get("text", "")), "url": landed}
+    except Exception as e:  # noqa: BLE001
+        note_swallowed("tools.web_search.browser_click", e)
+        _close_browser()
+        return None
+
+
+def type_text(
+    text: str, x: float = -1.0, y: float = -1.0, target: str = "", selector: str = ""
+) -> dict | None:
+    """Type into her tab — into whatever has focus, or into the
+    element found by coords/selector/visible text (clicked first to
+    focus it, the way a person would)."""
+    browser = _get_browser()
+    if browser is None:
+        return None
+    try:
+        if x >= 0 or target or selector:
+            t = _resolve_target(browser, x, y, target, selector)
+            if not t.get("found"):
+                return {"typed": False, "reason": "no element matched"}
+            browser.click(t["x"], t["y"])
+            time.sleep(0.2)
+        browser.insert_text(text)
+        return {"typed": True, "chars": len(text)}
+    except Exception as e:  # noqa: BLE001
+        note_swallowed("tools.web_search.browser_type", e)
+        _close_browser()
+        return None
+
+
+# Named keys → (DOM key value, Windows virtual key code) — the
+# pair dispatchKeyEvent needs to be a real key event to the page.
+_KEY_CODES = {
+    "enter": ("Enter", 13),
+    "tab": ("Tab", 9),
+    "escape": ("Escape", 27),
+    "backspace": ("Backspace", 8),
+    "delete": ("Delete", 46),
+    "space": (" ", 32),
+    "arrowleft": ("ArrowLeft", 37),
+    "arrowup": ("ArrowUp", 38),
+    "arrowright": ("ArrowRight", 39),
+    "arrowdown": ("ArrowDown", 40),
+    "home": ("Home", 36),
+    "end": ("End", 35),
+    "pageup": ("PageUp", 33),
+    "pagedown": ("PageDown", 34),
+}
+
+
+def press_key(name: str) -> dict | None:
+    """Press one named key in her tab — Enter, Tab, Escape, arrows,
+    and friends: the keys a click can't reach."""
+    browser = _get_browser()
+    if browser is None:
+        return None
+    spec = _KEY_CODES.get(name.strip().lower())
+    if spec is None:
+        return {"pressed": False, "reason": f"unknown key {name!r}"}
+    dom_key, code = spec
+    try:
+        browser.key(dom_key, code)
+        return {"pressed": True, "key": name.strip().lower()}
+    except Exception as e:  # noqa: BLE001
+        note_swallowed("tools.web_search.browser_key", e)
+        _close_browser()
+        return None
+
+
+def scroll_page(dy: float = 600) -> dict | None:
+    """Scroll her tab — positive down, negative up."""
+    browser = _get_browser()
+    if browser is None:
+        return None
+    try:
+        browser.wheel(dy)
+        return {"scrolled": dy}
+    except Exception as e:  # noqa: BLE001
+        note_swallowed("tools.web_search.browser_scroll", e)
+        _close_browser()
+        return None
+
+
+def go_back() -> dict | None:
+    """Back one history entry; returns the page she lands on.
+
+    Uses Page.navigateToHistoryEntry rather than evaluating
+    ``history.back()`` — an eval that navigates can destroy its own
+    execution context mid-call and come back as a CDP error.
+    """
+    browser = _get_browser()
+    if browser is None:
+        return None
+    try:
+        hist = browser.call("Page.getNavigationHistory")
+        idx = int(hist.get("currentIndex", 0))
+        entries = hist.get("entries") or []
+        if idx <= 0 or idx - 1 >= len(entries):
+            return {"back": False}
+        browser.call("Page.navigateToHistoryEntry", entryId=entries[idx - 1]["id"])
+        _browser_wait_ready(browser)
+        state = _page_state(browser)
+        if state is not None:
+            state["back"] = True
+        return state
+    except Exception as e:  # noqa: BLE001
+        note_swallowed("tools.web_search.browser_back", e)
+        _close_browser()
+        return None
+
+
+def ask_human(url: str, timeout: float = 120) -> dict | None:
+    """Put a walled page on the owner's screen and wait for a person
+    to clear it — captcha, consent, "verify you are human".
+
+    The headless tab must yield the profile first: one Chrome owns a
+    user-data dir at a time, so it closes, the visible window opens
+    on the same profile (the owner's sign-in and cookies travel with
+    it), the human solves, and the window closes — the clearance
+    persists profile-side for the headless runs after.
+    """
+    if not is_url_safe(url):
+        return {"solved": False, "reason": "url refused"}
+    if urllib.parse.urlparse(url).scheme not in ("http", "https"):
+        return {"solved": False, "reason": "url refused"}
+    display = os.environ.get("GENESIS_DISPLAY") or os.environ.get("DISPLAY")
+    if not display:
+        return {"solved": False, "reason": "no display to show her human"}
+    _close_browser()
+    try:
+        from tools.browser import _Browser
+
+        vis = _Browser(headless=False, purpose="web")
+    except Exception as e:  # noqa: BLE001
+        note_swallowed("tools.web_search.ask_human", e)
+        return {"solved": False, "reason": str(e)}
+    try:
+        vis.navigate(url)
+        landed = url
+        solved = False
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            try:
+                title = str(vis.js("document.title") or "")
+                landed = str(vis.js("window.location.href") or "")
+            except Exception:  # noqa: BLE001 — window closed by her
+                break  # human; the answer is in the profile either
+                # way — report honestly below
+            if landed and not _WALL_RE.search(f"{title} {landed}"):
+                solved = True
+                break
+            time.sleep(2)
+        if not solved:
+            return {"solved": False, "reason": "not cleared before the window closed or timed out"}
+        return {"solved": True, "url": landed}
+    finally:
+        try:
+            vis.close()
+        except Exception:  # noqa: BLE001 — already gone
+            pass
 
 
 def search_and_fetch(query: str, limit: int = 3) -> WebFetchResult | None:

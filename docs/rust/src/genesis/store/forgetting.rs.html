@@ -1,0 +1,473 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `Self_World/src/store/forgetting.rs`."><title>forgetting.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-203241e4.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="genesis" data-themes="" data-resource-suffix="" data-rustdoc-version="1.100.0 (0ef1bc386 2026-11-09)" data-channel="1.100.0" data-search-js="search-b167f383.js" data-stringdex-js="stringdex-b5109af9.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="../../../static.files/src-script-813739b1.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-1814ead3.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-9f56287d.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1><div class="sub-heading">genesis/store/</div>forgetting.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! Gentle forgetting — the power-law decay of memory accessibility.
+<a href=#2 id=2 data-nosnippet>2</a>//!
+<a href=#3 id=3 data-nosnippet>3</a>//! Forgetting is the mirror of encoding: the store's `store()` binds a
+<a href=#4 id=4 data-nosnippet>4</a>//! trace, and this module decides how that trace's accessibility decays
+<a href=#5 id=5 data-nosnippet>5</a>//! over time. The model follows the empirical biology rather than an
+<a href=#6 id=6 data-nosnippet>6</a>//! arbitrary eviction policy:
+<a href=#7 id=7 data-nosnippet>7</a>//!
+<a href=#8 id=8 data-nosnippet>8</a>//! 1. **Power-law trace decay** (Anderson &amp; Schooler 1991; Wixted &amp;
+<a href=#9 id=9 data-nosnippet>9</a>//!    Ebbesen 1991): each presentation of a memory leaves a trace whose
+<a href=#10 id=10 data-nosnippet>10</a>//!    strength decays as t^(−d), d ≈ 0.5. Repeated presentation leaves
+<a href=#11 id=11 data-nosnippet>11</a>//!    multiple traces; total trace mass is the sum of the surviving
+<a href=#12 id=12 data-nosnippet>12</a>//!    strengths, M_i = Σ_k (age_k)^(−d).
+<a href=#13 id=13 data-nosnippet>13</a>//!
+<a href=#14 id=14 data-nosnippet>14</a>//! 2. **Base-level activation** (ACT-R): B_i = ln M_i + w·salience.
+<a href=#15 id=15 data-nosnippet>15</a>//!    Retrieval succeeds when activation exceeds a threshold, with
+<a href=#16 id=16 data-nosnippet>16</a>//!    activation noise s·χ making the boundary stochastic — matching
+<a href=#17 id=17 data-nosnippet>17</a>//!    the probabilistic retrieval observed in biological memory.
+<a href=#18 id=18 data-nosnippet>18</a>//!
+<a href=#19 id=19 data-nosnippet>19</a>//! 3. **Dopaminergic forgetting** (Davis &amp; Zhong 2017): dopamine
+<a href=#20 id=20 data-nosnippet>20</a>//!    "forgetting cells" accelerate trace decay while a memory is not
+<a href=#21 id=21 data-nosnippet>21</a>//!    being retrieved. High dopamine lowers the effective retrieval
+<a href=#22 id=22 data-nosnippet>22</a>//!    threshold τ_eff, raising apparent accessibility for recently
+<a href=#23 id=23 data-nosnippet>23</a>//!    encoded items and deepening the forgetting of untouched ones —
+<a href=#24 id=24 data-nosnippet>24</a>//!    modeled as a transient shift τ_eff = τ₀ − g·(DA − DA_baseline).
+<a href=#25 id=25 data-nosnippet>25</a>//!
+<a href=#26 id=26 data-nosnippet>26</a>//! 4. **Nothing is deleted while it is still reachable.** The prune
+<a href=#27 id=27 data-nosnippet>27</a>//!    predicate `should_forget` fires only when a memory's activation
+<a href=#28 id=28 data-nosnippet>28</a>//!    is below the point where even a maximal-similarity cue could
+<a href=#29 id=29 data-nosnippet>29</a>//!    reach it — B_i &lt; τ₀ − w_cue — i.e. the engram is functionally
+<a href=#30 id=30 data-nosnippet>30</a>//!    dismantled and only its storage remains. Rehearsal (every call
+<a href=#31 id=31 data-nosnippet>31</a>//!    to `retrieve`) appends a fresh trace, so a memory that is still
+<a href=#32 id=32 data-nosnippet>32</a>//!    being used cannot drift to the forget boundary.
+<a href=#33 id=33 data-nosnippet>33</a>//!
+<a href=#34 id=34 data-nosnippet>34</a>//! Rehearsal is the declared opposite of forgetting: `touch()` is the
+<a href=#35 id=35 data-nosnippet>35</a>//! `+` to decay's `−`.
+<a href=#36 id=36 data-nosnippet>36</a>
+<a href=#37 id=37 data-nosnippet>37</a>/// Power-law decay exponent. The classic value (Anderson &amp; Schooler
+<a href=#38 id=38 data-nosnippet>38</a>/// 1991; Wixted 2004) is d ≈ 0.5.
+<a href=#39 id=39 data-nosnippet>39</a></span><span class="kw">pub const </span>TRACE_DECAY: f64 = <span class="number">0.5</span>;
+<a href=#40 id=40 data-nosnippet>40</a>
+<a href=#41 id=41 data-nosnippet>41</a><span class="doccomment">/// Milliseconds per day — decay is measured in days so TRACE_DECAY's
+<a href=#42 id=42 data-nosnippet>42</a>/// empirical value stays meaningful.
+<a href=#43 id=43 data-nosnippet>43</a></span><span class="kw">pub const </span>DAY_MS: f64 = <span class="number">86_400_000.0</span>;
+<a href=#44 id=44 data-nosnippet>44</a>
+<a href=#45 id=45 data-nosnippet>45</a><span class="doccomment">/// Weight of episode salience in base-level activation. A
+<a href=#46 id=46 data-nosnippet>46</a>/// maximally-salient first-hearing memory gets +1.0 on top of its
+<a href=#47 id=47 data-nosnippet>47</a>/// trace term, shifting its forget horizon outward by e^2 ≈ 7.4×.
+<a href=#48 id=48 data-nosnippet>48</a></span><span class="kw">pub const </span>SALIENCE_GAIN: f64 = <span class="number">1.0</span>;
+<a href=#49 id=49 data-nosnippet>49</a>
+<a href=#50 id=50 data-nosnippet>50</a><span class="doccomment">/// How strongly retrieval-cue similarity contributes to accessibility.
+<a href=#51 id=51 data-nosnippet>51</a>/// A maximal cue (identical hash) contributes +w_cue.
+<a href=#52 id=52 data-nosnippet>52</a></span><span class="kw">pub const </span>CUE_WEIGHT: f64 = <span class="number">2.0</span>;
+<a href=#53 id=53 data-nosnippet>53</a>
+<a href=#54 id=54 data-nosnippet>54</a><span class="doccomment">/// Base retrieval threshold — accessibility ≥ τ is retrievable.
+<a href=#55 id=55 data-nosnippet>55</a></span><span class="kw">pub const </span>RETRIEVAL_TAU: f64 = <span class="number">0.0</span>;
+<a href=#56 id=56 data-nosnippet>56</a>
+<a href=#57 id=57 data-nosnippet>57</a><span class="doccomment">/// Activation-noise scale — the logistic s parameter. The ±1σ band
+<a href=#58 id=58 data-nosnippet>58</a>/// around the threshold is ≈ 1.54·s ≈ ±0.39 logits.
+<a href=#59 id=59 data-nosnippet>59</a></span><span class="kw">pub const </span>NOISE_SCALE: f64 = <span class="number">0.25</span>;
+<a href=#60 id=60 data-nosnippet>60</a>
+<a href=#61 id=61 data-nosnippet>61</a><span class="doccomment">/// Dopamine baseline (resting). The forgetting gate uses deviation
+<a href=#62 id=62 data-nosnippet>62</a>/// from this, not the absolute level.
+<a href=#63 id=63 data-nosnippet>63</a></span><span class="kw">pub const </span>DA_BASELINE: f64 = <span class="number">0.5</span>;
+<a href=#64 id=64 data-nosnippet>64</a>
+<a href=#65 id=65 data-nosnippet>65</a><span class="doccomment">/// How strongly above-baseline dopamine eases retrieval (and, below
+<a href=#66 id=66 data-nosnippet>66</a>/// baseline, deepens it). Kept small so chemistry modulates the
+<a href=#67 id=67 data-nosnippet>67</a>/// boundary rather than dominating it.
+<a href=#68 id=68 data-nosnippet>68</a></span><span class="kw">pub const </span>DA_FORGETTING_GAIN: f64 = <span class="number">0.4</span>;
+<a href=#69 id=69 data-nosnippet>69</a>
+<a href=#70 id=70 data-nosnippet>70</a><span class="doccomment">/// An episode must be at least this old to be a prune candidate —
+<a href=#71 id=71 data-nosnippet>71</a>/// protection against clock anomalies and freshly encoded items.
+<a href=#72 id=72 data-nosnippet>72</a></span><span class="kw">pub const </span>PRUNE_AGE_FLOOR_DAYS: f64 = <span class="number">30.0</span>;
+<a href=#73 id=73 data-nosnippet>73</a>
+<a href=#74 id=74 data-nosnippet>74</a><span class="doccomment">/// The activation below which a memory is unreachable even by a
+<a href=#75 id=75 data-nosnippet>75</a>/// perfect retrieval cue: τ₀ − w_cue. Below this the engram is
+<a href=#76 id=76 data-nosnippet>76</a>/// functionally gone and pruning only reclaims its residue.
+<a href=#77 id=77 data-nosnippet>77</a></span><span class="kw">pub const </span>FORGET_BOUND: f64 = RETRIEVAL_TAU - CUE_WEIGHT;
+<a href=#78 id=78 data-nosnippet>78</a>
+<a href=#79 id=79 data-nosnippet>79</a><span class="doccomment">/// One retrieval/rehearsal event for a single episode: how many times
+<a href=#80 id=80 data-nosnippet>80</a>/// it has been activated and when it was last touched.
+<a href=#81 id=81 data-nosnippet>81</a></span><span class="attr">#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+<a href=#82 id=82 data-nosnippet>82</a></span><span class="kw">pub struct </span>Trace {
+<a href=#83 id=83 data-nosnippet>83</a>    <span class="doccomment">/// Number of encodings + retrievals (≥ 1 while the episode exists).
+<a href=#84 id=84 data-nosnippet>84</a>    </span><span class="kw">pub </span>access_count: u32,
+<a href=#85 id=85 data-nosnippet>85</a>    <span class="doccomment">/// Wall-clock millisecond timestamp of the most recent access.
+<a href=#86 id=86 data-nosnippet>86</a>    </span><span class="kw">pub </span>last_access_ms: u64,
+<a href=#87 id=87 data-nosnippet>87</a>}
+<a href=#88 id=88 data-nosnippet>88</a>
+<a href=#89 id=89 data-nosnippet>89</a><span class="kw">impl </span>Trace {
+<a href=#90 id=90 data-nosnippet>90</a>    <span class="doccomment">/// A fresh trace for an episode encoded at `timestamp_ms`.
+<a href=#91 id=91 data-nosnippet>91</a>    </span><span class="kw">pub fn </span>encoded(timestamp_ms: u64) -&gt; <span class="self">Self </span>{
+<a href=#92 id=92 data-nosnippet>92</a>        <span class="self">Self </span>{
+<a href=#93 id=93 data-nosnippet>93</a>            access_count: <span class="number">1</span>,
+<a href=#94 id=94 data-nosnippet>94</a>            last_access_ms: timestamp_ms,
+<a href=#95 id=95 data-nosnippet>95</a>        }
+<a href=#96 id=96 data-nosnippet>96</a>    }
+<a href=#97 id=97 data-nosnippet>97</a>}
+<a href=#98 id=98 data-nosnippet>98</a>
+<a href=#99 id=99 data-nosnippet>99</a><span class="doccomment">/// Total surviving trace mass for an episode — the sum of each
+<a href=#100 id=100 data-nosnippet>100</a>/// presentation's power-law-decayed strength.
+<a href=#101 id=101 data-nosnippet>101</a>///
+<a href=#102 id=102 data-nosnippet>102</a>/// For n presentations over the episode's lifetime, exact mass is
+<a href=#103 id=103 data-nosnippet>103</a>/// Σ_k a_k^(−d), but only the count and the two endpoint ages are
+<a href=#104 id=104 data-nosnippet>104</a>/// persisted. Two estimators bound the unknown interior:
+<a href=#105 id=105 data-nosnippet>105</a>///
+<a href=#106 id=106 data-nosnippet>106</a>/// - **Blend** (Anderson &amp; Schooler 1991's merged-trace
+<a href=#107 id=107 data-nosnippet>107</a>///   approximation): presentations treated as uniformly spaced, so
+<a href=#108 id=108 data-nosnippet>108</a>///   M ≈ 2n / (√a₀ + √a_L). Best when reactivations are spread
+<a href=#109 id=109 data-nosnippet>109</a>///   evenly through the episode's life.
+<a href=#110 id=110 data-nosnippet>110</a>/// - **Endpoint bound**: the newest trace contributes its exact
+<a href=#111 id=111 data-nosnippet>111</a>///   a_L^(−d); every earlier trace is at least as old as a₀ and
+<a href=#112 id=112 data-nosnippet>112</a>///   therefore contributes at least a₀^(−d), giving
+<a href=#113 id=113 data-nosnippet>113</a>///   M ≥ a_L^(−d) + (n−1)·a₀^(−d). Exact for n ≤ 2, and the honest
+<a href=#114 id=114 data-nosnippet>114</a>///   floor for a memory rehearsed once after a long silence — where
+<a href=#115 id=115 data-nosnippet>115</a>///   the blend would spread the fresh trace's strength back across
+<a href=#116 id=116 data-nosnippet>116</a>///   the whole span and under-count it.
+<a href=#117 id=117 data-nosnippet>117</a>///
+<a href=#118 id=118 data-nosnippet>118</a>/// The mass is the larger of the two — the estimator that least
+<a href=#119 id=119 data-nosnippet>119</a>/// underestimates for the history the episode actually lived.
+<a href=#120 id=120 data-nosnippet>120</a>///
+<a href=#121 id=121 data-nosnippet>121</a>/// `age_first_days`/`age_last_days` are ages of the oldest and newest
+<a href=#122 id=122 data-nosnippet>122</a>/// trace in days; ages are floored so a just-encoded trace never
+<a href=#123 id=123 data-nosnippet>123</a>/// produces an infinite mass.
+<a href=#124 id=124 data-nosnippet>124</a></span><span class="kw">pub fn </span>trace_mass(access_count: u32, age_first_days: f64, age_last_days: f64) -&gt; f64 {
+<a href=#125 id=125 data-nosnippet>125</a>    <span class="kw">if </span>access_count == <span class="number">0 </span>{
+<a href=#126 id=126 data-nosnippet>126</a>        <span class="kw">return </span><span class="number">0.0</span>;
+<a href=#127 id=127 data-nosnippet>127</a>    }
+<a href=#128 id=128 data-nosnippet>128</a>    <span class="kw">let </span>a_first = age_first_days.max(MIN_AGE_DAYS);
+<a href=#129 id=129 data-nosnippet>129</a>    <span class="kw">let </span>a_last = age_last_days.max(MIN_AGE_DAYS);
+<a href=#130 id=130 data-nosnippet>130</a>    <span class="kw">if </span>access_count == <span class="number">1 </span>{
+<a href=#131 id=131 data-nosnippet>131</a>        <span class="kw">return </span>a_last.powf(-TRACE_DECAY);
+<a href=#132 id=132 data-nosnippet>132</a>    }
+<a href=#133 id=133 data-nosnippet>133</a>    <span class="kw">let </span>n = f64::from(access_count);
+<a href=#134 id=134 data-nosnippet>134</a>    <span class="kw">let </span>blend = <span class="number">2.0 </span>* n / (a_first.sqrt() + a_last.sqrt());
+<a href=#135 id=135 data-nosnippet>135</a>    <span class="kw">let </span>bound = a_last.powf(-TRACE_DECAY) + (n - <span class="number">1.0</span>) * a_first.powf(-TRACE_DECAY);
+<a href=#136 id=136 data-nosnippet>136</a>    blend.max(bound)
+<a href=#137 id=137 data-nosnippet>137</a>}
+<a href=#138 id=138 data-nosnippet>138</a>
+<a href=#139 id=139 data-nosnippet>139</a><span class="doccomment">/// Minimum age — the decay integral diverges at age 0, and real
+<a href=#140 id=140 data-nosnippet>140</a>/// presentations are separated by at least the encoding quantum.
+<a href=#141 id=141 data-nosnippet>141</a></span><span class="kw">const </span>MIN_AGE_DAYS: f64 = <span class="number">1.0 </span>/ <span class="number">1440.0</span>; <span class="comment">// one minute
+<a href=#142 id=142 data-nosnippet>142</a>
+<a href=#143 id=143 data-nosnippet>143</a></span><span class="doccomment">/// Base-level activation: ln M_i + w·salience.
+<a href=#144 id=144 data-nosnippet>144</a>///
+<a href=#145 id=145 data-nosnippet>145</a>/// `encoded_ms` is the episode's original encoding timestamp (the
+<a href=#146 id=146 data-nosnippet>146</a>/// oldest trace's age comes from it); `trace` carries access count
+<a href=#147 id=147 data-nosnippet>147</a>/// and recency. `salience` is the 0..1 salience stored at encoding.
+<a href=#148 id=148 data-nosnippet>148</a></span><span class="kw">pub fn </span>base_level(trace: Trace, encoded_ms: u64, salience: f32, now_ms: u64) -&gt; f64 {
+<a href=#149 id=149 data-nosnippet>149</a>    <span class="kw">let </span>age_first = (now_ms.saturating_sub(encoded_ms) <span class="kw">as </span>f64) / DAY_MS;
+<a href=#150 id=150 data-nosnippet>150</a>    <span class="kw">let </span>age_last = (now_ms.saturating_sub(trace.last_access_ms) <span class="kw">as </span>f64) / DAY_MS;
+<a href=#151 id=151 data-nosnippet>151</a>    trace_mass(trace.access_count, age_first, age_last).ln()
+<a href=#152 id=152 data-nosnippet>152</a>        + SALIENCE_GAIN * f64::from(salience.max(<span class="number">0.0</span>))
+<a href=#153 id=153 data-nosnippet>153</a>}
+<a href=#154 id=154 data-nosnippet>154</a>
+<a href=#155 id=155 data-nosnippet>155</a><span class="doccomment">/// Deterministic activation noise χ ∈ (−1, 1), hashed from the
+<a href=#156 id=156 data-nosnippet>156</a>/// episode and the query so the retrieval boundary is stochastic but
+<a href=#157 id=157 data-nosnippet>157</a>/// reproducible for the same probe — matching how a given cue at a
+<a href=#158 id=158 data-nosnippet>158</a>/// given moment either surfaces a memory or doesn't.
+<a href=#159 id=159 data-nosnippet>159</a></span><span class="kw">pub fn </span>activation_noise(episode_id: u64, query_hash: u64) -&gt; f64 {
+<a href=#160 id=160 data-nosnippet>160</a>    <span class="kw">let </span><span class="kw-2">mut </span>z = episode_id
+<a href=#161 id=161 data-nosnippet>161</a>        .wrapping_mul(<span class="number">0x9E37_79B9_7F4A_7C15</span>)
+<a href=#162 id=162 data-nosnippet>162</a>        .wrapping_add(query_hash);
+<a href=#163 id=163 data-nosnippet>163</a>    z = (z ^ (z &gt;&gt; <span class="number">30</span>)).wrapping_mul(<span class="number">0xBF58_476D_1CE4_E5B9</span>);
+<a href=#164 id=164 data-nosnippet>164</a>    z = (z ^ (z &gt;&gt; <span class="number">27</span>)).wrapping_mul(<span class="number">0x94D0_49BB_1331_11EB</span>);
+<a href=#165 id=165 data-nosnippet>165</a>    z ^= z &gt;&gt; <span class="number">31</span>;
+<a href=#166 id=166 data-nosnippet>166</a>    <span class="comment">// Map the 53-bit mantissa into [0,1), then to (−1,1).
+<a href=#167 id=167 data-nosnippet>167</a>    </span><span class="kw">let </span>u = ((z &gt;&gt; <span class="number">11</span>) <span class="kw">as </span>f64) / <span class="number">9007199254740992.0</span>; <span class="comment">// 2^53
+<a href=#168 id=168 data-nosnippet>168</a>    </span><span class="number">2.0 </span>* u - <span class="number">1.0
+<a href=#169 id=169 data-nosnippet>169</a></span>}
+<a href=#170 id=170 data-nosnippet>170</a>
+<a href=#171 id=171 data-nosnippet>171</a><span class="doccomment">/// The retrieval threshold after the dopaminergic forgetting-cell
+<a href=#172 id=172 data-nosnippet>172</a>/// modulation. Above-baseline dopamine lowers τ (easier retrieval of
+<a href=#173 id=173 data-nosnippet>173</a>/// anything still reachable); below-baseline raises it.
+<a href=#174 id=174 data-nosnippet>174</a></span><span class="kw">pub fn </span>effective_threshold(dopamine: f64) -&gt; f64 {
+<a href=#175 id=175 data-nosnippet>175</a>    RETRIEVAL_TAU - DA_FORGETTING_GAIN * (dopamine - DA_BASELINE)
+<a href=#176 id=176 data-nosnippet>176</a>}
+<a href=#177 id=177 data-nosnippet>177</a>
+<a href=#178 id=178 data-nosnippet>178</a><span class="doccomment">/// Full accessibility score for a candidate: B_i + w·sim + s·χ − τ_eff.
+<a href=#179 id=179 data-nosnippet>179</a>/// Positive means the cue reaches the memory.
+<a href=#180 id=180 data-nosnippet>180</a></span><span class="kw">pub fn </span>accessibility_score(
+<a href=#181 id=181 data-nosnippet>181</a>    base: f64,
+<a href=#182 id=182 data-nosnippet>182</a>    cue_similarity: f64,
+<a href=#183 id=183 data-nosnippet>183</a>    episode_id: u64,
+<a href=#184 id=184 data-nosnippet>184</a>    query_hash: u64,
+<a href=#185 id=185 data-nosnippet>185</a>    dopamine: f64,
+<a href=#186 id=186 data-nosnippet>186</a>) -&gt; f64 {
+<a href=#187 id=187 data-nosnippet>187</a>    base + CUE_WEIGHT * cue_similarity.clamp(<span class="number">0.0</span>, <span class="number">1.0</span>)
+<a href=#188 id=188 data-nosnippet>188</a>        + NOISE_SCALE * activation_noise(episode_id, query_hash)
+<a href=#189 id=189 data-nosnippet>189</a>        - effective_threshold(dopamine)
+<a href=#190 id=190 data-nosnippet>190</a>}
+<a href=#191 id=191 data-nosnippet>191</a>
+<a href=#192 id=192 data-nosnippet>192</a><span class="doccomment">/// Whether a candidate survives the forgetting gate for this probe.
+<a href=#193 id=193 data-nosnippet>193</a></span><span class="kw">pub fn </span>is_accessible(
+<a href=#194 id=194 data-nosnippet>194</a>    base: f64,
+<a href=#195 id=195 data-nosnippet>195</a>    cue_similarity: f64,
+<a href=#196 id=196 data-nosnippet>196</a>    episode_id: u64,
+<a href=#197 id=197 data-nosnippet>197</a>    query_hash: u64,
+<a href=#198 id=198 data-nosnippet>198</a>    dopamine: f64,
+<a href=#199 id=199 data-nosnippet>199</a>) -&gt; bool {
+<a href=#200 id=200 data-nosnippet>200</a>    accessibility_score(base, cue_similarity, episode_id, query_hash, dopamine) &gt;= <span class="number">0.0
+<a href=#201 id=201 data-nosnippet>201</a></span>}
+<a href=#202 id=202 data-nosnippet>202</a>
+<a href=#203 id=203 data-nosnippet>203</a><span class="doccomment">/// The deep-forget predicate: has this memory decayed past the point
+<a href=#204 id=204 data-nosnippet>204</a>/// where any cue could reach it?
+<a href=#205 id=205 data-nosnippet>205</a>///
+<a href=#206 id=206 data-nosnippet>206</a>/// Fires only when B_i &lt; τ₀ − w_cue, so even a maximal-similarity
+<a href=#207 id=207 data-nosnippet>207</a>/// probe with no noise assistance cannot retrieve it, AND the episode
+<a href=#208 id=208 data-nosnippet>208</a>/// is older than the age floor. Deliberately conservative — the bar
+<a href=#209 id=209 data-nosnippet>209</a>/// sits a full CUE_WEIGHT below the retrieval threshold, so memories
+<a href=#210 id=210 data-nosnippet>210</a>/// that are merely hard to reach stay stored; only the functionally
+<a href=#211 id=211 data-nosnippet>211</a>/// dismantled are released.
+<a href=#212 id=212 data-nosnippet>212</a></span><span class="kw">pub fn </span>should_forget(base: f64, age_first_days: f64) -&gt; bool {
+<a href=#213 id=213 data-nosnippet>213</a>    base &lt; FORGET_BOUND &amp;&amp; age_first_days &gt;= PRUNE_AGE_FLOOR_DAYS
+<a href=#214 id=214 data-nosnippet>214</a>}
+<a href=#215 id=215 data-nosnippet>215</a>
+<a href=#216 id=216 data-nosnippet>216</a><span class="doccomment">/// Predicted days until a memory with this activation reaches the
+<a href=#217 id=217 data-nosnippet>217</a>/// forget boundary — positive while it is still retrievable, and the
+<a href=#218 id=218 data-nosnippet>218</a>/// number a mind would use to decide "rehearse it now or let it go".
+<a href=#219 id=219 data-nosnippet>219</a>///
+<a href=#220 id=220 data-nosnippet>220</a>/// B_i = ln(2n/(√a₀ + √a_L)) + w·s → solves for the a₀ at which
+<a href=#221 id=221 data-nosnippet>221</a>/// B_i hits FORGET_BOUND, holding n, a_L ≈ a₀ (the uniform blend):
+<a href=#222 id=222 data-nosnippet>222</a>///   a_forget ≈ (2n / e^{FORGET_BOUND − w·s})² / 4
+<a href=#223 id=223 data-nosnippet>223</a>/// Returns days remaining until that age; ∞ if it can never fade
+<a href=#224 id=224 data-nosnippet>224</a>/// below the bound with the current trace count.
+<a href=#225 id=225 data-nosnippet>225</a></span><span class="kw">pub fn </span>days_until_forgotten(access_count: u32, salience: f32, current_age_days: f64) -&gt; f64 {
+<a href=#226 id=226 data-nosnippet>226</a>    <span class="comment">// With a₀ ≈ a_L = a, trace_mass = 2n/(2√a) = n·a^(−1/2); B =
+<a href=#227 id=227 data-nosnippet>227</a>    // ln n − (d)·ln a + w·s  →  a_forget = (n / e^{B̄})^(1/d) where
+<a href=#228 id=228 data-nosnippet>228</a>    // B̄ = FORGET_BOUND − w·s.
+<a href=#229 id=229 data-nosnippet>229</a>    </span><span class="kw">let </span>barrier = FORGET_BOUND - SALIENCE_GAIN * f64::from(salience.max(<span class="number">0.0</span>));
+<a href=#230 id=230 data-nosnippet>230</a>    <span class="kw">let </span>n = f64::from(access_count.max(<span class="number">1</span>));
+<a href=#231 id=231 data-nosnippet>231</a>    <span class="kw">let </span>a_forget = (n / barrier.exp()).powf(<span class="number">1.0 </span>/ TRACE_DECAY);
+<a href=#232 id=232 data-nosnippet>232</a>    a_forget - current_age_days
+<a href=#233 id=233 data-nosnippet>233</a>}
+<a href=#234 id=234 data-nosnippet>234</a>
+<a href=#235 id=235 data-nosnippet>235</a><span class="comment">// ─────────────────────────────────────────────────────────────────
+<a href=#236 id=236 data-nosnippet>236</a>//  Trace persistence — the .traces sidecar
+<a href=#237 id=237 data-nosnippet>237</a>// ─────────────────────────────────────────────────────────────────
+<a href=#238 id=238 data-nosnippet>238</a>//
+<a href=#239 id=239 data-nosnippet>239</a>// The `.meta` IndexEntry format is frozen at 64 bytes — the Python
+<a href=#240 id=240 data-nosnippet>240</a>// index scanner unpacks it directly — so rehearsal state lives in a
+<a href=#241 id=241 data-nosnippet>241</a>// fourth file beside the store: `{base}.traces`.
+<a href=#242 id=242 data-nosnippet>242</a>//
+<a href=#243 id=243 data-nosnippet>243</a>// ```text
+<a href=#244 id=244 data-nosnippet>244</a>// ┌─────────────────────────────────────────────────────┐
+<a href=#245 id=245 data-nosnippet>245</a>// │  Traces file (.traces) — random-access              │
+<a href=#246 id=246 data-nosnippet>246</a>// │  16-byte header: magic "LTMT" + version + count     │
+<a href=#247 id=247 data-nosnippet>247</a>// │  24-byte records: id u64 | n u32 | pad u32 | t u64  │
+<a href=#248 id=248 data-nosnippet>248</a>// └─────────────────────────────────────────────────────┘
+<a href=#249 id=249 data-nosnippet>249</a>// ```
+<a href=#250 id=250 data-nosnippet>250</a>//
+<a href=#251 id=251 data-nosnippet>251</a>// Writes are write-through but not fsync'd per touch — a lost
+<a href=#252 id=252 data-nosnippet>252</a>// rehearsal record only weakens a trace slightly (biologically the
+<a href=#253 id=253 data-nosnippet>253</a>// same thing happens: not every reactivation consolidates). The
+<a href=#254 id=254 data-nosnippet>254</a>// store's `sync()` fsyncs the file along with everything else.
+<a href=#255 id=255 data-nosnippet>255</a>// A missing or corrupt traces file opens empty and heals: every
+<a href=#256 id=256 data-nosnippet>256</a>// episode without a record reads as exactly one presentation at its
+<a href=#257 id=257 data-nosnippet>257</a>// encoding timestamp, which is its true floor anyway.
+<a href=#258 id=258 data-nosnippet>258</a>
+<a href=#259 id=259 data-nosnippet>259</a></span><span class="kw">use </span>std::collections::HashMap;
+<a href=#260 id=260 data-nosnippet>260</a><span class="kw">use </span>std::fs::OpenOptions;
+<a href=#261 id=261 data-nosnippet>261</a><span class="kw">use </span>std::io::{Read, Seek, SeekFrom, Write};
+<a href=#262 id=262 data-nosnippet>262</a><span class="kw">use </span>std::path::{Path, PathBuf};
+<a href=#263 id=263 data-nosnippet>263</a>
+<a href=#264 id=264 data-nosnippet>264</a><span class="doccomment">/// Magic bytes for the traces file: ASCII `"LTMT"`.
+<a href=#265 id=265 data-nosnippet>265</a></span><span class="kw">pub const </span>TRACES_MAGIC: [u8; <span class="number">4</span>] = <span class="kw-2">*</span><span class="string">b"LTMT"</span>;
+<a href=#266 id=266 data-nosnippet>266</a><span class="doccomment">/// Traces file schema version.
+<a href=#267 id=267 data-nosnippet>267</a></span><span class="kw">pub const </span>TRACES_VERSION: u32 = <span class="number">1</span>;
+<a href=#268 id=268 data-nosnippet>268</a><span class="doccomment">/// Traces header size in bytes.
+<a href=#269 id=269 data-nosnippet>269</a></span><span class="kw">pub const </span>TRACES_HEADER_SIZE: u64 = <span class="number">16</span>;
+<a href=#270 id=270 data-nosnippet>270</a><span class="doccomment">/// One trace record: episode_id u64 | access_count u32 | _pad u32 |
+<a href=#271 id=271 data-nosnippet>271</a>/// last_access_ms u64.
+<a href=#272 id=272 data-nosnippet>272</a></span><span class="kw">pub const </span>TRACE_RECORD_SIZE: u64 = <span class="number">24</span>;
+<a href=#273 id=273 data-nosnippet>273</a>
+<a href=#274 id=274 data-nosnippet>274</a><span class="doccomment">/// Rehearsal/access state for every episode — persisted beside the
+<a href=#275 id=275 data-nosnippet>275</a>/// LTM store so retrieval strengthens memory without touching the
+<a href=#276 id=276 data-nosnippet>276</a>/// frozen `.meta` row format.
+<a href=#277 id=277 data-nosnippet>277</a></span><span class="kw">pub struct </span>TraceStore {
+<a href=#278 id=278 data-nosnippet>278</a>    file: std::fs::File,
+<a href=#279 id=279 data-nosnippet>279</a>    <span class="doccomment">/// episode_id → record slot (byte offset = HEADER + slot·RECORD)
+<a href=#280 id=280 data-nosnippet>280</a>    </span>slots: HashMap&lt;u64, u32&gt;,
+<a href=#281 id=281 data-nosnippet>281</a>    <span class="doccomment">/// episode_id → trace. Entries not present read as the default
+<a href=#282 id=282 data-nosnippet>282</a>    /// encoded-once trace — see [`TraceStore::get`].
+<a href=#283 id=283 data-nosnippet>283</a>    </span>traces: HashMap&lt;u64, Trace&gt;,
+<a href=#284 id=284 data-nosnippet>284</a>    next_slot: u32,
+<a href=#285 id=285 data-nosnippet>285</a>    path: PathBuf,
+<a href=#286 id=286 data-nosnippet>286</a>}
+<a href=#287 id=287 data-nosnippet>287</a>
+<a href=#288 id=288 data-nosnippet>288</a><span class="kw">impl </span>TraceStore {
+<a href=#289 id=289 data-nosnippet>289</a>    <span class="doccomment">/// Open the traces file for `base`, creating it if absent. A
+<a href=#290 id=290 data-nosnippet>290</a>    /// corrupt or partial tail record is ignored rather than fatal —
+<a href=#291 id=291 data-nosnippet>291</a>    /// the worst case is a trace that looks one rehearsal weaker.
+<a href=#292 id=292 data-nosnippet>292</a>    </span><span class="kw">pub fn </span>open_or_create(base_path: <span class="kw-2">&amp;</span>Path) -&gt; std::io::Result&lt;<span class="self">Self</span>&gt; {
+<a href=#293 id=293 data-nosnippet>293</a>        <span class="kw">let </span>path = base_path.with_extension(<span class="string">"traces"</span>);
+<a href=#294 id=294 data-nosnippet>294</a>        <span class="kw">let </span><span class="kw-2">mut </span>file = OpenOptions::new()
+<a href=#295 id=295 data-nosnippet>295</a>            .read(<span class="bool-val">true</span>)
+<a href=#296 id=296 data-nosnippet>296</a>            .write(<span class="bool-val">true</span>)
+<a href=#297 id=297 data-nosnippet>297</a>            .create(<span class="bool-val">true</span>)
+<a href=#298 id=298 data-nosnippet>298</a>            .truncate(<span class="bool-val">false</span>)
+<a href=#299 id=299 data-nosnippet>299</a>            .open(<span class="kw-2">&amp;</span>path)<span class="question-mark">?</span>;
+<a href=#300 id=300 data-nosnippet>300</a>
+<a href=#301 id=301 data-nosnippet>301</a>        <span class="kw">let </span>len = file.metadata()<span class="question-mark">?</span>.len();
+<a href=#302 id=302 data-nosnippet>302</a>        <span class="kw">let </span><span class="kw-2">mut </span>slots = HashMap::new();
+<a href=#303 id=303 data-nosnippet>303</a>        <span class="kw">let </span><span class="kw-2">mut </span>traces = HashMap::new();
+<a href=#304 id=304 data-nosnippet>304</a>        <span class="kw">let </span><span class="kw-2">mut </span>next_slot = <span class="number">0u32</span>;
+<a href=#305 id=305 data-nosnippet>305</a>
+<a href=#306 id=306 data-nosnippet>306</a>        <span class="kw">if </span>len &gt;= TRACES_HEADER_SIZE {
+<a href=#307 id=307 data-nosnippet>307</a>            <span class="kw">let </span><span class="kw-2">mut </span>header = [<span class="number">0u8</span>; TRACES_HEADER_SIZE <span class="kw">as </span>usize];
+<a href=#308 id=308 data-nosnippet>308</a>            file.seek(SeekFrom::Start(<span class="number">0</span>))<span class="question-mark">?</span>;
+<a href=#309 id=309 data-nosnippet>309</a>            file.read_exact(<span class="kw-2">&amp;mut </span>header)<span class="question-mark">?</span>;
+<a href=#310 id=310 data-nosnippet>310</a>            <span class="kw">if </span>header[<span class="number">0</span>..<span class="number">4</span>] == TRACES_MAGIC
+<a href=#311 id=311 data-nosnippet>311</a>                &amp;&amp; u32::from_le_bytes(header[<span class="number">4</span>..<span class="number">8</span>].try_into().unwrap_or_default()) == TRACES_VERSION
+<a href=#312 id=312 data-nosnippet>312</a>            {
+<a href=#313 id=313 data-nosnippet>313</a>                <span class="kw">let </span>declared = u32::from_le_bytes(header[<span class="number">8</span>..<span class="number">12</span>].try_into().unwrap_or_default());
+<a href=#314 id=314 data-nosnippet>314</a>                <span class="kw">let </span>present = ((len - TRACES_HEADER_SIZE) / TRACE_RECORD_SIZE) <span class="kw">as </span>u32;
+<a href=#315 id=315 data-nosnippet>315</a>                <span class="kw">let </span>readable = declared.min(present);
+<a href=#316 id=316 data-nosnippet>316</a>                <span class="kw">let </span><span class="kw-2">mut </span>buf = <span class="macro">vec!</span>[<span class="number">0u8</span>; (readable * TRACE_RECORD_SIZE <span class="kw">as </span>u32) <span class="kw">as </span>usize];
+<a href=#317 id=317 data-nosnippet>317</a>                file.read_exact(<span class="kw-2">&amp;mut </span>buf)<span class="question-mark">?</span>;
+<a href=#318 id=318 data-nosnippet>318</a>                <span class="kw">for </span>slot <span class="kw">in </span><span class="number">0</span>..readable {
+<a href=#319 id=319 data-nosnippet>319</a>                    <span class="kw">let </span>off = (slot * TRACE_RECORD_SIZE <span class="kw">as </span>u32) <span class="kw">as </span>usize;
+<a href=#320 id=320 data-nosnippet>320</a>                    <span class="kw">let </span>episode_id =
+<a href=#321 id=321 data-nosnippet>321</a>                        u64::from_le_bytes(buf[off..off + <span class="number">8</span>].try_into().unwrap_or_default());
+<a href=#322 id=322 data-nosnippet>322</a>                    <span class="kw">let </span>access_count =
+<a href=#323 id=323 data-nosnippet>323</a>                        u32::from_le_bytes(buf[off + <span class="number">8</span>..off + <span class="number">12</span>].try_into().unwrap_or_default());
+<a href=#324 id=324 data-nosnippet>324</a>                    <span class="kw">let </span>last_access_ms =
+<a href=#325 id=325 data-nosnippet>325</a>                        u64::from_le_bytes(buf[off + <span class="number">16</span>..off + <span class="number">24</span>].try_into().unwrap_or_default());
+<a href=#326 id=326 data-nosnippet>326</a>                    <span class="kw">if </span>episode_id == <span class="number">0 </span>|| access_count == <span class="number">0 </span>{
+<a href=#327 id=327 data-nosnippet>327</a>                        <span class="kw">continue</span>;
+<a href=#328 id=328 data-nosnippet>328</a>                    }
+<a href=#329 id=329 data-nosnippet>329</a>                    slots.insert(episode_id, slot);
+<a href=#330 id=330 data-nosnippet>330</a>                    traces.insert(
+<a href=#331 id=331 data-nosnippet>331</a>                        episode_id,
+<a href=#332 id=332 data-nosnippet>332</a>                        Trace {
+<a href=#333 id=333 data-nosnippet>333</a>                            access_count,
+<a href=#334 id=334 data-nosnippet>334</a>                            last_access_ms,
+<a href=#335 id=335 data-nosnippet>335</a>                        },
+<a href=#336 id=336 data-nosnippet>336</a>                    );
+<a href=#337 id=337 data-nosnippet>337</a>                }
+<a href=#338 id=338 data-nosnippet>338</a>                next_slot = present;
+<a href=#339 id=339 data-nosnippet>339</a>            }
+<a href=#340 id=340 data-nosnippet>340</a>        }
+<a href=#341 id=341 data-nosnippet>341</a>
+<a href=#342 id=342 data-nosnippet>342</a>        <span class="kw">if </span>len &lt; TRACES_HEADER_SIZE {
+<a href=#343 id=343 data-nosnippet>343</a>            <span class="comment">// Fresh file — write the header now so the file is never
+<a href=#344 id=344 data-nosnippet>344</a>            // zero-length garbage on disk.
+<a href=#345 id=345 data-nosnippet>345</a>            </span><span class="self">Self</span>::write_header(<span class="kw-2">&amp;mut </span>file, <span class="number">0</span>)<span class="question-mark">?</span>;
+<a href=#346 id=346 data-nosnippet>346</a>        }
+<a href=#347 id=347 data-nosnippet>347</a>
+<a href=#348 id=348 data-nosnippet>348</a>        <span class="prelude-val">Ok</span>(<span class="self">Self </span>{
+<a href=#349 id=349 data-nosnippet>349</a>            file,
+<a href=#350 id=350 data-nosnippet>350</a>            slots,
+<a href=#351 id=351 data-nosnippet>351</a>            traces,
+<a href=#352 id=352 data-nosnippet>352</a>            next_slot,
+<a href=#353 id=353 data-nosnippet>353</a>            path,
+<a href=#354 id=354 data-nosnippet>354</a>        })
+<a href=#355 id=355 data-nosnippet>355</a>    }
+<a href=#356 id=356 data-nosnippet>356</a>
+<a href=#357 id=357 data-nosnippet>357</a>    <span class="kw">fn </span>write_header(file: <span class="kw-2">&amp;mut </span>std::fs::File, count: u32) -&gt; std::io::Result&lt;()&gt; {
+<a href=#358 id=358 data-nosnippet>358</a>        <span class="kw">let </span><span class="kw-2">mut </span>header = [<span class="number">0u8</span>; TRACES_HEADER_SIZE <span class="kw">as </span>usize];
+<a href=#359 id=359 data-nosnippet>359</a>        header[<span class="number">0</span>..<span class="number">4</span>].copy_from_slice(<span class="kw-2">&amp;</span>TRACES_MAGIC);
+<a href=#360 id=360 data-nosnippet>360</a>        header[<span class="number">4</span>..<span class="number">8</span>].copy_from_slice(<span class="kw-2">&amp;</span>TRACES_VERSION.to_le_bytes());
+<a href=#361 id=361 data-nosnippet>361</a>        header[<span class="number">8</span>..<span class="number">12</span>].copy_from_slice(<span class="kw-2">&amp;</span>count.to_le_bytes());
+<a href=#362 id=362 data-nosnippet>362</a>        file.seek(SeekFrom::Start(<span class="number">0</span>))<span class="question-mark">?</span>;
+<a href=#363 id=363 data-nosnippet>363</a>        file.write_all(<span class="kw-2">&amp;</span>header)<span class="question-mark">?</span>;
+<a href=#364 id=364 data-nosnippet>364</a>        <span class="prelude-val">Ok</span>(())
+<a href=#365 id=365 data-nosnippet>365</a>    }
+<a href=#366 id=366 data-nosnippet>366</a>
+<a href=#367 id=367 data-nosnippet>367</a>    <span class="kw">fn </span>write_record(
+<a href=#368 id=368 data-nosnippet>368</a>        file: <span class="kw-2">&amp;mut </span>std::fs::File,
+<a href=#369 id=369 data-nosnippet>369</a>        slot: u32,
+<a href=#370 id=370 data-nosnippet>370</a>        episode_id: u64,
+<a href=#371 id=371 data-nosnippet>371</a>        trace: Trace,
+<a href=#372 id=372 data-nosnippet>372</a>    ) -&gt; std::io::Result&lt;()&gt; {
+<a href=#373 id=373 data-nosnippet>373</a>        <span class="kw">let </span><span class="kw-2">mut </span>rec = [<span class="number">0u8</span>; TRACE_RECORD_SIZE <span class="kw">as </span>usize];
+<a href=#374 id=374 data-nosnippet>374</a>        rec[<span class="number">0</span>..<span class="number">8</span>].copy_from_slice(<span class="kw-2">&amp;</span>episode_id.to_le_bytes());
+<a href=#375 id=375 data-nosnippet>375</a>        rec[<span class="number">8</span>..<span class="number">12</span>].copy_from_slice(<span class="kw-2">&amp;</span>trace.access_count.to_le_bytes());
+<a href=#376 id=376 data-nosnippet>376</a>        rec[<span class="number">16</span>..<span class="number">24</span>].copy_from_slice(<span class="kw-2">&amp;</span>trace.last_access_ms.to_le_bytes());
+<a href=#377 id=377 data-nosnippet>377</a>        file.seek(SeekFrom::Start(
+<a href=#378 id=378 data-nosnippet>378</a>            TRACES_HEADER_SIZE + u64::from(slot) * TRACE_RECORD_SIZE,
+<a href=#379 id=379 data-nosnippet>379</a>        ))<span class="question-mark">?</span>;
+<a href=#380 id=380 data-nosnippet>380</a>        file.write_all(<span class="kw-2">&amp;</span>rec)<span class="question-mark">?</span>;
+<a href=#381 id=381 data-nosnippet>381</a>        <span class="prelude-val">Ok</span>(())
+<a href=#382 id=382 data-nosnippet>382</a>    }
+<a href=#383 id=383 data-nosnippet>383</a>
+<a href=#384 id=384 data-nosnippet>384</a>    <span class="doccomment">/// The trace for an episode; absent records default to a single
+<a href=#385 id=385 data-nosnippet>385</a>    /// presentation at `encoded_ms` — every stored episode has at
+<a href=#386 id=386 data-nosnippet>386</a>    /// least its encoding trace.
+<a href=#387 id=387 data-nosnippet>387</a>    </span><span class="kw">pub fn </span>get(<span class="kw-2">&amp;</span><span class="self">self</span>, episode_id: u64, encoded_ms: u64) -&gt; Trace {
+<a href=#388 id=388 data-nosnippet>388</a>        <span class="self">self</span>.traces
+<a href=#389 id=389 data-nosnippet>389</a>            .get(<span class="kw-2">&amp;</span>episode_id)
+<a href=#390 id=390 data-nosnippet>390</a>            .copied()
+<a href=#391 id=391 data-nosnippet>391</a>            .unwrap_or_else(|| Trace::encoded(encoded_ms))
+<a href=#392 id=392 data-nosnippet>392</a>    }
+<a href=#393 id=393 data-nosnippet>393</a>
+<a href=#394 id=394 data-nosnippet>394</a>    <span class="doccomment">/// Record an encoding: the first trace, stamped at the episode's
+<a href=#395 id=395 data-nosnippet>395</a>    /// own timestamp.
+<a href=#396 id=396 data-nosnippet>396</a>    </span><span class="kw">pub fn </span>record_encoding(<span class="kw-2">&amp;mut </span><span class="self">self</span>, episode_id: u64, timestamp_ms: u64) -&gt; std::io::Result&lt;()&gt; {
+<a href=#397 id=397 data-nosnippet>397</a>        <span class="self">self</span>.put(episode_id, Trace::encoded(timestamp_ms))
+<a href=#398 id=398 data-nosnippet>398</a>    }
+<a href=#399 id=399 data-nosnippet>399</a>
+<a href=#400 id=400 data-nosnippet>400</a>    <span class="doccomment">/// Rehearsal — the opposite of forgetting. Each retrieval adds a
+<a href=#401 id=401 data-nosnippet>401</a>    /// presentation to the trace: n += 1, t_last = now. The added
+<a href=#402 id=402 data-nosnippet>402</a>    /// mass is strongest exactly when it lands, so a just-rehearsed
+<a href=#403 id=403 data-nosnippet>403</a>    /// memory jumps well clear of the retrieval boundary.
+<a href=#404 id=404 data-nosnippet>404</a>    </span><span class="kw">pub fn </span>touch(<span class="kw-2">&amp;mut </span><span class="self">self</span>, episode_id: u64, now_ms: u64) -&gt; std::io::Result&lt;()&gt; {
+<a href=#405 id=405 data-nosnippet>405</a>        <span class="kw">let </span>current = <span class="self">self
+<a href=#406 id=406 data-nosnippet>406</a>            </span>.traces
+<a href=#407 id=407 data-nosnippet>407</a>            .get(<span class="kw-2">&amp;</span>episode_id)
+<a href=#408 id=408 data-nosnippet>408</a>            .copied()
+<a href=#409 id=409 data-nosnippet>409</a>            .unwrap_or_else(|| Trace::encoded(now_ms));
+<a href=#410 id=410 data-nosnippet>410</a>        <span class="self">self</span>.put(
+<a href=#411 id=411 data-nosnippet>411</a>            episode_id,
+<a href=#412 id=412 data-nosnippet>412</a>            Trace {
+<a href=#413 id=413 data-nosnippet>413</a>                access_count: current.access_count.saturating_add(<span class="number">1</span>),
+<a href=#414 id=414 data-nosnippet>414</a>                last_access_ms: now_ms,
+<a href=#415 id=415 data-nosnippet>415</a>            },
+<a href=#416 id=416 data-nosnippet>416</a>        )
+<a href=#417 id=417 data-nosnippet>417</a>    }
+<a href=#418 id=418 data-nosnippet>418</a>
+<a href=#419 id=419 data-nosnippet>419</a>    <span class="kw">fn </span>put(<span class="kw-2">&amp;mut </span><span class="self">self</span>, episode_id: u64, trace: Trace) -&gt; std::io::Result&lt;()&gt; {
+<a href=#420 id=420 data-nosnippet>420</a>        <span class="kw">let </span>slot = <span class="kw">match </span><span class="self">self</span>.slots.get(<span class="kw-2">&amp;</span>episode_id) {
+<a href=#421 id=421 data-nosnippet>421</a>            <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>slot) =&gt; slot,
+<a href=#422 id=422 data-nosnippet>422</a>            <span class="prelude-val">None </span>=&gt; {
+<a href=#423 id=423 data-nosnippet>423</a>                <span class="kw">let </span>slot = <span class="self">self</span>.next_slot;
+<a href=#424 id=424 data-nosnippet>424</a>                <span class="self">self</span>.next_slot = <span class="self">self</span>.next_slot.saturating_add(<span class="number">1</span>);
+<a href=#425 id=425 data-nosnippet>425</a>                <span class="self">self</span>.slots.insert(episode_id, slot);
+<a href=#426 id=426 data-nosnippet>426</a>                <span class="self">Self</span>::write_header(<span class="kw-2">&amp;mut </span><span class="self">self</span>.file, <span class="self">self</span>.next_slot)<span class="question-mark">?</span>;
+<a href=#427 id=427 data-nosnippet>427</a>                slot
+<a href=#428 id=428 data-nosnippet>428</a>            }
+<a href=#429 id=429 data-nosnippet>429</a>        };
+<a href=#430 id=430 data-nosnippet>430</a>        <span class="self">Self</span>::write_record(<span class="kw-2">&amp;mut </span><span class="self">self</span>.file, slot, episode_id, trace)<span class="question-mark">?</span>;
+<a href=#431 id=431 data-nosnippet>431</a>        <span class="self">self</span>.traces.insert(episode_id, trace);
+<a href=#432 id=432 data-nosnippet>432</a>        <span class="prelude-val">Ok</span>(())
+<a href=#433 id=433 data-nosnippet>433</a>    }
+<a href=#434 id=434 data-nosnippet>434</a>
+<a href=#435 id=435 data-nosnippet>435</a>    <span class="doccomment">/// Forget an episode's trace — the record on disk is left as dead
+<a href=#436 id=436 data-nosnippet>436</a>    /// space until `retain` rewrites the file, mirroring how a deleted
+<a href=#437 id=437 data-nosnippet>437</a>    /// episode's `.meta` row lingers until compaction.
+<a href=#438 id=438 data-nosnippet>438</a>    </span><span class="kw">pub fn </span>remove(<span class="kw-2">&amp;mut </span><span class="self">self</span>, episode_id: u64) {
+<a href=#439 id=439 data-nosnippet>439</a>        <span class="self">self</span>.traces.remove(<span class="kw-2">&amp;</span>episode_id);
+<a href=#440 id=440 data-nosnippet>440</a>        <span class="self">self</span>.slots.remove(<span class="kw-2">&amp;</span>episode_id);
+<a href=#441 id=441 data-nosnippet>441</a>    }
+<a href=#442 id=442 data-nosnippet>442</a>
+<a href=#443 id=443 data-nosnippet>443</a>    <span class="doccomment">/// Drop every trace whose episode no longer exists — called
+<a href=#444 id=444 data-nosnippet>444</a>    /// during compaction so the sidecar shrinks with the store it
+<a href=#445 id=445 data-nosnippet>445</a>    /// shadows.
+<a href=#446 id=446 data-nosnippet>446</a>    </span><span class="kw">pub fn </span>retain(<span class="kw-2">&amp;mut </span><span class="self">self</span>, live: <span class="kw-2">&amp;</span>std::collections::HashSet&lt;u64&gt;) -&gt; std::io::Result&lt;()&gt; {
+<a href=#447 id=447 data-nosnippet>447</a>        <span class="self">self</span>.traces.retain(|id, <span class="kw">_</span>| live.contains(id));
+<a href=#448 id=448 data-nosnippet>448</a>        <span class="comment">// Rewrite the file compactly: the slot space is dense again.
+<a href=#449 id=449 data-nosnippet>449</a>        </span><span class="kw">let </span><span class="kw-2">mut </span>entries: Vec&lt;(u64, Trace)&gt; = <span class="self">self</span>.traces.iter().map(|(<span class="kw-2">&amp;</span>id, <span class="kw-2">&amp;</span>t)| (id, t)).collect();
+<a href=#450 id=450 data-nosnippet>450</a>        entries.sort_unstable_by_key(|(id, <span class="kw">_</span>)| <span class="kw-2">*</span>id);
+<a href=#451 id=451 data-nosnippet>451</a>        <span class="self">self</span>.file.set_len(<span class="number">0</span>)<span class="question-mark">?</span>;
+<a href=#452 id=452 data-nosnippet>452</a>        <span class="self">Self</span>::write_header(<span class="kw-2">&amp;mut </span><span class="self">self</span>.file, entries.len() <span class="kw">as </span>u32)<span class="question-mark">?</span>;
+<a href=#453 id=453 data-nosnippet>453</a>        <span class="self">self</span>.slots.clear();
+<a href=#454 id=454 data-nosnippet>454</a>        <span class="kw">for </span>(slot, (id, trace)) <span class="kw">in </span>entries.into_iter().enumerate() {
+<a href=#455 id=455 data-nosnippet>455</a>            <span class="kw">let </span>slot = slot <span class="kw">as </span>u32;
+<a href=#456 id=456 data-nosnippet>456</a>            <span class="self">Self</span>::write_record(<span class="kw-2">&amp;mut </span><span class="self">self</span>.file, slot, id, trace)<span class="question-mark">?</span>;
+<a href=#457 id=457 data-nosnippet>457</a>            <span class="self">self</span>.slots.insert(id, slot);
+<a href=#458 id=458 data-nosnippet>458</a>        }
+<a href=#459 id=459 data-nosnippet>459</a>        <span class="self">self</span>.next_slot = <span class="self">self</span>.slots.len() <span class="kw">as </span>u32;
+<a href=#460 id=460 data-nosnippet>460</a>        <span class="self">self</span>.file.sync_all()
+<a href=#461 id=461 data-nosnippet>461</a>    }
+<a href=#462 id=462 data-nosnippet>462</a>
+<a href=#463 id=463 data-nosnippet>463</a>    <span class="doccomment">/// Flush the traces file. Called from `LtmStore::sync()`.
+<a href=#464 id=464 data-nosnippet>464</a>    </span><span class="kw">pub fn </span>sync(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; std::io::Result&lt;()&gt; {
+<a href=#465 id=465 data-nosnippet>465</a>        <span class="self">self</span>.file.sync_all()
+<a href=#466 id=466 data-nosnippet>466</a>    }
+<a href=#467 id=467 data-nosnippet>467</a>
+<a href=#468 id=468 data-nosnippet>468</a>    <span class="doccomment">/// Filesystem path of the backing file (for compaction staging).
+<a href=#469 id=469 data-nosnippet>469</a>    </span><span class="kw">pub fn </span>path(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Path {
+<a href=#470 id=470 data-nosnippet>470</a>        <span class="kw-2">&amp;</span><span class="self">self</span>.path
+<a href=#471 id=471 data-nosnippet>471</a>    }
+<a href=#472 id=472 data-nosnippet>472</a>}
+</code></pre></div></section></main></body></html>

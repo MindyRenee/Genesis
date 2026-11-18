@@ -926,9 +926,16 @@ fn test_deep_recall_and_unarchive() {
     let ep_id = {
         let mut ltm = LtmStore::open(&sys.ltm_base).expect("open ltm");
         let tag = [0.5f32; 12];
+        // Deep recall is gated by the forgetting horizon, which the
+        // daemon scores against the wall clock — a synthetic timestamp
+        // would read as decades-faded and correctly return nothing.
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64;
 
         ltm.store(
-            1000,
+            now_ms,
             0.4,
             tag,
             [0.4, 0.3, 0.2, 0.5],

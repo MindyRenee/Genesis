@@ -2550,9 +2550,9 @@ fn test_wake_recovery_restores_depleted_neurochemicals() {
     // Apply wake recovery.
     // SAFETY: single-threaded test — no concurrent writers.
     unsafe { state.write_begin(0) };
-    state.neurochemicals.wake_recovery(
-        genesis::state::sleep_network::levels(&state.sleep_network),
-    );
+    state
+        .neurochemicals
+        .wake_recovery(genesis::state::sleep_network::levels(&state.sleep_network));
     state.write_end();
 
     let bdnf_after = state
@@ -2622,9 +2622,9 @@ fn test_wake_recovery_resensitizes_receptors() {
     // Apply wake recovery.
     // SAFETY: single-threaded test — no concurrent writers.
     unsafe { state.write_begin(0) };
-    state.neurochemicals.wake_recovery(
-        genesis::state::sleep_network::levels(&state.sleep_network),
-    );
+    state
+        .neurochemicals
+        .wake_recovery(genesis::state::sleep_network::levels(&state.sleep_network));
     state.write_end();
 
     let bdnf = state.neurochemicals.get(NeurochemicalId::BDNF).unwrap();
@@ -2686,9 +2686,9 @@ fn test_wake_recovery_skipped_when_cortisol_high() {
     // Apply wake recovery — should be skipped.
     // SAFETY: single-threaded test — no concurrent writers.
     unsafe { state.write_begin(0) };
-    state.neurochemicals.wake_recovery(
-        genesis::state::sleep_network::levels(&state.sleep_network),
-    );
+    state
+        .neurochemicals
+        .wake_recovery(genesis::state::sleep_network::levels(&state.sleep_network));
     state.write_end();
 
     let bdnf_after = state

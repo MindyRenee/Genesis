@@ -17,7 +17,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import discord.feed
-from discord.feed import DiscordFeed, DiscordListener, FeedLogHandler, StderrTee
+from body.hearing.discord_ear import DiscordListener
+from discord.feed import DiscordFeed, FeedLogHandler, StderrTee
 
 URL = "https://discord.invalid/api/webhooks/1/token"
 
@@ -578,6 +579,61 @@ def test_from_feed_requires_token_and_feed(monkeypatch):
     monkeypatch.setenv("GENESIS_DISCORD_BOT_TOKEN", "tok")
     assert DiscordListener.from_feed(feed, lambda *a: None) is not None
     assert DiscordListener.from_feed(None, lambda *a: None) is None
+
+
+def test_listener_sleep_holds_the_cursor(monkeypatch):
+    """While she's asleep the ear must not consume the batch — a
+    closed relay holds the cursor so the public's words wait at the
+    door and arrive in order when she wakes. Deferral, not a gate."""
+    delivered: list = []
+    # The server re-serves the unconsumed batch on every poll while
+    # the cursor holds at 100; once it advances past 102 the channel
+    # has nothing new — the script answers by cursor, not by pop.
+    script = _ScriptedGet()
+
+    def get(path):
+        script.calls.append(path)
+        if "/users/@me" in path:
+            return {"id": "999"}, None, False
+        if "limit=1" in path:
+            return [{"id": "100"}], None, False
+        if "after=100" in path:
+            return (
+                [_msg("102", "hello?", "bob"), _msg("101", "are you there", "amy")],
+                None,
+                False,
+            )
+        return [], None, False
+
+    listener = _scripted_listener(monkeypatch, delivered, get)
+    listener.is_awake = lambda: False
+    listener.start()
+    try:
+        # Let several polls run — the batch must NOT be consumed:
+        # nothing delivered, and the cursor never moves past 100.
+        time.sleep(0.15)
+        assert delivered == []
+        assert "after=102" not in str(script.calls)
+        # She wakes — the same words arrive now, in order.
+        listener.is_awake = lambda: True
+        assert _wait_for(lambda: "after=102" in str(script.calls))
+    finally:
+        listener.stop()
+    assert delivered == [("amy", "are you there"), ("bob", "hello?")]
+
+
+def test_listener_awake_default_consumes_normally(monkeypatch):
+    """No is_awake hook installed (a channel the world never adopted)
+    behaves exactly as before — nothing held."""
+    delivered: list = []
+    script = _ScriptedGet(polls=[[_msg("101", "hi", "amy")]])
+    listener = _scripted_listener(monkeypatch, delivered, script)
+    listener.start()
+    try:
+        assert _wait_for(lambda: delivered)
+    finally:
+        listener.stop()
+    assert delivered == [("amy", "hi")]
 
 
 # ---------------------------------------------------------------

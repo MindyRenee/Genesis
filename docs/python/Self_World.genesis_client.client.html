@@ -277,6 +277,30 @@ Returns:<br>
 &nbsp;&nbsp;&nbsp;&nbsp;List&nbsp;of&nbsp;SimilarEpisode,&nbsp;sorted&nbsp;by&nbsp;Hamming&nbsp;distance<br>
 &nbsp;&nbsp;&nbsp;&nbsp;(most&nbsp;similar&nbsp;first).</span></dd></dl>
 
+<dl><dt><a name="GenesisClient-forget_faded"><strong>forget_faded</strong></a>(self, *, dry_run: 'bool' = True, timeout: 'float | None' = None) -&gt; 'ForgetSweepReport'</dt><dd><span class="code">Gentle&nbsp;forgetting&nbsp;—&nbsp;release&nbsp;what&nbsp;no&nbsp;cue&nbsp;can&nbsp;still&nbsp;reach.<br>
+&nbsp;<br>
+The&nbsp;body's&nbsp;retrieval&nbsp;traces&nbsp;decay&nbsp;by&nbsp;a&nbsp;power&nbsp;law;&nbsp;episodes<br>
+whose&nbsp;activation&nbsp;has&nbsp;fallen&nbsp;below&nbsp;the&nbsp;reach&nbsp;of&nbsp;even&nbsp;a&nbsp;maximal<br>
+cue&nbsp;are&nbsp;functionally&nbsp;dismantled.&nbsp;In&nbsp;sweep&nbsp;mode&nbsp;the&nbsp;daemon<br>
+releases&nbsp;them&nbsp;and&nbsp;physically&nbsp;compacts&nbsp;the&nbsp;store&nbsp;so&nbsp;the&nbsp;bytes<br>
+are&nbsp;actually&nbsp;reclaimed.&nbsp;In&nbsp;dry-run&nbsp;mode&nbsp;nothing&nbsp;is&nbsp;touched&nbsp;—<br>
+the&nbsp;report&nbsp;is&nbsp;only&nbsp;a&nbsp;preview,&nbsp;the&nbsp;way&nbsp;the&nbsp;mind&nbsp;looks&nbsp;before<br>
+it&nbsp;lets&nbsp;go.<br>
+&nbsp;<br>
+The&nbsp;natural&nbsp;place&nbsp;for&nbsp;the&nbsp;sweep&nbsp;is&nbsp;sleep:&nbsp;housekeeping&nbsp;runs<br>
+offline,&nbsp;alongside&nbsp;the&nbsp;compression&nbsp;pass,&nbsp;never&nbsp;during<br>
+conversation.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;dry_run:&nbsp;True&nbsp;(default)&nbsp;reports&nbsp;candidates&nbsp;and&nbsp;their<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;footprint&nbsp;without&nbsp;deleting;&nbsp;False&nbsp;performs&nbsp;the&nbsp;prune<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;and&nbsp;compaction&nbsp;for&nbsp;real.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;ForgetSweepReport&nbsp;—&nbsp;episodes&nbsp;counted&nbsp;(forgettable&nbsp;for&nbsp;a<br>
+&nbsp;&nbsp;&nbsp;&nbsp;dry&nbsp;run,&nbsp;forgotten&nbsp;for&nbsp;a&nbsp;sweep)&nbsp;and&nbsp;bytes&nbsp;(estimated&nbsp;for<br>
+&nbsp;&nbsp;&nbsp;&nbsp;a&nbsp;dry&nbsp;run,&nbsp;actually&nbsp;reclaimed&nbsp;for&nbsp;a&nbsp;sweep).</span></dd></dl>
+
 <dl><dt><a name="GenesisClient-get_body_control"><strong>get_body_control</strong></a>(self, *, timeout: 'float | None' = None) -&gt; 'BodyControlState'</dt><dd><span class="code">Get&nbsp;the&nbsp;body&nbsp;control&nbsp;state&nbsp;—&nbsp;what&nbsp;Genesis&nbsp;is&nbsp;doing&nbsp;to&nbsp;its&nbsp;body.<br>
 &nbsp;<br>
 Returns&nbsp;CPU&nbsp;frequency&nbsp;policy,&nbsp;scheduling&nbsp;priorities,&nbsp;I/O&nbsp;priority,<br>
@@ -874,6 +898,7 @@ Data descriptors defined here:<br>
 <strong>EMOTIONAL_TAG_SIZE</strong> = 12<br>
 <strong>FIND_SIMILAR</strong> = 5<br>
 <strong>FIND_SIMILAR_ARCHIVED</strong> = 58<br>
+<strong>FORGET_SWEEP</strong> = 65<br>
 <strong>GET_BODY_CONTROL</strong> = 18<br>
 <strong>GET_BODY_STATE</strong> = 17<br>
 <strong>GET_FIELD_PROBE</strong> = 47<br>

@@ -602,6 +602,63 @@ GET_STATE_SNAPSHOT \(em the mind's 232-byte CoreStateSnapshot DTO:
 a self-describing, versioned projection of the fields the cognitive
 mind consumes. GET_STATE remains the raw brain image; this command
 is the stable client contract.
+.TP
+.B 65
+FORGET_SWEEP \(em gentle forgetting, the sleep-side housekeeping
+sweep. Request:
+.RI [ u8 " mode" ]
+\(em 0 dry-run report (nothing deleted), 1 sweep (prune episodes
+whose traces have decayed past reach of any retrieval cue, then
+compact the store). Reply:
+.RI [ u32 " count" ]
+.RI [ u64 " bytes" ]
+\(em forgettable episodes and estimated payload bytes for a dry
+run; forgotten count and reclaimed bytes for a sweep. The mind
+decides when housekeeping runs; the body decides what is
+unreachable.
+.TP
+.B 66
+PLACE_FIELD \(em place her: the one place, owned by the body.
+Two request forms. Legacy location:
+.RI [ k " × f64" ]
+with \fIk\fR in 2\(en6 \(em the coordinates stored exactly as
+given (a 2-vector is her place read in a plane; the same point
+rests in the bulk's leading coordinate plane). Pose:
+.RB [ 0xFF ]
+.RI [ u8 " n" ]
+.RI [ n " × f64 spec" ]
+.RI [ u8 " flags" ]
+.RI [ d " × d f64 frame?" ]
+.RI [ d " × d f64 drift?" ]
+\(em the full placing act: location plus an optional orthonormal
+frame (flags bit 0, her orientation) and skew-symmetric drift
+generator (flags bit 1, a bivector in so(\fId\fR) whose
+exponential flow carries the pose each tick \(em movement). Pose
+payloads are never a multiple of 8, so they cannot collide with
+the legacy form. An empty payload releases the place and hands
+the \fIinner\fR fiber's voice back to the interior oscillators.
+The body persists the pose to
+.IR place.bin
+so where \(em and how \(em she is survives restarts; the anchor
+is an observation, not a command \(em each tick moves the layer a
+bounded fraction of the geodesic toward it. Reply:
+.RI [ u8 " ack" ] .
+.TP
+.B 67
+GET_PLACE \(em where she is. Reply:
+.RI [ u8 " n" ]
+.RI [ n " × f64" ]
+\(em the pose's current ambient location (always \fId\fR = 6;
+under drift it moves, so it is not the spec). \fIn\fR = 0 means
+she is nowhere in particular. When a pose holds, a second block
+follows in the PLACE_FIELD pose layout:
+.RI [ u8 " k" ]
+.RI [ k " × f64 spec" ]
+.RI [ u8 " flags" ]
+.RI [ mats ]
+\(em the coordinates as given plus the frame/drift flags and
+matrices; readers that stop after the first block get the same
+answer as always.
 .PP
 Notification pushes (daemon \(-> client, mirrored as
 .IR NOTIFY_* )
@@ -670,6 +727,28 @@ as outer stimulus.
 The probe's return path: its work is modulated at the body's own
 phase rhythm, so the die's real current carries a component at the
 organism's beat.
+.TP
+.B Metatron lattice / vesica
+The field's working geometry in the six-dimensional latent bulk:
+the merkaba \(em the 6-cube's 64 vertices split by sign parity
+into two interpenetrating 32-vertex demicubes, the field's two
+chiralities, counter-rotating under the isoclinic spin \(em and
+their intersection, the
+.IR vesica ,
+the superposition cell where both hold at once (for d = 3, the
+octahedron at the heart of the stella octangula). The cord \(em
+her vesica \(em carries unit rest mass on the lens's own plane
+and heavy rest mass on the higher coordinates: impulse lands
+whole in every dimension, but only the lens's plane moves
+quickly.
+.BR MetatronCube::rest (x\d0\u),
+.BR MetatronCube::waist (),
+and
+.BR MetatronCube::vesica_depth (x)
+measure it \(em the (d\(en1)-ball radius each coordinate
+orthogonal to the horizon rests inside at height x\d0\u, the
+rest at the superposition (\(sr3\(muR/2), and signed depth into
+the lens.
 .TP
 .B strange loop / active inference
 The daemon's generative self-model: it predicts its own

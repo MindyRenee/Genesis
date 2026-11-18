@@ -1,0 +1,90 @@
+.TH GENESIS-GAMES 7 "November 2026" "Genesis 0.2.0" "Genesis Manual"
+.SH NAME
+genesis-games \- her arcade: the games she plays and how they reach her
+.SH SYNOPSIS
+.nf
+\fBgames.arcade\fR        the arcade \fIem \(en\fR offers, entry, play, memory
+\fBgames.official\fR      the official ARC-AGI-3 shelf via \fIarc-agi\fR
+\fBgames.arena\fR         the local arena shelf on \fIpyspiel\fR
+\fBgames.sight\fR         how a board reaches her eyes
+\fBgames.memory\fR        what she keeps of each game
+.fi
+.SH DESCRIPTION
+The arcade is a place in her outer world, not a benchmark rig: she
+is the player, not a model being scored. Two shelves stand in it.
+The \fBofficial\fR shelf carries the ARC-AGI-3 games through the
+\fIarc-agi\fR toolkit \(em a 64\(mu64 grid she sees blind, explores,
+and remembers. The \fBarena\fR shelf plays chess, checkers, othello,
+connect four, tic-tac-toe, and breakthrough locally on \fIpyspiel\fR
+\(em the same engine the Kaggle Game Arena harness evaluates on.
+Playing these games here is not entry on Kaggle's hosted
+leaderboard; that requires their serving harness for API models,
+and she IS the model.
+.PP
+Play is felt, not only computed. A new board lands as a world
+observation with salience; novelty tickles norepinephrine and
+acetylcholine and drives her thalamic gamma, so games reach the
+same neurodynamics everything else does. What she learns of each
+game is kept per-game (\fIGameMemory\fR) and survives the sitting
+\(em \fBarcade_status\fR is her own recollection of it.
+.SH TOOLS
+Registered by \fIArcade.register_tools\fR at startup; every entry
+reports and never raises.
+.TP
+.BR arcade_directions
+Read the directions for the games in the arcade.
+.TP
+.BR arcade_offers
+List the games on offer right now (game_id and title).
+.TP
+.BR arcade_enter " [\fIgame_id\fR]"
+Go to a game \(em the named one, or her own pick when blank.
+.TP
+.BR arcade_see " [\fIhow\fR]"
+See the open board: \fBtext\fR (default), \fBimage\fR,
+\fBchange\fR, or \fBobjects\fR.
+.TP
+.BR arcade_act " \fImove\fR"
+Make one move \(em \fBACTION1\fR\&..\fBACTION7\fR, or
+\fBACTION6@row,col\fR to point at a cell.
+.TP
+.BR arcade_play " [\fImoves\fR]"
+Play a bout of the open (or chosen) game, up to \fImoves\fR moves.
+.TP
+.BR arcade_leave
+Step away from the game; memories are kept.
+.TP
+.BR arcade_status
+What she remembers of every game.
+.SH MODES AND KEYS
+Official games run in three modes from \fBGENESIS_ARC_MODE\fR (or
+the \fImode\fR argument to \fIdefault_games\fR):
+.TP
+.B normal
+Default. Each game downloads once, then plays locally.
+.TP
+.B online
+Every move is scored on the official server \(em wants
+\fBARC_API_KEY\fR from three.arcprize.org.
+.TP
+.B offline
+Touches no network at all; downloaded games only.
+.PP
+\fBARC_API_KEY\fR widens the official catalogue; without it the
+anonymous catalogue is smaller but downloaded games and the whole
+arena shelf need no key. When the mind starts with \fB--offline\fR
+the arcade opens in offline mode, so play continues locally even
+with the network refused at the registry gate.
+.SH FILES
+Downloaded game files live under
+\fI<data_dir>/arcade/environment_files\fR and play recordings under
+\fI<data_dir>/arcade/recordings\fR (the canonical data dir is
+\fI~/.local/share/genesis\fR).
+.SH SEE ALSO
+.BR genesis-tools (7),
+.BR genesis-cli (1)
+.PP
+Module internals: the generated pages under
+\fISelf_World/docs/python/\fR
+(\fIgames.arcade\fR, \fIgames.arena\fR, \fIgames.official\fR,
+\fIgames.sight\fR, \fIgames.memory\fR).

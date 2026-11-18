@@ -21,7 +21,7 @@ from .lgn import LGNOutput, LGNRelay
 from .v1 import V1Model, VisualField
 
 if TYPE_CHECKING:
-    from optic_nerve import OpticNerve
+    from body.sight.optic_nerve import OpticNerve
 
 logger = logging.getLogger(__name__)
 

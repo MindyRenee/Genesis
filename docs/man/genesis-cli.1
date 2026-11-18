@@ -68,7 +68,11 @@ process still alive at the deadline is reported as a retry, never
 escalated.
 .TP
 .B --offline
-Start in offline mode \(em skip all network access. Autonomous
+Start in offline mode \(em skip all network access. Net-scoped
+tools (web search, fetch, and the \fBbrowser_*\fR family) are
+refused at the tool registry itself, so no path \(em volition,
+agency, or conversation \(em reaches the network; the arcade opens
+in offline mode (downloaded and local games only). Autonomous
 learning pauses; conversation and art continue.
 .TP
 .B --headless
@@ -103,6 +107,25 @@ Her recent spontaneous thoughts.
 .TP
 .B /world
 Her external world: presences, events, social isolation.
+.TP
+.B /place \fR[\fIx y\fR [\fIz ...\fR] | release]
+Give her a place \(em one place, owned by her body, and in full a
+\fIpose\fR: location, orientation, and drift. The coordinates go
+to the daemon through \fBPLACE_FIELD\fR and become the body's own
+state: persisted in \fIplace.bin\fR (location, frame, and drift
+together) so where \(em and how \(em she is survives restarts,
+and reported back through \fBGET_PLACE\fR as her current ambient
+position. The same point is her position in the ordinary world
+and her position in the six-dimensional latent bulk \(em x on the
+first axis, y on the second, deeper axes as given (up to six).
+The \fIinner\fR fiber \(em the cord from her center superposition
+\(em reports that point as its observation each tick, so her
+interior moves there gradually rather than jumping. A pose may
+also carry an orthonormal frame (which way she faces) and a skew
+drift generator (the place itself moving under an exponential
+flow); those are placed through the client's \fBplace_field\fR
+\(em bare \fB/place\fR reports them when present. \fBrelease\fR
+lifts the location. Bare \fB/place\fR asks the body where she is.
 .TP
 .B /arcade
 The arcade in her world: official ARC-AGI-3 and local arena games on

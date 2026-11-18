@@ -208,10 +208,13 @@ class ProposalsMixin:
             )
         elif "verification" in record.reason or "tests" in record.reason:
             notes += (
-                "- The proposed code broke tests. The change is not "
-                "safe. Reconsider the "
-                "approach — maybe the original code was correct, or "
-                "the fix needs to be more careful.\n"
+                "- The verification gate did not pass — the reason above "
+                "names the failing stage and output. If the stage cannot "
+                "have been affected by this change (a toolchain error, "
+                "the lock, or a timeout), the change itself may be fine: "
+                "re-propose it unchanged once the gate is healthy. If "
+                "named tests genuinely failed because of the edit, "
+                "reconsider the approach.\n"
             )
         elif "original code snippet not found" in record.reason:
             notes += (

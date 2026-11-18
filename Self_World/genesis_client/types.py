@@ -821,6 +821,38 @@ class ArchivedEpisode:
     emotional_tag: tuple[float, float, float, float]
 
 
+# ─── ForgetSweepReport ────────────────────────────────────────
+#
+# From FORGET_SWEEP response: [u32 count][u64 bytes]. For a dry run
+# these are the forgettable-episode count and the estimated bytes a
+# compaction would reclaim; for a sweep they are the number
+# forgotten and the bytes actually freed.
+
+
+@dataclass(frozen=True)
+class ForgetSweepReport:
+    """The result of a forgetting sweep — or the preview of one.
+
+    Gentle forgetting releases only what no retrieval cue can still
+    reach; `episodes` is how many traces had decayed that far, and
+    `bytes` is the storage their release frees (estimated for a dry
+    run, measured for a sweep).
+    """
+
+    episodes: int
+    bytes: int
+
+
+def unpack_forget_sweep(data: bytes) -> ForgetSweepReport:
+    """Unpack a FORGET_SWEEP response into a report."""
+    if len(data) < 12:
+        return ForgetSweepReport(episodes=0, bytes=0)
+    return ForgetSweepReport(
+        episodes=_U32.unpack(data[0:4])[0],
+        bytes=_U64.unpack(data[4:12])[0],
+    )
+
+
 def unpack_archived_episodes(data: bytes) -> list[ArchivedEpisode]:
     """Unpack a SEARCH_ARCHIVED response into a list of entries."""
     if len(data) < 4:
@@ -2321,6 +2353,24 @@ class FieldState:
     measured timing fluctuation), cooling at its own rate.
     ``consensus_norm`` is ‖consensus‖ — how far the center has
     drifted from nominal (the sphere's pole).
+
+    The holographic readout (src/field/metatron.rs — the lattice
+    inside the bulk: the merkaba's two counter-rotating demicubes,
+    the vesica cell at the center, the twelve rays the superposition
+    — the inner world — radiates outward along to the rim):
+
+    ``boundary`` is the consensus's image on the S⁵ screen — its
+    radial projection onto the rim the superposition radiates onto.
+    ``None`` when the center sits at the superposition point itself:
+    the source has no single ray. ``superposition`` is the
+    consensus's signed depth into the vesica cell — the region where
+    both demicubes hold at once — positive inside, negative outside.
+    ``coupling`` is the field's fine-structure analog: ω·R, the
+    rim's tangential speed against the chart's unit propagation
+    limit, from the spectrum's measured spin. ``None`` until the
+    field has spun long enough to measure. All three are newer keys
+    — an older daemon simply doesn't publish them, so they parse
+    leniently rather than failing the whole readout.
     """
 
     consensus: tuple[float, ...]
@@ -2328,6 +2378,9 @@ class FieldState:
     temperature: float
     consensus_norm: float
     fiber_count: int
+    boundary: tuple[float, ...] | None = None
+    superposition: float | None = None
+    coupling: float | None = None
 
     @classmethod
     def from_internals(cls, internals: dict[str, str]) -> FieldState | None:
@@ -2347,10 +2400,31 @@ class FieldState:
         values = (*consensus, disagreement, temperature, consensus_norm)
         if not all(math.isfinite(v) for v in values):
             return None
+        boundary: tuple[float, ...] | None = None
+        if raw_boundary := internals.get("field.boundary"):
+            try:
+                parsed = tuple(float(x) for x in raw_boundary.split(","))
+            except ValueError:
+                parsed = ()
+            if parsed and all(math.isfinite(v) for v in parsed):
+                boundary = parsed
+
+        def _optional(key: str) -> float | None:
+            try:
+                value = float(internals[key])
+            except (KeyError, ValueError):
+                return None
+            return value if math.isfinite(value) else None
+
+        superposition = _optional("field.superposition")
+        coupling = _optional("field.coupling")
         return cls(
             consensus=consensus,
             disagreement=disagreement,
             temperature=temperature,
             consensus_norm=consensus_norm,
             fiber_count=fiber_count,
+            boundary=boundary,
+            superposition=superposition,
+            coupling=coupling,
         )

@@ -53,8 +53,12 @@ fn mat_vec(m: &[Vector], x: &[f64]) -> Result<Vector, FieldError> {
 /// from one layer into another. Nonlinear/state-dependent engines can be
 /// layered on top of this interface without changing the field topology.
 ///
-/// `spiral` holds a per-layer skew-symmetric generator: dx += J·x with
-/// Jᵀ = −J. A skew term is norm-preserving — ⟨x, Jx⟩ = 0 — so it rotates
+/// The derivative this engine returns is a force: layers integrate it
+/// into momentum (ṗ = gain·F, ẋ = p/rest), so every term below acts on
+/// her motion, not her position directly.
+///
+/// `spiral` holds a per-layer skew-symmetric generator: F += J·x with
+/// Jᵀ = −J. A skew term is norm-preserving — ⟨x, Jx⟩ = 0 — so it torques
 /// the state without damping it. Combined with a radial term the
 /// trajectory is a logarithmic spiral on the stereographic chart: a
 /// loxodrome, the constant-bearing curve around the pole of the sphere.

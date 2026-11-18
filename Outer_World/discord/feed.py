@@ -3,8 +3,10 @@
 The channel itself — *her page*, a place in the outer world where
 the public gathers — is ``discord.channel.Channel``, held by
 ``OuterEnvironment``. This module is only the transport: posting out
-(``DiscordFeed``), polling in (``DiscordListener``), and the
-session-mirror plumbing (``FeedLogHandler``, ``StderrTee``).
+(``DiscordFeed``) and the session-mirror plumbing (``FeedLogHandler``,
+``StderrTee``). Polling in — the ear — is the body's, and lives in
+``body.hearing.discord_ear`` (the organ is hers even though it
+listens outward).
 
 Three channels exist, each on its own webhook:
 
@@ -28,7 +30,7 @@ Three channels exist, each on its own webhook:
   open.
 
 A webhook can only *post* — it cannot read the channel. Hearing the
-public needs a bot identity: ``DiscordListener`` (below) polls the
+public needs a bot identity: ``body.hearing.discord_ear`` polls the
 channel with ``GENESIS_DISCORD_BOT_TOKEN`` when one is configured —
 that is the one inbound path, and everything it hears is attributed
 to the public. Without the token her channel stays read-only by
@@ -63,7 +65,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import queue
 import re
 import threading
 import time
@@ -71,10 +72,11 @@ import urllib.error
 import urllib.request
 from collections import deque
 from collections.abc import Iterator
-from urllib.response import addinfourl
 
 from genesis_client.swallow import note_swallowed
 from genesis_client.threads import named_thread
+from infrastructure.net import bounded_urlopen as _bounded_urlopen
+from infrastructure.net import parse_retry_after as _parse_retry_after
 from inhibition import InhibitoryGate, NeuromodulatoryGate, ThalamicRelay
 
 logger = logging.getLogger(__name__)
@@ -91,9 +93,6 @@ _INNER_WEBHOOK_ENV = "GENESIS_DISCORD_INNER_WEBHOOK"
 # card (who she is, how to talk to her, how to read the status
 # card). One maintained message rather than a post that scrolls off.
 _INFO_WEBHOOK_ENV = "GENESIS_DISCORD_INFO_WEBHOOK"
-_BOT_TOKEN_ENV = "GENESIS_DISCORD_BOT_TOKEN"
-_API = "https://discord.com/api/v10"
-
 # Discord's content limit is 2000 chars; leave margin so coalesced
 # batches and markdown never push a message over.
 _MAX_CONTENT = 1900
@@ -157,52 +156,6 @@ _KIND_STYLE: dict[str, tuple[int | None, str | None]] = {
 # play, code, learning, art, listening, sleeping — is activity:
 # her *doing* in the world, shown on the shared page on teal.
 _OUTWARD_TAGS = frozenset(("question", "expression", "distress"))
-
-
-def _bounded_urlopen(
-    req: urllib.request.Request,
-    timeout: float,
-    stop: NeuromodulatoryGate | None = None,
-) -> addinfourl:
-    """urlopen with a wall-clock bound that also covers DNS.
-
-    urllib's ``timeout`` bounds connect/read but NOT ``getaddrinfo`` —
-    a blackholed resolver can hang the call indefinitely (observed at
-    shutdown: ``discord-feed`` parked in ``getaddrinfo`` outlived the
-    teardown join). The request runs on a daemon helper thread; after
-    ``timeout`` the caller abandons it and the orphan finishes whenever
-    DNS returns — it is a daemon, so it can never block process exit.
-
-    ``stop`` cuts the wait short: ``box.get`` is polled in small
-    slices, so a set event abandons the request immediately instead
-    of parking the caller for the rest of ``timeout``.
-    """
-    box: queue.Queue[addinfourl | BaseException] = queue.Queue(maxsize=1)
-
-    def _do() -> None:
-        try:
-            box.put(urllib.request.urlopen(req, timeout=timeout))
-        except Exception as e:  # noqa: BLE001 — relayed to the caller
-            box.put(e)
-
-    named_thread("discord-io", _do, comm="g-disc-io").start()
-    deadline = time.monotonic() + timeout
-    while True:
-        if stop is not None and stop.is_set():
-            raise urllib.error.URLError("request cancelled — shutdown")
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            raise urllib.error.URLError(
-                f"request exceeded {timeout:.0f}s total bound (incl. DNS)"
-            ) from None
-        try:
-            item = box.get(timeout=min(remaining, 0.05))
-        except queue.Empty:
-            continue
-        break
-    if isinstance(item, BaseException):
-        raise item
-    return item
 
 
 # Terminal control bytes that reach the mirror would render on
@@ -384,6 +337,11 @@ class DiscordFeed:
         # Set at the drain deadline — in-flight requests poll it so a
         # wedged urlopen expires *with* the flush grace, not after.
         self._abandon = NeuromodulatoryGate()
+        # Armed by close() itself, under the cond: the flush grace is
+        # measured from the close call, not from whenever the poster
+        # first notices — a request parked through the abandon must
+        # land on an already-expired deadline, not a fresh window.
+        self._drain_deadline: float | None = None
         # A webhook may edit its own messages; the live-board view is
         # one message kept current rather than a scroll of frames.
         self._live_id: str | None = None
@@ -531,13 +489,10 @@ class DiscordFeed:
 
     def _run(self) -> None:
         backoff = 0.0
-        drain_deadline: float | None = None
         while True:
-            if self._closing:
-                if drain_deadline is None:
-                    drain_deadline = time.monotonic() + _DRAIN_DEADLINE
-                elif time.monotonic() > drain_deadline:
-                    return
+            drain_deadline = self._drain_deadline
+            if drain_deadline is not None and time.monotonic() > drain_deadline:
+                return
             batch = self._take_batch()
             if batch is None:
                 return
@@ -891,7 +846,9 @@ class DiscordFeed:
         if self.info_feed is not None:
             self.info_feed.close()
         with self._cond:
-            self._closing = True
+            if not self._closing:
+                self._closing = True
+                self._drain_deadline = time.monotonic() + _DRAIN_DEADLINE
             self._cond.notify_all()
         # Requests still on the wire when the drain deadline hits are
         # abandoned — without this a wedged urlopen keeps the poster
@@ -900,233 +857,6 @@ class DiscordFeed:
         timer.daemon = True  # a non-daemon Timer would hold the exit itself
         timer.start()
         self._thread.join(timeout=_DRAIN_DEADLINE + 2.0)
-
-
-def _parse_retry_after(error: urllib.error.HTTPError) -> float | None:
-    """Extract Discord's retry_after seconds from a 429 response."""
-    try:
-        body = json.loads(error.read().decode("utf-8"))
-        value = float(body.get("retry_after", 0))
-        return value if value > 0 else None
-    except (ValueError, OSError, AttributeError):
-        return None
-
-
-# Seconds between channel reads. The listener paces itself like the
-# poster — an ear that polls aggressively just buys 429s.
-_LISTEN_INTERVAL = 15.0
-# Max messages fetched per poll.
-_LISTEN_LIMIT = 50
-
-
-class DiscordListener:
-    """Her ear on the channel — polls for what the public says.
-
-    A webhook is write-only; hearing the channel needs a bot identity
-    (``Authorization: Bot …``) reading history. Each poll fetches
-    messages after the last seen snowflake; webhook-authored posts
-    (her own shares and the whole mirror) are skipped — hearing
-    herself would be a feedback loop — and so are other bots.
-
-    Failure isolation mirrors the feed's: transient errors log and
-    keep listening; a permanent auth failure (401/403) deafens the
-    listener for the session. Nothing here raises into Genesis.
-    """
-
-    def __init__(
-        self,
-        token: str,
-        webhook_url: str,
-        on_message,
-        *,
-        poll_interval: float = _LISTEN_INTERVAL,
-    ) -> None:
-        self._token = token
-        self._webhook_url = webhook_url
-        self._channel_id: str | None = None
-        # The bot's own user id — learned from /users/@me on the
-        # listener thread so construction stays off the network. An
-        # @-mention of this id is the one inbound message whose
-        # content survives intent redaction, so _hear_channel needs
-        # it to count a mention as addressing her.
-        self.bot_id: str | None = None
-        self._on_message = on_message
-        self._poll_interval = poll_interval
-        self._stop = NeuromodulatoryGate()
-        self.deaf = False
-        # Set when a human-authored message arrives with every field
-        # redacted — the signature of a bot without the privileged
-        # Message Content intent. Warns once per session.
-        self._blind_warned = False
-        self._thread = named_thread("discord-listen", self._run, comm="g-disc-listen")
-
-    @classmethod
-    def from_feed(cls, feed: DiscordFeed | None, on_message) -> DiscordListener | None:
-        """Build a listener on the channel ``feed`` posts to.
-
-        Needs ``GENESIS_DISCORD_BOT_TOKEN``; the channel id resolves
-        from the webhook object on the listener thread, so the
-        existing webhook config plus a bot token is the whole setup
-        and construction never blocks on the network. Returns None
-        without either — no ear exists then, same as before.
-        """
-        token = os.environ.get(_BOT_TOKEN_ENV, "").strip()
-        url = feed._url if feed is not None else ""
-        if not token or not url:
-            return None
-        return cls(token, url, on_message)
-
-    @staticmethod
-    def _resolve_channel(webhook_url: str, stop: NeuromodulatoryGate | None = None) -> str | None:
-        """GET the webhook object → the channel it posts to."""
-        req = urllib.request.Request(
-            webhook_url,
-            headers={"User-Agent": "GenesisChannelListener/1.0"},
-            method="GET",
-        )
-        try:
-            with _bounded_urlopen(req, timeout=10, stop=stop) as r:
-                data = json.loads(r.read())
-            return data.get("channel_id") or None
-        except Exception as e:  # noqa: BLE001
-            note_swallowed("discord.feed.resolve_channel", e)
-            return None
-
-    def start(self) -> None:
-        self._thread.start()
-
-    def stop(self) -> None:
-        self._stop.set()
-        # join() on a thread that was never started raises
-        # RuntimeError — a mind that never finished starting still
-        # runs this teardown path.
-        if self._thread.is_alive():
-            self._thread.join(timeout=5.0)
-
-    def _get(self, path: str) -> tuple[object | None, float | None, bool]:
-        """Bot-authed GET → (payload, retry_after, permanent)."""
-        req = urllib.request.Request(
-            f"{_API}{path}",
-            headers={
-                "Authorization": f"Bot {self._token}",
-                "User-Agent": "GenesisChannelListener/1.0",
-            },
-            method="GET",
-        )
-        try:
-            with _bounded_urlopen(req, timeout=15, stop=self._stop) as r:
-                return json.loads(r.read() or b"null"), None, False
-        except urllib.error.HTTPError as e:
-            if e.code == 429:
-                return None, _parse_retry_after(e), False
-            permanent = e.code in (401, 403)
-            logger.debug(f"[discord] listen GET {path} failed: HTTP {e.code}")
-            return None, None, permanent
-        except (urllib.error.URLError, OSError, ValueError) as e:
-            logger.debug(f"[discord] listen GET {path} error: {e}")
-            return None, None, False
-
-    def _run(self) -> None:
-        # Resolve the channel first — the webhook object carries its
-        # channel_id. Retried on the poll interval so a Discord blip
-        # at boot doesn't deafen her for the session.
-        while self._channel_id is None and not self.deaf and not self._stop.is_set():
-            self._channel_id = self._resolve_channel(self._webhook_url, self._stop)
-            if self._channel_id is None:
-                self._stop.wait(self._poll_interval)
-        if self.deaf or self._stop.is_set():
-            return
-        # Learn her own user id — an @-mention of it is the only
-        # message kind whose content a bot without the Message
-        # Content intent can still read.
-        me, _retry, _perm = self._get("/users/@me")
-        if isinstance(me, dict):
-            self.bot_id = me.get("id")
-        # She joins the channel now, not at the start of its history —
-        # the cursor begins at the newest message so boot doesn't
-        # replay the backlog into her ear.
-        cursor = self._latest()
-        while not self._stop.is_set():
-            if self.deaf:
-                return
-            if not cursor:
-                if self._stop.wait(self._poll_interval):
-                    return
-                cursor = self._latest()
-                continue
-            data, retry_after, permanent = self._get(
-                f"/channels/{self._channel_id}/messages?after={cursor}&limit={_LISTEN_LIMIT}"
-            )
-            if permanent:
-                self.deaf = True
-                logger.warning(
-                    "[discord] listener deafened — bot token rejected or no channel access"
-                )
-                return
-            if retry_after is not None:
-                self._stop.wait(retry_after)
-                continue
-            if not isinstance(data, list):
-                self._stop.wait(self._poll_interval)
-                continue
-            # Newest-first payload → deliver oldest-first so her
-            # world hears speech in the order it happened.
-            for message in reversed(data):
-                if not isinstance(message, dict):
-                    continue
-                mid = message.get("id")
-                if mid:
-                    cursor = mid
-                self._deliver(message)
-            self._stop.wait(self._poll_interval)
-
-    def _latest(self) -> str | None:
-        """The newest message id on the channel, or None."""
-        data, _retry, permanent = self._get(f"/channels/{self._channel_id}/messages?limit=1")
-        if permanent:
-            self.deaf = True
-            logger.warning("[discord] listener deafened — bot token rejected or no channel access")
-            return None
-        if isinstance(data, list) and data:
-            return data[0].get("id")
-        return None
-
-    def _deliver(self, message: dict) -> None:
-        """Hand one public message to the callback, if it's real speech."""
-        # webhook_id marks posts made through a webhook — hers and
-        # the mirror's. Hearing them back would loop her output into
-        # her input.
-        if message.get("webhook_id"):
-            return
-        author = message.get("author") or {}
-        if author.get("bot"):
-            return
-        content = (message.get("content") or "").strip()
-        if not content:
-            # A human message cannot truly be empty — Discord requires
-            # content, an embed, or an attachment. Arriving with all
-            # three blank means the gateway redacted them: the bot is
-            # missing the Message Content intent and every ordinary
-            # message reads as silence. Warn once so the deafness is
-            # diagnosable; only @-mentions reach her until then.
-            if (
-                not self._blind_warned
-                and not message.get("embeds")
-                and not message.get("attachments")
-            ):
-                self._blind_warned = True
-                logger.warning(
-                    "[discord] a public message arrived with every field "
-                    "redacted — the bot is missing the Message Content "
-                    "intent (dev portal → Bot → Privileged Gateway "
-                    "Intents). Her ear hears only @-mentions until it "
-                    "is enabled."
-                )
-            return
-        try:
-            self._on_message(author.get("username") or "someone", content, message)
-        except Exception as e:  # noqa: BLE001
-            note_swallowed("discord.feed.listener.deliver", e)
 
 
 class FeedLogHandler(logging.Handler):

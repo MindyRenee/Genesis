@@ -336,6 +336,11 @@ class SleepCompressor:
         - **prune_ltm** — releases archived engrams the memory system
           itself reports dead. Runs only when a ``release_fn`` is
           supplied: forgetting is her verdict, not the compressor's.
+        - **forget_ltm** — the body's own sweep: releases episodes
+          whose retrieval traces have decayed past the reach of any
+          cue, then physically compacts the store so the bytes are
+          actually reclaimed. Follows prune_ltm so a single
+          compaction clears both verdicts' dead.
         - **save** — VQ codebook + holographic graph, plus the
           periodic holographic rebuild.
 
@@ -367,6 +372,12 @@ class SleepCompressor:
                     (
                         "prune_ltm",
                         lambda: self._phase_prune_ltm(ltm_client, release_fn),
+                    )
+                )
+                steps.append(
+                    (
+                        "forget_ltm",
+                        lambda: self._phase_forget_ltm(ltm_client),
                     )
                 )
 
@@ -1061,6 +1072,59 @@ class SleepCompressor:
             stats["ltm_meta_skipped"],
             stats["ltm_dreams_skipped"],
             stats["ltm_release_deferred"],
+        )
+        return stats
+
+    def _phase_forget_ltm(
+        self,
+        ltm_client: object,
+    ) -> dict[str, int | float]:
+        """The body's sweep — physical forgetting and the disk reclaim.
+
+        Where prune_ltm executes the mind's own retention verdict on
+        the archived tier, this asks the body to do the parallel work:
+        release every episode whose retrieval trace has decayed past
+        the reach of any cue (the power-law model in the daemon's
+        store), then physically compact the LTM files so the space is
+        actually freed. One compaction clears both verdicts' dead —
+        the mind's soft deletes and the body's faded — because the
+        rewrite drops every deleted-flagged row regardless of which
+        model tagged it.
+
+        Runs directly after prune_ltm within the same release gate:
+        when no ``release_fn`` was supplied the whole terminal tier is
+        off, body and mind alike.
+        """
+        stats: dict[str, int | float] = {
+            "ltm_forgotten": 0,
+            "ltm_bytes_reclaimed": 0,
+        }
+
+        if not getattr(ltm_client, "is_connected", True):
+            logger.warning("LTM forget skipped: client not connected")
+            stats["ltm_forget_skipped"] = 1
+            return stats
+
+        forget_faded = getattr(ltm_client, "forget_faded", None)
+        if forget_faded is None:
+            logger.warning("LTM forget skipped: client lacks the sweep op")
+            stats["ltm_forget_skipped"] = 1
+            return stats
+
+        try:
+            report = forget_faded(dry_run=False)
+        except OSError as e:
+            logger.warning("LTM forget failed: %s", e)
+            stats["ltm_forget_failed"] = 1
+            return stats
+
+        stats["ltm_forgotten"] = getattr(report, "episodes", 0)
+        stats["ltm_bytes_reclaimed"] = getattr(report, "bytes", 0)
+
+        logger.info(
+            "LTM forget: %d episodes released, %d bytes reclaimed",
+            stats["ltm_forgotten"],
+            stats["ltm_bytes_reclaimed"],
         )
         return stats
 

@@ -16,7 +16,7 @@
 # self-improvement engine reverts the change.
 #
 # Usage:
-#   scripts/verify_change.sh [project_root] [rust_dir]
+#   scripts/verify_change.sh [project_root] [rust_dir] [arm]
 #
 # Arguments:
 #   project_root — the repository root holding the three worlds
@@ -24,12 +24,37 @@
 #                  Outer_World). Defaults to the directory
 #                  containing this script's parent.
 #   rust_dir      — path to the Rust crate root (default: project_root)
+#   arm           — which half of the gate to run: "python" (py_compile,
+#                   import check, pytest), "rust" (cargo test), or "all"
+#                   (default). A Python-only edit cannot regress the crate
+#                   and vice versa — running the irrelevant arm once
+#                   reverted every proposal on a toolchain problem that
+#                   had nothing to do with the change.
+#
+# The whole gate is serialized by a flock on $ROOT/.verify.lock: two
+# concurrent runs fight over the same ports, sockets, and CPU, and a
+# losing race once read as "tests failed" and reverted good work. A
+# run that cannot take the lock within GENESIS_VERIFY_LOCK_WAIT_S
+# (default 3600) exits 4 without touching the tree.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="${1:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 RUST_DIR="${2:-$ROOT}"
+ARM="${3:-all}"
+
+case "$ARM" in
+    python|rust|all) ;;
+    *) echo "verify_change.sh: unknown arm '$ARM' (expected python|rust|all)" >&2; exit 2 ;;
+esac
+
+# Serialize the gate — one verification run at a time per tree.
+exec 9>"$ROOT/.verify.lock"
+if ! flock -w "${GENESIS_VERIFY_LOCK_WAIT_S:-3600}" 9; then
+    echo "[verify] x could not take the verify lock — another run is still in progress" >&2
+    exit 4
+fi
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -56,6 +81,9 @@ fi
 # their packages resolve, then the root for loose root modules.
 PYTHONPATH_JOINED="$(IFS=:; echo "${WORLDS[*]}"):$ROOT${PYTHONPATH:+:$PYTHONPATH}"
 export PYTHONPATH="$PYTHONPATH_JOINED"
+
+# ─── Python arm (arm=python|all) ────────────────────────────────
+if [ "$ARM" != "rust" ]; then
 
 # The gate must run under an interpreter that can actually run the
 # suite — a bare `python3` can be a system interpreter with no pytest
@@ -171,13 +199,41 @@ if ! (cd "$ROOT" && "$PY" -m pytest tests/python -q -o addopts=''); then
 fi
 pass "pytest OK"
 
-# ─── 3. Rust test suite ──────────────────────────────────────────
+fi  # end Python arm
+
+# ─── 3. Rust test suite (arm=rust|all) ───────────────────────────
+if [ "$ARM" != "python" ]; then
+
 log "Step 3: Rust test suite (cargo test)"
-if ! (cd "$RUST_DIR" && cargo test -q 2>&1); then
+
+# The ambient PATH is not trustworthy here: under systemd it once
+# resolved `cargo` to the system 1.75, which cannot parse
+# `edition2024`, and every experiment was reverted on a toolchain
+# error misreported as "tests failed". Prefer the rustup toolchain
+# in ~/.cargo/bin, then whatever PATH offers.
+CARGO="cargo"
+if [ -x "$HOME/.cargo/bin/cargo" ]; then
+    CARGO="$HOME/.cargo/bin/cargo"
+fi
+
+# bindgen (v4l2-sys-mit) needs libclang — cargo-env.sh locates it via
+# llvm-config and sets CC/LIBCLANG_PATH. Not fatal if absent: the
+# cargo build either works without it or fails honestly below.
+if [ -f "$SCRIPT_DIR/cargo-env.sh" ]; then
+    # shellcheck disable=SC1091
+    . "$SCRIPT_DIR/cargo-env.sh" || log "cargo-env.sh could not be sourced — continuing"
+fi
+
+# --release reuses the warm target/release artifacts and matches the
+# binaries she actually runs; a cold dev-profile build can exceed the
+# experiment timeout on its own.
+if ! (cd "$RUST_DIR" && "$CARGO" test --release -q 2>&1); then
     fail "cargo test failed"
     exit 3
 fi
 pass "cargo test OK"
+
+fi  # end Rust arm
 
 # ─── All checks passed ────────────────────────────────────────────
 pass "All verification checks passed"

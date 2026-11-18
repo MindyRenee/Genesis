@@ -1199,7 +1199,7 @@ class MetronomeMixin:
         try:
             if self._is_sleeping or self.inner_life._was_sleeping:
                 self.inner_life.sleep_tick(now)
-            elif not self._self_directed:
+            else:
                 self.inner_life.tick(now)
         except Exception as e:  # noqa: BLE001
             note_swallowed(

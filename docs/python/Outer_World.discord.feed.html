@@ -32,6 +32,11 @@ Three&nbsp;channels&nbsp;exist,&nbsp;each&nbsp;on&nbsp;its&nbsp;own&nbsp;webhook
 &nbsp;&nbsp;part&nbsp;of&nbsp;the&nbsp;conversation.&nbsp;Unset,&nbsp;they&nbsp;stay&nbsp;on&nbsp;the&nbsp;main&nbsp;channel.<br>
 -&nbsp;``GENESIS_DISCORD_PULSE_WEBHOOK``&nbsp;—&nbsp;an&nbsp;opt-in&nbsp;ops&nbsp;telemetry&nbsp;feed<br>
 &nbsp;&nbsp;driven&nbsp;by&nbsp;``scripts/discord_pulse.py``.<br>
+-&nbsp;``GENESIS_DISCORD_INFO_WEBHOOK``&nbsp;—&nbsp;optional:&nbsp;a&nbsp;read-only&nbsp;info&nbsp;page.<br>
+&nbsp;&nbsp;When&nbsp;set,&nbsp;the&nbsp;"about&nbsp;this&nbsp;channel"&nbsp;card&nbsp;(``discord.guide``)&nbsp;is&nbsp;kept<br>
+&nbsp;&nbsp;there&nbsp;as&nbsp;one&nbsp;maintained&nbsp;message,&nbsp;so&nbsp;the&nbsp;explanation&nbsp;never&nbsp;scrolls<br>
+&nbsp;&nbsp;away.&nbsp;Unset,&nbsp;the&nbsp;guide&nbsp;posts&nbsp;once&nbsp;to&nbsp;the&nbsp;shared&nbsp;channel&nbsp;at&nbsp;page<br>
+&nbsp;&nbsp;open.<br>
 &nbsp;<br>
 A&nbsp;webhook&nbsp;can&nbsp;only&nbsp;*post*&nbsp;—&nbsp;it&nbsp;cannot&nbsp;read&nbsp;the&nbsp;channel.&nbsp;Hearing&nbsp;the<br>
 public&nbsp;needs&nbsp;a&nbsp;bot&nbsp;identity:&nbsp;``<a href="#DiscordListener">DiscordListener</a>``&nbsp;(below)&nbsp;polls&nbsp;the<br>
@@ -104,7 +109,7 @@ Design&nbsp;notes:<br>
 <td class="section-title" colspan=3>&nbsp;<br><a name="DiscordFeed">class <strong>DiscordFeed</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
     
 <tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
-<td class="decor title-decor" colspan=2><span class="code"><a href="#DiscordFeed">DiscordFeed</a>(webhook_url:&nbsp;'str',&nbsp;*,&nbsp;post_interval:&nbsp;'float'&nbsp;=&nbsp;1.0,&nbsp;queue_max:&nbsp;'int'&nbsp;=&nbsp;512)&nbsp;-&amp;gt;&nbsp;'None'<br>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#DiscordFeed">DiscordFeed</a>(webhook_url:&nbsp;'str',&nbsp;*,&nbsp;post_interval:&nbsp;'float'&nbsp;=&nbsp;1.0,&nbsp;queue_max:&nbsp;'int'&nbsp;=&nbsp;512,&nbsp;live_kind:&nbsp;'str'&nbsp;=&nbsp;'board')&nbsp;-&amp;gt;&nbsp;'None'<br>
 &nbsp;<br>
 Background&nbsp;webhook&nbsp;poster.&nbsp;All&nbsp;public&nbsp;methods&nbsp;are&nbsp;thread-safe.<br>
 &nbsp;<br>
@@ -114,7 +119,7 @@ Args:<br>
 &nbsp;&nbsp;&nbsp;&nbsp;queue_max:&nbsp;Maximum&nbsp;buffered&nbsp;lines&nbsp;before&nbsp;oldest&nbsp;are&nbsp;dropped.<br>&nbsp;</span></td></tr>
 <tr><td>&nbsp;</td>
 <td class="singlecolumn">Methods defined here:<br>
-<dl><dt><a name="DiscordFeed-__init__"><strong>__init__</strong></a>(self, webhook_url: 'str', *, post_interval: 'float' = 1.0, queue_max: 'int' = 512) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+<dl><dt><a name="DiscordFeed-__init__"><strong>__init__</strong></a>(self, webhook_url: 'str', *, post_interval: 'float' = 1.0, queue_max: 'int' = 512, live_kind: 'str' = 'board') -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
 
 <dl><dt><a name="DiscordFeed-close"><strong>close</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Flush&nbsp;remaining&nbsp;lines&nbsp;(best-effort)&nbsp;and&nbsp;stop&nbsp;the&nbsp;poster&nbsp;thread.</span></dd></dl>
 
@@ -155,6 +160,9 @@ Data descriptors defined here:<br>
 </dl>
 <dl><dt><strong>__weakref__</strong></dt>
 <dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+<dl><dt><strong>live_message_id</strong></dt>
+<dd><span class="code">The&nbsp;maintained&nbsp;message's&nbsp;id,&nbsp;once&nbsp;the&nbsp;poster&nbsp;has&nbsp;created&nbsp;it.</span></dd>
 </dl>
 </td></tr></table> <p>
 <table class="section">
@@ -364,6 +372,7 @@ Data descriptors defined here:<br>
 <tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
 <td class="singlecolumn"><strong>KIND_ACTIVITY</strong> = 'activity'<br>
 <strong>KIND_BOARD</strong> = 'board'<br>
+<strong>KIND_GUIDE</strong> = 'guide'<br>
 <strong>KIND_INNER</strong> = 'inner'<br>
 <strong>KIND_PULSE</strong> = 'pulse'<br>
 <strong>KIND_SPEECH</strong> = 'speech'<br>
