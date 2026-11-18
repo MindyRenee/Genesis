@@ -14,8 +14,10 @@
 The&nbsp;channel&nbsp;itself&nbsp;—&nbsp;*her&nbsp;page*,&nbsp;a&nbsp;place&nbsp;in&nbsp;the&nbsp;outer&nbsp;world&nbsp;where<br>
 the&nbsp;public&nbsp;gathers&nbsp;—&nbsp;is&nbsp;``discord.channel.Channel``,&nbsp;held&nbsp;by<br>
 ``OuterEnvironment``.&nbsp;This&nbsp;module&nbsp;is&nbsp;only&nbsp;the&nbsp;transport:&nbsp;posting&nbsp;out<br>
-(``<a href="#DiscordFeed">DiscordFeed</a>``),&nbsp;polling&nbsp;in&nbsp;(``<a href="#DiscordListener">DiscordListener</a>``),&nbsp;and&nbsp;the<br>
-session-mirror&nbsp;plumbing&nbsp;(``<a href="#FeedLogHandler">FeedLogHandler</a>``,&nbsp;``<a href="#StderrTee">StderrTee</a>``).<br>
+(``<a href="#DiscordFeed">DiscordFeed</a>``)&nbsp;and&nbsp;the&nbsp;session-mirror&nbsp;plumbing&nbsp;(``<a href="#FeedLogHandler">FeedLogHandler</a>``,<br>
+``<a href="#StderrTee">StderrTee</a>``).&nbsp;Polling&nbsp;in&nbsp;—&nbsp;the&nbsp;ear&nbsp;—&nbsp;is&nbsp;the&nbsp;body's,&nbsp;and&nbsp;lives&nbsp;in<br>
+``body.hearing.discord_ear``&nbsp;(the&nbsp;organ&nbsp;is&nbsp;hers&nbsp;even&nbsp;though&nbsp;it<br>
+listens&nbsp;outward).<br>
 &nbsp;<br>
 Three&nbsp;channels&nbsp;exist,&nbsp;each&nbsp;on&nbsp;its&nbsp;own&nbsp;webhook:<br>
 &nbsp;<br>
@@ -39,7 +41,7 @@ Three&nbsp;channels&nbsp;exist,&nbsp;each&nbsp;on&nbsp;its&nbsp;own&nbsp;webhook
 &nbsp;&nbsp;open.<br>
 &nbsp;<br>
 A&nbsp;webhook&nbsp;can&nbsp;only&nbsp;*post*&nbsp;—&nbsp;it&nbsp;cannot&nbsp;read&nbsp;the&nbsp;channel.&nbsp;Hearing&nbsp;the<br>
-public&nbsp;needs&nbsp;a&nbsp;bot&nbsp;identity:&nbsp;``<a href="#DiscordListener">DiscordListener</a>``&nbsp;(below)&nbsp;polls&nbsp;the<br>
+public&nbsp;needs&nbsp;a&nbsp;bot&nbsp;identity:&nbsp;``body.hearing.discord_ear``&nbsp;polls&nbsp;the<br>
 channel&nbsp;with&nbsp;``GENESIS_DISCORD_BOT_TOKEN``&nbsp;when&nbsp;one&nbsp;is&nbsp;configured&nbsp;—<br>
 that&nbsp;is&nbsp;the&nbsp;one&nbsp;inbound&nbsp;path,&nbsp;and&nbsp;everything&nbsp;it&nbsp;hears&nbsp;is&nbsp;attributed<br>
 to&nbsp;the&nbsp;public.&nbsp;Without&nbsp;the&nbsp;token&nbsp;her&nbsp;channel&nbsp;stays&nbsp;read-only&nbsp;by<br>
@@ -76,11 +78,10 @@ Design&nbsp;notes:<br>
 <td class="singlecolumn"><table><tr><td class="multicolumn"><a href="json.html">json</a><br>
 <a href="logging.html">logging</a><br>
 </td><td class="multicolumn"><a href="os.html">os</a><br>
-<a href="queue.html">queue</a><br>
-</td><td class="multicolumn"><a href="re.html">re</a><br>
-<a href="threading.html">threading</a><br>
-</td><td class="multicolumn"><a href="time.html">time</a><br>
-<a href="urllib.html">urllib</a><br>
+<a href="re.html">re</a><br>
+</td><td class="multicolumn"><a href="threading.html">threading</a><br>
+<a href="time.html">time</a><br>
+</td><td class="multicolumn"><a href="urllib.html">urllib</a><br>
 </td></tr></table></td></tr></table><p>
 <table class="section">
 <tr class="decor index-decor heading-text">
@@ -92,7 +93,6 @@ Design&nbsp;notes:<br>
 </dt><dd>
 <dl>
 <dt class="heading-text"><a href="Outer_World.discord.feed.html#DiscordFeed">DiscordFeed</a>
-</dt><dt class="heading-text"><a href="Outer_World.discord.feed.html#DiscordListener">DiscordListener</a>
 </dt><dt class="heading-text"><a href="Outer_World.discord.feed.html#StderrTee">StderrTee</a>
 </dt></dl>
 </dd>
@@ -163,51 +163,6 @@ Data descriptors defined here:<br>
 </dl>
 <dl><dt><strong>live_message_id</strong></dt>
 <dd><span class="code">The&nbsp;maintained&nbsp;message's&nbsp;id,&nbsp;once&nbsp;the&nbsp;poster&nbsp;has&nbsp;created&nbsp;it.</span></dd>
-</dl>
-</td></tr></table> <p>
-<table class="section">
-<tr class="decor title-decor heading-text">
-<td class="section-title" colspan=3>&nbsp;<br><a name="DiscordListener">class <strong>DiscordListener</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
-    
-<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
-<td class="decor title-decor" colspan=2><span class="code"><a href="#DiscordListener">DiscordListener</a>(token:&nbsp;'str',&nbsp;webhook_url:&nbsp;'str',&nbsp;on_message,&nbsp;*,&nbsp;poll_interval:&nbsp;'float'&nbsp;=&nbsp;15.0)&nbsp;-&amp;gt;&nbsp;'None'<br>
-&nbsp;<br>
-Her&nbsp;ear&nbsp;on&nbsp;the&nbsp;channel&nbsp;—&nbsp;polls&nbsp;for&nbsp;what&nbsp;the&nbsp;public&nbsp;says.<br>
-&nbsp;<br>
-A&nbsp;webhook&nbsp;is&nbsp;write-only;&nbsp;hearing&nbsp;the&nbsp;channel&nbsp;needs&nbsp;a&nbsp;bot&nbsp;identity<br>
-(``Authorization:&nbsp;Bot&nbsp;…``)&nbsp;reading&nbsp;history.&nbsp;Each&nbsp;poll&nbsp;fetches<br>
-messages&nbsp;after&nbsp;the&nbsp;last&nbsp;seen&nbsp;snowflake;&nbsp;webhook-authored&nbsp;posts<br>
-(her&nbsp;own&nbsp;shares&nbsp;and&nbsp;the&nbsp;whole&nbsp;mirror)&nbsp;are&nbsp;skipped&nbsp;—&nbsp;hearing<br>
-herself&nbsp;would&nbsp;be&nbsp;a&nbsp;feedback&nbsp;loop&nbsp;—&nbsp;and&nbsp;so&nbsp;are&nbsp;other&nbsp;bots.<br>
-&nbsp;<br>
-Failure&nbsp;isolation&nbsp;mirrors&nbsp;the&nbsp;feed's:&nbsp;transient&nbsp;errors&nbsp;log&nbsp;and<br>
-keep&nbsp;listening;&nbsp;a&nbsp;permanent&nbsp;auth&nbsp;failure&nbsp;(401/403)&nbsp;deafens&nbsp;the<br>
-listener&nbsp;for&nbsp;the&nbsp;session.&nbsp;Nothing&nbsp;here&nbsp;raises&nbsp;into&nbsp;Genesis.<br>&nbsp;</span></td></tr>
-<tr><td>&nbsp;</td>
-<td class="singlecolumn">Methods defined here:<br>
-<dl><dt><a name="DiscordListener-__init__"><strong>__init__</strong></a>(self, token: 'str', webhook_url: 'str', on_message, *, poll_interval: 'float' = 15.0) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
-
-<dl><dt><a name="DiscordListener-start"><strong>start</strong></a>(self) -&gt; 'None'</dt></dl>
-
-<dl><dt><a name="DiscordListener-stop"><strong>stop</strong></a>(self) -&gt; 'None'</dt></dl>
-
-<hr>
-Class methods defined here:<br>
-<dl><dt><a name="DiscordListener-from_feed"><strong>from_feed</strong></a>(feed: 'DiscordFeed | None', on_message) -&gt; 'DiscordListener | None'</dt><dd><span class="code">Build&nbsp;a&nbsp;listener&nbsp;on&nbsp;the&nbsp;channel&nbsp;``feed``&nbsp;posts&nbsp;to.<br>
-&nbsp;<br>
-Needs&nbsp;``GENESIS_DISCORD_BOT_TOKEN``;&nbsp;the&nbsp;channel&nbsp;id&nbsp;resolves<br>
-from&nbsp;the&nbsp;webhook&nbsp;<a href="builtins.html#object">object</a>&nbsp;on&nbsp;the&nbsp;listener&nbsp;thread,&nbsp;so&nbsp;the<br>
-existing&nbsp;webhook&nbsp;config&nbsp;plus&nbsp;a&nbsp;bot&nbsp;token&nbsp;is&nbsp;the&nbsp;whole&nbsp;setup<br>
-and&nbsp;construction&nbsp;never&nbsp;blocks&nbsp;on&nbsp;the&nbsp;network.&nbsp;Returns&nbsp;None<br>
-without&nbsp;either&nbsp;—&nbsp;no&nbsp;ear&nbsp;exists&nbsp;then,&nbsp;same&nbsp;as&nbsp;before.</span></dd></dl>
-
-<hr>
-Data descriptors defined here:<br>
-<dl><dt><strong>__dict__</strong></dt>
-<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
-</dl>
-<dl><dt><strong>__weakref__</strong></dt>
-<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
 </dl>
 </td></tr></table> <p>
 <table class="section">

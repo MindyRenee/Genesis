@@ -28,6 +28,14 @@ path = "Self_World/src/bin/genesis-daemon.rs"
 name = "genesis-retina"
 path = "Self_World/src/bin/genesis-retina.rs"
 
+[[bin]]
+name = "genesis-merge-ltm"
+path = "Self_World/src/bin/genesis-merge-ltm.rs"
+
+[[bin]]
+name = "genesis-merge-stm"
+path = "Self_World/src/bin/genesis-merge-stm.rs"
+
 # Suppress linker deprecation warning for -O1 flag
 [lints.rust]
 linker_messages = "allow"
@@ -48,7 +56,7 @@ proc-macro2 = { version = "*", features = ["span-locations"] }
 quote = "*"
 shared_memory = "*"
 syn = { version = "*", features = ["full", "parsing", "printing", "visit"] }
-v4l = "*"
+v4l = "0.14"
 
 [profile.release]
 opt-level = 2

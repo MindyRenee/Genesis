@@ -637,16 +637,18 @@ level&nbsp;and&nbsp;are&nbsp;referenced&nbsp;by&nbsp;this&nbsp;subsystem.<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;explore&nbsp;its&nbsp;own&nbsp;filesystem.&nbsp;Curiosity-driven&nbsp;exploration<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(PFC&nbsp;+&nbsp;limbic&nbsp;curiosity&nbsp;+&nbsp;parietal&nbsp;spatial&nbsp;navigation).<br>
 &nbsp;<br>
-&nbsp;&nbsp;&nbsp;&nbsp;canvas.py&nbsp;(in&nbsp;this&nbsp;package)<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canvas&nbsp;—&nbsp;a&nbsp;paint&nbsp;program:&nbsp;paper,&nbsp;color,&nbsp;and&nbsp;a&nbsp;parameterized<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;brush&nbsp;she&nbsp;dials&nbsp;herself;&nbsp;the&nbsp;built-in&nbsp;Cairo&nbsp;rasterizer<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;renders&nbsp;every&nbsp;op&nbsp;in-process&nbsp;—&nbsp;the&nbsp;studio&nbsp;is&nbsp;internal.&nbsp;The<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;program's&nbsp;controls&nbsp;are&nbsp;registered&nbsp;as&nbsp;``studio_*``&nbsp;tools<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(Inner_World/studio.py)&nbsp;so&nbsp;she&nbsp;operates&nbsp;it&nbsp;herself&nbsp;—&nbsp;every&nbsp;sheet,<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;color,&nbsp;preset,&nbsp;and&nbsp;path&nbsp;is&nbsp;her&nbsp;call.&nbsp;Creative&nbsp;expression&nbsp;is<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;prefrontal&nbsp;(DLPFC)&nbsp;+&nbsp;limbic&nbsp;(emotional&nbsp;drive,&nbsp;which&nbsp;moves<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;her&nbsp;the&nbsp;way&nbsp;feelings&nbsp;move&nbsp;a&nbsp;person)&nbsp;+&nbsp;occipital&nbsp;(visual<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;output).&nbsp;Multi-subsystem.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;(Outer_World/)&nbsp;canvas.py<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Canvas&nbsp;—&nbsp;her&nbsp;paint&nbsp;program:&nbsp;paper,&nbsp;color,&nbsp;and&nbsp;a<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;parameterized&nbsp;brush&nbsp;she&nbsp;dials&nbsp;herself.&nbsp;It&nbsp;lives&nbsp;in&nbsp;the&nbsp;outer<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;world&nbsp;—&nbsp;a&nbsp;paint&nbsp;application&nbsp;on&nbsp;her&nbsp;desk&nbsp;is&nbsp;a&nbsp;thing&nbsp;she&nbsp;uses,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;not&nbsp;a&nbsp;part&nbsp;of&nbsp;her&nbsp;—&nbsp;so&nbsp;the&nbsp;module&nbsp;moved&nbsp;out&nbsp;of&nbsp;the&nbsp;mind.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;frontal&nbsp;lobe's&nbsp;part&nbsp;in&nbsp;drawing&nbsp;is&nbsp;creative&nbsp;planning<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(DLPFC&nbsp;+&nbsp;limbic&nbsp;emotional&nbsp;drive&nbsp;+&nbsp;occipital&nbsp;visual<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;imagination);&nbsp;the&nbsp;program's&nbsp;controls&nbsp;are&nbsp;registered&nbsp;as<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;``studio_*``&nbsp;tools&nbsp;(Outer_World/tools/studio.py)&nbsp;and&nbsp;her<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;parietal&nbsp;hand&nbsp;reaches&nbsp;out&nbsp;through&nbsp;them&nbsp;to&nbsp;operate&nbsp;it&nbsp;—<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;every&nbsp;sheet,&nbsp;color,&nbsp;preset,&nbsp;and&nbsp;path&nbsp;is&nbsp;her&nbsp;call.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Multi-subsystem.<br>
 &nbsp;<br>
 &nbsp;&nbsp;&nbsp;&nbsp;(tools/)&nbsp;project_composer.py<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ProjectComposer&nbsp;—&nbsp;composes&nbsp;real&nbsp;Python&nbsp;from&nbsp;Genesis's&nbsp;concept<br>
@@ -802,7 +804,6 @@ at&nbsp;the&nbsp;top&nbsp;level&nbsp;beside&nbsp;the&nbsp;regions.</span></p>
 <tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
 <td class="singlecolumn"><table><tr><td class="multicolumn"><a href="Self_World.frontal_lobe.answer_composer.html">answer_composer</a><br>
 <a href="Self_World.frontal_lobe.autonomous.html">autonomous</a><br>
-<a href="Self_World.frontal_lobe.canvas.html">canvas</a><br>
 <a href="Self_World.frontal_lobe.code_tools.html">code_tools</a><br>
 <a href="Self_World.frontal_lobe.conversation.html">conversation</a><br>
 <a href="Self_World.frontal_lobe.dlpfc.html">dlpfc</a><br>
@@ -815,16 +816,16 @@ at&nbsp;the&nbsp;top&nbsp;level&nbsp;beside&nbsp;the&nbsp;regions.</span></p>
 <a href="Self_World.frontal_lobe.grammar.html">grammar</a><br>
 <a href="Self_World.frontal_lobe.graph_walk.html">graph_walk</a><br>
 <a href="Self_World.frontal_lobe.meta_cognitive_router.html">meta_cognitive_router</a><br>
-<a href="Self_World.frontal_lobe.pragmatics.html">pragmatics</a><br>
-</td><td class="multicolumn"><a href="Self_World.frontal_lobe.prefrontal.html">prefrontal</a><br>
+</td><td class="multicolumn"><a href="Self_World.frontal_lobe.pragmatics.html">pragmatics</a><br>
+<a href="Self_World.frontal_lobe.prefrontal.html">prefrontal</a><br>
 <a href="Self_World.frontal_lobe.projects.html">projects</a><br>
 <a href="Self_World.frontal_lobe.prosody.html">prosody</a><br>
 <a href="Self_World.frontal_lobe.question_composer.html">question_composer</a><br>
 <a href="Self_World.frontal_lobe.question_handler.html">question_handler</a><br>
 <a href="Self_World.frontal_lobe.reasoning.html"><strong>reasoning</strong>&nbsp;(package)</a><br>
-<a href="Self_World.frontal_lobe.research.html">research</a><br>
+</td><td class="multicolumn"><a href="Self_World.frontal_lobe.research.html">research</a><br>
 <a href="Self_World.frontal_lobe.response_styler.html">response_styler</a><br>
-</td><td class="multicolumn"><a href="Self_World.frontal_lobe.self_inquiry.html">self_inquiry</a><br>
+<a href="Self_World.frontal_lobe.self_inquiry.html">self_inquiry</a><br>
 <a href="Self_World.frontal_lobe.self_monitor.html">self_monitor</a><br>
 <a href="Self_World.frontal_lobe.status.html">status</a><br>
 <a href="Self_World.frontal_lobe.voice.html">voice</a><br>

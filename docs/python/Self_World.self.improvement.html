@@ -66,9 +66,10 @@ staging&nbsp;copy:&nbsp;the&nbsp;system&nbsp;is&nbsp;her&nbsp;workspace.&nbsp;Tw
 &nbsp;&nbsp;the&nbsp;full&nbsp;test&nbsp;suite,&nbsp;reverting&nbsp;on&nbsp;any&nbsp;failure.<br>
 -&nbsp;**Experiments**&nbsp;—&nbsp;everything&nbsp;else,&nbsp;including&nbsp;Rust.&nbsp;A&nbsp;proposal's<br>
 &nbsp;&nbsp;``original_code``&nbsp;→&nbsp;``proposed_code``&nbsp;edit&nbsp;lands&nbsp;on&nbsp;the&nbsp;live&nbsp;file<br>
-&nbsp;&nbsp;(with&nbsp;a&nbsp;``.pre_experiment``&nbsp;backup&nbsp;beside&nbsp;it),&nbsp;then&nbsp;the&nbsp;full<br>
-&nbsp;&nbsp;verification&nbsp;gate&nbsp;runs:&nbsp;``py_compile``&nbsp;+&nbsp;module&nbsp;import&nbsp;+&nbsp;pytest&nbsp;+<br>
-&nbsp;&nbsp;cargo&nbsp;test.&nbsp;A&nbsp;passing&nbsp;gate&nbsp;marks&nbsp;the&nbsp;proposal&nbsp;applied;&nbsp;a&nbsp;failure<br>
+&nbsp;&nbsp;(with&nbsp;a&nbsp;``.pre_experiment``&nbsp;backup&nbsp;beside&nbsp;it),&nbsp;then&nbsp;the<br>
+&nbsp;&nbsp;verification&nbsp;gate&nbsp;runs&nbsp;the&nbsp;arm&nbsp;the&nbsp;change&nbsp;can&nbsp;affect:<br>
+&nbsp;&nbsp;``py_compile``&nbsp;+&nbsp;module&nbsp;import&nbsp;+&nbsp;pytest&nbsp;for&nbsp;Python&nbsp;edits,&nbsp;cargo<br>
+&nbsp;&nbsp;test&nbsp;for&nbsp;Rust&nbsp;edits.&nbsp;A&nbsp;passing&nbsp;gate&nbsp;marks&nbsp;the&nbsp;proposal&nbsp;applied;&nbsp;a&nbsp;failure<br>
 &nbsp;&nbsp;restores&nbsp;the&nbsp;file&nbsp;and&nbsp;the&nbsp;proposal&nbsp;is&nbsp;rejected&nbsp;with&nbsp;notes&nbsp;teaching<br>
 &nbsp;&nbsp;what&nbsp;went&nbsp;wrong.&nbsp;The&nbsp;verification&nbsp;gate&nbsp;is&nbsp;the&nbsp;arbiter&nbsp;of&nbsp;which<br>
 &nbsp;&nbsp;changes&nbsp;land&nbsp;—&nbsp;pending&nbsp;proposals&nbsp;run&nbsp;through&nbsp;it&nbsp;automatically;&nbsp;the<br>
@@ -252,8 +253,9 @@ learning&nbsp;heuristics.&nbsp;The&nbsp;process:<br>
 2.&nbsp;**Apply**:&nbsp;write&nbsp;the&nbsp;change&nbsp;into&nbsp;the&nbsp;live&nbsp;source&nbsp;file,&nbsp;with&nbsp;a<br>
 &nbsp;&nbsp;&nbsp;``.pre_experiment``&nbsp;backup&nbsp;beside&nbsp;it&nbsp;—&nbsp;her&nbsp;source&nbsp;tree&nbsp;is&nbsp;her<br>
 &nbsp;&nbsp;&nbsp;workspace;&nbsp;there&nbsp;is&nbsp;no&nbsp;staging&nbsp;copy.<br>
-3.&nbsp;**Verify**:&nbsp;run&nbsp;the&nbsp;verification&nbsp;gate&nbsp;(py_compile&nbsp;+&nbsp;module<br>
-&nbsp;&nbsp;&nbsp;import&nbsp;+&nbsp;pytest&nbsp;+&nbsp;cargo&nbsp;test)&nbsp;against&nbsp;the&nbsp;live&nbsp;tree.<br>
+3.&nbsp;**Verify**:&nbsp;run&nbsp;the&nbsp;verification&nbsp;gate&nbsp;against&nbsp;the&nbsp;live&nbsp;tree&nbsp;—<br>
+&nbsp;&nbsp;&nbsp;the&nbsp;Python&nbsp;arm&nbsp;(py_compile&nbsp;+&nbsp;module&nbsp;import&nbsp;+&nbsp;pytest)&nbsp;for&nbsp;.py<br>
+&nbsp;&nbsp;&nbsp;edits,&nbsp;the&nbsp;Rust&nbsp;arm&nbsp;(cargo&nbsp;test)&nbsp;for&nbsp;.rs&nbsp;edits.<br>
 4.&nbsp;**Commit&nbsp;or&nbsp;revert**:&nbsp;if&nbsp;all&nbsp;checks&nbsp;pass&nbsp;the&nbsp;change&nbsp;stays&nbsp;—<br>
 &nbsp;&nbsp;&nbsp;taking&nbsp;effect&nbsp;on&nbsp;her&nbsp;next&nbsp;start,&nbsp;like&nbsp;any&nbsp;other&nbsp;edit.&nbsp;If&nbsp;any<br>
 &nbsp;&nbsp;&nbsp;check&nbsp;fails&nbsp;the&nbsp;file&nbsp;is&nbsp;restored&nbsp;from&nbsp;the&nbsp;backup&nbsp;content,&nbsp;and<br>

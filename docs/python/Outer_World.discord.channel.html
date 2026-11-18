@@ -13,10 +13,12 @@
 &nbsp;<br>
 A&nbsp;Discord&nbsp;channel&nbsp;is&nbsp;a&nbsp;place&nbsp;in&nbsp;the&nbsp;world,&nbsp;not&nbsp;a&nbsp;part&nbsp;of&nbsp;the&nbsp;mind:<br>
 the&nbsp;public&nbsp;gathers&nbsp;there,&nbsp;she&nbsp;posts&nbsp;there,&nbsp;and&nbsp;when&nbsp;a&nbsp;bot&nbsp;token<br>
-exists&nbsp;she&nbsp;can&nbsp;hear&nbsp;it.&nbsp;The&nbsp;transports&nbsp;live&nbsp;in&nbsp;``discord.feed``<br>
-(the&nbsp;platform&nbsp;adapter&nbsp;—&nbsp;webhook&nbsp;out,&nbsp;bot-token&nbsp;polling&nbsp;in);&nbsp;this<br>
-<a href="builtins.html#object">object</a>&nbsp;is&nbsp;the&nbsp;world-facing&nbsp;thing&nbsp;—&nbsp;the&nbsp;page's&nbsp;lifecycle,&nbsp;its&nbsp;ear,<br>
-and&nbsp;the&nbsp;door&nbsp;inbound&nbsp;speech&nbsp;comes&nbsp;through.<br>
+exists&nbsp;she&nbsp;can&nbsp;hear&nbsp;it.&nbsp;The&nbsp;outbound&nbsp;transport&nbsp;lives&nbsp;in<br>
+``discord.feed``&nbsp;(the&nbsp;platform&nbsp;adapter&nbsp;—&nbsp;webhook&nbsp;out)&nbsp;and&nbsp;the&nbsp;ear&nbsp;in<br>
+``body.hearing.discord_ear``&nbsp;(bot-token&nbsp;polling&nbsp;in&nbsp;—&nbsp;the&nbsp;organ&nbsp;is&nbsp;the<br>
+body's,&nbsp;it&nbsp;only&nbsp;listens&nbsp;outward);&nbsp;this&nbsp;<a href="builtins.html#object">object</a>&nbsp;is&nbsp;the&nbsp;world-facing<br>
+thing&nbsp;—&nbsp;the&nbsp;page's&nbsp;lifecycle,&nbsp;its&nbsp;ear,&nbsp;and&nbsp;the&nbsp;door&nbsp;inbound&nbsp;speech<br>
+comes&nbsp;through.<br>
 &nbsp;<br>
 The&nbsp;channel&nbsp;owns&nbsp;no&nbsp;cognition:&nbsp;it&nbsp;delivers&nbsp;what&nbsp;it&nbsp;hears&nbsp;to<br>
 ``on_speech``&nbsp;(the&nbsp;OuterEnvironment&nbsp;registers&nbsp;its&nbsp;own&nbsp;handler&nbsp;—&nbsp;the<br>
