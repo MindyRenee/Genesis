@@ -885,9 +885,11 @@ impl Drop for OpticCapture {
 /// The limb's whole existence: a life, a count, a pause, another
 /// life. Every death lands here once — the same accounting the
 /// mind's rebirth watcher kept for the standalone process, now held
-/// where the loss actually happens. Bounded: after the table's
-/// worth of un-lived lives the eye is accepted absent and the limb
-/// rests — the organism goes on without sight.
+/// where the loss actually happens. Patient: after the table's
+/// worth of un-lived lives the eye does not die — it rests on the
+/// longest rung and keeps watching, so a camera that recovers (USB
+/// power, a device still releasing, a transient driver fault) finds
+/// the retina waiting rather than the body already blind.
 ///
 /// `pub` for `genesis-retina`: when the eye is its own process again
 /// the binary runs this same limb on the main thread — one
@@ -895,49 +897,63 @@ impl Drop for OpticCapture {
 pub fn capture_limb(shm_name: &str, stop: &AtomicBool) {
     let configured =
         std::env::var("GENESIS_CAMERA").unwrap_or_else(|_| DEFAULT_CAMERA_PATH.to_string());
-    for (i, camera_path) in camera_candidates(&configured).iter().enumerate() {
-        if i > 0 {
-            eprintln!(
-                "[genesis] eye: {configured} exhausted its retries — \
-                 falling back to {camera_path}"
-            );
-        }
-        let camera_index = camera_path
-            .strip_prefix("/dev/video")
-            .and_then(|s| s.parse::<usize>().ok())
-            .unwrap_or(0);
-        let mut deaths = 0usize;
-        while !stop.load(Ordering::Relaxed) {
-            if deaths >= EYE_BACKOFF_S.len() {
-                break;
+    let candidates = camera_candidates(&configured);
+    // The patient cycle: each pass walks every candidate through its
+    // bounded table. When a whole pass fails the eye rests one
+    // heartbeat on the longest rung and watches again — it never
+    // accepts absent while it lives.
+    let mut resting_announced = false;
+    loop {
+        for (i, camera_path) in candidates.iter().enumerate() {
+            if i > 0 {
+                eprintln!(
+                    "[genesis] eye: {configured} exhausted its retries — \
+                     falling back to {camera_path}"
+                );
             }
-            let lived = eye_life(shm_name, camera_index, camera_path, stop);
-            if stop.load(Ordering::Relaxed) {
-                return;
-            }
-            if lived >= EYE_STABLE_S {
-                // A life past the stability window refunds the count —
-                // only sustained failure spends the table.
-                deaths = 0;
-                continue;
-            }
-            let slot = deaths.min(EYE_BACKOFF_S.len() - 1);
-            deaths += 1;
-            for _ in 0..EYE_BACKOFF_S[slot] * 10 {
+            let camera_index = camera_path
+                .strip_prefix("/dev/video")
+                .and_then(|s| s.parse::<usize>().ok())
+                .unwrap_or(0);
+            let mut deaths = 0usize;
+            while !stop.load(Ordering::Relaxed) {
+                if deaths >= EYE_BACKOFF_S.len() {
+                    break;
+                }
+                let lived = eye_life(shm_name, camera_index, camera_path, stop);
                 if stop.load(Ordering::Relaxed) {
                     return;
                 }
-                thread::sleep(Duration::from_millis(100));
+                if lived >= EYE_STABLE_S {
+                    // A life past the stability window refunds the
+                    // count — only sustained failure spends the table.
+                    deaths = 0;
+                    continue;
+                }
+                let slot = deaths.min(EYE_BACKOFF_S.len() - 1);
+                deaths += 1;
+                for _ in 0..EYE_BACKOFF_S[slot] * 10 {
+                    if stop.load(Ordering::Relaxed) {
+                        return;
+                    }
+                    thread::sleep(Duration::from_millis(100));
+                }
+            }
+            if stop.load(Ordering::Relaxed) {
+                return;
             }
         }
-        if stop.load(Ordering::Relaxed) {
-            return;
+        if !resting_announced {
+            eprintln!("[genesis] the eye rests — watching for a camera to return");
+            resting_announced = true;
+        }
+        for _ in 0..EYE_BACKOFF_S[EYE_BACKOFF_S.len() - 1] * 10 {
+            if stop.load(Ordering::Relaxed) {
+                return;
+            }
+            thread::sleep(Duration::from_millis(100));
         }
     }
-    eprintln!(
-        "[genesis] the eye will not re-open — accepted absent; \
-         the body goes on without sight"
-    );
 }
 
 /// One life of the eye: device open → format negotiate → segment

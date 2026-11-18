@@ -26,7 +26,6 @@ from collections import deque
 from dataclasses import dataclass, field
 
 from brain_waves import SleepStage
-from inhibition import InhibitoryGate
 from temporal_lobe.concepts import ConceptNetwork, RelationType
 
 
@@ -279,6 +278,13 @@ class SleepCycleTracker:
 # metabolic cost of sustained strong connections.
 
 
+#: Minimum efficacy of a live synapse under SHY renormalisation.
+#: Downscaling asymptotes edges toward this floor instead of zero —
+#: a weak association that survives the night can still be
+#: re-potentiated tomorrow, which is the point of homeostasis.
+_SHY_WEIGHT_FLOOR: float = 0.01
+
+
 @dataclass(slots=True)
 class SynapticDownscaler:
     """Synaptic Homeostasis Hypothesis (SHY) downscaling mechanism.
@@ -320,7 +326,6 @@ class SynapticDownscaler:
     body_pressure: float = 0.0
     # Bounded history of synaptic load snapshots for introspection.
     load_history: deque[float] = field(default_factory=lambda: deque(maxlen=200))
-    _lock: InhibitoryGate = field(default_factory=InhibitoryGate)
 
     def accumulate_synaptic_load(self, amount: float) -> None:
         """Accumulate synaptic load during wakefulness.
@@ -335,8 +340,7 @@ class SynapticDownscaler:
                 values are ~0.01-0.05.
         """
         if amount > 0.0:
-            with self._lock:
-                self.synaptic_load += amount
+            self.synaptic_load += amount
 
     def downscale_during_n3(self, network: ConceptNetwork, dt: float) -> float:
         """Downscale synaptic strengths during N3 slow-wave sleep.
@@ -359,48 +363,58 @@ class SynapticDownscaler:
         Returns:
             The total weight reduction applied this call.
         """
-        with self._lock:
-            # The effective load is the greater of the cognitive
-            # accumulator and the body's own sleep pressure (Process
-            # S, scaled onto the load axis). Borbély's two-process
-            # model makes S the master signal for SWS depth; SHY makes
-            # the same pressure drive the downscaling rate. A body
-            # that still needs sleep renormalises even when the
-            # cognitive load tally is thin.
-            effective_load = max(self.synaptic_load, 4.0 * self.body_pressure)
-            if dt <= 0.0 or effective_load <= 0.0:
-                return 0.0
+        # The effective load is the greater of the cognitive
+        # accumulator and the body's own sleep pressure (Process
+        # S, scaled onto the load axis). Borbély's two-process
+        # model makes S the master signal for SWS depth; SHY makes
+        # the same pressure drive the downscaling rate. A body
+        # that still needs sleep renormalises even when the
+        # cognitive load tally is thin.
+        effective_load = max(self.synaptic_load, 4.0 * self.body_pressure)
+        if dt <= 0.0 or effective_load <= 0.0:
+            return 0.0
 
-            # Downscaling rate per second, gated by effective load.
-            # A higher load → faster renormalisation, but bounded so a
-            # single tick never strips the network.
-            rate = min(0.05, 0.01 * effective_load)
+        # Downscaling rate per second, gated by effective load.
+        # A higher load → faster renormalisation, but bounded so a
+        # single tick never strips the network.
+        rate = min(0.05, 0.01 * effective_load)
 
-            total_removed = 0.0
-            for edge in network.edges:
-                if edge.weight <= 0.0:
-                    continue
-                # Proportional downscaling: stronger synapses lose more.
-                # This is the core of SHY — renormalisation that preserves
-                # relative ordering while reducing absolute strengths.
-                reduction = rate * dt * edge.weight
-                edge.weight = max(0.0, edge.weight - reduction)
-                total_removed += reduction
+        total_removed = 0.0
+        for edge in network.edges:
+            # A live synapse has a minimum efficacy: SHY scales
+            # weights *toward* the baseline, it does not erase
+            # them. Without the floor the proportional term is an
+            # unbounded ratchet — every N3 multiplies every weak
+            # edge toward zero, so a thin association that should
+            # survive the night silently approaches deletion.
+            # Edges at or under the floor have already yielded all
+            # renormalisation can take; a weight of exactly zero
+            # stays zero (nothing here resurrects a pruned edge).
+            if edge.weight <= _SHY_WEIGHT_FLOOR:
+                continue
+            # Proportional downscaling: stronger synapses lose more.
+            # This is the core of SHY — renormalisation that preserves
+            # relative ordering while reducing absolute strengths.
+            reduction = min(
+                rate * dt * edge.weight,
+                edge.weight - _SHY_WEIGHT_FLOOR,
+            )
+            edge.weight -= reduction
+            total_removed += reduction
 
-            # Resolve synaptic load: downscaling consumes sleep pressure.
-            # The load decreases by the same rate, completing the
-            # homeostatic loop (wake potentiates → sleep renormalises).
-            self.synaptic_load = max(0.0, self.synaptic_load - rate * dt)
-            self.total_downscaling += total_removed
+        # Resolve synaptic load: downscaling consumes sleep pressure.
+        # The load decreases by the same rate, completing the
+        # homeostatic loop (wake potentiates → sleep renormalises).
+        self.synaptic_load = max(0.0, self.synaptic_load - rate * dt)
+        self.total_downscaling += total_removed
 
-            # Record a load snapshot for history.
-            self.load_history.append(self.synaptic_load)
+        # Record a load snapshot for history.
+        self.load_history.append(self.synaptic_load)
         return total_removed
 
     def get_synaptic_load(self) -> float:
         """Return the current accumulated synaptic load."""
-        with self._lock:
-            return self.synaptic_load
+        return self.synaptic_load
 
     def describe(self) -> str:
         """Human-readable description of the downscaling state."""

@@ -66,6 +66,14 @@ pub struct FieldIntegration {
     /// plus the physical bath, cooling at its own rate. The
     /// Langevin kick amplitude for the *next* step is set by it.
     pub temperature: f64,
+    /// The total momentum the field carries — Σ‖p‖ over every
+    /// layer of every fiber. How much motion she holds, heavy
+    /// dimensions and light ones alike.
+    pub momentum: f64,
+    /// The cord's own depth into its vesica — where the inner
+    /// fiber's aggregate state sits inside the full-dimensional
+    /// lens. Positive inside, negative outside.
+    pub vesica: f64,
     pub fiber_count: usize,
 }
 
@@ -673,6 +681,23 @@ impl FieldRuntime {
             for layer in &mut fiber.layers {
                 let current = layer.state.clone();
                 layer.state = manifold.geodesic(&current, &observation, gain)?;
+                if dt > 0.0 {
+                    // The observation pushed her — and the push is
+                    // a move, not a teleport: her momentum relaxes
+                    // toward the velocity the pull implied by the
+                    // same fraction the state took, so the pull
+                    // carries through her motion afterward.
+                    for ((p, m), (x1, x0)) in layer
+                        .momentum
+                        .iter_mut()
+                        .zip(layer.rest.iter())
+                        .zip(layer.state.iter().zip(current.iter()))
+                    {
+                        if m.is_finite() {
+                            *p += gain * (m * (x1 - x0) / dt - *p);
+                        }
+                    }
+                }
             }
         }
 
@@ -705,12 +730,27 @@ impl FieldRuntime {
         }
         let consensus = consensus.ok_or(FieldError::EmptyState)?;
         self.spectrum.observe_consensus(&consensus, dt);
+        let momentum: f64 = next
+            .fibers
+            .iter()
+            .flat_map(|f| f.layers.iter())
+            .map(|l| l.momentum.iter().map(|v| v * v).sum::<f64>().sqrt())
+            .sum();
+        let vesica = next
+            .fibers
+            .iter()
+            .find(|f| f.id == "inner")
+            .and_then(|f| f.state().ok())
+            .map(|s| self.lattice.vesica_depth(&s))
+            .unwrap_or(0.0);
         let integration = FieldIntegration {
             boundary: self.lattice.boundary_point(&consensus).ok(),
             superposition: self.lattice.superposition_depth(&consensus),
             consensus,
             disagreement: next.disagreement,
             temperature: next.temperature,
+            momentum,
+            vesica,
             fiber_count: next.fibers.len(),
         };
         self.field = next;

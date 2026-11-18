@@ -85,7 +85,6 @@ from typing import Any, Protocol
 
 from brain_waves import BrainWave, BrainWaveState
 from genesis_client.swallow import note_swallowed
-from inhibition import InhibitoryGate
 
 logger = logging.getLogger(__name__)
 
@@ -254,7 +253,6 @@ class GlobalWorkspace:
         # (during think()) and the inner life thread (spontaneous
         # thoughts broadcast + tick). This lock protects _items,
         # _pending, and _broadcast_count from concurrent modification.
-        self._lock = InhibitoryGate()
 
     def register_module(self, module: WorkspaceModule) -> None:
         """Register a module to receive workspace broadcasts.
@@ -385,66 +383,65 @@ class GlobalWorkspace:
         ignited = False
         just_ignited: set[int] = set()
         recurrent_ignitions: set[int] = set()
-        with self._lock:
-            # Refresh fast path — same content+source already in the
-            # workspace updates the incumbent and rebroadcasts.
-            for item in self._items:
-                if item.source == source and _content_equal(item.content, content):
-                    item.activation = max(item.activation, activation)
-                    item.refresh_count += 1
-                    to_distribute.append(item)
-                    ignited = True
-                    break
+        # Refresh fast path — same content+source already in the
+        # workspace updates the incumbent and rebroadcasts.
+        for item in self._items:
+            if item.source == source and _content_equal(item.content, content):
+                item.activation = max(item.activation, activation)
+                item.refresh_count += 1
+                to_distribute.append(item)
+                ignited = True
+                break
+        else:
+            self._expire_pending()
+            candidate = WorkspaceItem(
+                content=content,
+                source=source,
+                activation=min(1.0, activation),
+                metadata=dict(metadata or {}),
+            )
+            # Recurrent competition among incumbents, the candidate,
+            # and the pending pool. Settled activations decide
+            # co-ignitions and eviction order; the candidate's own
+            # ignition is all-or-none on its input (feedforward
+            # drive) OR on its settled activation (recurrent
+            # support from coherent incumbents).
+            self._settle(candidate, effective_threshold)
+            ignited = (
+                activation >= effective_threshold or candidate.activation >= effective_threshold
+            )
+            if ignited:
+                self._items.append(candidate)
+                just_ignited.add(id(candidate))
+                if activation < effective_threshold:
+                    recurrent_ignitions.add(id(candidate))
+                self._broadcast_count += 1
+                to_distribute.append(candidate)
             else:
-                self._expire_pending()
-                candidate = WorkspaceItem(
-                    content=content,
-                    source=source,
-                    activation=min(1.0, activation),
-                    metadata=dict(metadata or {}),
-                )
-                # Recurrent competition among incumbents, the candidate,
-                # and the pending pool. Settled activations decide
-                # co-ignitions and eviction order; the candidate's own
-                # ignition is all-or-none on its input (feedforward
-                # drive) OR on its settled activation (recurrent
-                # support from coherent incumbents).
-                self._settle(candidate, effective_threshold)
-                ignited = (
-                    activation >= effective_threshold or candidate.activation >= effective_threshold
-                )
-                if ignited:
-                    self._items.append(candidate)
-                    just_ignited.add(id(candidate))
-                    if activation < effective_threshold:
-                        recurrent_ignitions.add(id(candidate))
+                self._upsert_pending(candidate)
+
+            # Coalition ignition — pending items the settle pulled
+            # over threshold join the workspace and broadcast.
+            still_pending: list[WorkspaceItem] = []
+            for p in self._pending:
+                if p.activation >= effective_threshold:
+                    self._items.append(p)
+                    just_ignited.add(id(p))
+                    recurrent_ignitions.add(id(p))
                     self._broadcast_count += 1
-                    to_distribute.append(candidate)
+                    to_distribute.append(p)
                 else:
-                    self._upsert_pending(candidate)
+                    still_pending.append(p)
+            self._pending = still_pending
 
-                # Coalition ignition — pending items the settle pulled
-                # over threshold join the workspace and broadcast.
-                still_pending: list[WorkspaceItem] = []
-                for p in self._pending:
-                    if p.activation >= effective_threshold:
-                        self._items.append(p)
-                        just_ignited.add(id(p))
-                        recurrent_ignitions.add(id(p))
-                        self._broadcast_count += 1
-                        to_distribute.append(p)
-                    else:
-                        still_pending.append(p)
-                self._pending = still_pending
+            # Tag recurrent ignitions on the item itself so
+            # receivers can treat emerged content differently
+            # from driven content.
+            for item in self._items:
+                if id(item) in recurrent_ignitions:
+                    item.metadata["ignition"] = "recurrent"
 
-                # Tag recurrent ignitions on the item itself so
-                # receivers can treat emerged content differently
-                # from driven content.
-                for item in self._items:
-                    if id(item) in recurrent_ignitions:
-                        item.metadata["ignition"] = "recurrent"
-
-                self._enforce_capacity(just_ignited)
+            self._enforce_capacity(just_ignited)
 
         return to_distribute, ignited, just_ignited, recurrent_ignitions
 
@@ -565,10 +562,9 @@ class GlobalWorkspace:
         pending buffer, competed, lost, and timed out. The
         caller decides their fate (curiosity topics, memory traces).
         """
-        with self._lock:
-            drained = list(self._expired)
-            self._expired.clear()
-            return drained
+        drained = list(self._expired)
+        self._expired.clear()
+        return drained
 
     def _upsert_pending(self, candidate: WorkspaceItem) -> None:
         """Add or refresh a below-threshold candidate in the pending pool."""
@@ -600,55 +596,52 @@ class GlobalWorkspace:
         Returns:
             List of items that were evicted due to decay.
         """
-        with self._lock:
-            self._expire_pending()
-            evicted: list[WorkspaceItem] = []
-            surviving: list[WorkspaceItem] = []
+        self._expire_pending()
+        evicted: list[WorkspaceItem] = []
+        surviving: list[WorkspaceItem] = []
 
-            for item in self._items:
-                item.activation *= 1.0 - self.decay_rate * dt
-                # Clamp to non-negative — a large dt can make the decay
-                # factor negative, flipping activation's sign.
-                if item.activation < 0.0:
-                    item.activation = 0.0
-                surviving.append(item)
+        for item in self._items:
+            item.activation *= 1.0 - self.decay_rate * dt
+            # Clamp to non-negative — a large dt can make the decay
+            # factor negative, flipping activation's sign.
+            if item.activation < 0.0:
+                item.activation = 0.0
+            surviving.append(item)
 
-            # Recurrent coupling step. Scaled by min(dt, 1): the
-            # coupling is a per-tick competitive event, not continuous
-            # integration, and production ticks carry large dt.
-            if len(surviving) > 1:
-                scale = min(dt, 1.0)
-                activations = [item.activation for item in surviving]
-                for i, item in enumerate(surviving):
-                    coupling = 0.0
-                    others = 0.0
-                    for j, other in enumerate(surviving):
-                        if i == j:
-                            continue
-                        coupling += (2.0 * self._coherence(item, other) - 1.0) * activations[j]
-                        others += activations[j]
-                    delta = self.coupling_rate * scale * (coupling - others / max(1, self.capacity))
-                    delta = max(
-                        -self.max_coupling_delta,
-                        min(self.max_coupling_delta, delta),
-                    )
-                    item.activation = max(0.0, min(1.0, item.activation + delta))
+        # Recurrent coupling step. Scaled by min(dt, 1): the
+        # coupling is a per-tick competitive event, not continuous
+        # integration, and production ticks carry large dt.
+        if len(surviving) > 1:
+            scale = min(dt, 1.0)
+            activations = [item.activation for item in surviving]
+            for i, item in enumerate(surviving):
+                coupling = 0.0
+                others = 0.0
+                for j, other in enumerate(surviving):
+                    if i == j:
+                        continue
+                    coupling += (2.0 * self._coherence(item, other) - 1.0) * activations[j]
+                    others += activations[j]
+                delta = self.coupling_rate * scale * (coupling - others / max(1, self.capacity))
+                delta = max(
+                    -self.max_coupling_delta,
+                    min(self.max_coupling_delta, delta),
+                )
+                item.activation = max(0.0, min(1.0, item.activation + delta))
 
-            self._items = [item for item in surviving if item.activation >= 0.1]
-            evicted = [item for item in surviving if item.activation < 0.1]
-            return evicted
+        self._items = [item for item in surviving if item.activation >= 0.1]
+        evicted = [item for item in surviving if item.activation < 0.1]
+        return evicted
 
     @property
     def items(self) -> list[WorkspaceItem]:
         """Currently cognitive items in the workspace."""
-        with self._lock:
-            return list(self._items)
+        return list(self._items)
 
     @property
     def is_empty(self) -> bool:
         """Whether the workspace is currently empty (no cognitive content)."""
-        with self._lock:
-            return len(self._items) == 0
+        return len(self._items) == 0
 
     @property
     def pending_count(self) -> int:
@@ -658,14 +651,12 @@ class GlobalWorkspace:
         Not part of the workspace — not cognitive — but available for
         coalition ignition on subsequent broadcasts.
         """
-        with self._lock:
-            return len(self._pending)
+        return len(self._pending)
 
     @property
     def broadcast_count(self) -> int:
         """Total number of successful broadcasts since creation."""
-        with self._lock:
-            return self._broadcast_count
+        return self._broadcast_count
 
     @property
     def registered_modules(self) -> list[WorkspaceModule]:
@@ -679,10 +670,9 @@ class GlobalWorkspace:
         — what the mind is currently most aware of. Less-activated items
         are in the "fringe" of cognition.
         """
-        with self._lock:
-            if not self._items:
-                return None
-            return max(self._items, key=lambda item: item.activation)
+        if not self._items:
+            return None
+        return max(self._items, key=lambda item: item.activation)
 
     @property
     def integration(self) -> float:
@@ -730,8 +720,7 @@ class GlobalWorkspace:
             items from diverse sources share topics at high
             activation.
         """
-        with self._lock:
-            items = list(self._items)
+        items = list(self._items)
 
         if not items:
             return 0.0
@@ -778,9 +767,8 @@ class GlobalWorkspace:
 
     def clear(self) -> None:
         """Clear all items from the workspace."""
-        with self._lock:
-            self._items.clear()
-            self._pending.clear()
+        self._items.clear()
+        self._pending.clear()
 
 
 def _content_equal(a: Any, b: Any) -> bool:

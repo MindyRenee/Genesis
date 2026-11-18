@@ -38,7 +38,6 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from genesis_client.swallow import note_swallowed
-from inhibition import InhibitoryGate
 
 logger = logging.getLogger(__name__)
 
@@ -100,7 +99,6 @@ class NotificationQueue:
         self._get_neuro_summary = get_neuro_summary
         self._get_recent_episodes = get_recent_episodes
         self._queue: deque[Notification] = deque(maxlen=max_size)
-        self._lock = InhibitoryGate()
 
         # State tracking for change detection.
         self._last_phase: str = ""
@@ -204,20 +202,17 @@ class NotificationQueue:
         Returns:
             A list of notifications, oldest first. May be empty.
         """
-        with self._lock:
-            notifications = list(self._queue)
-            self._queue.clear()
+        notifications = list(self._queue)
+        self._queue.clear()
         return notifications
 
     def peek(self) -> int:
         """Return the number of pending notifications without draining."""
-        with self._lock:
-            return len(self._queue)
+        return len(self._queue)
 
     def _enqueue(self, notification: Notification) -> None:
         """Add a notification to the queue (thread-safe)."""
-        with self._lock:
-            self._queue.append(notification)
+        self._queue.append(notification)
 
     def reset(self) -> None:
         """Reset state tracking (e.g., after a daemon restart).
@@ -225,9 +220,8 @@ class NotificationQueue:
         Clears the queue and resets the phase/episode high-water marks
         so the next poll doesn't generate a flood of notifications.
         """
-        with self._lock:
-            self._queue.clear()
-            self._last_phase = ""
-            self._last_dream_episode_id = 0
-            self._dream_initialized = False
-            self._initialized = False
+        self._queue.clear()
+        self._last_phase = ""
+        self._last_dream_episode_id = 0
+        self._dream_initialized = False
+        self._initialized = False

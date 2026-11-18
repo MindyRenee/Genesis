@@ -93,6 +93,8 @@ from .recognition import FaceRecognizer
 if TYPE_CHECKING:
     from limbic_system.emotion import EmotionalState
 
+    from occipital_lobe.visual_spacetime import VisualSpacetimeBridge
+
 logger = logging.getLogger(__name__)
 
 
@@ -286,13 +288,21 @@ class Vision:
         # dictionary construction cost if there's no camera.
         self._occipital: V1Model | None = occipital
         self._on_gamma: Callable[[float], None] | None = None
-        # Facing orientation — which handedness her reports carry.
-        # False (default): looking out — the raw capture reads the
+        # Calibrated bridge to the shared self/inner/outer causal
+        # workspace, attached by the caller via
+        # set_visual_spacetime_bridge; raw camera pixels are never
+        # treated as world position without one.
+        self._visual_spacetime_bridge: VisualSpacetimeBridge | None = None
+        # Facing orientation — which frame her reports carry.
+        # "without" (default): looking out — the raw capture reads the
         # way she faces the world: light on her right is field-right.
-        # True: the mirror view — a single-axis reflection, the
+        # "within": the mirror view — a single-axis reflection, the
         # handedness of someone facing her, so a raised right hand
         # reads "right" the way that person experiences it.
-        self.mirror: bool = False
+        # "up"/"down": the optical axis tipped to a pole — the image
+        # itself is unchanged, but her geometry reports through the
+        # tipped frame.
+        self.facing: str = "without"
         # Sight callback — fired on every analyzed look with the
         # visual drive (salience × relay gain). The brain wave system
         # uses it for alpha blocking (the Berger effect): retinal
@@ -338,6 +348,14 @@ class Vision:
         synchrony based on what it actually sees.
         """
         self._on_gamma = callback
+
+    def set_visual_spacetime_bridge(self, bridge) -> None:
+        """Connect a calibrated VisualSpacetimeBridge to this visual cortex."""
+        from occipital_lobe.visual_spacetime import VisualSpacetimeBridge
+
+        if not isinstance(bridge, VisualSpacetimeBridge):
+            raise TypeError("bridge must be a VisualSpacetimeBridge")
+        self._visual_spacetime_bridge = bridge
 
     def set_sight_callback(self, callback: Callable[[float], None]) -> None:
         """Register a callback fired on every analyzed look.
@@ -580,6 +598,7 @@ class Vision:
         network=None,
         mirror: bool | None = None,
         nerve: str = "optic",
+        facing: str | None = None,
     ) -> VisionScene:
         """Look through an afferent nerve and return the structured scene.
 
@@ -593,9 +612,11 @@ class Vision:
         7. Package the percept as a VisionScene
         8. Wire into memory, concept network, neurochemistry, brain waves
 
-        ``mirror`` selects the facing orientation for this look —
-        ``None`` (default) follows ``self.mirror``; ``False`` looks
-        out at the world, ``True`` takes the facing (mirror) view.
+        ``facing`` selects the orientation this look reports through —
+        ``None`` (default) follows ``self.facing``; ``"without"`` looks
+        out at the world, ``"within"`` takes the facing (mirror) view,
+        ``"up"``/``"down"`` tip the optical axis to a pole. ``mirror``
+        is the legacy switch — ``True`` means ``"within"``.
 
         ``nerve`` selects the afferent — ``"optic"`` is the body's
         camera eye, ``"screen"`` the screen-capture nerve a relay
@@ -639,7 +660,9 @@ class Vision:
                 client,
                 emotion,
                 network,
-                self.mirror if mirror is None else mirror,
+                self.facing
+                if facing is None and mirror is None
+                else facing or ("within" if mirror else "without"),
                 nerve,
             )
             scene.nerve = nerve
@@ -695,21 +718,23 @@ class Vision:
         client,
         emotion: EmotionalState | None,
         network,
-        mirror: bool,
+        facing: str,
         nerve: str = "optic",
     ) -> VisionScene:
         """The cortical pipeline on one captured frame: optics,
         illumination, recognition, packaging, integration."""
-        # ── Facing orientation — out at the world, or in as a
-        # mirror ─────────────────────────────────────────────────
-        # Looking out (default): the capture already reads the way
-        # she faces the world — her right is field-right. The mirror
-        # view is a single-axis reflection (not the lens's 180°
-        # inversion) — the handedness of someone facing her, so her
-        # report reads the way they experience the scene. Whatever
-        # orientation this look takes holds for everything
+        # ── Facing orientation — out at the world, in as a mirror,
+        # or tipped to a pole ─────────────────────────────────────
+        # Looking out ("without", default): the capture already reads
+        # the way she faces the world — her right is field-right. The
+        # "within" view is a single-axis reflection (not the lens's
+        # 180° inversion) — the handedness of someone facing her, so
+        # her report reads the way they experience the scene. "Up"
+        # and "down" tip the optical axis to a pole — the image is
+        # unchanged, but geometry reports through the tipped frame.
+        # Whatever orientation this look takes holds for everything
         # downstream: regions, directions and motion share it.
-        if mirror:
+        if facing == "within":
             rgb = optics.mirror_view(rgb)
 
         # ── Eye optics — the aperture the body set ─────────────
@@ -759,7 +784,7 @@ class Vision:
         # orientation. (Un-mirroring the adapted frame is exact:
         # von Kries gain is per-pixel and the illuminant map
         # mirrors with its input.)
-        faces_rgb = optics.mirror_view(rgb) if mirror else rgb
+        faces_rgb = optics.mirror_view(rgb) if facing == "within" else rgb
         face_names, n_unknown_faces = self._recognize_faces(faces_rgb)
 
         # ── V1 sparse coding (sublayer: edges, gamma) ──────────
@@ -768,6 +793,19 @@ class Vision:
         # ── MSTd (dorsal stream): two-view geometry of this look
         # against the last — self-motion, heading, parallax depth
         two_view = self._two_view_geometry(rgb, nerve)
+        if two_view is not None:
+            # The report carries this look's facing orientation — the
+            # workspace needs it so a mirrored look's directions land
+            # un-flipped in the canonical frame.
+            two_view.facing = facing
+        if two_view is not None and self._visual_spacetime_bridge is not None:
+            try:
+                # Camera report timestamps and the shared workspace use
+                # the same monotonic clock; coordinate conversion remains
+                # the responsibility of the explicitly calibrated bridge.
+                self._visual_spacetime_bridge.publish(two_view, time_s=time.monotonic())
+            except Exception as error:  # noqa: BLE001 — causal telemetry must not blind vision
+                note_swallowed("occipital_lobe.perception.vision.visual_spacetime", error)
 
         # ── Package the structured scene percept ────────────────
         scene = _build_scene(

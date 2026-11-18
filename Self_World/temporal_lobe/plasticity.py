@@ -59,7 +59,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, ClassVar
 
 import numpy as np
-from inhibition import InhibitoryGate
 
 from temporal_lobe.concepts import RelationType
 
@@ -120,7 +119,6 @@ class HebbianPlasticity:
 
         # Co-occurrence buffer — (concept_a, concept_b, strength)
         self._co_occurrences: list[tuple[str, str, float]] = []
-        self._co_occurrence_lock = InhibitoryGate()
 
         # Update counters — separate for waking vs sleep
         # Sleep processes orders of magnitude more updates, so a shared
@@ -176,8 +174,7 @@ class HebbianPlasticity:
         if self.embeddings.get_concept_vector(concept_b) is None:
             return
 
-        with self._co_occurrence_lock:
-            self._co_occurrences.append((concept_a, concept_b, strength))
+        self._co_occurrences.append((concept_a, concept_b, strength))
 
     def record_co_occurrences(self, concepts: list[str], strength: float = 1.0) -> None:
         """Record all pairwise co-occurrences within a set of concepts.
@@ -203,11 +200,10 @@ class HebbianPlasticity:
         if not self.embeddings.has_embeddings:
             return 0
 
-        with self._co_occurrence_lock:
-            if not self._co_occurrences:
-                return 0
-            # Work on a copy
-            co_occurrences = list(self._co_occurrences)
+        if not self._co_occurrences:
+            return 0
+        # Work on a copy
+        co_occurrences = list(self._co_occurrences)
 
         lr = self._learning_rate(self.WAKING_LR)
         updated = 0
@@ -243,9 +239,8 @@ class HebbianPlasticity:
         graph_repelled = 0
 
         # 1. Apply co-occurrence updates with larger learning rate
-        with self._co_occurrence_lock:
-            co_occurrences = list(self._co_occurrences)
-            self._co_occurrences.clear()
+        co_occurrences = list(self._co_occurrences)
+        self._co_occurrences.clear()
 
         for concept_a, concept_b, strength in co_occurrences:
             if self._hebbian_attract(concept_a, concept_b, lr * strength, is_sleep=True):
@@ -319,8 +314,7 @@ class HebbianPlasticity:
             Dict with counts: 'strengthened', 'weakened', 'decayed'.
         """
         if co_occurrences is None:
-            with self._co_occurrence_lock:
-                co_occurrences = list(self._co_occurrences)
+            co_occurrences = list(self._co_occurrences)
 
         # Protected origins — explicit teaching shouldn't decay
         PROTECTED_ORIGINS = frozenset(

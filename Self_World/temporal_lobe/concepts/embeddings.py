@@ -63,7 +63,6 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 from genesis_client.swallow import note_swallowed
 from infrastructure._npz_io import load_npz, save_npz, str_array
-from inhibition import RecurrentInhibition
 
 from .classify import _normalize_id
 
@@ -293,7 +292,6 @@ class EmbeddingStore:
         # full rebuild and calls private builders that in turn reach
         # public read accessors; an RLock makes that class of
         # self-deadlock impossible rather than merely unlikely.
-        self._lock = RecurrentInhibition()
 
         # Dimensionality (set at build time)
         self._dim = 0
@@ -437,15 +435,14 @@ class EmbeddingStore:
         matrix — a wrong vector, silently. See `refresh`.
         """
         self._ensure_loaded()
-        with self._lock:
-            matrix = self._concept_matrix
-            if matrix is None:
-                return None
+        matrix = self._concept_matrix
+        if matrix is None:
+            return None
 
-            # Check the precomputed index first
-            idx = self._concept_to_idx.get(concept_name)
-            if idx is not None:
-                return matrix[idx]
+        # Check the precomputed index first
+        idx = self._concept_to_idx.get(concept_name)
+        if idx is not None:
+            return matrix[idx]
 
         # Check the ad-hoc cache
         if concept_name in self._concept_cache:
@@ -532,8 +529,7 @@ class EmbeddingStore:
         generation. `refresh()` (sleep thread) rebinds all three.
         """
         self._ensure_loaded()
-        with self._lock:
-            return self._find_similar_concepts_locked(concept_name, k, threshold)
+        return self._find_similar_concepts_locked(concept_name, k, threshold)
 
     def _find_similar_concepts_locked(
         self, concept_name: str, k: int, threshold: float
@@ -789,12 +785,11 @@ class EmbeddingStore:
         come from the same generation.
         """
         self._ensure_loaded()
-        with self._lock:
-            if self._concept_matrix is None:
-                return []
-            return self._search_concept_matrix(
-                vector, k, threshold, query_has_spectral=query_has_spectral
-            )
+        if self._concept_matrix is None:
+            return []
+        return self._search_concept_matrix(
+            vector, k, threshold, query_has_spectral=query_has_spectral
+        )
 
     def find_concepts_related_to_both(
         self,
@@ -936,9 +931,8 @@ class EmbeddingStore:
         # the concept graph — so the race did not merely return bad
         # search results, it wrote invented relationships into the
         # network.
-        with self._lock:
-            self._refresh_preserve_experiential()
-            self._concept_cache.clear()
+        self._refresh_preserve_experiential()
+        self._concept_cache.clear()
 
     def _restore_hebbian_experiential(
         self,
@@ -1337,11 +1331,10 @@ class EmbeddingStore:
         """Lazily build/load embeddings on first access (thread-safe)."""
         if self._loaded:
             return
-        with self._lock:
-            if self._loaded:
-                return
-            self._load()
-            self._loaded = True  # Set AFTER load completes
+        if self._loaded:
+            return
+        self._load()
+        self._loaded = True  # Set AFTER load completes
 
     def _load(self) -> None:
         """Load GloVe (if available) and build concept embeddings."""

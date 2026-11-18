@@ -23,7 +23,7 @@
 //! drop request  := [u8 name_len] [name utf8]
 //! ```
 
-use crate::inhibition::{Inhibition, Innate};
+use crate::shared::{Free, Shared};
 use std::collections::HashMap;
 
 /// Element dtypes shared across the wire. The codes are part of the
@@ -251,11 +251,11 @@ impl TensorSlab {
 }
 
 /// The shared slab instance.
-static SLAB: Innate<Inhibition<TensorSlab>> = Innate::new();
+static SLAB: Free<Shared<TensorSlab>> = Free::new();
 
 /// Access the daemon's tensor slab.
-pub fn slab() -> &'static Inhibition<TensorSlab> {
-    SLAB.get_or_init(|| Inhibition::new(TensorSlab::default()))
+pub fn slab() -> &'static Shared<TensorSlab> {
+    SLAB.get_or_init(|| Shared::new(TensorSlab::default()))
 }
 
 /// Parse `[u8 name_len][name]` from the front of `buf`; returns the

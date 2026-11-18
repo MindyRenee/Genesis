@@ -15,7 +15,6 @@ from genesis_client.protocol import (
 )
 from genesis_client.swallow import note_swallowed
 from genesis_client.threads import named_thread
-from inhibition import InhibitoryGate
 from parietal_lobe.grid import Grid
 from parietal_lobe.grounding import ground_scene
 from parietal_lobe.scene import Scene
@@ -132,11 +131,9 @@ class ConversationMixin:
         _active_think_worker: threading.Thread | None
         _think_recovery_active: bool
         _think_wedged_since: float | None
-        _think_worker_lock: InhibitoryGate
         # Deferred-state machinery — initialized in Mind.__init__
         # (mind.py), consumed by _defer/_advance_deferred_state here.
         _deferred_callbacks: list[tuple[float, Callable[[], None]]]
-        _deferred_callbacks_lock: InhibitoryGate
         _post_conversation_self_invoke_pending: bool
 
         def __getattr__(self, name: str) -> Any: ...
@@ -311,10 +308,9 @@ class ConversationMixin:
         # answers from inside the state without being roused.
         if self._is_meditating or (self._is_sleeping and not self.is_hypnagogic):
             return
-        with self._speech_queue_lock:
-            if text in self._speech_queue:
-                return
-            self._speech_queue.append(text)
+        if text in self._speech_queue:
+            return
+        self._speech_queue.append(text)
 
     def _defer(self, delay: float, callback: Callable[[], None]) -> None:
         """Schedule ``callback`` as metronome-advanced deferred state.
@@ -324,21 +320,19 @@ class ConversationMixin:
         after ``stop()`` remain queued and inert with the mind.
         """
         due_at = time.monotonic() + delay
-        with self._deferred_callbacks_lock:
-            self._deferred_callbacks.append((due_at, callback))
+        self._deferred_callbacks.append((due_at, callback))
 
     def _advance_deferred_state(self) -> None:
         """Run deferred conversation transitions whose deadlines arrived."""
         now = time.monotonic()
         due: list[Callable[[], None]] = []
         pending: list[tuple[float, Callable[[], None]]] = []
-        with self._deferred_callbacks_lock:
-            for due_at, callback in self._deferred_callbacks:
-                if due_at <= now:
-                    due.append(callback)
-                else:
-                    pending.append((due_at, callback))
-            self._deferred_callbacks = pending
+        for due_at, callback in self._deferred_callbacks:
+            if due_at <= now:
+                due.append(callback)
+            else:
+                pending.append((due_at, callback))
+        self._deferred_callbacks = pending
         for callback in due:
             try:
                 callback()
@@ -696,11 +690,10 @@ class ConversationMixin:
 
     def _schedule_think_recovery(self) -> None:
         """Resume background systems only after the timed-out thinker exits."""
-        with self._think_worker_lock:
-            worker = self._active_think_worker
-            if worker is None or self._think_recovery_active:
-                return
-            self._think_recovery_active = True
+        worker = self._active_think_worker
+        if worker is None or self._think_recovery_active:
+            return
+        self._think_recovery_active = True
 
         def _recover() -> None:
             # Bounded join. A thread cannot be killed in Python, so if
@@ -717,12 +710,11 @@ class ConversationMixin:
             # looking like ordinary slowness.
             worker.join(timeout=_THINK_RECOVERY_JOIN_S)
             still_alive = worker.is_alive()
-            with self._think_worker_lock:
-                if self._active_think_worker is worker:
-                    self._active_think_worker = None
-                self.brain.frontal._last_state = None
-                self._think_recovery_active = False
-                self._think_wedged_since = time.monotonic() if still_alive else None
+            if self._active_think_worker is worker:
+                self._active_think_worker = None
+            self.brain.frontal._last_state = None
+            self._think_recovery_active = False
+            self._think_wedged_since = time.monotonic() if still_alive else None
             if still_alive:
                 logger.error(
                     "think() worker still running %.0fs after timeout; "
@@ -926,10 +918,9 @@ class ConversationMixin:
         they are looking at; otherwise a permanently-gated conversation
         layer is indistinguishable from a slow one. Returns None when
         the turn may proceed (the dead worker's slot is cleared)."""
-        with self._think_worker_lock:
-            active_worker = self._active_think_worker
-            recovery_active = self._think_recovery_active
-            wedged_since = self._think_wedged_since
+        active_worker = self._active_think_worker
+        recovery_active = self._think_recovery_active
+        wedged_since = self._think_wedged_since
         if active_worker is None:
             return None
         if active_worker.is_alive() or recovery_active:
@@ -943,9 +934,8 @@ class ConversationMixin:
                     stuck,
                 )
             return self._said(self._respond_timeout(user_input, timeout))
-        with self._think_worker_lock:
-            if self._active_think_worker is active_worker:
-                self._active_think_worker = None
+        if self._active_think_worker is active_worker:
+            self._active_think_worker = None
         return None
 
     def _after_thought(self, user_input: str, response: str, state) -> None:
@@ -1063,17 +1053,15 @@ class ConversationMixin:
                 result_holder["error"] = e
 
         worker = named_thread("think-worker", _think_worker, comm="g-think")
-        with self._think_worker_lock:
-            self._active_think_worker = worker
+        self._active_think_worker = worker
         worker.start()
         worker.join(timeout=timeout)
 
         if worker.is_alive():
             return None
 
-        with self._think_worker_lock:
-            if self._active_think_worker is worker:
-                self._active_think_worker = None
+        if self._active_think_worker is worker:
+            self._active_think_worker = None
 
         if "error" in result_holder:
             err = result_holder["error"]

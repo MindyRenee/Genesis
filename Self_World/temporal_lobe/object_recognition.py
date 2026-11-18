@@ -38,7 +38,6 @@ from dataclasses import dataclass
 import numpy as np
 from genesis_client.swallow import note_swallowed
 from infrastructure.config import default_data_dir
-from inhibition import InhibitoryGate
 
 logger = logging.getLogger(__name__)
 
@@ -198,7 +197,6 @@ class ObjectRecognizer:
         self._net: object | None = None
         # cv2.dnn.Net is not thread-safe — see the note on
         # FaceRecognizer._infer_lock in occipital_lobe.perception.
-        self._infer_lock = InhibitoryGate()
         self._available: bool | None = None
 
     def is_available(self) -> bool:
@@ -278,10 +276,9 @@ class ObjectRecognizer:
             (_INPUT_SIZE, _INPUT_SIZE),
             swapRB=False,
         )
-        with self._infer_lock:
-            net = self._get_net()
-            net.setInput(blob)
-            output = net.forward()
+        net = self._get_net()
+        net.setInput(blob)
+        output = net.forward()
 
         # YOLOv5 output: (1, 25200, 85)
         # Each row: [cx, cy, w, h, obj_score, 80_class_scores]

@@ -67,7 +67,7 @@
 //!   interpersonal exchange, towards a second-person approach
 //!   to social neuroscience.
 
-use crate::inhibition::Inhibition;
+use crate::shared::Shared;
 use std::collections::VecDeque;
 
 /// Shared slot for the latest user affect observation, written by the
@@ -75,13 +75,13 @@ use std::collections::VecDeque;
 /// `UpdateUserAffect` command) and read by the daemon's `advance_neuro`.
 /// This follows the same pattern as the shared body state in
 /// `interoception.rs`.
-static SHARED_USER_AFFECT: Inhibition<Option<UserAffectObservation>> = Inhibition::new(None);
+static SHARED_USER_AFFECT: Shared<Option<UserAffectObservation>> = Shared::new(None);
 
 /// Publish a user affect observation to the shared slot. Called by
 /// the IPC handler when the conscious mind sends an
 /// `UpdateUserAffect` command.
 pub fn publish_user_affect(obs: UserAffectObservation) {
-    if let Ok(mut slot) = SHARED_USER_AFFECT.lock() {
+    if let Ok(slot) = SHARED_USER_AFFECT.lock() {
         *slot = Some(obs);
     }
 }
@@ -90,7 +90,7 @@ pub fn publish_user_affect(obs: UserAffectObservation) {
 /// `advance_neuro` each cycle. Returns `None` if no new observation has
 /// been received since the last read.
 pub fn take_user_affect() -> Option<UserAffectObservation> {
-    if let Ok(mut slot) = SHARED_USER_AFFECT.lock() {
+    if let Ok(slot) = SHARED_USER_AFFECT.lock() {
         slot.take()
     } else {
         None

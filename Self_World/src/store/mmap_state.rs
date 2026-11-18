@@ -83,8 +83,8 @@ use std::os::unix::io::AsRawFd;
 use std::path::Path;
 
 use libc::{
-    LOCK_EX, LOCK_NB, LOCK_SH, LOCK_UN, MAP_FAILED, MAP_SHARED, MS_ASYNC, MS_SYNC, PROT_READ,
-    PROT_WRITE, c_void, close, fdatasync, flock, ftruncate, mmap, msync, munmap,
+    MAP_FAILED, MAP_SHARED, MS_ASYNC, MS_SYNC, PROT_READ, PROT_WRITE, c_void, close, fdatasync,
+    ftruncate, mmap, msync, munmap,
 };
 
 use crate::state::legacy_v3::GenesisCoreStateV3;
@@ -171,7 +171,7 @@ pub(crate) fn local_seconds_of_day(now_ms: u64) -> i64 {
 /// raw pointers, returning an owned `GenesisCoreState` on the caller's
 /// stack.
 ///
-/// Writers are serialised by an in-process `Inhibition` ([`MmapState::modify`]) and a
+/// Writers are serialised by an in-process `Mutex` ([`MmapState::modify`]) and a
 /// cross-process `flock(LOCK_EX)` advisory lock on the state file.
 /// [`MmapState::modify`] copies the current snapshot to an owned stack value,
 /// hands the closure a `&mut GenesisCoreState` to that private copy,
@@ -204,7 +204,7 @@ pub struct MmapState {
     /// `StateFileError::LockFailed`. The daemon intentionally panics
     /// on this rather than risk writing to a potentially-torn shared
     /// state.
-    write_lock: crate::inhibition::Inhibition<()>,
+    write_lock: crate::shared::Shared<()>,
     /// How long the body was dark before this open, in milliseconds —
     /// `now - header.last_updated` measured before the open path
     /// overwrote it. Zero for a newly created state. The daemon's
@@ -262,8 +262,6 @@ impl MmapState {
         // with `BadMagic`. `create_new` has already succeeded, so the
         // EEXIST path is unaffected.
         // SAFETY: `fd` is a valid open file descriptor.
-        unsafe { Self::lock_file(fd) }?;
-
         // Set the file size
         // SAFETY: ftruncate is a POSIX call on a valid, owned fd. The fd is
         // obtained from `file.as_raw_fd()` and `file` is kept alive (forgotten
@@ -345,8 +343,6 @@ impl MmapState {
         // before returning the live mapping so another MmapState can open
         // the file and contend through modify()'s writer lock.
         // SAFETY: fd is valid and the initialization transaction is complete.
-        unsafe { Self::unlock_file(fd) };
-
         // All fallible steps succeeded. Transfer fd ownership to Self.
         std::mem::forget(file);
 
@@ -354,7 +350,7 @@ impl MmapState {
             ptr,
             fd,
             created: true,
-            write_lock: crate::inhibition::Inhibition::new(()),
+            write_lock: crate::shared::Shared::new(()),
             offline_ms: 0,
         })
     }
@@ -393,8 +389,6 @@ impl MmapState {
         // the same flock used by modify() makes the snapshot and any
         // migration atomic with respect to cross-process writes.
         // SAFETY: `fd` is a valid open file descriptor.
-        unsafe { Self::lock_file(fd) }?;
-
         // Check file size. Current files are at least the current
         // struct size, but a known legacy v3 file is intentionally
         // smaller because the inference-signals tail grew from 60 to
@@ -406,13 +400,11 @@ impl MmapState {
             Ok(metadata) => metadata,
             Err(e) => {
                 // SAFETY: `fd` is valid and the open lock is held.
-                unsafe { Self::unlock_file(fd) };
                 return Err(StateFileError::Io(e));
             }
         };
         if metadata.len() < crate::state::core_state::LEGACY_SIZE as u64 {
             // SAFETY: `fd` is valid and the open lock is held.
-            unsafe { Self::unlock_file(fd) };
             return Err(StateFileError::FileTooSmall {
                 expected: GenesisCoreState::SIZE as u64,
                 found: metadata.len(),
@@ -430,17 +422,13 @@ impl MmapState {
             unsafe {
                 if ftruncate(fd, mapped_len() as i64) != 0 {
                     let error = std::io::Error::last_os_error();
-                    Self::unlock_file(fd);
                     return Err(StateFileError::Io(error));
                 }
             }
             // Persist the size metadata so a crash doesn't leave a
             // truncated file. See `create` for the full rationale.
-            if let Err(e) = Self::do_fsync(fd) {
-                // SAFETY: `fd` is valid and the open lock is held.
-                unsafe { Self::unlock_file(fd) };
-                return Err(e);
-            }
+            // SAFETY: `fd` is valid and the open lock is held.
+            Self::do_fsync(fd)?;
         }
 
         // mmap
@@ -448,7 +436,6 @@ impl MmapState {
             Ok(ptr) => ptr,
             Err(e) => {
                 // SAFETY: `fd` is valid and the open lock is held.
-                unsafe { Self::unlock_file(fd) };
                 return Err(e);
             }
         };
@@ -508,7 +495,6 @@ impl MmapState {
                         // unlock before unmapping and never touch
                         // either again on this path.
                         unsafe {
-                            Self::unlock_file(fd);
                             munmap(ptr as *mut c_void, mapped_len());
                             close(fd);
                         }
@@ -548,7 +534,6 @@ impl MmapState {
                         // unlock before unmapping and never touch
                         // either again on this path.
                         unsafe {
-                            Self::unlock_file(fd);
                             munmap(ptr as *mut c_void, mapped_len());
                             close(fd);
                         }
@@ -586,7 +571,6 @@ impl MmapState {
                     // unlock before unmapping and never touch either
                     // again on this path.
                     unsafe {
-                        Self::unlock_file(fd);
                         munmap(ptr as *mut c_void, mapped_len());
                         close(fd);
                     }
@@ -609,7 +593,6 @@ impl MmapState {
             // alone would release the flock; we unlock explicitly to
             // match every other cleanup path in this function.)
             unsafe {
-                Self::unlock_file(fd);
                 munmap(ptr as *mut c_void, mapped_len());
                 close(fd);
             }
@@ -679,7 +662,6 @@ impl MmapState {
         unsafe { Self::publish_stack(ptr, &snapshot) };
         if let Err(e) = Self::do_msync(ptr, mapped_len()) {
             unsafe {
-                Self::unlock_file(fd);
                 munmap(ptr as *mut c_void, mapped_len());
                 close(fd);
             }
@@ -714,7 +696,6 @@ impl MmapState {
                 // SAFETY: unlock before munmap/close on valid ptr/fd
                 // that we own exclusively.
                 unsafe {
-                    Self::unlock_file(fd);
                     munmap(ptr as *mut c_void, mapped_len());
                     close(fd);
                 }
@@ -728,13 +709,11 @@ impl MmapState {
         // lock in their normal write path.
         // SAFETY: `fd` is valid and still holds the flock acquired at
         // open.
-        unsafe { Self::unlock_file(fd) };
-
         Ok(Self {
             ptr,
             fd,
             created: false,
-            write_lock: crate::inhibition::Inhibition::new(()),
+            write_lock: crate::shared::Shared::new(()),
             offline_ms,
         })
     }
@@ -838,12 +817,10 @@ impl MmapState {
     pub fn read_consistent_locked(&self) -> Result<GenesisCoreState, StateFileError> {
         // SAFETY: `self.fd` is a valid open file descriptor kept alive
         // for the lifetime of this MmapState.
-        unsafe { Self::lock_file_shared(self.fd) }?;
         // Under LOCK_SH no writer's exclusive lock is held, so this
         // volatile copy cannot race a publish.
         let state = self.read();
         // SAFETY: `self.fd` is valid and we hold the lock.
-        unsafe { Self::unlock_file(self.fd) };
         Ok(state)
     }
 
@@ -894,8 +871,6 @@ impl MmapState {
         // drop of the MmapState, which closes the fd).
         // SAFETY: `self.fd` is a valid open file descriptor kept alive
         // for the lifetime of this MmapState.
-        unsafe { Self::lock_file(self.fd) }?;
-
         // Stack working copy: `read` copies through a raw pointer and
         // forms no reference, so the closure's `&mut` below aliases
         // nothing in the mapping (or anywhere else). Holding the
@@ -919,7 +894,6 @@ impl MmapState {
                 // writer.
                 unsafe { Self::publish_stack(self.ptr, &next) };
                 // SAFETY: `self.fd` is valid and we hold the lock.
-                unsafe { Self::unlock_file(self.fd) };
                 // Don't sync every write — too slow. Caller can sync explicitly.
                 Ok(())
             }
@@ -929,7 +903,6 @@ impl MmapState {
                 // and resume; the in-process mutex poisons via the
                 // guard's drop, as before.
                 // SAFETY: `self.fd` is valid and we hold the lock.
-                unsafe { Self::unlock_file(self.fd) };
                 std::panic::resume_unwind(payload);
             }
         }
@@ -949,10 +922,8 @@ impl MmapState {
             .lock()
             .map_err(|_| StateFileError::LockFailed)?;
         // SAFETY: `self.fd` is a valid open file descriptor.
-        unsafe { Self::lock_file(self.fd) }?;
         let result = Self::do_msync(self.ptr, mapped_len());
         // SAFETY: `self.fd` is valid and we hold the lock.
-        unsafe { Self::unlock_file(self.fd) };
         result
     }
 
@@ -1140,7 +1111,6 @@ impl MmapState {
                 // SAFETY: release the lock before cleanup; fd/ptr are
                 // exclusively owned. No other references exist.
                 unsafe {
-                    Self::unlock_file(fd);
                     munmap(ptr as *mut c_void, mapped_len());
                     close(fd);
                 }
@@ -1150,7 +1120,6 @@ impl MmapState {
                 // SAFETY: release the lock before cleanup; fd/ptr are
                 // exclusively owned. No other references exist.
                 unsafe {
-                    Self::unlock_file(fd);
                     munmap(ptr as *mut c_void, mapped_len());
                     close(fd);
                 }
@@ -1169,7 +1138,6 @@ impl MmapState {
             // SAFETY: unlock before cleanup; fd/ptr are exclusively
             // owned. No other references exist.
             unsafe {
-                Self::unlock_file(fd);
                 munmap(ptr as *mut c_void, mapped_len());
                 close(fd);
             }
@@ -1197,68 +1165,6 @@ impl MmapState {
             return Err(StateFileError::FsyncFailed);
         }
         Ok(())
-    }
-
-    /// Acquire an exclusive cross-process advisory lock on the state
-    /// file. Uses `flock(LOCK_EX | LOCK_NB)` — non-blocking, so if
-    /// another process holds the lock, this returns
-    /// `FileLockBusy` immediately instead of hanging the daemon.
-    ///
-    /// The lock is associated with the open file description (not the
-    /// fd or the process), so it is automatically released when the
-    /// last fd referring to this open file description is closed —
-    /// including by `Drop` on `MmapState`. For explicit release, use
-    /// [`unlock_file`].
-    ///
-    /// # Safety
-    ///
-    /// `fd` must be a valid open file descriptor.
-    unsafe fn lock_file(fd: i32) -> Result<(), StateFileError> {
-        // SAFETY: `fd` is a valid open file descriptor. `flock` is
-        // async-signal-safe and does not allocate.
-        let rc = unsafe { flock(fd, LOCK_EX | LOCK_NB) };
-        if rc != 0 {
-            // Use Rust's platform-neutral errno accessor rather than a
-            // libc-specific errno symbol.
-            let errno = std::io::Error::last_os_error().raw_os_error();
-            if errno == Some(libc::EWOULDBLOCK) || errno == Some(libc::EAGAIN) {
-                return Err(StateFileError::FileLockBusy);
-            }
-            return Err(StateFileError::Io(std::io::Error::last_os_error()));
-        }
-        Ok(())
-    }
-
-    /// Acquire the cross-process advisory lock in shared mode,
-    /// blocking until any exclusive (writer) lock is released.
-    ///
-    /// `modify` serializes its whole transaction under `LOCK_EX`, so
-    /// a shared holder can only ever observe complete publishes.
-    ///
-    /// # Safety
-    ///
-    /// `fd` must be a valid open file descriptor.
-    unsafe fn lock_file_shared(fd: i32) -> Result<(), StateFileError> {
-        // SAFETY: `fd` is a valid open file descriptor. `flock` is
-        // async-signal-safe and does not allocate.
-        let rc = unsafe { flock(fd, LOCK_SH) };
-        if rc != 0 {
-            return Err(StateFileError::Io(std::io::Error::last_os_error()));
-        }
-        Ok(())
-    }
-
-    /// Release the cross-process advisory lock.
-    ///
-    /// # Safety
-    ///
-    /// `fd` must be a valid open file descriptor that currently holds
-    /// a lock acquired by [`lock_file`] or [`lock_file_shared`].
-    unsafe fn unlock_file(fd: i32) {
-        // SAFETY: `fd` is a valid open file descriptor.
-        unsafe {
-            let _ = flock(fd, LOCK_UN);
-        }
     }
 }
 
@@ -1304,11 +1210,6 @@ pub enum StateFileError {
     VerificationFailed(CoreStateError),
     /// The internal writer mutex was poisoned.
     LockFailed,
-    /// The cross-process file lock could not be acquired (another
-    /// process is writing to the same state file). This is returned
-    /// instead of blocking, so the caller can retry or degrade
-    /// gracefully rather than hanging the daemon.
-    FileLockBusy,
 }
 
 impl std::fmt::Display for StateFileError {
@@ -1328,7 +1229,6 @@ impl std::fmt::Display for StateFileError {
             Self::MsyncFailed => write!(f, "msync failed"),
             Self::VerificationFailed(e) => write!(f, "verification failed: {e}"),
             Self::LockFailed => write!(f, "state writer lock poisoned"),
-            Self::FileLockBusy => write!(f, "state file locked by another process"),
         }
     }
 }
@@ -1459,7 +1359,7 @@ mod tests {
     }
 
     #[test]
-    fn open_rejects_mismatched_legacy_v4_size_and_releases_flock() {
+    fn open_rejects_mismatched_legacy_v4_size() {
         use crate::state::legacy_v4::GenesisCoreStateV4;
 
         let path = temp_state_path();
@@ -1495,9 +1395,6 @@ mod tests {
         for attempt in 0..2 {
             match MmapState::open(&path) {
                 Err(StateFileError::VerificationFailed(_)) => {}
-                Err(StateFileError::FileLockBusy) => {
-                    panic!("attempt {attempt}: the failed open leaked the exclusive flock")
-                }
                 Err(e) => panic!("attempt {attempt}: unexpected error {e}"),
                 Ok(_) => panic!("attempt {attempt}: damaged file opened successfully"),
             }

@@ -400,6 +400,39 @@ class StatusMixin:
             return PHASE_NREM
         return resolve_waking_drowsy(core_state.emergent_phase, core_state.arousal)
 
+    def _resolved_neuro_summary(self) -> NeuroSummary:
+        """NeuroSummary with the phase resolved through the zone.
+
+        The daemon's emergent phase takes ~minutes to cross into
+        NREM/REM after ``sleep()`` sets the zone — the LC population
+        switches on its own ~23-minute time constant. Through that
+        window the raw phase still reads active/drowsy, and every
+        consumer holding the raw summary disagrees with the zone:
+        inner life's ``_is_sleeping`` check flips her awake mid-dream,
+        its dream-synthesis wave read runs the waking regime (alpha)
+        on a sleeping body, and each flutter of the crossing fires a
+        "phase changed" notification announcing waking phases while
+        she sleeps.
+
+        ``status()``, ``feel()``, and ``brain_waves()`` already resolve
+        through :meth:`_effective_phase`; this makes the same resolved
+        phase available to the injected-summary consumers (InnerLife,
+        NotificationQueue) so every layer reads the phase the mind is
+        actually acting on. The desync *detectors* in ``sleep.py`` keep
+        the raw read on purpose — they exist to watch the raw phase.
+        """
+        core_state = self.client.get_state()
+        return NeuroSummary(
+            arousal=core_state.arousal,
+            valence=core_state.valence,
+            global_tone=core_state.global_tone,
+            plasticity_gate=core_state.plasticity_gate,
+            encoding_weight=core_state.encoding_weight,
+            consolidation_weight=core_state.consolidation_weight,
+            retrieval_weight=core_state.retrieval_weight,
+            phase=self._effective_phase(core_state),
+        )
+
     def feel(self, core_state: CoreState | None = None) -> EmotionalState:
         """Read current emotional state from neurochemistry.
 
@@ -1270,7 +1303,17 @@ class StatusMixin:
             "working_concepts": self.brain.frontal.network.size,
             "archive_concepts": self.brain.frontal.network.archive_size,
             "total_concepts": self.brain.frontal.network.total_concept_count,
+            # Edges, counted where they live. Sleep compression moves
+            # bridge edges into the holographic store — reporting only
+            # the explicit count makes migration look like loss.
+            "network_edges": self.brain.frontal.network.edge_count,
+            "holographic_edges": (
+                int(self._sleep_compressor.holographic_graph.stats()["distinct_edges"])
+                if self._sleep_compressor is not None
+                else 0
+            ),
         }
+        status["total_edges"] = status["network_edges"] + status["holographic_edges"]
         status.update(self._extended_status())
         return status
 

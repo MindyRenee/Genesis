@@ -76,7 +76,6 @@ from typing import Any
 
 from brain_waves import BrainWave, BrainWaveState
 from frontal_lobe.reasoning import Reasoner, ReasoningResult, ReasoningType
-from inhibition import RecurrentInhibition
 from temporal_lobe.concepts import QUALITY_THRESHOLD, ConceptNetwork, RelationType, is_world_concept
 
 from .emotion import EmotionalState
@@ -206,7 +205,6 @@ class Curiosity:
         # autonomous learner, the conversation path, and the global
         # workspace (receive_broadcast) — and a plain deque iteration
         # raises RuntimeError if another thread appends mid-loop.
-        self._lock = RecurrentInhibition()
         # Track recently asked questions to avoid repeating them.
         # The full deque holds 500 entries; _is_novel checks against
         # all of them (not just the last 20) so questions don't expire
@@ -260,14 +258,13 @@ class Curiosity:
         concept = concept.lower().strip()
         if not concept:
             return
-        with self._lock:
-            if concept not in self._resolved_questions_set:
-                self._resolved_questions.append(concept)
-                self._resolved_questions_set.add(concept)
-                # Keep the set in sync with the deque's maxlen pruning.
-                if len(self._resolved_questions_set) > self._resolved_questions_maxlen:
-                    self._resolved_questions_set = set(self._resolved_questions)
-                logger.debug(f"Curiosity question resolved for '{concept}'")
+        if concept not in self._resolved_questions_set:
+            self._resolved_questions.append(concept)
+            self._resolved_questions_set.add(concept)
+            # Keep the set in sync with the deque's maxlen pruning.
+            if len(self._resolved_questions_set) > self._resolved_questions_maxlen:
+                self._resolved_questions_set = set(self._resolved_questions)
+            logger.debug(f"Curiosity question resolved for '{concept}'")
 
     def assess_curiosity(
         self,
@@ -339,8 +336,7 @@ class Curiosity:
                 questions (reviewing what it already knows rather
                 than seeking new topics).
         """
-        with self._lock:
-            return self._generate_questions(emotion, active_concepts, max_questions, brain_waves)
+        return self._generate_questions(emotion, active_concepts, max_questions, brain_waves)
 
     def _generate_questions(
         self,
@@ -404,15 +400,13 @@ class Curiosity:
         what her questions broadcast back).
         """
         topics = item.metadata.get("topics") if item.metadata else None
-        with self._lock:
-            for topic in topics or ():
-                if topic and isinstance(topic, str):
-                    self._broadcast_concepts.append(topic)
+        for topic in topics or ():
+            if topic and isinstance(topic, str):
+                self._broadcast_concepts.append(topic)
 
     def current_focus_concepts(self) -> list[str]:
         """Return the strongest current world-concept attentional targets."""
-        with self._lock:
-            return self._collect_focus_concepts(None)
+        return self._collect_focus_concepts(None)
 
     def _collect_focus_concepts(self, active_concepts: list[str] | None) -> list[str]:
         """Determine which concepts to focus question generation on.
@@ -847,8 +841,7 @@ class Curiosity:
         If the gap_id is not yet tracked, it starts at 1. If it is
         already tracked, the count increments.
         """
-        with self._lock:
-            self._exposure_counts[gap_id] = self._exposure_counts.get(gap_id, 0) + 1
+        self._exposure_counts[gap_id] = self._exposure_counts.get(gap_id, 0) + 1
 
     def get_exposure_count(self, gap_id: str) -> int:
         """Get the exposure count for a knowledge gap.
@@ -905,13 +898,12 @@ class Curiosity:
         if curiosity_level < 0.2:
             return []
 
-        with self._lock:
-            questions = self._collect_social_questions(user_model, curiosity_level)
+        questions = self._collect_social_questions(user_model, curiosity_level)
 
-            # Apply habituation and information gain
-            for q in questions:
-                self._apply_habituation(q)
-                q.info_gain = self.compute_information_gap(q)
+        # Apply habituation and information gain
+        for q in questions:
+            self._apply_habituation(q)
+            q.info_gain = self.compute_information_gap(q)
 
         # Sort by curiosity score
         questions.sort(key=lambda q: -q.curiosity_score)
@@ -1031,42 +1023,38 @@ class Curiosity:
         restart reset the novelty window and the same gaps produced
         the same questions again.
         """
-        with self._lock:
-            return {
-                "asked_questions": list(self._asked_questions),
-                "resolved_questions": list(self._resolved_questions),
-                "exposure_counts": dict(self._exposure_counts),
-                "last_exposure_confidence": dict(self._last_exposure_confidence),
-            }
+        return {
+            "asked_questions": list(self._asked_questions),
+            "resolved_questions": list(self._resolved_questions),
+            "exposure_counts": dict(self._exposure_counts),
+            "last_exposure_confidence": dict(self._last_exposure_confidence),
+        }
 
     def restore_from_dict(self, data: dict[str, Any]) -> None:
         """Restore persisted curiosity state after validating its shape."""
         if not isinstance(data, dict):
             raise TypeError("curiosity state must be an object")
 
-        with self._lock:
-            asked = data.get("asked_questions", [])
-            if not isinstance(asked, list):
-                raise TypeError("curiosity.asked_questions must be a list")
-            self._asked_questions = deque(
-                (str(k) for k in asked), maxlen=self._asked_questions_maxlen
-            )
-            self._asked_questions_set = set(self._asked_questions)
+        asked = data.get("asked_questions", [])
+        if not isinstance(asked, list):
+            raise TypeError("curiosity.asked_questions must be a list")
+        self._asked_questions = deque((str(k) for k in asked), maxlen=self._asked_questions_maxlen)
+        self._asked_questions_set = set(self._asked_questions)
 
-            resolved = data.get("resolved_questions", [])
-            if not isinstance(resolved, list):
-                raise TypeError("curiosity.resolved_questions must be a list")
-            self._resolved_questions = deque(
-                (str(k) for k in resolved), maxlen=self._resolved_questions_maxlen
-            )
-            self._resolved_questions_set = set(self._resolved_questions)
+        resolved = data.get("resolved_questions", [])
+        if not isinstance(resolved, list):
+            raise TypeError("curiosity.resolved_questions must be a list")
+        self._resolved_questions = deque(
+            (str(k) for k in resolved), maxlen=self._resolved_questions_maxlen
+        )
+        self._resolved_questions_set = set(self._resolved_questions)
 
-            exposure = data.get("exposure_counts", {})
-            if not isinstance(exposure, dict):
-                raise TypeError("curiosity.exposure_counts must be an object")
-            self._exposure_counts = {str(k): int(v) for k, v in exposure.items()}
+        exposure = data.get("exposure_counts", {})
+        if not isinstance(exposure, dict):
+            raise TypeError("curiosity.exposure_counts must be an object")
+        self._exposure_counts = {str(k): int(v) for k, v in exposure.items()}
 
-            last_confidence = data.get("last_exposure_confidence", {})
-            if not isinstance(last_confidence, dict):
-                raise TypeError("curiosity.last_exposure_confidence must be an object")
-            self._last_exposure_confidence = {str(k): float(v) for k, v in last_confidence.items()}
+        last_confidence = data.get("last_exposure_confidence", {})
+        if not isinstance(last_confidence, dict):
+            raise TypeError("curiosity.last_exposure_confidence must be an object")
+        self._last_exposure_confidence = {str(k): float(v) for k, v in last_confidence.items()}

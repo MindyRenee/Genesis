@@ -1548,8 +1548,8 @@ pub fn write_message(stream: &mut UnixStream, cmd_id: u8, payload: &[u8]) -> std
 /// A trait for obtaining mutable access to an `LtmStore`.
 ///
 /// This abstraction lets the `IpcServer` work with both:
-/// - **Shared ownership** (daemon): `Arc<Inhibition<LtmStore>>` implements
-///   this trait, locking the mutex and returning a `InhibitionGuard`.
+/// - **Shared ownership** (daemon): `Arc<Shared<LtmStore>>` implements
+///   this trait, locking the mutex and returning a `MutexGuard`.
 ///
 /// Without this, the daemon binary had to reimplement the entire IPC
 /// accept loop and connection handler — a 100-line duplication that
@@ -1565,20 +1565,14 @@ pub trait LtmAccess {
     fn access(&mut self) -> Self::Guard<'_>;
 }
 
-impl LtmAccess for std::sync::Arc<crate::inhibition::Inhibition<LtmStore>> {
+impl LtmAccess for std::sync::Arc<crate::shared::Shared<LtmStore>> {
     type Guard<'a>
-        = crate::inhibition::InhibitionGuard<'a, LtmStore>
+        = &'a mut LtmStore
     where
         Self: 'a;
 
     fn access(&mut self) -> Self::Guard<'_> {
-        // A poisoned LTM mutex means a prior writer panicked mid-write.
-        // Recovering the inner data is safer than crashing the daemon
-        // (which would kill every IPC connection thread). The data may
-        // be inconsistent, but not undefined behavior — `LtmStore`
-        // contains only owned Rust types (no raw pointers in the
-        // metadata structures).
-        self.lock().unwrap_or_else(|e| e.into_inner())
+        self.get()
     }
 }
 
@@ -1655,7 +1649,7 @@ impl IpcServer {
     /// This blocks the calling thread — run it in a dedicated thread.
     ///
     /// The `ltm` parameter is generic over `LtmAccess`, so callers
-    /// pass an `Arc<Inhibition<LtmStore>>` (daemon and tests) without
+    /// pass an `Arc<Shared<LtmStore>>` (daemon and tests) without
     /// reimplementing the server loop.
     ///
     /// `mmap` and `stm` are wrapped in `Arc` because they cannot be
@@ -4391,9 +4385,9 @@ pub fn default_handler<L: LtmAccess>(
 /// This handler dispatches the reactive commands to the TickLoop
 /// and delegates all other commands to default_handler.
 pub fn reactive_handler<L>(
-    tick_loop: std::sync::Arc<crate::inhibition::Inhibition<super::tick::TickLoop>>,
+    tick_loop: std::sync::Arc<crate::shared::Shared<super::tick::TickLoop>>,
     data_dir: std::path::PathBuf,
-    auto_internals: std::sync::Arc<crate::inhibition::Inhibition<super::adaptive::AutoSnapshot>>,
+    auto_internals: std::sync::Arc<crate::shared::Shared<super::adaptive::AutoSnapshot>>,
 ) -> impl Fn(&MmapState, &RingBuffer, &mut L, u8, &[u8]) -> Vec<u8> + Clone + Send + 'static
 where
     L: LtmAccess,
@@ -4440,7 +4434,7 @@ where
                 // dead. A future protocol revision can drop it.
                 let _requested_dt =
                     f32::from_le_bytes(payload[0..4].try_into().unwrap_or_default());
-                let mut tl = match tick_loop.lock() {
+                let tl = match tick_loop.lock() {
                     Ok(tl) => tl,
                     Err(e) => {
                         eprintln!("[ipc] ADVANCE_NEURO: tick_loop poisoned: {e}");
@@ -4518,7 +4512,7 @@ where
                     f32::from_le_bytes(payload[0..4].try_into().unwrap_or_default()),
                     0.0,
                 );
-                let mut tl = match tick_loop.lock() {
+                let tl = match tick_loop.lock() {
                     Ok(tl) => tl,
                     Err(e) => {
                         eprintln!("[ipc] ADVANCE_PHYSICS: tick_loop poisoned: {e}");
@@ -4559,7 +4553,7 @@ where
             }
 
             cmd::CONSOLIDATE => {
-                let mut tl = match tick_loop.lock() {
+                let tl = match tick_loop.lock() {
                     Ok(tl) => tl,
                     Err(e) => {
                         eprintln!("[ipc] CONSOLIDATE: tick_loop poisoned: {e}");
@@ -4574,7 +4568,7 @@ where
             }
 
             cmd::ASSOCIATE => {
-                let mut tl = match tick_loop.lock() {
+                let tl = match tick_loop.lock() {
                     Ok(tl) => tl,
                     Err(e) => {
                         eprintln!("[ipc] ASSOCIATE: tick_loop poisoned: {e}");
@@ -4589,7 +4583,7 @@ where
             }
 
             cmd::DREAM => {
-                let mut tl = match tick_loop.lock() {
+                let tl = match tick_loop.lock() {
                     Ok(tl) => tl,
                     Err(e) => {
                         eprintln!("[ipc] DREAM: tick_loop poisoned: {e}");
@@ -4604,7 +4598,7 @@ where
             }
 
             cmd::READ_SENSORS => {
-                let mut tl = match tick_loop.lock() {
+                let tl = match tick_loop.lock() {
                     Ok(tl) => tl,
                     Err(e) => {
                         eprintln!("[ipc] READ_SENSORS: tick_loop poisoned: {e}");
@@ -4621,7 +4615,7 @@ where
             }
 
             cmd::APPLY_BODY_CONTROL => {
-                let mut tl = match tick_loop.lock() {
+                let tl = match tick_loop.lock() {
                     Ok(tl) => tl,
                     Err(e) => {
                         eprintln!("[ipc] APPLY_BODY_CONTROL: tick_loop poisoned: {e}");
@@ -4665,7 +4659,6 @@ where
                         resp.extend_from_slice(&tally.total_ms(i, now_ms).to_le_bytes());
                     }
                 }
-                drop(tally_guard);
                 resp
             }
 
@@ -4682,7 +4675,7 @@ where
             }
 
             cmd::SAVE_INFERENCE => {
-                let mut tl = match tick_loop.lock() {
+                let tl = match tick_loop.lock() {
                     Ok(tl) => tl,
                     Err(e) => {
                         eprintln!("[ipc] SAVE_INFERENCE: tick_loop poisoned: {e}");
@@ -4749,7 +4742,7 @@ where
                 }
                 let gain = f32::from_le_bytes(payload[0..4].try_into().unwrap_or_default());
                 match tick_loop.lock() {
-                    Ok(mut tl) => {
+                    Ok(tl) => {
                         tl.set_optic_gain(gain);
                         vec![1u8]
                     }
@@ -4769,7 +4762,7 @@ where
                 }
                 let meters = f32::from_le_bytes(payload[0..4].try_into().unwrap_or_default());
                 match tick_loop.lock() {
-                    Ok(mut tl) => {
+                    Ok(tl) => {
                         tl.set_focus(meters);
                         vec![1u8]
                     }
@@ -4791,7 +4784,7 @@ where
                 }
                 let openness = f32::from_le_bytes(payload[0..4].try_into().unwrap_or_default());
                 match tick_loop.lock() {
-                    Ok(mut tl) => {
+                    Ok(tl) => {
                         tl.set_lid(openness);
                         vec![1u8]
                     }
@@ -4844,7 +4837,7 @@ where
                     return vec![error::INVALID_VALUE];
                 };
                 match tick_loop.lock() {
-                    Ok(mut tl) => {
+                    Ok(tl) => {
                         tl.place_inner(pose.clone());
                         // The body keeps its place: write it where the
                         // boot path will hand it back to the cord —

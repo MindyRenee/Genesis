@@ -297,6 +297,125 @@ impl StereographicSphere {
         }
         Ok(out)
     }
+    /// Exact geodesic flight: lift the chart point x and chart
+    /// velocity u to the sphere of radius 1/√κ and advance the
+    /// great circle by θ = ω·dt — parallel transport itself,
+    /// not a truncation of it. On the unit-sphere chart
+    /// y = √κ·x with conformal λ(y) = 2/(1+‖y‖²), the lift is
+    ///
+    ///   Y = (λy, 1 − λ‖y‖²),   V = (λ(w − λ⟨y,w⟩y), −λ²⟨y,w⟩),
+    ///   w = √κ·u,
+    ///
+    /// which satisfies Y·V = 0 and ‖V‖ = λ‖w‖ = ω exactly.
+    /// The geodesic is the rotation Y(t) = Y cos θ + V sin θ/ω,
+    /// V(t) = V cos θ − ωY sin θ — norm-preserving to machine
+    /// precision at any step size, periodic where Euler blows
+    /// up — and the chart back is
+    ///
+    ///   y⁺ = Y⁺_eq/(1 + Y⁺_pol),   u⁺ = (V⁺_eq − V⁺_pol·y⁺)/(λ(y⁺)√κ).
+    pub fn geodesic_flow(
+        &self,
+        x: &[f64],
+        u: &[f64],
+        dt: f64,
+    ) -> Result<(Vector, Vector), FieldError> {
+        if x.len() != self.dimension || u.len() != self.dimension {
+            return Err(FieldError::DimensionMismatch);
+        }
+        if x.iter().chain(u.iter()).any(|c| !c.is_finite()) || !dt.is_finite() || dt < 0.0 {
+            return Err(FieldError::NonFiniteState);
+        }
+        let sqrt_c = self.curvature.sqrt();
+        let y = scaled(x, sqrt_c);
+        let y2 = dot(&y, &y);
+        let lambda = 2.0 / (1.0 + y2);
+        let mut big_y = scaled(&y, lambda);
+        big_y.push(1.0 - lambda * y2);
+        let w = scaled(u, sqrt_c);
+        let s = dot(&y, &w);
+        let mut big_v: Vector = w
+            .iter()
+            .zip(y.iter())
+            .map(|(wi, yi)| lambda * (wi - lambda * s * yi))
+            .collect();
+        big_v.push(-lambda * lambda * s);
+        let omega = norm(&big_v);
+        if omega < EPS {
+            return Ok((x.to_vec(), u.to_vec()));
+        }
+        let theta = omega * dt;
+        let (sn, cs) = theta.sin_cos();
+        let y_next: Vector = big_y
+            .iter()
+            .zip(big_v.iter())
+            .map(|(yi, vi)| yi * cs + vi * sn / omega)
+            .collect();
+        let v_next: Vector = big_y
+            .iter()
+            .zip(big_v.iter())
+            .map(|(yi, vi)| vi * cs - omega * yi * sn)
+            .collect();
+        let (y_eq, y_pol) = y_next.split_at(self.dimension);
+        let denom = 1.0 + y_pol[0];
+        if !denom.is_finite() || denom.abs() < EPS {
+            return Err(FieldError::NonFiniteState);
+        }
+        let y_out = scaled(y_eq, 1.0 / denom);
+        let lambda_out = 2.0 / (1.0 + dot(&y_out, &y_out));
+        if !lambda_out.is_finite() {
+            return Err(FieldError::NonFiniteState);
+        }
+        let (v_eq, v_pol) = v_next.split_at(self.dimension);
+        let u_out: Vector = v_eq
+            .iter()
+            .zip(y_out.iter())
+            .map(|(ve, yo)| (ve - v_pol[0] * yo) / (lambda_out * sqrt_c))
+            .collect();
+        let x_out = scaled(&y_out, 1.0 / sqrt_c);
+        if x_out.iter().chain(u_out.iter()).any(|c| !c.is_finite()) {
+            return Err(FieldError::NonFiniteState);
+        }
+        Ok((x_out, u_out))
+    }
+    /// The Christoffel contraction Γ(x; v, v) of the
+    /// κ-stereographic metric g = λ²δ, λ = 2/(1+κ‖x‖²) — the
+    /// chart-coordinate deflection a freely carried vector
+    /// undergoes. On a positively curved sphere parallel
+    /// transport is not coordinate-constant: a vector moving
+    /// tangentially is bent back toward the pole
+    /// (Γ ∝ −‖v‖²x), and a vector moving radially finds the
+    /// chart stretching under it (Γ ∝ +⟨x,v⟩v) — at constant
+    /// geodesic speed the chart speed grows outward. The
+    /// geodesic equation reads v̇ = −Γ(v, v):
+    ///
+    ///   Γ^k_ij v^i v^j = −2κ/(1+κ‖x‖²)·(2⟨x,v⟩v^k − ‖v‖²x^k).
+    ///
+    /// Vanishes at the pole (the chart is Cartesian there) and
+    /// diverges at the south pole, which the cap never reaches.
+    pub fn connection_acceleration(&self, x: &[f64], v: &[f64]) -> Result<Vector, FieldError> {
+        if x.len() != self.dimension || v.len() != self.dimension {
+            return Err(FieldError::DimensionMismatch);
+        }
+        if x.iter().chain(v.iter()).any(|c| !c.is_finite()) {
+            return Err(FieldError::NonFiniteState);
+        }
+        let x2 = dot(x, x);
+        let xv = dot(x, v);
+        let v2 = dot(v, v);
+        let w = 1.0 + self.curvature * x2;
+        if !w.is_finite() || w.abs() < EPS {
+            return Err(FieldError::NonFiniteState);
+        }
+        let mut gamma = scaled(v, 2.0 * xv);
+        for (g, xk) in gamma.iter_mut().zip(x.iter()) {
+            *g -= v2 * xk;
+        }
+        let gamma = scaled(&gamma, -2.0 * self.curvature / w);
+        if gamma.iter().any(|c| !c.is_finite()) {
+            return Err(FieldError::NonFiniteState);
+        }
+        Ok(gamma)
+    }
     /// Möbius addition — the gyrovector operation that plays the
     /// role of vector addition on the stereographic sphere (Ungar;
     /// κ > 0, equator image at radius 1/√κ):
@@ -653,6 +772,53 @@ impl SystemFiber {
     pub fn layer_mut(&mut self, id: &str) -> Option<&mut SubsystemLayer> {
         self.layers.iter_mut().find(|l| l.id == id)
     }
+    /// Positive curvature: momentum is a chart vector on the
+    /// κ-sphere, so free flight is not the flat Euler move — it
+    /// is the geodesic. The scheme is kick–drift–kick: the
+    /// midpoint momentum p½ = (p + p⁺)/2 owns the flight, its
+    /// velocity u½ = p½/m is lifted to the sphere and carried
+    /// along the great circle in closed form — all orders of
+    /// the curvature, none of the truncation — and the second
+    /// half-impulse Δp/2 lands in the new tangent frame.
+    /// As κ → 0 this collapses to the layer's flat trapezoid:
+    /// x⁺ = x + u½·dt, p⁺ = p½ + Δp/2. The layer stays
+    /// geometry-agnostic; the fiber owns the manifold and owes
+    /// its momenta the curvature. A coordinate at m = ∞
+    /// contributes no velocity to the flight: its momentum is
+    /// held, not carried.
+    fn transport(
+        &self,
+        state: &[f64],
+        momentum: &[f64],
+        rest: &[f64],
+        dt: f64,
+        next_state: &mut Vector,
+        next_momentum: &mut Vector,
+    ) -> Result<(), FieldError> {
+        let u: Vector = momentum
+            .iter()
+            .zip(next_momentum.iter())
+            .zip(rest.iter())
+            .map(|((p, pn), m)| {
+                if m.is_finite() {
+                    (p + pn) / (2.0 * m)
+                } else {
+                    0.0
+                }
+            })
+            .collect();
+        if u.iter().all(|c| *c == 0.0) {
+            return Ok(());
+        }
+        let (x, u) = self.manifold.geodesic_flow(state, &u, dt)?;
+        *next_state = x;
+        for i in 0..next_momentum.len() {
+            if rest[i].is_finite() {
+                next_momentum[i] = rest[i] * u[i] + (next_momentum[i] - momentum[i]) / 2.0;
+            }
+        }
+        Ok(())
+    }
     pub fn step(&mut self, dt: f64) -> Result<(), FieldError> {
         if !self.engine_clock.is_finite() || self.engine_clock < 0.0 {
             return Err(FieldError::InvalidTime);
@@ -739,8 +905,31 @@ impl SystemFiber {
             let mean_force: Vector = (0..layer.state.len())
                 .map(|j| (k1[i][j] + 2.0 * k2[i][j] + 2.0 * k3[i][j] + k4[i][j]) / 6.0)
                 .collect();
-            let (state, momentum) = layer.advect(&mean_force, effective_dt)?;
-            layer.state = self.manifold.project(&state)?;
+            let (mut state, mut momentum) = layer.advect(&mean_force, effective_dt)?;
+            self.transport(
+                &layer.state,
+                &layer.momentum,
+                &layer.rest,
+                effective_dt,
+                &mut state,
+                &mut momentum,
+            )?;
+            let projected = self.manifold.project(&state)?;
+            // The cap is a wall: whatever displacement the
+            // projection removed is motion the constraint never
+            // allowed, and its reaction takes the same impulse
+            // back out of her momentum — Δp = −m·δx/dt. Without
+            // this a sustained outward force piles momentum up
+            // against the rim forever.
+            for i in 0..momentum.len() {
+                if layer.rest[i].is_finite() {
+                    momentum[i] -= layer.rest[i] * (state[i] - projected[i]) / effective_dt;
+                }
+            }
+            if momentum.iter().any(|v| !v.is_finite()) {
+                return Err(FieldError::NonFiniteState);
+            }
+            layer.state = projected;
             layer.momentum = momentum;
         }
         let next_clock = self.engine_clock + effective_dt;
@@ -789,9 +978,31 @@ impl SystemFiber {
             return Ok(());
         }
         let mut next_layers = self.layers.clone();
-        for (layer, derivative) in next_layers.iter_mut().zip(derivatives) {
+        for ((layer, launch), derivative) in next_layers
+            .iter_mut()
+            .zip(self.layers.iter())
+            .zip(derivatives)
+        {
             layer.evolve(derivative, effective_dt)?;
-            layer.state = self.manifold.project(&layer.state)?;
+            self.transport(
+                &launch.state,
+                &launch.momentum,
+                &launch.rest,
+                effective_dt,
+                &mut layer.state,
+                &mut layer.momentum,
+            )?;
+            let projected = self.manifold.project(&layer.state)?;
+            for i in 0..layer.momentum.len() {
+                if layer.rest[i].is_finite() {
+                    layer.momentum[i] -=
+                        layer.rest[i] * (layer.state[i] - projected[i]) / effective_dt;
+                }
+            }
+            if layer.momentum.iter().any(|v| !v.is_finite()) {
+                return Err(FieldError::NonFiniteState);
+            }
+            layer.state = projected;
         }
         let next_clock = self.engine_clock + effective_dt;
         if !next_clock.is_finite() {
@@ -1285,18 +1496,26 @@ impl GlobalField {
     /// the way toward (positive) or away from (negative)
     /// `target_tangent` — expressed in the reference frame, mapped
     /// back through the transport inverse — plus a thermal kick of
-    /// amplitude `sigma`. Then all staged states commit at once, so
-    /// a failure mid-loop leaves the field untouched.
+    /// amplitude `sigma`. The moves are pushes, not teleportation:
+    /// the deterministic correction imparts the momentum of the
+    /// velocity it implies, m·δ/dt, and the kick lands as a
+    /// Langevin impulse √m·σ·g — velocity kick ∝ 1/√m, so a
+    /// rested dimension trembles less for the same heat. Then all
+    /// staged states commit at once, so a failure mid-loop leaves
+    /// the field untouched.
     fn pull_toward(
         &mut self,
         target_tangent: &Vector,
         signed_gain: f64,
         sigma: f64,
+        dt: f64,
     ) -> Result<(), FieldError> {
         let mut rng = self.rng_state;
         let reference_id = self.fibers[0].id.clone();
-        let mut next_states: Vec<(usize, Vec<Vector>)> =
-            Vec::with_capacity(self.fibers.len().saturating_sub(1));
+        // Per fiber: its index, the deterministic correction every
+        // layer took, and per layer the staged state plus the kick
+        // that pushed it — the two halves of the impulse.
+        let mut staged = Vec::with_capacity(self.fibers.len().saturating_sub(1));
         for i in 1..self.fibers.len() {
             let matrix = self.path_matrix(&self.fibers[i].id, &reference_id)?;
             let inv = matrix_inverse(&matrix)?;
@@ -1309,18 +1528,39 @@ impl GlobalField {
             for layer in &self.fibers[i].layers {
                 let tangent = manifold.log_origin(&layer.state)?;
                 let mut updated = add(&tangent, &correction);
+                let mut kick = vec![0.0; updated.len()];
                 if sigma > 0.0 {
-                    for v in updated.iter_mut() {
-                        *v += sigma * gaussian(&mut rng);
+                    for (v, k) in updated.iter_mut().zip(kick.iter_mut()) {
+                        *k = sigma * gaussian(&mut rng);
+                        *v += *k;
                     }
                 }
                 let next = manifold.project(&manifold.exp_origin(&updated)?)?;
-                states_for_fiber.push(next);
+                states_for_fiber.push((next, kick));
             }
-            next_states.push((i, states_for_fiber));
+            staged.push((i, correction, states_for_fiber));
         }
-        for (i, states_for_fiber) in next_states {
-            for (layer, next) in self.fibers[i].layers.iter_mut().zip(states_for_fiber) {
+        for (i, correction, states_for_fiber) in staged {
+            for (layer, (next, kick)) in self.fibers[i].layers.iter_mut().zip(states_for_fiber) {
+                if dt > 0.0 {
+                    let gain = signed_gain.abs();
+                    for (((p, m), c), k) in layer
+                        .momentum
+                        .iter_mut()
+                        .zip(layer.rest.iter())
+                        .zip(correction.iter())
+                        .zip(kick.iter())
+                    {
+                        if m.is_finite() {
+                            // The pull implied a velocity — her
+                            // momentum relaxes toward it by the
+                            // same fraction the state took — and
+                            // the kick lands as a Langevin impulse
+                            // √m·σ·g, velocity ∝ 1/√m.
+                            *p += gain * (m * c / dt - *p) + m.sqrt() * k;
+                        }
+                    }
+                }
                 layer.state = next;
             }
         }
@@ -1337,7 +1577,7 @@ impl GlobalField {
         let (next_disagreement, gain, sigma, next_temperature) =
             self.thermal_plan(&states, &consensus, dt, bath)?;
         let consensus_tangent = self.manifold.log_origin(&consensus)?;
-        self.pull_toward(&consensus_tangent, gain, sigma)?;
+        self.pull_toward(&consensus_tangent, gain, sigma, dt)?;
         self.disagreement = next_disagreement;
         self.temperature = next_temperature;
         Ok(Some(consensus))
@@ -1362,7 +1602,7 @@ impl GlobalField {
         let (next_disagreement, gain, sigma, next_temperature) =
             self.thermal_plan(&states, &consensus, dt, bath)?;
         let consensus_tangent = self.manifold.log_origin(&consensus)?;
-        self.pull_toward(&consensus_tangent, -gain, sigma)?;
+        self.pull_toward(&consensus_tangent, -gain, sigma, dt)?;
         self.disagreement = next_disagreement;
         self.temperature = next_temperature;
         Ok(Some(consensus))
@@ -2009,9 +2249,9 @@ mod tests {
         // `step` does: a fiber at 2× pushes dt·2·gain·F into the
         // layer's momentum and advances its clock by the scaled
         // interval. Momentum is the carrier now: the force lands
-        // as q = (1 − e^{−rest·dt})/rest of itself, and the state
-        // follows only the fraction the momentum had time to
-        // gather — inertia, not instantaneous displacement.
+        // whole, p⁺ = gain·F·dt, and the state follows only the
+        // fraction the rest mass let become motion — inertia, not
+        // instantaneous displacement.
         let m = StereographicSphere::new(1, 1.0).unwrap();
         let mut engine = SystemEngine::zero(1, 1);
         engine.time_scale = 2.0;
@@ -2021,9 +2261,14 @@ mod tests {
         fiber.evolve(&[vec![0.5]], 0.1).unwrap();
         // dt_eff = 0.2: the impulse lands whole, p⁺ = gain·F·dt;
         // the state gathers only the part momentum had time to
-        // spend — (p·dt + a·dt²/2)/m with p = 0, m = 1.
-        assert!((fiber.layers[0].momentum[0] - 0.1).abs() < 1.0e-12);
-        assert!((fiber.layers[0].state[0] - 0.01).abs() < 1.0e-12);
+        // spend — (p·dt + a·dt²/2)/m with p = 0, m = 1. The
+        // manifold's kick–drift–kick bends both slightly: the
+        // midpoint velocity flies the great circle (state =
+        // tan(θ/2), not the flat trapezoid) and the second
+        // half-kick lands in the transported frame — the ~5e-6
+        // drift from the flat values is the curvature itself.
+        assert!((fiber.layers[0].momentum[0] - 0.1).abs() < 1.0e-4);
+        assert!((fiber.layers[0].state[0] - 0.01).abs() < 1.0e-4);
         assert!((fiber.engine_clock - 0.2).abs() < 1.0e-12);
     }
 
@@ -2091,6 +2336,89 @@ mod tests {
         let mid = m.geodesic(&x, &y, 0.5).unwrap();
         assert!((m.distance(&x, &mid).unwrap() - 0.5 * full).abs() < 1.0e-9);
         assert!((m.distance(&mid, &y).unwrap() - 0.5 * full).abs() < 1.0e-9);
+    }
+
+    #[test]
+    fn geodesic_flow_preserves_metric_speed_at_any_step() {
+        // Free flight is parallel transport: the conformal speed
+        // λ(x)·‖u‖, λ = 2/(1+κ‖x‖²), is conserved exactly — even
+        // for a step that sweeps half the sphere, where any
+        // truncated connection term would feed back on itself.
+        let m = StereographicSphere::new(2, 1.0).unwrap();
+        let conformal_speed = |x: &[f64], u: &[f64]| 2.0 / (1.0 + dot(x, x)) * norm(u);
+        let x = vec![0.3, -0.2];
+        let u = vec![0.7, 0.4];
+        let s0 = conformal_speed(&x, &u);
+        for dt in [0.01, 0.5, 3.0, 20.0] {
+            let (x1, u1) = m.geodesic_flow(&x, &u, dt).unwrap();
+            let s1 = conformal_speed(&x1, &u1);
+            assert!(
+                (s1 - s0).abs() < 1.0e-10,
+                "metric speed must be conserved at dt={dt}: {s0} vs {s1}"
+            );
+        }
+        // And the flight is honest geodesic motion: the distance
+        // travelled is the metric speed times the interval.
+        let (x1, _) = m.geodesic_flow(&x, &u, 0.5).unwrap();
+        assert!(
+            (m.distance(&x, &x1).unwrap() - s0 * 0.5).abs() < 1.0e-9,
+            "the flight path is a great circle flown at constant speed"
+        );
+    }
+
+    #[test]
+    fn geodesic_flow_agrees_with_the_connection_to_first_order() {
+        // For a short step the closed-form flight must reproduce
+        // the Christoffel deflection: u⁺ = u − Γ(v,v)·dt + O(dt²),
+        // x⁺ = x + u·dt + O(dt²). This pins the lift to the
+        // connection the geometry claims it integrates.
+        let m = StereographicSphere::new(2, 1.0).unwrap();
+        let x = vec![0.3, -0.2];
+        let u = vec![0.4, 0.25];
+        let dt = 1.0e-4;
+        let gamma = m.connection_acceleration(&x, &u).unwrap();
+        let (x1, u1) = m.geodesic_flow(&x, &u, dt).unwrap();
+        for i in 0..2 {
+            assert!(
+                (x1[i] - (x[i] + u[i] * dt)).abs() < 1.0e-8,
+                "short flight is Euler to first order"
+            );
+            assert!(
+                (u1[i] - (u[i] - gamma[i] * dt)).abs() < 1.0e-7,
+                "short transport is Christoffel to first order"
+            );
+        }
+        // At the pole the chart is Cartesian: Γ vanishes and the
+        // launch is a straight line in the u's own direction —
+        // but the chart speed still grows as the conformal
+        // factor shrinks, since only λ‖u‖ is conserved.
+        let (x1, u1) = m.geodesic_flow(&[0.0, 0.0], &u, 1.0e-4).unwrap();
+        for i in 0..2 {
+            assert!((x1[i] - u[i] * 1.0e-4).abs() < 1.0e-9);
+            assert!((u1[i] - u[i]).abs() < 1.0e-7);
+        }
+    }
+
+    #[test]
+    fn geodesic_flow_wraps_the_sphere_without_blowing_up() {
+        // The sphere is compact: a huge step must come back, not
+        // diverge — the failure mode of any additive curvature
+        // term is exactly this blow-up.
+        let m = StereographicSphere::new(1, 1.0).unwrap();
+        let x = vec![0.1];
+        let u = vec![1.0];
+        let (x1, u1) = m.geodesic_flow(&x, &u, 1.0e3).unwrap();
+        assert!(x1[0].is_finite() && u1[0].is_finite());
+        // Two half-period flights compose into a full orbit:
+        // geodesic speed s = λ‖u‖ = 2·1/(1.01), period =
+        // 2π/s in coordinate time… simpler: flying θ and θ+2π/ω
+        // returns both point and vector.
+        let speed = 2.0 / (1.0 + 0.01) * 1.0;
+        let period = 2.0 * std::f64::consts::PI / speed;
+        let (xa, ua) = m.geodesic_flow(&x, &u, 0.3 * period).unwrap();
+        let (xb, ub) = m.geodesic_flow(&xa, &ua, 0.7 * period).unwrap();
+        assert!((xb[0] - x[0]).abs() < 1.0e-8);
+        assert!((ub[0] - u[0]).abs() < 1.0e-8);
     }
 
     #[test]

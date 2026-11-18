@@ -44,7 +44,7 @@
 //! - The IPC server runs in a background accept thread
 //! - Each accepted client connection is served on its own thread, so a
 //!   single slow request cannot block other clients
-//! - Access to the LTM store is serialized via `Arc<Inhibition<LtmStore>>`.
+//! - Access to the LTM store is serialized via `Arc<Shared<LtmStore>>`.
 //!   The IPC handler holds the lock briefly during requests. The
 //!   `LtmAccess` trait lets the library `IpcServer` work with the
 //!   mutex-protected store without reimplementing the accept loop.
@@ -55,7 +55,7 @@
 //!
 //! A bridge thread forwards daemon→IPC, and the main thread checks both.
 
-use genesis::inhibition::Inhibition;
+use genesis::shared::Shared;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -81,7 +81,7 @@ impl Default for Config {
         Self {
             socket_path: data_dir.join("genesis.sock"),
             data_dir,
-            stm_capacity: 256,
+            stm_capacity: 4096,
             ltm_capacity: 65_536,
         }
     }
@@ -154,7 +154,7 @@ fn parse_args() -> Config {
                 println!(
                     "  --socket <path>        Unix socket path (default: <data-dir>/genesis.sock)"
                 );
-                println!("  --stm-capacity <n>     STM ring buffer capacity (default: 256)");
+                println!("  --stm-capacity <n>     STM ring buffer capacity (default: 4096)");
                 println!("  --ltm-capacity <n>     LTM episode capacity (default: 65536)");
                 println!("  --help, -h             Show this help message");
                 std::process::exit(0);
@@ -184,25 +184,9 @@ fn parse_args() -> Config {
 ///
 /// Returns `true` when the refusal was a poison — an unrecoverable,
 /// permanent refusal the caller must escalate rather than skip.
-fn lock_refusal<T>(what: &'static str, e: std::sync::TryLockError<T>) -> bool {
-    if let std::sync::TryLockError::Poisoned(_) = e {
-        static REPORTED: genesis::inhibition::Innate<Inhibition<Vec<&'static str>>> =
-            genesis::inhibition::Innate::new();
-        let reported = REPORTED.get_or_init(|| Inhibition::new(Vec::new()));
-        let mut guard = match reported.lock() {
-            Ok(g) => g,
-            Err(poisoned) => poisoned.into_inner(),
-        };
-        if !guard.contains(&what) {
-            guard.push(what);
-            eprintln!(
-                "[genesis] {what} mutex is poisoned — a thread panicked while holding it. \
-                 The autonomous fallback cannot run this subsystem and will keep skipping it \
-                 until the daemon restarts. The IPC path will refuse it too."
-            );
-        }
-        return true;
-    }
+fn lock_refusal(_what: &'static str, _e: genesis::shared::Denied) -> bool {
+    // `Shared` never refuses — this arm only exists so the shaped
+    // `Err` patterns still type-check; it is unreachable.
     false
 }
 
@@ -400,7 +384,7 @@ fn main() {
     }
 
     // Wrap the LTM in a mutex for shared access between IPC handlers.
-    let ltm = Arc::new(Inhibition::new(ltm));
+    let ltm = Arc::new(Shared::new(ltm));
     let stm = Arc::new(stm);
     let mmap = Arc::new(mmap);
 
@@ -450,9 +434,7 @@ fn main() {
     // lease) and the main-thread autonomous fallback (past the
     // lease). The mind drives while alive; the daemon drives itself
     // when silent. Body-control application stays mind-requested.
-    let tick_loop = Arc::new(Inhibition::new(TickLoop::new_with_data_dir(
-        &config.data_dir,
-    )));
+    let tick_loop = Arc::new(Shared::new(TickLoop::new_with_data_dir(&config.data_dir)));
 
     // Create the IPC server (library version — no duplicated accept loop)
     let ipc_server = IpcServer::new(&config.socket_path);
@@ -482,7 +464,7 @@ fn main() {
     // iteration; the IPC handler reads it. Everything inside is a
     // plain copy, so a reader can never stall the fallback by
     // holding the lock.
-    let auto_internals = Arc::new(Inhibition::new(
+    let auto_internals = Arc::new(Shared::new(
         genesis::daemon::adaptive::AutoSnapshot::default(),
     ));
 
@@ -580,7 +562,7 @@ fn main() {
         // snapshot per iteration, before any gate fires this pass.
         // Placed ahead of every `continue` below so the view stays
         // current whether or not the lease is held.
-        if let Ok(mut snap) = auto_internals.lock() {
+        if let Ok(snap) = auto_internals.lock() {
             snap.gates.clear();
             snap.gates.extend_from_slice(&[
                 ("staleness", staleness_gate.snapshot()),
@@ -603,7 +585,7 @@ fn main() {
         // absent one drifts the check toward the ceiling.
         if staleness_gate.due(now_ms) {
             match tick_loop.try_lock() {
-                Ok(mut tl) => {
+                Ok(tl) => {
                     tl.check_staleness(&mmap);
                     if tl.mind_lease_expired() {
                         staleness_gate.relax();
@@ -679,7 +661,7 @@ fn main() {
         // (mind or fallback), capped like the IPC path, so catch-up
         // after a stall never overshoots the integrator.
         {
-            let mut tl = match tick_loop.try_lock() {
+            let tl = match tick_loop.try_lock() {
                 Ok(tl) => tl,
                 Err(e) => {
                     if lock_refusal("tick_loop", e) {
@@ -699,7 +681,7 @@ fn main() {
 
         // ── Autonomous memory + sensing (LTM first, then TickLoop:
         // same order as the IPC path, both try_lock) ──
-        let mut ltm_guard = match ltm.try_lock() {
+        let ltm_guard = match ltm.try_lock() {
             Ok(g) => g,
             Err(e) => {
                 // IPC owns LTM (physiology already advanced above) —
@@ -708,7 +690,7 @@ fn main() {
                 continue;
             }
         };
-        let mut tl = match tick_loop.try_lock() {
+        let tl = match tick_loop.try_lock() {
             Ok(tl) => tl,
             Err(e) => {
                 // Mind driving — the LTM guard drops by scope end.
@@ -722,9 +704,9 @@ fn main() {
         if !tl.mind_lease_expired() {
             continue;
         }
-        // LTMStore derefs through the InhibitionGuard; the granular
+        // LTMStore derefs through the MutexGuard; the granular
         // TickLoop methods take `&mut LtmStore`.
-        let ltm_store: &mut LtmStore = &mut ltm_guard;
+        let ltm_store: &mut LtmStore = &mut *ltm_guard;
         // Consolidation is self-gating (plasticity, overwhelm, empty
         // STM) — call whenever autonomous and let it decide.
         tl.consolidate(&mmap, &stm, ltm_store);
@@ -793,15 +775,12 @@ fn main() {
         if zone_gate.due(now_ms) {
             tl.arbitrate_zone(&mmap, ltm_store);
         }
-        // Guards drop here (LTM, then TickLoop).
-        drop(tl);
-        drop(ltm_guard);
 
         // Body-control recommendation publish (compute + publish
         // only — never application). Needs the TickLoop alone.
         if body_gate.due(now_ms) {
             match tick_loop.try_lock() {
-                Ok(mut tl) if tl.mind_lease_expired() => {
+                Ok(tl) if tl.mind_lease_expired() => {
                     tl.publish_body_recommendation(&mmap);
                     // Thermal/throttle pressure on the last-read body
                     // revisits policy sooner; a cool machine drifts.
@@ -934,7 +913,7 @@ fn main() {
     // and potentially writing corrupt data to disk.
     let mut clean_shutdown = true;
     {
-        let mut ltm_guard = match ltm.lock() {
+        let ltm_guard = match ltm.lock() {
             Ok(g) => g,
             Err(_) => {
                 eprintln!(

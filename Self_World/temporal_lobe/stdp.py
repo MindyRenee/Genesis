@@ -19,7 +19,6 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
-from inhibition import RecurrentInhibition
 
 from .synapses import SynapticStore
 
@@ -100,7 +99,6 @@ class STDP:
         self._spike_history: dict[str, deque[float]] = {}
         self._max_history = 50
         self._pending: list[tuple[str, str, float, float]] = []
-        self._lock = RecurrentInhibition()
         self._modulator = 1.0
 
         self.total_potentiated = 0
@@ -111,13 +109,11 @@ class STDP:
         """Set the third-factor neuromodulatory signal."""
         if not np.isfinite(modulator):
             raise ValueError("modulator must be finite")
-        with self._lock:
-            self._modulator = float(modulator)
+        self._modulator = float(modulator)
 
     def get_modulator(self) -> float:
         """Return the current third-factor signal."""
-        with self._lock:
-            return self._modulator
+        return self._modulator
 
     def record_spike(self, concept: str, time_ms: float) -> None:
         """Record an activation and form STDP pairs with recent activations.
@@ -137,45 +133,44 @@ class STDP:
         concept = self.network._resolve(concept) or concept
         pairs: list[tuple[str, str, float, float]] = []
 
-        with self._lock:
-            for other, other_times in self._spike_history.items():
-                if other == concept:
+        for other, other_times in self._spike_history.items():
+            if other == concept:
+                continue
+            for other_time in reversed(other_times):
+                delta_t = time_ms - other_time
+                if abs(delta_t) > self.window_ms:
                     continue
-                for other_time in reversed(other_times):
-                    delta_t = time_ms - other_time
-                    if abs(delta_t) > self.window_ms:
-                        continue
-                    # Forward direction: other (pre) → concept (post).
-                    weight_change = self._stdp_weight(delta_t)
-                    if abs(weight_change) > 1e-12:
-                        pairs.append((other, concept, delta_t, weight_change))
-                    # Reverse direction: concept (pre) → other (post) with
-                    # negated timing. At Δt_forward > 0 this yields LTD on
-                    # the acausal edge; at simultaneity both are ~0.
-                    rev_change = self._stdp_weight(-delta_t)
-                    if abs(rev_change) > 1e-12:
-                        pairs.append((concept, other, -delta_t, rev_change))
+                # Forward direction: other (pre) → concept (post).
+                weight_change = self._stdp_weight(delta_t)
+                if abs(weight_change) > 1e-12:
+                    pairs.append((other, concept, delta_t, weight_change))
+                # Reverse direction: concept (pre) → other (post) with
+                # negated timing. At Δt_forward > 0 this yields LTD on
+                # the acausal edge; at simultaneity both are ~0.
+                rev_change = self._stdp_weight(-delta_t)
+                if abs(rev_change) > 1e-12:
+                    pairs.append((concept, other, -delta_t, rev_change))
 
-            if self.defer_updates:
-                self._spike_history = {
-                    name: deque(
-                        (stamp for stamp in times if time_ms - stamp <= self.window_ms),
-                        maxlen=self._max_history,
-                    )
-                    for name, times in self._spike_history.items()
-                    if times and time_ms - times[-1] <= self.window_ms
-                }
-            self._spike_history.setdefault(concept, deque(maxlen=self._max_history)).append(
-                float(time_ms)
-            )
-            if self.defer_updates:
-                self._decay_eligibility(time_ms)
-                for pre, post, _delta_t, delta in pairs:
-                    key = (pre, post)
-                    previous, previous_time = self._eligibility.get(key, (0.0, time_ms))
-                    self._eligibility[key] = (previous + delta, max(previous_time, time_ms))
-            else:
-                self._pending.extend(pairs)
+        if self.defer_updates:
+            self._spike_history = {
+                name: deque(
+                    (stamp for stamp in times if time_ms - stamp <= self.window_ms),
+                    maxlen=self._max_history,
+                )
+                for name, times in self._spike_history.items()
+                if times and time_ms - times[-1] <= self.window_ms
+            }
+        self._spike_history.setdefault(concept, deque(maxlen=self._max_history)).append(
+            float(time_ms)
+        )
+        if self.defer_updates:
+            self._decay_eligibility(time_ms)
+            for pre, post, _delta_t, delta in pairs:
+                key = (pre, post)
+                previous, previous_time = self._eligibility.get(key, (0.0, time_ms))
+                self._eligibility[key] = (previous + delta, max(previous_time, time_ms))
+        else:
+            self._pending.extend(pairs)
 
         if pairs and not self.defer_updates:
             self._apply_pending()
@@ -190,13 +185,12 @@ class STDP:
         if time_ms is not None and not np.isfinite(time_ms):
             raise ValueError("time_ms must be finite")
         if self.defer_updates:
-            with self._lock:
-                if time_ms is None:
-                    time_ms = max((stamp for _, stamp in self._eligibility.values()), default=0.0)
-                self._decay_eligibility(time_ms)
-                for (pre, post), (trace, _stamp) in self._eligibility.items():
-                    self._pending.append((pre, post, 0.0, trace))
-                return self._apply_pending()
+            if time_ms is None:
+                time_ms = max((stamp for _, stamp in self._eligibility.values()), default=0.0)
+            self._decay_eligibility(time_ms)
+            for (pre, post), (trace, _stamp) in self._eligibility.items():
+                self._pending.append((pre, post, 0.0, trace))
+            return self._apply_pending()
         return self._apply_pending()
 
     def _decay_eligibility(self, time_ms: float) -> None:
@@ -220,33 +214,30 @@ class STDP:
 
     def get_statistics(self) -> dict[str, int | float]:
         """Return STDP activity and plasticity statistics."""
-        with self._lock:
-            total_spikes = sum(len(times) for times in self._spike_history.values())
-            return {
-                "total_potentiated": self.total_potentiated,
-                "total_depressed": self.total_depressed,
-                "total_gated": self.total_gated,
-                "modulator": self._modulator,
-                "tracked_concepts": len(self._spike_history),
-                "total_spikes_buffered": total_spikes,
-                "pending_updates": len(self._pending),
-                "expressed_synapses": len(self.synapses.connections()),
-            }
+        total_spikes = sum(len(times) for times in self._spike_history.values())
+        return {
+            "total_potentiated": self.total_potentiated,
+            "total_depressed": self.total_depressed,
+            "total_gated": self.total_gated,
+            "modulator": self._modulator,
+            "tracked_concepts": len(self._spike_history),
+            "total_spikes_buffered": total_spikes,
+            "pending_updates": len(self._pending),
+            "expressed_synapses": len(self.synapses.connections()),
+        }
 
     def clear_history(self) -> None:
         """Clear transient spike timing history and pending updates."""
-        with self._lock:
-            self._spike_history.clear()
-            self._pending.clear()
-            self._eligibility.clear()
+        self._spike_history.clear()
+        self._pending.clear()
+        self._eligibility.clear()
 
     def save_state(self) -> dict[str, object]:
         """Serialize persistent synaptic efficacy and timing parameters."""
-        with self._lock:
-            return {
-                "synapses": self.synapses.save_state(),
-                "modulator": self._modulator,
-            }
+        return {
+            "synapses": self.synapses.save_state(),
+            "modulator": self._modulator,
+        }
 
     def load_state(self, state: dict[str, object]) -> None:
         """Restore persistent synaptic efficacy."""
@@ -272,10 +263,9 @@ class STDP:
         return 0.0
 
     def _apply_pending(self) -> dict[str, int]:
-        with self._lock:
-            pending = self._pending
-            self._pending = []
-            modulator = self._modulator
+        pending = self._pending
+        self._pending = []
+        modulator = self._modulator
 
         potentiated = 0
         depressed = 0
@@ -295,6 +285,5 @@ class STDP:
 
         self.total_potentiated += potentiated
         self.total_depressed += depressed
-        with self._lock:
-            self.total_gated += gated
+        self.total_gated += gated
         return {"potentiated": potentiated, "depressed": depressed}

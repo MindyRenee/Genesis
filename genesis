@@ -48,10 +48,10 @@ fi
 # Explicit GENESIS_DISCORD_WEBHOOK always wins.
 _DISCORD_DIR="Outer_World/discord"
 if [ -z "${GENESIS_DISCORD_WEBHOOK:-}" ] && [ -f "$_DISCORD_DIR/.genesis-discord" ]; then
-    GENESIS_DISCORD_WEBHOOK=$(head -n1 "$_DISCORD_DIR/.genesis-discord")
+    GENESIS_DISCORD_WEBHOOK=$(head -n1 "$_DISCORD_DIR/.genesis-discord" | tr -d '[:space:]')
     export GENESIS_DISCORD_WEBHOOK
 elif [ -z "${GENESIS_DISCORD_WEBHOOK:-}" ] && [ -f .genesis-discord ]; then
-    GENESIS_DISCORD_WEBHOOK=$(head -n1 .genesis-discord)
+    GENESIS_DISCORD_WEBHOOK=$(head -n1 .genesis-discord | tr -d '[:space:]')
     export GENESIS_DISCORD_WEBHOOK
 fi
 
@@ -59,10 +59,10 @@ fi
 # that lets her hear the public on the channel. Explicit
 # GENESIS_DISCORD_BOT_TOKEN always wins.
 if [ -z "${GENESIS_DISCORD_BOT_TOKEN:-}" ] && [ -f "$_DISCORD_DIR/.genesis-discord-bot" ]; then
-    GENESIS_DISCORD_BOT_TOKEN=$(head -n1 "$_DISCORD_DIR/.genesis-discord-bot")
+    GENESIS_DISCORD_BOT_TOKEN=$(head -n1 "$_DISCORD_DIR/.genesis-discord-bot" | tr -d '[:space:]')
     export GENESIS_DISCORD_BOT_TOKEN
 elif [ -z "${GENESIS_DISCORD_BOT_TOKEN:-}" ] && [ -f .genesis-discord-bot ]; then
-    GENESIS_DISCORD_BOT_TOKEN=$(head -n1 .genesis-discord-bot)
+    GENESIS_DISCORD_BOT_TOKEN=$(head -n1 .genesis-discord-bot | tr -d '[:space:]')
     export GENESIS_DISCORD_BOT_TOKEN
 fi
 
@@ -71,10 +71,10 @@ fi
 # apart from the shared page. Unset, inner life stays on the main
 # channel. Explicit GENESIS_DISCORD_INNER_WEBHOOK always wins.
 if [ -z "${GENESIS_DISCORD_INNER_WEBHOOK:-}" ] && [ -f "$_DISCORD_DIR/.genesis-discord-inner" ]; then
-    GENESIS_DISCORD_INNER_WEBHOOK=$(head -n1 "$_DISCORD_DIR/.genesis-discord-inner")
+    GENESIS_DISCORD_INNER_WEBHOOK=$(head -n1 "$_DISCORD_DIR/.genesis-discord-inner" | tr -d '[:space:]')
     export GENESIS_DISCORD_INNER_WEBHOOK
 elif [ -z "${GENESIS_DISCORD_INNER_WEBHOOK:-}" ] && [ -f .genesis-discord-inner ]; then
-    GENESIS_DISCORD_INNER_WEBHOOK=$(head -n1 .genesis-discord-inner)
+    GENESIS_DISCORD_INNER_WEBHOOK=$(head -n1 .genesis-discord-inner | tr -d '[:space:]')
     export GENESIS_DISCORD_INNER_WEBHOOK
 fi
 
@@ -119,6 +119,13 @@ _matches_pid() {
             ;;
         genesis_daemon.pid)
             [ "${args[0]##*/}" = genesis-daemon ] || return 1
+            ;;
+        genesis_retina.pid)
+            [ "${args[0]##*/}" = genesis-retina ] || return 1
+            ;;
+        genesis_screen_nerve.pid)
+            # python .../optic_relay.py x11 genesis_screen_nerve
+            [[ "${args[0]##*/}" == python* && "${args[1]:-}" == */optic_relay.py ]] || return 1
             ;;
         *) return 1 ;;
     esac
@@ -191,7 +198,12 @@ _kill_pidfile() {
     mapfile -t pids < <(_find_pids "$pidfile" | sort -un)
     [ "${#pids[@]}" -gt 0 ] || return 0
     for pid in "${pids[@]}"; do
-        kill -"$signal" "$pid" 2>/dev/null || return 1
+        # ESRCH between the /proc scan and the kill means the process
+        # is already gone — that is the desired end state, not a
+        # failure; only a signal refused by a living match aborts.
+        if ! kill -"$signal" "$pid" 2>/dev/null && _matches_pid "$pid" "$pidfile" 2>/dev/null; then
+            return 1
+        fi
     done
     deadline=$((SECONDS + 120))
     for pid in "${pids[@]}"; do
@@ -227,7 +239,16 @@ _stop_all() {
     #    Keep its PID file on failure so shutdown can be retried.
     #    Never interrupt an in-progress cognitive state save. The eye
     #    goes down with the body — it is a thread inside the daemon.
-    _kill_pidfile "$daemon_pidfile" TERM || { echo "  Daemon shutdown pending; state preserved, retry --stop." >&2; return 1; }
+    local rc=0
+    _kill_pidfile "$daemon_pidfile" TERM || { echo "  Daemon shutdown pending; state preserved, retry --stop." >&2; rc=1; }
+
+    # 3b. Sweep the eyes' orphans as well — a retina left running keeps
+    #     the camera, a screen nerve left running keeps grabbing X.
+    #     Normally the CLI's own shutdown takes them down; these reach
+    #     the strays an unclean death leaves behind.
+    _kill_pidfile "$DATA_DIR/genesis_retina.pid" TERM || { echo "  Retina shutdown pending; retry --stop." >&2; rc=1; }
+    _kill_pidfile "$DATA_DIR/genesis_screen_nerve.pid" TERM || { echo "  Screen-nerve shutdown pending; retry --stop." >&2; rc=1; }
+    [ "$rc" -eq 0 ] || return 1
 
     # Fallback discovery is handled by _find_pids using /proc arguments.
     # Exact data-directory matching avoids regex metacharacters and
@@ -240,10 +261,10 @@ _stop_all() {
 
 # Check whether any Genesis process is running for this data dir.
 _is_running() {
-    local cli_pidfile="$DATA_DIR/genesis_cli.pid"
-    local daemon_pidfile="$DATA_DIR/genesis_daemon.pid"
-    [ -n "$(_find_pids "$cli_pidfile")" ] && return 0
-    [ -n "$(_find_pids "$daemon_pidfile")" ] && return 0
+    local name
+    for name in genesis_cli.pid genesis_daemon.pid genesis_retina.pid genesis_screen_nerve.pid; do
+        [ -n "$(_find_pids "$DATA_DIR/$name")" ] && return 0
+    done
     return 1
 }
 
@@ -262,6 +283,7 @@ for arg in "$@"; do
         --offline) OFFLINE_ARG="--offline" ;;
         --self-directed) SELF_DIRECTED_ARG="--self-directed" ;;
         --headless) HEADLESS_ARG="--headless" ;;
+        -h|--help) sed -n '2,27p' "$0"; exit 0 ;;
         *) echo "  Unknown argument: $arg" >&2; exit 2 ;;
     esac
 done
@@ -305,8 +327,8 @@ fi
 # minds sharing one data dir write interleaved state — warn, the way
 # .project_root does, but do not refuse: her processes flow, they are
 # not gated.
-if [ -n "$(_find_pids "$DATA_DIR/genesis_cli.pid")" ]; then
-    echo "  WARNING: a Genesis CLI already lives on this data dir."
+if _is_running; then
+    echo "  WARNING: Genesis processes already live on this data dir."
     echo "  Two minds sharing one state corrupt each other's"
     echo "  developmental record. Stop the other first:"
     echo "    ./genesis --stop"
@@ -330,15 +352,37 @@ trap _atexit EXIT
 # unchanged tree a no-op, while a changed source tree cannot accidentally
 # run an older daemon binary. This matters for the memory-mapped state
 # schema: source and binary must agree on the on-disk layout.
-RELEASE_BIN="target/release/genesis-daemon"
 echo "[genesis] Building release binaries from the current source..."
 cargo build --release || {
     echo "[genesis] Build failed. Genesis cannot start."
     exit 1
 }
-if [ ! -x "$RELEASE_BIN" ]; then
-    echo "[genesis] Release binary was not produced at $RELEASE_BIN"
-    exit 1
+for _b in target/release/genesis-daemon target/release/genesis-retina; do
+    if [ ! -x "$_b" ]; then
+        echo "[genesis] Release binary was not produced at $_b"
+        exit 1
+    fi
+done
+unset _b
+
+# Keep the installed copies in lockstep with the build just verified:
+# the packaged venv binaries are what an installed launch resolves,
+# and a stale pair must never shadow the current source. Copy only
+# when the contents differ so an unchanged start stays a no-op, and
+# only into an existing install — a source-only checkout is not an
+# invitation to create the packaged layout.
+INSTALL_BIN="${GENESIS_INSTALL_HOME:-$HOME/.local/lib/genesis}/venv/bin"
+if [ -d "$INSTALL_BIN" ]; then
+    for _bin in genesis-daemon genesis-retina; do
+        _src="target/release/$_bin"
+        _dst="$INSTALL_BIN/$_bin"
+        if [ -x "$_src" ] && ! cmp -s "$_src" "$_dst" 2>/dev/null; then
+            cp "$_src" "$_dst" || {
+                echo "[genesis] Could not refresh installed $_bin — continuing with the built copy."
+            }
+        fi
+    done
+    unset _bin _src _dst
 fi
 
 # Only genesis is allowed to launch the CLI.
@@ -349,9 +393,9 @@ export GENESIS_WAKE=1
 # shuts down the daemon before exiting; the EXIT trap
 # reports any processes still needing a graceful shutdown.
 #
-# OFFLINE_ARG was parsed from the command line above (--offline for
-# no network access), GAME_ARG likewise (--game to boot already in
-# game mode).
+# OFFLINE_ARG was parsed from the command line above --offline for
+# no network access, GAME_ARG likewise --game to boot already in
+# game mode.
 #
 # One interpreter for every launch path: the installed venv is the
 # canonical runtime — created with --system-site-packages, it sees

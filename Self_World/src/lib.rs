@@ -53,10 +53,10 @@ pub mod cognition;
 pub mod daemon;
 pub mod data_dir;
 pub mod field;
-pub mod inhibition;
 pub mod math;
 #[cfg(feature = "python")]
 pub mod python_ext;
+pub mod shared;
 pub mod state;
 pub mod store;
 
@@ -65,6 +65,5 @@ pub use field::{
     BraidTrajectory, FieldError, GaugeTransport, GlobalField, StereographicSphere, SubsystemLayer,
     SystemEngine, SystemFiber, Vector,
 };
-pub use inhibition::{Inhibition, Innate};
 pub use state::GenesisCoreState;
 pub use store::{MmapState, StateFileError};

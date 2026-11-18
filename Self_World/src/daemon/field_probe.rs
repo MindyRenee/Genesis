@@ -188,7 +188,7 @@
 //! assumption.
 //! Additive — PROTOCOL_VERSION unchanged.
 
-use crate::inhibition::{Inhibition, Innate};
+use crate::shared::{Free, Shared};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
@@ -1592,19 +1592,19 @@ struct ProbeInner {
 /// The running probe. `spawn`ed once by the daemon; `signature` is
 /// called by the IPC handler at the mind's cadence.
 pub struct FieldProbe {
-    inner: Inhibition<ProbeInner>,
+    inner: Shared<ProbeInner>,
     /// Serializes a signature's snapshot→compute→apply cycle so two
     /// concurrent readers can't interleave their baseline write-backs.
     /// Uncontended in practice — held for the resonator passes too, so
     /// `inner` stays µs-held while the math runs lock-free.
-    sig_lock: Inhibition<()>,
+    sig_lock: Shared<()>,
     running: AtomicBool,
     stop: AtomicBool,
 }
 
 /// Process-shared probe handle. Started in `daemon main`, read by
 /// the IPC handler — mirrors how `interoception` shares state.
-static FIELD_PROBE: Innate<std::sync::Arc<FieldProbe>> = Innate::new();
+static FIELD_PROBE: Free<std::sync::Arc<FieldProbe>> = Free::new();
 
 /// Ask RealtimeKit to lift this thread out of bulk SCHED_OTHER
 /// competition — the unprivileged scheduling boost (rtkit-daemon
@@ -1619,14 +1619,14 @@ static FIELD_PROBE: Innate<std::sync::Arc<FieldProbe>> = Innate::new();
 /// which is why a one-shot `dbus-send` cannot do this job. An
 /// absent service or a refusal leaves scheduling as it was —
 /// degraded jitter, never a failure.
-fn request_scheduling_boost(inner: &Inhibition<ProbeInner>) {
+fn request_scheduling_boost(inner: &Shared<ProbeInner>) {
     let pid = std::process::id() as u64;
     // SAFETY: SYS_gettid takes no arguments and cannot fail — the
     // raw syscall always returns the calling thread's id.
     let tid = unsafe { libc::syscall(libc::SYS_gettid) } as u64;
     match super::rtkit::grant_high_priority(pid, tid) {
         Ok((nice, conn)) => {
-            inner.lock().unwrap_or_else(|e| e.into_inner()).bus_hold = Some(conn);
+            inner.get().bus_hold = Some(conn);
             eprintln!("[field-probe] rtkit granted nice {nice}");
         }
         Err(e) => eprintln!("[field-probe] rtkit boost unavailable: {e}"),
@@ -1704,8 +1704,8 @@ impl FieldProbe {
     fn new() -> Self {
         Self {
             running: AtomicBool::new(false),
-            sig_lock: Inhibition::new(()),
-            inner: Inhibition::new(ProbeInner {
+            sig_lock: Shared::new(()),
+            inner: Shared::new(ProbeInner {
                 throughput: Channel::new(),
                 jitter: Channel::new(),
                 carrier_ref: Channel::new(),
@@ -1760,7 +1760,7 @@ impl FieldProbe {
     /// rhythm back to the body's phase. Clamped: depth 0..1, freq to
     /// the resolvable band.
     pub fn set_carrier(&self, depth: f32, freq: f32) {
-        let mut g = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        let g = self.inner.get();
         if depth.is_finite() {
             g.carrier_depth = depth.clamp(0.0, 1.0);
         }
@@ -1780,7 +1780,7 @@ impl FieldProbe {
     /// 0..1, mod_freq to the infraslow band (0.01..4 Hz — below the
     /// carrier and above the bath's own weather).
     pub fn set_pulse(&self, base: f32, mod_freq: f32, mod_depth: f32) {
-        let mut g = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        let g = self.inner.get();
         g.pulse_armed = mod_freq.is_finite() && mod_freq > 0.0;
         if g.pulse_armed {
             g.pulse_base = if base.is_finite() {
@@ -1809,7 +1809,7 @@ impl FieldProbe {
     /// at slower cadences.
     fn sample_electrical(&self) {
         let (sensors, hci_name, wlan_iface) = {
-            let g = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+            let g = self.inner.get();
             (
                 g.elec.sensors(),
                 g.radio.hci_name.clone(),
@@ -1840,7 +1840,7 @@ impl FieldProbe {
                 radio.station = wlan_iface.as_deref().and_then(read_iw_station);
             }
             {
-                let mut g = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+                let g = self.inner.get();
                 g.elec.apply(reading, t0);
                 g.radio.apply(radio, t0);
             }
@@ -1859,7 +1859,7 @@ impl FieldProbe {
         // wants counter deltas at the full probe rate, read
         // unlocked like the rest of the loop's file I/O.
         let wlan_stats = {
-            let g = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+            let g = self.inner.get();
             g.radio.wlan_stats.clone()
         };
         while !self.stop.load(Ordering::Relaxed) {
@@ -1877,7 +1877,7 @@ impl FieldProbe {
             let carrier_f;
             let slow_due;
             {
-                let mut g = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+                let g = self.inner.get();
                 slow_due = g.last_slow.elapsed() >= Duration::from_millis(250);
                 if slow_due {
                     g.carrier_freq = if g.carrier_freq_override > 0.0 {
@@ -1909,7 +1909,7 @@ impl FieldProbe {
             let carrier_phase;
             let depth;
             {
-                let mut g = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+                let g = self.inner.get();
                 if let Some((trans, intr, wintr)) = slow_reads {
                     let dt = g.last_slow.elapsed().as_secs_f32().max(1e-3);
                     if g.last_tis.1 > 0 {
@@ -1945,7 +1945,7 @@ impl FieldProbe {
             std::hint::black_box(acc);
             let throughput = iters as f32 / work_secs;
 
-            let mut g = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+            let g = self.inner.get();
             g.throughput.push(throughput);
             g.jitter.push(jitter);
             g.carrier_ref.push(carrier_phase);
@@ -1980,7 +1980,6 @@ impl FieldProbe {
             g.throughput_mean += 0.01 * (throughput - g.throughput_mean);
             g.jitter_mean += 0.01 * (jitter - g.jitter_mean);
             g.jitter_sq_mean += 0.01 * (jitter * jitter - g.jitter_sq_mean);
-            drop(g);
 
             // Sleep the rest of the period.
             let spent = t0.elapsed();
@@ -2041,7 +2040,7 @@ impl FieldProbe {
     /// what exceeds the climate. `None` until the jitter ring
     /// warms — an absent channel is no reading.
     pub fn bath_fluctuation(&self) -> Option<f64> {
-        let mut g = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        let g = self.inner.get();
         if !g.jitter.filled {
             return None;
         }
@@ -2075,7 +2074,7 @@ impl FieldProbe {
     /// starve this — that starvation used to stall the whole IPC
     /// queue for tens of seconds.
     pub fn signature(&self) -> Vec<u8> {
-        let _sig = self.sig_lock.lock().unwrap_or_else(|e| e.into_inner());
+        let _sig = self.sig_lock.get();
 
         // ── Phase 1: snapshot under `inner` ──────────────────────
         let mut t_s = Vec::with_capacity(RING_LEN);
@@ -2116,7 +2115,7 @@ impl FieldProbe {
             rx_mbps,
             rf_present,
         ) = {
-            let g = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+            let g = self.inner.get();
             g.throughput.drain_into(&mut t_s);
             g.jitter.drain_into(&mut j_s);
             g.power.drain_into(&mut p_s);
@@ -2242,7 +2241,7 @@ impl FieldProbe {
         // ── Phase 3: baseline write-back under `inner` ───────────
         let now = Instant::now();
         let (t_bands, j_bands, p_bands, rf_bands, rr_bands) = {
-            let mut g = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+            let g = self.inner.get();
             (
                 g.throughput.apply_baseline(t_raw, now),
                 g.jitter.apply_baseline(j_raw, now),
@@ -2375,7 +2374,7 @@ mod tests {
         let probe = FieldProbe::new();
         probe.set_pulse(0.55, 0.15, 0.10);
         {
-            let g = probe.inner.lock().unwrap();
+            let g = probe.inner.get();
             assert!(g.pulse_armed);
             assert_eq!(g.pulse_base, 0.55);
             assert_eq!(g.pulse_mod_freq, 0.15);
@@ -2384,7 +2383,7 @@ mod tests {
         // mod_freq <= 0 disarms; the static set-point is untouched.
         probe.set_pulse(0.0, 0.0, 0.0);
         {
-            let g = probe.inner.lock().unwrap();
+            let g = probe.inner.get();
             assert!(!g.pulse_armed);
             assert_eq!(g.carrier_depth, 0.60);
         }
@@ -2395,7 +2394,7 @@ mod tests {
         let probe = FieldProbe::new();
         probe.set_carrier(f32::NAN, f32::INFINITY);
         probe.set_pulse(f32::NAN, f32::INFINITY, f32::NAN);
-        let g = probe.inner.lock().unwrap();
+        let g = probe.inner.get();
         assert_eq!(g.carrier_depth, 0.60, "NaN depth leaves set-point");
         assert_eq!(g.carrier_freq_override, 0.0, "∞ override is absent");
         assert!(!g.pulse_armed, "∞ pulse frequency disarms");
@@ -2406,7 +2405,7 @@ mod tests {
         let probe = FieldProbe::new();
         // Push a handful of samples so the path is exercised.
         {
-            let mut g = probe.inner.lock().unwrap();
+            let g = probe.inner.get();
             for i in 0..8 {
                 g.throughput.push(i as f32);
                 g.jitter.push((i as f32) * 1e-6);
@@ -2578,7 +2577,7 @@ mod tests {
         // in the presence mask — not as watts that were never read.
         let probe = FieldProbe::new();
         {
-            let mut g = probe.inner.lock().unwrap();
+            let g = probe.inner.get();
             g.elec.power = None;
             g.elec.volts = None;
             g.elec.amps = None;

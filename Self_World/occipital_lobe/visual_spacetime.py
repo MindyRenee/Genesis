@@ -30,6 +30,59 @@ class VisualEventResult:
 CameraToWorkspace = Callable[[TwoViewReport], tuple[float, float, float]]
 
 
+# Facing orientations as basis-change maps — the eye's image basis
+# (right r, forward f, up u) expressed in the canonical egocentric
+# frame (+X right, +Y forward, +Z up). Each facing is one point of
+# the eye frame's orientation group, and every facing has its
+# opposite:
+#
+#   without ↔ within   the mirror reflection across the vertical
+#                      plane — the one improper map (det −1); what
+#                      someone facing her sees
+#   up      ↔ down     ±90° rotations about the right axis —
+#                      Rx(+90°) tips the optical axis to +Z,
+#                      Rx(−90°) to −Z
+#
+# canonical_position = R_facing · d_img
+_FACING: dict[str, tuple[tuple[float, float, float], ...]] = {
+    "without": ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)),
+    "within": ((-1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)),
+    "up": ((1.0, 0.0, 0.0), (0.0, 0.0, -1.0), (0.0, 1.0, 0.0)),
+    "down": ((1.0, 0.0, 0.0), (0.0, 0.0, 1.0), (0.0, -1.0, 0.0)),
+}
+
+
+def egocentric_projection(report: TwoViewReport) -> tuple[float, float, float]:
+    """Project a two-view report into the canonical egocentric frame.
+
+    The eye is the origin: +Y is gaze-forward, +X is right, +Z is up.
+    ``bearing_deg`` (0° forward, 90° right) and ``elevation_deg`` give
+    the direction in the look's own image frame; the report's
+    ``facing`` then rotates that direction into the canonical frame
+    through the basis-change map — a mirrored look un-flips, an
+    upward look's forward lands overhead. Range is the report's
+    baseline-scaled ``median_depth``, real only for ``travel`` —
+    still and turn reports land on the unit sphere, where direction
+    is honest and range carries no information.
+    """
+    bearing = math.radians(report.bearing_deg)
+    elevation = math.radians(report.elevation_deg)
+    depth = report.median_depth if report.kind == "travel" and report.median_depth > 0 else 1.0
+    horizontal = depth * math.cos(elevation)
+    # d_img in the look's image basis: (right, forward, up)
+    d_img = (
+        horizontal * math.sin(bearing),
+        horizontal * math.cos(bearing),
+        depth * math.sin(elevation),
+    )
+    r = _FACING.get(report.facing, _FACING["without"])
+    return (
+        r[0][0] * d_img[0] + r[0][1] * d_img[1] + r[0][2] * d_img[2],
+        r[1][0] * d_img[0] + r[1][1] * d_img[1] + r[1][2] * d_img[2],
+        r[2][0] * d_img[0] + r[2][1] * d_img[1] + r[2][2] * d_img[2],
+    )
+
+
 class VisualSpacetimeBridge:
     """Publish visual geometry only when a coordinate transform is calibrated."""
 

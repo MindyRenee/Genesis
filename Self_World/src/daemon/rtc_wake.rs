@@ -21,12 +21,12 @@
 //! `BodyState::suspend_caps` reports what the hardware *offers*, not
 //! whether the permission is installed.
 
-use crate::inhibition::Innate;
+use crate::shared::Free;
 use std::process::Command;
 
 /// Whether `sudo -n` runs without a password. Cached.
 fn sudo_available() -> bool {
-    static SUDO_AVAILABLE: Innate<bool> = Innate::new();
+    static SUDO_AVAILABLE: Free<bool> = Free::new();
     *SUDO_AVAILABLE.get_or_init(|| {
         Command::new("sudo")
             .args(["-n", "true"])

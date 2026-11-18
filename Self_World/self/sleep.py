@@ -761,8 +761,7 @@ class SleepMixin:
             if restarted and self._is_sleeping:
                 record_event(
                     "daemon_resume",
-                    "daemon restarted while the mind slept — "
-                    "re-driving body toward sleep",
+                    "daemon restarted while the mind slept — re-driving body toward sleep",
                 )
                 self._send_sleep_neuro_impulses()
                 self._body_sleep_confirmed = False

@@ -13,5 +13,4 @@
 //!   `core_state` is written into.
 
 pub use crate::data_dir;
-pub use crate::inhibition;
 pub use crate::store::mmap_state;

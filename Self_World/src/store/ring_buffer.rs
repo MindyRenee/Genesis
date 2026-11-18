@@ -38,8 +38,8 @@ use std::os::unix::io::AsRawFd;
 use std::path::Path;
 
 use libc::{
-    EEXIST, LOCK_EX, LOCK_NB, MAP_FAILED, MAP_SHARED, MS_SYNC, PROT_READ, PROT_WRITE, c_void,
-    close, fdatasync, flock, ftruncate, mmap, msync, munmap,
+    EEXIST, MAP_FAILED, MAP_SHARED, MS_SYNC, PROT_READ, PROT_WRITE, c_void, close, fdatasync,
+    ftruncate, mmap, msync, munmap,
 };
 
 // ─────────────────────────────────────────────────────────────────
@@ -361,11 +361,6 @@ pub enum RingBufferError {
         /// The capacity the other fields were checked against.
         capacity: u32,
     },
-    /// The sole-mapper flock could not be acquired: another process
-    /// holds a live mapping of this file. Returned instead of blocking
-    /// so the caller can retry or degrade rather than silently racing
-    /// a second writer into the same `MAP_SHARED` pages.
-    LockBusy,
 }
 
 impl std::fmt::Display for RingBufferError {
@@ -402,10 +397,6 @@ impl std::fmt::Display for RingBufferError {
                      outside capacity {capacity}"
                 )
             }
-            Self::LockBusy => write!(
-                f,
-                "STM file is locked by another process (sole-mapper invariant)"
-            ),
         }
     }
 }
@@ -456,7 +447,7 @@ pub struct RingBuffer {
     /// `.expect("access_lock poisoned: mmap may be inconsistent")` the guard and intentionally panic the daemon in
     /// that case — crashing is safer than continuing with a torn
     /// in-memory event log.
-    access_lock: crate::inhibition::Inhibition<()>,
+    access_lock: crate::shared::Shared<()>,
 }
 
 // SAFETY (Send/Sync): all access to the mapped region goes through
@@ -531,8 +522,6 @@ impl RingBuffer {
             .map_err(RingBufferError::Io)?;
 
         let fd = file.as_raw_fd();
-        Self::acquire_sole_mapper_lock(fd)?;
-
         // Set the file size to the page-aligned mmap length so the
         // entire mapping is backed by the file. Without this, the tail
         // of the last page would be unbacked and touching it would
@@ -590,7 +579,7 @@ impl RingBuffer {
             fd,
             capacity,
             file_len: mmap_len,
-            access_lock: crate::inhibition::Inhibition::new(()),
+            access_lock: crate::shared::Shared::new(()),
         })
     }
 
@@ -609,7 +598,6 @@ impl RingBuffer {
             .map_err(RingBufferError::Io)?;
 
         let fd = file.as_raw_fd();
-        Self::acquire_sole_mapper_lock(fd)?;
         let metadata = file.metadata().map_err(RingBufferError::Io)?;
 
         // Read the header to get capacity
@@ -753,7 +741,7 @@ impl RingBuffer {
             fd,
             capacity,
             file_len: final_mmap_len,
-            access_lock: crate::inhibition::Inhibition::new(()),
+            access_lock: crate::shared::Shared::new(()),
         })
     }
 
@@ -1059,28 +1047,6 @@ impl RingBuffer {
     }
 
     // ─── Internal ────────────────────────────────────────────────
-
-    /// Take the sole-mapper advisory lock on the backing file.
-    ///
-    /// `RingBuffer` forms `&`/`&mut` references into `MAP_SHARED`
-    /// memory, which is only sound when no second process can map and
-    /// write the same file concurrently. `flock(LOCK_EX | LOCK_NB)` is
-    /// held for the life of the file descriptor — released implicitly
-    /// when `Drop` closes `fd` — so any other `open`/`create` (in this
-    /// process or another) fails fast with [`RingBufferError::LockBusy`]
-    /// instead of silently violating the aliasing contract.
-    ///
-    /// Callers must hold the lock *before* resizing or mapping the
-    /// file; that is why `create_inner` does not pass `.truncate()` to
-    /// `OpenOptions`.
-    fn acquire_sole_mapper_lock(fd: i32) -> Result<(), RingBufferError> {
-        // SAFETY: `fd` is a valid open file descriptor. flock is
-        // advisory and a failed call changes no state.
-        if unsafe { flock(fd, LOCK_EX | LOCK_NB) } != 0 {
-            return Err(RingBufferError::LockBusy);
-        }
-        Ok(())
-    }
 
     fn do_mmap(fd: i32, len: usize) -> Result<*mut u8, RingBufferError> {
         // SAFETY: `fd` is a valid open file descriptor with read+write

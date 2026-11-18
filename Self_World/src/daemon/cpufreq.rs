@@ -51,15 +51,15 @@
 //! (the common case — a machine that was never configured for this)
 //! logs once rather than on every heartbeat.
 
-use crate::inhibition::{Inhibition, Innate};
+use crate::shared::{Free, Shared};
 use std::process::Command;
 
 use crate::state::neurochemical::NeurochemicalId;
 
 /// The set of body-control failure causes already reported.
-fn reported_failures() -> &'static Inhibition<std::collections::HashSet<String>> {
-    static SEEN: Innate<Inhibition<std::collections::HashSet<String>>> = Innate::new();
-    SEEN.get_or_init(|| Inhibition::new(std::collections::HashSet::new()))
+fn reported_failures() -> &'static Shared<std::collections::HashSet<String>> {
+    static SEEN: Free<Shared<std::collections::HashSet<String>>> = Free::new();
+    SEEN.get_or_init(|| Shared::new(std::collections::HashSet::new()))
 }
 
 /// Report a body-control failure at most once per cause per process.
@@ -74,13 +74,13 @@ fn reported_failures() -> &'static Inhibition<std::collections::HashSet<String>>
 /// Reporting is deliberately *not* re-armed by a later success.
 /// Every capability gate in this module (`SUDO_AVAILABLE`,
 /// `HELPER_PATH`, `EPP_AVAILABLE`, `BOOST_AVAILABLE`) is a
-/// `Innate` — capability state is fixed for the process lifetime,
+/// `OnceLock` — capability state is fixed for the process lifetime,
 /// so a transient success (e.g. an unprivileged `renice` lowering
 /// priority, which always works) is not a repair. The previous
 /// clear-on-success behaviour oscillated report → clear → report on
 /// exactly that pattern and was itself the spam.
 fn report_failure(cause: &str, detail: &str) {
-    let mut guard = match reported_failures().lock() {
+    let guard = match reported_failures().lock() {
         Ok(g) => g,
         Err(poisoned) => poisoned.into_inner(),
     };
@@ -97,16 +97,16 @@ fn report_failure(cause: &str, detail: &str) {
 // "what am I doing to my body?" via GET_BODY_CONTROL. This bridges the
 // two threads without coupling the IPC handler to the TickLoop struct.
 
-static SHARED_CONTROL_STATE: Innate<Inhibition<BodyControlState>> = Innate::new();
+static SHARED_CONTROL_STATE: Free<Shared<BodyControlState>> = Free::new();
 
-fn shared_control() -> &'static Inhibition<BodyControlState> {
-    SHARED_CONTROL_STATE.get_or_init(|| Inhibition::new(BodyControlState::default()))
+fn shared_control() -> &'static Shared<BodyControlState> {
+    SHARED_CONTROL_STATE.get_or_init(|| Shared::new(BodyControlState::default()))
 }
 
 /// Publish the latest body control state so the IPC handler can read it.
 /// Called after each reactive body-control application.
 pub fn publish_control_state(state: &BodyControlState) {
-    if let Ok(mut guard) = shared_control().lock() {
+    if let Ok(guard) = shared_control().lock() {
         *guard = state.clone();
     }
 }
@@ -185,7 +185,7 @@ pub struct BodyControlState {
 pub const CPUFREQ_INTERVAL_TICKS: u64 = 50;
 
 /// Whether `sudo -n` runs without a password. Cached after first check.
-static SUDO_AVAILABLE: Innate<bool> = Innate::new();
+static SUDO_AVAILABLE: Free<bool> = Free::new();
 
 /// Check if passwordless sudo is available. Cached.
 ///
@@ -504,7 +504,7 @@ pub struct HardwareSnapshot {
     pub boost: Option<bool>,
 }
 
-static HARDWARE_SNAPSHOT: Innate<HardwareSnapshot> = Innate::new();
+static HARDWARE_SNAPSHOT: Free<HardwareSnapshot> = Free::new();
 
 fn read_sysfs_u32(path: &str) -> Option<u32> {
     std::fs::read_to_string(path)
@@ -865,24 +865,24 @@ pub fn derive_nice(ach: f32) -> i32 {
 /// when the mind dies and a new one adopts the surviving body, the
 /// env var still holds the dead launcher's PID. `SET_COGNITIVE_PID`
 /// carries the living one.
-static COGNITIVE_PID_OVERRIDE: Innate<Inhibition<Option<u32>>> = Innate::new();
+static COGNITIVE_PID_OVERRIDE: Free<Shared<Option<u32>>> = Free::new();
 
-fn cognitive_pid_override() -> &'static Inhibition<Option<u32>> {
-    COGNITIVE_PID_OVERRIDE.get_or_init(|| Inhibition::new(None))
+fn cognitive_pid_override() -> &'static Shared<Option<u32>> {
+    COGNITIVE_PID_OVERRIDE.get_or_init(|| Shared::new(None))
 }
 
 /// Store the PID a re-inhabiting mind pushed over IPC.
 pub fn set_cognitive_pid(pid: u32) {
-    if let Ok(mut guard) = cognitive_pid_override().lock() {
+    if let Ok(guard) = cognitive_pid_override().lock() {
         *guard = Some(pid);
     }
 }
 
-/// Clear the IPC-pushed override (test-only — the Innate cannot be
+/// Clear the IPC-pushed override (test-only — the OnceLock cannot be
 /// un-written in production, matching every other capability gate).
 #[cfg(test)]
 pub fn reset_cognitive_pid() {
-    if let Ok(mut guard) = cognitive_pid_override().lock() {
+    if let Ok(guard) = cognitive_pid_override().lock() {
         *guard = None;
     }
 }
@@ -1136,7 +1136,7 @@ pub fn apply_thermal_cap(policy: &mut FreqPolicy, temp_c: f32, freq_min: u32, fr
 /// Probes `/sys/devices/system/cpu/cpu0/cpufreq/energy_performance_preference`.
 /// Cached after first check — the sysfs topology doesn't change at
 /// runtime.
-static EPP_AVAILABLE: Innate<bool> = Innate::new();
+static EPP_AVAILABLE: Free<bool> = Free::new();
 
 fn epp_available() -> bool {
     *EPP_AVAILABLE.get_or_init(|| {
@@ -1388,7 +1388,7 @@ impl BoostState {
 
 /// Check whether the platform exposes a turbo gate. Cached after the
 /// first check — the sysfs topology doesn't change at runtime.
-static BOOST_AVAILABLE: Innate<bool> = Innate::new();
+static BOOST_AVAILABLE: Free<bool> = Free::new();
 
 fn boost_available() -> bool {
     *BOOST_AVAILABLE.get_or_init(|| {

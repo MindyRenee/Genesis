@@ -503,6 +503,8 @@ impl TickLoop {
                     let _ = writeln!(out, "field.boundary={}", boundary_csv.join(","));
                 }
                 let _ = writeln!(out, "field.superposition={:.6}", integration.superposition);
+                let _ = writeln!(out, "field.momentum={:.6}", integration.momentum);
+                let _ = writeln!(out, "field.vesica={:.6}", integration.vesica);
                 if let Some(coupling) = self.field_runtime.coupling() {
                     let _ = writeln!(out, "field.coupling={:.6}", coupling);
                 }
@@ -681,17 +683,9 @@ impl TickLoop {
 
         // 2. Neurochemical tick — advance the coupled dynamics.
         //    No LTM lock needed.
-        // Transient cross-process lock contention (FileLockBusy) skips
-        // the tick instead of killing the daemon; a poisoned mutex or
-        // I/O failure still panics since continuing with torn state is
-        // unsafe.
         if let Err(e) = mmap.modify(now_ms, |state| {
             state.neuro_tick_with_params(&neuro_params);
         }) {
-            if matches!(e, crate::store::StateFileError::FileLockBusy) {
-                eprintln!("[tick] neuro tick skipped (state locked): {e}");
-                return result;
-            }
             panic!("neuro tick failed: {e}");
         }
 
@@ -867,11 +861,7 @@ impl TickLoop {
                 1.0,
             );
         }) {
-            if matches!(e, crate::store::StateFileError::FileLockBusy) {
-                eprintln!("[tick] inference feedback skipped (state locked): {e}");
-            } else {
-                panic!("active inference feedback failed: {e}");
-            }
+            panic!("active inference feedback failed: {e}");
         }
 
         // 2e. Body control — neurochemistry suggests hardware settings.
@@ -1148,12 +1138,6 @@ impl TickLoop {
             }
             state.manifest.recompute();
         }) {
-            if matches!(e, crate::store::StateFileError::FileLockBusy) {
-                eprintln!("[tick] manifest update skipped (state locked): {e}");
-                return result;
-            }
-            // Panic on a failed/poisoned write — don't continue with a
-            // possibly-torn manifest or shared state.
             panic!("manifest update failed: {e}");
         }
 

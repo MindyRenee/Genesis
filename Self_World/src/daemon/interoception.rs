@@ -220,7 +220,7 @@
 //! It can ask for help. It can say "I'm too hot" or "I'm
 //! overwhelmed" because it can actually feel it.
 
-use crate::inhibition::{Inhibition, Innate};
+use crate::shared::{Free, Shared};
 use std::fs;
 use std::time::Instant;
 
@@ -316,15 +316,15 @@ const SENSOR_BITS: [(u32, &str); 17] = [
     (sensor::CPUIDLE, "cpuidle state counters"),
 ];
 
-static SHARED_SENSOR_PRESENCE: Innate<Inhibition<u32>> = Innate::new();
+static SHARED_SENSOR_PRESENCE: Free<Shared<u32>> = Free::new();
 
-fn shared_presence() -> &'static Inhibition<u32> {
-    SHARED_SENSOR_PRESENCE.get_or_init(|| Inhibition::new(0))
+fn shared_presence() -> &'static Shared<u32> {
+    SHARED_SENSOR_PRESENCE.get_or_init(|| Shared::new(0))
 }
 
 /// Publish the discovered sensor-presence mask alongside the body state.
 pub fn publish_sensor_presence(mask: u32) {
-    if let Ok(mut guard) = shared_presence().lock() {
+    if let Ok(guard) = shared_presence().lock() {
         *guard = mask;
     }
 }
@@ -338,10 +338,10 @@ pub fn read_sensor_presence() -> u32 {
     shared_presence().lock().map(|g| *g).unwrap_or(0)
 }
 
-static SHARED_MEMORY_MB: Innate<Inhibition<f32>> = Innate::new();
+static SHARED_MEMORY_MB: Free<Shared<f32>> = Free::new();
 
-fn shared_memory_mb() -> &'static Inhibition<f32> {
-    SHARED_MEMORY_MB.get_or_init(|| Inhibition::new(0.0))
+fn shared_memory_mb() -> &'static Shared<f32> {
+    SHARED_MEMORY_MB.get_or_init(|| Shared::new(0.0))
 }
 
 /// The last measured RSS of Genesis's process tree, in megabytes.
@@ -373,15 +373,15 @@ impl ProcessHealth {
     }
 }
 
-static SHARED_PROCESS_HEALTH: Innate<Inhibition<ProcessHealth>> = Innate::new();
+static SHARED_PROCESS_HEALTH: Free<Shared<ProcessHealth>> = Free::new();
 
-fn shared_health() -> &'static Inhibition<ProcessHealth> {
-    SHARED_PROCESS_HEALTH.get_or_init(|| Inhibition::new(ProcessHealth::default()))
+fn shared_health() -> &'static Shared<ProcessHealth> {
+    SHARED_PROCESS_HEALTH.get_or_init(|| Shared::new(ProcessHealth::default()))
 }
 
 /// Publish the current process health.
 pub fn publish_process_health(health: ProcessHealth) {
-    if let Ok(mut guard) = shared_health().lock() {
+    if let Ok(guard) = shared_health().lock() {
         *guard = health;
     }
 }
@@ -421,22 +421,22 @@ pub fn report_missing_sensors(mask: u32) {
 // via GET_BODY_STATE. This bridges the two threads without coupling the
 // IPC handler to the TickLoop struct.
 
-static SHARED_BODY_STATE: Innate<Inhibition<BodyState>> = Innate::new();
+static SHARED_BODY_STATE: Free<Shared<BodyState>> = Free::new();
 
-fn shared_body() -> &'static Inhibition<BodyState> {
-    SHARED_BODY_STATE.get_or_init(|| Inhibition::new(BodyState::default()))
+fn shared_body() -> &'static Shared<BodyState> {
+    SHARED_BODY_STATE.get_or_init(|| Shared::new(BodyState::default()))
 }
 
-static SHARED_LOBE_TELEMETRY: Innate<Inhibition<(Vec<SubsystemTelemetry>, u64)>> = Innate::new();
+static SHARED_LOBE_TELEMETRY: Free<Shared<(Vec<SubsystemTelemetry>, u64)>> = Free::new();
 
-fn shared_subsystems() -> &'static Inhibition<(Vec<SubsystemTelemetry>, u64)> {
-    SHARED_LOBE_TELEMETRY.get_or_init(|| Inhibition::new((Vec::new(), 0)))
+fn shared_subsystems() -> &'static Shared<(Vec<SubsystemTelemetry>, u64)> {
+    SHARED_LOBE_TELEMETRY.get_or_init(|| Shared::new((Vec::new(), 0)))
 }
 
 /// Publish the latest per-subsystem telemetry so the IPC handler can
 /// serve GET_SUBSYSTEM_TELEMETRY. Called at the end of each read().
 pub fn publish_subsystem_telemetry(subsystems: &[SubsystemTelemetry]) {
-    if let Ok(mut guard) = shared_subsystems().lock() {
+    if let Ok(guard) = shared_subsystems().lock() {
         let published_ms = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_millis() as u64)
@@ -517,7 +517,7 @@ pub struct SubsystemTelemetry {
 /// Publish the latest body state so the IPC handler can read it.
 /// Called after each reactive hardware read.
 pub fn publish_body_state(state: &BodyState) {
-    if let Ok(mut guard) = shared_body().lock() {
+    if let Ok(guard) = shared_body().lock() {
         *guard = state.clone();
     }
 }
@@ -2044,7 +2044,7 @@ impl Interoceptor {
     /// this way keeps one traversal for both consumers.
     /// Publish this process tree's absolute resident memory.
     fn publish_memory_mb(&self, mb: f32) {
-        if let Ok(mut guard) = shared_memory_mb().lock() {
+        if let Ok(guard) = shared_memory_mb().lock() {
             *guard = mb;
         }
     }
@@ -4938,16 +4938,13 @@ mod tests {
 #[cfg(test)]
 mod sensor_presence_tests {
     use super::{SENSOR_BITS, read_sensor_presence, report_missing_sensors, sensor};
-    use crate::inhibition::{Inhibition, Innate};
+    use crate::shared::{Free, Shared};
 
     // The mask is process-global (it bridges the interoception thread
-    // and the IPC handler), so the tests that touch it share one lock
-    // rather than racing.
-    fn guard() -> crate::inhibition::InhibitionGuard<'static, ()> {
-        static LOCK: Innate<Inhibition<()>> = Innate::new();
-        LOCK.get_or_init(|| Inhibition::new(()))
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
+    // and the IPC handler); the tests that touch it share one cell.
+    fn guard() -> &'static mut () {
+        static LOCK: Free<Shared<()>> = Free::new();
+        LOCK.get_or_init(|| Shared::new(())).get()
     }
 
     #[test]

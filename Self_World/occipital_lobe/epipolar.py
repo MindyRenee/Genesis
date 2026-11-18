@@ -71,7 +71,6 @@ import math
 from dataclasses import dataclass
 
 import numpy as np
-from inhibition import InhibitoryGate
 
 __all__ = [
     "EpipolarProcessor",
@@ -931,6 +930,21 @@ class TwoViewReport:
     nearest_region: str = ""  # third of the view with the strongest parallax
     movers: int = 0  # cleanly-tracked structure the model rejected
     mover_centroid: tuple[float, float] | None = None
+    # The motion pair — every state carries both faces.
+    #   momentum: retinal motion magnitude — median displacement of
+    #     the tracks that moved, work-scale px per look
+    #   rest: its opposite — 1/(1+momentum): unity at stillness,
+    #     decaying under motion. rest = 0 with momentum = 0 is the
+    #     indeterminate read — the pair couldn't measure either face.
+    momentum: float = 0.0
+    rest: float = 1.0
+    # The look's facing orientation, stamped by vision — "without"
+    # (canonical looking-out frame), "within" (the mirror view:
+    # directions read the way someone facing her experiences them),
+    # "up" or "down" (the eye's optical axis tipped to the pole).
+    # Consumers that need canonical geometry rotate back through the
+    # facing's basis-change map.
+    facing: str = "without"
 
 
 class EpipolarProcessor:
@@ -958,18 +972,15 @@ class EpipolarProcessor:
         self._rng = np.random.default_rng(seed)
         self._prev: np.ndarray | None = None
         self._prev_pts: np.ndarray | None = None
-        self._lock = InhibitoryGate()
 
     def reset(self) -> None:
         """Drop the previous view — the next look opens a new pair."""
-        with self._lock:
-            self._prev = None
-            self._prev_pts = None
+        self._prev = None
+        self._prev_pts = None
 
     def process(self, rgb: np.ndarray) -> TwoViewReport:
         """Relate this look to the last and report what moved."""
-        with self._lock:
-            return self._process(rgb)
+        return self._process(rgb)
 
     def _process(self, rgb: np.ndarray) -> TwoViewReport:
         gray, _scale = _shrink(_to_luminance(rgb), self._max_dim)
@@ -993,11 +1004,14 @@ class EpipolarProcessor:
 
         if kept < _MIN_TRACKS:
             report.kind = "unresolved"
+            report.rest = 0.0  # neither face measured
             self._seed(gray)
             return report
 
         disp = np.linalg.norm(pts2[ok] - prev_pts[ok], axis=1)
-        if float(np.median(disp)) < _MOTION_EPS_PX:
+        report.momentum = float(np.median(disp))
+        report.rest = 1.0 / (1.0 + report.momentum)
+        if report.momentum < _MOTION_EPS_PX:
             # No baseline: the eye held still on a still scene. The
             # tracks still carry forward — stillness is a real read.
             report.kind = "still"
@@ -1054,6 +1068,12 @@ class EpipolarProcessor:
         # true correspondence and counts against the model.
         disp = np.linalg.norm(p2 - p1, axis=1)
         moved = disp >= _GEOM_MIN_DISP_PX
+        if moved.any():
+            # Momentum belongs to the tracks that actually moved —
+            # stationary phantoms would drag the median toward a
+            # false stillness.
+            report.momentum = float(np.median(disp[moved]))
+            report.rest = 1.0 / (1.0 + report.momentum)
         if int(moved.sum()) < 8:
             report.kind = "unresolved"
             report.moved = True

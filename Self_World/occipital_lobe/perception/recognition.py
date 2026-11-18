@@ -47,7 +47,6 @@ from pathlib import Path
 import numpy as np
 from genesis_client.swallow import note_swallowed
 from infrastructure.config import default_data_dir
-from inhibition import InhibitoryGate
 
 __all__ = ["DetectedFace", "FaceRecognizer", "KnownFace"]
 
@@ -184,7 +183,6 @@ class FaceRecognizer:
         # corrupts the engine's internal buffers (observed as the
         # OpenCV 5 forwardGraph "buf.shape() == m.shape()" assert).
         # Every cv2 touch in detect_faces runs under this lock.
-        self._infer_lock = InhibitoryGate()
         self._available: bool | None = None
         self._known_faces: dict[str, list[KnownFace]] = {}
         # Anonymous face clusters — stable "face:N" identities for
@@ -291,47 +289,46 @@ class FaceRecognizer:
         bgr = cv2.cvtColor(rgb_frame, cv2.COLOR_RGB2BGR)
         h, w = bgr.shape[:2]
 
-        with self._infer_lock:
-            detector = self._get_detector()
-            detector.setInputSize((w, h))
+        detector = self._get_detector()
+        detector.setInputSize((w, h))
 
-            # Detect faces — returns Nx15 matrix:
-            # columns: x, y, w, h, x_re, y_re, x_le, y_le, x_nose, y_nose,
-            #          x_rm, y_rm, x_lm, y_lm, score
-            _, faces = detector.detect(bgr)
-            if faces is None:
-                return []
+        # Detect faces — returns Nx15 matrix:
+        # columns: x, y, w, h, x_re, y_re, x_le, y_le, x_nose, y_nose,
+        #          x_rm, y_rm, x_lm, y_lm, score
+        _, faces = detector.detect(bgr)
+        if faces is None:
+            return []
 
-            recognizer = self._get_recognizer()
-            results: list[DetectedFace] = []
+        recognizer = self._get_recognizer()
+        results: list[DetectedFace] = []
 
-            for face in faces:
-                x, y, w, h = int(face[0]), int(face[1]), int(face[2]), int(face[3])
+        for face in faces:
+            x, y, w, h = int(face[0]), int(face[1]), int(face[2]), int(face[3])
 
-                # Extract 128-d embedding using SFace. alignCrop takes one
-                # face row (15 values); passing the whole N×15 matrix would
-                # align every embedding to the first face's landmarks.
-                aligned = recognizer.alignCrop(bgr, face[None])
-                embedding = recognizer.feature(aligned).flatten()
+            # Extract 128-d embedding using SFace. alignCrop takes one
+            # face row (15 values); passing the whole N×15 matrix would
+            # align every embedding to the first face's landmarks.
+            aligned = recognizer.alignCrop(bgr, face[None])
+            embedding = recognizer.feature(aligned).flatten()
 
-                # Try to recognize — named first, then anonymous clusters.
-                # Either way the face leaves with a stable person key.
-                name, confidence = self._match_face(embedding)
-                if name is not None:
-                    person_key, tier = name, "named"
-                else:
-                    person_key, tier = self._match_or_cluster(embedding)
+            # Try to recognize — named first, then anonymous clusters.
+            # Either way the face leaves with a stable person key.
+            name, confidence = self._match_face(embedding)
+            if name is not None:
+                person_key, tier = name, "named"
+            else:
+                person_key, tier = self._match_or_cluster(embedding)
 
-                results.append(
-                    DetectedFace(
-                        bbox=(x, y, w, h),
-                        name=name,
-                        confidence=confidence,
-                        embedding=embedding,
-                        person_key=person_key,
-                        tier=tier,
-                    )
+            results.append(
+                DetectedFace(
+                    bbox=(x, y, w, h),
+                    name=name,
+                    confidence=confidence,
+                    embedding=embedding,
+                    person_key=person_key,
+                    tier=tier,
                 )
+            )
 
         return results
 

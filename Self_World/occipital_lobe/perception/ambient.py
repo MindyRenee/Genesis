@@ -41,7 +41,6 @@ from collections.abc import Callable
 from typing import Any
 
 from genesis_client.threads import call_on_named_thread, named_thread
-from inhibition import InhibitoryGate
 
 __all__ = ["AmbientListener", "contains_wake_word", "strip_wake_word"]
 
@@ -150,14 +149,12 @@ class AmbientListener:
         # Serializes start/stop — without it a start racing a stop
         # loses the old thread's handle while the old loop resumes on
         # the cleared flag, leaving a phantom second listener alive.
-        self._lifecycle_lock = InhibitoryGate()
         self._vosk_model = None
         self._initialized = False
         self._init_error: str | None = None
 
         # Recent utterance log (for debugging / the caller to inspect)
         self._recent: deque[str] = deque(maxlen=20)
-        self._recent_lock = InhibitoryGate()
 
     def _init_vosk(self) -> bool:
         """Load the Vosk model. Returns True on success."""
@@ -198,32 +195,30 @@ class AmbientListener:
         if not self.available:
             logger.error(f"Ambient listener cannot start: {self._init_error}")
             return False
-        with self._lifecycle_lock:
-            if self._running:
-                return True
-            if self._thread is not None and self._thread.is_alive():
-                # A stop() join may have timed out — wait for the old
-                # loop to finish rather than spawn beside it.
-                self._thread.join(timeout=self._START_JOIN_TIMEOUT_S)
-                if self._thread.is_alive():
-                    logger.error(
-                        "Ambient listener: previous thread still alive after join — "
-                        "refusing to start a second one"
-                    )
-                    return False
-            self._running = True
-            self._thread = named_thread("ambient-listener", self._listen_loop, comm="g-ambient")
-            self._thread.start()
+        if self._running:
+            return True
+        if self._thread is not None and self._thread.is_alive():
+            # A stop() join may have timed out — wait for the old
+            # loop to finish rather than spawn beside it.
+            self._thread.join(timeout=self._START_JOIN_TIMEOUT_S)
+            if self._thread.is_alive():
+                logger.error(
+                    "Ambient listener: previous thread still alive after join — "
+                    "refusing to start a second one"
+                )
+                return False
+        self._running = True
+        self._thread = named_thread("ambient-listener", self._listen_loop, comm="g-ambient")
+        self._thread.start()
         logger.info("Ambient listener started — listening to the room")
         return True
 
     def stop(self) -> None:
         """Stop the listener."""
-        with self._lifecycle_lock:
-            self._running = False
-            if self._thread:
-                self._thread.join(timeout=3.0)
-                self._thread = None
+        self._running = False
+        if self._thread:
+            self._thread.join(timeout=3.0)
+            self._thread = None
         logger.info("Ambient listener stopped")
 
     @property
@@ -233,8 +228,7 @@ class AmbientListener:
 
     def recent_utterances(self) -> list[str]:
         """Return recent transcribed utterances (for debugging)."""
-        with self._recent_lock:
-            return list(self._recent)
+        return list(self._recent)
 
     def _listen_loop(self) -> None:
         """Main capture loop — runs until stopped.
@@ -407,8 +401,7 @@ class AmbientListener:
 
         # Log it
         logger.info(f'Ambient heard: "{text}"')
-        with self._recent_lock:
-            self._recent.append(text)
+        self._recent.append(text)
 
         # Deliver to callback
         try:

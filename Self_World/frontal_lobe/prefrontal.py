@@ -49,7 +49,6 @@ to the <Subsystem> subsystem.`` docstrings throughout this file).
 """
 
 from __future__ import annotations
-from inhibition import RecurrentInhibition
 
 import heapq
 import logging
@@ -521,17 +520,7 @@ class FrontalLobe:
         if kind != KIND_HEARD or payload is None:
             return
         turn_id, text = payload
-        # This handler runs on the heartbeat thread. think() already
-        # serializes on _think_mutex, but waiting unboundedly would
-        # stall the body clock behind a long console turn — bound the
-        # wait and let the utterance go unheard if she's mid-thought.
-        if not self._think_mutex.acquire(timeout=5.0):
-            logger.debug("heard turn dropped: think() busy")
-            return
-        try:
-            response, state = self.think(text)
-        finally:
-            self._think_mutex.release()
+        response, state = self.think(text)
         if self._thalamus is not None:
             self._thalamus.post(MODULE_LANGUAGE, KIND_SPOKE, (turn_id, (response, state)))
 
@@ -601,7 +590,6 @@ class FrontalLobe:
         # (spreading-activation maps, episodic stores, the concept
         # network), so think() serializes on it — the console worker
         # and heartbeat-delivered heard turns must never overlap.
-        self._think_mutex = RecurrentInhibition()
 
     def _init_intelligence(
         self,
@@ -3743,8 +3731,7 @@ class FrontalLobe:
         """
         from turn import Turn
 
-        with self._think_mutex:
-            return Turn(self, user_input).run()
+        return Turn(self, user_input).run()
 
     def _think_run_pipeline(
         self,

@@ -370,6 +370,22 @@ class VolitionConfig:
                     "concept_growth": 0.03,  # new concepts → integrate
                 },
             ),
+            # Manual-tending urge — changes to her own man pages wait
+            # in her review queue (man_review) rather than installing
+            # silently. The urge builds while pending changes sit
+            # unreviewed; when it fires she applies or vetoes them
+            # herself, one bounded bout per firing.
+            UrgeConfig(
+                name="manual",
+                threshold=0.55,
+                growth=0.0004,
+                decay=0.0004,
+                cooldown=300.0,
+                stimuli={
+                    "manual_pending": 0.05,
+                    "idle_seconds": 0.01,
+                },
+            ),
             # Self-study urge — she feels like reading her own source.
             # The code learner used to run only when a user typed
             # /learn-code; the urge is the same act chosen from

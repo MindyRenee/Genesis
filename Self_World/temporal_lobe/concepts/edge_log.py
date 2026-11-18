@@ -43,7 +43,6 @@ from pathlib import Path
 from typing import Any, TextIO
 
 from genesis_client.swallow import note_swallowed
-from inhibition import RecurrentInhibition
 
 from .types import Edge, RelationType
 
@@ -181,7 +180,6 @@ class EdgeLog:
 
     def __init__(self, path: Path, decay_fn: Callable[[Edge, int], float] | None = None) -> None:
         self._path = Path(path)
-        self._lock = RecurrentInhibition()
         self._fh: TextIO | None = None
         # Fold-time decay policy: (edge, now_ms) -> effective weight.
         # None = raw earned weights (default). The mechanism lives
@@ -218,12 +216,11 @@ class EdgeLog:
                     self._fh.flush()
 
     def close(self) -> None:
-        with self._lock:
-            if self._fh is not None:
-                self._fh.flush()
-                os.fsync(self._fh.fileno())
-                self._fh.close()
-                self._fh = None
+        if self._fh is not None:
+            self._fh.flush()
+            os.fsync(self._fh.fileno())
+            self._fh.close()
+            self._fh = None
 
     def __enter__(self) -> EdgeLog:
         return self
@@ -267,20 +264,19 @@ class EdgeLog:
         """
         if is_derivable_edge(relation, origin):
             return False
-        with self._lock:
-            self._write(
-                {
-                    "op": "assert",
-                    "source": source,
-                    "target": target,
-                    "relation": relation.value,
-                    "weight": weight,
-                    "origin": origin,
-                    "created_at": created_at,
-                }
-            )
-            if self._fh is not None:
-                self._fh.flush()
+        self._write(
+            {
+                "op": "assert",
+                "source": source,
+                "target": target,
+                "relation": relation.value,
+                "weight": weight,
+                "origin": origin,
+                "created_at": created_at,
+            }
+        )
+        if self._fh is not None:
+            self._fh.flush()
         return True
 
     def retract_edge(
@@ -290,17 +286,16 @@ class EdgeLog:
         relation: RelationType,
     ) -> None:
         """Append a tombstone for an edge triple."""
-        with self._lock:
-            self._write(
-                {
-                    "op": "retract",
-                    "source": source,
-                    "target": target,
-                    "relation": relation.value,
-                }
-            )
-            if self._fh is not None:
-                self._fh.flush()
+        self._write(
+            {
+                "op": "retract",
+                "source": source,
+                "target": target,
+                "relation": relation.value,
+            }
+        )
+        if self._fh is not None:
+            self._fh.flush()
 
     def snapshot(self, edges: list[Edge]) -> None:
         """Append a full-state snapshot, resetting the fold base."""
@@ -316,18 +311,16 @@ class EdgeLog:
             for e in edges
             if not is_derivable_edge(e.relation, e.origin)
         ]
-        with self._lock:
-            self._write({"op": "snapshot", "edges": payload})
-            if self._fh is not None:
-                self._fh.flush()
-                os.fsync(self._fh.fileno())
+        self._write({"op": "snapshot", "edges": payload})
+        if self._fh is not None:
+            self._fh.flush()
+            os.fsync(self._fh.fileno())
 
     def sync(self) -> None:
         """Flush + fsync pending appends (called at save points)."""
-        with self._lock:
-            if self._fh is not None:
-                self._fh.flush()
-                os.fsync(self._fh.fileno())
+        if self._fh is not None:
+            self._fh.flush()
+            os.fsync(self._fh.fileno())
 
     # ─── Reads ──────────────────────────────────────────────────
 
@@ -341,22 +334,21 @@ class EdgeLog:
         history.
         """
         live: dict[str, Edge] = {}
-        with self._lock:
-            if self._fh is not None:
-                self._fh.flush()
-            try:
-                with open(self._path, encoding="utf-8") as f:
-                    for line in f:
-                        line = line.strip()
-                        if not line:
-                            continue
-                        try:
-                            ev = json.loads(line)
-                        except json.JSONDecodeError:
-                            continue  # torn tail from a crash — skip
-                        self._apply(ev, live)
-            except FileNotFoundError:
-                return {}
+        if self._fh is not None:
+            self._fh.flush()
+        try:
+            with open(self._path, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        ev = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue  # torn tail from a crash — skip
+                    self._apply(ev, live)
+        except FileNotFoundError:
+            return {}
         if self._decay_fn is not None and now_ms:
             for e in live.values():
                 e.weight = max(0.0, min(1.0, self._decay_fn(e, now_ms)))
@@ -432,50 +424,49 @@ class EdgeLog:
         temp-file + rename; the fold is taken under the lock so no
         append can interleave mid-compaction.
         """
-        with self._lock:
+        if self._fh is not None:
+            self._fh.flush()
+        live = self.fold()
+        edges = [
+            {
+                "source": e.source,
+                "target": e.target,
+                "relation": e.relation.value,
+                "weight": e.weight,
+                "origin": e.origin,
+                "created_at": e.created_at,
+            }
+            for _, e in sorted(live.items())
+        ]
+        fd, tmp = tempfile.mkstemp(dir=self._path.parent, prefix="edge_log_", suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                payload = json.dumps({"op": "snapshot", "edges": edges}, separators=(",", ":"))
+                f.write(payload + "\n")
+                f.flush()
+                os.fsync(f.fileno())
+            # Close before rename so the new file is the one we append to
             if self._fh is not None:
-                self._fh.flush()
-            live = self.fold()
-            edges = [
-                {
-                    "source": e.source,
-                    "target": e.target,
-                    "relation": e.relation.value,
-                    "weight": e.weight,
-                    "origin": e.origin,
-                    "created_at": e.created_at,
-                }
-                for _, e in sorted(live.items())
-            ]
-            fd, tmp = tempfile.mkstemp(dir=self._path.parent, prefix="edge_log_", suffix=".tmp")
+                self._fh.close()
+            os.replace(tmp, self._path)
+            self._open()
+        except Exception:
             try:
-                with os.fdopen(fd, "w", encoding="utf-8") as f:
-                    payload = json.dumps({"op": "snapshot", "edges": edges}, separators=(",", ":"))
-                    f.write(payload + "\n")
-                    f.flush()
-                    os.fsync(f.fileno())
-                # Close before rename so the new file is the one we append to
-                if self._fh is not None:
-                    self._fh.close()
-                os.replace(tmp, self._path)
+                os.unlink(tmp)
+            except OSError as cleanup_e:
+                note_swallowed(
+                    "temporal_lobe.concepts.edge_log.compact",
+                    cleanup_e,
+                )
+            # Test for *closed*, not just None. The handle was
+            # closed above before the rename, so on a rename
+            # failure it is still a live reference to a closed file
+            # and `is None` is False — leaving the log permanently
+            # unable to accept a write. `_write` also self-heals,
+            # but repair it here so `fold()` works too.
+            if self._fh is None or self._fh.closed:
                 self._open()
-            except Exception:
-                try:
-                    os.unlink(tmp)
-                except OSError as cleanup_e:
-                    note_swallowed(
-                        "temporal_lobe.concepts.edge_log.compact",
-                        cleanup_e,
-                    )
-                # Test for *closed*, not just None. The handle was
-                # closed above before the rename, so on a rename
-                # failure it is still a live reference to a closed file
-                # and `is None` is False — leaving the log permanently
-                # unable to accept a write. `_write` also self-heals,
-                # but repair it here so `fold()` works too.
-                if self._fh is None or self._fh.closed:
-                    self._open()
-                raise
+            raise
         return len(edges)
 
 

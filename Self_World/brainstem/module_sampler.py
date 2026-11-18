@@ -50,7 +50,7 @@ from genesis_client.protocol import (
 )
 from genesis_client.swallow import note_swallowed
 from genesis_client.threads import named_thread
-from inhibition import NeuromodulatoryGate
+from infrastructure.pulse import Pulse
 
 logger = logging.getLogger(__name__)
 
@@ -344,7 +344,7 @@ class ModuleSampler:
     def __init__(self, credit: Callable[[int, float], None]) -> None:
         """Initialize the sampler with the callback receiving module-time credit."""
         self._credit = credit
-        self._stop = NeuromodulatoryGate()
+        self._stop = Pulse()
         self._thread: threading.Thread | None = None
         # thread ident → (id of leaf frame, f_lasti) at the last
         # sample. An identical pair twice in a row means the leaf has

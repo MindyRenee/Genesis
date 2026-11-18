@@ -73,7 +73,7 @@ from genesis_client.protocol import (
 from genesis_client.swallow import note_swallowed
 from genesis_client.types import CoreState
 from infrastructure.config import EmotionalConfig, default_data_dir
-from inhibition import InhibitoryGate, NeuromodulatoryGate
+from infrastructure.pulse import Pulse
 
 from .emotion import CauseCategory, EmotionalState, EmotionField
 
@@ -566,7 +566,6 @@ class InteroceptionSystem:
         # Guards layer mutation plus the recompose, so a concurrent
         # `update_from_body_state` cannot read a half-updated process
         # layer and publish a torn snapshot.
-        self._state_lock = InhibitoryGate()
         # Cached psutil Process objects and core count to avoid
         # recreating Process handles and blocking on the first
         # cpu_percent call every regulation cycle.
@@ -582,7 +581,6 @@ class InteroceptionSystem:
         self._last_modules: tuple[Any, ...] = ()
         # Observed user-turn response latency. Interoception must not
         # benchmark a synthetic operation and call that responsiveness.
-        self._latency_lock = InhibitoryGate()
         self._response_latency_ms: float | None = None
         self._last_response_latency_ms: float | None = None
         # The authoritative chemical vector, pushed from the
@@ -859,24 +857,22 @@ class InteroceptionSystem:
         # the real conversation/request path. It is not measured here:
         # sensing must never benchmark itself and mistake that benchmark
         # for user-visible responsiveness.
-        with self._latency_lock:
-            response_latency = self._response_latency_ms
-            last_response_latency = self._last_response_latency_ms
+        response_latency = self._response_latency_ms
+        last_response_latency = self._last_response_latency_ms
         latency_observed = last_response_latency is not None
 
-        with self._state_lock:
-            self._process = _ProcessLayer(
-                cpu_usage=cpu_usage,
-                memory_usage=memory_usage,
-                daemon_connected=daemon_connected,
-                response_latency=response_latency if response_latency is not None else 0.0,
-                last_response_latency=(
-                    last_response_latency if last_response_latency is not None else 0.0
-                ),
-                latency_observed=latency_observed,
-            )
-            state = self._compose_locked()
-            self._last_state = state
+        self._process = _ProcessLayer(
+            cpu_usage=cpu_usage,
+            memory_usage=memory_usage,
+            daemon_connected=daemon_connected,
+            response_latency=response_latency if response_latency is not None else 0.0,
+            last_response_latency=(
+                last_response_latency if last_response_latency is not None else 0.0
+            ),
+            latency_observed=latency_observed,
+        )
+        state = self._compose_locked()
+        self._last_state = state
         return state
 
     def _process_stress(self, process: _ProcessLayer) -> float:
@@ -1024,12 +1020,9 @@ class InteroceptionSystem:
         if not isinstance(latency_ms, int | float) or not math.isfinite(latency_ms):
             return
         sample = max(0.0, float(latency_ms))
-        with self._latency_lock:
-            previous = self._response_latency_ms
-            self._last_response_latency_ms = sample
-            self._response_latency_ms = (
-                sample if previous is None else (0.3 * sample + 0.7 * previous)
-            )
+        previous = self._response_latency_ms
+        self._last_response_latency_ms = sample
+        self._response_latency_ms = sample if previous is None else (0.3 * sample + 0.7 * previous)
 
     @property
     def last_state(self) -> InternalState | None:
@@ -1163,9 +1156,8 @@ class InteroceptionSystem:
         body.rest_measured = bool(sensor_mask & SENSOR_CPUIDLE)
         body.temp_measured = bool(sensor_mask & SENSOR_TEMPERATURE)
 
-        with self._state_lock:
-            self._body = body
-            self._last_state = self._compose_locked()
+        self._body = body
+        self._last_state = self._compose_locked()
 
     def update_chemicals(self, chemicals: dict[str, float] | None) -> None:
         """Cache the daemon's authoritative chemical vector.
@@ -1180,9 +1172,8 @@ class InteroceptionSystem:
         """
         if not chemicals:
             return
-        with self._state_lock:
-            self._chemicals = dict(chemicals)
-            self._last_state = self._compose_locked()
+        self._chemicals = dict(chemicals)
+        self._last_state = self._compose_locked()
 
 
 # ─── Metabolic modeling ───────────────────────────────────────────────
@@ -1507,7 +1498,7 @@ class EmotionalRegulator:
         self._last_rest_time = time.time()
 
         self._running = False
-        self._stop_event = NeuromodulatoryGate()
+        self._stop_event = Pulse()
         # Discrete regulation keeps its state-dependent cadence while
         # the metronome owns the process boundary.
         self._next_regulation_at = 0.0
@@ -1515,7 +1506,6 @@ class EmotionalRegulator:
         # Track regulation history for introspection
         self._regulations: deque[dict] = deque(maxlen=50)
         self._regulation_count = 0
-        self._regulations_lock = InhibitoryGate()
         self._last_cause: str | None = None
 
         # The continuous affective field — per-region OU relaxation
@@ -1526,7 +1516,6 @@ class EmotionalRegulator:
 
         # Track per-chemical effective levels for tonic/phasic decomposition
         self._chemical_history: deque[dict[str, float]] = deque(maxlen=60)
-        self._chemical_history_lock = InhibitoryGate()
 
         # Her regulation "style" — how actively she regulates
         # This could evolve over time as she develops
@@ -1723,18 +1712,15 @@ class EmotionalRegulator:
         # Build per-chemical recent series inside the lock to avoid
         # copying the entire deque. Only the chemicals we track are
         # extracted, minimizing lock hold time and allocation.
-        with self._chemical_history_lock:
-            self._chemical_history.append(chemicals)
-            history_len = len(self._chemical_history)
-            recent_by_chem: dict[str, list[float]] = {}
-            if history_len >= 3:
-                for chem in TONIC_PHASIC_CHEMICALS:
-                    if chem in chemicals:
-                        recent_by_chem[chem] = [
-                            sample[chem]
-                            for sample in list(self._chemical_history)
-                            if chem in sample
-                        ]
+        self._chemical_history.append(chemicals)
+        history_len = len(self._chemical_history)
+        recent_by_chem: dict[str, list[float]] = {}
+        if history_len >= 3:
+            for chem in TONIC_PHASIC_CHEMICALS:
+                if chem in chemicals:
+                    recent_by_chem[chem] = [
+                        sample[chem] for sample in list(self._chemical_history) if chem in sample
+                    ]
 
         result: dict[str, TonicPhasic] = {}
         if history_len < 3:
@@ -2269,17 +2255,16 @@ class EmotionalRegulator:
         if cause:
             self._last_cause = cause
         if actions:
-            with self._regulations_lock:
-                self._regulation_count += 1
-                entry = {
-                    "timestamp": int(time.time() * 1000),
-                    "state": emotion.label,
-                    "actions": actions,
-                }
-                if cause:
-                    entry["cause"] = cause
-                self._regulations.append(entry)
-                # deque(maxlen=50) handles pruning automatically
+            self._regulation_count += 1
+            entry = {
+                "timestamp": int(time.time() * 1000),
+                "state": emotion.label,
+                "actions": actions,
+            }
+            if cause:
+                entry["cause"] = cause
+            self._regulations.append(entry)
+            # deque(maxlen=50) handles pruning automatically
             logger.debug(
                 f"Self-regulation: {', '.join(actions)} (was {emotion.label}) cause={cause}"
             )
@@ -2702,20 +2687,17 @@ class EmotionalRegulator:
     @property
     def regulation_count(self) -> int:
         """Total number of regulations applied."""
-        with self._regulations_lock:
-            return self._regulation_count
+        return self._regulation_count
 
     @property
     def recent_regulations(self) -> list[dict]:
         """The most recent regulation entries (up to 10)."""
-        with self._regulations_lock:
-            return list(self._regulations)[-10:]
+        return list(self._regulations)[-10:]
 
     @property
     def last_cause(self) -> str | None:
         """The most recently detected cause of her state."""
-        with self._regulations_lock:
-            return self._last_cause
+        return self._last_cause
 
     def describe_regulation(self) -> str:
         """Describe her recent self-regulation activity.
@@ -2723,10 +2705,9 @@ class EmotionalRegulator:
         Returns a structural summary — cause category IDs, not English
         prose. The language system generates text from the concept network.
         """
-        with self._regulations_lock:
-            recent = list(self._regulations)[-5:]
-            count = self._regulation_count
-            last_cause = self._last_cause
+        recent = list(self._regulations)[-5:]
+        count = self._regulation_count
+        last_cause = self._last_cause
         if not recent:
             if last_cause:
                 return f"regulation_count={count} last_cause={last_cause}"

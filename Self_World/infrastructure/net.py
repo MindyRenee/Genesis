@@ -16,13 +16,14 @@ import urllib.request
 from urllib.response import addinfourl
 
 from genesis_client.threads import named_thread
-from inhibition import NeuromodulatoryGate
+
+from infrastructure.pulse import Pulse
 
 
 def bounded_urlopen(
     req: urllib.request.Request,
     timeout: float,
-    stop: NeuromodulatoryGate | None = None,
+    stop: Pulse | None = None,
 ) -> addinfourl:
     """urlopen with a wall-clock bound that also covers DNS.
 
