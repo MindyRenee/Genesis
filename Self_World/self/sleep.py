@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 import math
+import os
 import time
 from collections import deque
 from collections.abc import Callable, Generator
@@ -201,6 +202,12 @@ class SleepMixin:
         # used to distinguish a real body wake from threshold flutter.
         self._body_sleep_confirmed: bool = False
         self._body_awake_since: float = 0.0
+        # Daemon-restart token: the inode of the daemon's bound socket.
+        # A restart unlinks the stale socket and binds a fresh one, so
+        # a changed inode is the one reliable "new daemon process"
+        # signal — persisted header fields (instance_id, created_at)
+        # all survive a restart inside the same state file.
+        self._daemon_socket_inode: int | None = None
         # Whether the last wake() was an explicit user request
         # (/wake, or an interaction waking a sleeping mind). While a
         # user-wake's cascade is still in its switch window, the
@@ -272,6 +279,31 @@ class SleepMixin:
             stage = getattr(cycle, "current_stage", None) if cycle else None
             return stage is SleepStage.N1
         return self.inner_life.current_hypnagogic is not None
+
+    @property
+    def is_meditating(self) -> bool:
+        """Whether it is currently meditating."""
+        return self._is_meditating
+
+    @property
+    def is_resting(self) -> bool:
+        """Whether discretionary (waking-mode) cognition is paused.
+
+        The single rest-state predicate: asleep, meditating, or in
+        hypnagogia (the theta-dominant N1 descent). While resting,
+        ordinary waking activity is held — volition urges, autonomous
+        and self-directed learning, speech and outreach, drawing,
+        self-improvement, executive intention formation, and waking
+        spontaneous thought all wait for the state to resolve.
+
+        What is NOT held: physiology (metronome body maintenance,
+        neurochemistry, sensors, notifications, autosave), sleep-stage
+        work (dreaming, consolidation, emotional replay), and the
+        hypnagogic descent itself — those *are* the rest process.
+        Interaction still wakes her through ``wake_if_asleep``; this
+        gate only stops her from initiating waking work while under.
+        """
+        return self._is_sleeping or self._is_meditating or self.is_hypnagogic
 
     @property
     def thalamic_gate_closed(self) -> bool:
@@ -648,6 +680,34 @@ class SleepMixin:
                 f"Sleep schema induction: {schemas} reified schema edges",
             )
 
+    def _rebase_sleep_marks(self, now: float) -> None:
+        """Rebase wall-clock marks that landed ahead of *now*.
+
+        The sync guards measure intervals off ``time.time()`` marks —
+        the flutter guard, the onset window, the wake settle, the
+        min-sleep and idle floors. The host clock can step backward
+        (this hardware keeps its RTC in localtime, so boot applies a
+        −7h correction mid-run; NTP resyncs and suspend wakes do the
+        same), leaving a mark in the future that every interval reads
+        as "not yet due": ``now - mark < window`` stays true for the
+        whole gap, so a desync the guards exist to end persists for
+        hours. Biological oscillators cannot run backward — a mark
+        ahead of now is an interval that cannot be measured, so it
+        restarts here rather than holding its gate closed.
+        """
+        for mark in (
+            "_body_awake_since",
+            "_last_sleep_attempt",
+            "_last_wake_attempt",
+            "_wake_time",
+            "_last_wake_time",
+            "_last_interaction_time",
+            "_sleep_start_time",
+            "_last_rest_time",
+        ):
+            if getattr(self, mark, 0.0) > now:
+                setattr(self, mark, now)
+
     def _check_sleep_sync(self) -> None:
         """Keep the mind's sleep state synced to the body's, and run
         the waking-side sleep signals.
@@ -681,6 +741,34 @@ class SleepMixin:
 
         adenosine = core_state.chemicals.get("adenosine", 0.0)
         daemon_phase = core_state.phase_name
+
+        # ── Daemon-restart reconciliation ──
+        # A restart binds a fresh socket inode. A resumed daemon's
+        # phase is restored chemistry, not a wake — the daemon was not
+        # a separate self awake in the meantime, it is her body
+        # resuming. Same rule as a mind-side restore: the record wins.
+        # Re-drive the body toward the sleep it was in and reset the
+        # desync trackers so the uncrossed phase reads as an onset in
+        # progress, not a contradiction.
+        try:
+            sock = getattr(self.client, "socket_path", None)
+            inode = os.stat(sock).st_ino if sock is not None else None
+        except OSError:
+            inode = None
+        if inode is not None and inode != self._daemon_socket_inode:
+            restarted = self._daemon_socket_inode is not None
+            self._daemon_socket_inode = inode
+            if restarted and self._is_sleeping:
+                record_event(
+                    "daemon_resume",
+                    "daemon restarted while the mind slept — "
+                    "re-driving body toward sleep",
+                )
+                self._send_sleep_neuro_impulses()
+                self._body_sleep_confirmed = False
+                self._body_awake_since = 0.0
+
+        self._rebase_sleep_marks(time.time())
 
         # ── Hypnagogic edge bookkeeping ──
         # The theta descent is a rest state: discretionary work holds

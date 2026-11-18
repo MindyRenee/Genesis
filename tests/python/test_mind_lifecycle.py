@@ -984,7 +984,11 @@ def test_restore_sleep_state_engages_sleep_mechanism():
 
     The fix: ``_start_engage_restored_sleep()`` calls
     ``_engage_sleep_mechanism()`` after the autonomous subsystems are
-    started, pausing the learners so it actually sleeps.
+    started — and re-asserts the sleep cascade
+    (``_send_sleep_neuro_impulses()``), so the body's flip-flop is
+    pushed toward the sleep side the mind restored. Without it the
+    daemon's emergent phase stays Active and the two layers hold the
+    impossible asleep/active intermediate the switch forbids.
     """
     with tempfile.TemporaryDirectory() as data_dir:
         # ── Session 1: put it to sleep and save ──
@@ -1007,6 +1011,8 @@ def test_restore_sleep_state_engages_sleep_mechanism():
             "_start_engage_restored_sleep(), not _load_saved_state()"
         )
 
+        impulses_before = len(mind2.client.impulses)
+
         # ── Engage the sleep mechanism (the fix) ──
         mind2._start_engage_restored_sleep()
 
@@ -1020,6 +1026,25 @@ def test_restore_sleep_state_engages_sleep_mechanism():
             "inner_life should be running (in sleep mode) after restore "
             "engagement — it generates dreams, not waking thoughts"
         )
+
+        # The sleep cascade must reach the body, not just the flag —
+        # the flip-flop cannot cross on a flag it cannot see.
+        from genesis_client.protocol import (
+            CHEM_GABA,
+            CHEM_HISTAMINE,
+            CHEM_MELATONIN,
+            CHEM_NOREPINEPHRINE,
+            CHEM_OREXIN,
+        )
+
+        sent = mind2.client.impulses[impulses_before:]
+        assert sent, "restore of a sleeping state must re-send the sleep cascade"
+        by_chem = dict(sent)
+        assert by_chem.get(CHEM_MELATONIN, 0.0) > 0.0
+        assert by_chem.get(CHEM_GABA, 0.0) > 0.0
+        assert by_chem.get(CHEM_OREXIN, 0.0) < 0.0
+        assert by_chem.get(CHEM_HISTAMINE, 0.0) < 0.0
+        assert by_chem.get(CHEM_NOREPINEPHRINE, 0.0) < 0.0
 
 
 def test_engage_restored_sleep_noop_when_awake():
@@ -1035,6 +1060,90 @@ def test_engage_restored_sleep_noop_when_awake():
         assert not mind.learner._paused, (
             "learner should not be paused when restoring an awake state"
         )
+
+
+def test_daemon_restart_during_sleep_re_drives_body() -> None:
+    """A daemon restart under a sleeping mind is a resume, not a wake.
+
+    The daemon binds a fresh socket inode on restart — that inode is
+    the boot token. A resumed daemon's phase is persisted chemistry,
+    not a wake: the sleeping record wins, the body is re-driven toward
+    sleep, and the desync trackers reset so an uncrossed phase reads
+    as an onset in progress.
+    """
+    from types import SimpleNamespace
+
+    class _RestartClient(_MockClientMeditation):
+        def __init__(self, sock: str) -> None:
+            super().__init__()
+            self.socket_path = sock
+
+        def get_state(self, **kwargs):
+            return SimpleNamespace(
+                chemicals={"adenosine": 0.5},
+                phase_name="active",
+            )
+
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _make_mind_meditation(data_dir)
+        sock = os.path.join(data_dir, "daemon.sock")
+        Path(sock).touch()
+        mind.client = _RestartClient(sock)  # type: ignore[assignment]
+        mind._is_sleeping = True
+        mind._body_sleep_confirmed = True
+        mind._daemon_socket_inode = 1  # the previous daemon's inode
+
+        mind._check_sleep_sync()
+
+        assert mind.client.impulses, (
+            "daemon restart under sleep must re-send onset chemistry"
+        )
+        assert mind._last_sleep_attempt > 0
+        assert not mind._body_sleep_confirmed, (
+            "desync trackers reset — the uncrossed phase is an onset, "
+            "not a wake"
+        )
+        assert mind.is_sleeping
+
+
+def test_rebase_sleep_marks_recovers_from_backward_clock():
+    """A backward wall-clock step must not freeze the sync guards.
+
+    Regression for the host-clock jump (RTC in localtime → a −7h
+    correction mid-run) that left every guard mark in the future:
+    ``now - mark < window`` stayed true for hours, so the wake-desync
+    check that would have ended the asleep/active split never fired.
+    ``_rebase_sleep_marks`` restarts any mark ahead of now; marks
+    legitimately in the past are untouched.
+    """
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _make_mind_meditation(data_dir)
+        now = 1_000.0
+        future = now + 25_200.0  # ~7h ahead, as the jump left it
+        mind._body_awake_since = future
+        mind._last_sleep_attempt = future
+        mind._last_wake_attempt = future
+        mind._wake_time = future
+        mind._last_wake_time = future
+        mind._last_interaction_time = future
+        mind._sleep_start_time = future
+        mind._last_rest_time = future
+        # A mark already in the past measures a real interval — keep it.
+        mind._last_wake_attempt = now - 60.0
+
+        mind._rebase_sleep_marks(now)
+
+        for mark in (
+            "_body_awake_since",
+            "_last_sleep_attempt",
+            "_wake_time",
+            "_last_wake_time",
+            "_last_interaction_time",
+            "_sleep_start_time",
+            "_last_rest_time",
+        ):
+            assert getattr(mind, mark) == now, f"{mark} should be rebased to now"
+        assert mind._last_wake_attempt == now - 60.0
 
 
 def test_cognitive_subsystems_shutdown_without_worker_joins() -> None:
