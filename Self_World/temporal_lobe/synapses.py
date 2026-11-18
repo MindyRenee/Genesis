@@ -16,8 +16,6 @@ from __future__ import annotations
 
 import math
 
-from inhibition import RecurrentInhibition
-
 __all__ = ["SynapticStore"]
 
 
@@ -35,12 +33,10 @@ class SynapticStore:
 
     def __init__(self) -> None:
         self._weights: dict[tuple[str, str], float] = {}
-        self._lock = RecurrentInhibition()
 
     def get_weight(self, pre: str, post: str) -> float:
         """Return synaptic efficacy, or zero when no learned connection exists."""
-        with self._lock:
-            return self._weights.get((pre, post), 0.0)
+        return self._weights.get((pre, post), 0.0)
 
     def set_weight(self, pre: str, post: str, weight: float) -> float:
         """Set and return a bounded synaptic efficacy."""
@@ -48,8 +44,7 @@ class SynapticStore:
         if not math.isfinite(weight):
             raise ValueError("synaptic weight must be finite")
         bounded = max(self.MIN_WEIGHT, min(self.MAX_WEIGHT, weight))
-        with self._lock:
-            self._weights[(pre, post)] = bounded
+        self._weights[(pre, post)] = bounded
         return bounded
 
     def apply_delta(self, pre: str, post: str, delta: float) -> float:
@@ -57,11 +52,10 @@ class SynapticStore:
         delta = float(delta)
         if not math.isfinite(delta):
             raise ValueError("synaptic delta must be finite")
-        with self._lock:
-            old = self._weights.get((pre, post), 0.0)
-            new = max(self.MIN_WEIGHT, min(self.MAX_WEIGHT, old + delta))
-            self._weights[(pre, post)] = new
-            return new
+        old = self._weights.get((pre, post), 0.0)
+        new = max(self.MIN_WEIGHT, min(self.MAX_WEIGHT, old + delta))
+        self._weights[(pre, post)] = new
+        return new
 
     def propagate(self, seeds: list[str], amount: float = 1.0) -> dict[str, float]:
         """Propagate activation through expressed learned connections.
@@ -85,8 +79,7 @@ class SynapticStore:
             return {}
         seed_set = set(seeds)
         totals: dict[str, float] = {}
-        with self._lock:
-            weights = dict(self._weights)
+        weights = dict(self._weights)
         for (pre, post), weight in weights.items():
             if pre in seed_set and weight > 0.0:
                 contribution = float(amount) * weight
@@ -95,18 +88,15 @@ class SynapticStore:
 
     def has_connection(self, pre: str, post: str) -> bool:
         """Return whether this directed plastic connection has been expressed."""
-        with self._lock:
-            return (pre, post) in self._weights
+        return (pre, post) in self._weights
 
     def connections(self) -> dict[tuple[str, str], float]:
         """Return a snapshot of all expressed plastic connections."""
-        with self._lock:
-            return dict(self._weights)
+        return dict(self._weights)
 
     def save_state(self) -> dict[str, float]:
         """Serialize expressed synaptic efficacies."""
-        with self._lock:
-            return {f"{pre}\t{post}": weight for (pre, post), weight in self._weights.items()}
+        return {f"{pre}\t{post}": weight for (pre, post), weight in self._weights.items()}
 
     def load_state(self, state: dict[str, float]) -> None:
         """Restore expressed synaptic efficacies from persisted state."""
@@ -116,5 +106,4 @@ class SynapticStore:
             if not separator or not pre or not post:
                 continue
             restored[(pre, post)] = max(self.MIN_WEIGHT, min(self.MAX_WEIGHT, float(weight)))
-        with self._lock:
-            self._weights = restored
+        self._weights = restored

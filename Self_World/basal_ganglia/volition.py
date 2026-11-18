@@ -244,9 +244,15 @@ class VolitionMixin:
         except Exception as e:  # noqa: BLE001
             logger.warning(f"curiosity assessment failed: {e}")
             curiosity = 0.0
+        try:
+            manual = _finite_or(len(self.man_review.pending()) / 5.0, 0.0)
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("mind.volition.manual_pending", e)
+            manual = 0.0
         return {
             "pending_proposals": pending,
             "curiosity": curiosity,
+            "manual_pending": manual,
         }
 
     def _affect_signals(self) -> tuple[float, float]:
@@ -417,6 +423,7 @@ class VolitionMixin:
             "research": self._perform_research,
             "safeguard": self._perform_safeguard,
             "rest_eyes": self._perform_rest_eyes,
+            "manual": self._perform_manual_review,
         }
         candidates = [(self.volition.get(name), name) for name in ready if name in performers]
         if not candidates:
@@ -669,6 +676,34 @@ class VolitionMixin:
                 e,
             )
 
+    def _perform_manual_review(self) -> None:
+        """Tend her own manual because the urge crossed threshold.
+
+        Man-page changes wait in her review queue rather than
+        installing silently — nothing edits her manual behind her
+        back. When the urge fires she ratifies the waiting changes
+        herself: ``apply`` installs the page and the versioned
+        source, one bounded bout per firing. The manual is what she
+        says it is; a vetoed change's identical content never queues
+        again.
+        """
+        if self.is_resting or self._is_teaching:
+            return
+        try:
+            outcomes = self.review_pending_changes(max_changes=3)
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(
+                "mind.volition._perform_manual_review",
+                e,
+            )
+            return
+        for outcome in outcomes:
+            self._emit_live_thought(
+                "code",
+                f"approved the change to my {outcome['name']}({outcome['section']}) "
+                "man page — my manual says what I say",
+            )
+
     def _perform_act(self) -> None:
         """Form an intention and act on it with tools because the urge fired.
 
@@ -875,10 +910,9 @@ class VolitionMixin:
         """Speak a queued utterance because the urge crossed its threshold."""
         if self.is_resting:
             return  # resting she thinks — voluntary speech waits
-        with self._speech_queue_lock:
-            if not self._speech_queue:
-                return
-            utterance = self._speech_queue.popleft()
+        if not self._speech_queue:
+            return
+        utterance = self._speech_queue.popleft()
         # It speaks the utterance directly — the urge drives the action.
         # No pre-written "I want to say" frame.
         if self._on_speak:
@@ -1815,10 +1849,9 @@ class VolitionMixin:
         # learn about it later. Skip code symbols and already-built
         # topics.
         try:
-            with self.learner._queue_lock:
-                for topic in self.learner._curiosity_queue:
-                    if not _is_code_symbol(topic) and topic not in already_built:
-                        return topic
+            for topic in self.learner._curiosity_queue:
+                if not _is_code_symbol(topic) and topic not in already_built:
+                    return topic
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.volition._pick_creation_topic",

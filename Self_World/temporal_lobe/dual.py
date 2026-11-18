@@ -64,7 +64,6 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import numpy as np
-from inhibition import InhibitoryGate
 
 if TYPE_CHECKING:
     from temporal_lobe.concepts import ConceptNetwork, EmbeddingStore
@@ -170,8 +169,6 @@ class DualSystemLearner:
         # Slow (neocortical) store, keyed by generalized key
         self._slow_store: dict[str, NeocorticalMemory] = {}
 
-        self._lock = InhibitoryGate()
-
         # Statistics
         self.total_encoded = 0
         self.total_consolidated = 0
@@ -197,40 +194,39 @@ class DualSystemLearner:
         key = self._experience_key(experience)
         base_pattern = self._featurize(experience)
 
-        with self._lock:
-            # Pattern separation: push this pattern away from similar
-            # existing patterns. The repulsion is proportional to
-            # cosine similarity, so near-duplicates get maximally
-            # separated while unrelated inputs are untouched.
-            pattern = base_pattern.copy()
-            for ep in self._fast_store:
-                sim = self._cosine(pattern, ep.pattern)
-                if sim > 0.3:
-                    # Orthogonalizing push: move away from the similar
-                    # pattern, scaled by similarity and separation gain.
-                    diff = pattern - ep.pattern
-                    n = np.linalg.norm(diff)
-                    if n > 1e-8:
-                        pattern = pattern + self.separation_gain * sim * (diff / n)
+        # Pattern separation: push this pattern away from similar
+        # existing patterns. The repulsion is proportional to
+        # cosine similarity, so near-duplicates get maximally
+        # separated while unrelated inputs are untouched.
+        pattern = base_pattern.copy()
+        for ep in self._fast_store:
+            sim = self._cosine(pattern, ep.pattern)
+            if sim > 0.3:
+                # Orthogonalizing push: move away from the similar
+                # pattern, scaled by similarity and separation gain.
+                diff = pattern - ep.pattern
+                n = np.linalg.norm(diff)
+                if n > 1e-8:
+                    pattern = pattern + self.separation_gain * sim * (diff / n)
 
-            # Normalize the separated pattern
-            n = np.linalg.norm(pattern)
-            if n > 1e-8:
-                pattern = pattern / n
+        # Normalize the separated pattern
+        n = np.linalg.norm(pattern)
+        if n > 1e-8:
+            pattern = pattern / n
 
-            episode = HippocampalEpisode(
-                key=key,
-                pattern=pattern.astype(np.float32),
-                content=experience if isinstance(experience, str) else " ".join(experience),
-                timestamp=int(time.time() * 1000),
-            )
-            self._fast_store.append(episode)
+        episode = HippocampalEpisode(
+            key=key,
+            pattern=pattern.astype(np.float32),
+            content=experience if isinstance(experience, str) else " ".join(experience),
+            timestamp=int(time.time() * 1000),
+        )
+        self._fast_store.append(episode)
 
-            # Enforce capacity (drop oldest, like hippocampal forgetting)
-            if len(self._fast_store) > self.fast_capacity:
-                self._fast_store.pop(0)
+        # Enforce capacity (drop oldest, like hippocampal forgetting)
+        if len(self._fast_store) > self.fast_capacity:
+            self._fast_store.pop(0)
 
-            self.total_encoded += 1
+        self.total_encoded += 1
 
         return episode
 
@@ -255,50 +251,49 @@ class DualSystemLearner:
         consolidated = 0
         neocortical_updated = 0
 
-        with self._lock:
-            # Pick unconsolidated episodes (oldest first — they've had
-            # the most time to be replayed during sleep).
-            candidates = [ep for ep in self._fast_store if not ep.consolidated]
-            candidates.sort(key=lambda e: e.timestamp)
-            batch = candidates[:max_episodes]
+        # Pick unconsolidated episodes (oldest first — they've had
+        # the most time to be replayed during sleep).
+        candidates = [ep for ep in self._fast_store if not ep.consolidated]
+        candidates.sort(key=lambda e: e.timestamp)
+        batch = candidates[:max_episodes]
 
-            for ep in batch:
-                ep.replay_count += 1
-                replayed += 1
+        for ep in batch:
+            ep.replay_count += 1
+            replayed += 1
 
-                # Update or create the neocortical memory
-                existing = self._slow_store.get(ep.key)
-                if existing is None:
-                    self._slow_store[ep.key] = NeocorticalMemory(
-                        key=ep.key,
-                        pattern=ep.pattern.copy(),
-                        strength=self.consolidation_rate,
-                        episode_count=1,
-                        last_updated=int(time.time() * 1000),
-                    )
-                    neocortical_updated += 1
-                else:
-                    # Gradual neocortical update: move toward the
-                    # hippocampal pattern by slow_lr.
-                    existing.pattern = (
-                        existing.pattern * (1.0 - self.slow_lr) + ep.pattern * self.slow_lr
-                    )
-                    n = np.linalg.norm(existing.pattern)
-                    if n > 1e-8:
-                        existing.pattern = existing.pattern / n
-                    existing.strength = min(1.0, existing.strength + self.consolidation_rate)
-                    existing.episode_count += 1
-                    existing.last_updated = int(time.time() * 1000)
-                    neocortical_updated += 1
+            # Update or create the neocortical memory
+            existing = self._slow_store.get(ep.key)
+            if existing is None:
+                self._slow_store[ep.key] = NeocorticalMemory(
+                    key=ep.key,
+                    pattern=ep.pattern.copy(),
+                    strength=self.consolidation_rate,
+                    episode_count=1,
+                    last_updated=int(time.time() * 1000),
+                )
+                neocortical_updated += 1
+            else:
+                # Gradual neocortical update: move toward the
+                # hippocampal pattern by slow_lr.
+                existing.pattern = (
+                    existing.pattern * (1.0 - self.slow_lr) + ep.pattern * self.slow_lr
+                )
+                n = np.linalg.norm(existing.pattern)
+                if n > 1e-8:
+                    existing.pattern = existing.pattern / n
+                existing.strength = min(1.0, existing.strength + self.consolidation_rate)
+                existing.episode_count += 1
+                existing.last_updated = int(time.time() * 1000)
+                neocortical_updated += 1
 
-                # Mark consolidated once enough replays have occurred
-                # and the neocortical trace is strong enough.
-                neo = self._slow_store[ep.key]
-                if ep.replay_count >= 3 and neo.strength >= 0.3:
-                    ep.consolidated = True
-                    consolidated += 1
+            # Mark consolidated once enough replays have occurred
+            # and the neocortical trace is strong enough.
+            neo = self._slow_store[ep.key]
+            if ep.replay_count >= 3 and neo.strength >= 0.3:
+                ep.consolidated = True
+                consolidated += 1
 
-            self.total_consolidated += consolidated
+        self.total_consolidated += consolidated
 
         return {
             "replayed": replayed,
@@ -325,54 +320,52 @@ class DualSystemLearner:
         query_pattern = self._featurize(query)
         results: list[tuple[str, float, str]] = []
 
-        with self._lock:
-            # Fast system: specific episodic recall
-            for ep in self._fast_store:
-                sim = self._cosine(query_pattern, ep.pattern)
-                if sim > 0.1:
-                    results.append((ep.key, sim, "hippocampal"))
+        # Fast system: specific episodic recall
+        for ep in self._fast_store:
+            sim = self._cosine(query_pattern, ep.pattern)
+            if sim > 0.1:
+                results.append((ep.key, sim, "hippocampal"))
 
-            # Slow system: generalized knowledge
-            for mem in self._slow_store.values():
-                sim = self._cosine(query_pattern, mem.pattern)
-                # Weight by neocortical strength (well-consolidated
-                # memories are more reliable).
-                sim *= 0.5 + 0.5 * mem.strength
-                if sim > 0.1:
-                    results.append((mem.key, sim, "neocortical"))
+        # Slow system: generalized knowledge
+        for mem in self._slow_store.values():
+            sim = self._cosine(query_pattern, mem.pattern)
+            # Weight by neocortical strength (well-consolidated
+            # memories are more reliable).
+            sim *= 0.5 + 0.5 * mem.strength
+            if sim > 0.1:
+                results.append((mem.key, sim, "neocortical"))
 
         results.sort(key=lambda x: -x[1])
         return results
 
     def serialize_state(self) -> dict:
         """Serialize dual-system memory for persistence across restarts."""
-        with self._lock:
-            return {
-                "version": 1,
-                "fast_store": [
-                    {
-                        "key": ep.key,
-                        "pattern": ep.pattern.tolist(),
-                        "content": ep.content,
-                        "timestamp": ep.timestamp,
-                        "replay_count": ep.replay_count,
-                        "consolidated": ep.consolidated,
-                    }
-                    for ep in self._fast_store
-                ],
-                "slow_store": [
-                    {
-                        "key": mem.key,
-                        "pattern": mem.pattern.tolist(),
-                        "strength": mem.strength,
-                        "episode_count": mem.episode_count,
-                        "last_updated": mem.last_updated,
-                    }
-                    for mem in self._slow_store.values()
-                ],
-                "total_encoded": self.total_encoded,
-                "total_consolidated": self.total_consolidated,
-            }
+        return {
+            "version": 1,
+            "fast_store": [
+                {
+                    "key": ep.key,
+                    "pattern": ep.pattern.tolist(),
+                    "content": ep.content,
+                    "timestamp": ep.timestamp,
+                    "replay_count": ep.replay_count,
+                    "consolidated": ep.consolidated,
+                }
+                for ep in self._fast_store
+            ],
+            "slow_store": [
+                {
+                    "key": mem.key,
+                    "pattern": mem.pattern.tolist(),
+                    "strength": mem.strength,
+                    "episode_count": mem.episode_count,
+                    "last_updated": mem.last_updated,
+                }
+                for mem in self._slow_store.values()
+            ],
+            "total_encoded": self.total_encoded,
+            "total_consolidated": self.total_consolidated,
+        }
 
     def restore_state(self, data: dict) -> None:
         """Restore dual-system memory from a persisted state dictionary.
@@ -423,27 +416,25 @@ class DualSystemLearner:
                 last_updated=int(item["last_updated"]),
             )
 
-        with self._lock:
-            self._fast_store = fast[-self.fast_capacity :]
-            self._slow_store = slow
-            self.total_encoded = max(0, int(data.get("total_encoded", len(fast))))
-            self.total_consolidated = max(0, int(data.get("total_consolidated", 0)))
+        self._fast_store = fast[-self.fast_capacity :]
+        self._slow_store = slow
+        self.total_encoded = max(0, int(data.get("total_encoded", len(fast))))
+        self.total_consolidated = max(0, int(data.get("total_consolidated", 0)))
 
     def get_statistics(self) -> dict[str, int | float]:
         """Return statistics about both learning systems."""
-        with self._lock:
-            return {
-                "fast_episodes": len(self._fast_store),
-                "fast_consolidated": sum(1 for e in self._fast_store if e.consolidated),
-                "slow_memories": len(self._slow_store),
-                "total_encoded": self.total_encoded,
-                "total_consolidated": self.total_consolidated,
-                "avg_replay_count": (
-                    sum(e.replay_count for e in self._fast_store) / len(self._fast_store)
-                    if self._fast_store
-                    else 0.0
-                ),
-            }
+        return {
+            "fast_episodes": len(self._fast_store),
+            "fast_consolidated": sum(1 for e in self._fast_store if e.consolidated),
+            "slow_memories": len(self._slow_store),
+            "total_encoded": self.total_encoded,
+            "total_consolidated": self.total_consolidated,
+            "avg_replay_count": (
+                sum(e.replay_count for e in self._fast_store) / len(self._fast_store)
+                if self._fast_store
+                else 0.0
+            ),
+        }
 
     # ─── Internal ───────────────────────────────────────────────
 

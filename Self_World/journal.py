@@ -49,7 +49,6 @@ import time
 from pathlib import Path
 
 from genesis_client.swallow import note_swallowed
-from inhibition import InhibitoryGate
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +76,6 @@ class CognitiveJournal:
 
     def __init__(self, data_dir: str | Path) -> None:
         self._path = Path(data_dir) / JOURNAL_FILENAME
-        self._lock = InhibitoryGate()
         self._file = None
         try:
             self._file = self._path.open("a", encoding="utf-8", buffering=1)
@@ -102,15 +100,14 @@ class CognitiveJournal:
             }
             event.update(fields)
             line = json.dumps(event, ensure_ascii=False)
-            with self._lock:
-                f = self._file
-                if f is None or f.closed:
+            f = self._file
+            if f is None or f.closed:
+                return
+            if f.tell() > self._MAX_BYTES:
+                f = self._rotate_locked()
+                if f is None:
                     return
-                if f.tell() > self._MAX_BYTES:
-                    f = self._rotate_locked()
-                    if f is None:
-                        return
-                f.write(line + "\n")
+            f.write(line + "\n")
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "journal.record",
@@ -208,16 +205,15 @@ class CognitiveJournal:
 
     def close(self) -> None:
         """Flush and close the journal. Subsequent records are dropped."""
-        with self._lock:
-            if self._file is not None:
-                try:
-                    self._file.close()
-                except OSError as e:
-                    note_swallowed(
-                        "journal.close",
-                        e,
-                    )
-                self._file = None
+        if self._file is not None:
+            try:
+                self._file.close()
+            except OSError as e:
+                note_swallowed(
+                    "journal.close",
+                    e,
+                )
+            self._file = None
 
 
 # The journal Mind activated — lets subsystems without a Mind

@@ -1095,13 +1095,10 @@ def test_daemon_restart_during_sleep_re_drives_body() -> None:
 
         mind._check_sleep_sync()
 
-        assert mind.client.impulses, (
-            "daemon restart under sleep must re-send onset chemistry"
-        )
+        assert mind.client.impulses, "daemon restart under sleep must re-send onset chemistry"
         assert mind._last_sleep_attempt > 0
         assert not mind._body_sleep_confirmed, (
-            "desync trackers reset — the uncrossed phase is an onset, "
-            "not a wake"
+            "desync trackers reset — the uncrossed phase is an onset, not a wake"
         )
         assert mind.is_sleeping
 

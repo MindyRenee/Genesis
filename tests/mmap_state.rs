@@ -64,28 +64,6 @@ fn test_create_state_file() {
 // ─── Open existing ────────────────────────────────────────────
 
 #[test]
-fn test_open_rejects_concurrent_writer_lock() {
-    let path = temp_path("open_locked");
-    {
-        let mmap = MmapState::create(&path, 7, now_ms()).expect("create");
-        mmap.sync().expect("sync");
-    }
-
-    let file = std::fs::File::open(&path).expect("open lock file");
-    let fd = std::os::unix::io::AsRawFd::as_raw_fd(&file);
-    // SAFETY: fd is valid for the duration of this scope.
-    assert_eq!(unsafe { libc::flock(fd, libc::LOCK_EX | libc::LOCK_NB) }, 0);
-
-    let result = MmapState::open(&path);
-    assert!(matches!(result, Err(StateFileError::FileLockBusy)));
-
-    // SAFETY: fd is valid and currently holds the flock.
-    unsafe { libc::flock(fd, libc::LOCK_UN) };
-    drop(file);
-    cleanup(&path);
-}
-
-#[test]
 fn test_open_existing_state_file() {
     let path = temp_path("open");
 
@@ -807,74 +785,18 @@ fn test_file_size_is_one_page() {
 // ─── Cross-process file lock ──────────────────────────────────
 
 #[test]
-fn test_cross_process_lock_blocks_second_writer() {
-    // Two MmapState instances on the same file simulate two processes.
-    // The first modify() acquires the flock; the second modify() on a
-    // different instance (different fd, different open file description)
-    // should fail with FileLockBusy because the lock is held by the
-    // first. This verifies that the flock serializes writers across
-    // open file descriptions, not just within one.
-    //
-    // Note: flock locks are associated with the open file description,
-    // not the fd or the process. Two opens of the same file produce two
-    // independent open file descriptions, so the second open's flock
-    // will conflict with the first's.
-    use genesis::store::StateFileError;
-
-    let path = temp_path("xproc_lock");
-
-    let mmap1 = MmapState::create(&path, 1, 1000).expect("create 1");
-    let mmap2 = MmapState::open(&path).expect("open 2");
-
-    // Acquire the lock via mmap1's modify. The closure holds the lock
-    // for the duration of the call, so we need to test contention
-    // from within the closure.
-    let result = mmap1.modify(1100, |state| {
-        // While mmap1 holds the flock, mmap2 should not be able to
-        // acquire it.
-        let result2 = mmap2.modify(1200, |_state2| {
-            // If we get here, the lock didn't work — two writers
-            // are inside the critical section simultaneously.
-            panic!("second writer should have been blocked by flock");
-        });
-        assert!(
-            matches!(result2, Err(StateFileError::FileLockBusy)),
-            "second modify should return FileLockBusy, got {:?}",
-            result2
-        );
-        // Verify mmap1's state is still accessible inside the closure.
-        state.zones.transition_to(CognitiveZone::Learning, 1100);
-    });
-    assert!(result.is_ok(), "first modify should succeed: {:?}", result);
-
-    // After mmap1's modify releases the lock, mmap2 should succeed.
-    let result3 = mmap2.modify(1300, |state| {
-        assert_eq!(state.zones.zone(), CognitiveZone::Learning);
-    });
-    assert!(
-        result3.is_ok(),
-        "second modify after lock release should succeed: {:?}",
-        result3
-    );
-
-    cleanup(&path);
-}
-
-#[test]
-fn test_cross_process_lock_released_after_modify() {
-    // Verify that the flock is released after modify() returns, so
-    // subsequent modify() calls on the same instance succeed.
+fn test_modify_can_be_called_repeatedly() {
+    // Subsequent modify() calls on the same instance succeed.
     let path = temp_path("xproc_release");
 
     let mmap = MmapState::create(&path, 1, 1000).expect("create");
 
-    // First modify should acquire and release the lock.
     mmap.modify(1100, |state| {
         state.zones.transition_to(CognitiveZone::Coding, 1100);
     })
     .expect("first modify");
 
-    // Second modify should succeed — the lock was released.
+    // Second modify should succeed.
     mmap.modify(1200, |state| {
         assert_eq!(state.zones.zone(), CognitiveZone::Coding);
     })

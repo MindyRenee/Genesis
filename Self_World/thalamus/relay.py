@@ -28,7 +28,6 @@ import time
 from collections.abc import Callable
 
 from genesis_client.swallow import note_swallowed
-from inhibition import InhibitoryGate
 
 # kind is the low 8 bits of the module's task_id. 0 means the module
 # has nothing to say. The remaining bits are a per-post salt so two
@@ -87,7 +86,6 @@ class Thalamus:
     """
 
     def __init__(self) -> None:
-        self._lock = InhibitoryGate()
         self._pending: dict[int, tuple[int, object]] = {}
         self._seen: dict[int, int] = {}
         self._handlers: dict[int, list[Handler]] = {}
@@ -99,16 +97,14 @@ class Thalamus:
 
     def register(self, module_id: int, handler: Handler) -> Handler:
         """Project onto ``module_id`` — hear every message it publishes."""
-        with self._lock:
-            self._handlers.setdefault(module_id, []).append(handler)
+        self._handlers.setdefault(module_id, []).append(handler)
         return handler
 
     def unregister(self, module_id: int, handler: Handler) -> None:
         """Stop hearing ``module_id`` — drop the projection."""
-        with self._lock:
-            handlers = self._handlers.get(module_id)
-            if handlers and handler in handlers:
-                handlers.remove(handler)
+        handlers = self._handlers.get(module_id)
+        if handlers and handler in handlers:
+            handlers.remove(handler)
 
     def once(self, module_id: int, handler: OnceHandler) -> Handler:
         """Hear the first matching message, then drop the projection.
@@ -166,17 +162,16 @@ class Thalamus:
         if not math.isfinite(drive) or drive <= 0.0:
             return 0
 
-        with self._lock:
-            gain = self._trn_gate(module_id, drive, time.monotonic())
-            if gain < _TRN_FLOOR:
-                return 0
-            self._salt = (self._salt + 1) & 0xFFFFFF
-            task_id = pack(kind, self._salt)
-            self._pending[module_id] = (task_id, payload)
-            # Mark delivered-in-process so the telemetry echo does
-            # not replay it.
-            self._seen[module_id] = task_id
-            handlers = list(self._handlers.get(module_id, ()))
+        gain = self._trn_gate(module_id, drive, time.monotonic())
+        if gain < _TRN_FLOOR:
+            return 0
+        self._salt = (self._salt + 1) & 0xFFFFFF
+        task_id = pack(kind, self._salt)
+        self._pending[module_id] = (task_id, payload)
+        # Mark delivered-in-process so the telemetry echo does
+        # not replay it.
+        self._seen[module_id] = task_id
+        handlers = list(self._handlers.get(module_id, ()))
         for handler in handlers:
             try:
                 handler(kind, payload)
@@ -197,9 +192,8 @@ class Thalamus:
         recency reads ``SubsystemReport.published_at_ms`` — the
         sample's own freshness — rather than a message TTL.
         """
-        with self._lock:
-            pending = self._pending.get(module_id)
-            return pending[0] if pending else None
+        pending = self._pending.get(module_id)
+        return pending[0] if pending else None
 
     def deliver(self, modules) -> None:
         """Hand messages that arrived over the wire to subscribers.
@@ -214,13 +208,12 @@ class Thalamus:
             task_id = int(getattr(module, "task_id", 0) or 0)
             if module_id is None or unpack(task_id) == 0:
                 continue
-            with self._lock:
-                if self._seen.get(module_id) == task_id:
-                    continue
-                self._seen[module_id] = task_id
-                posted = self._pending.get(module_id)
-                payload = posted[1] if posted and posted[0] == task_id else None
-                handlers = list(self._handlers.get(module_id, ()))
+            if self._seen.get(module_id) == task_id:
+                continue
+            self._seen[module_id] = task_id
+            posted = self._pending.get(module_id)
+            payload = posted[1] if posted and posted[0] == task_id else None
+            handlers = list(self._handlers.get(module_id, ()))
             for handler in handlers:
                 try:
                     handler(unpack(task_id), payload)

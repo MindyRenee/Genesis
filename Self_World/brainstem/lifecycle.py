@@ -578,6 +578,20 @@ class LifecycleMixin:
         """
         if not self._is_sleeping:
             return
+        # The flag is only half the restore — the body's side was not
+        # saved with it. The daemon re-derives its phase from chemistry
+        # alone, and the dark interval has already metabolised some of
+        # the pressure she went down holding, so the flip-flop can sit
+        # wake-side while the mind sleeps — the intermediate state the
+        # switch exists to forbid. Re-assert the same cascade sleep()
+        # sends; it is a push, not a held drive, so a body that is
+        # genuinely rested simply will not cross, and the wake-desync
+        # check then wakes the mind to match. Either way the two
+        # layers settle into one state. The send also re-arms
+        # ``_last_sleep_attempt``, giving the restored onset its own
+        # switch window instead of landing straight in the desync
+        # persistence guard.
+        self._send_sleep_neuro_impulses()
         self._engage_sleep_mechanism()
         logger.info(
             "Engaged sleep mechanism on restore — learners paused, "
@@ -1569,6 +1583,47 @@ class LifecycleMixin:
                         (self.inner_life, "_lucid_dream_count", counts[2]),
                     )
                 )
+                # Validate into a detached object before committing restored state.
+                if ils.get("inner_world") is not None:
+                    try:
+                        from sleep.inner_world import InnerWorldExperientialLatentSpace
+
+                        staged_world = InnerWorldExperientialLatentSpace()
+                        staged_world.restore(ils["inner_world"])
+                    except (KeyError, TypeError, ValueError, OverflowError) as error:
+                        note_swallowed("mind.lifecycle._stage_inner_life.inner_world", error)
+                    else:
+                        scalar_updates.append((self.inner_life, "inner_world", staged_world))
+                if ils.get("self_latent_space") is not None:
+                    try:
+                        from self.latent_geometry import SelfLatentSpaceArchitecture
+
+                        staged_self_latent = SelfLatentSpaceArchitecture()
+                        staged_self_latent.restore(ils["self_latent_space"])
+                    except (KeyError, TypeError, ValueError, OverflowError) as error:
+                        note_swallowed("mind.lifecycle._stage_inner_life.self_latent_space", error)
+                    else:
+                        scalar_updates.append((self, "self_latent_space", staged_self_latent))
+                if ils.get("language_latent_space") is not None:
+                    try:
+                        from temporal_lobe.language_latent_space import LanguageLatentSpace
+
+                        staged_language_latent = LanguageLatentSpace()
+                        staged_language_latent.restore(ils["language_latent_space"])
+                    except (
+                        KeyError,
+                        TypeError,
+                        ValueError,
+                        OverflowError,
+                        ArithmeticError,
+                    ) as error:
+                        note_swallowed(
+                            "mind.lifecycle._stage_inner_life.language_latent_space", error
+                        )
+                    else:
+                        scalar_updates.append(
+                            (self.brain.temporal, "language_latent_space", staged_language_latent)
+                        )
                 logger.info(
                     "Restored inner life state: thoughts=%d, dreams=%d, lucid=%d",
                     *counts,
@@ -1699,6 +1754,13 @@ class LifecycleMixin:
                     "thought_count": self.inner_life.thought_count,
                     "dream_count": self.inner_life.dream_count,
                     "lucid_dream_count": self.inner_life.lucid_dream_count,
+                    "inner_world": (
+                        self.inner_life.inner_world.to_dict()
+                        if hasattr(self.inner_life, "inner_world")
+                        else None
+                    ),
+                    "self_latent_space": self.self_latent_space.to_dict(),
+                    "language_latent_space": (self.brain.temporal.language_latent_space.to_dict()),
                 },
                 world_state=self.world.to_dict(),
                 executive=self.brain.frontal.executive,

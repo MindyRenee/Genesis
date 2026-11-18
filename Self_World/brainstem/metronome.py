@@ -92,7 +92,6 @@ class MetronomeMixin:
         _last_threat_snapshot: float
         _offline: bool
         _module_seconds: dict[int, float]
-        _module_seconds_lock: Any
         _known_modules: set[int]
         _learned_since_save: int
         _experience_since_identity: int
@@ -115,9 +114,8 @@ class MetronomeMixin:
         seconds = _finite_or(seconds, 0.0)
         if seconds <= 0.0:
             return
-        with self._module_seconds_lock:
-            self._module_seconds[module_id] = self._module_seconds.get(module_id, 0.0) + seconds
-            self._known_modules.add(module_id)
+        self._module_seconds[module_id] = self._module_seconds.get(module_id, 0.0) + seconds
+        self._known_modules.add(module_id)
 
     def _read_interoceptive_signals(self) -> dict[str, float]:
         """Read interoceptive signals for the meditation urge.
@@ -888,15 +886,12 @@ class MetronomeMixin:
         total_cpu_load would keep ratcheting upward. Idleness has to
         be stated as an explicit 0.0.
         """
-        with self._module_seconds_lock:
-            total_work = sum(self._module_seconds.values())
-            shares = (
-                {m: s / total_work for m, s in self._module_seconds.items()}
-                if total_work > 0.0
-                else {}
-            )
-            known = set(self._known_modules)
-            self._module_seconds.clear()
+        total_work = sum(self._module_seconds.values())
+        shares = (
+            {m: s / total_work for m, s in self._module_seconds.items()} if total_work > 0.0 else {}
+        )
+        known = set(self._known_modules)
+        self._module_seconds.clear()
         # The registered modules always report so their liveness is
         # maintained; the sampler's modules report their measured
         # share. A module in both sets is sent once, with the
@@ -1407,7 +1402,11 @@ class MetronomeMixin:
                 now = time.time()
                 # The real interval this cycle covers — every
                 # per-cycle accumulator below normalizes against it.
-                self._cycle_dt = now - self._last_cycle_at
+                # Clamped at zero: a backward wall-clock step (RTC
+                # resync, NTP correction, suspend wake) would hand the
+                # cycle a negative interval, and the impulses scaled by
+                # it would push chemistry the wrong direction.
+                self._cycle_dt = max(0.0, now - self._last_cycle_at)
                 self._last_cycle_at = now
 
                 # ── 3-4. Heartbeat modules and sensors ──

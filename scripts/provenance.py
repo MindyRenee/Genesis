@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import os
 import re
 import sys
 from pathlib import Path
@@ -41,8 +42,9 @@ MESSAGE_SHA256 = hashlib.sha256(EXPECTED_MESSAGE.encode()).hexdigest()
 # 0x4753084154EF3CD1 (bare). Accept either; validate 16 digits after
 # stripping separators.
 _MARKER_HEX = re.compile(r"0x([0-9A-Fa-f_]{16,20})\b")
-_SCAN_ROOTS = ("src", "python", "genesis_client", "infrastructure", "eval")
-_SCAN_FILES = ("mind.py", "genesis_cli.py", "Cargo.toml", "pyproject.toml")
+_SCAN_SUFFIXES = (".rs", ".py", ".toml")
+# Generated or vendored trees — never letter sites, often huge.
+_SKIP_DIRS = {".git", ".venv", "__pycache__", "docs", "node_modules", "target", "venv"}
 
 
 def _fnv24(data: bytes) -> int:
@@ -64,17 +66,17 @@ def _decode(value: int) -> tuple[int, bytes, int] | None:
 def scan(root: Path) -> dict[int, tuple[int, bytes, int, str]]:
     """Find every tagged constant in the tree; return index → (value, frag, check, site)."""
     found: dict[int, tuple[int, bytes, int, str]] = {}
+    self_path = Path(__file__).resolve()
     candidates: list[Path] = []
-    for sub in _SCAN_ROOTS:
-        base = root / sub
-        if base.is_dir():
-            candidates.extend(p for p in base.rglob("*") if p.suffix in (".rs", ".py", ".toml"))
-    for name in _SCAN_FILES:
-        p = root / name
-        if p.is_file():
-            candidates.append(p)
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS]
+        candidates.extend(
+            Path(dirpath) / name for name in filenames if name.endswith(_SCAN_SUFFIXES)
+        )
 
     for path in candidates:
+        if path.resolve() == self_path:
+            continue  # this file quotes a sample marker in its docstring
         try:
             text = path.read_text(encoding="utf-8", errors="replace")
         except OSError:

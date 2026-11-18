@@ -28,8 +28,6 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-from inhibition import InhibitoryGate
-
 # Words this short are usually grammatical noise, not topics.
 _MIN_TOPIC_WORD_LEN = 4
 
@@ -213,20 +211,16 @@ class EventStream:
     def __init__(self, max_size: int = 200) -> None:
         """Create a bounded stream holding at most ``max_size`` events."""
         self._events: deque[ExternalEvent] = deque(maxlen=max_size)
-        self._lock = InhibitoryGate()
 
     def append(self, event: ExternalEvent) -> None:
         """Record an event (thread-safe)."""
-        with self._lock:
-            self._events.append(event)
+        self._events.append(event)
 
     def recent(self, n: int = 20) -> list[ExternalEvent]:
         """Return the ``n`` most recent events, oldest first."""
-        with self._lock:
-            events = list(self._events)
+        events = list(self._events)
         return events[-n:] if len(events) > n else events
 
     def __len__(self) -> int:
         """Number of events currently in the stream."""
-        with self._lock:
-            return len(self._events)
+        return len(self._events)

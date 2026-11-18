@@ -54,7 +54,6 @@ from genesis_client.protocol import (
     CHEM_SEROTONIN,
 )
 from infrastructure.config import default_data_dir
-from inhibition import RecurrentInhibition
 from journal import record_event
 
 from games import sight
@@ -145,7 +144,6 @@ class Arcade:
         self._voice = voice
         self.image_dir = Path(image_dir) if image_dir else default_data_dir() / "arcade"
         self._rng = rng or random.Random()
-        self._lock = RecurrentInhibition()
         self._offers: list[GameOffer] = []
         self._offered_at = 0.0
         self.session: GameSession | None = None
@@ -179,21 +177,20 @@ class Arcade:
 
     def offers(self, *, refresh: bool = False) -> list[GameOffer]:
         """The games on offer right now; fetched from the API when stale."""
-        with self._lock:
-            if refresh or not self._offers or time.time() - self._offered_at > OFFER_REFRESH_S:
-                try:
-                    self._offers = self.games.offers()
-                    self.last_error = ""
-                except GamesUnavailable as exc:
-                    self.last_error = str(exc)
-                    return list(self._offers)
-                self._offered_at = time.time()
-                names = ", ".join(o.title or o.game_id for o in self._offers[:6])
-                self.world.notify(
-                    f"the arcade offers {len(self._offers)} games: {names}",
-                    salience=0.3,
-                )
-            return list(self._offers)
+        if refresh or not self._offers or time.time() - self._offered_at > OFFER_REFRESH_S:
+            try:
+                self._offers = self.games.offers()
+                self.last_error = ""
+            except GamesUnavailable as exc:
+                self.last_error = str(exc)
+                return list(self._offers)
+            self._offered_at = time.time()
+            names = ", ".join(o.title or o.game_id for o in self._offers[:6])
+            self.world.notify(
+                f"the arcade offers {len(self._offers)} games: {names}",
+                salience=0.3,
+            )
+        return list(self._offers)
 
     def pick(self) -> str | None:
         """Her choice of game: keep the open one, else the most tractable.
@@ -227,43 +224,41 @@ class Arcade:
 
     def enter(self, game_id: str) -> Board | None:
         """Walk up to ``game_id`` and see its first board."""
-        with self._lock:
-            self.leave(quietly=True)
-            try:
-                self.session = self.games.open(game_id)
-                board = self.session.reset()
-            except GamesUnavailable as exc:
-                self.last_error = str(exc)
-                self.session = None
-                return None
-            self.visits += 1
-            memory = self._memory(game_id)
-            # A fresh environment is a fresh run — the trail restarts so
-            # remembered paths index from move one, and the offer's
-            # published baselines refresh the par she plays against.
-            memory.trail.clear()
-            offer = next((o for o in self.offers() if o.game_id == game_id), None)
-            if offer is not None and offer.baselines:
-                memory.baselines = list(offer.baselines)
-            self.world.it_acted(f"went to play {game_id} in the arcade", detail=RULES)
-            record_event(
-                "arcade_enter", f"entered {game_id}", game=game_id, best_level=memory.best_level
+        self.leave(quietly=True)
+        try:
+            self.session = self.games.open(game_id)
+            board = self.session.reset()
+        except GamesUnavailable as exc:
+            self.last_error = str(exc)
+            self.session = None
+            return None
+        self.visits += 1
+        memory = self._memory(game_id)
+        # A fresh environment is a fresh run — the trail restarts so
+        # remembered paths index from move one, and the offer's
+        # published baselines refresh the par she plays against.
+        memory.trail.clear()
+        offer = next((o for o in self.offers() if o.game_id == game_id), None)
+        if offer is not None and offer.baselines:
+            memory.baselines = list(offer.baselines)
+        self.world.it_acted(f"went to play {game_id} in the arcade", detail=RULES)
+        record_event(
+            "arcade_enter", f"entered {game_id}", game=game_id, best_level=memory.best_level
+        )
+        if memory.level_paths:
+            self._wave("theta", 0.15)
+            self._say(f"I remember {game_id}. I got to level {memory.best_level} before.")
+        if board is not None:
+            self._perceive(
+                board,
+                sight.see_change(None, board.grid),
+                new=memory.see(sight.signature(board.grid)),
             )
-            if memory.level_paths:
-                self._wave("theta", 0.15)
-                self._say(f"I remember {game_id}. I got to level {memory.best_level} before.")
-            if board is not None:
-                self._perceive(
-                    board,
-                    sight.see_change(None, board.grid),
-                    new=memory.see(sight.signature(board.grid)),
-                )
-            return board
+        return board
 
     def leave(self, *, quietly: bool = False) -> None:
         """Step away from the current game; what she learned is kept."""
-        with self._lock:
-            session, self.session = self.session, None
+        session, self.session = self.session, None
         if session is None:
             return
         memory = self._memory(session.game_id)
@@ -303,84 +298,83 @@ class Arcade:
 
     def move(self, move: str, why: str = "her choice") -> MoveReport | None:
         """Make one move on the open game and feel what it did."""
-        with self._lock:
-            session = self.session
-            if session is None or session.board is None:
-                return None
-            before = session.board
-            memory = self._memory(session.game_id)
-            name, _, at = move.partition("@")
-            x = y = None
-            if at:
-                row, col = (int(v) for v in at.split(","))
-                x, y = col, row
-            try:
-                after = session.step(name, x=x, y=y, reasoning={"thought": why})
-            except (GamesUnavailable, ValueError) as exc:
-                self.last_error = str(exc)
-                return None
-            except Exception as exc:  # noqa: BLE001 — the API can fail mid-game
-                self.last_error = f"move failed: {exc}"
-                return None
-            if after is None:
-                return None
-            change = sight.see_change(before.grid, after.grid)
-            new = memory.see(sight.signature(after.grid))
-            reward = REWARD_NEW_BOARD if new and change.count else REWARD_NOTHING
-            levelled = after.levels_completed > before.levels_completed
-            if levelled:
-                reward += REWARD_LEVEL
-                par = (
-                    memory.baselines[after.levels_completed - 1]
-                    if 0 < after.levels_completed <= len(memory.baselines)
-                    else 0
-                )
-                if par:
-                    # The scorecard's own formula — (baseline/actions)²
-                    # capped at 1.15 — so her reward matches what she is
-                    # actually scored on: fast wins, not just wins.
-                    reward += min(1.15, (par / (len(memory.trail) + 1)) ** 2)
-            if after.won:
-                reward += REWARD_WIN
-            if after.over:
-                reward += REWARD_GAME_OVER
-            rpe = memory.learn(
-                sight.signature(before.grid),
-                move,
-                reward,
-                sight.signature(after.grid),
-                bool(change.count),
-                self.moves(after),
+        session = self.session
+        if session is None or session.board is None:
+            return None
+        before = session.board
+        memory = self._memory(session.game_id)
+        name, _, at = move.partition("@")
+        x = y = None
+        if at:
+            row, col = (int(v) for v in at.split(","))
+            x, y = col, row
+        try:
+            after = session.step(name, x=x, y=y, reasoning={"thought": why})
+        except (GamesUnavailable, ValueError) as exc:
+            self.last_error = str(exc)
+            return None
+        except Exception as exc:  # noqa: BLE001 — the API can fail mid-game
+            self.last_error = f"move failed: {exc}"
+            return None
+        if after is None:
+            return None
+        change = sight.see_change(before.grid, after.grid)
+        new = memory.see(sight.signature(after.grid))
+        reward = REWARD_NEW_BOARD if new and change.count else REWARD_NOTHING
+        levelled = after.levels_completed > before.levels_completed
+        if levelled:
+            reward += REWARD_LEVEL
+            par = (
+                memory.baselines[after.levels_completed - 1]
+                if 0 < after.levels_completed <= len(memory.baselines)
+                else 0
             )
-            self.world.it_acted(f"pressed {move} in {session.game_id}", detail=change.describe())
-            self._wave("beta2", 0.05)
-            self._impulse(CHEM_DOPAMINE, 0.05 * rpe)
-            self._perceive(after, change, new=new)
-            if levelled:
-                memory.level_up(after.levels_completed)
-                self._celebrate(session.game_id, after)
-            if after.won:
-                memory.wins += 1
-                self._impulse(CHEM_ENDORPHIN, 0.05)
-                self._impulse(CHEM_SEROTONIN, 0.04)
-                record_event(
-                    "arcade_win", f"won {session.game_id}", game=session.game_id, moves=memory.moves
-                )
-                self._say(f"I won {session.game_id}!")
-            if after.over:
-                memory.game_overs += 1
-                self._impulse(CHEM_CORTISOL, 0.02)
-                self._impulse(CHEM_NOREPINEPHRINE, 0.02)
-                record_event(
-                    "arcade_game_over", f"game over in {session.game_id}", game=session.game_id
-                )
-                # A level reset starts a new attempt — the trail must
-                # restart too, or remembered paths index into stale moves.
-                memory.trail.clear()
-                session.reset()
-            return MoveReport(
-                move, why, change.describe(), change.count, after.state, after.levels_completed, rpe
+            if par:
+                # The scorecard's own formula — (baseline/actions)²
+                # capped at 1.15 — so her reward matches what she is
+                # actually scored on: fast wins, not just wins.
+                reward += min(1.15, (par / (len(memory.trail) + 1)) ** 2)
+        if after.won:
+            reward += REWARD_WIN
+        if after.over:
+            reward += REWARD_GAME_OVER
+        rpe = memory.learn(
+            sight.signature(before.grid),
+            move,
+            reward,
+            sight.signature(after.grid),
+            bool(change.count),
+            self.moves(after),
+        )
+        self.world.it_acted(f"pressed {move} in {session.game_id}", detail=change.describe())
+        self._wave("beta2", 0.05)
+        self._impulse(CHEM_DOPAMINE, 0.05 * rpe)
+        self._perceive(after, change, new=new)
+        if levelled:
+            memory.level_up(after.levels_completed)
+            self._celebrate(session.game_id, after)
+        if after.won:
+            memory.wins += 1
+            self._impulse(CHEM_ENDORPHIN, 0.05)
+            self._impulse(CHEM_SEROTONIN, 0.04)
+            record_event(
+                "arcade_win", f"won {session.game_id}", game=session.game_id, moves=memory.moves
             )
+            self._say(f"I won {session.game_id}!")
+        if after.over:
+            memory.game_overs += 1
+            self._impulse(CHEM_CORTISOL, 0.02)
+            self._impulse(CHEM_NOREPINEPHRINE, 0.02)
+            record_event(
+                "arcade_game_over", f"game over in {session.game_id}", game=session.game_id
+            )
+            # A level reset starts a new attempt — the trail must
+            # restart too, or remembered paths index into stale moves.
+            memory.trail.clear()
+            session.reset()
+        return MoveReport(
+            move, why, change.describe(), change.count, after.state, after.levels_completed, rpe
+        )
 
     def play(self, max_moves: int = BOUT_MOVES) -> str:
         """One bout of play she chose: explore, remember, try to win."""

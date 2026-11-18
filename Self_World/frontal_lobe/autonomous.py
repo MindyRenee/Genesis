@@ -6,9 +6,6 @@ its source registry (local man pages and WordNet, then the Wikipedia
 API with a web-search fallback through her browser), reads the content, extracts
 concepts and relationships, and stores what it learned as memories.
 
-This is not a web crawler. It doesn't index the internet. It reads
-a source, thinks about it, and moves on. Like a person browsing a library.
-
 The learner is curiosity-driven:
 - It picks topics from its curiosity queue (gaps in its understanding)
 - It queries its source registry for content on those topics
@@ -19,8 +16,8 @@ The learner is curiosity-driven:
 - It pauses when someone starts talking to it
 
 Safety:
-- Wikipedia API returns structured content (no HTML scraping)
-- HTML pages are text-extracted (no scripts, styles, or forms)
+- Wikipedia API returns structured content
+- HTML pages are text-extracted
 - Rate-limited (one request every few seconds)
 - Timeout on every request
 - Bounded response reads and total page count per session
@@ -41,8 +38,6 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
-from inhibition import InhibitoryGate, NeuromodulatoryGate, RecurrentInhibition
-
 if TYPE_CHECKING:
     from genesis_client.types import PlasticityProfile
     from occipital_lobe import VisualCortex
@@ -52,6 +47,7 @@ from basal_ganglia.td import TDLearner
 from brain_waves import BrainWave
 from genesis_client.protocol import CHEM_DOPAMINE
 from genesis_client.swallow import note_swallowed
+from infrastructure.pulse import Pulse
 from infrastructure.text import sentences as _sentences
 from limbic_system.curiosity import Curiosity
 from memory import SemanticMemory, SpacedRepetitionScheduler
@@ -751,7 +747,7 @@ class AutonomousLearner:
         self._running = False
         self._paused = False
         self._throttled = False
-        self._stop_event = NeuromodulatoryGate()
+        self._stop_event = Pulse()
         # The metronome supplies cadence. This deadline keeps network
         # acquisition at the same bounded rate the former worker had,
         # without a second cognitive process.
@@ -796,7 +792,6 @@ class AutonomousLearner:
         self._session_pages = 0  # per-session (resets on start(), for limit)
         self._concepts_learned = 0
         self._relationships_learned = 0
-        self._stats_lock = InhibitoryGate()
 
         # Web access log — every URL it visits, with timestamp,
         # source name, topic, and whether it succeeded. This is
@@ -854,15 +849,13 @@ class AutonomousLearner:
             "detail": detail[:200] if detail else "",
             "timestamp": int(time.time()),
         }
-        with self._stats_lock:
-            self._web_log.append(entry)
-            if len(self._web_log) > self._web_log_max:
-                self._web_log = self._web_log[-self._web_log_max :]
+        self._web_log.append(entry)
+        if len(self._web_log) > self._web_log_max:
+            self._web_log = self._web_log[-self._web_log_max :]
 
     def web_history(self, n: int = 20) -> list[dict[str, Any]]:
         """Return the last N web access entries."""
-        with self._stats_lock:
-            return list(self._web_log[-n:])
+        return list(self._web_log[-n:])
 
     def _init_sources(self) -> None:
         """Initialize the source registry."""
@@ -914,7 +907,6 @@ class AutonomousLearner:
         self._curiosity_queue: deque[str] = deque(maxlen=50)
         # RLock protecting _topic_queue, _urgent_queue, _curiosity_queue,
         # and _topics_searched across the learner and caller threads.
-        self._queue_lock = RecurrentInhibition()
 
         # Metalearning — adapts learning rate and selects strategies.
         self.meta_learner: MetaLearner = MetaLearner()
@@ -1120,10 +1112,9 @@ class AutonomousLearner:
             "rustc",
             "rustdoc",
         ]
-        with self._queue_lock:
-            for topic in toolchain_pages:
-                if topic not in self._topics_searched and topic not in self._urgent_queue:
-                    self._urgent_queue.append(topic)
+        for topic in toolchain_pages:
+            if topic not in self._topics_searched and topic not in self._urgent_queue:
+                self._urgent_queue.append(topic)
         self._man_page_topics_seeded = True
 
     def stop(self) -> None:
@@ -1282,11 +1273,10 @@ class AutonomousLearner:
         topic = topic.lower().strip()
         if not is_world_concept(topic):
             return
-        with self._queue_lock:
-            if topic and topic not in self._topics_searched:
-                self._topic_queue.append(topic)
-                self._next_learning_at = 0.0
-                self._idle_consolidated = False
+        if topic and topic not in self._topics_searched:
+            self._topic_queue.append(topic)
+            self._next_learning_at = 0.0
+            self._idle_consolidated = False
 
     def add_urgent_topic(self, topic: str) -> None:
         """Add a topic it was just asked about but didn't know.
@@ -1301,11 +1291,10 @@ class AutonomousLearner:
         topic = topic.lower().strip()
         if not is_world_concept(topic):
             return
-        with self._queue_lock:
-            if topic and topic not in self._topics_searched and topic not in self._urgent_queue:
-                self._urgent_queue.append(topic)
-                self._next_learning_at = 0.0
-                self._idle_consolidated = False
+        if topic and topic not in self._topics_searched and topic not in self._urgent_queue:
+            self._urgent_queue.append(topic)
+            self._next_learning_at = 0.0
+            self._idle_consolidated = False
 
     def lookup_topic_sync(self, topic: str) -> LearningResult | None:
         """Synchronously look up a topic from external sources.
@@ -1328,9 +1317,8 @@ class AutonomousLearner:
             return None
 
         # Skip topics already learned. Failed lookups remain retryable.
-        with self._queue_lock:
-            if topic in self._topics_searched:
-                return None
+        if topic in self._topics_searched:
+            return None
 
         # Query the source registry (Wikipedia, dictionary, cache)
         try:
@@ -1377,8 +1365,7 @@ class AutonomousLearner:
             try:
                 result = self._learn_from_content(sr, topic)
                 if result:
-                    with self._queue_lock:
-                        self._topics_searched.add(topic)
+                    self._topics_searched.add(topic)
                     logger.info(
                         f"sync lookup learned '{topic}' from {sr.source_name}: "
                         f"{len(result.concepts_learned)} concepts, "
@@ -1420,35 +1407,34 @@ class AutonomousLearner:
         Returns the number of topics queued.
         """
         queued = 0
-        with self._queue_lock:
-            for q in questions:
-                # Skip questions meant for the user
-                if getattr(q, "should_ask", False):
-                    continue
-                # Only learnable question types
-                qtype = getattr(q, "question_type", "")
-                if qtype not in self._LEARNABLE_TYPES:
-                    continue
-                concept = getattr(q, "target_concept", "")
-                if not concept:
-                    continue
-                # Strip polysemy sense suffix (e.g. "orange#2" → "orange")
-                # so dictionary/man-page lookups use the bare word.
-                topic = strip_sense_suffix(concept).lower().strip()
-                if not topic or topic in self._topics_searched:
-                    continue
-                # Reject non-world concepts (code symbols, function words,
-                # conversation fragments) — they produce garbage searches.
-                if not is_world_concept(topic):
-                    continue
-                # Avoid duplicate queue entries
-                if topic in self._curiosity_queue:
-                    continue
-                self._curiosity_queue.append(topic)
-                self._next_learning_at = 0.0
-                self._idle_consolidated = False
-                queued += 1
-                self._emit("learning", f"Queued curiosity topic: '{topic}' ({qtype})")
+        for q in questions:
+            # Skip questions meant for the user
+            if getattr(q, "should_ask", False):
+                continue
+            # Only learnable question types
+            qtype = getattr(q, "question_type", "")
+            if qtype not in self._LEARNABLE_TYPES:
+                continue
+            concept = getattr(q, "target_concept", "")
+            if not concept:
+                continue
+            # Strip polysemy sense suffix (e.g. "orange#2" → "orange")
+            # so dictionary/man-page lookups use the bare word.
+            topic = strip_sense_suffix(concept).lower().strip()
+            if not topic or topic in self._topics_searched:
+                continue
+            # Reject non-world concepts (code symbols, function words,
+            # conversation fragments) — they produce garbage searches.
+            if not is_world_concept(topic):
+                continue
+            # Avoid duplicate queue entries
+            if topic in self._curiosity_queue:
+                continue
+            self._curiosity_queue.append(topic)
+            self._next_learning_at = 0.0
+            self._idle_consolidated = False
+            queued += 1
+            self._emit("learning", f"Queued curiosity topic: '{topic}' ({qtype})")
         return queued
 
     def describe_sources(self) -> str:
@@ -1501,10 +1487,9 @@ class AutonomousLearner:
     @property
     def stats(self) -> dict:
         """Summary statistics about learning activity."""
-        with self._queue_lock:
-            topics_explored = len(self._topics_searched)
-            queue_size = len(self._topic_queue)
-            curiosity_queue_size = len(self._curiosity_queue)
+        topics_explored = len(self._topics_searched)
+        queue_size = len(self._topic_queue)
+        curiosity_queue_size = len(self._curiosity_queue)
         return {
             "pages_fetched": self._pages_fetched,
             "concepts_learned": self._concepts_learned,
@@ -1524,40 +1509,38 @@ class AutonomousLearner:
         module; this only saves the learner's own state (topics
         already explored, cumulative stats, queues).
         """
-        with self._queue_lock:
-            return {
-                "topics_searched": list(self._topics_searched),
-                "pages_fetched": self._pages_fetched,
-                "concepts_learned": self._concepts_learned,
-                "relationships_learned": self._relationships_learned,
-                "emotion_skips": self._emotion_skips,
-                "posture_skips": self._posture_skips,
-                "topic_queue": list(self._topic_queue),
-                "curiosity_queue": list(self._curiosity_queue),
-                "surprise_baseline": self._surprise_baseline,
-                "predicted_reward": self._predicted_reward,
-                "dual_system": self.dual_system.serialize_state(),
-            }
+        return {
+            "topics_searched": list(self._topics_searched),
+            "pages_fetched": self._pages_fetched,
+            "concepts_learned": self._concepts_learned,
+            "relationships_learned": self._relationships_learned,
+            "emotion_skips": self._emotion_skips,
+            "posture_skips": self._posture_skips,
+            "topic_queue": list(self._topic_queue),
+            "curiosity_queue": list(self._curiosity_queue),
+            "surprise_baseline": self._surprise_baseline,
+            "predicted_reward": self._predicted_reward,
+            "dual_system": self.dual_system.serialize_state(),
+        }
 
     def restore_state(self, data: dict) -> None:
         """Restore learner state from a saved dict."""
-        with self._queue_lock:
-            self._topics_searched = set(data.get("topics_searched", []))
-            self._pages_fetched = data.get("pages_fetched", 0)
-            self._concepts_learned = data.get("concepts_learned", 0)
-            self._relationships_learned = data.get("relationships_learned", 0)
-            self._emotion_skips = data.get("emotion_skips", 0)
-            self._posture_skips = data.get("posture_skips", 0)
-            # Rebuild as a bounded deque, keeping the *most recent*
-            # entries if the saved queue is longer than the cap (the
-            # tail is the live work; the head is stale backlog).
-            self._topic_queue = deque(
-                data.get("topic_queue", [])[-_MAX_TOPIC_QUEUE:],
-                maxlen=_MAX_TOPIC_QUEUE,
-            )
-            self._curiosity_queue = deque(data.get("curiosity_queue", []), maxlen=50)
-            self._surprise_baseline = data.get("surprise_baseline", 0.0)
-            self._predicted_reward = data.get("predicted_reward", 0.0)
+        self._topics_searched = set(data.get("topics_searched", []))
+        self._pages_fetched = data.get("pages_fetched", 0)
+        self._concepts_learned = data.get("concepts_learned", 0)
+        self._relationships_learned = data.get("relationships_learned", 0)
+        self._emotion_skips = data.get("emotion_skips", 0)
+        self._posture_skips = data.get("posture_skips", 0)
+        # Rebuild as a bounded deque, keeping the *most recent*
+        # entries if the saved queue is longer than the cap (the
+        # tail is the live work; the head is stale backlog).
+        self._topic_queue = deque(
+            data.get("topic_queue", [])[-_MAX_TOPIC_QUEUE:],
+            maxlen=_MAX_TOPIC_QUEUE,
+        )
+        self._curiosity_queue = deque(data.get("curiosity_queue", []), maxlen=50)
+        self._surprise_baseline = data.get("surprise_baseline", 0.0)
+        self._predicted_reward = data.get("predicted_reward", 0.0)
 
         dual_state = data.get("dual_system")
         if dual_state is not None:
@@ -2037,9 +2020,8 @@ class AutonomousLearner:
         # Urgent topics — it was just asked about these in conversation
         # and didn't know the answer. Look them up first. These bypass
         # the volition gate because they're conversation-driven.
-        with self._queue_lock:
-            if self._urgent_queue:
-                return self._urgent_queue.popleft()
+        if self._urgent_queue:
+            return self._urgent_queue.popleft()
 
         # Non-urgent topics require volition permission. Without it,
         # the learner returns None and the main loop does idle
@@ -2061,38 +2043,34 @@ class AutonomousLearner:
                     e,
                 )  # agency callback failure shouldn't block learning
             else:
-                with self._queue_lock:
-                    if topic and topic not in self._topics_searched:
-                        return topic
+                if topic and topic not in self._topics_searched:
+                    return topic
 
         # Curiosity-driven topics — these are knowledge gaps it
         # explicitly wondered about. Use the interleaving scheduler
         # to avoid consecutive similar topics (Bjork & Bjork, 2011).
-        with self._queue_lock:
-            if len(self._curiosity_queue) >= 2:
-                # Schedule the next few topics with interleaving
-                n = min(3, len(self._curiosity_queue))
-                batch = [self._curiosity_queue.popleft() for _ in range(n)]
-                scheduled = self.interleaving_scheduler.schedule(batch)
-                # Put remaining back, return first
-                for t in scheduled[1:]:
-                    self._curiosity_queue.appendleft(t)
-                return scheduled[0]
-            if self._curiosity_queue:
-                return self._curiosity_queue.popleft()
+        if len(self._curiosity_queue) >= 2:
+            # Schedule the next few topics with interleaving
+            n = min(3, len(self._curiosity_queue))
+            batch = [self._curiosity_queue.popleft() for _ in range(n)]
+            scheduled = self.interleaving_scheduler.schedule(batch)
+            # Put remaining back, return first
+            for t in scheduled[1:]:
+                self._curiosity_queue.appendleft(t)
+            return scheduled[0]
+        if self._curiosity_queue:
+            return self._curiosity_queue.popleft()
 
         # Try the manual queue next
-        with self._queue_lock:
-            if self._topic_queue:
-                # FIFO, and O(1) — `pop(0)` was O(N) on the list this
-                # used to be.
-                return self._topic_queue.popleft()
+        if self._topic_queue:
+            # FIFO, and O(1) — `pop(0)` was O(N) on the list this
+            # used to be.
+            return self._topic_queue.popleft()
 
         # Generate from curiosity — pick isolated or uncertain concepts.
         # Take a snapshot of _topics_searched so the concept scan can run
         # without holding the lock while iterating the network.
-        with self._queue_lock:
-            searched = set(self._topics_searched)
+        searched = set(self._topics_searched)
 
         return self._pick_concept_candidate(searched)
 
@@ -2187,8 +2165,7 @@ class AutonomousLearner:
             )
             learned = self._learn_code_from_docs(topic)
             if learned:
-                with self._queue_lock:
-                    self._topics_searched.add(topic)
+                self._topics_searched.add(topic)
             # Also search GitHub for real-world examples of this topic
             # — seeing how other projects use a concept deepens
             # understanding beyond just reading the docs.
@@ -2222,8 +2199,7 @@ class AutonomousLearner:
                 result = self._fetch_and_learn(sr.url, topic)
 
             if result:
-                with self._queue_lock:
-                    self._topics_searched.add(topic)
+                self._topics_searched.add(topic)
                 # It learned something — mark the curiosity question
                 # about this topic as resolved so it doesn't keep
                 # wondering about what it now understands.
@@ -2262,12 +2238,11 @@ class AutonomousLearner:
         Only world concepts are queued — code symbols and fragments
         are filtered out.
         """
-        with self._queue_lock:
-            for rt in topics:
-                if rt not in self._topics_searched and is_world_concept(rt):
-                    self._curiosity_queue.append(rt)
-            self._next_learning_at = 0.0
-            self._idle_consolidated = False
+        for rt in topics:
+            if rt not in self._topics_searched and is_world_concept(rt):
+                self._curiosity_queue.append(rt)
+        self._next_learning_at = 0.0
+        self._idle_consolidated = False
 
     def _extract_and_merge_semantic_facts(
         self, text: str, new_relationships: list[tuple[str, str, str]]

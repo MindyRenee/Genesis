@@ -67,7 +67,6 @@ from dataclasses import dataclass
 
 import numpy as np
 from genesis_client.threads import call_on_named_thread, named_thread
-from inhibition import InhibitoryGate
 
 __all__ = ["AuditoryCortex", "SoundEvent"]
 
@@ -402,11 +401,9 @@ class AuditoryCortex:
         # Serializes start/stop — without it a start racing a stop
         # loses the old thread's handle while the old loop resumes on
         # the cleared flag, leaving a phantom second listener alive.
-        self._lifecycle_lock = InhibitoryGate()
 
         # Recent sound events (for debugging / inspection)
         self._recent: deque[SoundEvent] = deque(maxlen=50)
-        self._recent_lock = InhibitoryGate()
 
         # Event segmentation state — aggregated incrementally (sums,
         # peak, consecutive-block flux) rather than storing every
@@ -448,38 +445,35 @@ class AuditoryCortex:
         except (ImportError, OSError) as e:
             logger.warning(f"Auditory cortex: sounddevice unavailable ({e})")
             return False
-        with self._lifecycle_lock:
-            if self._running:
-                return True
-            if self._thread is not None and self._thread.is_alive():
-                # A stop() join may have timed out — wait for the old
-                # loop to finish rather than spawn beside it.
-                self._thread.join(timeout=self._START_JOIN_TIMEOUT_S)
-                if self._thread.is_alive():
-                    logger.error(
-                        "Auditory cortex: previous thread still alive after join — "
-                        "refusing to start a second one"
-                    )
-                    return False
-            self._running = True
-            self._thread = named_thread("auditory-cortex", self._listen_loop, comm="g-auditory")
-            self._thread.start()
+        if self._running:
+            return True
+        if self._thread is not None and self._thread.is_alive():
+            # A stop() join may have timed out — wait for the old
+            # loop to finish rather than spawn beside it.
+            self._thread.join(timeout=self._START_JOIN_TIMEOUT_S)
+            if self._thread.is_alive():
+                logger.error(
+                    "Auditory cortex: previous thread still alive after join — "
+                    "refusing to start a second one"
+                )
+                return False
+        self._running = True
+        self._thread = named_thread("auditory-cortex", self._listen_loop, comm="g-auditory")
+        self._thread.start()
         logger.info("Auditory cortex started — listening to sounds")
         return True
 
     def stop(self) -> None:
         """Stop the auditory cortex."""
-        with self._lifecycle_lock:
-            self._running = False
-            if self._thread:
-                self._thread.join(timeout=3.0)
-                self._thread = None
+        self._running = False
+        if self._thread:
+            self._thread.join(timeout=3.0)
+            self._thread = None
         logger.info("Auditory cortex stopped")
 
     def recent_events(self) -> list[SoundEvent]:
         """Return recent sound events (for debugging)."""
-        with self._recent_lock:
-            return list(self._recent)
+        return list(self._recent)
 
     def _listen_loop(self) -> None:
         """Main capture and classification loop.
@@ -656,8 +650,7 @@ class AuditoryCortex:
         )
         event.description = _describe_sound(event)
 
-        with self._recent_lock:
-            self._recent.append(event)
+        self._recent.append(event)
 
         try:
             self.callback(event)
@@ -683,8 +676,7 @@ class AuditoryCortex:
             timestamp=timestamp,
         )
         event.description = "silence | quiet | deep | tonal | brief"
-        with self._recent_lock:
-            self._recent.append(event)
+        self._recent.append(event)
         try:
             self.callback(event)
         except Exception:  # noqa: BLE001

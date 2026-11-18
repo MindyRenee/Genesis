@@ -28,7 +28,6 @@ import time
 from typing import Any
 
 from genesis_client.swallow import note_swallowed
-from inhibition import InhibitoryGate
 
 __all__ = [
     "Hands",
@@ -278,7 +277,6 @@ class Hands:
 
         self._E = ecodes
         self._codes: dict[str, int] = ecodes.ecodes
-        self._lock = InhibitoryGate()
         self._kbd = UInput(
             {ecodes.EV_KEY: sorted(ecodes.keys)},
             name="genesis-hand-keys",
@@ -329,19 +327,18 @@ class Hands:
         mods = [self._code(resolve_key_name(m)[0]) for m in modifiers]
         if shift:
             mods.insert(0, self._code("KEY_LEFTSHIFT"))
-        with self._lock:
-            for m in mods:
-                self._kbd.write(self._E.EV_KEY, m, 1)
-            self._kbd.syn()
-            time.sleep(_PRESS_GAP)
-            code = self._code(name)
-            self._kbd.write(self._E.EV_KEY, code, 1)
-            self._kbd.syn()
-            time.sleep(_PRESS_GAP)
-            self._kbd.write(self._E.EV_KEY, code, 0)
-            for m in reversed(mods):
-                self._kbd.write(self._E.EV_KEY, m, 0)
-            self._kbd.syn()
+        for m in mods:
+            self._kbd.write(self._E.EV_KEY, m, 1)
+        self._kbd.syn()
+        time.sleep(_PRESS_GAP)
+        code = self._code(name)
+        self._kbd.write(self._E.EV_KEY, code, 1)
+        self._kbd.syn()
+        time.sleep(_PRESS_GAP)
+        self._kbd.write(self._E.EV_KEY, code, 0)
+        for m in reversed(mods):
+            self._kbd.write(self._E.EV_KEY, m, 0)
+        self._kbd.syn()
         return name
 
     def type(self, text: str) -> int:
@@ -353,28 +350,26 @@ class Hands:
         """
         strokes = [char_key(c) for c in text]
         shift = self._code("KEY_LEFTSHIFT")
-        with self._lock:
-            for name, need_shift in strokes:
-                code = self._code(name)
-                if need_shift:
-                    self._kbd.write(self._E.EV_KEY, shift, 1)
-                self._kbd.write(self._E.EV_KEY, code, 1)
-                self._kbd.syn()
-                time.sleep(_PRESS_GAP)
-                self._kbd.write(self._E.EV_KEY, code, 0)
-                if need_shift:
-                    self._kbd.write(self._E.EV_KEY, shift, 0)
-                self._kbd.syn()
+        for name, need_shift in strokes:
+            code = self._code(name)
+            if need_shift:
+                self._kbd.write(self._E.EV_KEY, shift, 1)
+            self._kbd.write(self._E.EV_KEY, code, 1)
+            self._kbd.syn()
+            time.sleep(_PRESS_GAP)
+            self._kbd.write(self._E.EV_KEY, code, 0)
+            if need_shift:
+                self._kbd.write(self._E.EV_KEY, shift, 0)
+            self._kbd.syn()
         return len(text)
 
     def move(self, dx: int, dy: int) -> None:
         """Relative pointer motion — dx right, dy down, in pixels."""
-        with self._lock:
-            if dx:
-                self._ptr.write(self._E.EV_REL, self._E.REL_X, dx)
-            if dy:
-                self._ptr.write(self._E.EV_REL, self._E.REL_Y, dy)
-            self._ptr.syn()
+        if dx:
+            self._ptr.write(self._E.EV_REL, self._E.REL_X, dx)
+        if dy:
+            self._ptr.write(self._E.EV_REL, self._E.REL_Y, dy)
+        self._ptr.syn()
 
     def goto(self, x: int, y: int) -> tuple[int, int]:
         """Absolute pointer placement at desktop pixel (x, y).
@@ -388,10 +383,9 @@ class Hands:
         w, h = self._screen
         ax = min(_ABS_MAX, max(0, round(x * _ABS_MAX / max(1, w - 1))))
         ay = min(_ABS_MAX, max(0, round(y * _ABS_MAX / max(1, h - 1))))
-        with self._lock:
-            self._ptr.write(self._E.EV_ABS, self._E.ABS_X, ax)
-            self._ptr.write(self._E.EV_ABS, self._E.ABS_Y, ay)
-            self._ptr.syn()
+        self._ptr.write(self._E.EV_ABS, self._E.ABS_X, ax)
+        self._ptr.write(self._E.EV_ABS, self._E.ABS_Y, ay)
+        self._ptr.syn()
         return (x, y)
 
     def click(self, button: str = "left", x: int = -1, y: int = -1) -> str:
@@ -402,22 +396,20 @@ class Hands:
         if x >= 0 and y >= 0:
             self.goto(x, y)
         code = self._code(bname)
-        with self._lock:
-            self._ptr.write(self._E.EV_KEY, code, 1)
-            self._ptr.syn()
-            time.sleep(_PRESS_GAP)
-            self._ptr.write(self._E.EV_KEY, code, 0)
-            self._ptr.syn()
+        self._ptr.write(self._E.EV_KEY, code, 1)
+        self._ptr.syn()
+        time.sleep(_PRESS_GAP)
+        self._ptr.write(self._E.EV_KEY, code, 0)
+        self._ptr.syn()
         return bname
 
     def scroll(self, dy: int, dx: int = 0) -> None:
         """Wheel notches — dy positive scrolls up, dx is horizontal."""
-        with self._lock:
-            if dy:
-                self._ptr.write(self._E.EV_REL, self._E.REL_WHEEL, dy)
-            if dx:
-                self._ptr.write(self._E.EV_REL, self._E.REL_HWHEEL, dx)
-            self._ptr.syn()
+        if dy:
+            self._ptr.write(self._E.EV_REL, self._E.REL_WHEEL, dy)
+        if dx:
+            self._ptr.write(self._E.EV_REL, self._E.REL_HWHEEL, dx)
+        self._ptr.syn()
 
     def close(self) -> None:
         """Destroy both devices — the hand leaves the input bus."""

@@ -318,6 +318,50 @@ def test_effective_phase_resolves_waking_low_arousal_to_drowsy():
     assert effective(None, _core(ZONE_SLEEPING, PHASE_REM, 0.45)) == PHASE_REM
 
 
+def test_resolved_neuro_summary_gives_sleep_consumers_the_zone_phase():
+    """InnerLife and the notifier read the resolved phase, not the raw one.
+
+    During the ~23-minute onset crossing the emergent phase still reads
+    active — the raw summary would tell inner life she is awake
+    mid-dream and would fire waking-phase notifications while she
+    sleeps. The resolved summary carries the zone-authoritative phase.
+    """
+    from types import SimpleNamespace
+
+    from frontal_lobe.status import StatusMixin
+
+    class _Client:
+        def __init__(self, core):
+            self._core = core
+
+        def get_state(self):
+            return self._core
+
+    def _core(zone, phase):
+        return SimpleNamespace(
+            cognitive_zone=zone,
+            emergent_phase=phase,
+            arousal=0.2,
+            valence=0.1,
+            global_tone=0.5,
+            plasticity_gate=0.5,
+            encoding_weight=0.5,
+            consolidation_weight=0.5,
+            retrieval_weight=0.5,
+        )
+
+    mind = SimpleNamespace(
+        client=_Client(_core(ZONE_SLEEPING, PHASE_ACTIVE)),
+        _effective_phase=lambda core: StatusMixin._effective_phase(None, core),
+    )
+    summary = StatusMixin._resolved_neuro_summary(mind)
+    assert summary.phase_name == "nrem"
+
+    mind.client = _Client(_core(ZONE_IDLE, PHASE_ACTIVE))
+    summary = StatusMixin._resolved_neuro_summary(mind)
+    assert summary.phase_name == "drowsy"  # arousal 0.2 → N1 resolution
+
+
 def test_regional_powers_normalized_per_region():
     """Each region's power vector sums to 1."""
     state = assess_brain_waves(_make_summary(arousal=0.55, phase=PHASE_ACTIVE))

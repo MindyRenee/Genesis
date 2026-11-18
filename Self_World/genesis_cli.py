@@ -91,7 +91,7 @@ from genesis_client.ltm_index import scan_ltm_index
 from genesis_client.swallow import note_swallowed
 from genesis_client.threads import named_thread
 from infrastructure.config import default_data_dir
-from inhibition import InhibitoryGate, NeuromodulatoryGate, ThalamicRelay
+from infrastructure.pulse import Pulse
 from mind import Mind
 from occipital_lobe.perception.ambient import AmbientListener, contains_wake_word, strip_wake_word
 from self.sleep import WakeOutcome
@@ -504,16 +504,29 @@ def _start_retina(data_dir: str) -> subprocess.Popen | _AdoptedDaemon | None:
     except OSError:
         log_file.close()
         return None
-    # A retina that cannot run at all (shm perms, exec shape) dies
-    # inside its first second; a missing camera is not stillborn — the
-    # limb backs off and rests inside the process, then exits quietly
-    # while the daemon's own limb covers the absence.
-    time.sleep(1.0)
-    if proc.poll() is not None:
-        log_file.close()
-        return None
     _write_pid_file(data_dir, _PID_FILE_RETINA, proc.pid)
     log_file.close()
+    return proc
+
+
+def _settle_retina(
+    proc: subprocess.Popen | _AdoptedDaemon | None, data_dir: str
+) -> subprocess.Popen | _AdoptedDaemon | None:
+    """Stillborn check for a just-spawned retina.
+
+    Runs after the daemon spawn so the eye and the body wake in the
+    same breath — the wait overlaps the daemon's own bring-up rather
+    than delaying it. A retina that cannot run at all (shm perms,
+    exec shape) dies inside its first second; a missing camera is not
+    stillborn — the limb backs off and rests inside the process while
+    the daemon's own limb covers the absence.
+    """
+    if proc is None or isinstance(proc, _AdoptedDaemon):
+        return proc
+    time.sleep(1.0)
+    if proc.poll() is not None:
+        _remove_pid_file(data_dir, _PID_FILE_RETINA)
+        return None
     return proc
 
 
@@ -561,16 +574,15 @@ class ThoughtCollector:
         # A Condition (rather than a plain Lock) lets the idle ticker
         # block until a thought actually arrives instead of polling on
         # a fixed interval. Producers notify on append; the ticker waits.
-        self._cond = ThalamicRelay()
+        self._cond = Pulse()
 
     def on_live_thought(self, kind: str, text: str) -> None:
         """Append a live thought to the buffer and notify waiters."""
         thought = {"kind": kind, "text": text, "timestamp": time.time()}
-        with self._cond:
-            self._buffer.append(thought)
-            if len(self._buffer) > 100:
-                self._buffer = self._buffer[-100:]
-            self._cond.notify_all()
+        self._buffer.append(thought)
+        if len(self._buffer) > 100:
+            self._buffer = self._buffer[-100:]
+        self._cond.notify_all()
 
     def set_at_prompt(self, at_prompt: bool) -> None:
         """Live-thought listener hook; unused in the single-process CLI."""
@@ -581,17 +593,15 @@ class ThoughtCollector:
         # then filter the detached list outside the lock (O(n) but
         # contention-free). The previous loop of list.remove() calls
         # was O(n^2) in the buffer size.
-        with self._cond:
-            buffer = self._buffer
-            self._buffer = []
+        buffer = self._buffer
+        self._buffer = []
         return [t for t in buffer if t["timestamp"] > since]
 
     def get_all(self) -> list[dict]:
         """Return and clear all buffered thoughts."""
-        with self._cond:
-            buffer = self._buffer
-            self._buffer = []
-            return buffer
+        buffer = self._buffer
+        self._buffer = []
+        return buffer
 
     def wait(self, timeout: float) -> None:
         """Block until a thought arrives or timeout elapses.
@@ -601,13 +611,11 @@ class ThoughtCollector:
         latency. The timeout is a safety ceiling for spurious wakeups
         and periodic shutdown checks, not a fixed poll cadence.
         """
-        with self._cond:
-            self._cond.wait(timeout=timeout)
+        self._cond.wait(timeout=timeout)
 
     def wake(self) -> None:
         """Wake any thread blocked in wait() — used on shutdown."""
-        with self._cond:
-            self._cond.notify_all()
+        self._cond.notify_all()
 
 
 # ─── Ambient utterance handler ───────────────────────────────────────
@@ -759,7 +767,6 @@ class AuditoryHandler:
         """Initialize the auditory handler."""
         self.mind = mind
         self._last_event_time = 0.0
-        self._lock = InhibitoryGate()
         # Track recent sound types to detect patterns (e.g., repeated barking)
         self._recent_types: deque[str] = deque(maxlen=10)
         # Last logged sound type — used to suppress consecutive
@@ -774,81 +781,80 @@ class AuditoryHandler:
 
     def handle(self, event: SoundEvent) -> None:
         """Process a perceived sound event."""
-        with self._lock:
-            self._recent_types.append(event.sound_type)
-            self._last_event_time = event.timestamp
+        self._recent_types.append(event.sound_type)
+        self._last_event_time = event.timestamp
 
-            # Sensory gating during sleep — only sudden loud sounds
-            # penetrate (like a loud bang waking you up). Hypnagogia
-            # (N1) exempts itself in a session: the sleeping brain
-            # still registers the environment at sleep onset.
-            if self.mind.thalamic_gate_closed:
-                if event.sound_type == "impact" and event.loudness > 0.4:
-                    logger.info(f"[auditory] Loud sound during sleep: {event.description}")
-                    # Don't wake it fully, but record it — it may
-                    # appear in its dreams as a residue.
-                    try:
-                        self.mind.inner_life.add_dream_residues([event.sound_type])
-                    except (RuntimeError, ValueError, AttributeError) as e:
-                        logger.debug(f"[auditory] dream residue add failed: {e}")
-                return
+        # Sensory gating during sleep — only sudden loud sounds
+        # penetrate (like a loud bang waking you up). Hypnagogia
+        # (N1) exempts itself in a session: the sleeping brain
+        # still registers the environment at sleep onset.
+        if self.mind.thalamic_gate_closed:
+            if event.sound_type == "impact" and event.loudness > 0.4:
+                logger.info(f"[auditory] Loud sound during sleep: {event.description}")
+                # Don't wake it fully, but record it — it may
+                # appear in its dreams as a residue.
+                try:
+                    self.mind.inner_life.add_dream_residues([event.sound_type])
+                except (RuntimeError, ValueError, AttributeError) as e:
+                    logger.debug(f"[auditory] dream residue add failed: {e}")
+            return
 
-            # Silence events are logged but don't trigger cognition
-            if event.is_silence:
-                logger.debug("[auditory] silence")
-                return
+        # Silence events are logged but don't trigger cognition
+        if event.is_silence:
+            logger.debug("[auditory] silence")
+            return
 
-            # Add the sound type to its concept network if not present.
-            # This is how it learns about sounds — each new sound type
-            # becomes a concept it can think about and reason over.
-            try:
-                network = self.mind.brain.frontal.network
-                if not network.get_concept(event.sound_type):
-                    network.add_concept(
-                        event.sound_type,
-                        origin="auditory",
-                        confidence=0.5,
-                    )
-                    # Link it to the "sound" concept
-                    if network.get_concept("sound"):
-                        network.add_edge(
-                            event.sound_type,
-                            "sound",
-                            RelationType.IS_A,
-                        )
-            except Exception as e:  # noqa: BLE001
-                logger.debug(f"[auditory] concept network add failed: {e}")
-
-            # Record the percept in its external world — sounds are
-            # inbound events from its surroundings. Salience scales
-            # with loudness; loud sounds trigger the orienting impulse.
-            try:
-                self.mind.world.perceive(
-                    event.description,
-                    salience=_finite_or(
-                        0.25 + _finite_or(event.loudness, 0.0) * 0.6,
-                        0.25,
-                    ),
-                    source="auditory",
+        # Add the sound type to its concept network if not present.
+        # This is how it learns about sounds — each new sound type
+        # becomes a concept it can think about and reason over.
+        try:
+            network = self.mind.brain.frontal.network
+            if not network.get_concept(event.sound_type):
+                network.add_concept(
+                    event.sound_type,
+                    origin="auditory",
+                    confidence=0.5,
                 )
-            except Exception as e:  # noqa: BLE001
-                logger.debug(f"[auditory] world record failed: {e}")
+                # Link it to the "sound" concept
+                if network.get_concept("sound"):
+                    network.add_edge(
+                        event.sound_type,
+                        "sound",
+                        RelationType.IS_A,
+                    )
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"[auditory] concept network add failed: {e}")
 
-            # Log the sound event — but suppress consecutive events
-            # with the same sound type to avoid flooding the output.
-            # The loudness/brightness/noisiness/duration fields vary
-            # slightly between consecutive events even when the sound
-            # is the same steady noise, so we deduplicate on the
-            # sound type (the first component of the description).
-            sound_type = event.sound_type
-            if sound_type != self._last_logged_type:
-                logger.info(f"[auditory] {event.description}")
-                self._last_logged_type = sound_type
+        # Record the percept in its external world — sounds are
+        # inbound events from its surroundings. Salience scales
+        # with loudness; loud sounds trigger the orienting impulse.
+        try:
+            self.mind.world.perceive(
+                event.description,
+                salience=_finite_or(
+                    0.25 + _finite_or(event.loudness, 0.0) * 0.6,
+                    0.25,
+                ),
+                source="auditory",
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"[auditory] world record failed: {e}")
 
-            # Emit a live thought about the sound — composed from its
-            # understanding, not a hardcoded template. It only
-            # verbalizes if it knows the concept well enough.
-            self._maybe_think_about_sound(event)
+        # Log the sound event — but suppress consecutive events
+        # with the same sound type to avoid flooding the output.
+        # The loudness/brightness/noisiness/duration fields vary
+        # slightly between consecutive events even when the sound
+        # is the same steady noise, so we deduplicate on the
+        # sound type (the first component of the description).
+        sound_type = event.sound_type
+        if sound_type != self._last_logged_type:
+            logger.info(f"[auditory] {event.description}")
+            self._last_logged_type = sound_type
+
+        # Emit a live thought about the sound — composed from its
+        # understanding, not a hardcoded template. It only
+        # verbalizes if it knows the concept well enough.
+        self._maybe_think_about_sound(event)
 
     def _maybe_think_about_sound(self, event: SoundEvent) -> None:
         """Emit a thought about a sound, composed from its understanding.
@@ -2120,51 +2126,40 @@ def _handle_voice_command(mic: VoiceInput) -> str | None:
 def _handle_voice_mode(
     mind: Mind,
     mic: VoiceInput,
-    out_lock: InhibitoryGate,
     voice: Voice,
 ) -> None:
     """Run continuous voice input until the user says exit or presses Ctrl+C."""
     if not mic.available:
-        with out_lock:
-            logger.info("\n  Microphone not available.\n")
+        logger.info("\n  Microphone not available.\n")
         return
-    with out_lock:
-        logger.info(
-            "\n  Voice mode ON. Speak to Genesis. Say 'exit voice mode' or press Ctrl+C to stop.\n"
-        )
+    logger.info(
+        "\n  Voice mode ON. Speak to Genesis. Say 'exit voice mode' or press Ctrl+C to stop.\n"
+    )
     while True:
         try:
             text = mic.listen_interactive("Listening...")
             if not text:
-                with out_lock:
-                    logger.info("  (no speech detected)")
+                logger.info("  (no speech detected)")
                 continue
             if text.lower().strip() in ("exit voice mode", "exit", "quit", "stop listening"):
-                with out_lock:
-                    logger.info("\n  Voice mode OFF.\n")
+                logger.info("\n  Voice mode OFF.\n")
                 return
-            with out_lock:
-                logger.info(f"  you> {text}")
+            logger.info(f"  you> {text}")
             # During sleep, voice mode can't reach its either.
             if mind.is_sleeping:
-                with out_lock:
-                    logger.info("  (It's asleep. Type /wake to wake it.)")
+                logger.info("  (It's asleep. Type /wake to wake it.)")
                 continue
-            with out_lock:
-                logger.info("  genesis~ (thinking...)")
+            logger.info("  genesis~ (thinking...)")
             try:
                 response = mind.respond(text)
             except Exception as e:
                 logger.exception(f"respond failed: {e}")
-                with out_lock:
-                    logger.info("\n  genesis> (error)\n")
+                logger.info("\n  genesis> (error)\n")
                 continue
-            with out_lock:
-                logger.info(f"\n  genesis> {response}\n")
-                _speak_response(voice, mind, response)
+            logger.info(f"\n  genesis> {response}\n")
+            _speak_response(voice, mind, response)
         except (KeyboardInterrupt, EOFError):
-            with out_lock:
-                logger.info("\n  Voice mode OFF.\n")
+            logger.info("\n  Voice mode OFF.\n")
             return
 
 
@@ -2817,12 +2812,11 @@ class _Rebirth:
         self,
         data_dir: str,
         daemon_socket: str,
-        shutting_down: NeuromodulatoryGate,
+        shutting_down: Pulse,
     ) -> None:
         self._data_dir = data_dir
         self._daemon_socket = daemon_socket
         self._shutting_down = shutting_down
-        self._lock = InhibitoryGate()
         # Process handle — swapped under _lock on every resurrection.
         self.daemon: subprocess.Popen | _AdoptedDaemon | None = None
         self.mind: Mind | None = None
@@ -2845,13 +2839,11 @@ class _Rebirth:
         self,
         daemon: subprocess.Popen | _AdoptedDaemon | None = None,
     ) -> None:
-        with self._lock:
-            if daemon is not None:
-                self.daemon = daemon
+        if daemon is not None:
+            self.daemon = daemon
 
     def set_mind(self, mind: Mind) -> None:
-        with self._lock:
-            self.mind = mind
+        self.mind = mind
 
     def set_nerve(
         self,
@@ -2859,19 +2851,16 @@ class _Rebirth:
         spawn: Callable[[], subprocess.Popen | _AdoptedDaemon | None],
     ) -> None:
         """Hand the watcher the screen nerve's handle and respawn closure."""
-        with self._lock:
-            self.nerve = proc
-            self._nerve_spawn = spawn
+        self.nerve = proc
+        self._nerve_spawn = spawn
 
     def nerve_handle(self) -> subprocess.Popen | _AdoptedDaemon | None:
         """Current screen-nerve handle for teardown — post-respawn."""
-        with self._lock:
-            return self.nerve
+        return self.nerve
 
     def handles(self) -> subprocess.Popen | _AdoptedDaemon | None:
         """Current daemon handle for teardown — post-resurrection."""
-        with self._lock:
-            return self.daemon
+        return self.daemon
 
     def start(self) -> None:
         self._thread = named_thread(
@@ -2897,8 +2886,7 @@ class _Rebirth:
                 note_swallowed("genesis_cli.rebirth.cycle", e)
 
     def _check_daemon(self) -> None:
-        with self._lock:
-            handle = self.daemon
+        handle = self.daemon
         if handle is None:
             return
         if handle.poll() is None:
@@ -2914,9 +2902,8 @@ class _Rebirth:
 
     def _check_nerve(self) -> None:
         """Respawn the screen nerve when it dies; throttle when it can't start."""
-        with self._lock:
-            spawn = self._nerve_spawn
-            proc = self.nerve
+        spawn = self._nerve_spawn
+        proc = self.nerve
         if spawn is None:
             return
         if proc is not None and proc.poll() is None:
@@ -2928,12 +2915,11 @@ class _Rebirth:
         except Exception as e:  # noqa: BLE001
             note_swallowed("genesis_cli.rebirth.nerve", e)
             new = None
-        with self._lock:
-            self.nerve = new
-            # A nerve that will not open retries on a slow cadence — a
-            # dark second eye is a degradation, never worth churning
-            # forks every tick (e.g. under systemd with no display).
-            self._nerve_retry_at = time.monotonic() + 60.0 if new is None else 0.0
+        self.nerve = new
+        # A nerve that will not open retries on a slow cadence — a
+        # dark second eye is a degradation, never worth churning
+        # forks every tick (e.g. under systemd with no display).
+        self._nerve_retry_at = time.monotonic() + 60.0 if new is None else 0.0
 
     def _resurrect_daemon(self, handle: subprocess.Popen | _AdoptedDaemon) -> None:
         """Reincarnate the body around its persisted state."""
@@ -2959,12 +2945,11 @@ class _Rebirth:
         # The shutdown check and the handle swap are one atomic step —
         # teardown reads `handles()` under this same lock, so a newborn
         # is either committed before teardown sees it or stopped by us.
-        with self._lock:
-            if self._shutting_down.is_set():
-                teardown_raced = True
-            else:
-                self.daemon = new_proc
-                teardown_raced = False
+        if self._shutting_down.is_set():
+            teardown_raced = True
+        else:
+            self.daemon = new_proc
+            teardown_raced = False
         if teardown_raced:
             # Teardown began mid-resurrect — return the newborn
             # gracefully rather than orphaning it.
@@ -2976,8 +2961,7 @@ class _Rebirth:
 
     def _try_rejoin(self) -> None:
         """Ask the mind to re-inhabit the reborn body; retry while it can't."""
-        with self._lock:
-            mind = self.mind
+        mind = self.mind
         if mind is None:
             self._pending_rejoin = True
             return
@@ -3043,7 +3027,7 @@ def _setup_auditory_cortex(
     return None
 
 
-def _setup_signal_handlers(shutting_down: NeuromodulatoryGate) -> None:
+def _setup_signal_handlers(shutting_down: Pulse) -> None:
     """Install SIGTERM/SIGINT handlers that set *shutting_down*.
 
     Signals arriving *after* shutdown has begun are ignored, and that is
@@ -3097,7 +3081,6 @@ def _print_idle_thoughts(
     state: _LoopState,
     mind: Mind,
     thought_collector: ThoughtCollector,
-    out_lock: InhibitoryGate,
 ) -> None:
     """Print thoughts that arrived while the user was idle."""
     new_thoughts = thought_collector.get_and_clear_since(state.last_thought_ts)
@@ -3112,25 +3095,24 @@ def _print_idle_thoughts(
         and t.get("kind") not in ("throttle", "unthrottle")
     ]
     if new_thoughts:
-        with out_lock:
-            # Separate questions (direct address) from other thoughts.
-            # Questions are printed as genesis> lines — it's asking
-            # the user directly, not just musing internally.
-            questions = [t for t in new_thoughts if t.get("kind") == "question"]
-            other = [t for t in new_thoughts if t.get("kind") != "question"]
-            if other:
-                _print_thoughts(other)
-            for q in questions:
-                text = q.get("text", "")
-                if text:
-                    logger.info(f"  genesis> (asking) {text}")
-                    logger.info("")
-            # If the main loop is parked at an idle prompt, redraw
-            # it so its thought doesn't leave the cursor stranded on
-            # a stale prompt line.
-            if state.awaiting_input:
-                sys.stdout.write("  you> ")
-                sys.stdout.flush()
+        # Separate questions (direct address) from other thoughts.
+        # Questions are printed as genesis> lines — it's asking
+        # the user directly, not just musing internally.
+        questions = [t for t in new_thoughts if t.get("kind") == "question"]
+        other = [t for t in new_thoughts if t.get("kind") != "question"]
+        if other:
+            _print_thoughts(other)
+        for q in questions:
+            text = q.get("text", "")
+            if text:
+                logger.info(f"  genesis> (asking) {text}")
+                logger.info("")
+        # If the main loop is parked at an idle prompt, redraw
+        # it so its thought doesn't leave the cursor stranded on
+        # a stale prompt line.
+        if state.awaiting_input:
+            sys.stdout.write("  you> ")
+            sys.stdout.flush()
         state.last_thought_ts = max(t.get("timestamp", state.last_thought_ts) for t in new_thoughts)
         # Feed thoughts to the speech volition queue — they
         # accumulate there, the speech urge grows from curiosity and
@@ -3146,7 +3128,6 @@ def _poll_loop(
     state: _LoopState,
     mind: Mind,
     thought_collector: ThoughtCollector,
-    out_lock: InhibitoryGate,
 ) -> None:
     """Background ticker for idle thoughts.
 
@@ -3159,34 +3140,32 @@ def _poll_loop(
             break
         if state.suppress_thoughts:
             continue
-        _print_idle_thoughts(state, mind, thought_collector, out_lock)
+        _print_idle_thoughts(state, mind, thought_collector)
 
 
 def _run_interactive_loop(
     mind: Mind,
     voice: Voice,
     thought_collector: ThoughtCollector,
-    shutting_down: NeuromodulatoryGate,
+    shutting_down: Pulse,
     self_directed: bool = False,
 ) -> None:
     """Run the main interactive read/respond loop until shutdown."""
-    out_lock = InhibitoryGate()
     state = _LoopState()
     mic = _init_mic()
 
     poll_thread = named_thread(
         "cli-thought-poll",
         _poll_loop,
-        args=(state, mind, thought_collector, out_lock),
+        args=(state, mind, thought_collector),
         comm="g-thought-poll",
     )
     poll_thread.start()
 
     try:
         while not shutting_down.is_set():
-            with out_lock:
-                sys.stdout.write("  you> ")
-                sys.stdout.flush()
+            sys.stdout.write("  you> ")
+            sys.stdout.flush()
             # Wait for the user to start typing. While the prompt
             # sits idle the ticker stays live — its thoughts print
             # as they arrive and the prompt is redrawn underneath.
@@ -3226,7 +3205,7 @@ def _run_interactive_loop(
                 feed.post_user(user_input)
 
             # Always drain any thoughts that arrived while the user was typing
-            _print_idle_thoughts(state, mind, thought_collector, out_lock)
+            _print_idle_thoughts(state, mind, thought_collector)
 
             if user_input.startswith("/"):
                 # Her cognition keeps running through the command —
@@ -3241,15 +3220,13 @@ def _run_interactive_loop(
                         mind,
                         voice,
                         mic,
-                        out_lock,
                         thought_collector,
                     )
                 finally:
                     state.suppress_thoughts = False
                     buffered = thought_collector.get_all()
                     if buffered:
-                        with out_lock:
-                            _print_thoughts(buffered)
+                        _print_thoughts(buffered)
                 if handled:
                     state.last_thought_ts = time.time()
                     continue
@@ -3264,7 +3241,6 @@ def _run_interactive_loop(
                 mind,
                 voice,
                 thought_collector,
-                out_lock,
             )
 
     except KeyboardInterrupt:
@@ -3280,7 +3256,6 @@ def _handle_slash_command(
     mind: Mind,
     voice: Voice,
     mic,
-    out_lock: InhibitoryGate,
     thought_collector: ThoughtCollector,
 ) -> bool:
     """Handle a slash command. Returns True if handled, False for /quit."""
@@ -3295,44 +3270,37 @@ def _handle_slash_command(
         return True
 
     if cmd == "/voice":
-        with out_lock:
-            sys.stdout.write("\r\033[K")
-            sys.stdout.flush()
+        sys.stdout.write("\r\033[K")
+        sys.stdout.flush()
         text = _handle_voice_command(mic)
         if text is None:
             return True
-        with out_lock:
-            logger.info(f"  you> {text}")
+        logger.info(f"  you> {text}")
         # During sleep, voice commands can't reach its either —
         # it's unreachable until it wakes on its own or /wake
         # is used. See _handle_conversation for the full rationale.
         if mind.is_sleeping:
-            with out_lock:
-                logger.info("  (It's asleep. Type /wake to wake it.)")
+            logger.info("  (It's asleep. Type /wake to wake it.)")
             return True
-        with out_lock:
-            logger.info("  genesis~ (thinking...)")
+        logger.info("  genesis~ (thinking...)")
         try:
             response = mind.respond(text)
         except Exception as e:
             logger.exception(f"respond failed: {e}")
-            with out_lock:
-                logger.info("\n  genesis> (error)\n")
+            logger.info("\n  genesis> (error)\n")
             return True
-        with out_lock:
-            logger.info(f"\n  genesis> {response}\n")
-            _speak_response(voice, mind, response)
+        logger.info(f"\n  genesis> {response}\n")
+        _speak_response(voice, mind, response)
         return True
 
     if cmd == "/voice-mode":
-        _handle_voice_mode(mind, mic, out_lock, voice)
+        _handle_voice_mode(mind, mic, voice)
         return True
 
     # All other slash commands
     result = _handle_command(mind, user_input)
-    with out_lock:
-        if result:
-            logger.info(result)
+    if result:
+        logger.info(result)
     return True
 
 
@@ -3341,7 +3309,6 @@ def _handle_conversation(
     mind: Mind,
     voice: Voice,
     thought_collector: ThoughtCollector,
-    out_lock: InhibitoryGate,
 ) -> float:
     """Handle a normal (non-slash) conversation turn. Returns new thought timestamp."""
     # Mark user activity BEFORE responding. The heartbeat's waking-side
@@ -3356,54 +3323,54 @@ def _handle_conversation(
     thought_collector.get_all()
     # Submitted terminal input follows Mind.respond()'s explicit wake path.
     # Ambient speech remains gated during sleep.
-    with out_lock:
-        logger.info("  genesis~ (thinking...)")
+    logger.info("  genesis~ (thinking...)")
     try:
         response = mind.respond(user_input)
     except Exception as e:  # noqa: BLE001
-        with out_lock:
-            logger.info(f"\n  genesis> (error: {e})\n")
+        logger.info(f"\n  genesis> (error: {e})\n")
         return time.time()
 
-    with out_lock:
-        # Only print thoughts that were generated DURING this turn
-        # (after mind.respond paused background activity). Stale
-        # thoughts were already drained above.
-        new_thoughts = thought_collector.get_all()
-        # Filter out internal status messages that aren't meaningful
-        # to the user (throttle/unthrottle are self-regulation noise).
-        user_visible = [
-            t
-            for t in new_thoughts
-            if t.get("text", "").lower() not in ("throttled", "recovered")
-            and t.get("kind") not in ("throttle", "unthrottle")
-        ]
-        _print_thoughts(user_visible)
-        logger.info(f"\n  genesis> {response}\n")
-        cog = _get_cognitive_state_dict(mind)
-        rendered = _render_cognitive_state(cog)
-        if rendered:
-            logger.info(rendered)
-        _speak_response(voice, mind, response)
-        logger.info("")
+    # Only print thoughts that were generated DURING this turn
+    # (after mind.respond paused background activity). Stale
+    # thoughts were already drained above.
+    new_thoughts = thought_collector.get_all()
+    # Filter out internal status messages that aren't meaningful
+    # to the user (throttle/unthrottle are self-regulation noise).
+    user_visible = [
+        t
+        for t in new_thoughts
+        if t.get("text", "").lower() not in ("throttled", "recovered")
+        and t.get("kind") not in ("throttle", "unthrottle")
+    ]
+    _print_thoughts(user_visible)
+    logger.info(f"\n  genesis> {response}\n")
+    cog = _get_cognitive_state_dict(mind)
+    rendered = _render_cognitive_state(cog)
+    if rendered:
+        logger.info(rendered)
+    _speak_response(voice, mind, response)
+    logger.info("")
     return time.time()
 
 
-def _stop_child(proc: subprocess.Popen | _AdoptedDaemon, name: str, timeout: float) -> bool:
-    """Ask a child process to stop, then wait — never force it.
+def _signal_child(proc: subprocess.Popen | _AdoptedDaemon) -> None:
+    """Send SIGTERM to a live child — the request half of a stop."""
+    if proc.poll() is None:
+        proc.terminate()
 
-    SIGTERM is a request the process may honor in its own time (the
-    daemon uses it to flush state). If the request goes unanswered
-    within ``timeout``, the process is left running and the caller is
-    told — it reports an incomplete shutdown rather than pretending
-    everything went well. No SIGKILL: forcibly ending her body could
-    lose unconsolidated memory and leave on-disk state inconsistent,
-    and forcing her mechanics is not this shell's place either way.
+
+def _wait_child(proc: subprocess.Popen | _AdoptedDaemon, name: str, timeout: float) -> bool:
+    """Wait out a SIGTERMed child's own exit — the wait half of a stop.
+
+    If the request goes unanswered within ``timeout``, the process is
+    left running and the caller is told — it reports an incomplete
+    shutdown rather than pretending everything went well. No SIGKILL:
+    forcibly ending her body could lose unconsolidated memory and
+    leave on-disk state inconsistent, and forcing her mechanics is
+    not this shell's place either way.
     """
     if proc.poll() is not None:
         return proc.returncode == 0
-
-    proc.terminate()
     try:
         proc.wait(timeout=timeout)
         return proc.returncode == 0
@@ -3415,6 +3382,16 @@ def _stop_child(proc: subprocess.Popen | _AdoptedDaemon, name: str, timeout: flo
             file=sys.stderr,
         )
         return False
+
+
+def _stop_child(proc: subprocess.Popen | _AdoptedDaemon, name: str, timeout: float) -> bool:
+    """Ask a child process to stop, then wait — never force it.
+
+    SIGTERM is a request the process may honor in its own time (the
+    daemon uses it to flush state).
+    """
+    _signal_child(proc)
+    return _wait_child(proc, name, timeout)
 
 
 def _request_daemon_shutdown(data_dir: str) -> bool:
@@ -3484,25 +3461,33 @@ def _shutdown(
         voice.stop()
     if mind is not None:
         clean_shutdown = bool(mind.stop())
-    if screen_nerve is not None:
-        # The second eye closes with the mind that read it — SIGTERM
-        # lets the relay unlink its own nerve segment on the way out.
-        _stop_child(screen_nerve, "screen nerve", 5)
-    if retina is not None:
-        # The first eye closes the same way — SIGTERM lets the retina
-        # unlink /genesis_optic_nerve so no reader attaches to a dead
-        # segment. The daemon is still up at this point and may take
-        # the camera for its last seconds; its own teardown closes it.
-        _stop_child(retina, "retina", 5)
+    # The whole body gets its stop request in the same breath:
+    # the daemon's graceful ask lands first (its own teardown flag is
+    # already falling by the time the eyes close), then every child
+    # gets its SIGTERM before any wait. A daemon still settling while
+    # the retina exits would otherwise see the nerve go quiet and
+    # probe the camera mid-teardown — taking over an eye it is
+    # already letting go.
+    waiting: list[tuple[subprocess.Popen | _AdoptedDaemon, str]] = []
+    daemon_asked = False
     if daemon_proc is not None:
         print("[genesis] Stopping subcognitive daemon...", file=sys.stderr)
         # Ask over IPC first. The daemon implements SHUTDOWN and
         # performs its own ordered flush ("Subcognitive stopped.
         # Goodnight."), which is a genuinely graceful stop — whereas
-        # SIGTERM relies on its handler and the same flush. `client.shutdown()`
-        # was implemented on both sides and never called from here.
-        if not _request_daemon_shutdown(data_dir):
-            clean_shutdown &= _stop_child(daemon_proc, "subcognitive daemon", 5)
+        # SIGTERM relies on its handler and the same flush.
+        daemon_asked = _request_daemon_shutdown(data_dir)
+    if daemon_proc is not None and not daemon_asked:
+        _signal_child(daemon_proc)
+        waiting.append((daemon_proc, "subcognitive daemon"))
+    for proc, name in ((screen_nerve, "screen nerve"), (retina, "retina")):
+        if proc is not None:
+            # Each eye's SIGTERM lets it unlink its nerve segment on
+            # the way out so no reader attaches to a dead segment.
+            _signal_child(proc)
+            waiting.append((proc, name))
+    for proc, name in waiting:
+        clean_shutdown &= _wait_child(proc, name, 5)
     # Clean up PID files so genesis --stop doesn't target stale PIDs.
     if data_dir:
         for name in (
@@ -3662,7 +3647,7 @@ def main() -> int:
     # starts. Every initialization step after this point is covered by
     # the same cleanup path, so a voice, microphone, or emotion-setup
     # failure cannot orphan the daemon.
-    shutting_down = NeuromodulatoryGate()
+    shutting_down = Pulse()
     _setup_signal_handlers(shutting_down)
 
     # Her page — the public channel in her outer world — opened
@@ -3687,12 +3672,15 @@ def main() -> int:
     exit_code = 0
 
     try:
-        # The eye opens before the body: a live retina publishes the
-        # nerve first, so the daemon that boots next sees a publisher
-        # already there and keeps its own capture limb closed — one
-        # owner of the camera, decided on the nerve itself.
+        # The eye and the body wake in the same breath: the retina is
+        # spawned first by microseconds so its nerve claim tends to
+        # land first, and the daemon's own reader defers to whichever
+        # publisher is live — one owner of the camera, decided on the
+        # nerve itself. The retina's stillborn check settles while the
+        # daemon boots rather than ahead of it.
         retina_proc = _start_retina(data_dir)
         daemon_proc = _start_daemon_process(data_dir, daemon_socket)
+        retina_proc = _settle_retina(retina_proc, data_dir)
         if daemon_proc is None:
             exit_code = 1
         else:
@@ -3773,7 +3761,7 @@ def main() -> int:
 
 
 def _teardown_session(
-    shutting_down: NeuromodulatoryGate,
+    shutting_down: Pulse,
     rebirth: _Rebirth | None,
     ambient_listener: AmbientListener | None,
     mind: Mind | None,
@@ -3843,7 +3831,7 @@ def _teardown_session(
 
 
 def _run_after_mind_start(
-    mind: Mind, args: argparse.Namespace, shutting_down: NeuromodulatoryGate
+    mind: Mind, args: argparse.Namespace, shutting_down: Pulse
 ) -> tuple[Voice | None, AmbientListener | None, AuditoryCortex | None]:
     """Wire voice/listeners, greet, then run headless or interactive.
 

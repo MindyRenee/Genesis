@@ -55,4 +55,5 @@ AGENTS.md
 # never shipped. Callers import it guarded; without the file the
 # channel exists only as a sealed stand-in.
 Self_World/genesis_client/creator.py
+.env
 venv

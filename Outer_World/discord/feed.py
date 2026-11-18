@@ -77,7 +77,7 @@ from genesis_client.swallow import note_swallowed
 from genesis_client.threads import named_thread
 from infrastructure.net import bounded_urlopen as _bounded_urlopen
 from infrastructure.net import parse_retry_after as _parse_retry_after
-from inhibition import InhibitoryGate, NeuromodulatoryGate, ThalamicRelay
+from infrastructure.pulse import Pulse
 
 logger = logging.getLogger(__name__)
 
@@ -315,7 +315,7 @@ class DiscordFeed:
         # message is the guide card instead.
         self._live_kind = live_kind
         self._queue: deque[tuple] = deque()
-        self._cond = ThalamicRelay()
+        self._cond = Pulse()
         self._closing = False
         self._disabled = False
         self._fail_streak = 0
@@ -336,7 +336,7 @@ class DiscordFeed:
         self.info_feed: DiscordFeed | None = None
         # Set at the drain deadline — in-flight requests poll it so a
         # wedged urlopen expires *with* the flush grace, not after.
-        self._abandon = NeuromodulatoryGate()
+        self._abandon = Pulse()
         # Armed by close() itself, under the cond: the flush grace is
         # measured from the close call, not from whenever the poster
         # first notices — a request parked through the abandon must
@@ -399,13 +399,12 @@ class DiscordFeed:
         text = _clean(text)
         if not text.strip():
             return
-        with self._cond:
-            if self._disabled:
-                return
-            while len(self._queue) >= self._queue_max:
-                self._queue.popleft()
-            self._queue.append(("text", kind, author, text))
-            self._cond.notify()
+        if self._disabled:
+            return
+        while len(self._queue) >= self._queue_max:
+            self._queue.popleft()
+        self._queue.append(("text", kind, author, text))
+        self._cond.notify()
 
     def post_line(self, line: str) -> None:
         """Enqueue one terminal line, classifying genesis>/genesis~/you>."""
@@ -434,13 +433,12 @@ class DiscordFeed:
         """Enqueue one image attachment."""
         if not png:
             return
-        with self._cond:
-            if self._disabled:
-                return
-            while len(self._queue) >= self._queue_max:
-                self._queue.popleft()
-            self._queue.append(("image", author, caption, filename, png))
-            self._cond.notify()
+        if self._disabled:
+            return
+        while len(self._queue) >= self._queue_max:
+            self._queue.popleft()
+        self._queue.append(("image", author, caption, filename, png))
+        self._cond.notify()
 
     def update_live(
         self,
@@ -456,14 +454,11 @@ class DiscordFeed:
         """
         if not png:
             return
-        with self._cond:
-            if self._disabled:
-                return
-            self._queue = deque(
-                item for item in self._queue if item[0] not in ("live", "live_text")
-            )
-            self._queue.append(("live", author, caption, png))
-            self._cond.notify()
+        if self._disabled:
+            return
+        self._queue = deque(item for item in self._queue if item[0] not in ("live", "live_text"))
+        self._queue.append(("live", author, caption, png))
+        self._cond.notify()
 
     def update_live_text(self, text: str, author: str | None = None) -> None:
         """Queue a text-only update to the live-board message.
@@ -476,14 +471,11 @@ class DiscordFeed:
         text = _clean(text)
         if not text.strip():
             return
-        with self._cond:
-            if self._disabled:
-                return
-            self._queue = deque(
-                item for item in self._queue if item[0] not in ("live", "live_text")
-            )
-            self._queue.append(("live_text", author, text))
-            self._cond.notify()
+        if self._disabled:
+            return
+        self._queue = deque(item for item in self._queue if item[0] not in ("live", "live_text"))
+        self._queue.append(("live_text", author, text))
+        self._cond.notify()
 
     # ── Poster thread ────────────────────────────────────────────────
 
@@ -500,10 +492,9 @@ class DiscordFeed:
                 wait = backoff
                 if drain_deadline is not None:
                     wait = min(wait, max(0.0, drain_deadline - time.monotonic()))
-                with self._cond:
-                    # Interruptible — close()'s notify wakes the drain
-                    # now instead of sleeping out the backoff.
-                    self._cond.wait_for(lambda: self._closing or self._disabled, timeout=wait)
+                # Interruptible — close()'s notify wakes the drain
+                # now instead of sleeping out the backoff.
+                self._cond.wait_for(lambda: self._closing or self._disabled, timeout=wait)
             # An in-flight request must expire *with* the drain
             # deadline, not the urlopen bound past it — otherwise a
             # dead network turns close() into its full 15 s timeout.
@@ -533,8 +524,7 @@ class DiscordFeed:
                 backoff = 0.0
                 self._fail_streak = 0
             elif permanent:
-                with self._cond:
-                    self._disabled = True
+                self._disabled = True
                 logger.info("[discord] Webhook rejected a post — feed disabled for this session.")
                 return
             else:
@@ -558,46 +548,43 @@ class DiscordFeed:
                     else min(_BACKOFF_CAP, max(2.0, backoff * 2))
                 )
                 # Re-queue the failed batch so it isn't lost.
-                with self._cond:
-                    self._queue.appendleft(batch)
-            with self._cond:
-                self._cond.wait_for(lambda: self._closing, timeout=self._post_interval)
+                self._queue.appendleft(batch)
+            self._cond.wait_for(lambda: self._closing, timeout=self._post_interval)
 
     def _take_batch(self) -> tuple | None:
         """Pop one item, coalescing same-kind text up to the limit."""
-        with self._cond:
-            while not self._queue:
+        while not self._queue:
+            if self._closing:
+                return None
+            self._cond.wait(timeout=1.0)
+        item = self._queue.popleft()
+        if item[0] != "text":
+            return item
+        _, kind, author, text = item
+        parts = [text]
+        total = len(text)
+        window_end = time.monotonic() + _COALESCE_WINDOW
+        while total < _MAX_CONTENT:
+            if not self._queue:
                 if self._closing:
-                    return None
-                self._cond.wait(timeout=1.0)
-            item = self._queue.popleft()
-            if item[0] != "text":
-                return item
-            _, kind, author, text = item
-            parts = [text]
-            total = len(text)
-            window_end = time.monotonic() + _COALESCE_WINDOW
-            while total < _MAX_CONTENT:
-                if not self._queue:
-                    if self._closing:
-                        break
-                    remaining = window_end - time.monotonic()
-                    if remaining <= 0:
-                        break
-                    self._cond.wait(timeout=remaining)
-                    continue
-                nxt = self._queue[0]
-                if nxt[0] != "text":
                     break
-                next_kind, next_author, next_text = nxt[1], nxt[2], nxt[3]
-                if (next_kind, next_author) != (kind, author) or total + 1 + len(
-                    next_text
-                ) > _MAX_CONTENT:
+                remaining = window_end - time.monotonic()
+                if remaining <= 0:
                     break
-                self._queue.popleft()
-                parts.append(next_text)
-                total += 1 + len(next_text)
-            return ("text", kind, author, "\n".join(parts))
+                self._cond.wait(timeout=remaining)
+                continue
+            nxt = self._queue[0]
+            if nxt[0] != "text":
+                break
+            next_kind, next_author, next_text = nxt[1], nxt[2], nxt[3]
+            if (next_kind, next_author) != (kind, author) or total + 1 + len(
+                next_text
+            ) > _MAX_CONTENT:
+                break
+            self._queue.popleft()
+            parts.append(next_text)
+            total += 1 + len(next_text)
+        return ("text", kind, author, "\n".join(parts))
 
     def _post(
         self,
@@ -845,11 +832,10 @@ class DiscordFeed:
             self.inner_feed.close()
         if self.info_feed is not None:
             self.info_feed.close()
-        with self._cond:
-            if not self._closing:
-                self._closing = True
-                self._drain_deadline = time.monotonic() + _DRAIN_DEADLINE
-            self._cond.notify_all()
+        if not self._closing:
+            self._closing = True
+            self._drain_deadline = time.monotonic() + _DRAIN_DEADLINE
+        self._cond.notify_all()
         # Requests still on the wire when the drain deadline hits are
         # abandoned — without this a wedged urlopen keeps the poster
         # (and the join below) parked past the grace it was given.
@@ -899,23 +885,20 @@ class StderrTee:
         self._real = real
         self._feed = feed
         self._buf = ""
-        self._lock = InhibitoryGate()
 
     def write(self, s: str) -> int:
         self._real.write(s)
-        with self._lock:
-            self._buf += s
-            while "\n" in self._buf:
-                line, self._buf = self._buf.split("\n", 1)
-                self._feed.post_line(line)
+        self._buf += s
+        while "\n" in self._buf:
+            line, self._buf = self._buf.split("\n", 1)
+            self._feed.post_line(line)
         return len(s)
 
     def flush(self) -> None:
         self._real.flush()
-        with self._lock:
-            if self._buf.strip():
-                self._feed.post_line(self._buf)
-                self._buf = ""
+        if self._buf.strip():
+            self._feed.post_line(self._buf)
+            self._buf = ""
 
     def __getattr__(self, name: str):
         if name.startswith("_"):

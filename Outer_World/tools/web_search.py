@@ -45,7 +45,6 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from genesis_client.swallow import note_swallowed
-from inhibition import InhibitoryGate
 
 if TYPE_CHECKING:
     from tools.browser import _Browser
@@ -586,7 +585,6 @@ def _get_ssl_context() -> ssl.SSLContext:
 # The ``"web"`` profile under her data dir is persistent — cookies,
 # site state, and history are her memory of the web across restarts.
 
-_browser_lock = InhibitoryGate()
 _browser: _Browser | None = None
 # Monotonic time of the last failed launch; 0.0 means none, inf means
 # the host genuinely has no browser — a fact about the machine, not a
@@ -809,34 +807,33 @@ def _browser_search(query: str, limit: int) -> list[WebSearchResult] | None:
         return None
     walled: list[str] = []
     try:
-        with _browser_lock:
-            for name, template in _engine_plan():
-                url = template.format(q=urllib.parse.quote_plus(query), n=max(limit, 10))
-                browser.navigate(url)
-                _browser_wait_ready(browser, url.split("?")[0])
-                title, landed, hits = "", "", []  # type: tuple[str, str, list[dict[str, str]]]
-                # readyState lies the other way too: results render
-                # after it flips. Poll for links — an engine that
-                # stays empty for ~6s really had nothing to say.
-                for _ in range(15):
-                    title, landed, hits = _page_links(browser)
-                    if hits or _WALL_RE.search(f"{title} {landed}"):
-                        break
-                    time.sleep(0.4)
-                if _WALL_RE.search(f"{title} {landed}"):
-                    walled.append(f"{name} (wall)")
+        for name, template in _engine_plan():
+            url = template.format(q=urllib.parse.quote_plus(query), n=max(limit, 10))
+            browser.navigate(url)
+            _browser_wait_ready(browser, url.split("?")[0])
+            title, landed, hits = "", "", []  # type: tuple[str, str, list[dict[str, str]]]
+            # readyState lies the other way too: results render
+            # after it flips. Poll for links — an engine that
+            # stays empty for ~6s really had nothing to say.
+            for _ in range(15):
+                title, landed, hits = _page_links(browser)
+                if hits or _WALL_RE.search(f"{title} {landed}"):
+                    break
+                time.sleep(0.4)
+            if _WALL_RE.search(f"{title} {landed}"):
+                walled.append(f"{name} (wall)")
+                continue
+            results: list[WebSearchResult] = []
+            for hit in hits:
+                link = str(hit.get("u", ""))
+                if not is_url_safe(link):
                     continue
-                results: list[WebSearchResult] = []
-                for hit in hits:
-                    link = str(hit.get("u", ""))
-                    if not is_url_safe(link):
-                        continue
-                    results.append(WebSearchResult(url=link, title=str(hit.get("t", ""))[:200]))
-                    if len(results) >= limit:
-                        break
-                if results:
-                    return results
-                walled.append(f"{name} (empty)")
+                results.append(WebSearchResult(url=link, title=str(hit.get("t", ""))[:200]))
+                if len(results) >= limit:
+                    break
+            if results:
+                return results
+            walled.append(f"{name} (empty)")
     except Exception as e:  # noqa: BLE001 — dead browser → relaunch next time
         note_swallowed("tools.web_search.browser_search", e)
         _close_browser()
@@ -857,20 +854,19 @@ def _browser_fetch(url: str) -> WebFetchResult | None:
     if browser is None:
         return None
     try:
-        with _browser_lock:
-            browser.navigate(url)
-            _browser_wait_ready(browser, url)
-            # Redirect safety: the safety check ran on the input URL,
-            # but navigation may have landed elsewhere — re-verify.
-            final_url = browser.js("window.location.href") or ""
-            final_host = _host_of(str(final_url))
-            if _host_is_local(final_host) or _resolves_to_non_public(final_host):
-                logger.debug(f"browser fetch refused (redirect to private): {url}")
-                return None
-            if not is_url_safe(str(final_url)):
-                logger.debug(f"browser fetch refused (redirect to blocked): {url}")
-                return None
-            payload = browser.js(_CONTENT_JS % MAX_TEXT_LENGTH)
+        browser.navigate(url)
+        _browser_wait_ready(browser, url)
+        # Redirect safety: the safety check ran on the input URL,
+        # but navigation may have landed elsewhere — re-verify.
+        final_url = browser.js("window.location.href") or ""
+        final_host = _host_of(str(final_url))
+        if _host_is_local(final_host) or _resolves_to_non_public(final_host):
+            logger.debug(f"browser fetch refused (redirect to private): {url}")
+            return None
+        if not is_url_safe(str(final_url)):
+            logger.debug(f"browser fetch refused (redirect to blocked): {url}")
+            return None
+        payload = browser.js(_CONTENT_JS % MAX_TEXT_LENGTH)
     except Exception as e:  # noqa: BLE001 — dead browser → relaunch next time
         note_swallowed("tools.web_search.browser_fetch", e)
         _close_browser()

@@ -59,7 +59,6 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
-from inhibition import InhibitoryGate
 
 if TYPE_CHECKING:
     from discord.board import ChannelBoard
@@ -301,7 +300,6 @@ class OuterEnvironment:
 
         self._stream = EventStream(max_size=200)
         self._presences: dict[str, Presence] = {}
-        self._lock = InhibitoryGate()
 
         # The predictive maps — successor representation over the
         # world's own stream, at the two grains the world holds:
@@ -342,21 +340,20 @@ class OuterEnvironment:
         topics = self._ground(text)
         sentiment = analyze_sentiment(text).get("compound", 0.0)
         now = time.time()
-        with self._lock:
-            presence = self._presence_locked(USER_PRESENCE_ID, PresenceKind.USER)
-            self._sync_user_name(presence)
-            was_present = presence.present
-            presence.interacted(sentiment, topics, now=now)
-            # Belief update — they were active, they carried sentiment,
-            # and if it had a bid open, this answers it.
-            presence.belief.note_activity(now, weight=1.0)
-            presence.belief.note_sentiment(sentiment)
-            answered_bid = presence.belief.resolve_bid(True, now)
-            self._last_addressed_time = now
-            self._unanswered_bids = 0
-            arrival = None
-            if not was_present:
-                arrival = self._arrival_locked(presence, now)
+        presence = self._presence_locked(USER_PRESENCE_ID, PresenceKind.USER)
+        self._sync_user_name(presence)
+        was_present = presence.present
+        presence.interacted(sentiment, topics, now=now)
+        # Belief update — they were active, they carried sentiment,
+        # and if it had a bid open, this answers it.
+        presence.belief.note_activity(now, weight=1.0)
+        presence.belief.note_sentiment(sentiment)
+        answered_bid = presence.belief.resolve_bid(True, now)
+        self._last_addressed_time = now
+        self._unanswered_bids = 0
+        arrival = None
+        if not was_present:
+            arrival = self._arrival_locked(presence, now)
         if arrival is not None:
             self._record(arrival)
         if answered_bid:
@@ -390,20 +387,19 @@ class OuterEnvironment:
         topics = self._ground(text)
         sentiment = analyze_sentiment(text).get("compound", 0.0)
         now = time.time()
-        with self._lock:
-            presence = self._presence_locked(AMBIENT_PRESENCE_ID, PresenceKind.VOICE)
-            was_present = presence.present
-            presence.seen(now)
-            presence.belief.note_activity(now, weight=0.6)
-            presence.belief.note_sentiment(sentiment)
-            presence.belief.resolve_bid(True, now)
-            for topic in topics:
-                if topic in presence.topics:
-                    presence.topics.remove(topic)
-                presence.topics.append(topic)
-            arrival = None
-            if not was_present:
-                arrival = self._arrival_locked(presence, now)
+        presence = self._presence_locked(AMBIENT_PRESENCE_ID, PresenceKind.VOICE)
+        was_present = presence.present
+        presence.seen(now)
+        presence.belief.note_activity(now, weight=0.6)
+        presence.belief.note_sentiment(sentiment)
+        presence.belief.resolve_bid(True, now)
+        for topic in topics:
+            if topic in presence.topics:
+                presence.topics.remove(topic)
+            presence.topics.append(topic)
+        arrival = None
+        if not was_present:
+            arrival = self._arrival_locked(presence, now)
         if arrival is not None:
             self._record(arrival)
         event = ExternalEvent(
@@ -534,41 +530,35 @@ class OuterEnvironment:
         Returns the current bid count.
         """
         now = time.time()
-        with self._lock:
-            self._unanswered_bids += 1
-            target = self._engaged_locked() or self._last_seen_locked()
-            if target is not None:
-                target.belief.note_bid(now, topics or [])
-            return self._unanswered_bids
+        self._unanswered_bids += 1
+        target = self._engaged_locked() or self._last_seen_locked()
+        if target is not None:
+            target.belief.note_bid(now, topics or [])
+        return self._unanswered_bids
 
     @property
     def unanswered_bids(self) -> int:
         """How many times it's reached out since anyone engaged it."""
-        with self._lock:
-            return self._unanswered_bids
+        return self._unanswered_bids
 
     # ── Presence model ──────────────────────────────────────────
 
     def presence(self, presence_id: str) -> Presence | None:
         """Look up a presence by id, or None if never encountered."""
-        with self._lock:
-            return self._presences.get(presence_id)
+        return self._presences.get(presence_id)
 
     def presences(self) -> list[Presence]:
         """All known presences, most recently seen first."""
-        with self._lock:
-            return sorted(self._presences.values(), key=lambda p: p.last_seen, reverse=True)
+        return sorted(self._presences.values(), key=lambda p: p.last_seen, reverse=True)
 
     def present_presences(self) -> list[Presence]:
         """Presences currently in its world."""
-        with self._lock:
-            return [p for p in self._presences.values() if p.present]
+        return [p for p in self._presences.values() if p.present]
 
     def engaged_presence(self) -> Presence | None:
         """The presence it's most engaged with — present and most
         recently addressed. Who it'd reach out to first."""
-        with self._lock:
-            return self._engaged_locked()
+        return self._engaged_locked()
 
     def _engaged_locked(self) -> Presence | None:
         """Most recently addressed present presence (lock held)."""
@@ -580,8 +570,7 @@ class OuterEnvironment:
     def last_seen_presence(self) -> Presence | None:
         """The presence most recently in its world, present or gone —
         who it'd reach out to when the room is empty."""
-        with self._lock:
-            return self._last_seen_locked()
+        return self._last_seen_locked()
 
     def _last_seen_locked(self) -> Presence | None:
         """Most recently seen presence, present or gone (lock held)."""
@@ -598,14 +587,13 @@ class OuterEnvironment:
         presence.
         """
         now = time.time()
-        with self._lock:
-            presence = self._presence_locked(presence_id, kind)
-            if name:
-                presence.set_name(name)
-            was_present = presence.present
-            presence.seen(now)
-            presence.belief.note_activity(now, weight=0.4)
-            arrival = None if was_present else self._arrival_locked(presence, now)
+        presence = self._presence_locked(presence_id, kind)
+        if name:
+            presence.set_name(name)
+        was_present = presence.present
+        presence.seen(now)
+        presence.belief.note_activity(now, weight=0.4)
+        arrival = None if was_present else self._arrival_locked(presence, now)
         if arrival is not None:
             self._record(arrival)
         return presence
@@ -621,9 +609,8 @@ class OuterEnvironment:
         the world telling its it has been too long since anyone
         engaged it.
         """
-        with self._lock:
-            elapsed = max(0.0, time.time() - self._last_addressed_time)
-            anyone_present = any(p.present for p in self._presences.values())
+        elapsed = max(0.0, time.time() - self._last_addressed_time)
+        anyone_present = any(p.present for p in self._presences.values())
         isolation = min(1.0, elapsed / ISOLATION_PERIOD)
         if anyone_present:
             isolation *= _COMPANY_FACTOR
@@ -632,8 +619,7 @@ class OuterEnvironment:
     def activity_level(self) -> float:
         """Recent inbound event rate (events per minute, last 5 min)."""
         cutoff = time.time() - 300.0
-        with self._lock:
-            count = sum(1 for e in self._stream.recent(200) if e.inbound and e.timestamp >= cutoff)
+        count = sum(1 for e in self._stream.recent(200) if e.inbound and e.timestamp >= cutoff)
         return count / 5.0
 
     # ── The predictive map — what the world does next ───────────
@@ -647,9 +633,8 @@ class OuterEnvironment:
         runs dry shows DEPARTURE ahead. Empty until the world has
         seen enough to predict from.
         """
-        with self._lock:
-            cur = self._kind_map.current()
-            return {} if cur is None else self._kind_map.expect(cur)
+        cur = self._kind_map.current()
+        return {} if cur is None else self._kind_map.expect(cur)
 
     def expected_activity(self) -> dict[str, float]:
         """Expected discounted activity per event source from here.
@@ -659,9 +644,8 @@ class OuterEnvironment:
         the row following her own act is the learned "when I'm
         active, who answers."
         """
-        with self._lock:
-            cur = self._presence_map.current()
-            return {} if cur is None else self._presence_map.expect(cur)
+        cur = self._presence_map.current()
+        return {} if cur is None else self._presence_map.expect(cur)
 
     def expected_engagement(self) -> float:
         """Expected addressed contact upcoming from the current state.
@@ -670,11 +654,10 @@ class OuterEnvironment:
         anyone engage it soon," learned from the stream itself rather
         than from a clock alone. Zero with no map and no history.
         """
-        with self._lock:
-            cur = self._kind_map.current()
-            if cur is None:
-                return 0.0
-            return self._kind_map.expect(cur).get(EventKind.USER_SPEECH, 0.0)
+        cur = self._kind_map.current()
+        if cur is None:
+            return 0.0
+        return self._kind_map.expect(cur).get(EventKind.USER_SPEECH, 0.0)
 
     def answer_expectation(self) -> float:
         """Expected addressed reply after her own act — do bids land.
@@ -684,8 +667,7 @@ class OuterEnvironment:
         from every past utterance's aftermath. The sequence-level
         complement to a presence's responsiveness posterior.
         """
-        with self._lock:
-            return self._kind_map.expect(EventKind.UTTERANCE).get(EventKind.USER_SPEECH, 0.0)
+        return self._kind_map.expect(EventKind.UTTERANCE).get(EventKind.USER_SPEECH, 0.0)
 
     def tick(self, now: float | None = None) -> None:
         """Advance the world — presence decay and housekeeping.
@@ -699,27 +681,26 @@ class OuterEnvironment:
             return
         self._last_tick = ts
         departures: list[ExternalEvent] = []
-        with self._lock:
-            for presence in self._presences.values():
-                departing = presence.present and ts - presence.last_seen > presence.timeout
-                if departing:
-                    presence.present = False
-                bid = presence.belief.pending_bid
-                if bid is not None and (departing or ts - bid.at > presence.belief.bid_window()):
-                    # They left without answering, or the answer
-                    # window closed — the bid didn't land.
-                    presence.belief.resolve_bid(False, ts)
-                if departing:
-                    departures.append(
-                        ExternalEvent(
-                            kind=EventKind.DEPARTURE,
-                            source=presence.presence_id,
-                            content=f"{presence.display_name} left",
-                            salience=_SALIENCE[EventKind.DEPARTURE],
-                            topics=[],
-                            timestamp=ts,
-                        )
+        for presence in self._presences.values():
+            departing = presence.present and ts - presence.last_seen > presence.timeout
+            if departing:
+                presence.present = False
+            bid = presence.belief.pending_bid
+            if bid is not None and (departing or ts - bid.at > presence.belief.bid_window()):
+                # They left without answering, or the answer
+                # window closed — the bid didn't land.
+                presence.belief.resolve_bid(False, ts)
+            if departing:
+                departures.append(
+                    ExternalEvent(
+                        kind=EventKind.DEPARTURE,
+                        source=presence.presence_id,
+                        content=f"{presence.display_name} left",
+                        salience=_SALIENCE[EventKind.DEPARTURE],
+                        topics=[],
+                        timestamp=ts,
                     )
+                )
         for event in departures:
             self._record(event)
         if self.board is not None:
@@ -734,12 +715,11 @@ class OuterEnvironment:
     def summarize(self) -> str:
         """A human-readable summary of its external world."""
         lines = ["Its world:"]
-        with self._lock:
-            presences = sorted(
-                self._presences.values(),
-                key=lambda p: p.last_seen,
-                reverse=True,
-            )
+        presences = sorted(
+            self._presences.values(),
+            key=lambda p: p.last_seen,
+            reverse=True,
+        )
         present = [p for p in presences if p.present]
         now = time.time()
         if present:
@@ -781,19 +761,18 @@ class OuterEnvironment:
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize the world for persistence."""
-        with self._lock:
-            return {
-                "version": 1,
-                "presences": {pid: p.to_dict() for pid, p in self._presences.items()},
-                "events": [e.to_dict() for e in self._stream.recent(50)],
-                "last_addressed_time": self._last_addressed_time,
-                "unanswered_bids": self._unanswered_bids,
-                "maps": {
-                    "kinds": self._kind_map.to_dict(lambda k: k.value),
-                    "sources": self._presence_map.to_dict(str),
-                },
-                "arcade": self.arcade.to_dict() if self.arcade is not None else None,
-            }
+        return {
+            "version": 1,
+            "presences": {pid: p.to_dict() for pid, p in self._presences.items()},
+            "events": [e.to_dict() for e in self._stream.recent(50)],
+            "last_addressed_time": self._last_addressed_time,
+            "unanswered_bids": self._unanswered_bids,
+            "maps": {
+                "kinds": self._kind_map.to_dict(lambda k: k.value),
+                "sources": self._presence_map.to_dict(str),
+            },
+            "arcade": self.arcade.to_dict() if self.arcade is not None else None,
+        }
 
     def restore_from_dict(self, data: dict[str, Any]) -> None:
         """Restore the world from a persisted payload.
@@ -822,21 +801,20 @@ class OuterEnvironment:
         last_addressed = float(data.get("last_addressed_time", time.time()))
         bids = int(data.get("unanswered_bids", 0))
         maps = data.get("maps") or {}
-        with self._lock:
-            self._presences = presences
-            self._stream = EventStream(max_size=200)
-            for event in events:
-                self._stream.append(event)
-            self._last_addressed_time = last_addressed
-            self._unanswered_bids = max(0, bids)
-            # Learned structure persists across restarts — a map that
-            # forgot its transitions every boot would never grow up.
-            self._kind_map = _SuccessorMap()
-            self._presence_map = _SuccessorMap()
-            if isinstance(maps.get("kinds"), dict):
-                self._kind_map.restore(maps["kinds"], EventKind)
-            if isinstance(maps.get("sources"), dict):
-                self._presence_map.restore(maps["sources"], str)
+        self._presences = presences
+        self._stream = EventStream(max_size=200)
+        for event in events:
+            self._stream.append(event)
+        self._last_addressed_time = last_addressed
+        self._unanswered_bids = max(0, bids)
+        # Learned structure persists across restarts — a map that
+        # forgot its transitions every boot would never grow up.
+        self._kind_map = _SuccessorMap()
+        self._presence_map = _SuccessorMap()
+        if isinstance(maps.get("kinds"), dict):
+            self._kind_map.restore(maps["kinds"], EventKind)
+        if isinstance(maps.get("sources"), dict):
+            self._presence_map.restore(maps["sources"], str)
         if self.arcade is not None and isinstance(data.get("arcade"), dict):
             self.arcade.restore(data["arcade"])
 
@@ -844,9 +822,8 @@ class OuterEnvironment:
 
     def _record(self, event: ExternalEvent) -> None:
         """Append the event, learn its transitions, notify (no lock)."""
-        with self._lock:
-            self._kind_map.observe(event.kind)
-            self._presence_map.observe(event.source)
+        self._kind_map.observe(event.kind)
+        self._presence_map.observe(event.source)
         self._stream.append(event)
         listener = self.on_external_event
         if listener is not None:

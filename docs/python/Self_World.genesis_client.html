@@ -411,12 +411,31 @@ a&nbsp;zero&nbsp;reading.</span></dd></dl>
 
 <dl><dt><a name="GenesisClient-get_phase"><strong>get_phase</strong></a>(self, *, timeout: 'float | None' = None) -&gt; 'PhaseInfo'</dt><dd><span class="code">Get&nbsp;the&nbsp;current&nbsp;mental&nbsp;phase&nbsp;+&nbsp;arousal/valence&nbsp;(9&nbsp;bytes).</span></dd></dl>
 
+<dl><dt><a name="GenesisClient-get_place"><strong>get_place</strong></a>(self, *, timeout: 'float | None' = None) -&gt; 'list[float] | None'</dt><dd><span class="code">Where&nbsp;she&nbsp;is&nbsp;—&nbsp;the&nbsp;body's&nbsp;own&nbsp;answer.<br>
+&nbsp;<br>
+The&nbsp;pose's&nbsp;current&nbsp;ambient&nbsp;location&nbsp;—&nbsp;under&nbsp;drift&nbsp;this&nbsp;is<br>
+not&nbsp;the&nbsp;placed&nbsp;coordinates;&nbsp;it&nbsp;moves.&nbsp;``None``&nbsp;when&nbsp;she&nbsp;is<br>
+nowhere&nbsp;in&nbsp;particular&nbsp;(or&nbsp;the&nbsp;daemon&nbsp;could&nbsp;not&nbsp;answer&nbsp;—&nbsp;an<br>
+absent&nbsp;channel,&nbsp;never&nbsp;a&nbsp;fabricated&nbsp;position).</span></dd></dl>
+
 <dl><dt><a name="GenesisClient-get_plasticity_profile"><strong>get_plasticity_profile</strong></a>(self, *, timeout: 'float | None' = None) -&gt; 'PlasticityProfile'</dt><dd><span class="code">Get&nbsp;the&nbsp;plasticity&nbsp;profile&nbsp;—&nbsp;metaplastic&nbsp;state&nbsp;summary&nbsp;(40&nbsp;bytes).<br>
 &nbsp;<br>
 Exposes&nbsp;the&nbsp;substrate's&nbsp;"learning-to-learn"&nbsp;state:&nbsp;coupling-<br>
 matrix&nbsp;drift,&nbsp;receptor&nbsp;sensitivities,&nbsp;BDNF/cortisol&nbsp;levels,<br>
 and&nbsp;the&nbsp;plasticity&nbsp;gate.&nbsp;The&nbsp;cognitive&nbsp;mind&nbsp;uses&nbsp;this&nbsp;to<br>
 adapt&nbsp;its&nbsp;learning&nbsp;strategy&nbsp;(see&nbsp;``learning_posture``).</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-get_pose"><strong>get_pose</strong></a>(self, *, timeout: 'float | None' = None) -&gt; 'dict | None'</dt><dd><span class="code">The&nbsp;full&nbsp;placed&nbsp;pose&nbsp;—&nbsp;the&nbsp;body's&nbsp;whole&nbsp;answer.<br>
+&nbsp;<br>
+``{ambient,&nbsp;spec,&nbsp;frame,&nbsp;drift}``:&nbsp;the&nbsp;current&nbsp;ambient<br>
+location&nbsp;(six&nbsp;coordinates,&nbsp;moving&nbsp;under&nbsp;drift),&nbsp;the&nbsp;spec<br>
+coordinates&nbsp;at&nbsp;the&nbsp;arity&nbsp;they&nbsp;were&nbsp;given,&nbsp;and&nbsp;the&nbsp;optional<br>
+6×6&nbsp;orientation&nbsp;frame&nbsp;and&nbsp;skew&nbsp;drift&nbsp;generator&nbsp;(``None``<br>
+when&nbsp;the&nbsp;placing&nbsp;hand&nbsp;gave&nbsp;neither).&nbsp;``None``&nbsp;when&nbsp;she&nbsp;is<br>
+nowhere&nbsp;in&nbsp;particular&nbsp;or&nbsp;the&nbsp;daemon&nbsp;could&nbsp;not&nbsp;answer;&nbsp;when<br>
+the&nbsp;daemon&nbsp;predates&nbsp;the&nbsp;pose&nbsp;block,&nbsp;``spec``,&nbsp;``frame``,<br>
+and&nbsp;``drift``&nbsp;stay&nbsp;``None``&nbsp;while&nbsp;``ambient``&nbsp;still<br>
+answers.</span></dd></dl>
 
 <dl><dt><a name="GenesisClient-get_process_health"><strong>get_process_health</strong></a>(self, *, timeout: 'float | None' = None) -&gt; 'ProcessHealth'</dt><dd><span class="code">Get&nbsp;which&nbsp;of&nbsp;Genesis's&nbsp;own&nbsp;processes&nbsp;are&nbsp;alive,&nbsp;and&nbsp;death&nbsp;count.<br>
 &nbsp;<br>
@@ -543,6 +562,27 @@ Returns:<br>
 &nbsp;&nbsp;&nbsp;&nbsp;True&nbsp;if&nbsp;the&nbsp;impulse&nbsp;was&nbsp;applied&nbsp;successfully.</span></dd></dl>
 
 <dl><dt><a name="GenesisClient-ping"><strong>ping</strong></a>(self, *, timeout: 'float | None' = None) -&gt; 'PingResponse'</dt><dd><span class="code">Ping&nbsp;the&nbsp;daemon.&nbsp;Returns&nbsp;ack&nbsp;+&nbsp;uptime.</span></dd></dl>
+
+<dl><dt><a name="GenesisClient-place_field"><strong>place_field</strong></a>(self, point: 'list[float] | tuple[float, ...] | None', *, frame: 'list[list[float]] | None' = None, drift: 'list[list[float]] | None' = None, timeout: 'float | None' = None) -&gt; 'bool'</dt><dd><span class="code">Place&nbsp;her&nbsp;—&nbsp;the&nbsp;one&nbsp;place,&nbsp;owned&nbsp;by&nbsp;the&nbsp;body.<br>
+&nbsp;<br>
+``point``&nbsp;is&nbsp;one&nbsp;to&nbsp;six&nbsp;coordinates&nbsp;of&nbsp;her&nbsp;position,&nbsp;stored<br>
+exactly&nbsp;as&nbsp;given:&nbsp;a&nbsp;2-vector&nbsp;is&nbsp;her&nbsp;place&nbsp;read&nbsp;in&nbsp;a&nbsp;plane,<br>
+and&nbsp;the&nbsp;same&nbsp;point&nbsp;rests&nbsp;in&nbsp;the&nbsp;latent&nbsp;bulk's&nbsp;leading<br>
+coordinate&nbsp;plane&nbsp;(x&nbsp;on&nbsp;the&nbsp;first&nbsp;axis,&nbsp;y&nbsp;on&nbsp;the&nbsp;second).<br>
+``frame``&nbsp;is&nbsp;an&nbsp;optional&nbsp;6×6&nbsp;orthonormal&nbsp;basis&nbsp;—&nbsp;the&nbsp;pose's<br>
+orientation,&nbsp;the&nbsp;axes&nbsp;the&nbsp;coordinates&nbsp;are&nbsp;read&nbsp;along.<br>
+``drift``&nbsp;is&nbsp;an&nbsp;optional&nbsp;6×6&nbsp;skew-symmetric&nbsp;generator&nbsp;—&nbsp;a<br>
+bivector&nbsp;in&nbsp;so(6)&nbsp;whose&nbsp;exponential&nbsp;flow&nbsp;carries&nbsp;the&nbsp;pose<br>
+each&nbsp;tick:&nbsp;location&nbsp;and&nbsp;orientation&nbsp;moving&nbsp;together.&nbsp;The<br>
+body&nbsp;persists&nbsp;the&nbsp;whole&nbsp;pose&nbsp;—&nbsp;where&nbsp;and&nbsp;how&nbsp;she&nbsp;is<br>
+survives&nbsp;restarts,&nbsp;because&nbsp;her&nbsp;place&nbsp;is&nbsp;body&nbsp;state,&nbsp;not&nbsp;a<br>
+note&nbsp;the&nbsp;mind&nbsp;keeps.&nbsp;The&nbsp;anchor&nbsp;is&nbsp;an&nbsp;observation,&nbsp;not&nbsp;a<br>
+command:&nbsp;each&nbsp;tick&nbsp;moves&nbsp;the&nbsp;inner&nbsp;fiber&nbsp;a&nbsp;bounded&nbsp;fraction<br>
+of&nbsp;the&nbsp;geodesic&nbsp;toward&nbsp;it.&nbsp;``None``&nbsp;releases&nbsp;the&nbsp;location&nbsp;—<br>
+the&nbsp;interior&nbsp;oscillators&nbsp;resume&nbsp;speaking&nbsp;for&nbsp;themselves.<br>
+&nbsp;<br>
+Returns&nbsp;``False``&nbsp;when&nbsp;the&nbsp;daemon&nbsp;predates&nbsp;the&nbsp;command&nbsp;—&nbsp;an<br>
+absent&nbsp;channel,&nbsp;never&nbsp;silent.</span></dd></dl>
 
 <dl><dt><a name="GenesisClient-put_tensor"><strong>put_tensor</strong></a>(self, name: 'str', tensor: 'Tensor', *, timeout: 'float | None' = None) -&gt; 'bool'</dt><dd><span class="code">Store&nbsp;a&nbsp;named&nbsp;tensor&nbsp;on&nbsp;the&nbsp;daemon's&nbsp;slab&nbsp;(last&nbsp;write&nbsp;wins).<br>
 &nbsp;<br>

@@ -35,7 +35,6 @@ from genesis_client.threads import call_on_named_thread, named_thread
 from infrastructure.config import VOSK_MODEL_NAME, vosk_model_dir
 from infrastructure.text import is_blank
 from infrastructure.text import sentences as _sentences
-from inhibition import InhibitoryGate
 
 logger = logging.getLogger(__name__)
 
@@ -186,9 +185,7 @@ class Voice:
         self._piper_proc: subprocess.Popen | None = None
         self._play_proc: subprocess.Popen | None = None
         self._all_procs: list[subprocess.Popen] = []  # track all spawned procs
-        self._procs_lock = InhibitoryGate()
         self._speaking_count = 0
-        self._speaking_lock = InhibitoryGate()
         self._last_spoke_time = 0.0
         self._speech_tail = 0.3  # keep mic muted for 300ms after TTS ends
         # Speech queue: when speech is in progress, new utterances are
@@ -198,7 +195,6 @@ class Voice:
         self._speech_queue: collections.deque[
             tuple[str, float, float, float, float, float | None]
         ] = collections.deque(maxlen=3)
-        self._queue_lock = InhibitoryGate()
 
     def _check_piper(self) -> bool:
         """Check if Piper binary exists and is executable."""
@@ -273,12 +269,11 @@ class Voice:
             if i == 0:
                 self._speak_single(chunk, blocking, alertness, valence, caution, creativity, temp_c)
             else:
-                with self._queue_lock:
-                    max_q = self._speech_queue.maxlen or 3
-                    if len(self._speech_queue) < max_q:
-                        self._speech_queue.append(
-                            (chunk, alertness, valence, caution, creativity, temp_c)
-                        )
+                max_q = self._speech_queue.maxlen or 3
+                if len(self._speech_queue) < max_q:
+                    self._speech_queue.append(
+                        (chunk, alertness, valence, caution, creativity, temp_c)
+                    )
 
     def _speak_single(
         self,
@@ -298,12 +293,9 @@ class Voice:
         # responses arrive in quick succession. Blocking speech
         # always interrupts — the caller is waiting for it.
         if not blocking and self.is_speaking:
-            with self._queue_lock:
-                max_q = self._speech_queue.maxlen or 3
-                if len(self._speech_queue) < max_q:
-                    self._speech_queue.append(
-                        (text, alertness, valence, caution, creativity, temp_c)
-                    )
+            max_q = self._speech_queue.maxlen or 3
+            if len(self._speech_queue) < max_q:
+                self._speech_queue.append((text, alertness, valence, caution, creativity, temp_c))
             return
 
         self.stop()
@@ -366,10 +358,9 @@ class Voice:
         drain side of the speech queue — speak() enqueues when busy,
         and this method dequeues when idle.
         """
-        with self._queue_lock:
-            if not self._speech_queue:
-                return
-            text, alertness, _valence, caution, _creativity, temp_c = self._speech_queue.popleft()
+        if not self._speech_queue:
+            return
+        text, alertness, _valence, caution, _creativity, temp_c = self._speech_queue.popleft()
         # Play the queued utterance. We call the internal playback
         # directly (not speak()) to avoid re-checking is_speaking,
         # which would re-queue and never play.
@@ -388,22 +379,19 @@ class Voice:
 
     def _start_speaking(self) -> None:
         """Increment the speaking counter under lock to mark speech as active."""
-        with self._speaking_lock:
-            self._speaking_count += 1
+        self._speaking_count += 1
 
     def _done_speaking(self) -> None:
         """Decrement the speaking counter, recording the time when it reaches zero."""
-        with self._speaking_lock:
-            self._speaking_count = max(0, self._speaking_count - 1)
-            if self._speaking_count == 0:
-                self._last_spoke_time = time.time()
+        self._speaking_count = max(0, self._speaking_count - 1)
+        if self._speaking_count == 0:
+            self._last_spoke_time = time.time()
 
     @property
     def is_speaking(self) -> bool:
         """True while any TTS child is still speaking, plus a short tail."""
-        with self._speaking_lock:
-            if self._speaking_count > 0:
-                return True
+        if self._speaking_count > 0:
+            return True
         return time.time() - self._last_spoke_time < self._speech_tail
 
     def _speak_piper(
@@ -501,8 +489,7 @@ class Voice:
                     proc.kill()
                 self._piper_proc = None
                 raise
-            with self._procs_lock:
-                self._all_procs.extend([proc, self._play_proc])
+            self._all_procs.extend([proc, self._play_proc])
 
             if blocking:
                 self._play_proc.wait()
@@ -536,8 +523,7 @@ class Voice:
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
-            with self._procs_lock:
-                self._all_procs.append(self._play_proc)
+            self._all_procs.append(self._play_proc)
             if blocking:
                 self._play_proc.wait()
             else:
@@ -553,8 +539,7 @@ class Voice:
     def stop(self) -> None:
         """Stop any currently playing speech."""
         # Clear any queued utterances — they're stale once we stop.
-        with self._queue_lock:
-            self._speech_queue.clear()
+        self._speech_queue.clear()
         # Kill the latest procs (fast path)
         for proc in (self._piper_proc, self._play_proc):
             if proc:
@@ -568,9 +553,8 @@ class Voice:
                     logger.debug(repr(e))
         # Also kill any orphaned procs from previous non-blocking calls
         # whose _reap_children thread is still blocked on wait().
-        with self._procs_lock:
-            orphans = [p for p in self._all_procs if p.poll() is None]
-            self._all_procs.clear()
+        orphans = [p for p in self._all_procs if p.poll() is None]
+        self._all_procs.clear()
         for proc in orphans:
             try:
                 proc.terminate()
@@ -606,7 +590,6 @@ class VoiceInput:
         self.sample_rate = sample_rate
         self._backend: str | None = None
         self._vosk_model: Any = None
-        self._lock = InhibitoryGate()
 
         if lazy:
             # Defer model loading until the user actually uses /voice.
@@ -679,9 +662,8 @@ class VoiceInput:
         if not self._ensure_loaded():
             return None
 
-        with self._lock:
-            if self._backend == "vosk":
-                return self._listen_vosk(timeout, phrase_limit)
+        if self._backend == "vosk":
+            return self._listen_vosk(timeout, phrase_limit)
         return None
 
     def _listen_vosk(self, timeout: float | None, phrase_limit: float) -> str | None:

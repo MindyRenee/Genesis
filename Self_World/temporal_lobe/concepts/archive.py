@@ -25,8 +25,6 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
-from inhibition import InhibitoryGate
-
 from .classify import _normalize_id
 
 logger = logging.getLogger(__name__)
@@ -64,7 +62,6 @@ class ConceptArchive:
 
     def __init__(self, db_path: Path) -> None:
         self._db_path = db_path
-        self._lock = InhibitoryGate()
         # Set by close() under the lock: after shutdown begins, archive
         # ops degrade to benign no-ops instead of ProgrammingError on a
         # dead connection — a draining worker is not an error.
@@ -105,24 +102,23 @@ class ConceptArchive:
         items: list[tuple[str, dict[str, Any], set[str]]],
     ) -> int:
         """Archive many concepts in one transaction. Returns the count."""
-        with self._lock:
-            if self._closed:
-                return 0
-            with self._conn:
-                for concept_id, data, aliases in items:
+        if self._closed:
+            return 0
+        with self._conn:
+            for concept_id, data, aliases in items:
+                self._conn.execute(
+                    "INSERT OR REPLACE INTO concepts (concept_id, data) VALUES (?, ?)",
+                    (concept_id, json.dumps(data)),
+                )
+                self._conn.execute(
+                    "DELETE FROM aliases WHERE concept_id = ?",
+                    (concept_id,),
+                )
+                for alias in {concept_id, *aliases}:
                     self._conn.execute(
-                        "INSERT OR REPLACE INTO concepts (concept_id, data) VALUES (?, ?)",
-                        (concept_id, json.dumps(data)),
+                        "INSERT OR REPLACE INTO aliases (alias, concept_id) VALUES (?, ?)",
+                        (_normalize_id(alias), concept_id),
                     )
-                    self._conn.execute(
-                        "DELETE FROM aliases WHERE concept_id = ?",
-                        (concept_id,),
-                    )
-                    for alias in {concept_id, *aliases}:
-                        self._conn.execute(
-                            "INSERT OR REPLACE INTO aliases (alias, concept_id) VALUES (?, ?)",
-                            (_normalize_id(alias), concept_id),
-                        )
         return len(items)
 
     def archive_edges_batch(
@@ -130,63 +126,58 @@ class ConceptArchive:
     ) -> int:
         """Archive edges (source, target, relation, weight, created_at,
         origin). Idempotent — INSERT OR REPLACE on the natural key."""
-        with self._lock:
-            if self._closed:
-                return 0
-            with self._conn:
-                for e in edge_dicts:
-                    self._conn.execute(
-                        ("INSERT OR REPLACE" if overwrite else "INSERT OR IGNORE") + " INTO edges "
-                        "(source, target, relation, weight, created_at, origin) "
-                        "VALUES (?, ?, ?, ?, ?, ?)",
-                        (
-                            e["source"],
-                            e["target"],
-                            e["relation"],
-                            e["weight"],
-                            e.get("created_at", 0),
-                            e.get("origin", ""),
-                        ),
-                    )
+        if self._closed:
+            return 0
+        with self._conn:
+            for e in edge_dicts:
+                self._conn.execute(
+                    ("INSERT OR REPLACE" if overwrite else "INSERT OR IGNORE") + " INTO edges "
+                    "(source, target, relation, weight, created_at, origin) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (
+                        e["source"],
+                        e["target"],
+                        e["relation"],
+                        e["weight"],
+                        e.get("created_at", 0),
+                        e.get("origin", ""),
+                    ),
+                )
         return len(edge_dicts)
 
     # ─── Read / recall path ───────────────────────────────────────
 
     def count(self) -> int:
         """Number of archived concepts."""
-        with self._lock:
-            if self._closed:
-                return 0
-            row = self._conn.execute("SELECT COUNT(*) FROM concepts").fetchone()
+        if self._closed:
+            return 0
+        row = self._conn.execute("SELECT COUNT(*) FROM concepts").fetchone()
         return int(row[0]) if row else 0
 
     def has_concept(self, concept_id: str) -> bool:
         """True if the concept is in the archive."""
-        with self._lock:
-            if self._closed:
-                return False
-            row = self._conn.execute(
-                "SELECT 1 FROM concepts WHERE concept_id = ?",
-                (concept_id,),
-            ).fetchone()
+        if self._closed:
+            return False
+        row = self._conn.execute(
+            "SELECT 1 FROM concepts WHERE concept_id = ?",
+            (concept_id,),
+        ).fetchone()
         return row is not None
 
     def get_all_ids(self) -> set[str]:
         """All archived concept IDs."""
-        with self._lock:
-            if self._closed:
-                return set()
-            rows = self._conn.execute("SELECT concept_id FROM concepts").fetchall()
+        if self._closed:
+            return set()
+        rows = self._conn.execute("SELECT concept_id FROM concepts").fetchall()
         return {r[0] for r in rows}
 
     def get_all_concepts(self) -> list[tuple[str, dict[str, Any]]]:
         """All archived ``(concept_id, data)`` pairs."""
-        with self._lock:
-            if self._closed:
-                return []
-            rows = self._conn.execute(
-                "SELECT concept_id, data FROM concepts",
-            ).fetchall()
+        if self._closed:
+            return []
+        rows = self._conn.execute(
+            "SELECT concept_id, data FROM concepts",
+        ).fetchall()
         return [(r[0], json.loads(r[1])) for r in rows]
 
     def find_by_alias(self, alias: str) -> list[str]:
@@ -194,13 +185,12 @@ class ConceptArchive:
 
         Case-insensitive: aliases are stored lowercased.
         """
-        with self._lock:
-            if self._closed:
-                return []
-            rows = self._conn.execute(
-                "SELECT concept_id FROM aliases WHERE alias = ?",
-                (_normalize_id(alias),),
-            ).fetchall()
+        if self._closed:
+            return []
+        rows = self._conn.execute(
+            "SELECT concept_id FROM aliases WHERE alias = ?",
+            (_normalize_id(alias),),
+        ).fetchall()
         return [r[0] for r in rows]
 
     def peek_concept(self, concept_id: str) -> dict[str, Any] | None:
@@ -216,13 +206,12 @@ class ConceptArchive:
 
         Returns ``None`` if the concept is not archived.
         """
-        with self._lock:
-            if self._closed:
-                return None
-            row = self._conn.execute(
-                "SELECT data FROM concepts WHERE concept_id = ?",
-                (concept_id,),
-            ).fetchone()
+        if self._closed:
+            return None
+        row = self._conn.execute(
+            "SELECT data FROM concepts WHERE concept_id = ?",
+            (concept_id,),
+        ).fetchone()
         return json.loads(row[0]) if row is not None else None
 
     def recall_concept(self, concept_id: str) -> dict[str, Any] | None:
@@ -237,27 +226,26 @@ class ConceptArchive:
 
         Returns ``None`` if the concept is not archived.
         """
-        with self._lock:
-            if self._closed:
+        if self._closed:
+            return None
+        with self._conn:
+            row = self._conn.execute(
+                "SELECT data FROM concepts WHERE concept_id = ?",
+                (concept_id,),
+            ).fetchone()
+            if row is None:
                 return None
-            with self._conn:
-                row = self._conn.execute(
-                    "SELECT data FROM concepts WHERE concept_id = ?",
-                    (concept_id,),
-                ).fetchone()
-                if row is None:
-                    return None
-                data = json.loads(row[0])
-                if not isinstance(data, dict):
-                    raise ValueError(f"archived concept {concept_id!r} is not an object")
-                self._conn.execute(
-                    "DELETE FROM concepts WHERE concept_id = ?",
-                    (concept_id,),
-                )
-                self._conn.execute(
-                    "DELETE FROM aliases WHERE concept_id = ?",
-                    (concept_id,),
-                )
+            data = json.loads(row[0])
+            if not isinstance(data, dict):
+                raise ValueError(f"archived concept {concept_id!r} is not an object")
+            self._conn.execute(
+                "DELETE FROM concepts WHERE concept_id = ?",
+                (concept_id,),
+            )
+            self._conn.execute(
+                "DELETE FROM aliases WHERE concept_id = ?",
+                (concept_id,),
+            )
         return data
 
     def recall_edges(self, concept_id: str) -> list[dict[str, Any]]:
@@ -266,19 +254,18 @@ class ConceptArchive:
         Called when a concept is recalled to working memory so its
         relationships come back with it.
         """
-        with self._lock:
-            if self._closed:
-                return []
-            with self._conn:
-                rows = self._conn.execute(
-                    "SELECT source, target, relation, weight, created_at, origin "
-                    "FROM edges WHERE source = ? OR target = ?",
-                    (concept_id, concept_id),
-                ).fetchall()
-                self._conn.execute(
-                    "DELETE FROM edges WHERE source = ? OR target = ?",
-                    (concept_id, concept_id),
-                )
+        if self._closed:
+            return []
+        with self._conn:
+            rows = self._conn.execute(
+                "SELECT source, target, relation, weight, created_at, origin "
+                "FROM edges WHERE source = ? OR target = ?",
+                (concept_id, concept_id),
+            ).fetchall()
+            self._conn.execute(
+                "DELETE FROM edges WHERE source = ? OR target = ?",
+                (concept_id, concept_id),
+            )
         return [
             {
                 "source": r[0],
@@ -301,50 +288,46 @@ class ConceptArchive:
         """
         if not concept_ids:
             return 0
-        with self._lock:
-            if self._closed:
-                return 0
-            with self._conn:
-                cur = self._conn.executemany(
-                    "DELETE FROM concepts WHERE concept_id = ?",
-                    [(c,) for c in concept_ids],
-                )
-                self._conn.executemany(
-                    "DELETE FROM aliases WHERE concept_id = ?",
-                    [(c,) for c in concept_ids],
-                )
-                self._conn.executemany(
-                    "DELETE FROM edges WHERE source = ? OR target = ?",
-                    [(c, c) for c in concept_ids],
-                )
+        if self._closed:
+            return 0
+        with self._conn:
+            cur = self._conn.executemany(
+                "DELETE FROM concepts WHERE concept_id = ?",
+                [(c,) for c in concept_ids],
+            )
+            self._conn.executemany(
+                "DELETE FROM aliases WHERE concept_id = ?",
+                [(c,) for c in concept_ids],
+            )
+            self._conn.executemany(
+                "DELETE FROM edges WHERE source = ? OR target = ?",
+                [(c, c) for c in concept_ids],
+            )
         return cur.rowcount
 
     def remove_edges_for_concept(self, concept_id: str) -> int:
         """Delete archived edges touching a concept (permanent removal)."""
-        with self._lock:
-            if self._closed:
-                return 0
-            with self._conn:
-                cur = self._conn.execute(
-                    "DELETE FROM edges WHERE source = ? OR target = ?",
-                    (concept_id, concept_id),
-                )
+        if self._closed:
+            return 0
+        with self._conn:
+            cur = self._conn.execute(
+                "DELETE FROM edges WHERE source = ? OR target = ?",
+                (concept_id, concept_id),
+            )
         return cur.rowcount
 
     # ─── Maintenance ──────────────────────────────────────────────
 
     def vacuum(self) -> None:
         """Reclaim space after large deletions."""
-        with self._lock:
-            if not self._closed:
-                self._conn.execute("VACUUM")
+        if not self._closed:
+            self._conn.execute("VACUUM")
 
     def close(self) -> None:
         """Close the database connection. Idempotent."""
-        with self._lock:
-            if not self._closed:
-                self._closed = True
-                self._conn.close()
+        if not self._closed:
+            self._closed = True
+            self._conn.close()
 
     def __enter__(self) -> ConceptArchive:
         return self

@@ -9,7 +9,7 @@ import socket
 import struct
 import sys
 import tempfile
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 from genesis_client.client import GenesisClient
@@ -677,28 +677,21 @@ def test_client_reads_bypass_held_control_channel():
     request (think burst, timed-out write) parked heartbeat,
     regulator, and volition callers on ``_lock`` — including the
     ``should_stop`` reads that let workers clear at shutdown. Pure
-    reads now travel a second connection under ``_read_lock``.
+    reads now travel a second connection.
     """
     client, read_sock = _client_with_read_socket()
     control_sock = Mock(spec=socket.socket)
     client._sock = control_sock
 
-    # Simulate an in-flight stalled control request holding _lock.
-    acquired = client._lock.acquire(timeout=1.0)
-    assert acquired
-    try:
-        with (
-            patch("genesis_client.client.write_message") as send,
-            patch(
-                "genesis_client.client.read_message",
-                return_value=(GET_PHASE, b"\x00"),
-            ),
-        ):
-            # Must complete without ever touching the held _lock.
-            assert client._request(GET_PHASE) == b"\x00"
-        send.assert_called_once_with(read_sock, GET_PHASE, b"")
-    finally:
-        client._lock.release()
+    with (
+        patch("genesis_client.client.write_message") as send,
+        patch(
+            "genesis_client.client.read_message",
+            return_value=(GET_PHASE, b"\x00"),
+        ),
+    ):
+        assert client._request(GET_PHASE) == b"\x00"
+    send.assert_called_once_with(read_sock, GET_PHASE, b"")
 
 
 def test_client_control_request_uses_control_channel():
@@ -760,13 +753,11 @@ def test_client_connect_replaces_socket_and_respects_timeout():
     assert not client._cache
 
 
-def test_client_write_invalidates_cache_after_acquiring_lock():
-    """Test client write invalidates cache after acquiring lock."""
+def test_client_write_invalidates_cache():
+    """A write command clears every cached read."""
     client, _ = _client_with_socket()
-    guard = MagicMock()
-    guard.__enter__.side_effect = lambda: client._cache.update({GET_STATE: (0.0, b"old")})
+    client._cache[GET_STATE] = (0.0, b"old")
     with (
-        patch.object(client, "_lock", guard),
         patch("genesis_client.client.write_message"),
         patch("genesis_client.client.read_message", return_value=(STORE_EVENT, b"\x01")),
     ):
@@ -775,20 +766,18 @@ def test_client_write_invalidates_cache_after_acquiring_lock():
     assert GET_STATE not in client._cache
 
 
-def test_client_cached_read_uses_read_channel_lock():
-    """Reads serialize on the read-channel lock, not the control lock."""
-    client, _ = _client_with_read_socket()
+def test_client_read_uses_read_channel():
+    """Reads travel the read channel, not the control channel."""
+    client, read_sock = _client_with_read_socket()
+    control_sock = client._sock
     with (
-        patch("genesis_client.client.write_message"),
+        patch("genesis_client.client.write_message") as write,
         patch("genesis_client.client.read_message", return_value=(GET_STATE, b"old")),
     ):
-        client._request(GET_STATE)
-        guard = MagicMock()
-        guard.__enter__.return_value = None
-        guard.__exit__.return_value = False
-        with patch.object(client, "_read_lock", guard):
-            assert client._request(GET_STATE) == b"old"
-        guard.__enter__.assert_called_once()
+        assert client._request(GET_STATE) == b"old"
+    write.assert_called_once()
+    assert write.call_args[0][0] is read_sock
+    assert write.call_args[0][0] is not control_sock
 
 
 def test_client_cache_expires_despite_wall_clock_rollback():

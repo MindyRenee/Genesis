@@ -2380,6 +2380,8 @@ class FieldState:
     fiber_count: int
     boundary: tuple[float, ...] | None = None
     superposition: float | None = None
+    momentum: float | None = None
+    vesica: float | None = None
     coupling: float | None = None
 
     @classmethod
@@ -2417,6 +2419,8 @@ class FieldState:
             return value if math.isfinite(value) else None
 
         superposition = _optional("field.superposition")
+        momentum = _optional("field.momentum")
+        vesica = _optional("field.vesica")
         coupling = _optional("field.coupling")
         return cls(
             consensus=consensus,
@@ -2426,5 +2430,7 @@ class FieldState:
             fiber_count=fiber_count,
             boundary=boundary,
             superposition=superposition,
+            momentum=momentum,
+            vesica=vesica,
             coupling=coupling,
         )

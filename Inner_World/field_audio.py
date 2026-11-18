@@ -32,8 +32,6 @@ import os
 from collections import deque
 from typing import Any
 
-from inhibition import InhibitoryGate
-
 _SAMPLE_RATE = 16000
 _BLOCK = 1024
 # Emission bands (Hz): ~300 fan/motor region, 2 kHz and 5 kHz
@@ -47,7 +45,6 @@ _SLOW_ALPHA = 0.005  # ~13 s
 # Stimulus scale for sustained emission level.
 _EMISSION_STIMULUS = 0.08
 
-_listener_lock = InhibitoryGate()
 _listener: Any = None  # _FieldAudio | None
 _listener_failed = False  # one failed open ⇒ absent forever
 
@@ -136,17 +133,16 @@ def _get_listener() -> _FieldAudio | None:
         return None
     if _listener_failed:
         return None
-    with _listener_lock:
-        if _listener is not None:
-            return _listener
-        try:
-            from genesis_client.threads import call_on_named_thread
-
-            _listener = call_on_named_thread("field-audio", _FieldAudio, comm="g-field-aud")
-        except Exception:  # noqa: BLE001 — absent channel, any cause
-            _listener_failed = True
-            return None
+    if _listener is not None:
         return _listener
+    try:
+        from genesis_client.threads import call_on_named_thread
+
+        _listener = call_on_named_thread("field-audio", _FieldAudio, comm="g-field-aud")
+    except Exception:  # noqa: BLE001 — absent channel, any cause
+        _listener_failed = True
+        return None
+    return _listener
 
 
 def apply_audio_stimulus() -> bool:

@@ -55,7 +55,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from genesis_client.swallow import note_swallowed
-from inhibition import InhibitoryGate
 
 logger = logging.getLogger(__name__)
 
@@ -209,13 +208,11 @@ class SourceCache:
                 results. Created automatically if it does not exist.
         """
         self._dir = Path(cache_dir)
-        self._lock = InhibitoryGate()
 
     def _ensure_dir(self) -> None:
         """Create the cache directory if it doesn't exist."""
         if not self._dir.exists():
-            with self._lock:
-                self._dir.mkdir(parents=True, exist_ok=True)
+            self._dir.mkdir(parents=True, exist_ok=True)
 
     def _path_for(self, source_name: str, topic: str) -> Path:
         """Return the on-disk cache file path for a source/topic pair."""
@@ -259,11 +256,10 @@ class SourceCache:
             "topic": topic,
         }
         try:
-            with self._lock:
-                path.write_text(
-                    json.dumps(payload, ensure_ascii=False, indent=2),
-                    encoding="utf-8",
-                )
+            path.write_text(
+                json.dumps(payload, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
         except OSError as e:
             note_swallowed(
                 "tools.source_registry.put",
@@ -310,15 +306,14 @@ class SourceCache:
         """Remove all cached entries."""
         if not self._dir.exists():
             return
-        with self._lock:
-            for path in self._dir.glob("*.json"):
-                try:
-                    path.unlink()
-                except OSError as e:
-                    note_swallowed(
-                        "tools.source_registry.clear",
-                        e,
-                    )
+        for path in self._dir.glob("*.json"):
+            try:
+                path.unlink()
+            except OSError as e:
+                note_swallowed(
+                    "tools.source_registry.clear",
+                    e,
+                )
 
     @property
     def count(self) -> int:

@@ -29,7 +29,7 @@ import urllib.request
 from genesis_client.swallow import note_swallowed
 from genesis_client.threads import named_thread
 from infrastructure.net import bounded_urlopen, parse_retry_after
-from inhibition import NeuromodulatoryGate
+from infrastructure.pulse import Pulse
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +72,7 @@ class DiscordListener:
         self.bot_id: str | None = None
         self._on_message = on_message
         self._poll_interval = poll_interval
-        self._stop = NeuromodulatoryGate()
+        self._stop = Pulse()
         # Optional ``() -> bool`` the world installs: False while she
         # rests. A closed relay doesn't drop the batch — the cursor
         # simply holds, so the public's words wait at the door and
@@ -101,7 +101,7 @@ class DiscordListener:
         return cls(token, url, on_message)
 
     @staticmethod
-    def _resolve_channel(webhook_url: str, stop: NeuromodulatoryGate | None = None) -> str | None:
+    def _resolve_channel(webhook_url: str, stop: Pulse | None = None) -> str | None:
         """GET the webhook object → the channel it posts to."""
         req = urllib.request.Request(
             webhook_url,

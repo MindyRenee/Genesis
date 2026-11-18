@@ -34,8 +34,6 @@ import logging
 import time
 from collections.abc import Callable, Iterator
 
-from inhibition import InhibitoryGate
-
 logger = logging.getLogger(__name__)
 
 # The durable sink, set by the higher layer. This module lives in
@@ -81,7 +79,6 @@ _TAIL_STRIDE = 4096
 # trustworthy rather than merely bounded.
 _TAIL_SECONDS = 300.0
 
-_lock = InhibitoryGate()
 _counts: dict[str, int] = {}
 _reported_upto: dict[str, int] = {}
 _reported_at: dict[str, float] = {}
@@ -105,17 +102,16 @@ def note_swallowed(site: str, exc: BaseException) -> None:
     # them lets two threads on the same site both decide to report
     # (duplicate sink records) and lets a slower writer overwrite
     # ``_reported_upto`` with an older count, shifting the backoff.
-    with _lock:
-        count = _counts.get(site, 0) + 1
-        _counts[site] = count
-        already = _reported_upto.get(site, 0)
-        due_by_count = count == 1 or count >= already + _next_interval(already)
-        last_at = _reported_at.get(site)
-        due_by_time = last_at is not None and (now - last_at) >= _TAIL_SECONDS
-        should_report = due_by_count or due_by_time
-        if should_report:
-            _reported_upto[site] = count
-            _reported_at[site] = now
+    count = _counts.get(site, 0) + 1
+    _counts[site] = count
+    already = _reported_upto.get(site, 0)
+    due_by_count = count == 1 or count >= already + _next_interval(already)
+    last_at = _reported_at.get(site)
+    due_by_time = last_at is not None and (now - last_at) >= _TAIL_SECONDS
+    should_report = due_by_count or due_by_time
+    if should_report:
+        _reported_upto[site] = count
+        _reported_at[site] = now
 
     logger.debug(f"{site}: {exc!r}")
 
@@ -148,14 +144,12 @@ def _next_interval(already: int) -> int:
 
 def swallow_count(site: str) -> int:
     """How many exceptions ``site`` has swallowed this process."""
-    with _lock:
-        return _counts.get(site, 0)
+    return _counts.get(site, 0)
 
 
 def total_swallowed() -> int:
     """Total swallowed exceptions across all sites."""
-    with _lock:
-        return sum(_counts.values())
+    return sum(_counts.values())
 
 
 def failing_sites(limit: int | None = None) -> list[tuple[str, int]]:
@@ -165,8 +159,7 @@ def failing_sites(limit: int | None = None) -> list[tuple[str, int]]:
     the journal: a site appearing here has swallowed something, and a
     large count means it is failing continuously rather than once.
     """
-    with _lock:
-        items = sorted(_counts.items(), key=lambda kv: (-kv[1], kv[0]))
+    items = sorted(_counts.items(), key=lambda kv: (-kv[1], kv[0]))
     return items if limit is None else items[:limit]
 
 
@@ -186,13 +179,11 @@ def swallow_report() -> dict[str, object]:
 
 def reset_swallow_tallies() -> None:
     """Clear the tallies. For tests; the journal is not cleared."""
-    with _lock:
-        _counts.clear()
-        _reported_upto.clear()
-        _reported_at.clear()
+    _counts.clear()
+    _reported_upto.clear()
+    _reported_at.clear()
 
 
 def iter_sites() -> Iterator[str]:
     """Iterate the site names seen so far."""
-    with _lock:
-        yield from list(_counts)
+    yield from list(_counts)

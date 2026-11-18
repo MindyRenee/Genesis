@@ -270,3 +270,16 @@ def test_processor_turn_reports_swing_not_travel():
     # The field slid right on the sensor → the gaze turned left.
     assert report.direction == "left"
     assert report.rotation_deg == pytest.approx(1.5, abs=0.5)
+
+
+def test_motion_pair_rest_and_momentum_are_duals():
+    # rest = 1/(1+momentum) — the opposite face of one scalar.
+    report = ep.TwoViewReport(kind="still", momentum=0.0, rest=1.0)
+    assert report.momentum == 0.0
+    assert report.rest == 1.0
+
+
+def test_motion_pair_unresolved_is_indeterminate():
+    # No measurement: momentum=0 and rest=0 — neither face claimed.
+    report = ep.TwoViewReport(kind="unresolved", momentum=0.0, rest=0.0)
+    assert report.rest == 0.0

@@ -27,8 +27,6 @@ import os
 from dataclasses import dataclass, field
 from typing import Any
 
-from inhibition import InhibitoryGate
-
 logger = logging.getLogger(__name__)
 
 #: Action names the official games use. ACTION6 takes a cell (x, y).
@@ -193,7 +191,6 @@ class OfficialGames:
         self._environments_dir = environments_dir
         self._recordings_dir = recordings_dir
         self._arcade: Any = None
-        self._lock = InhibitoryGate()
 
     @property
     def keyed(self) -> bool:
@@ -202,33 +199,32 @@ class OfficialGames:
 
     def _toolkit(self) -> Any:
         """Build the toolkit ``Arcade`` once, quietly."""
-        with self._lock:
-            if self._arcade is not None:
-                return self._arcade
-            if self._factory is not None:
-                self._arcade = self._factory()
-                return self._arcade
-            try:
-                from arc_agi import Arcade, OperationMode
-            except ImportError as exc:
-                raise GamesUnavailable(
-                    "the arc-agi toolkit is not installed (pip install arc-agi)"
-                ) from exc
-            quiet = logging.getLogger("genesis.arc_agi")
-            quiet.setLevel(logging.WARNING)
-            kwargs: dict[str, Any] = {
-                "operation_mode": OperationMode(self.mode),
-                "logger": quiet,
-            }
-            if self._environments_dir is not None:
-                kwargs["environments_dir"] = self._environments_dir
-            if self._recordings_dir is not None:
-                kwargs["recordings_dir"] = self._recordings_dir
-            try:
-                self._arcade = Arcade(**kwargs)
-            except Exception as exc:
-                raise GamesUnavailable(f"could not reach the official games: {exc}") from exc
+        if self._arcade is not None:
             return self._arcade
+        if self._factory is not None:
+            self._arcade = self._factory()
+            return self._arcade
+        try:
+            from arc_agi import Arcade, OperationMode
+        except ImportError as exc:
+            raise GamesUnavailable(
+                "the arc-agi toolkit is not installed (pip install arc-agi)"
+            ) from exc
+        quiet = logging.getLogger("genesis.arc_agi")
+        quiet.setLevel(logging.WARNING)
+        kwargs: dict[str, Any] = {
+            "operation_mode": OperationMode(self.mode),
+            "logger": quiet,
+        }
+        if self._environments_dir is not None:
+            kwargs["environments_dir"] = self._environments_dir
+        if self._recordings_dir is not None:
+            kwargs["recordings_dir"] = self._recordings_dir
+        try:
+            self._arcade = Arcade(**kwargs)
+        except Exception as exc:
+            raise GamesUnavailable(f"could not reach the official games: {exc}") from exc
+        return self._arcade
 
     def offers(self) -> list[GameOffer]:
         """List the games the official API offers right now."""
@@ -307,8 +303,7 @@ class OfficialGames:
 
     def close(self) -> None:
         """Close the official scorecard for this session, if one is open."""
-        with self._lock:
-            arcade, self._arcade = self._arcade, None
+        arcade, self._arcade = self._arcade, None
         if arcade is not None:
             try:
                 arcade.close_scorecard()

@@ -169,7 +169,6 @@ from genesis_client.protocol import (
     PHASE_REM,
 )
 from genesis_client.types import FoldMargins
-from inhibition import RecurrentInhibition
 
 __all__ = [
     "N1_THETA_ALERTNESS",
@@ -1536,7 +1535,6 @@ class BrainWaveOscillator:
         # concurrent assess emits into it is a hard fault, not a
         # stale value. One re-entrant lock serializes the advance and
         # the mutators that feed it.
-        self._lock = RecurrentInhibition()
         self._rng = rng if rng is not None else random.Random()
         self._texture = max(0.0, texture)
         self._top_down: dict[BrainWave, float] = dict.fromkeys(BrainWave, 0.0)
@@ -1597,8 +1595,7 @@ class BrainWaveOscillator:
                 or negative (inhibition). Typical range [-0.5, 0.5].
             decay: Per-tick decay factor (0-1). Higher = slower decay.
         """
-        with self._lock:
-            self._stimulus[band] = self._stimulus[band] * decay + strength
+        self._stimulus[band] = self._stimulus[band] * decay + strength
 
     def hold_stimulus(self, band: BrainWave, level: float) -> None:
         """Set the standing stimulus level for a continuous channel.
@@ -1622,8 +1619,7 @@ class BrainWaveOscillator:
         pulse channel — so re-reporting replaces only the standing
         level and never erases a pulse still ringing on the band.
         """
-        with self._lock:
-            self._held[band] = max(-0.5, min(0.5, level))
+        self._held[band] = max(-0.5, min(0.5, level))
 
     def add_top_down_drive(self, band: BrainWave, strength: float) -> None:
         """Add top-down drive to a band.
@@ -1641,8 +1637,7 @@ class BrainWaveOscillator:
             band: The band to drive.
             strength: Drive strength (0-1, added to band target).
         """
-        with self._lock:
-            self._top_down[band] = min(1.0, self._top_down[band] + max(0.0, strength))
+        self._top_down[band] = min(1.0, self._top_down[band] + max(0.0, strength))
 
     def perturb_phase(self, band: BrainWave, delta: float) -> None:
         """Nudge a band's instantaneous phase by ``delta`` radians.
@@ -1656,8 +1651,7 @@ class BrainWaveOscillator:
         own cycle. A positive delta advances the band, negative
         retards it.
         """
-        with self._lock:
-            self._z[band] *= complex(math.cos(delta), math.sin(delta))
+        self._z[band] *= complex(math.cos(delta), math.sin(delta))
 
     def reset_phase(self, band: BrainWave, phase: float = 0.0) -> None:
         """Snap a band's phase to ``phase`` (radians).
@@ -1668,9 +1662,8 @@ class BrainWaveOscillator:
         is repositioned at the given phase of its cycle. Use for
         transients large enough to dominate the band's own precession.
         """
-        with self._lock:
-            r = abs(self._z[band])
-            self._z[band] = complex(r * math.cos(phase), r * math.sin(phase))
+        r = abs(self._z[band])
+        self._z[band] = complex(r * math.cos(phase), r * math.sin(phase))
 
     @property
     def _phase(self) -> _PhaseView:
@@ -1734,8 +1727,7 @@ class BrainWaveOscillator:
         targets modulated by both inner (neurochemical) and outer
         (stimulus) inputs.
         """
-        with self._lock:
-            return self._assess_locked(summary, sleep_stage, fold, chemicals)
+        return self._assess_locked(summary, sleep_stage, fold, chemicals)
 
     def _assess_locked(
         self,

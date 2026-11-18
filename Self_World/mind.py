@@ -45,6 +45,7 @@ from cerebellum.cerebellum import Cerebellum
 from discord.board import ChannelBoard
 from discord.feed import DiscordFeed
 from frontal_lobe.autonomous import AutonomousLearner
+from frontal_lobe.painting import Painter
 from frontal_lobe.prefrontal import FrontalLobe
 from genesis_client import GenesisClient
 from genesis_client.protocol import CHEM_ACETYLCHOLINE
@@ -52,16 +53,17 @@ from genesis_client.swallow import note_swallowed, set_swallow_sink
 from growth_ledger import GrowthLedger
 from infrastructure.config import MindConfig
 from infrastructure.paths import code_root
-from inhibition import InhibitoryGate, NeuromodulatoryGate
 from journal import CognitiveJournal, set_active
 from limbic_system.limbic import LimbicSystem
 from memory import MemorySystem
 from occipital_lobe.occipital import OccipitalLobe
 from occipital_lobe.perception import FaceRecognizer
+from occipital_lobe.visual_spacetime import VisualSpacetimeBridge, egocentric_projection
 from parietal_lobe.parietal import ParietalLobe
 from parietal_lobe.system_monitor import SystemMonitor
 from self.identity import DevelopmentalTracker, EmergentIdentity, EmergentIdentitySource
 from self.improvement import HeuristicExperiment, SelfImprovement
+from self.latent_geometry import SelfLatentSpaceArchitecture
 from self.self_model import SelfModel
 from sleep.inner_life import InnerLife
 from temporal_lobe.base import Language
@@ -83,7 +85,9 @@ from brainstem.metronome import MetronomeMixin
 from frontal_lobe.conversation import ConversationMixin
 from frontal_lobe.projects import ProjectsMixin
 from frontal_lobe.status import StatusMixin
+from infrastructure.pulse import Pulse
 from self.man_pages import ManPagesMixin
+from self.man_review import ManReviewMixin
 from self.proposals import ProposalsMixin
 from self.sleep import SleepMixin
 from sleep.dream_residues import DreamResiduesMixin
@@ -98,6 +102,7 @@ logger = logging.getLogger(__name__)
 
 class Mind(
     LifecycleMixin,
+    ManReviewMixin,
     MetronomeMixin,
     VolitionMixin,
     SleepMixin,
@@ -217,6 +222,10 @@ class Mind(
         # Self-model — who Genesis is
         self.self_model = SelfModel(born_at=int(time.time() * 1000))
         self.self_model.body_model.socket_path = socket_path
+        # Shared geometric self-state model. Real thought and world-event
+        # callbacks feed this same instance so transitions are measured
+        # across the inner/outer boundary rather than in isolated demos.
+        self.self_latent_space = SelfLatentSpaceArchitecture()
 
         # User profile — a structured, persistent model of the human.
         profile_path = Path(self.data_dir) / "user_profile.json"
@@ -322,7 +331,7 @@ class Mind(
         # the urge gate) parks between work chunks instead of starving
         # the interactive path for the GIL. Volition threads also run
         # at lower CPU priority; this event is the cooperative layer.
-        self._foreground_active = NeuromodulatoryGate()
+        self._foreground_active = Pulse()
 
         # Thalamus — the relay. A region posts a message; the next
         # heartbeat writes it onto that module's manifest task_id;
@@ -432,13 +441,14 @@ class Mind(
             self_composer=self.brain.frontal.self_composer,
             self_model=self.self_model,
             learner=self.learner,
-            get_neuro_summary=self.client.get_neuro_summary,
+            get_neuro_summary=self._resolved_neuro_summary,
             get_fold_margins=self.client.get_fold_margins,
             question_composer=self.brain.frontal.question_composer,
             is_mind_sleeping=lambda: self._is_sleeping,
             frontal=self.brain.frontal,
             is_nap_mode=lambda: self._nap_mode,
             engagement=lambda: 0.0,
+            on_latent_signal=self._observe_self_latent_signal,
         )
 
         # Wire the emotional memory callback: when a high-emotion
@@ -491,7 +501,7 @@ class Mind(
         from infrastructure.notifications import NotificationQueue
 
         self.notifications = NotificationQueue(
-            get_neuro_summary=self.client.get_neuro_summary,
+            get_neuro_summary=self._resolved_neuro_summary,
             get_recent_episodes=self.client.get_recent_episodes,
         )
 
@@ -765,6 +775,16 @@ class Mind(
         # Wire the face recognizer to its data directory so known
         # faces persist across sessions
         self.vision._face_recognizer = FaceRecognizer(data_dir=self.data_dir)
+        # The dorsal stream's two-view geometry feeds the shared causal
+        # workspace through a calibrated egocentric projection — the eye
+        # at the origin; range is real only where a travel baseline
+        # existed. The workspace lives on the cognitive map.
+        self.vision.set_visual_spacetime_bridge(
+            VisualSpacetimeBridge(
+                self.brain.temporal.cognitive_map.spacetime,
+                camera_to_workspace=egocentric_projection,
+            )
+        )
 
         self.visual_cortex = self.brain.occipital.grow_cortex(
             embeddings=self.brain.frontal.embeddings,
@@ -861,6 +881,7 @@ class Mind(
         # and path is hers to issue. What she makes is hers: nothing
         # prescribes the subject, colors, tools, or marks.
         self.canvas = Canvas(data_dir=Path(self.data_dir) / "drawings")
+        self.painter = Painter()
         from tools.framework import get_tools
         from tools.studio import register_studio_tools
 
@@ -884,6 +905,46 @@ class Mind(
         # It acts when the urge to bug-scan, study its own code, or seek
         # improvements crosses a threshold, not on a fixed schedule.
         self.volition = self._init_volition()
+
+        # Psychoanalysis — the analytic engine. It reads the emotional
+        # memory's amygdala charge against the concept network's
+        # access to keep the repression register, interprets dreams
+        # back to their latent content at wake, and traces the return
+        # of the repressed in her stream. The drive map is a callable
+        # so the wish-fulfilment read follows live state.
+        from self.psychoanalysis import Psychoanalysis
+
+        self.psychoanalysis = Psychoanalysis(
+            network=self.brain.frontal.network,
+            emotional_memory=self.memory.emotional_memory,
+            get_drives=self._analysis_drives,
+        )
+
+        # Man page review — her own manual is part of her, so changes
+        # to it wait in <data_dir>/man_review/ for her say: she reads,
+        # applies, or vetoes. Drift between the versioned sources in
+        # docs/man/ and the installed pages is queued now so she sees
+        # it — nothing edits her manual silently.
+        from self.man_review import ManPageReview
+
+        self.man_review = ManPageReview(
+            data_dir=self.data_dir,
+            docs_man=Path(self.code_learner.project_root) / "docs" / "man",
+        )
+        staged = self.man_review.scan_drift()
+        if staged:
+            logger.info(
+                "%d man page change(s) awaiting her review: %s",
+                len(staged),
+                ", ".join(c.id for c in staged),
+            )
+
+        # The unified E/I/S/language engine consumes the same live signals
+        # as the existing workspace and self-state systems.
+        from cognitive_topos_runtime import CognitiveToposRuntime
+
+        self.cognitive_topos = CognitiveToposRuntime()
+        self.add_live_thought_listener(self._on_cognitive_topos_thought)
 
         # Verified self-improvement loop (workstream D) — Genesis can
         # safely tweak its own learning heuristics. The edit lands on
@@ -957,6 +1018,93 @@ class Mind(
         self.inner_life.set_sleep_stage_transition_callback(self._on_sleep_stage_transition)
         self.inner_life.set_sleep_tick_callback(self._on_sleep_tick)
 
+    def _analysis_drives(self) -> dict[str, float]:
+        """Unmet-drive map for the analytic engine's wish read.
+
+        Keys are what the drive is *of* — the engine resolves each
+        through the concept network, so a drive with no concept yet
+        contributes nothing rather than fabricating a wish.
+        """
+        drives: dict[str, float] = {}
+        try:
+            drives["social"] = float(self.world.social_isolation())
+        except Exception:
+            logger.debug("social drive unavailable", exc_info=True)
+        try:
+            for name, urge in (getattr(self.volition, "urges", None) or {}).items():
+                drives[name] = float(getattr(urge, "value", 0.0))
+        except Exception:
+            logger.debug("volition drives unavailable", exc_info=True)
+        return drives
+
+    def _observe_self_latent_signal(
+        self, content: str, kind: str, metadata: dict | None = None
+    ) -> None:
+        """Feed a real inner-life signal into the shared self-state geometry."""
+        try:
+            meta = metadata or {}
+            self.self_latent_space.observe_signal(
+                content,
+                kind=kind,
+                salience=float(meta.get("salience", 0.4)),
+                addressed=bool(meta.get("addressed", False)),
+                metadata={k: v for k, v in meta.items() if k not in ("salience", "addressed")},
+            )
+        except Exception:
+            logger.debug("self latent signal observation failed", exc_info=True)
+
+    def _on_cognitive_topos_thought(self, kind: str, content: str) -> None:
+        """Integrate actual inner-life/learning emissions into the four-domain engine."""
+        self._integrate_cognitive_topos("inner", kind, content)
+
+    def _integrate_cognitive_topos(
+        self,
+        domain: str,
+        kind: str,
+        content: str,
+        *,
+        outer_snapshot: dict | None = None,
+        self_snapshot: dict | None = None,
+    ) -> None:
+        """Bridge a live event into the cognitive topos engine without blocking cognition."""
+        try:
+            if self_snapshot is None:
+                self_snapshot = self.self_latent_space.observe_signal(
+                    content,
+                    kind=f"topos:{domain}:{kind}",
+                    salience=0.4,
+                    inbound=domain != "language",
+                )
+            if outer_snapshot is None and domain == "outer":
+                exp_space = getattr(self.world, "experiential_space", None)
+                if exp_space is not None and hasattr(exp_space, "snapshot"):
+                    outer_snapshot = exp_space.snapshot()
+            inner_snapshot = None
+            inner_life = getattr(self, "inner_life", None)
+            inner_world = getattr(inner_life, "inner_world", None)
+            if inner_world is not None and hasattr(inner_world, "snapshot"):
+                inner_snapshot = inner_world.snapshot()
+
+            language_snapshot = None
+            temporal = getattr(getattr(self, "brain", None), "temporal", None)
+            language_space = getattr(temporal, "language_latent_space", None)
+            if language_space is not None and hasattr(language_space, "snapshot"):
+                language_snapshot = language_space.snapshot()
+
+            self.cognitive_topos.observe(
+                domain,
+                kind=kind,
+                content=content,
+                self_snapshot=self_snapshot,
+                outer_snapshot=outer_snapshot,
+                inner_snapshot=inner_snapshot,
+                language_snapshot=language_snapshot,
+            )
+        except Exception:
+            # This is an observer: a geometry failure must not stop the
+            # event stream, response path, or inner-life thread.
+            logger.debug("cognitive topos integration failed", exc_info=True)
+
     def _journal_swallow_sink(
         self,
         site: str,
@@ -999,11 +1147,10 @@ class Mind(
         # Interruptible wait for the heartbeat's adaptive cadence: the
         # loop sleeps up to 5 s when idle, which meets the 5 s shutdown
         # join budget. stop() sets this so the loop wakes immediately.
-        self._cycle_stop = NeuromodulatoryGate()
+        self._cycle_stop = Pulse()
         self._shutdown_save_ok: bool | None = None
         self._interaction_count = 0
         self._last_interaction_time = time.time()
-        self._think_worker_lock = InhibitoryGate()
         self._active_think_worker: threading.Thread | None = None
         # Per-module activity accounting — seconds of observed
         # execution per manifest module since the last heartbeat
@@ -1014,7 +1161,6 @@ class Mind(
         # section). Guarded by a lock: the sampler and heartbeat
         # threads both touch it.
         self._module_seconds: dict[int, float] = {}
-        self._module_seconds_lock = InhibitoryGate()
         # Every module id the sampler has ever observed. The heartbeat
         # reports an explicit share for all of them each round — not
         # just the fixed heartbeat tuple — because the daemon's
@@ -1046,13 +1192,11 @@ class Mind(
         # _perform_speech (volition thread) both access it, and the
         # check-then-add in offer_utterance must be atomic to prevent
         # duplicates under concurrent access.
-        self._speech_queue_lock = InhibitoryGate()
         self._on_speak: Callable[[str], None] | None = None
         # Deferred conversation state is a metronome deadline queue:
         # resumes and post-turn self-invocation happen on the same
         # serial cycle, not on helper timers.
         self._deferred_callbacks: list[tuple[float, Callable[[], None]]] = []
-        self._deferred_callbacks_lock = InhibitoryGate()
         self._post_conversation_self_invoke_pending = False
         self._dream_residue_restore_pending = False
         # Track the *set* of active warning condition keys (not the

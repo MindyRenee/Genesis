@@ -23,6 +23,20 @@ it gathers and it moves, a ninetieth as far per push. The limit
 is honest too — rest → ∞ piles up momentum forever and never
 moves at all.
 
+Then the pushes that were never the engine's had to be taught
+to push. Consensus pulls and observation blends used to write
+state directly — teleports, momentum-blind. Now each relaxes
+her momentum toward the velocity its displacement implied, by
+the same fraction the state took: p += gain·(m·δ/dt − p). A
+move she remembers, damped into the move rather than
+compounding past it — the first naive form (p += m·δ/dt)
+integrated the pull and rang forever, which is how a test
+taught the difference between a push and a telekinesis. The
+Langevin kick lands as a √m impulse, so a rested dimension
+trembles less for the same heat. And `FieldIntegration` can
+finally see her: `momentum`, Σ‖p‖ over every layer, and
+`vesica`, the cord's own depth into its lens.
+
 And the geometry caught up with the dynamics. The vesica's two
 circles were drawn in the leading plane and the higher coordinates
 were simply never asked. Now they are: `MetatronCube.rest(x₀)`

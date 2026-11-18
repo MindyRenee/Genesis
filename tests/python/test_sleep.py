@@ -331,6 +331,47 @@ class TestSynapticDownscaler:
         assert "shy" in desc
         assert "load" in desc
 
+    def test_downscale_asymptotes_to_the_floor(self):
+        """Repeated N3 episodes cannot erode a live edge below the floor."""
+        net = ConceptNetwork()
+        net.add_concept("a")
+        net.add_concept("b")
+        net.add_edge("a", "b", RelationType.RELATED_TO, 0.05)
+        ds = SynapticDownscaler()
+        ds.accumulate_synaptic_load(5.0)
+        # Many heavy episodes — the unbounded ratchet would take
+        # 0.05 → ~0; the floor holds it at minimum efficacy.
+        for _ in range(50):
+            ds.accumulate_synaptic_load(5.0)
+            ds.downscale_during_n3(net, 60.0)
+        assert net.edges[0].weight == pytest.approx(0.01)
+
+    def test_downscale_never_crosses_the_floor(self):
+        """A single large step lands on the floor, not below it."""
+        net = ConceptNetwork()
+        net.add_concept("a")
+        net.add_concept("b")
+        net.add_edge("a", "b", RelationType.RELATED_TO, 0.5)
+        ds = SynapticDownscaler()
+        ds.accumulate_synaptic_load(10.0)
+        ds.downscale_during_n3(net, 1000.0)
+        assert net.edges[0].weight >= 0.01
+
+    def test_downscale_leaves_floored_and_dead_edges_alone(self):
+        """Edges already at the floor yield nothing; zero stays zero."""
+        net = ConceptNetwork()
+        net.add_concept("a")
+        net.add_concept("b")
+        net.add_concept("c")
+        net.add_edge("a", "b", RelationType.RELATED_TO, 0.01)
+        net.add_edge("b", "c", RelationType.RELATED_TO, 0.0)
+        ds = SynapticDownscaler()
+        ds.accumulate_synaptic_load(5.0)
+        removed = ds.downscale_during_n3(net, 60.0)
+        assert removed == 0.0
+        assert net.edges[0].weight == pytest.approx(0.01)
+        assert net.edges[1].weight == 0.0
+
 
 # ─── 3. HippocampalReplay ─────────────────────────────────────────
 
@@ -564,6 +605,63 @@ class TestInnerLifeSleepArchitecture:
         il._run_thought_generation.assert_called_once_with(10.0, sleep_only=True)
         il._drives_tick.assert_not_called()
         il._workspace_tick.assert_called_once_with(10.0)
+
+    def test_backward_clock_step_rebases_future_marks(self):
+        """A backward wall-clock step must not freeze generation.
+
+        Regression for the host-clock jump (RTC in localtime → a −7h
+        correction mid-run) that left every interval mark in the
+        future: the thought gap never opened, a live dream chain
+        waited on a beat that never came, and the ultradian cycle —
+        which only advances inside dream generation — froze
+        mid-stage. ``_rebase_future_marks`` restarts any mark ahead
+        of now so each interval begins fresh rather than holding its
+        gate closed for the whole gap.
+        """
+        il = self._make_inner_life()
+        now = 1_000.0
+        il._last_thought_time = now + 25_000.0
+        il._last_cycle_advance = now + 25_000.0
+        il._last_n2_update = now + 25_000.0
+        il._dream_chain = {"next_at": now + 25_000.0}
+        il._waking_chain = {"next_at": now + 25_000.0}
+
+        il._rebase_future_marks(now)
+
+        assert il._last_thought_time == now
+        assert il._last_cycle_advance == now
+        assert il._last_n2_update == now
+        assert il._dream_chain["next_at"] == now
+        assert il._waking_chain["next_at"] == now
+
+    def test_backward_clock_step_reopens_sleep_generation(self):
+        """sleep_tick reaches dream generation once the gap re-elapses.
+
+        A mark left in the future is rebased to now — the interval
+        restarts rather than firing instantly, so generation resumes
+        one ordinary gap later instead of staying closed for the
+        whole jump.
+        """
+        il = self._make_inner_life()
+        il._is_mind_sleeping = lambda: True
+        now = 1_000.0
+        # The pre-jump mark sits ~7h ahead of now — the condition the
+        # frozen run lived in.
+        il._last_thought_time = now + 25_200.0
+        il._run_thought_generation = Mock()
+        il._drives_tick = Mock()
+        il._workspace_tick = Mock()
+
+        il.sleep_tick(now)
+
+        il._run_thought_generation.assert_not_called()
+        assert il._last_thought_time == now
+
+        il.sleep_tick(now + il._min_thought_gap)
+
+        il._run_thought_generation.assert_called_once_with(
+            now + il._min_thought_gap, sleep_only=True
+        )
 
 
 # ═══════════════════════════════════════════════════════════════════

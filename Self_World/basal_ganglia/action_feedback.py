@@ -43,7 +43,6 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, TypeGuard
 
-from inhibition import RecurrentInhibition
 from temporal_lobe.concepts import ConceptNetwork, RelationType
 
 if TYPE_CHECKING:
@@ -679,25 +678,21 @@ class ActionFeedback:
         # only state mutations and snapshots; external callbacks
         # (listener, reward learner, value estimator, suggesters) run
         # outside it so they cannot wedge the engine.
-        self._lock = RecurrentInhibition()
 
     @property
     def history(self) -> list[ActionAttempt]:
         """Recent completed attempts (copy)."""
-        with self._lock:
-            return list(self._history)
+        return list(self._history)
 
     @property
     def pending_count(self) -> int:
         """How many begun actions are still awaiting observation."""
-        with self._lock:
-            return len(self._pending)
+        return len(self._pending)
 
     @property
     def model_count(self) -> int:
         """How many action/context models have been learned."""
-        with self._lock:
-            return len(self._models)
+        return len(self._models)
 
     # ─── Prediction ───────────────────────────────────────────────
 
@@ -717,14 +712,13 @@ class ActionFeedback:
         pending set, so unobserved actions are explicit rather than being
         silently treated as successful.
         """
-        with self._lock:
-            attempt = self._begin(
-                action,
-                expected=expected,
-                confidence=confidence,
-                retry_of=retry_of,
-                metadata=metadata,
-            )
+        attempt = self._begin(
+            action,
+            expected=expected,
+            confidence=confidence,
+            retry_of=retry_of,
+            metadata=metadata,
+        )
         self._notify_attempt(attempt, "begin")
         return attempt
 
@@ -887,14 +881,13 @@ class ActionFeedback:
         could not observe the world should pass ``observed=False`` in an
         ``OutcomeState`` rather than fabricating a result.
         """
-        with self._lock:
-            attempt = self._observe(
-                attempt_or_id,
-                actual,
-                alternatives=alternatives,
-                repair=repair,
-                metadata=metadata,
-            )
+        attempt = self._observe(
+            attempt_or_id,
+            actual,
+            alternatives=alternatives,
+            repair=repair,
+            metadata=metadata,
+        )
         self._apply_reward_learning(attempt)
         self._notify_attempt(attempt, "observed")
         return attempt
@@ -1075,30 +1068,28 @@ class ActionFeedback:
 
     def model_for(self, action: ActionSpec) -> dict[str, Any]:
         """Return a read-only summary of the learned model, if any."""
-        with self._lock:
-            model = self._models.get(action.model_key)
-            if model is None:
-                return {}
-            return {
-                "attempts": model.attempts,
-                "successes": model.successes,
-                "success_rate": model.success_rate,
-                "expected_success": model.expected_success,
-                "failure_causes": dict(model.failure_causes),
-                "discrepancy_ema": model.discrepancy_ema,
-                "repeated_error_count": model.repeated_error_count,
-            }
+        model = self._models.get(action.model_key)
+        if model is None:
+            return {}
+        return {
+            "attempts": model.attempts,
+            "successes": model.successes,
+            "success_rate": model.success_rate,
+            "expected_success": model.expected_success,
+            "failure_causes": dict(model.failure_causes),
+            "discrepancy_ema": model.discrepancy_ema,
+            "repeated_error_count": model.repeated_error_count,
+        }
 
     def expected_numeric(self, action: ActionSpec, field_name: str) -> float | None:
         """Return the learned numeric expectation for a field, if known."""
-        with self._lock:
-            model = self._models.get(action.model_key)
-            if model is None:
-                return None
-            stat = model.numeric_stats.get(field_name)
-            if stat is None or stat.count == 0:
-                return None
-            return stat.mean
+        model = self._models.get(action.model_key)
+        if model is None:
+            return None
+        stat = model.numeric_stats.get(field_name)
+        if stat is None or stat.count == 0:
+            return None
+        return stat.mean
 
     def _update_model(self, model: _ActionModel, attempt: ActionAttempt) -> None:
         """Update the durable action model from an observed outcome."""
@@ -1455,12 +1446,11 @@ class ActionFeedback:
         learned or domain-supplied expected value, and repeated identical
         failures are not blindly repeated.
         """
-        with self._lock:
-            return self._recommend(
-                attempt,
-                alternatives=alternatives,
-                repair=repair,
-            )
+        return self._recommend(
+            attempt,
+            alternatives=alternatives,
+            repair=repair,
+        )
 
     def _recommend(
         self,
@@ -1676,50 +1666,47 @@ class ActionFeedback:
 
     def statistics(self) -> dict[str, Any]:
         """Return aggregate learning statistics."""
-        with self._lock:
-            total_attempts = sum(model.attempts for model in self._models.values())
-            total_successes = sum(model.successes for model in self._models.values())
-            return {
-                "models": len(self._models),
-                "pending": len(self._pending),
-                "history": len(self._history),
-                "attempts": total_attempts,
-                "successes": total_successes,
-                "success_rate": (total_successes / total_attempts if total_attempts else 0.0),
-            }
+        total_attempts = sum(model.attempts for model in self._models.values())
+        total_successes = sum(model.successes for model in self._models.values())
+        return {
+            "models": len(self._models),
+            "pending": len(self._pending),
+            "history": len(self._history),
+            "attempts": total_attempts,
+            "successes": total_successes,
+            "success_rate": (total_successes / total_attempts if total_attempts else 0.0),
+        }
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize learned action models and bounded recent history."""
-        with self._lock:
-            return {
-                "version": 1,
-                "counter": self._counter,
-                "models": {key: model.to_dict() for key, model in self._models.items()},
-                "history": [attempt.to_dict() for attempt in self._history[-100:]],
-            }
+        return {
+            "version": 1,
+            "counter": self._counter,
+            "models": {key: model.to_dict() for key, model in self._models.items()},
+            "history": [attempt.to_dict() for attempt in self._history[-100:]],
+        }
 
     def restore_from_dict(self, data: dict[str, Any]) -> None:
         """Restore learned action models from persistence."""
         if not isinstance(data, dict):
             return
-        with self._lock:
-            self._counter = int(data.get("counter", 0))
-            models_raw = data.get("models", {})
-            self._models = {}
-            if isinstance(models_raw, dict):
-                for key, model_data in models_raw.items():
-                    if not isinstance(model_data, dict):
-                        continue
-                    model = _ActionModel.from_dict(model_data)
-                    model.key = model.key or str(key)
-                    self._models[model.key] = model
-            history_raw = data.get("history", [])
-            self._history = []
-            self._pending = {}
-            if isinstance(history_raw, list):
-                for attempt_data in history_raw[-_MAX_HISTORY:]:
-                    if isinstance(attempt_data, dict):
-                        self._history.append(ActionAttempt.from_dict(attempt_data))
+        self._counter = int(data.get("counter", 0))
+        models_raw = data.get("models", {})
+        self._models = {}
+        if isinstance(models_raw, dict):
+            for key, model_data in models_raw.items():
+                if not isinstance(model_data, dict):
+                    continue
+                model = _ActionModel.from_dict(model_data)
+                model.key = model.key or str(key)
+                self._models[model.key] = model
+        history_raw = data.get("history", [])
+        self._history = []
+        self._pending = {}
+        if isinstance(history_raw, list):
+            for attempt_data in history_raw[-_MAX_HISTORY:]:
+                if isinstance(attempt_data, dict):
+                    self._history.append(ActionAttempt.from_dict(attempt_data))
         # Pending attempts are intentionally not restored: after a
         # restart there is no reliable post-action observation window.
 

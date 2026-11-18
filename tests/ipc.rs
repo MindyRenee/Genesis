@@ -74,7 +74,7 @@ impl IpcTestSystem {
         let mmap = std::sync::Arc::new(MmapState::open(&self.state_path).expect("open state"));
         let stm = std::sync::Arc::new(RingBuffer::open(&self.stm_path).expect("open stm"));
         let ltm = LtmStore::open(&self.ltm_base).expect("open ltm");
-        let ltm = std::sync::Arc::new(genesis::inhibition::Inhibition::new(ltm));
+        let ltm = std::sync::Arc::new(genesis::shared::Shared::new(ltm));
         let socket_path = self.socket_path.clone();
 
         let server = IpcServer::new(&socket_path);
@@ -1916,7 +1916,7 @@ fn test_ipc_bind_failure_signals_shutdown() {
     let stm =
         std::sync::Arc::new(RingBuffer::create(temp_path("ipc-bind-stm", "bin"), 4).expect("stm"));
     let ltm_base = temp_base("ipc-bind-ltm");
-    let ltm = std::sync::Arc::new(genesis::inhibition::Inhibition::new(
+    let ltm = std::sync::Arc::new(genesis::shared::Shared::new(
         LtmStore::create(&ltm_base, 64).expect("ltm"),
     ));
 
@@ -1942,7 +1942,7 @@ fn test_ipc_shutdown_waits_for_active_handler() {
 
     let mmap = Arc::new(MmapState::create(&state_path, 1, 1000).expect("create state"));
     let stm = Arc::new(RingBuffer::create(&stm_path, 16).expect("create stm"));
-    let ltm = Arc::new(genesis::inhibition::Inhibition::new(
+    let ltm = Arc::new(genesis::shared::Shared::new(
         LtmStore::create(&ltm_base, 64).expect("create ltm"),
     ));
 

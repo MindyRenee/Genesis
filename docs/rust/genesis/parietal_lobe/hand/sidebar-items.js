@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["channel_weight","dial","mix64","pair_hash"]};
+window.SIDEBAR_ITEMS = {"fn":["dial"]};

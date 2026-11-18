@@ -56,10 +56,9 @@ import math
 import os
 import socket
 import struct
+import threading
 import time
 from typing import Any
-
-from inhibition import InhibitoryGate, RecurrentInhibition
 
 from .exceptions import (
     ConnectionError as GenesisConnectionError,
@@ -231,12 +230,16 @@ class GenesisClient:
     def __init__(self, socket_path: str, request_timeout: float = 30.0) -> None:
         """Initialize the client with a socket path and request timeout."""
         self.socket_path = socket_path
+        # Channels are thread-local: every thread owns its own control
+        # and read socket, so concurrent commands can never interleave
+        # bytes on one stream — no lock needed because nothing is
+        # shared. ``_all_socks`` tracks every opened channel so
+        # disconnect() can still tear the whole client down.
+        self._tls = threading.local()
+        self._all_socks: list[socket.socket] = []
         self._sock: socket.socket | None = None
         self._read_sock: socket.socket | None = None
         self._ever_connected = False
-        self._lock = RecurrentInhibition()
-        self._read_lock = RecurrentInhibition()
-        self._cache_lock = InhibitoryGate()
         self.request_timeout = request_timeout
         # Short-TTL cache for frequently-called read-only commands.
         # Background threads (inner_life, learner, regulator) call
@@ -245,9 +248,25 @@ class GenesisClient:
         # roughly once per heartbeat cycle), so a 150ms cache is fresh
         # enough for emotion assessment while eliminating redundant
         # socket round-trips that contend with the conversation thread
-        # for the IPC lock.
+        # for the IPC channels.
         self._cache: dict[int, tuple[float, bytes]] = {}
         self._cache_ttl = 0.150  # 150ms
+
+    @property
+    def _sock(self) -> socket.socket | None:
+        return getattr(self._tls, "sock", None)
+
+    @_sock.setter
+    def _sock(self, value: socket.socket | None) -> None:
+        self._tls.sock = value
+
+    @property
+    def _read_sock(self) -> socket.socket | None:
+        return getattr(self._tls, "read_sock", None)
+
+    @_read_sock.setter
+    def _read_sock(self, value: socket.socket | None) -> None:
+        self._tls.read_sock = value
 
     def connect(self) -> None:
         """Connect to the daemon with protocol version handshake.
@@ -257,9 +276,8 @@ class GenesisClient:
             GenesisConnectionError: If the connection fails.
             ProtocolError: If the daemon's protocol version doesn't match.
         """
-        with self._lock:
-            self.disconnect()
-            self._connect()
+        self.disconnect()
+        self._connect()
 
     @staticmethod
     def _close(sock: socket.socket | None, site: str) -> None:
@@ -284,14 +302,13 @@ class GenesisClient:
     def _close_socket(self) -> None:
         """Close the control socket if open and clear the reference.
 
-        Does NOT clear the cache or acquire the lock — callers already
-        hold ``_lock`` (the request path) or cleared it themselves.
+        Does NOT clear the cache — callers handle it.
         """
         self._close(self._sock, "genesis_client.client._close_socket")
         self._sock = None
 
     def _close_read_socket(self) -> None:
-        """Close the read-channel socket (caller holds ``_read_lock``)."""
+        """Close this thread's read-channel socket."""
         self._close(self._read_sock, "genesis_client.client._close_read_socket")
         self._read_sock = None
 
@@ -340,6 +357,7 @@ class GenesisClient:
             raise ProtocolError(
                 f"protocol version mismatch: client={PROTOCOL_VERSION}, daemon={daemon_version}"
             )
+        self._all_socks.append(sock)
         return sock
 
     def _connect(self) -> None:
@@ -348,20 +366,23 @@ class GenesisClient:
         self._ever_connected = True
 
     def _connect_read(self) -> None:
-        """Open the read-only channel (caller holds ``_read_lock``)."""
+        """Open this thread's read-only channel."""
         self._read_sock = self._open_channel()
 
     def disconnect(self) -> None:
-        """Close the connection to the daemon."""
-        with self._lock:
-            with self._cache_lock:
-                self._cache.clear()
-            self._close_socket()
-            # The read channel is closed without taking _read_lock so
-            # disconnect can never block behind a stalled read; the
-            # in-flight read sees the socket die and reconnects lazily.
-            self._close(self._read_sock, "genesis_client.client.disconnect")
-            self._read_sock = None
+        """Close every channel across all threads."""
+        self._cache.clear()
+        # Close all thread-local channels — shutdown before close so a
+        # thread parked in read_message on any of them is released
+        # immediately rather than lingering until its read timeout.
+        seen: set[int] = set()
+        for sock in [*self._all_socks, self._sock, self._read_sock]:
+            if sock is not None and id(sock) not in seen:
+                seen.add(id(sock))
+                self._close(sock, "genesis_client.client.disconnect")
+        self._all_socks.clear()
+        self._sock = None
+        self._read_sock = None
 
     def __enter__(self) -> GenesisClient:
         """Context manager entry — connect and return self."""
@@ -609,37 +630,33 @@ class GenesisClient:
         """
         effective_timeout = self.request_timeout if timeout is None else timeout
         on_read_channel = cmd_id in self._READ_CHANNEL_CMDS
-        channel_lock = self._read_lock if on_read_channel else self._lock
-        with channel_lock:
-            if on_read_channel:
-                self._ensure_read_connected()
-            else:
-                self._ensure_connected()
-            # Check cache for read-only commands
-            if cmd_id in self._CACHEABLE_CMDS and not payload:
-                with self._cache_lock:
-                    cached = self._cache.get(cmd_id)
-                if cached is not None:
-                    ts, data = cached
-                    if time.monotonic() - ts < self._cache_ttl:
-                        return data
+        if on_read_channel:
+            self._ensure_read_connected()
+        else:
+            self._ensure_connected()
+        # Check cache for read-only commands
+        if cmd_id in self._CACHEABLE_CMDS and not payload:
+            cached = self._cache.get(cmd_id)
+            if cached is not None:
+                ts, data = cached
+                if time.monotonic() - ts < self._cache_ttl:
+                    return data
 
-            # Write commands invalidate all cached state — the next read
-            # must go to the daemon to see the updated values.
-            if cmd_id in self._CACHE_INVALIDATING_CMDS:
-                with self._cache_lock:
-                    self._cache.clear()
+        # Write commands invalidate all cached state — the next read
+        # must go to the daemon to see the updated values.
+        if cmd_id in self._CACHE_INVALIDATING_CMDS:
+            self._cache.clear()
 
-            for attempt in range(2):
-                resp_data = self._request_attempt(
-                    cmd_id,
-                    payload,
-                    effective_timeout,
-                    on_read_channel,
-                    attempt,
-                )
-                if resp_data is not None:
-                    return resp_data
+        for attempt in range(2):
+            resp_data = self._request_attempt(
+                cmd_id,
+                payload,
+                effective_timeout,
+                on_read_channel,
+                attempt,
+            )
+            if resp_data is not None:
+                return resp_data
 
         raise GenesisConnectionError("request failed after reconnect attempt")
 
@@ -668,7 +685,7 @@ class GenesisClient:
             if elapsed > 2.0:
                 # Slow IPC is the early sign of daemon-side
                 # serialization stalls — a command that holds
-                # the tick lock or LTM while doing slow work
+                # a daemon-side serialization stall while doing slow work
                 # queues every caller behind it.
                 logger.debug(
                     "ipc cmd %d took %.2fs (deadline %.2fs)",
@@ -685,8 +702,7 @@ class GenesisClient:
                 self._close_read_socket()
             else:
                 self._close_socket()
-            with self._cache_lock:
-                self._cache.clear()
+            self._cache.clear()
             # Connection broke — try to reconnect once
             if attempt == 0:
                 # Teardown unlinks the socket: a daemon that is gone
@@ -747,8 +763,7 @@ class GenesisClient:
     ) -> bytes:
         """Check a response for framing/protocol errors and cache reads."""
         if resp_cmd != cmd_id:
-            # Framing is broken on this channel — drop it, but
-            # don't take the other channel's lock from here.
+            # Framing is broken on this channel — drop it.
             if on_read_channel:
                 self._close_read_socket()
             else:
@@ -772,8 +787,7 @@ class GenesisClient:
                 raise ProtocolError(f"daemon error: {error_name(err_code)} (0x{err_code:02x})")
         # Cache read-only responses
         if cmd_id in self._CACHEABLE_CMDS and not payload:
-            with self._cache_lock:
-                self._cache[cmd_id] = (time.monotonic(), resp_data)
+            self._cache[cmd_id] = (time.monotonic(), resp_data)
         return resp_data
 
     # ─── Commands ──────────────────────────────────────────────
@@ -1179,7 +1193,7 @@ class GenesisClient:
         flags = tail[1 + k * 8]
         off = 1 + k * 8 + 1
         d = self._PLACE_DIMENSION
-        mats = []
+        mats: list[list[list[float]] | None] = []
         for present in (flags & 1, flags & 2):
             if not present:
                 mats.append(None)

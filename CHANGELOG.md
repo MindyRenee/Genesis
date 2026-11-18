@@ -37,7 +37,16 @@ with the evidence behind it — see [DEVLOG.md](DEVLOG.md).
   superposition (√3·R/2), and `vesica_depth(x)` signed depth
   into the full-dimensional lens — the intersection of the two
   d-balls about the circle centers, symmetric in every rest
-  direction at once.
+  direction at once. The pushes outside the engine — the
+  consensus pull and the observation blend — are moves, not
+  teleports: each relaxes a layer's momentum toward the
+  velocity its displacement implied, by the same fraction the
+  state took, and the Langevin kick lands as a √m impulse —
+  a rested dimension trembles less for the same heat.
+  `FieldIntegration` reports what she carries: `momentum`
+  (Σ‖p‖ over every layer) and `vesica` (the inner fiber's own
+  depth into its lens), written to the status channel as
+  `field.momentum`/`field.vesica`.
 - **The eye's organs in her hands — voluntary anatomy, resolved
   live**: `Outer_World/tools/eye.py` registers the `eye_*` family.
   The retinal organs — `eye_pupil` (the iris's light intake),
@@ -194,6 +203,35 @@ with the evidence behind it — see [DEVLOG.md](DEVLOG.md).
   same identity; `urllib` remains the dependency-free fallback.
 
 ### Fixed
+
+- **Every layer now reads the phase the mind is acting on**: the
+  daemon's emergent phase takes ~minutes to cross into NREM/REM
+  after the zone goes Sleeping — the LC population switches on its
+  own ~23-minute time constant. `status()`, `feel()`, and
+  `brain_waves()` already resolved through `_effective_phase`, but
+  `InnerLife` and `NotificationQueue` were wired to the raw
+  `client.get_neuro_summary`: through the crossing window the raw
+  phase still reads active/drowsy, so inner life's `_is_sleeping`
+  flipped her awake mid-dream, dream-synthesis ran the waking wave
+  regime — alpha on a sleeping body — and each flutter of the
+  crossing fired a "phase changed" notification announcing waking
+  phases while she slept. Both now take `_resolved_neuro_summary()`,
+  the zone-authoritative read every other layer already uses; the
+  desync *detectors* in `self/sleep.py` keep the raw read on
+  purpose, since they exist to watch it. Dream-synthesis's wave
+  assessment also takes the ultradian tracker's stage — the
+  summary's NREM cannot express N1/N2/N3 depth.
+- **SHY downscaling can no longer erase a live edge**: the N3
+  downscaler's proportional `w −= rate·dt·w` was an unbounded
+  ratchet — every slow-wave episode multiplied every weak edge
+  toward zero, so thin associations that should survive the night
+  silently approached deletion. `w` now asymptotes to
+  `_SHY_WEIGHT_FLOOR = 0.01` — the minimum efficacy of a live
+  synapse — and edges already at the floor yield nothing; a weight
+  of exactly zero stays zero. `status()` also reports
+  `network_edges`, `holographic_edges`, and `total_edges`, so
+  bridge edges migrating into the holographic store stop looking
+  like loss.
 
 - **She can draw again — the easel gets a working sitting**: the
   Painter removal left the `draw` urge sitting her down and nothing

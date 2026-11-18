@@ -49,8 +49,6 @@ from collections import deque
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
-from inhibition import InhibitoryGate, NeuromodulatoryGate
-
 if TYPE_CHECKING:
     from genesis_client import NeuroSummary
     from parietal_lobe.system_monitor import SystemMonitor
@@ -61,6 +59,7 @@ from brain_waves import (  # canonical definition — avoids threshold drift
 )
 from brainstem.architecture import HippocampalReplay, SleepCycleTracker, SynapticDownscaler
 from genesis_client.swallow import note_swallowed
+from infrastructure.pulse import Pulse
 from limbic_system.curiosity import Curiosity
 from limbic_system.emotion import (
     CognitiveMode,
@@ -69,6 +68,7 @@ from limbic_system.emotion import (
 )
 from self.reflection import Insight, Reflection
 from sleep.dream_synthesis import DreamSynthesis
+from sleep.inner_world import InnerWorldExperientialLatentSpace
 from temporal_lobe.concepts import ConceptNetwork, RelationType, strip_sense_suffix
 from temporal_lobe.concepts.types import Neighbor
 from thalamus.events import (
@@ -223,6 +223,7 @@ class InnerLife:
         is_nap_mode=None,
         engagement=None,
         get_fold_margins=None,
+        on_latent_signal=None,
         seed: int | None = None,
     ) -> None:
         """Initialize the inner life with its cognitive engines and callbacks.
@@ -273,6 +274,7 @@ class InnerLife:
         self.reflection = reflection
         self._get_emotion = get_emotion
         self._on_thought = on_thought
+        self._on_latent_signal = on_latent_signal
         self._on_neuro_impulse = on_neuro_impulse
         self._self_composer = self_composer
         self._self_model = self_model
@@ -315,6 +317,8 @@ class InnerLife:
         self._init_sleep_cycle()
         self._init_replay_systems()
         self._init_dream_synthesis()
+        # Persistent numerical state model updated by each recorded thought.
+        self.inner_world = InnerWorldExperientialLatentSpace()
 
     def _init_awareness_agency(self) -> None:
         """Set up self-awareness module slots and curiosity-driven agency."""
@@ -350,13 +354,12 @@ class InnerLife:
         """Initialize active-state gates and thought tracking."""
         self._running = False
         self._paused = False
-        self._stop_event = NeuromodulatoryGate()
+        self._stop_event = Pulse()
 
         # Track its thoughts (bounded — old thoughts auto-evicted)
         self._thoughts: deque[SpontaneousThought] = deque(maxlen=100)
         self._last_thought_time = 0.0
         self._thought_count = 0
-        self._thoughts_lock = InhibitoryGate()
 
         # Locks for shared deques accessed from the metronome and
         # external callers (main thread, learner state).
@@ -367,10 +370,6 @@ class InnerLife:
         # never hold one while acquiring another. If nesting is ever
         # required, acquire in this declaration order (thoughts >
         # stimuli > emotional_memories > agency_topics > dream_residues).
-        self._stimuli_lock = InhibitoryGate()
-        self._emotional_memories_lock = InhibitoryGate()
-        self._agency_topics_lock = InhibitoryGate()
-        self._dream_residues_lock = InhibitoryGate()
 
     def _init_drive_state(self) -> None:
         """Initialize cooldown, social drive, curiosity drive, and chain deadlines.
@@ -646,8 +645,7 @@ class InnerLife:
         matters — reporting this as "spontaneous thoughts" made a night of
         dreaming look like a night of thinking.
         """
-        with self._thoughts_lock:
-            return self._thought_count
+        return self._thought_count
 
     @property
     def waking_thought_count(self) -> int:
@@ -658,22 +656,19 @@ class InnerLife:
         thinking rather than dreaming", which is the question the merged
         counter could not.
         """
-        with self._thoughts_lock:
-            return sum(1 for t in self._thoughts if not getattr(t, "is_dream", False))
+        return sum(1 for t in self._thoughts if not getattr(t, "is_dream", False))
 
     @property
     def recent_dreams(self) -> list[SpontaneousThought]:
         """The retained dreams, newest last. A filtered view, not a copy
         of a separate store — there is only one deque."""
-        with self._thoughts_lock:
-            return [t for t in self._thoughts if getattr(t, "is_dream", False)]
+        return [t for t in self._thoughts if getattr(t, "is_dream", False)]
 
     @property
     def recent_thoughts(self) -> list[SpontaneousThought]:
         """The last 10 spontaneous thoughts (newest last), as a copy."""
-        with self._thoughts_lock:
-            all_thoughts = list(self._thoughts)
-            return all_thoughts[-10:] if len(all_thoughts) > 10 else all_thoughts
+        all_thoughts = list(self._thoughts)
+        return all_thoughts[-10:] if len(all_thoughts) > 10 else all_thoughts
 
     @property
     def dream_count(self) -> int:
@@ -878,8 +873,45 @@ class InnerLife:
         """
         self._hippocampal_replay.queue_for_replay(experience_sequence, salience)
 
+    def _rebase_future_marks(self, now: float) -> None:
+        """Rebase wall-clock marks that landed ahead of *now*.
+
+        The inner-life oscillators pace themselves off ``time.time()``
+        marks — the thought gap, each chain's next beat, the ultradian
+        cycle's advance epoch, the drive and question cadences. The
+        host clock can step backward (an RTC resync, an NTP
+        correction, a suspend wake), leaving a mark in the future
+        that every gate reads as "not yet due": thoughts stop
+        generating for the whole gap, an active chain waits on a beat
+        that never comes, the sleep cycle freezes mid-stage because
+        its advance only happens inside dream generation. Biological
+        oscillators cannot run backward — a mark ahead of now is an
+        interval that cannot be measured, so it restarts here rather
+        than holding its gate closed.
+        """
+        for mark in (
+            "_last_thought_time",
+            "_last_question_time",
+            "_last_drive_tick_at",
+            "_last_workspace_tick_at",
+            "_last_cycle_advance",
+            "_last_n2_update",
+            "_last_inertia_update",
+            "_last_distress_communication",
+            "_last_curiosity_cycle",
+            "_last_executive_feed",
+        ):
+            if getattr(self, mark, 0.0) > now:
+                setattr(self, mark, now)
+        for chain in (self._waking_chain, self._dream_chain):
+            if chain is not None and chain.get("next_at", 0.0) > now:
+                chain["next_at"] = now
+        if self._hypnagogic is not None and self._hypnagogic.started_at > now:
+            self._hypnagogic.started_at = now
+
     def tick(self, now: float) -> None:
         """Run one bounded inner-life step on the metronome."""
+        self._rebase_future_marks(now)
         try:
             self._update_sleep_inertia(now)
             if not self._running or self._stop_event.is_set() or self._paused:
@@ -911,6 +943,7 @@ class InnerLife:
         then returns before any waking chain can be generated.
         """
         is_sleeping = False
+        self._rebase_future_marks(now)
         try:
             self._update_sleep_inertia(now)
             if self._stop_event.is_set():
@@ -1388,8 +1421,7 @@ class InnerLife:
                 "a loud sound", "a notification ping").
         """
         if description:
-            with self._stimuli_lock:
-                self._pending_stimuli.append(description)
+            self._pending_stimuli.append(description)
 
     def queue_emotional_memory(self, concept_id: str, intensity: float) -> None:
         """Queue an emotional memory for REM processing.
@@ -1406,8 +1438,7 @@ class InnerLife:
             intensity: Affective intensity in [0, 1].
         """
         if concept_id and intensity > 0.0:
-            with self._emotional_memories_lock:
-                self._pending_emotional_memories.append((concept_id, max(0.0, min(1.0, intensity))))
+            self._pending_emotional_memories.append((concept_id, max(0.0, min(1.0, intensity))))
 
     def _generate_dream(self, emotion: EmotionalState, summary) -> None:
         """Generate a dream sequence during sleep.
@@ -1582,7 +1613,16 @@ class InnerLife:
                 try:
                     from brain_waves import assess_brain_waves
 
-                    waves = assess_brain_waves(summary, fold=self._fold_margins())
+                    # The tracker's stage is authoritative — the
+                    # summary's NREM cannot express N1/N2/N3 depth, so
+                    # without it the wave read defaults to deep-sleep
+                    # powers for the whole night.
+                    stage = (
+                        self._sleep_cycle.current_stage if self._sleep_cycle is not None else None
+                    )
+                    waves = assess_brain_waves(
+                        summary, sleep_stage=stage, fold=self._fold_margins()
+                    )
                 except Exception as e:  # noqa: BLE001
                     note_swallowed(
                         "sleep.inner_life._run_dream_synthesis",
@@ -2248,10 +2288,9 @@ class InnerLife:
         # Evoked K-complexes tend to be higher amplitude (the brain
         # mounts a stronger gating response to detected stimuli).
         triggered = False
-        with self._stimuli_lock:
-            if self._pending_stimuli:
-                self._pending_stimuli.popleft()
-                triggered = True
+        if self._pending_stimuli:
+            self._pending_stimuli.popleft()
+            triggered = True
 
         if triggered:
             amplitude = 0.7 + self._rng.random() * 0.3  # 0.7-1.0
@@ -2306,40 +2345,39 @@ class InnerLife:
 
         Returns the number of emotional memories processed this call.
         """
-        with self._emotional_memories_lock:
-            if not self._pending_emotional_memories:
-                return 0
+        if not self._pending_emotional_memories:
+            return 0
 
-            # Noradrenergic silence: the decay factor modelling how much
-            # the affective charge fades per REM cycle without NE. A
-            # larger factor = faster extinction. ~40% reduction per cycle
-            # captures the gradual, multi-night nature of emotional memory
-            # depotentiation (Walker & van der Helm, 2009).
-            NE_SILENCE_DECAY = 0.40
-            # Factual consolidation boost per processed memory.
-            FACTUAL_BOOST = 0.05
+        # Noradrenergic silence: the decay factor modelling how much
+        # the affective charge fades per REM cycle without NE. A
+        # larger factor = faster extinction. ~40% reduction per cycle
+        # captures the gradual, multi-night nature of emotional memory
+        # depotentiation (Walker & van der Helm, 2009).
+        NE_SILENCE_DECAY = 0.40
+        # Factual consolidation boost per processed memory.
+        FACTUAL_BOOST = 0.05
 
-            processed = 0
-            requeue: list[tuple[str, float]] = []
-            while self._pending_emotional_memories:
-                concept_id, intensity = self._pending_emotional_memories.popleft()
-                processed += 1
-                self._emotional_memories_processed += 1
+        processed = 0
+        requeue: list[tuple[str, float]] = []
+        while self._pending_emotional_memories:
+            concept_id, intensity = self._pending_emotional_memories.popleft()
+            processed += 1
+            self._emotional_memories_processed += 1
 
-                # Reduce affective intensity (extinction-like)
-                new_intensity = intensity * (1.0 - NE_SILENCE_DECAY)
+            # Reduce affective intensity (extinction-like)
+            new_intensity = intensity * (1.0 - NE_SILENCE_DECAY)
 
-                # Consolidate the factual content: boost concept confidence
-                concept = self.network.get_concept(concept_id)
-                if concept is not None and concept.confidence < 1.0:
-                    concept.confidence = min(1.0, concept.confidence + FACTUAL_BOOST)
+            # Consolidate the factual content: boost concept confidence
+            concept = self.network.get_concept(concept_id)
+            if concept is not None and concept.confidence < 1.0:
+                concept.confidence = min(1.0, concept.confidence + FACTUAL_BOOST)
 
-                # Re-queue if residual emotional charge is still notable
-                if new_intensity > 0.1:
-                    requeue.append((concept_id, new_intensity))
+            # Re-queue if residual emotional charge is still notable
+            if new_intensity > 0.1:
+                requeue.append((concept_id, new_intensity))
 
-            for item in requeue:
-                self._pending_emotional_memories.append(item)
+        for item in requeue:
+            self._pending_emotional_memories.append(item)
 
         if processed > 0:
             self._emit(
@@ -2717,8 +2755,7 @@ class InnerLife:
         # This is the emotional residue of waking experience, not a
         # learning goal. Dreams explore what's salient, not what's
         # on a to-do list.
-        with self._thoughts_lock:
-            recent_concepts = [t.directed_concept for t in self._thoughts if t.directed_concept]
+        recent_concepts = [t.directed_concept for t in self._thoughts if t.directed_concept]
         if recent_concepts:
             return self._rng.choice(recent_concepts[-10:])
 
@@ -3872,8 +3909,7 @@ class InnerLife:
         salience decays as they're consumed.
         """
         candidates: list[dict[str, Any]] = []
-        with self._dream_residues_lock:
-            residues = list(self._dream_residues)
+        residues = list(self._dream_residues)
         for residue in residues[:3]:
             candidates.append(
                 {
@@ -5075,13 +5111,73 @@ class InnerLife:
                     facts.append(f"{rel_str} {target_display}")
         return ". ".join(facts), knowledge
 
+    def _observe_inner_world(self, thought: SpontaneousThought, emotion: EmotionalState) -> None:
+        """Map measured affect and this thought into the inner-world state."""
+
+        def bounded(name: str, default: float, low: float = -1.0, high: float = 1.0) -> float:
+            try:
+                value = float(getattr(emotion, name, default))
+            except (TypeError, ValueError):
+                value = default
+            return max(low, min(high, value)) if math.isfinite(value) else default
+
+        valence = bounded("valence", 0.0)
+        arousal = bounded("arousal", 0.5, 0.0, 1.0)
+        tone = bounded("tone", 0.0)
+        plasticity = bounded("plasticity", 0.5, 0.0, 1.0)
+        intensity = bounded("intensity", 0.0, 0.0, 1.0)
+        novelty = 0.0
+        metadata = getattr(thought, "metadata", None)
+        if isinstance(metadata, dict):
+            try:
+                novelty = max(0.0, min(1.0, float(metadata.get("novelty", 0.0))))
+            except (TypeError, ValueError):
+                novelty = 0.0
+        is_dream = bool(getattr(thought, "is_dream", False))
+        content = str(getattr(thought, "content", ""))
+        signals = [
+            valence,
+            arousal,
+            tone,
+            plasticity,
+            intensity,
+            novelty,
+            float(is_dream),
+            min(len(content), 1000) / 1000.0,
+        ]
+        try:
+            self.inner_world.observe(
+                [valence, arousal, tone, plasticity],
+                signals,
+                label=str(getattr(thought, "trigger", ""))[:128],
+            )
+        except (TypeError, ValueError, ArithmeticError):
+            # Observational geometry must not interrupt the existing pipeline.
+            logger.debug("inner-world observation rejected", exc_info=True)
+
     def _record_thought(self, thought: SpontaneousThought, emotion: EmotionalState) -> None:
-        """Record a spontaneous thought and its effects."""
-        with self._thoughts_lock:
-            self._thoughts.append(thought)
-            self._thought_count += 1
-            self._last_thought_time = time.time()
-            # deque(maxlen=100) handles pruning automatically
+        """Record a spontaneous thought and update its inner-world state."""
+        self._observe_inner_world(thought, emotion)
+        # Every recorded thought enters the shared self latent space,
+        # including sub-verbal thoughts that are not surfaced to language.
+        if self._on_latent_signal is not None:
+            try:
+                self._on_latent_signal(
+                    thought.content,
+                    f"thought:{thought.trigger or 'internal'}",
+                    {
+                        "trigger": thought.trigger,
+                        "is_dream": bool(getattr(thought, "is_dream", False)),
+                        "salience": 0.4,
+                        "addressed": getattr(thought, "intent", "") == "question",
+                    },
+                )
+            except Exception:
+                logger.debug("self latent thought integration failed", exc_info=True)
+        self._thoughts.append(thought)
+        self._thought_count += 1
+        self._last_thought_time = time.time()
+        # deque(maxlen=100) handles pruning automatically
 
         # Track recent topics for recency inhibition in the salience
         # model. The trigger is used as the topic proxy when the
@@ -5160,11 +5256,10 @@ class InnerLife:
                 # Strip polysemy sense suffix (e.g. "orange#2" → "orange")
                 # so dictionary/man-page lookups use the bare word.
                 topic = strip_sense_suffix(concept)
-                with self._agency_topics_lock:
-                    if topic not in self._agency_topics:
-                        self._agency_topics.append(topic)
-                    else:
-                        continue
+                if topic not in self._agency_topics:
+                    self._agency_topics.append(topic)
+                else:
+                    continue
                 self._emit(
                     "learning",
                     f"Agency: queued '{topic}' for learning from curiosity thought",
@@ -5284,11 +5379,10 @@ class InnerLife:
         for item in gw.drain_subliminal():
             if item.metadata.get("is_learning_target") is False:
                 continue
-            with self._agency_topics_lock:
-                for topic in item.metadata.get("topics", []):
-                    if topic and isinstance(topic, str):
-                        self._agency_topics.append(topic)
-                        queued += 1
+            for topic in item.metadata.get("topics", []):
+                if topic and isinstance(topic, str):
+                    self._agency_topics.append(topic)
+                    queued += 1
         return queued
 
     @property
@@ -5298,8 +5392,7 @@ class InnerLife:
         These come from waking curiosity only — dreams do not feed
         into agency topics.
         """
-        with self._agency_topics_lock:
-            return list(self._agency_topics)
+        return list(self._agency_topics)
 
     def pop_agency_topic(self) -> str | None:
         """Pop the next agency-driven topic for learning.
@@ -5308,9 +5401,8 @@ class InnerLife:
         should call this to get topics that emerged from its actual
         thinking, giving its genuine agency over what it learns.
         """
-        with self._agency_topics_lock:
-            if self._agency_topics:
-                return self._agency_topics.popleft()
+        if self._agency_topics:
+            return self._agency_topics.popleft()
         return None
 
     def feed_social_drive(self, amount: float) -> None:
@@ -5334,8 +5426,7 @@ class InnerLife:
         the autonomous learner. This separates dreams (subcognitive,
         affective) from goals (cognitive, prefrontal).
         """
-        with self._dream_residues_lock:
-            return list(self._dream_residues)
+        return list(self._dream_residues)
 
     def add_dream_residues(self, concepts: list[str]) -> None:
         """Queue dream residues as emotional impressions, not learning goals.
@@ -5345,11 +5436,10 @@ class InnerLife:
         become agency topics for the autonomous learner. A human
         doesn't dream about goals; goals are set by waking cognition.
         """
-        with self._dream_residues_lock:
-            for concept in concepts:
-                stripped = strip_sense_suffix(concept)
-                if stripped and stripped not in self._dream_residues:
-                    self._dream_residues.append(stripped)
+        for concept in concepts:
+            stripped = strip_sense_suffix(concept)
+            if stripped and stripped not in self._dream_residues:
+                self._dream_residues.append(stripped)
 
     def pop_dream_residue(self) -> str | None:
         """Pop the next dream residue for reflective thought generation.
@@ -5357,21 +5447,19 @@ class InnerLife:
         Returns None if no residues remain. These should be used to
         generate dream-reflection thoughts, not learning targets.
         """
-        with self._dream_residues_lock:
-            if self._dream_residues:
-                return self._dream_residues.popleft()
+        if self._dream_residues:
+            return self._dream_residues.popleft()
         return None
 
     def describe_recent_thoughts(self, n: int = 5) -> str:
         """Human-readable description of recent thoughts."""
-        with self._thoughts_lock:
-            if not self._thoughts:
-                return "no spontaneous thoughts yet"
-            # Convert to list for slicing (deque doesn't support negative slices)
-            all_thoughts = list(self._thoughts)
-            recent = all_thoughts[-n:] if n < len(all_thoughts) else all_thoughts
-            total = self._thought_count
-            dreams = sum(1 for t in all_thoughts if getattr(t, "is_dream", False))
+        if not self._thoughts:
+            return "no spontaneous thoughts yet"
+        # Convert to list for slicing (deque doesn't support negative slices)
+        all_thoughts = list(self._thoughts)
+        recent = all_thoughts[-n:] if n < len(all_thoughts) else all_thoughts
+        total = self._thought_count
+        dreams = sum(1 for t in all_thoughts if getattr(t, "is_dream", False))
         # Report the two populations separately. One merged number made a
         # night of dreams indistinguishable from a night of thinking.
         parts = [f"{total} spontaneous thoughts ({total - dreams} waking, {dreams} dream)"]

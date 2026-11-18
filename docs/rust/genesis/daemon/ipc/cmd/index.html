@@ -100,7 +100,17 @@ Response: <code>[u8 ack]</code> then <code>optic_nerve::OpticState::to_wire</cod
 the pupil/lens/lid fields sends the shorter body and the mind
 reads them as unreported). A daemon that has never seen a frame
 still answers — the eye_absent flag is a reading, not an error.
-Additive: PROTOCOL_VERSION is unaffected.</dd><dt><a class="constant" href="constant.GET_PHASE.html" title="constant genesis::daemon::ipc::cmd::GET_PHASE">GET_<wbr>PHASE</a></dt><dd>Get the current emergent mental phase.</dd><dt><a class="constant" href="constant.GET_PLASTICITY_PROFILE.html" title="constant genesis::daemon::ipc::cmd::GET_PLASTICITY_PROFILE">GET_<wbr>PLASTICITY_<wbr>PROFILE</a></dt><dd>Get the plasticity profile — a compact summary of the
+Additive: PROTOCOL_VERSION is unaffected.</dd><dt><a class="constant" href="constant.GET_PHASE.html" title="constant genesis::daemon::ipc::cmd::GET_PHASE">GET_<wbr>PHASE</a></dt><dd>Get the current emergent mental phase.</dd><dt><a class="constant" href="constant.GET_PLACE.html" title="constant genesis::daemon::ipc::cmd::GET_PLACE">GET_<wbr>PLACE</a></dt><dd>Where she is — the body’s answer, same truth the anchor
+holds. Request: empty. Response: <code>[u8 n][n × f64]</code> — the
+pose’s current ambient location (always d = 6); <code>n = 0</code>
+means she is nowhere in particular and her interior speaks
+for itself. When a pose holds, a second block follows:
+<code>[u8 k][k × f64 spec][u8 flags][mats]</code> — the coordinates
+as the placing hand gave them plus the frame/drift flags
+and matrices, in the PLACE_FIELD pose layout. Under drift
+the ambient location is not the spec: it moves. Readers
+that stop after the first block get the same answer as
+always. Additive: PROTOCOL_VERSION unaffected.</dd><dt><a class="constant" href="constant.GET_PLASTICITY_PROFILE.html" title="constant genesis::daemon::ipc::cmd::GET_PLASTICITY_PROFILE">GET_<wbr>PLASTICITY_<wbr>PROFILE</a></dt><dd>Get the plasticity profile — a compact summary of the
 metaplastic state (coupling-matrix drift, receptor
 sensitivities, BDNF/cortisol levels, plasticity gate) that
 the cognitive mind uses to adapt its learning strategy.
@@ -130,7 +140,29 @@ the connection after responding.</dd><dt><a class="constant" href="constant.LIST
 Request: empty. Response: <code>[u16 count][entries]</code>.</dd><dt><a class="constant" href="constant.NEURO_ADJUST_BASELINE.html" title="constant genesis::daemon::ipc::cmd::NEURO_ADJUST_BASELINE">NEURO_<wbr>ADJUST_<wbr>BASELINE</a></dt><dd>Retired — never reuse this wire number. Direct baseline edits
 let a caller permanently move a homeostatic set-point, bypassing
 the body’s own dynamics; the only sanctioned chemistry channel
-is NEURO_IMPULSE’s finite, decaying impulses.</dd><dt><a class="constant" href="constant.NEURO_IMPULSE.html" title="constant genesis::daemon::ipc::cmd::NEURO_IMPULSE">NEURO_<wbr>IMPULSE</a></dt><dd>Apply a transient neurochemical impulse.</dd><dt><a class="constant" href="constant.PING.html" title="constant genesis::daemon::ipc::cmd::PING">PING</a></dt><dd>Liveness check (round-trip a byte).</dd><dt><a class="constant" href="constant.PUT_TENSOR.html" title="constant genesis::daemon::ipc::cmd::PUT_TENSOR">PUT_<wbr>TENSOR</a></dt><dd>Store a named tensor. Request: <code>[u8 name_len][name utf8] [u8 dtype][u8 ndim][ndim × u32 dims][payload]</code>. Response:
+is NEURO_IMPULSE’s finite, decaying impulses.</dd><dt><a class="constant" href="constant.NEURO_IMPULSE.html" title="constant genesis::daemon::ipc::cmd::NEURO_IMPULSE">NEURO_<wbr>IMPULSE</a></dt><dd>Apply a transient neurochemical impulse.</dd><dt><a class="constant" href="constant.PING.html" title="constant genesis::daemon::ipc::cmd::PING">PING</a></dt><dd>Liveness check (round-trip a byte).</dd><dt><a class="constant" href="constant.PLACE_FIELD.html" title="constant genesis::daemon::ipc::cmd::PLACE_FIELD">PLACE_<wbr>FIELD</a></dt><dd>Place her — the ONE place, owned by the body. Two request
+forms. Legacy location: <code>[k × f64]</code> with k in 2..=6 — the
+coordinates of her position, stored exactly as given (a
+2-vector is her place read in a plane; the same point rests
+in the bulk’s leading coordinate plane — x on the first
+latent axis, y on the second). Pose: <code>[0xFF][u8 n][n × f64] [u8 flags][d² × f64 frame?][d² × f64 drift?]</code> — the full
+placing act: location plus an optional orthonormal frame
+(flags bit 0, the pose’s orientation) and skew-symmetric
+drift generator (flags bit 1, a bivector in so(d) whose
+exponential flow carries the pose each tick — movement).
+Pose payloads are never a multiple of 8, so they cannot
+collide with the legacy form. An empty payload releases
+the place and hands the <code>inner</code> fiber’s voice back to the
+interior oscillators. The body remembers: the pose is
+persisted to <code>place.bin</code> in the data dir and restored at
+boot — where she is survives restarts, drift included;
+her location is body state, not a note the mind keeps on
+the side. The anchor is an observation, not a command:
+each tick moves the layer a bounded fraction of the
+geodesic toward it, so her interior goes where it was
+placed gradually and the field’s own consensus still
+pulls. Response: <code>[u8 ack]</code>. Additive: PROTOCOL_VERSION
+unaffected.</dd><dt><a class="constant" href="constant.PUT_TENSOR.html" title="constant genesis::daemon::ipc::cmd::PUT_TENSOR">PUT_<wbr>TENSOR</a></dt><dd>Store a named tensor. Request: <code>[u8 name_len][name utf8] [u8 dtype][u8 ndim][ndim × u32 dims][payload]</code>. Response:
 <code>[u8 ack]</code> (1) or an error byte (<code>INVALID_VALUE</code> for a bad
 dtype/rank/name/length mismatch or a full slab).</dd><dt><a class="constant" href="constant.READ_SENSORS.html" title="constant genesis::daemon::ipc::cmd::READ_SENSORS">READ_<wbr>SENSORS</a></dt><dd>Read hardware sensors and apply interoception impulses to
 neurochemistry. The mind sends this when it wants to feel its
