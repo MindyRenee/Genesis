@@ -15,7 +15,7 @@ socket for the Python cognitive mind to communicate with.
 
 .PP
 It is built from
-.I src/bin/genesis-daemon.rs
+.I Self_World/src/bin/genesis-daemon.rs
 and is normally launched and supervised by
 .BR genesis-cli (1)
 (the \fBgenesis\fR console script), which is in turn launched by
@@ -87,11 +87,12 @@ speeds the CPU up, GABA slows it down, melatonin selects powersave;
 ACh raises scheduling priority; the plasticity gate sets the I/O
 priority class; CPU temp caps the max frequency regardless of
 dopamine (autonomic fatigue). Privileged levers (governor, RTC wake
-alarm) route through root-owned helpers under
-.IR /usr/local/libexec/genesis/
-when installed by
-.BR scripts/install_sudoers.sh ;
-without them, sensing still works and only actuation stays read-only.
+alarm) invoke
+.BR "sudo \-n"
+directly under the NOPASSWD grant from the
+.IR scripts/genesis-sudoers
+template; without it, sensing still works and only actuation stays
+read-only.
 .IP \(bu 2
 \fBAdaptive sync\fR modulates the LTM disk-sync rate by the plasticity
 gate (the sync AdaptiveGate above).
@@ -140,39 +141,21 @@ rejection CRH forever.
 .SS Optic nerve
 The daemon owns the canonical optic frame mapping named
 .I /genesis_optic_nerve .
-On Linux the capture limb opens the V4L2 device selected by
+The capture limb opens the V4L2 device selected by
 .I GENESIS_CAMERA
 (default
 .IR /dev/video0 ),
 requests 640x480 RGB24 and falls back to YUYV when RGB24 is
-unavailable. On Android, a separate Camera2 foreground service
-captures YUV_420_888 frames, converts them to packed RGB24, and
-hosts a loopback TCP stream at
-.IR 127.0.0.1:8765 ;
-the daemon connects outward, validates the bounded frame packets,
-and publishes them into the same optic mapping. Android frames are
-bounded to 640x480 and the adapter targets up to 10 frames per
-second. The mapping is POSIX shared memory on Linux and a
-file-backed mapping on Android. The transport protocol and platform
-details are documented in
+unavailable, and publishes the frames into the same optic mapping.
+The mapping is POSIX shared memory; the transport protocol and
+frame contract are documented in
 .BR genesis-vision (7).
 .PP
-Ownership of the name is settled on the nerve itself. The external
-retina
+The daemon is only a reader of the nerve. The retina
 .RB ( genesis-retina (1))
-and the daemon's embedded capture limb are two carriers of the same
-implementation; whichever claims the V4L2 device first owns the
-organ, and the daemon takes the camera back only after the nerve
-has gone silent past its grace window. A life that finds the nerve
-already live — the segment's frame counter still moving — stands
-down instead of unlinking a working eye, and no carrier unlinks a
-name it did not create: ownership is tracked through an explicit
-flag set only while a live segment is held, so a stillborn or
-stood-down limb cannot delete another publisher's rendezvous.
-While publishing, the limb re-verifies that the name still resolves
-to its own segment (inode identity, not mere existence); a name
-deleted out from under it ends the life so the next one re-creates
-the nerve, keeping fresh readers able to attach.
+is the eye's sole carrier — the only process that opens the V4L2
+device or publishes frames — so a dead retina leaves the organism
+blind rather than handing the camera to another owner.
 .PP
 The daemon has two outputs from each fresh frame. It pools sampled
 pixels into scalar subcortical channels, and it retains the full
@@ -198,8 +181,8 @@ and voluntary eyelid openness through
 .BR SET_LID ;
 corticothalamic feedback adjusts relay gain through
 .BR SET_OPTIC_GAIN .
-These are internal ocular and relay models. They do not set Android
-sensor exposure, ISO, autofocus, or white balance. See
+These are internal ocular and relay models. They do not set the
+sensor's exposure, ISO, autofocus, or white balance. See
 .BR genesis-vision (7)
 for the distinction between physical capture controls and the
 software visual pathway.
@@ -248,11 +231,10 @@ variable.
 Overrides the resolved data directory.
 .TP
 .B GENESIS_CAMERA
-Linux V4L2 capture device used by the daemon's optic-capture limb.
-Default
+Linux V4L2 capture device, honoured by
+.BR genesis-retina (1)
+\(em the sole carrier of the eye. Default
 .IR /dev/video0 .
-Android uses the Camera2 adapter instead; see
-.BR genesis-vision (7).
 .SH FILES
 .TP
 .I $DATA_DIR/core_state.bin

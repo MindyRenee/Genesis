@@ -56,9 +56,11 @@ def dial(uniform: float, channels: Iterable[float]) -> float:
     ``uniform`` is the hand's own sample for the parameter in
     [0, 1); the live channel values — untouched, never weighted —
     sum to a pressure ``P`` and the position is
-    ``uniform ^ e^{−P}`` — a bijection of the dial: no clamp, no
-    wrap, every position still reachable, and silent channels leave
-    the dial exactly at ``uniform``.
+    ``uniform ^ e^{−tanh P}`` — a bijection of the dial: no clamp,
+    no wrap, every position still reachable, silent channels leave
+    the dial exactly at ``uniform``, and the ``tanh`` bound keeps a
+    loud state leaning hard without collapsing the dial onto a
+    stop — a quantized dial would otherwise pin on its last bin.
     """
     if _body is None:
         return uniform % 1.0

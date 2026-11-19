@@ -42,7 +42,7 @@ The named means. The Pythagorean three \(em
 .IR geometric ,
 .I harmonic
 \(em sit on the power-mean ladder
-.RI ( "(\(*Sx^p / n)^(1/p)" ),
+.RI ( "(sum x^p / n)^(1/p)" ),
 alongside
 .I quadratic
 .RI ( p =2),
@@ -50,7 +50,7 @@ alongside
 .RI ( p =3),
 and
 .I contraharmonic
-.RI ( "\(*Sx^2 / \(*Sx" ).
+.RI ( "sum x^2 / sum x" ).
 The two-value interpolating family
 .I ( heronian ", " heinz ", " lehmer )
 smoothly connects the classical cases; Lehmer's ladder recovers
@@ -110,17 +110,13 @@ returns a
 The module itself when the measures are needed individually.
 .SH FILES
 .TP
-.I Self_World/parietal_lobe/math/
+.I python/parietal_lobe/math/
 The package source.
 .TP
-.I tests/python/test_statistics.py
+.I python/tests/test_statistics.py
 The taxonomy under test \(em the mean inequality, both ladders, the
 CLT demonstration.
 .SH SEE ALSO
 .BR genesis (1),
-.BR genesis-browser (7),
 .BR genesis-cli (1),
-.BR genesis-daemon (8),
-.BR genesis-games (7),
-.BR genesis-reasoning (7),
-.BR genesis-retina (1)
+.BR genesis-reasoning (7)

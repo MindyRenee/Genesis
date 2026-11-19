@@ -1,93 +1,57 @@
-.TH GENESIS-RETINA 1 "October 2026" "Genesis 0.2.0" "Genesis Manual"
+.TH GENESIS-RETINA 1 "November 2026" "Genesis 0.2.0" "Genesis Manual"
 .SH NAME
-genesis-retina \- Genesis vision capture process (V4L2 -> shared memory)
+genesis-retina \- the eye: sole V4L2 capture process for Genesis
 .SH SYNOPSIS
+Launched automatically by
+.BR genesis-cli (1)
+before the daemon; not normally invoked by hand.
+.PP
 .B genesis-retina
 .SH DESCRIPTION
 .B genesis-retina
-is Genesis's eye. It opens the V4L2 capture device named by
-.I GENESIS_CAMERA
+is the only process that ever opens the camera. It opens the V4L2
+device named by
+.B GENESIS_CAMERA
 (default
 .IR /dev/video0 ),
-requests an uncompressed RGB24 640x480 format (falling back to the
-camera's native uncompressed format, typically YUYV, if RGB3 is
-unavailable), converts a YUYV source to packed RGB24 itself, and
-streams captured frames into a POSIX shared memory
-object named
-.IR /genesis_retina
-(visible at
-.IR /dev/shm/genesis_retina )
-for the cognitive mind to read.
-
+requests 640x480 RGB24 (falling back to YUYV), and publishes raw
+frames into the POSIX shared-memory segment
+.IR /genesis_optic_nerve
+\(em the optic nerve \(em which the daemon and the mind read but
+never write.
 .PP
-The binary is built from
-.I src/bin/genesis-retina.rs
-and is normally launched and supervised by
-.BR genesis-cli (1),
-which is in turn launched by
-.BR genesis (1)
-or the
-.BR genesis (1)
-console script. Direct invocation is supported for diagnostics. The
-retina is optional: if no camera is present the launcher continues
-without it, and the mind's vision paths degrade rather than fail.
-
-.SS Shared memory layout
-Each frame is written as a 28-byte header followed by the raw pixel
-data:
-.IP \(bu 2
-The header carries the frame's width, height, stride, pixel format
-FourCC, and a seqlock sequence counter for consistent reads.
-.IP \(bu 2
-The pixel data follows immediately, sized as
-.IR width \(mu height \(mu bytes-per-pixel .
+The daemon carries no capture limb of its own: if no retina is
+running, or the retina dies, the organism is blind until it returns.
+The retina is therefore the eye's only connection, and exactly one
+process can own the camera at a time.
 .PP
-Readers must use the seqlock protocol (read the sequence counter
-before and after the frame; retry if it changed or is odd). Writing
-is single-producer (the retina); reading is many-consumer (any
-process that maps the object).
-.PP
-The shared memory object is
-.IR shm_unlink 'd
-on the next run's pre-creation step so a fresh object is always
-published — unless the nerve is already live, in which case this
-eye stands down rather than delete a working publisher's
-rendezvous. On clean shutdown (SIGINT/SIGTERM) the retina unlinks
-the name it owns before exiting so a stale
-.I /dev/shm/genesis_optic_nerve
-does not linger after the eye closes; a retina that never created
-the segment unlinks nothing. While publishing, the retina
-re-verifies that the name still resolves to its own segment and
-re-incarnates the nerve if the name is lost.
-.SH SIGNALS
-.TP
-.B SIGINT ", " SIGTERM
-Set the exit flag; the capture loop notices, unlinks the shared
-memory object it owns, and exits cleanly.
+An absent or dying camera is re-opened on a bounded backoff table
+and then accepted absent \(em sight is a degradation, never a fault.
+On SIGINT/SIGTERM the limb winds down and the segment's name is
+unlinked, so a dead eye never publishes stale frames under a live
+name.
 .SH ENVIRONMENT
 .TP
 .B GENESIS_CAMERA
-Path of the V4L2 capture device to open. Default
+Linux V4L2 capture device. Default
 .IR /dev/video0 .
-Set by the user; the launcher passes it through to the retina
+.TP
+.B GENESIS_DATA_DIR
+Data-directory binding used by the CLI to identify and adopt the
 process.
 .SH FILES
 .TP
-.I /dev/shm/genesis_retina
-The POSIX shared memory object holding the latest frame.
+.I /genesis_optic_nerve
+Canonical frame mapping (POSIX shared memory); this process is its
+sole publisher.
 .TP
-.IR $DATA_DIR/retina.log
-Retina stdout/stderr (rotated at 5 MB by the launcher).
+.I $DATA_DIR/retina.log
+Capture diagnostics.
 .TP
-.IR $DATA_DIR/genesis_retina.pid
-PID file written by the launcher so
-.BR genesis " \fB--stop\fR"
-can target this exact process.
+.I $DATA_DIR/genesis_retina.pid
+PID file written by the supervising CLI.
 .SH SEE ALSO
 .BR genesis (1),
-.BR genesis-browser (7),
 .BR genesis-cli (1),
 .BR genesis-daemon (8),
-.BR genesis-games (7),
-.BR genesis-math (7),
-.BR genesis-reasoning (7)
+.BR genesis-vision (7)

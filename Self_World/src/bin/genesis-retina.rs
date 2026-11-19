@@ -1,19 +1,14 @@
-//! genesis-retina — the eye as its own organ.
+//! genesis-retina — the eye as its own organ, and the only one.
 //!
 //! The retina opens the V4L2 capture device itself and publishes raw
-//! frames into the POSIX shared-memory segment `/genesis_optic_nerve`
-//! — the same segment the daemon's embedded capture limb writes when
-//! no retina is running. One capture implementation, two carriers:
-//! the daemon runs it on a thread (`OpticCapture`), this binary runs
-//! it on the main thread of a dedicated process.
+//! frames into the POSIX shared-memory segment `/genesis_optic_nerve`.
+//! It is the sole writer of the nerve: the daemon carries no capture
+//! limb of its own and only reads, so the retina is the eye's only
+//! connection — no retina means no eye.
 //!
-//! The CLI launches the retina before the daemon; ownership is
-//! settled on the nerve itself — the daemon's own optic reader sees
-//! these frames arriving and keeps its embedded limb closed, and if
-//! this process dies the daemon takes the camera back. Exactly one
-//! process owns the device at a time. On SIGINT/SIGTERM the limb
-//! winds down and the segment's name is unlinked, so a dead eye
-//! never publishes stale frames under a live name.
+//! The CLI launches the retina before the daemon. On SIGINT/SIGTERM
+//! the limb winds down and the segment's name is unlinked, so a dead
+//! eye never publishes stale frames under a live name.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 

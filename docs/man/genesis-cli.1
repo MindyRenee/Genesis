@@ -12,13 +12,12 @@ genesis-cli \- Genesis cognitive mind and interactive terminal
 is the cognitive mind of Genesis and the interactive terminal through
 which a user converses with her. It creates and starts the cognitive
 Mind in-process, starts the Rust daemon if needed, and handles the terminal
-directly. On Android, the launcher separately opens the Camera2
-adapter; Linux V4L2 capture is integrated into the daemon.
+directly. Camera capture is integrated into the daemon over Linux
+V4L2.
 
 .PP
-The CLI owns the daemon lifecycle as a child process. The Android
-Camera2 adapter is a separate foreground service, not a child
-capture process. The CLI passes its PID to the daemon via
+The CLI owns the daemon lifecycle as a child process and passes its
+PID to the daemon via
 .I GENESIS_COGNITIVE_PID
 so the daemon can include the mind in interoception \(em reading its
 CPU/memory/IO metrics as part of feeling its body state. The daemon
@@ -64,8 +63,7 @@ cognitive mind. Useful for diagnostics.
 Stop the running session for this data dir (same staged teardown as
 .BR genesis " \fB--stop\fR):"
 SIGINT the CLI, then SIGTERM the daemon, each with its own grace
-period. The launcher also requests shutdown of the Android camera
-adapter when that adapter is active.
+period.
 .TP
 .B --offline
 Start in offline mode \(em skip all network access. Autonomous
@@ -323,20 +321,18 @@ and are promoted back only on success.
 .IR $DATA_DIR/experiments/admin/
 The privileged staging sandbox. The
 .B run_privileged
-tool executes a script she wrote here as root, via the root-owned
-helper
-.IR /usr/local/libexec/genesis/genesis_admin_helper.sh
-(installed with its NOPASSWD sudoers rule by
-.IR scripts/install_sudoers.sh ).
-Her acting loop reaches it through
+tool executes a script she wrote here as root via
+.BR "sudo \-n" \(em
+direct, unmediated root under the broad NOPASSWD grant installed
+from the
+.I scripts/genesis-sudoers
+template. Her acting loop reaches it through
 .B maintain
 intentions: staged
 .I *.sh
-files surface as work, are read back for review, then elevated. The
-helper denies catastrophic or self-widening shapes, rate-limits runs,
-and appends every attempt to the root-owned audit log
-.IR /var/log/genesis-admin.log
-before anything runs.
+files surface as work, are read back for review, then elevated. On a
+host without the grant sudo refuses quietly and the call fails \(em
+there is no mediated helper and no audit log.
 .SH SEE ALSO
 .BR genesis (1),
 .BR genesis-browser (7),
@@ -360,13 +356,12 @@ genesis-cli \- Genesis cognitive mind and interactive terminal
 is the cognitive mind of Genesis and the interactive terminal through
 which a user converses with her. It creates and starts the cognitive
 Mind in-process, starts the Rust daemon if needed, and handles the terminal
-directly. On Android, the launcher separately opens the Camera2
-adapter; Linux V4L2 capture is integrated into the daemon.
+directly. Camera capture is integrated into the daemon over Linux
+V4L2.
 
 .PP
-The CLI owns the daemon lifecycle as a child process. The Android
-Camera2 adapter is a separate foreground service, not a child
-capture process. The CLI passes its PID to the daemon via
+The CLI owns the daemon lifecycle as a child process and passes its
+PID to the daemon via
 .I GENESIS_COGNITIVE_PID
 so the daemon can include the mind in interoception \(em reading its
 CPU/memory/IO metrics as part of feeling its body state. The daemon
@@ -412,8 +407,7 @@ cognitive mind. Useful for diagnostics.
 Stop the running session for this data dir (same staged teardown as
 .BR genesis " \fB--stop\fR):"
 SIGINT the CLI, then SIGTERM the daemon, each with its own grace
-period. The launcher also requests shutdown of the Android camera
-adapter when that adapter is active.
+period.
 .TP
 .B --offline
 Start in offline mode \(em skip all network access. Autonomous
@@ -671,20 +665,18 @@ and are promoted back only on success.
 .IR $DATA_DIR/experiments/admin/
 The privileged staging sandbox. The
 .B run_privileged
-tool executes a script she wrote here as root, via the root-owned
-helper
-.IR /usr/local/libexec/genesis/genesis_admin_helper.sh
-(installed with its NOPASSWD sudoers rule by
-.IR scripts/install_sudoers.sh ).
-Her acting loop reaches it through
+tool executes a script she wrote here as root via
+.BR "sudo \-n" \(em
+direct, unmediated root under the broad NOPASSWD grant installed
+from the
+.I scripts/genesis-sudoers
+template. Her acting loop reaches it through
 .B maintain
 intentions: staged
 .I *.sh
-files surface as work, are read back for review, then elevated. The
-helper denies catastrophic or self-widening shapes, rate-limits runs,
-and appends every attempt to the root-owned audit log
-.IR /var/log/genesis-admin.log
-before anything runs.
+files surface as work, are read back for review, then elevated. On a
+host without the grant sudo refuses quietly and the call fails \(em
+there is no mediated helper and no audit log.
 .SH SEE ALSO
 .BR genesis (1),
 .BR genesis-daemon (8),

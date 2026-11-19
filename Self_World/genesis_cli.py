@@ -188,10 +188,10 @@ _PID_FILE_DAEMON = "genesis_daemon.pid"
 # (optic_nerve.SCREEN_NAME), her second eye.
 _PID_FILE_SCREEN_NERVE = "genesis_screen_nerve.pid"
 _SCREEN_NERVE_SHM = "genesis_screen_nerve"
-# The retina — the camera as its own process again (src/bin/
+# The retina — the camera as its own process (src/bin/
 # genesis-retina.rs), publishing /genesis_optic_nerve for every
-# reader. The daemon only opens its embedded capture limb when no
-# retina is publishing on the nerve.
+# reader. It is the only carrier of the eye: the daemon has no
+# capture limb of its own and only reads the nerve.
 _PID_FILE_RETINA = "genesis_retina.pid"
 
 # Maximum time to wait for the daemon's IPC socket (seconds).
@@ -464,19 +464,18 @@ def _start_screen_nerve(data_dir: str) -> subprocess.Popen | _AdoptedDaemon | No
 
 
 def _start_retina(data_dir: str) -> subprocess.Popen | _AdoptedDaemon | None:
-    """Launch the retina — the camera as its own process again.
+    """Launch the retina — the sole carrier of the eye.
 
     ``genesis-retina`` owns ``/dev/video0`` and publishes frames into
-    ``/genesis_optic_nerve`` — the same segment the daemon's embedded
-    limb would write, so ownership is settled on the nerve itself:
-    the daemon sees the retina's frames arriving and keeps its limb
-    closed, and if the retina dies the daemon takes the camera over.
-    Launched before the daemon so the external eye wins the organ.
+    ``/genesis_optic_nerve``; it is the only process that ever opens
+    the camera. The daemon carries no capture limb — it only reads
+    the nerve, so no retina means no eye, and a dead retina leaves
+    her blind rather than silently swapping owners.
 
     A missing binary or a retina already alive for this data dir are
-    both non-fatal — absent the binary, the daemon's own limb keeps
-    sight working exactly as before; an orphan is adopted rather than
-    duplicated (two writers on one camera only starve each other).
+    both non-fatal — the organism runs blind without it; an orphan is
+    adopted rather than duplicated (two writers on one camera only
+    starve each other).
     """
     retina_path = _find_binary("genesis-retina")
     if retina_path is None:
@@ -518,8 +517,8 @@ def _settle_retina(
     same breath — the wait overlaps the daemon's own bring-up rather
     than delaying it. A retina that cannot run at all (shm perms,
     exec shape) dies inside its first second; a missing camera is not
-    stillborn — the limb backs off and rests inside the process while
-    the daemon's own limb covers the absence.
+    stillborn — the limb backs off and rests inside the process,
+    leaving the organism blind but alive.
     """
     if proc is None or isinstance(proc, _AdoptedDaemon):
         return proc
@@ -2797,16 +2796,15 @@ def _start_daemon_process(
 class _Rebirth:
     """The organism's deep self-repair: it resurrects a dead body.
 
-    A background watcher owns the process-tree handle — the daemon,
-    whose optic-nerve thread now owns the eye — and heals it while the
-    mind lives. A child that exits is reincarnated in place: the
-    daemon reopens the same persisted state, so neurochemistry, sleep
-    phase, and memory continue unbroken, and the mind re-inhabits it
-    through ``Mind.rejoin_body``. The eye re-opens with the body — the
-    capture limb rides inside the daemon, so its bounded re-open table
-    (``src/daemon/optic_nerve.rs``) needs no watching here; a camera
-    that will not come back is a tolerated degradation, never a fatal
-    one.
+    A background watcher owns the process-tree handles — the daemon,
+    the retina (the eye's sole carrier), and the screen nerve — and
+    heals them while the mind lives. A child that exits is
+    reincarnated in place: the daemon reopens the same persisted
+    state, so neurochemistry, sleep phase, and memory continue
+    unbroken, and the mind re-inhabits it through ``Mind.rejoin_body``.
+    The eye heals here too — the retina is its own process now, so a
+    dead retina respawns on the same watched cadence; a camera that
+    will not come back is a tolerated degradation, never a fatal one.
 
     Only actual death triggers resurrection — a live body is left
     alone entirely, however it behaves. There is no probing, no
@@ -2832,6 +2830,13 @@ class _Rebirth:
         self.nerve: subprocess.Popen | _AdoptedDaemon | None = None
         self._nerve_spawn: Callable[[], subprocess.Popen | _AdoptedDaemon | None] | None = None
         self._nerve_retry_at = 0.0
+        # The retina — the eye's sole carrier, watched the same way:
+        # respawned when it dies, throttled when it cannot start. A
+        # retina that was never launched (missing binary) stays
+        # absent — blindness was accepted at boot.
+        self.retina: subprocess.Popen | _AdoptedDaemon | None = None
+        self._retina_spawn: Callable[[], subprocess.Popen | _AdoptedDaemon | None] | None = None
+        self._retina_retry_at = 0.0
         # Rebirth accounting: each resurrection draws a backoff slot;
         # a body that stays alive past _REBIRTH_STABLE_S refunds the
         # count.
@@ -2859,6 +2864,19 @@ class _Rebirth:
         """Hand the watcher the screen nerve's handle and respawn closure."""
         self.nerve = proc
         self._nerve_spawn = spawn
+
+    def set_retina(
+        self,
+        proc: subprocess.Popen | _AdoptedDaemon | None,
+        spawn: Callable[[], subprocess.Popen | _AdoptedDaemon | None],
+    ) -> None:
+        """Hand the watcher the retina's handle and respawn closure."""
+        self.retina = proc
+        self._retina_spawn = spawn
+
+    def retina_handle(self) -> subprocess.Popen | _AdoptedDaemon | None:
+        """Current retina handle for teardown — post-respawn."""
+        return self.retina
 
     def nerve_handle(self) -> subprocess.Popen | _AdoptedDaemon | None:
         """Current screen-nerve handle for teardown — post-respawn."""
@@ -2888,6 +2906,7 @@ class _Rebirth:
             try:
                 self._check_daemon()
                 self._check_nerve()
+                self._check_retina()
             except Exception as e:  # noqa: BLE001 — a watcher that dies leaves her unguarded
                 note_swallowed("genesis_cli.rebirth.cycle", e)
 
@@ -2926,6 +2945,31 @@ class _Rebirth:
         # dark second eye is a degradation, never worth churning
         # forks every tick (e.g. under systemd with no display).
         self._nerve_retry_at = time.monotonic() + 60.0 if new is None else 0.0
+
+    def _check_retina(self) -> None:
+        """Respawn the retina when it dies; throttle when it can't start.
+
+        The retina is the eye's only carrier — no fallback exists, so
+        its death is blindness. Healing it is the organism's job; the
+        daemon only ever reads the nerve.
+        """
+        spawn = self._retina_spawn
+        proc = self.retina
+        if spawn is None:
+            return
+        if proc is not None and proc.poll() is None:
+            return
+        if time.monotonic() < self._retina_retry_at:
+            return
+        try:
+            new = spawn()
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("genesis_cli.rebirth.retina", e)
+            new = None
+        self.retina = new
+        # Same slow cadence as the screen nerve — a stillborn retina
+        # retries gently rather than churning forks every tick.
+        self._retina_retry_at = time.monotonic() + 60.0 if new is None else 0.0
 
     def _resurrect_daemon(self, handle: subprocess.Popen | _AdoptedDaemon) -> None:
         """Reincarnate the body around its persisted state."""
@@ -3476,10 +3520,7 @@ def _shutdown(
     # The whole body gets its stop request in the same breath:
     # the daemon's graceful ask lands first (its own teardown flag is
     # already falling by the time the eyes close), then every child
-    # gets its SIGTERM before any wait. A daemon still settling while
-    # the retina exits would otherwise see the nerve go quiet and
-    # probe the camera mid-teardown — taking over an eye it is
-    # already letting go.
+    # gets its SIGTERM before any wait.
     waiting: list[tuple[subprocess.Popen | _AdoptedDaemon, str]] = []
     daemon_asked = False
     if daemon_proc is not None:
@@ -3684,12 +3725,11 @@ def main() -> int:
     exit_code = 0
 
     try:
-        # The eye and the body wake in the same breath: the retina is
-        # spawned first by microseconds so its nerve claim tends to
-        # land first, and the daemon's own reader defers to whichever
-        # publisher is live — one owner of the camera, decided on the
-        # nerve itself. The retina's stillborn check settles while the
-        # daemon boots rather than ahead of it.
+        # The eye and the body wake in the same breath: the retina —
+        # the camera's only carrier — spawns first so the daemon's
+        # optic reader finds a live nerve from its first tick. The
+        # retina's stillborn check settles while the daemon boots
+        # rather than ahead of it.
         retina_proc = _start_retina(data_dir)
         daemon_proc = _start_daemon_process(data_dir, daemon_socket)
         retina_proc = _settle_retina(retina_proc, data_dir)
@@ -3734,13 +3774,16 @@ def main() -> int:
             else:
                 # The organism repairs its own process tree from here:
                 # the body resurrects around its persisted state and
-                # the mind re-inhabits it — the eye re-opens with the
-                # body, its capture limb inside the daemon — for as
+                # the mind re-inhabits it — the eye heals the same way,
+                # the retina respawned by the watcher — for as
                 # long as the mind lives. Self-directed mode leaves the
                 # resurrection worker on: directing herself is no reason
                 # to go without a body that heals.
                 rebirth = _Rebirth(data_dir, daemon_socket, shutting_down)
                 rebirth.set_children(daemon=daemon_proc)
+                # The eye — its sole carrier, respawned by the watcher
+                # like every other organ.
+                rebirth.set_retina(retina_proc, lambda: _start_retina(data_dir))
                 rebirth.set_mind(mind)
                 rebirth.start()
                 # Her second eye — the display itself, published as its
@@ -3807,6 +3850,7 @@ def _teardown_session(
         rebirth.stop()
         daemon_proc = rebirth.handles()
         nerve_proc = rebirth.nerve_handle()
+        retina_proc = rebirth.retina_handle()
     if not _shutdown(
         ambient_listener,
         mind,

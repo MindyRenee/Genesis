@@ -2631,13 +2631,21 @@ class MemorySystem:
                     modality=entry.get("source_modality", "text"),
                     confidence=_finite_or(entry.get("source_confidence", 0.8), 0.8),
                 )
+            # Emotional tags are EMOTIONAL_TAG_SIZE chemicals wide —
+            # records written under an older schema may carry fewer or
+            # more entries. Normalize at the persistence boundary so
+            # every restored record satisfies the field's contract:
+            # a short tag is padded with the neutral default, a long
+            # one keeps its chemical prefix and drops the retired tail.
+            raw_tag = entry.get("emotional_tag")
+            if not isinstance(raw_tag, (list, tuple)):
+                raw_tag = [0.5] * EMOTIONAL_TAG_SIZE
+            normalized_tag = [_finite_or(v, 0.5) for v in list(raw_tag)[:EMOTIONAL_TAG_SIZE]]
+            normalized_tag.extend([0.5] * (EMOTIONAL_TAG_SIZE - len(normalized_tag)))
             rec = MemoryRecord(
                 episode_id=eid,
                 salience=_finite_or(entry.get("salience", 0.5), 0.5),
-                emotional_tag=[
-                    _finite_or(v, 0.5)
-                    for v in entry.get("emotional_tag", [0.5] * EMOTIONAL_TAG_SIZE)
-                ],
+                emotional_tag=normalized_tag,
                 encoded_at=int(entry.get("encoded_at", 0)),
                 last_accessed=int(entry.get("last_accessed", 0)),
                 access_count=max(0, int(entry.get("access_count", 0))),

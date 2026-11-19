@@ -1,9 +1,9 @@
 //! Optic nerve — the whole retinal afferent path, held inside the body.
 //!
-//! The nerve's retinal end is the body's own limb: the daemon opens
-//! the camera itself and writes raw frames into the POSIX
+//! The nerve's retinal end is `genesis-retina` — the only process
+//! that ever opens the camera. It writes raw frames into the POSIX
 //! shared-memory segment `/genesis_optic_nerve` — that segment is
-//! the optic nerve. Anatomically the nerve does not reach cortex
+//! the optic nerve, and the daemon only ever reads it. Anatomically the nerve does not reach cortex
 //! directly: its ~10⁶ ganglion-cell axons fan out to roughly forty
 //! subcortical targets, and only the thalamocortical radiation
 //! carries what the thalamus relays onward. The subcortical
@@ -57,9 +57,8 @@
 //! mind — the words side.
 
 use std::ffi::CString;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::thread::{self, JoinHandle};
+use std::thread;
 use std::time::{Duration, Instant};
 
 use v4l::Device;
@@ -792,7 +791,7 @@ impl Default for OpticNerve {
 // Retry lives here too: an absent or dying camera is re-opened on
 // the same bounded table the mind's rebirth watcher kept for the
 // process, then accepted absent — sight is a degradation, never a
-// fault. The daemon is never at risk: every failure in the limb is
+// fault. The retina is never at risk: every failure in the limb is
 // logging, a count, and a backoff, never a panic.
 
 /// Bounded re-open table: after each un-lived life the limb waits
@@ -837,90 +836,18 @@ fn camera_candidates(configured: &str) -> Vec<String> {
     candidates
 }
 
-/// The eye's handle: a stop flag, the segment's POSIX name for
-/// unlinking, an ownership flag for the segment the limb created,
-/// and the capture thread. `stop()` flags the limb out and — only
-/// when the limb actually owns a segment — takes the name back; a
-/// thread still blocked in the driver's dequeue is reaped by the
-/// daemon's own exit — the same bound the process tree had.
-pub struct OpticCapture {
-    stop: Arc<AtomicBool>,
-    shm_name: String,
-    owns_nerve: Arc<AtomicBool>,
-    _limb: JoinHandle<()>,
-}
-
-impl OpticCapture {
-    /// Open the eye on its own thread. Never fails into the caller —
-    /// a missing camera just means the limb goes dark after its
-    /// bounded retries and the nerve reports no eye.
-    pub fn start() -> Self {
-        Self::with_segment(SHM_NAME)
-    }
-
-    /// Same, on a named segment (tests use private names).
-    pub fn with_segment(shm_name: &str) -> Self {
-        let stop = Arc::new(AtomicBool::new(false));
-        let owns_nerve = Arc::new(AtomicBool::new(false));
-        let shm_name = shm_name.to_string();
-        let limb = {
-            let stop = stop.clone();
-            let owns = owns_nerve.clone();
-            let name = shm_name.clone();
-            thread::Builder::new()
-                .name("genesis-eye".to_string())
-                .spawn(move || capture_limb(&name, &stop, &owns))
-                .expect("spawn optic capture limb")
-        };
-        Self {
-            stop,
-            shm_name,
-            owns_nerve,
-            _limb: limb,
-        }
-    }
-
-    /// Close the eye: flag the limb out and unlink the segment's
-    /// name — but only a limb that actually owns a segment may take
-    /// the name back. A limb stillborn on a busy camera, or one that
-    /// stood down to a live publisher, must not unlink another eye's
-    /// nerve. Readers already holding the mapping keep it until they
-    /// detach; the name is gone, so nothing new attaches to a dead
-    /// eye.
-    pub fn stop(&self) {
-        self.stop.store(true, Ordering::Relaxed);
-        if self.owns_nerve.load(Ordering::Relaxed) {
-            if let Ok(name) = CString::new(self.shm_name.as_str()) {
-                // SAFETY: `name` is a valid NUL-terminated CString;
-                // shm_unlink of a missing name returns ENOENT,
-                // ignored — the owner `Shmem`'s own drop may already
-                // have released it.
-                unsafe {
-                    let _ = libc::shm_unlink(name.as_ptr());
-                }
-            }
-        }
-    }
-}
-
-impl Drop for OpticCapture {
-    fn drop(&mut self) {
-        self.stop();
-    }
-}
-
 /// The limb's whole existence: a life, a count, a pause, another
 /// life. Every death lands here once — the same accounting the
-/// mind's rebirth watcher kept for the standalone process, now held
-/// where the loss actually happens. Patient: after the table's
-/// worth of un-lived lives the eye does not die — it rests on the
-/// longest rung and keeps watching, so a camera that recovers (USB
-/// power, a device still releasing, a transient driver fault) finds
-/// the retina waiting rather than the body already blind.
+/// mind's rebirth watcher kept for the standalone process. Patient:
+/// after the table's worth of un-lived lives the eye does not die —
+/// it rests on the longest rung and keeps watching, so a camera that
+/// recovers (USB power, a device still releasing, a transient driver
+/// fault) finds the retina waiting rather than the body already
+/// blind.
 ///
-/// `pub` for `genesis-retina`: when the eye is its own process again
-/// the binary runs this same limb on the main thread — one
-/// implementation, two carriers.
+/// The retina is the only carrier: `genesis-retina` runs this limb
+/// on its main thread and is the sole writer of the nerve. The
+/// daemon has no capture limb of its own — it only reads.
 ///
 /// `owns_nerve` is set only while a life actually holds a segment it
 /// created, so a stopping caller can tell its own name from a nerve

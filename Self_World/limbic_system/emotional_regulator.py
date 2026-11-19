@@ -573,6 +573,7 @@ class InteroceptionSystem:
         self._psutil_primed = False
         self._n_cores: int | None = None
         self._daemon_pid: int | None = None
+        self._retina_pid: int | None = None
         # Per-subsystem silicon telemetry from the daemon
         # (GET_SUBSYSTEM_TELEMETRY) — which process in its tree is
         # firing, plus the self-reported brain parts (manifest
@@ -596,10 +597,10 @@ class InteroceptionSystem:
         Single source of truth for both :meth:`_sense_cpu_usage` and
         :meth:`_sense_memory_usage`, so the two layers agree on what
         "its own body" is. Matches the daemon's ``genesis_subsystems``
-        set — the mind (this process) and the daemon pidfile (the
-        eye's capture thread rides inside it) — extended with each
-        member's live child processes (voice, speech recognition,
-        spawned helpers).
+        set — the mind (this process), the daemon pidfile, and the
+        retina pidfile (the eye is its own process, the camera's sole
+        carrier) — extended with each member's live child processes
+        (voice, speech recognition, spawned helpers).
 
         PIDs <= 0 are never valid (PID 0 is the kernel scheduler, and
         a failed pidfile parse must not slip through) and are
@@ -621,7 +622,10 @@ class InteroceptionSystem:
         if me > 0:
             own_pids.append(me)
 
-        for attr, pidfile in (("_daemon_pid", "genesis_daemon.pid"),):
+        for attr, pidfile in (
+            ("_daemon_pid", "genesis_daemon.pid"),
+            ("_retina_pid", "genesis_retina.pid"),
+        ):
             cached = getattr(self, attr)
             stale = cached is None
             if not stale:

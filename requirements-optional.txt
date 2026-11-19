@@ -29,14 +29,5 @@ piper-tts
 # scripts/genesis-uinput.rules.
 evdev
 
-# Arcade — official ARC-AGI-3 toolkit plus the local Game Arena
-# shelf (open-spiel provides pyspiel, the same engine Kaggle's
-# arena evaluates on) and the arena harness itself. After install,
-# prune the harness's LLM-client deps:
-#   pip uninstall -y litellm openai anthropic google-genai \
-#       tiktoken tokenizers transformers
-# she IS the model — her seat needs no API client.
+# Arcade — official ARC-AGI-3 toolkit
 arc-agi
-open-spiel
-game-arena
-kaggle-environments

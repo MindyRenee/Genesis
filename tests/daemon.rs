@@ -1423,7 +1423,7 @@ fn test_process_health_tracks_liveness() {
     );
 
     let lost = ProcessHealth {
-        alive_mask: 0b0011, // daemon + cognitive; bit 2 (retired eye) clear
+        alive_mask: 0b0011, // daemon + cognitive; bit 2 (retina) clear
         deaths: 1,
         last_death: 2,
     };

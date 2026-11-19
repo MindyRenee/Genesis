@@ -1378,8 +1378,8 @@ class GenesisClient:
         Returns a :class:`SubsystemReport` with two granularities:
 
         - ``subsystems``: one :class:`SubsystemTelemetry` per process in its
-          process tree (daemon, cognitive — the eye rides inside the
-          daemon) — hardware-measured
+          process tree (daemon, cognitive, retina — the eye is its own
+          process, the camera's sole carrier) — hardware-measured
           CPU/I/O share plus microarchitectural prediction-error
           ratios (cache/branch misses).
         - ``modules``: one :class:`ModuleTelemetry` per non-Stopped

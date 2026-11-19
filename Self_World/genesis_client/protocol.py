@@ -533,7 +533,7 @@ GET_ZONE_TRANSITIONS = 37
 # Which of Genesis's own processes are alive, and how many have died.
 # Response: [u16 alive_mask][u16 deaths][u8 last_death]
 # Bit n of alive_mask is set while subsystem n runs (0=daemon,
-# 1=cognitive, 2=retired — the eye is a thread inside the daemon now).
+# 1=cognitive, 2=retina — the eye's sole carrier).
 # A subsystem that was never running does not
 # count as a death. last_death is 0xff when nothing has been lost.
 # A subsystem that dies used to vanish from the telemetry with no
@@ -562,9 +562,8 @@ GET_MOTOR_TARGET = 45
 
 SUBSYSTEM_DAEMON = 0
 SUBSYSTEM_COGNITIVE = 1
-# Retired wire tag — the eye was once a standalone retina process;
-# its capture is a thread inside the daemon now, so nothing is ever
-# tagged 2 anymore. Kept so old telemetry still decodes by name.
+# The eye — genesis-retina, the camera's sole carrier, running as its
+# own process.
 SUBSYSTEM_RETINA = 2
 
 SUBSYSTEM_NAMES: dict[int, str] = {

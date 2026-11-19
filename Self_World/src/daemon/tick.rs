@@ -92,13 +92,6 @@ pub const AUTONOMOUS_INTERVAL_MS: u64 = 200;
 
 /// How long after boot the daemon waits for an external
 /// `genesis-retina` to claim the optic nerve before opening its own
-/// capture limb — long enough to cover a camera probe and format
-/// negotiation, short enough that a missing eye degrades gracefully
-/// rather than stalling sight. Once a publisher has existed the
-/// window no longer applies: a dead retina hands the camera back
-/// immediately.
-pub const EYE_OWNERSHIP_GRACE_MS: u64 = 4_000;
-
 /// Consolidation threshold: entries with a consolidation score below
 /// this are skipped (left to decay in the ring buffer).
 pub const CONSOLIDATION_THRESHOLD: f32 = 0.15;
@@ -374,7 +367,7 @@ impl TickLoop {
             zone_tally: Default::default(),
             phase_tally: Default::default(),
             intention_manager: IntentionManager::new(4),
-            interoceptor: Interoceptor::new(),
+            interoceptor: Interoceptor::new_with_data_dir(data_dir),
             last_body_state: super::interoception::BodyState::neutral(),
             inference_engine,
             dyadic_model: DyadicAffectModel::new(),

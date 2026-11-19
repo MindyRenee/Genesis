@@ -414,17 +414,11 @@ fn main() {
         });
     }
 
-    // The eye — the optic nerve's retinal end. Ownership is settled
-    // on the nerve itself, not by a flag: the daemon's own optic
-    // reader (inside the TickLoop) already watches the segment's
-    // frame counter, so the main loop below arbitrates. While an
-    // external `genesis-retina` publishes, the limb stays closed;
-    // when the grace window ends with no publisher — or a publisher
-    // that was here stops — the daemon opens its own limb and takes
-    // the camera. One owner at a time, healing in place.
-    let mut eye: Option<genesis::daemon::optic_nerve::OpticCapture> = None;
-    let eye_grace_until_ms =
-        genesis::daemon::tick::current_ms() + genesis::daemon::tick::EYE_OWNERSHIP_GRACE_MS;
+    // The eye belongs to `genesis-retina` alone — it is the only
+    // writer of the optic nerve. The daemon never opens the camera;
+    // its optic reader (inside the TickLoop) consumes whatever the
+    // retina publishes, and no retina means no eye — there is no
+    // embedded capture limb to fall back on.
 
     // Set up shutdown coordination
     let shutdown_flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
@@ -536,10 +530,6 @@ fn main() {
     // intentions evolve slowly, and each pass writes a manifest
     // transaction plus a possible LTM trace.
     let mut zone_gate = AdaptiveGate::new(5_000, 2_000, 30_000);
-    // Eye ownership polls the optic reader's frame accounting — the
-    // nerve itself is the rendezvous, no flag between the retina
-    // process and the daemon.
-    let mut eye_gate = AdaptiveGate::new(1_000, 500, 10_000);
     let mut model_save_gate = AdaptiveGate::new(60_000, 20_000, 300_000);
     let mut last_model_save_ticks = 0u32;
     // The fallback's own axle is adaptive too: deep NREM idles at
@@ -574,7 +564,6 @@ fn main() {
                 ("sync", sync_gate.snapshot()),
                 ("body", body_gate.snapshot()),
                 ("zone", zone_gate.snapshot()),
-                ("eye", eye_gate.snapshot()),
                 ("model_save", model_save_gate.snapshot()),
             ]);
             snap.axle_ms = axle_ms;
@@ -593,43 +582,6 @@ fn main() {
                         staleness_gate.relax();
                     } else {
                         staleness_gate.demand();
-                    }
-                }
-                Err(e) => {
-                    if lock_refusal("tick_loop", e) {
-                        fatal_if_poisoned("tick_loop", &shutdown_flag);
-                    }
-                }
-            }
-        }
-
-        // Eye ownership, decided on the nerve rather than a flag.
-        // Runs regardless of lease — whoever holds the camera, the
-        // daemon watches its own reader's accounting: frames_seen > 0
-        // means a publisher existed; fresh means it still does. The
-        // limb opens only once the grace window has passed with no
-        // publisher, or a publisher that existed has gone silent —
-        // a dead external retina hands the camera back instead of
-        // leaving her blind. Once opened, the limb keeps the camera
-        // for the daemon's life; a later retina backs off on EBUSY
-        // and the first owner keeps the organ.
-        if eye.is_none() && eye_gate.due(now_ms) {
-            match tick_loop.try_lock() {
-                Ok(tl) => {
-                    let external_live = tl.optic.frames_seen() > 0 && tl.optic.fresh(now_ms);
-                    let still_listening =
-                        tl.optic.frames_seen() == 0 && now_ms < eye_grace_until_ms;
-                    if !external_live && !still_listening {
-                        if tl.optic.frames_seen() > 0 {
-                            eprintln!(
-                                "[genesis] eye: external retina stopped — the limb takes the camera"
-                            );
-                        } else {
-                            eprintln!(
-                                "[genesis] eye: no retina claimed the nerve — the limb takes the camera"
-                            );
-                        }
-                        eye = Some(genesis::daemon::optic_nerve::OpticCapture::start());
                     }
                 }
                 Err(e) => {
@@ -852,14 +804,6 @@ fn main() {
 
     // Shutdown sequence
     eprintln!("[genesis] Shutting down...");
-
-    // Close the eye first so no reader attaches to a dead nerve — the
-    // limb's thread is reaped by process exit if it is still blocked
-    // in the driver's dequeue. `None` when an external retina owned
-    // the nerve to the end, or none ever did.
-    if let Some(eye) = eye.take() {
-        eye.stop();
-    }
 
     // Restore the host's CPU policy captured at startup. This runs
     // before the sync block below (which can bail out on a poisoned

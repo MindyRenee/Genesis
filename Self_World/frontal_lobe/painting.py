@@ -56,9 +56,8 @@ GESTURES = (
 )
 
 # Informal labels for what a dialed brush *resembles* — used only to
-# name her utensil in history and (on a Krita backend) to find a real
-# preset that feels similar. The brush itself is always her own
-# parameters; the label is a description, not a selection.
+# name her utensil in her drawing history. The brush itself is always
+# her own parameters; the label is a description, not a selection.
 
 
 class Painter:

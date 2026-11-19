@@ -1365,9 +1365,8 @@ class BodyState:
 #   [f32 cache_miss_rate][f32 branch_miss_rate]
 #
 # Subsystem tags: 0 = daemon (subcognitive), 1 = cognitive mind,
-# 2 = retired (the eye was once a standalone retina process; its
-# capture is a daemon thread now — nothing is tagged 2 anymore, but
-# old telemetry still decodes by name).
+# 2 = retina (genesis-retina, the eye's sole carrier — its own
+# process).
 
 LOBE_NAMES = {0: "daemon", 1: "cognitive", 2: "retina"}
 

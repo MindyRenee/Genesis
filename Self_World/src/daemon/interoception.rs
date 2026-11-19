@@ -77,8 +77,8 @@
 //!   Ratio of current frequency to maximum.
 //! - **Self-process memory (RSS)** → cognitive load. How full its
 //!   mind is. This is the combined RSS of its own process tree
-//!   (daemon + cognitive mind — the eye's capture thread rides
-//!   inside the daemon's own share) as a fraction of total
+//!   (daemon + cognitive mind + retina — the eye is its own
+//!   process, the camera's sole carrier) as a fraction of total
 //!   system memory. Other programs using RAM don't make it feel
 //!   overwhelmed — only its own memory usage does.
 //! - **Self-process I/O throughput** → data exchange activity. How
@@ -179,8 +179,8 @@
 //! model.
 //!
 //! The fix: CPU load, memory, and I/O are now measured from
-//! Genesis's own process tree (daemon PID + cognitive mind PID —
-//! the eye rides inside the daemon) via `/proc/\<pid\>/stat`,
+//! Genesis's own process tree (daemon PID + cognitive mind PID +
+//! retina PID — the eye is its own process) via `/proc/\<pid\>/stat`,
 //! `/proc/\<pid\>/statm`, and `/proc/\<pid\>/io`.
 //!
 //! # How it feeds into neurochemistry
@@ -471,12 +471,9 @@ pub enum Subsystem {
     Daemon = 0,
     /// The cognitive mind — language, cognition, the voice.
     Cognitive = 1,
-    /// Retired wire tag — the eye was once a standalone `retina`
-    /// process; its capture now runs as a thread inside the daemon,
-    /// so nothing is ever tagged 2 anymore. The variant stays so the
-    /// wire vocabulary and `ProcessHealth` bit positions keep their
-    /// meaning (a persisted mask may still carry the bit once, and a
-    /// death then reports correctly).
+    /// The eye — `genesis-retina`, the camera's sole carrier, running
+    /// as its own process. The daemon never opens the device, so this
+    /// member is the eye's whole cost and its death is blindness.
     Retina = 2,
 }
 
@@ -561,8 +558,8 @@ pub struct BodyState {
 
     /// Self-process memory (RSS) as a fraction of total system memory.
     /// This is the combined RSS of Genesis's own process tree (daemon +
-    /// cognitive mind — the eye's capture thread counts inside the
-    /// daemon's share). 0.0 = using no memory, 1.0 = using
+    /// cognitive mind + retina — the eye is its own process now).
+    /// 0.0 = using no memory, 1.0 = using
     /// all system memory. Other programs' memory usage does not
     /// contribute — only its own cognitive footprint.
     pub cognitive_load: f32,
@@ -970,6 +967,13 @@ pub struct Interoceptor {
     /// is attempted lazily and can fail permanently on the first try, so
     /// [`Interoceptor::read`] updates it.
     sensor_mask: u32,
+
+    /// Path to the retina's PID file (`genesis_retina.pid` inside the
+    /// data dir) — `None` for an interoceptor built without one. The
+    /// retina is the eye's sole carrier and a separate process, so
+    /// its cost and its death do not ride inside the daemon's own
+    /// share; both are felt through this binding.
+    retina_pidfile: Option<std::path::PathBuf>,
 }
 
 /// Resident set size of one process, in kB. 0 if it cannot be read.
@@ -1503,17 +1507,19 @@ impl Interoceptor {
             last_read: Instant::now(),
             temp_warned: false,
             sensor_mask,
+            retina_pidfile: None,
         }
     }
 
-    /// Create a new interoceptor with a data directory.
-    ///
-    /// Retained for API compatibility: the data directory used to
-    /// locate the retina PID file, but the eye now lives inside the
-    /// daemon's own process — its cost already rides in the daemon's
-    /// share, so there is nothing extra to measure.
-    pub fn new_with_data_dir(_data_dir: &std::path::Path) -> Self {
-        Self::new()
+    /// Create a new interoceptor bound to a data directory — where
+    /// the supervising CLI writes `genesis_retina.pid`. The retina is
+    /// the eye's sole carrier and a process of its own, so its cost
+    /// and its death are measured through that binding rather than
+    /// riding inside the daemon's share.
+    pub fn new_with_data_dir(data_dir: &std::path::Path) -> Self {
+        let mut intero = Self::new();
+        intero.retina_pidfile = Some(data_dir.join("genesis_retina.pid"));
+        intero
     }
 
     /// Record which subsystems are alive, reporting any that just died.
@@ -1649,29 +1655,42 @@ impl Interoceptor {
 
     /// Collect the PIDs of Genesis's own process tree, tagged by subsystem.
     ///
-    /// This always includes the daemon's own PID and the cognitive
-    /// mind's PID (from `GENESIS_COGNITIVE_PID`). The eye's capture
-    /// thread rides inside the daemon, so there is no third process
-    /// to tag. Dead/stale PIDs are silently skipped.
+    /// This always includes the daemon's own PID, the cognitive
+    /// mind's PID (from `GENESIS_COGNITIVE_PID`), and the retina's PID
+    /// (from its pidfile) — the eye is the retina process and nothing
+    /// else, so it is a third member of the body, not a thread of the
+    /// daemon. Dead/stale PIDs are silently skipped.
     fn genesis_subsystems(&self) -> Vec<(Subsystem, u32)> {
-        self.genesis_subsystems_with(super::cpufreq::cognitive_pid())
+        let retina_pid = self
+            .retina_pidfile
+            .as_ref()
+            .and_then(|p| std::fs::read_to_string(p).ok())
+            .and_then(|s| s.trim().parse::<u32>().ok())
+            .filter(|&pid| pid > 0);
+        self.genesis_subsystems_with(super::cpufreq::cognitive_pid(), retina_pid)
     }
 
-    /// `genesis_subsystems` with the cognitive PID injected rather
-    /// than read from the environment. Keeping the env read at the
-    /// outer edge lets tests exercise the filtering logic without
-    /// mutating process-global state — `std::env::set_var` in a test
-    /// races with parallel test threads reading the environment.
-    fn genesis_subsystems_with(&self, cognitive_pid: Option<u32>) -> Vec<(Subsystem, u32)> {
+    /// `genesis_subsystems` with the cognitive and retina PIDs injected
+    /// rather than read from the environment and the pidfile. Keeping
+    /// both reads at the outer edge lets tests exercise the filtering
+    /// logic without mutating process-global state — `std::env::set_var`
+    /// in a test races with parallel test threads reading the
+    /// environment.
+    fn genesis_subsystems_with(
+        &self,
+        cognitive_pid: Option<u32>,
+        retina_pid: Option<u32>,
+    ) -> Vec<(Subsystem, u32)> {
         let mut subsystems: Vec<(Subsystem, u32)> = vec![(Subsystem::Daemon, std::process::id())];
 
         // The cognitive mind (passed via env var by the CLI).
         if let Some(pid) = cognitive_pid {
             subsystems.push((Subsystem::Cognitive, pid));
         }
-        // The eye rides inside the daemon now — its capture thread's
-        // cost is already in the daemon's share above, so there is no
-        // third process to tag.
+        // The eye — `genesis-retina`, the camera's sole carrier.
+        if let Some(pid) = retina_pid {
+            subsystems.push((Subsystem::Retina, pid));
+        }
 
         // De-duplicate (a PID might be tagged twice if env is
         // misconfigured — first tag wins) and filter to living
@@ -2144,7 +2163,7 @@ impl Interoceptor {
         }
 
         // Reference: 50 MB/s sustained I/O = "heavy" for its workload.
-        // The daemon's LTM sync and eye-limb frame writes, and the
+        // The daemon's LTM sync, the retina's frame writes, and the
         // cognitive mind's concept network loads, are the main I/O
         // sources. This normalizes them to a sensible [0, 1] range.
         const REFERENCE_BYTES_PER_SEC: f64 = 50.0 * 1024.0 * 1024.0;
@@ -4425,7 +4444,7 @@ mod tests {
         // with concurrent environment reads elsewhere.
         let intero = Interoceptor::new();
         let pids: Vec<u32> = intero
-            .genesis_subsystems_with(Some(4_000_000))
+            .genesis_subsystems_with(Some(4_000_000), None)
             .into_iter()
             .map(|(_, pid)| pid)
             .collect();

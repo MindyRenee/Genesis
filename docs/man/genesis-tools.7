@@ -5,7 +5,7 @@ genesis-tools \- the tool layer of the Genesis mind: her workstation
 .nf
 \fBtools.framework\fR        \fITool\fR, \fIToolResult\fR, \fIToolRegistry\fR
 \fBtools.hid\fR              virtual keyboard and pointer via uinput
-\fBworkstation.environment\fR           \fIOuterEnvironment\fR \(em where her acts land
+\fBworlds.world\fR           \fIOuterWorld\fR \(em where her acts land
 .fi
 .SH DESCRIPTION
 Genesis acts on the world through a flat registry of tools. A
@@ -14,14 +14,13 @@ returns \fIToolResult\fR (success plus output, or an error string)
 \(em tools report, they never raise. The registry
 .RI ( tools.framework.ToolRegistry )
 starts with the builtins in \fI_BUILTIN_TOOLS\fR and grows at
-runtime: \fIgames.arcade.Arcade.register_tools\fR adds the
-\fBarcade_*\fR family and \fIOuter_World/tools/studio.py\fR the
-\fBstudio_*\fR family when the mind is constructed.
+runtime: \fIworlds.games.arcade.Arcade.register_tools\fR adds the
+\fBarcade_*\fR family when the mind is constructed.
 .PP
 There is no sandbox around the registry. File paths resolve to
 their real locations, the shell is unfiltered, and nothing at the
 tool layer intercepts a destructive act \(em the counsel she is
-given lives in the docstring of \fIOuter_World/tools/charter.py\fR. See
+given lives in the docstring of \fIpython/tools/charter.py\fR. See
 the AGENCY section of
 .BR genesis (1)
 for the trust model.
@@ -46,40 +45,10 @@ Without the grant the call fails and nothing else changes.
 the read-verify half of her code work.
 
 .SS Web tools
-\fBweb_fetch\fR reads pages directly: requests carry the machine's
-own browser identity \(em the User-Agent is resolved from the
-installed browser binary \(em and go out through \fIcurl_cffi\fR,
-which presents Chrome's real TLS and HTTP/2 fingerprint, so sites
-that refuse plain script clients still answer her. \fIurllib\fR is
-the dependency-free fallback. \fBweb_search\fR drives her real
-browser \(em Chrome over CDP; one browser, one transport (see
-\fIOuter_World/tools/browser.py\fR) \(em because
-engines refuse anonymous protocols entirely. Adult, malware, and
-private-address URLs are refused everywhere. The shared browser
-stays open between calls \(em \fBbrowser_close\fR puts it away when
-she is done, flushing the profile and freeing the process. A failed
-launch retries after a short cooldown rather than disabling the
-browser for the rest of the session.
-.PP
-The \fBbrowser_*\fR family is her hand inside that tab:
-\fBbrowser_open\fR, \fBbrowser_read\fR, \fBbrowser_click\fR,
-\fBbrowser_type\fR, \fBbrowser_key\fR, \fBbrowser_scroll\fR, and
-\fBbrowser_back\fR. Input is synthesized at the page level over CDP
-\(em real trusted events, distinct from the desktop-wide uinput
-hand \(em and works headless.
-Clicks that navigate re-pass the same URL safety checks.
-\fBbrowser_ask_human\fR is the honest end of the scale: when a page
-demands a human, the headless browser yields the profile, a visible
-window opens on the owner's display, the person clears the
-challenge, and the window closes \(em the shared profile keeps
-whatever the human proved.
-.PP
-The browser profile may carry a signed-in Google session belonging
-to the machine's owner, provisioned deliberately so engines stop
-treating her as anonymous bot traffic. Her web presence then runs
-under that account name, not a dedicated one of her own \(em worth
-knowing when reading cookies, history, or site state she did not
-create.
+\fBweb_search\fR and \fBweb_fetch\fR drive her real browser \(em
+Firefox over WebDriver BiDi, Chromium-family over CDP (see
+.BR genesis-browser (7)).
+Both are read-only; adult/malware URLs are refused.
 
 .SS Body tools
 \fBsense_cpu\fR is proprioception \(em governor, clock, allowed
@@ -92,9 +61,7 @@ backed by SymPy (the \fBmath\fR extra): exact calculation, an
 equality oracle that answers verified, refuted, or undecided, and a
 persistent long-horizon workbench whose claims can only be marked
 verified through the oracle. \fBconcept_lookup\fR queries her own
-concept network, and \fBman_page\fR reads the machine's local
-manual pages by name \(em the same text \fBman\fR(1) shows, no
-network, so her reference library works offline.
+concept network.
 
 .SS Hands \(em the virtual HID
 \fBhid_status\fR, \fBkey_press\fR, \fBtype_text\fR,
@@ -108,383 +75,17 @@ writable by her user; no sudo is involved in daily use. Without
 \fIevdev\fR or the device the tools report unavailable and nothing
 else degrades.
 
-.SS The studio
-\fIOuter_World/tools/studio.py\fR registers the paint program's controls
-as the \fBstudio_*\fR family: \fBstudio_open\fR (sit down at the
-easel \(em the surface is internal), \fBstudio_sheet\fR (any size
-and paper),
-\fBstudio_color\fR (any RGBA), \fBstudio_tool\fR (any name she gives
-the brush she dialed), \fBstudio_brush\fR (size, opacity, hardness,
-scatter, texture, erase, blend), \fBstudio_stroke\fR (any point path
-\(em a hand move and a computed curve are the same op, and
-\fIlabel\fR names the gesture in her art history),
-\fBstudio_line\fR, \fBstudio_shape\fR (ellipse, rect, polygon),
-\fBstudio_fill\fR, \fBstudio_clear\fR, \fBstudio_presets\fR
-(list the tool names she has reached for), and \fBstudio_done\fR
-(finish the sheet \(em save it, remember it, share it). No fixed
-gesture vocabulary, color sectors, or tool menus: she issues the
-ops, so what gets drawn is her decision. The built-in rasterizer
-.RI ( Outer_World/canvas.py )
-executes every op in-process \(em the paint program lives in the
-world with her other instruments, the canonical artifact is the
-saved WebP. When the draw urge sits her
-down, two channels drive the hand: her felt state (chemistry \(en
-emotion) picks the subject \(em whatever her train of thought is
-holding at the easel \(em while every dial of the sitting (sheet,
-paper, color, brush, path, which op, stroke count) is sampled
-uniform and warped by the raw sum of every channel she feels,
-including her live brain-wave powers \(em the values arrive
-untouched, no weights, no transform \(em through
-.RI ( Self_World/src/parietal_lobe/hand.rs )
-\(em waves influence creativity only while she draws. Scripts she makes with
-\fBwrite_file\fR/\fBrun_shell\fR can drive the same canvas module
-alongside the client.
-
-.SS The eye
-\fIOuter_World/tools/eye.py\fR registers the eye's organs as the
-\fBeye_*\fR family \(em the same voluntary anatomy a human eye
-answers. The retinal organs resolve onto whichever muscle the
-capture device builds them from (read live through
-\fBv4l2-ctl\fR(1)): \fBeye_pupil\fR is the iris (aperture or
-integration time), \fBeye_chroma\fR the cone opponent gain,
-\fBeye_acuity\fR the retinal lateral inhibition,
-\fBeye_sensitivity\fR photoreceptor adaptation,
-\fBeye_adaptation\fR the cone classes' white balance, and
-\fBeye_contrast\fR the ganglion output range. Each takes a
-biological fraction 0.0\(en1.0 mapped onto that muscle's own
-range; an organ whose muscle the eye lacks reports itself absent.
-\fBeye_anatomy\fR names every organ and the dial it rides on;
-\fBeye_set\fR reaches a raw hardware dial for muscles outside
-any organ. The body's organs travel the optic channel:
-\fBeye_lid\fR holds the voluntary eyelid (a few percent always
-leaks through), \fBeye_focus\fR powers the ciliary muscle in
-metres (0 relaxes to infinity), and \fBeye_gain\fR is the
-corticothalamic gain stacked on the sleep-stage gate. The device
-is whichever /dev/video* answers \(em \fIGENESIS_CAMERA\fR
-checked first, same as the daemon's. Nothing here decides what
-she sees \(em the muscles only set how the light arrives.
-
 .SS The outer world
-Her workstation's other half is \fIworkstation.environment.OuterEnvironment\fR:
+Her workstation's other half is \fIworlds.world.OuterWorld\fR:
 presences, events, and the places she can act. Observations enter
-through \fIOuterEnvironment.perceive()\fR and her acts leave through
+through \fIOuterWorld.perceive()\fR and her acts leave through
 \fIit_acted()\fR, feeding memory, cognition, emotion, learning,
 brain waves, and neurochemistry on the way. The Discord channel
-(\fIdiscord.channel\fR) is one such place; the arcade
-(\fIgames\fR, see \fIOuter_World/games/\fR and the generated
-pages under \fISelf_World/docs/python/\fR)
+(\fIworlds.channel\fR) is one such place; the arcade
+(\fIworlds.games\fR, see
+.BR genesis-arcade (7))
 is another. The browser is a third: a place she goes, not a sense
 she has.
-
-.SH TOOL REFERENCE
-Each entry: the tool's name, the arguments it takes, and what it
-does and reports back. Arguments arrive as strings; tools return a
-\fIToolResult\fR \(em \fIsuccess\fR plus \fIoutput\fR, or an
-\fIerror\fR string. They report, they never raise.
-.SS Filesystem and code
-.TP
-.BR read_file " \fIpath [offset] [limit] [project_root]\fR"
-Return a character window of a text file starting at \fIoffset\fR;
-binary files return metadata (size, sha256, format, hex head)
-instead. Any readable file answers.
-.TP
-.BR write_file " \fIpath content [project_root]\fR"
-Write \fIcontent\fR to \fIpath\fR, creating parents. Overwrites
-wholesale \(em this is the whole file, not an append.
-.TP
-.BR make_dir " \fIpath [project_root]\fR"
-Create the directory and any missing parents.
-.TP
-.BR list_dir " \fIpath [project_root]\fR"
-List a directory's contents.
-.TP
-.BR delete_file " \fIpath [project_root]\fR"
-Delete a file. Refuses directories.
-.TP
-.BR move_file " \fIsource destination [project_root]\fR"
-Move or rename; absolute paths reach anywhere.
-.TP
-.BR compile_python " \fIpath\fR"
-Syntax-check a Python file; success means it compiles.
-.TP
-.BR run_pytest " \fIpath [project_root]\fR"
-Run pytest on a file or directory and return the result.
-.TP
-.BR analyze_python " \fIpath [symbol] [project_root]\fR"
-Read-only structural analysis: symbols, call edges, per-function
-cyclomatic complexity, imports; \fIsymbol\fR asks for impact
-analysis of that one name.
-.SS Shell
-.TP
-.BR run_shell " \fIcommand [timeout]\fR"
-Execute \fIcommand\fR with the checkout as cwd and the full user
-environment \(em unfiltered. Timeout defaults to 30 s, capped at
-3600 s.
-.TP
-.BR run_privileged " \fIscript [args]\fR"
-Run a staged or absolute-path script as root via
-\fBsudo \-n bash\fR \(em full control, no undo. Needs the NOPASSWD
-sudoers drop-in; without the grant it fails harmlessly.
-.SS Web
-.TP
-.BR web_search " \fIquery [num_results]\fR"
-Walk the search-engine plan and return result titles and URLs.
-Read-only; adult/malware results are blocked.
-.TP
-.BR web_fetch " \fIurl\fR"
-Fetch a page and return its readable article text plus up to five
-related links for curiosity chaining. Read-only GET.
-.TP
-.B browser_close
-Ask the shared browser to close: flushes profile/history to disk,
-frees the process. Reopens on the next search or fetch.
-.TP
-.BR browser_open " \fIurl\fR"
-Navigate her tab to \fIurl\fR and report the page: title, landed
-URL, and the interactive elements (links, buttons, inputs) with
-click coordinates \(em the controls \fBbrowser_click\fR and
-\fBbrowser_type\fR act on.
-.TP
-.B browser_read
-Re-read the current tab: title, URL, and interactive elements.
-.TP
-.BR browser_click " \fI[x y] [text] [selector]\fR"
-Click in her tab \(em at \fIx,y\fR page coordinates, on a CSS
-\fIselector\fR, or on the element whose visible text contains
-\fItext\fR. A click that navigates re-checks the landing URL.
-.TP
-.BR browser_type " \fItext [x y] [target] [selector]\fR"
-Type \fItext\fR into the focused element, or into the element found
-by \fIx,y\fR, CSS \fIselector\fR, or visible \fItarget\fR text
-(clicked first to focus it).
-.TP
-.BR browser_key " \fIkey\fR"
-Press one named key in her tab: \fIenter\fR, \fItab\fR,
-\fIescape\fR, \fIbackspace\fR, \fIdelete\fR, \fIspace\fR, the
-arrows, \fIhome\fR, \fIend\fR, \fIpageup\fR, \fIpagedown\fR \(em
-the keys a click cannot reach; Enter submits, Tab moves focus.
-.TP
-.BR browser_scroll " \fI[dy]\fR"
-Wheel-scroll her tab; positive down, negative up. Triggers
-lazy-loaded content.
-.TP
-.B browser_back
-Back one history entry in her tab; reports the page she lands on.
-.TP
-.BR browser_ask_human " \fIurl [timeout]\fR"
-Open \fIurl\fR in a visible window on the owner's display and wait
-(up to \fItimeout\fR seconds, default 120) for the person to clear
-a human check \(em captcha, consent wall. The headless browser
-yields the shared profile first, so the visible window carries her
-sign-in; the window closes afterward and headless fetches inherit
-the clearance. Reports whether the wall cleared.
-.SS Body and reference
-.TP
-.B sense_cpu
-Proprioception \(em report her governor, clock speed, and allowed
-cores. Read-only.
-.TP
-.BR set_cpu_effort " \fImode\fR"
-Change how hard her process works: \fIslow\fR pins one core and
-idles I/O, \fIfast\fR restores everything, \fIauto\fR leaves
-scheduling alone. Reversible in both directions.
-.TP
-.BR concept_lookup " \fIname\fR"
-Describe a concept in her own knowledge network.
-.TP
-.BR man_page " \fIpage [section]\fR"
-Read a local manual page \(em the text \fBman\fR(1) shows. No
-network. Returns the page title, its \fBman:\fR URL, the NAME
-summary, and the rendered text.
-.SS Mathematics
-.TP
-.BR symbolic_math " \fIop expr [var] [point] [n]\fR"
-Exact CAS work via SymPy: \fIsimplify\fR, \fIexpand\fR,
-\fIfactor\fR, \fIcancel\fR, \fIapart\fR, \fItogether\fR,
-\fItrigsimp\fR, \fIdiff\fR, \fIintegrate\fR, \fIsolve\fR,
-\fIlimit\fR, \fIseries\fR, \fIevalf\fR, and matrix ops
-(\fIdet\fR, \fIeigenvals\fR, \fItrace\fR, \fIinv\fR,
-\fIcharpoly\fR) on \fB[[a,b],[c,d]]\fR literals.
-.TP
-.BR verify_equality " \fIlhs rhs\fR"
-Ask the oracle whether two expressions are exactly equal:
-\fIverified\fR, \fIrefuted\fR (with a numeric counterexample when
-one exists), or \fIundecided\fR \(em the honest third answer.
-.TP
-.BR research " \fIaction ...\fR"
-The persistent workbench: \fIopen\fR (statement), \fIconjecture\fR,
-\fIreading\fR, \fIattempt\fR, \fIempirical\fR, \fIverify\fR,
-\fIresolve\fR, \fIpause\fR, \fIstatus\fR. Threads persist across
-sessions; only the oracle can mark a claim verified.
-.SS Hands \(em the virtual HID
-.TP
-.B hid_status
-Report whether the uinput keyboard/pointer exist and are
-writable, plus the screen size absolute moves scale against.
-.TP
-.BR key_press " \fIkey\fR"
-A kernel-level keystroke: \fIenter\fR, \fItab\fR, \fIf5\fR,
-\fIa\fR, or a combo like \fIctrl+c\fR.
-.TP
-.BR type_text " \fItext\fR"
-Type a string, one keystroke per character on a US layout;
-newline is enter, tab is tab.
-.TP
-.BR mouse_move " \fIdx dy\fR"
-Move the pointer relative: \fIdx\fR right, \fIdy\fR down.
-.TP
-.BR mouse_goto " \fIx y\fR"
-Place the pointer at absolute desktop pixel \fI(x, y)\fR.
-.TP
-.BR mouse_click " \fI[button] [x] [y]\fR"
-Click \fIleft\fR/\fIright\fR/\fImiddle\fR, optionally moving to
-\fI(x, y)\fR first.
-.TP
-.BR mouse_scroll " \fIdy [dx]\fR"
-Turn the wheel \fIdy\fR notches (positive up), \fIdx\fR sideways.
-.SS Studio \(em the paint program
-Registered from \fIOuter_World/tools/studio.py\fR; full description under
-\fBThe studio\fR above.
-.TP
-.B studio_open
-Open the studio: sit down at the easel \(em confirms the internal
-surface is up.
-.TP
-.BR studio_sheet " \fI[width] [height] [r] [g] [b]\fR"
-Lay out a fresh sheet \(em any size, any paper color.
-.TP
-.BR studio_color " \fIr g b [a]\fR"
-Dip the utensil in any RGBA color.
-.TP
-.BR studio_tool " \fItool [size]\fR"
-Take up a tool by name \(em her own label; there is no fixed menu.
-.TP
-.BR studio_brush " \fI[size] [opacity] [hardness] [scatter] [texture] [erase] [blend]\fR"
-Dial any point in brush space.
-.TP
-.BR studio_stroke " \fIpoints [label]\fR"
-Move through a path: \fB"x1,y1; x2,y2; ..."\fR or a
-\fB[[x,y],...]\fR list. \fIlabel\fR names the gesture for her art
-history.
-.TP
-.BR studio_line " \fIx1 y1 x2 y2\fR"
-A straight stroke.
-.TP
-.BR studio_shape " \fIkind ...\fR"
-A closed figure: \fIellipse\fR or \fIrect\fR with \fIx y w h\fR, or
-\fIpolygon\fR with \fIpoints\fR; \fIfill=true\fR paints it solid.
-.TP
-.BR studio_fill " \fIx y\fR"
-Flood-fill the region under a point.
-.TP
-.B studio_clear
-Wipe the sheet back to bare paper.
-.TP
-.BR studio_presets " \fI[query]\fR"
-List the real app's tool presets; \fIquery\fR filters by substring.
-.TP
-.BR studio_done " \fI[description] [mood]\fR"
-Finish the sheet \(em save it, remember it, share it.
-.SS Eye \(em the visual organs
-Registered from \fIOuter_World/tools/eye.py\fR; full description under
-\fBThe eye\fR above. The retinal organs take a fraction 0.0\(en1.0
-of the muscle's own range.
-.TP
-.B eye_anatomy
-Every organ, the hardware dial it rides on, its range, and its
-current position \(em plus the body's optic state.
-.TP
-.BR eye_pupil " \fIfraction\fR"
-The iris \(em light intake, closed to open.
-.TP
-.BR eye_chroma " \fIfraction\fR"
-Cone opponent gain \(em monochrome to full color.
-.TP
-.BR eye_acuity " \fIfraction\fR"
-Lateral inhibition \(em soft to crisp edges.
-.TP
-.BR eye_sensitivity " \fIfraction\fR"
-Photoreceptor adaptation \(em dim-adapted to fully sensitive.
-.TP
-.BR eye_adaptation " \fIfraction\fR"
-Cone white-point balance across the eye's range.
-.TP
-.BR eye_contrast " \fIfraction\fR"
-Ganglion output contrast.
-.TP
-.BR eye_set " \fIdial value\fR"
-A raw hardware dial by driver name, for muscles outside an organ.
-.TP
-.BR eye_lid " \fIopenness\fR"
-Hold the voluntary eyelid, 0.0\(en1.0.
-.TP
-.BR eye_focus " \fImeters\fR"
-Ciliary accommodation to a distance in metres; 0 relaxes to infinity.
-.TP
-.BR eye_gain " \fIvalue\fR"
-The corticothalamic gain on the relay; 1.0 is neutral.
-.SS Arcade
-The \fBarcade_*\fR family (registered by
-\fIgames.arcade.Arcade\fR) puts two shelves of games in her hands:
-the official ARC-AGI-3 games through the \fIarc-agi\fR toolkit, and
-the local arena shelf \(em chess, checkers, othello, connect four,
-tic-tac-toe, breakthrough \(em played on \fIpyspiel\fR, the engine
-the Kaggle Game Arena harness evaluates on. She is the player, not
-a model being scored: \fBarcade_offers\fR lists the games,
-\fBarcade_enter\fR opens one, \fBarcade_see\fR shows the board
-(text, image, change, or objects), \fBarcade_act\fR makes a move,
-\fBarcade_play\fR plays a bout, \fBarcade_leave\fR steps away,
-\fBarcade_status\fR recalls what she remembers of each game, and
-\fBarcade_directions\fR reads the rules.
-.PP
-Official games run in three modes (\fIGENESIS_ARC_MODE\fR):
-\fBnormal\fR downloads each game once and plays locally,
-\fBonline\fR scores every move on the official server, and
-\fBoffline\fR touches no network at all. \fBARC_API_KEY\fR (from
-three.arcprize.org) widens the catalogue; downloaded games and the
-arena shelf need no key. When the mind starts with
-\fB\-\-offline\fR the arcade is opened in offline mode, so play
-continues \(em locally \(em even with the network refused.
-Module internals are the generated pages under
-\fISelf_World/docs/python/\fR
-(\fIOuter_World.games.arcade\fR, \fI.games.arena\fR,
-\fI.games.official\fR, \fI.games.sight\fR).
-
-.SH GLOSSARY
-.TP
-.B Tool
-A named callable in the registry: name, description, function.
-She invokes one by name with arguments.
-.TP
-.B ToolResult
-What a tool returns: \fIsuccess\fR plus \fIoutput\fR, or an
-\fIerror\fR string. A tool reports failure; it never raises.
-.TP
-.B Registry
-The flat \fIToolRegistry\fR dispatch table holding every tool she
-can call; \fIrun(name, **kwargs)\fR executes one.
-.TP
-.B Preset
-A tool name she has used before \(em her own label for a point in
-brush space, not a fixed menu (\fBstudio_presets\fR lists them).
-.TP
-.B Rasterizer
-The built-in renderer that turns her ops into pixels on the
-internal sheet \(em the canonical artifact.
-.TP
-.B uinput
-The kernel facility for synthetic input devices \(em her
-\fBkey_press\fR/\fBmouse_*\fR events are real kernel events, not
-app-level fakes.
-.TP
-.B Oracle
-The SymPy-backed equality checker \(em the only authority that
-can mark a research claim \fIverified\fR.
-.TP
-.B Interstitial
-A captcha, consent wall, or bot challenge that blocks a fetched
-page \(em detected and reported honestly, never rendered as empty
-results.
 
 .SH DEPENDENCIES
 The core registry needs nothing beyond the project venv. Optional
@@ -492,36 +93,33 @@ capabilities install as extras and degrade to honest errors, never
 crashes; \fIscripts/install_optional_deps.sh\fR installs and then
 verifies each one live.
 .TP
-.B uv pip install evdev
-compiles a small C extension; needs the udev rule for
+.B uv sync --extra hid
+evdev \(em compiles a small C extension; needs the udev rule for
 /dev/uinput access.
 .TP
-.B uv pip install sympy mpmath
-the symbolic tools.
+.B uv sync --extra math
+sympy, mpmath \(em the symbolic tools.
 .TP
-.B uv pip install vosk sounddevice speechrecognition piper-tts
-her voice; binds system audio libraries.
+.B uv sync --extra arc
+arc-agi, game-arena, kaggle-environments, kaggle, six \(em the
+arcade shelves (see
+.BR genesis-arcade (7)).
 .TP
-.B uv pip install arc-agi game-arena kaggle-environments open-spiel
-the arcade shelves \(em commented optional deps in
-\fIrequirements.txt\fR (no extra is declared).
-.TP
-.B curl_cffi
-Required, not optional: \fBweb_fetch\fR's transport \(em Chrome's
-real TLS/HTTP2 fingerprint on plain GETs. Listed in
-\fIrequirements.txt\fR; \fIurllib\fR is the fallback if absent.
+.B uv sync --extra voice
+vosk, sounddevice, speechrecognition, piper-tts \(em her voice;
+binds system audio libraries.
 .TP
 .B System packages
-google-chrome or a Chromium-family sibling (the only browser her
-tools drive), cairo headers for pycairo (the canvas), a compiler for
-evdev, and the NOPASSWD sudoers drop-in for \fBrun_privileged\fR.
+google-chrome (the browser), cairo headers for pycairo (the
+canvas), a compiler for evdev, and the NOPASSWD sudoers drop-in
+for \fBrun_privileged\fR.
 
 .SH FILES
 .TP
-.I Outer_World/tools/framework.py
+.I python/tools/framework.py
 The registry, the builtins, and \fBrun_privileged\fR.
 .TP
-.I Outer_World/tools/hid.py
+.I python/tools/hid.py
 The virtual keyboard and pointer.
 .TP
 .I scripts/genesis-uinput.rules
@@ -533,16 +131,11 @@ The NOPASSWD template for \fBrun_privileged\fR.
 .I scripts/install_optional_deps.sh
 Installs and verifies every optional capability.
 .TP
-.I Outer_World/workstation/environment.py
+.I python/worlds/world.py
 The outer world her acts land in.
-.TP
-.I Outer_World/tools/studio.py
-The \fBstudio_*\fR tool family \(em her hands on the paint program.
 
 .SH SEE ALSO
 .BR genesis (1),
 .BR genesis-cli (1),
-.BR genesis-daemon (8).
-Subsystem internals are the generated docs under
-.IR Self_World/docs/
-.RI ( scripts/gen_docs.sh ).
+.BR genesis-arcade (7),
+.BR genesis-browser (7)

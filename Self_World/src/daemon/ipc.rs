@@ -309,8 +309,8 @@ pub mod cmd {
     ///           [f32×12 stamped_tag] (on ack=1)
     pub const STORE_EPISODE: u8 = 32;
     /// Get per-subsystem silicon telemetry — which part of the mind's
-    /// process tree is firing. Each subsystem (daemon, cognitive —
-    /// the eye rides inside the daemon) reports its own CPU share,
+    /// process tree is firing. Each subsystem (daemon, cognitive,
+    /// retina — the eye is its own process) reports its own CPU share,
     /// I/O share, and
     /// microarchitectural prediction-error ratios (cache/branch
     /// misses). The cognitive mind correlates this with its task
@@ -408,8 +408,8 @@ pub mod cmd {
     /// Response: `[u16 alive_mask][u16 deaths][u8 last_death]`
     ///
     /// Bit *n* of `alive_mask` is set while subsystem *n* is running
-    /// (0 = daemon, 1 = cognitive; 2 is retired — the eye is a thread
-    /// inside the daemon, not a process). `deaths` counts
+    /// (0 = daemon, 1 = cognitive, 2 = retina — the eye's sole
+    /// carrier, its own process). `deaths` counts
     /// transitions from alive to not-alive since startup; a subsystem
     /// that was never running does not count. `last_death` is the
     /// subsystem index of the most recent loss, or 0xff if none.
@@ -1123,11 +1123,11 @@ pub struct BodyStateSummary {
 }
 
 /// Per-subsystem silicon telemetry — one process's activity signals.
-/// `subsystem` is the wire tag: 0 = daemon, 1 = cognitive (2 is a
-/// retired tag — the eye rides inside the daemon now).
+/// `subsystem` is the wire tag: 0 = daemon, 1 = cognitive, 2 = retina
+/// (the eye's sole carrier, its own process).
 #[derive(Clone, Debug, Default)]
 pub struct SubsystemTelemetrySummary {
-    /// Subsystem tag (0=daemon, 1=cognitive, 2=retired).
+    /// Subsystem tag (0=daemon, 1=cognitive, 2=retina).
     pub subsystem: u8,
     /// Process ID.
     pub pid: u32,

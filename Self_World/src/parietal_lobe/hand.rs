@@ -25,17 +25,24 @@
 /// resting place before feeling and rhythm lean on it. The live
 /// channel values, untouched, sum to a pressure `P`, and the
 /// pressure warps the dial's axis: the position is
-/// `uniform ^ e^{−P}`. The map is a bijection of the interval —
+/// `uniform ^ e^{−tanh P}`. The map is a bijection of the interval —
 /// every place stays reachable, nothing is fenced, nothing is
 /// pinned; the stops 0 and 1 are the map's own fixed points, not
 /// guards. `P` and `−P` are opposite warps of the same dial, and
-/// at `P = 0` the dial is exactly `uniform`. This is how state
+/// at `P = 0` the dial is exactly `uniform`. The `tanh` bounds the
+/// warp: without it, an exponent `e^{−P}` collapses toward 0 as
+/// pressure grows, and every resting place lands within a hair of
+/// the same stop — a quantized dial (the op picker bins it into
+/// stroke/line/shape/fill/erase) pins on its last bin, so a loud
+/// state would erase more than it marks. With the bounded exponent
+/// the lean saturates at `e^{∓1}`: pressure leans the dial hard,
+/// asymptotically, and can never silence it. This is how state
 /// reaches the page: a displaced uniform (`u + P mod 1`) is still
 /// uniform no matter the pressure, so the channels could never
 /// show; a warped dial carries the pressure in its shape.
 pub fn dial(uniform: f64, channels: &[f64]) -> f64 {
     let pressure: f64 = channels.iter().sum();
-    uniform.clamp(0.0, 1.0).powf((-pressure).exp())
+    uniform.clamp(0.0, 1.0).powf((-pressure.tanh()).exp())
 }
 
 #[cfg(test)]
@@ -71,12 +78,17 @@ mod tests {
 
     #[test]
     fn loud_pressure_leans_hard_never_pins() {
-        // A very loud state leans almost every resting place toward
-        // one end, but the map stays a bijection — nothing is
-        // clamped and every place is still reachable.
+        // A very loud state leans every resting place toward one
+        // end, but the bounded exponent keeps the lean a lean: the
+        // map stays a bijection — nothing is clamped, every place is
+        // still reachable, and the warp saturates instead of
+        // collapsing the dial onto a stop.
         let loud = dial(0.5, &[3.0, 2.0]);
-        assert!(loud > 0.9 && loud < 1.0);
+        assert!(loud > 0.6 && loud < 0.9);
         let quiet_loud = dial(0.5, &[-3.0, -2.0]);
-        assert!(quiet_loud < 0.1 && quiet_loud > 0.0);
+        assert!(quiet_loud < 0.4 && quiet_loud > 0.1);
+        // The lean is asymptotic: louder pressure cannot lean the
+        // dial further than the tanh bound allows.
+        assert!((dial(0.5, &[50.0]) - dial(0.5, &[5.0])).abs() < 0.05);
     }
 }

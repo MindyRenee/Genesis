@@ -1,8 +1,8 @@
 """Optic nerve — the mind's end of the afferent path.
 
-The body's optic nerve (``src/daemon/optic_nerve.rs`` — the daemon owns
-the camera now, a capture thread inside the body rather than a separate
-process) writes raw frames into the POSIX shared-memory segment
+The body's optic nerve (``src/daemon/optic_nerve.rs`` — written only
+by ``genesis-retina``, the camera's sole carrier) publishes raw
+frames into the POSIX shared-memory segment
 ``/genesis_optic_nerve``. This module attaches to that segment and wraps
 the live frame directly into a NumPy array without any serialization,
 JSON, or socket round-trips.

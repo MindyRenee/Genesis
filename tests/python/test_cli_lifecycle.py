@@ -355,10 +355,9 @@ def test_self_directed_keeps_rebirth_watcher_running(tmp_path):
 
 
 def test_retina_launches_before_the_daemon(tmp_path):
-    """The eye opens before the body: a publishing retina must already
-    be on the nerve when the daemon boots, so the daemon's arbitration
-    keeps its embedded limb closed and exactly one process owns the
-    camera."""
+    """The eye wakes before the body: the retina — the sole carrier of
+    the camera — launches first so the daemon's optic reader finds a
+    live nerve from its first tick."""
     calls = []
     retina = Mock(side_effect=lambda *a, **k: calls.append("retina"))
     daemon = Mock()
