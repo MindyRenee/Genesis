@@ -629,12 +629,25 @@ class ActingLoop:
             if edges:
                 result.discoveries.append(f"knew '{topic}' with {edges} relationships")
 
-        # Queue the topic onto the autonomous learner either way — its
-        # deep pipeline (source registry, spaced review) can take it
-        # further than a one-shot probe can.
+        # The deep pipeline (source registry, spaced review) takes a
+        # topic further than a one-shot probe can. With the learner's
+        # loop open that means queueing it for the next metronome
+        # step; with the loop closed (self-directed) this chosen
+        # action invokes the bounded step directly — the topic, then
+        # whatever urgent gaps conversation left queued, so the queue
+        # is a record she drains when she chooses, not a dead letter.
         if self.learner is not None and is_world_concept(topic):
             try:
-                self.learner.add_topic(topic)
+                if self.learner.running:
+                    self.learner.add_topic(topic)
+                else:
+                    if self.learner.lookup_topic_sync(topic) is not None:
+                        result.discoveries.append(f"learned '{topic}' from sources")
+                    for _ in range(2):
+                        queued = self.learner.pop_urgent_topic()
+                        if queued is None:
+                            break
+                        self.learner.lookup_topic_sync(queued)
             except Exception as e:  # noqa: BLE001
                 note_swallowed(
                     "parietal_lobe.agency._execute_learn",

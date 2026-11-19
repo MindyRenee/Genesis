@@ -43,7 +43,7 @@ pub struct VisionSystem {
     /// Ciliary accommodation — defocus σ in pixels. Voluntary for
     /// now (the mind's SET_FOCUS analog); 0 is a sharp image.
     pub defocus_sigma: f64,
-    /// Sympathetic drive ∈ [0,1] for the pupil's dilator component —
+    /// Sympathetic drive ∈ `[0,1]` for the pupil's dilator component —
     /// wired to effective norepinephrine by whatever owns the body.
     pub ne_drive: f64,
 }

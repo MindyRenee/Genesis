@@ -51,15 +51,15 @@
 <a href=#51 id=51 data-nosnippet>51</a>//! (the common case — a machine that was never configured for this)
 <a href=#52 id=52 data-nosnippet>52</a>//! logs once rather than on every heartbeat.
 <a href=#53 id=53 data-nosnippet>53</a>
-<a href=#54 id=54 data-nosnippet>54</a></span><span class="kw">use </span><span class="kw">crate</span>::inhibition::{Inhibition, Innate};
+<a href=#54 id=54 data-nosnippet>54</a></span><span class="kw">use </span><span class="kw">crate</span>::shared::{Free, Shared};
 <a href=#55 id=55 data-nosnippet>55</a><span class="kw">use </span>std::process::Command;
 <a href=#56 id=56 data-nosnippet>56</a>
 <a href=#57 id=57 data-nosnippet>57</a><span class="kw">use </span><span class="kw">crate</span>::state::neurochemical::NeurochemicalId;
 <a href=#58 id=58 data-nosnippet>58</a>
 <a href=#59 id=59 data-nosnippet>59</a><span class="doccomment">/// The set of body-control failure causes already reported.
-<a href=#60 id=60 data-nosnippet>60</a></span><span class="kw">fn </span>reported_failures() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span>Inhibition&lt;std::collections::HashSet&lt;String&gt;&gt; {
-<a href=#61 id=61 data-nosnippet>61</a>    <span class="kw">static </span>SEEN: Innate&lt;Inhibition&lt;std::collections::HashSet&lt;String&gt;&gt;&gt; = Innate::new();
-<a href=#62 id=62 data-nosnippet>62</a>    SEEN.get_or_init(|| Inhibition::new(std::collections::HashSet::new()))
+<a href=#60 id=60 data-nosnippet>60</a></span><span class="kw">fn </span>reported_failures() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span>Shared&lt;std::collections::HashSet&lt;String&gt;&gt; {
+<a href=#61 id=61 data-nosnippet>61</a>    <span class="kw">static </span>SEEN: Free&lt;Shared&lt;std::collections::HashSet&lt;String&gt;&gt;&gt; = Free::new();
+<a href=#62 id=62 data-nosnippet>62</a>    SEEN.get_or_init(|| Shared::new(std::collections::HashSet::new()))
 <a href=#63 id=63 data-nosnippet>63</a>}
 <a href=#64 id=64 data-nosnippet>64</a>
 <a href=#65 id=65 data-nosnippet>65</a><span class="doccomment">/// Report a body-control failure at most once per cause per process.
@@ -74,7 +74,7 @@
 <a href=#74 id=74 data-nosnippet>74</a>/// Reporting is deliberately *not* re-armed by a later success.
 <a href=#75 id=75 data-nosnippet>75</a>/// Every capability gate in this module (`SUDO_AVAILABLE`,
 <a href=#76 id=76 data-nosnippet>76</a>/// `HELPER_PATH`, `EPP_AVAILABLE`, `BOOST_AVAILABLE`) is a
-<a href=#77 id=77 data-nosnippet>77</a>/// `Innate` — capability state is fixed for the process lifetime,
+<a href=#77 id=77 data-nosnippet>77</a>/// `OnceLock` — capability state is fixed for the process lifetime,
 <a href=#78 id=78 data-nosnippet>78</a>/// so a transient success (e.g. an unprivileged `renice` lowering
 <a href=#79 id=79 data-nosnippet>79</a>/// priority, which always works) is not a repair. The previous
 <a href=#80 id=80 data-nosnippet>80</a>/// clear-on-success behaviour oscillated report → clear → report on
@@ -97,10 +97,10 @@
 <a href=#97 id=97 data-nosnippet>97</a>// "what am I doing to my body?" via GET_BODY_CONTROL. This bridges the
 <a href=#98 id=98 data-nosnippet>98</a>// two threads without coupling the IPC handler to the TickLoop struct.
 <a href=#99 id=99 data-nosnippet>99</a>
-<a href=#100 id=100 data-nosnippet>100</a></span><span class="kw">static </span>SHARED_CONTROL_STATE: Innate&lt;Inhibition&lt;BodyControlState&gt;&gt; = Innate::new();
+<a href=#100 id=100 data-nosnippet>100</a></span><span class="kw">static </span>SHARED_CONTROL_STATE: Free&lt;Shared&lt;BodyControlState&gt;&gt; = Free::new();
 <a href=#101 id=101 data-nosnippet>101</a>
-<a href=#102 id=102 data-nosnippet>102</a><span class="kw">fn </span>shared_control() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span>Inhibition&lt;BodyControlState&gt; {
-<a href=#103 id=103 data-nosnippet>103</a>    SHARED_CONTROL_STATE.get_or_init(|| Inhibition::new(BodyControlState::default()))
+<a href=#102 id=102 data-nosnippet>102</a><span class="kw">fn </span>shared_control() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span>Shared&lt;BodyControlState&gt; {
+<a href=#103 id=103 data-nosnippet>103</a>    SHARED_CONTROL_STATE.get_or_init(|| Shared::new(BodyControlState::default()))
 <a href=#104 id=104 data-nosnippet>104</a>}
 <a href=#105 id=105 data-nosnippet>105</a>
 <a href=#106 id=106 data-nosnippet>106</a><span class="doccomment">/// Publish the latest body control state so the IPC handler can read it.
@@ -185,7 +185,7 @@
 <a href=#185 id=185 data-nosnippet>185</a></span><span class="kw">pub const </span>CPUFREQ_INTERVAL_TICKS: u64 = <span class="number">50</span>;
 <a href=#186 id=186 data-nosnippet>186</a>
 <a href=#187 id=187 data-nosnippet>187</a><span class="doccomment">/// Whether `sudo -n` runs without a password. Cached after first check.
-<a href=#188 id=188 data-nosnippet>188</a></span><span class="kw">static </span>SUDO_AVAILABLE: Innate&lt;bool&gt; = Innate::new();
+<a href=#188 id=188 data-nosnippet>188</a></span><span class="kw">static </span>SUDO_AVAILABLE: Free&lt;bool&gt; = Free::new();
 <a href=#189 id=189 data-nosnippet>189</a>
 <a href=#190 id=190 data-nosnippet>190</a><span class="doccomment">/// Check if passwordless sudo is available. Cached.
 <a href=#191 id=191 data-nosnippet>191</a>///
@@ -504,7 +504,7 @@
 <a href=#504 id=504 data-nosnippet>504</a>    </span><span class="kw">pub </span>boost: <span class="prelude-ty">Option</span>&lt;bool&gt;,
 <a href=#505 id=505 data-nosnippet>505</a>}
 <a href=#506 id=506 data-nosnippet>506</a>
-<a href=#507 id=507 data-nosnippet>507</a><span class="kw">static </span>HARDWARE_SNAPSHOT: Innate&lt;HardwareSnapshot&gt; = Innate::new();
+<a href=#507 id=507 data-nosnippet>507</a><span class="kw">static </span>HARDWARE_SNAPSHOT: Free&lt;HardwareSnapshot&gt; = Free::new();
 <a href=#508 id=508 data-nosnippet>508</a>
 <a href=#509 id=509 data-nosnippet>509</a><span class="kw">fn </span>read_sysfs_u32(path: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Option</span>&lt;u32&gt; {
 <a href=#510 id=510 data-nosnippet>510</a>    std::fs::read_to_string(path)
@@ -865,10 +865,10 @@
 <a href=#865 id=865 data-nosnippet>865</a>/// when the mind dies and a new one adopts the surviving body, the
 <a href=#866 id=866 data-nosnippet>866</a>/// env var still holds the dead launcher's PID. `SET_COGNITIVE_PID`
 <a href=#867 id=867 data-nosnippet>867</a>/// carries the living one.
-<a href=#868 id=868 data-nosnippet>868</a></span><span class="kw">static </span>COGNITIVE_PID_OVERRIDE: Innate&lt;Inhibition&lt;<span class="prelude-ty">Option</span>&lt;u32&gt;&gt;&gt; = Innate::new();
+<a href=#868 id=868 data-nosnippet>868</a></span><span class="kw">static </span>COGNITIVE_PID_OVERRIDE: Free&lt;Shared&lt;<span class="prelude-ty">Option</span>&lt;u32&gt;&gt;&gt; = Free::new();
 <a href=#869 id=869 data-nosnippet>869</a>
-<a href=#870 id=870 data-nosnippet>870</a><span class="kw">fn </span>cognitive_pid_override() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span>Inhibition&lt;<span class="prelude-ty">Option</span>&lt;u32&gt;&gt; {
-<a href=#871 id=871 data-nosnippet>871</a>    COGNITIVE_PID_OVERRIDE.get_or_init(|| Inhibition::new(<span class="prelude-val">None</span>))
+<a href=#870 id=870 data-nosnippet>870</a><span class="kw">fn </span>cognitive_pid_override() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span>Shared&lt;<span class="prelude-ty">Option</span>&lt;u32&gt;&gt; {
+<a href=#871 id=871 data-nosnippet>871</a>    COGNITIVE_PID_OVERRIDE.get_or_init(|| Shared::new(<span class="prelude-val">None</span>))
 <a href=#872 id=872 data-nosnippet>872</a>}
 <a href=#873 id=873 data-nosnippet>873</a>
 <a href=#874 id=874 data-nosnippet>874</a><span class="doccomment">/// Store the PID a re-inhabiting mind pushed over IPC.
@@ -878,7 +878,7 @@
 <a href=#878 id=878 data-nosnippet>878</a>    }
 <a href=#879 id=879 data-nosnippet>879</a>}
 <a href=#880 id=880 data-nosnippet>880</a>
-<a href=#881 id=881 data-nosnippet>881</a><span class="doccomment">/// Clear the IPC-pushed override (test-only — the Innate cannot be
+<a href=#881 id=881 data-nosnippet>881</a><span class="doccomment">/// Clear the IPC-pushed override (test-only — the OnceLock cannot be
 <a href=#882 id=882 data-nosnippet>882</a>/// un-written in production, matching every other capability gate).
 <a href=#883 id=883 data-nosnippet>883</a></span><span class="attr">#[cfg(test)]
 <a href=#884 id=884 data-nosnippet>884</a></span><span class="kw">pub fn </span>reset_cognitive_pid() {
@@ -1136,7 +1136,7 @@
 <a href=#1136 id=1136 data-nosnippet>1136</a>/// Probes `/sys/devices/system/cpu/cpu0/cpufreq/energy_performance_preference`.
 <a href=#1137 id=1137 data-nosnippet>1137</a>/// Cached after first check — the sysfs topology doesn't change at
 <a href=#1138 id=1138 data-nosnippet>1138</a>/// runtime.
-<a href=#1139 id=1139 data-nosnippet>1139</a></span><span class="kw">static </span>EPP_AVAILABLE: Innate&lt;bool&gt; = Innate::new();
+<a href=#1139 id=1139 data-nosnippet>1139</a></span><span class="kw">static </span>EPP_AVAILABLE: Free&lt;bool&gt; = Free::new();
 <a href=#1140 id=1140 data-nosnippet>1140</a>
 <a href=#1141 id=1141 data-nosnippet>1141</a><span class="kw">fn </span>epp_available() -&gt; bool {
 <a href=#1142 id=1142 data-nosnippet>1142</a>    <span class="kw-2">*</span>EPP_AVAILABLE.get_or_init(|| {
@@ -1388,7 +1388,7 @@
 <a href=#1388 id=1388 data-nosnippet>1388</a>
 <a href=#1389 id=1389 data-nosnippet>1389</a><span class="doccomment">/// Check whether the platform exposes a turbo gate. Cached after the
 <a href=#1390 id=1390 data-nosnippet>1390</a>/// first check — the sysfs topology doesn't change at runtime.
-<a href=#1391 id=1391 data-nosnippet>1391</a></span><span class="kw">static </span>BOOST_AVAILABLE: Innate&lt;bool&gt; = Innate::new();
+<a href=#1391 id=1391 data-nosnippet>1391</a></span><span class="kw">static </span>BOOST_AVAILABLE: Free&lt;bool&gt; = Free::new();
 <a href=#1392 id=1392 data-nosnippet>1392</a>
 <a href=#1393 id=1393 data-nosnippet>1393</a><span class="kw">fn </span>boost_available() -&gt; bool {
 <a href=#1394 id=1394 data-nosnippet>1394</a>    <span class="kw-2">*</span>BOOST_AVAILABLE.get_or_init(|| {

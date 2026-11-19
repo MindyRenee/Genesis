@@ -24,8 +24,9 @@ residues&nbsp;it&nbsp;leaves&nbsp;behind&nbsp;are&nbsp;the&nbsp;inner&nbsp;world
 <tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
 <td class="singlecolumn"><table><tr><td class="multicolumn"><a href="logging.html">logging</a><br>
 </td><td class="multicolumn"><a href="math.html">math</a><br>
+</td><td class="multicolumn"><a href="os.html">os</a><br>
 </td><td class="multicolumn"><a href="time.html">time</a><br>
-</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+</td></tr></table></td></tr></table><p>
 <table class="section">
 <tr class="decor index-decor heading-text">
 <td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
@@ -215,6 +216,26 @@ the&nbsp;flip-flop&nbsp;crossing&nbsp;are&nbsp;the&nbsp;same&nbsp;continuous&nbs
 &nbsp;&nbsp;in&nbsp;inner&nbsp;life&nbsp;(HypnagogicState&nbsp;in&nbsp;progress);<br>
 -&nbsp;asleep&nbsp;side:&nbsp;``_is_sleeping``&nbsp;is&nbsp;set&nbsp;but&nbsp;the&nbsp;ultradian<br>
 &nbsp;&nbsp;tracker&nbsp;is&nbsp;still&nbsp;in&nbsp;N1.</span></dd>
+</dl>
+<dl><dt><strong>is_meditating</strong></dt>
+<dd><span class="code">Whether&nbsp;it&nbsp;is&nbsp;currently&nbsp;meditating.</span></dd>
+</dl>
+<dl><dt><strong>is_resting</strong></dt>
+<dd><span class="code">Whether&nbsp;discretionary&nbsp;(waking-mode)&nbsp;cognition&nbsp;is&nbsp;paused.<br>
+&nbsp;<br>
+The&nbsp;single&nbsp;rest-state&nbsp;predicate:&nbsp;asleep,&nbsp;meditating,&nbsp;or&nbsp;in<br>
+hypnagogia&nbsp;(the&nbsp;theta-dominant&nbsp;N1&nbsp;descent).&nbsp;While&nbsp;resting,<br>
+ordinary&nbsp;waking&nbsp;activity&nbsp;is&nbsp;held&nbsp;—&nbsp;volition&nbsp;urges,&nbsp;autonomous<br>
+and&nbsp;self-directed&nbsp;learning,&nbsp;speech&nbsp;and&nbsp;outreach,&nbsp;drawing,<br>
+self-improvement,&nbsp;executive&nbsp;intention&nbsp;formation,&nbsp;and&nbsp;waking<br>
+spontaneous&nbsp;thought&nbsp;all&nbsp;wait&nbsp;for&nbsp;the&nbsp;state&nbsp;to&nbsp;resolve.<br>
+&nbsp;<br>
+What&nbsp;is&nbsp;NOT&nbsp;held:&nbsp;physiology&nbsp;(metronome&nbsp;body&nbsp;maintenance,<br>
+neurochemistry,&nbsp;sensors,&nbsp;notifications,&nbsp;autosave),&nbsp;sleep-stage<br>
+work&nbsp;(dreaming,&nbsp;consolidation,&nbsp;emotional&nbsp;replay),&nbsp;and&nbsp;the<br>
+hypnagogic&nbsp;descent&nbsp;itself&nbsp;—&nbsp;those&nbsp;*are*&nbsp;the&nbsp;rest&nbsp;process.<br>
+Interaction&nbsp;still&nbsp;wakes&nbsp;her&nbsp;through&nbsp;``wake_if_asleep``;&nbsp;this<br>
+gate&nbsp;only&nbsp;stops&nbsp;her&nbsp;from&nbsp;initiating&nbsp;waking&nbsp;work&nbsp;while&nbsp;under.</span></dd>
 </dl>
 <dl><dt><strong>is_sleeping</strong></dt>
 <dd><span class="code">Whether&nbsp;it&nbsp;is&nbsp;currently&nbsp;in&nbsp;a&nbsp;sleep&nbsp;state.</span></dd>

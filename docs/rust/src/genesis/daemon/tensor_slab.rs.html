@@ -23,7 +23,7 @@
 <a href=#23 id=23 data-nosnippet>23</a>//! drop request  := [u8 name_len] [name utf8]
 <a href=#24 id=24 data-nosnippet>24</a>//! ```
 <a href=#25 id=25 data-nosnippet>25</a>
-<a href=#26 id=26 data-nosnippet>26</a></span><span class="kw">use </span><span class="kw">crate</span>::inhibition::{Inhibition, Innate};
+<a href=#26 id=26 data-nosnippet>26</a></span><span class="kw">use </span><span class="kw">crate</span>::shared::{Free, Shared};
 <a href=#27 id=27 data-nosnippet>27</a><span class="kw">use </span>std::collections::HashMap;
 <a href=#28 id=28 data-nosnippet>28</a>
 <a href=#29 id=29 data-nosnippet>29</a><span class="doccomment">/// Element dtypes shared across the wire. The codes are part of the
@@ -251,11 +251,11 @@
 <a href=#251 id=251 data-nosnippet>251</a>}
 <a href=#252 id=252 data-nosnippet>252</a>
 <a href=#253 id=253 data-nosnippet>253</a><span class="doccomment">/// The shared slab instance.
-<a href=#254 id=254 data-nosnippet>254</a></span><span class="kw">static </span>SLAB: Innate&lt;Inhibition&lt;TensorSlab&gt;&gt; = Innate::new();
+<a href=#254 id=254 data-nosnippet>254</a></span><span class="kw">static </span>SLAB: Free&lt;Shared&lt;TensorSlab&gt;&gt; = Free::new();
 <a href=#255 id=255 data-nosnippet>255</a>
 <a href=#256 id=256 data-nosnippet>256</a><span class="doccomment">/// Access the daemon's tensor slab.
-<a href=#257 id=257 data-nosnippet>257</a></span><span class="kw">pub fn </span>slab() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span>Inhibition&lt;TensorSlab&gt; {
-<a href=#258 id=258 data-nosnippet>258</a>    SLAB.get_or_init(|| Inhibition::new(TensorSlab::default()))
+<a href=#257 id=257 data-nosnippet>257</a></span><span class="kw">pub fn </span>slab() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span>Shared&lt;TensorSlab&gt; {
+<a href=#258 id=258 data-nosnippet>258</a>    SLAB.get_or_init(|| Shared::new(TensorSlab::default()))
 <a href=#259 id=259 data-nosnippet>259</a>}
 <a href=#260 id=260 data-nosnippet>260</a>
 <a href=#261 id=261 data-nosnippet>261</a><span class="doccomment">/// Parse `[u8 name_len][name]` from the front of `buf`; returns the

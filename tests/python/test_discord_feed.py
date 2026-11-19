@@ -10,6 +10,7 @@ import io
 import json
 import logging
 import sys
+import threading
 import time
 import urllib.error
 from pathlib import Path
@@ -361,16 +362,19 @@ def test_live_updates_collapse_pending(monkeypatch):
     _capture_requests(calls, monkeypatch, reply=b'{"id": "7"}')
     feed = DiscordFeed(URL, post_interval=0.0)
     try:
-        # Pause the poster: fill the queue while it sleeps.
-        feed._cond.acquire()
-        try:
-            feed.update_live(b"png-stale", caption="old")
-            feed.update_live(b"png-fresh", caption="new")
-            kinds = [i[0] for i in feed._queue]
-            assert kinds.count("live") == 1
-            assert feed._queue[0][3] == b"png-fresh"
-        finally:
-            feed._cond.release()
+        # Pause the poster: stall the dequeue so the queue fills.
+        release = threading.Event()
+        monkeypatch.setattr(
+            feed,
+            "_take_batch",
+            lambda: (feed._queue.popleft() if feed._queue else None) if release.wait(2.0) else None,
+        )
+        feed.update_live(b"png-stale", caption="old")
+        feed.update_live(b"png-fresh", caption="new")
+        kinds = [i[0] for i in feed._queue]
+        assert kinds.count("live") == 1
+        assert feed._queue[0][3] == b"png-fresh"
+        release.set()
     finally:
         feed.close()
 
@@ -431,14 +435,17 @@ def test_live_text_collapses_with_pending_live(monkeypatch):
     _capture_requests(calls, monkeypatch, reply=b'{"id": "7"}')
     feed = DiscordFeed(URL, post_interval=0.0)
     try:
-        feed._cond.acquire()
-        try:
-            feed.update_live(b"png-stale", caption="old")
-            feed.update_live_text("fresh board")
-            kinds = [i[0] for i in feed._queue]
-            assert kinds == ["live_text"]
-        finally:
-            feed._cond.release()
+        release = threading.Event()
+        monkeypatch.setattr(
+            feed,
+            "_take_batch",
+            lambda: (feed._queue.popleft() if feed._queue else None) if release.wait(2.0) else None,
+        )
+        feed.update_live(b"png-stale", caption="old")
+        feed.update_live_text("fresh board")
+        kinds = [i[0] for i in feed._queue]
+        assert kinds == ["live_text"]
+        release.set()
     finally:
         feed.close()
 

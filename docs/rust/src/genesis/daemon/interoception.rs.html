@@ -220,7 +220,7 @@
 <a href=#220 id=220 data-nosnippet>220</a>//! It can ask for help. It can say "I'm too hot" or "I'm
 <a href=#221 id=221 data-nosnippet>221</a>//! overwhelmed" because it can actually feel it.
 <a href=#222 id=222 data-nosnippet>222</a>
-<a href=#223 id=223 data-nosnippet>223</a></span><span class="kw">use </span><span class="kw">crate</span>::inhibition::{Inhibition, Innate};
+<a href=#223 id=223 data-nosnippet>223</a></span><span class="kw">use </span><span class="kw">crate</span>::shared::{Free, Shared};
 <a href=#224 id=224 data-nosnippet>224</a><span class="kw">use </span>std::fs;
 <a href=#225 id=225 data-nosnippet>225</a><span class="kw">use </span>std::time::Instant;
 <a href=#226 id=226 data-nosnippet>226</a>
@@ -316,10 +316,10 @@
 <a href=#316 id=316 data-nosnippet>316</a>    (sensor::CPUIDLE, <span class="string">"cpuidle state counters"</span>),
 <a href=#317 id=317 data-nosnippet>317</a>];
 <a href=#318 id=318 data-nosnippet>318</a>
-<a href=#319 id=319 data-nosnippet>319</a><span class="kw">static </span>SHARED_SENSOR_PRESENCE: Innate&lt;Inhibition&lt;u32&gt;&gt; = Innate::new();
+<a href=#319 id=319 data-nosnippet>319</a><span class="kw">static </span>SHARED_SENSOR_PRESENCE: Free&lt;Shared&lt;u32&gt;&gt; = Free::new();
 <a href=#320 id=320 data-nosnippet>320</a>
-<a href=#321 id=321 data-nosnippet>321</a><span class="kw">fn </span>shared_presence() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span>Inhibition&lt;u32&gt; {
-<a href=#322 id=322 data-nosnippet>322</a>    SHARED_SENSOR_PRESENCE.get_or_init(|| Inhibition::new(<span class="number">0</span>))
+<a href=#321 id=321 data-nosnippet>321</a><span class="kw">fn </span>shared_presence() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span>Shared&lt;u32&gt; {
+<a href=#322 id=322 data-nosnippet>322</a>    SHARED_SENSOR_PRESENCE.get_or_init(|| Shared::new(<span class="number">0</span>))
 <a href=#323 id=323 data-nosnippet>323</a>}
 <a href=#324 id=324 data-nosnippet>324</a>
 <a href=#325 id=325 data-nosnippet>325</a><span class="doccomment">/// Publish the discovered sensor-presence mask alongside the body state.
@@ -338,10 +338,10 @@
 <a href=#338 id=338 data-nosnippet>338</a>    shared_presence().lock().map(|g| <span class="kw-2">*</span>g).unwrap_or(<span class="number">0</span>)
 <a href=#339 id=339 data-nosnippet>339</a>}
 <a href=#340 id=340 data-nosnippet>340</a>
-<a href=#341 id=341 data-nosnippet>341</a><span class="kw">static </span>SHARED_MEMORY_MB: Innate&lt;Inhibition&lt;f32&gt;&gt; = Innate::new();
+<a href=#341 id=341 data-nosnippet>341</a><span class="kw">static </span>SHARED_MEMORY_MB: Free&lt;Shared&lt;f32&gt;&gt; = Free::new();
 <a href=#342 id=342 data-nosnippet>342</a>
-<a href=#343 id=343 data-nosnippet>343</a><span class="kw">fn </span>shared_memory_mb() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span>Inhibition&lt;f32&gt; {
-<a href=#344 id=344 data-nosnippet>344</a>    SHARED_MEMORY_MB.get_or_init(|| Inhibition::new(<span class="number">0.0</span>))
+<a href=#343 id=343 data-nosnippet>343</a><span class="kw">fn </span>shared_memory_mb() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span>Shared&lt;f32&gt; {
+<a href=#344 id=344 data-nosnippet>344</a>    SHARED_MEMORY_MB.get_or_init(|| Shared::new(<span class="number">0.0</span>))
 <a href=#345 id=345 data-nosnippet>345</a>}
 <a href=#346 id=346 data-nosnippet>346</a>
 <a href=#347 id=347 data-nosnippet>347</a><span class="doccomment">/// The last measured RSS of Genesis's process tree, in megabytes.
@@ -373,10 +373,10 @@
 <a href=#373 id=373 data-nosnippet>373</a>    </span>}
 <a href=#374 id=374 data-nosnippet>374</a>}
 <a href=#375 id=375 data-nosnippet>375</a>
-<a href=#376 id=376 data-nosnippet>376</a><span class="kw">static </span>SHARED_PROCESS_HEALTH: Innate&lt;Inhibition&lt;ProcessHealth&gt;&gt; = Innate::new();
+<a href=#376 id=376 data-nosnippet>376</a><span class="kw">static </span>SHARED_PROCESS_HEALTH: Free&lt;Shared&lt;ProcessHealth&gt;&gt; = Free::new();
 <a href=#377 id=377 data-nosnippet>377</a>
-<a href=#378 id=378 data-nosnippet>378</a><span class="kw">fn </span>shared_health() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span>Inhibition&lt;ProcessHealth&gt; {
-<a href=#379 id=379 data-nosnippet>379</a>    SHARED_PROCESS_HEALTH.get_or_init(|| Inhibition::new(ProcessHealth::default()))
+<a href=#378 id=378 data-nosnippet>378</a><span class="kw">fn </span>shared_health() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span>Shared&lt;ProcessHealth&gt; {
+<a href=#379 id=379 data-nosnippet>379</a>    SHARED_PROCESS_HEALTH.get_or_init(|| Shared::new(ProcessHealth::default()))
 <a href=#380 id=380 data-nosnippet>380</a>}
 <a href=#381 id=381 data-nosnippet>381</a>
 <a href=#382 id=382 data-nosnippet>382</a><span class="doccomment">/// Publish the current process health.
@@ -421,16 +421,16 @@
 <a href=#421 id=421 data-nosnippet>421</a>// via GET_BODY_STATE. This bridges the two threads without coupling the
 <a href=#422 id=422 data-nosnippet>422</a>// IPC handler to the TickLoop struct.
 <a href=#423 id=423 data-nosnippet>423</a>
-<a href=#424 id=424 data-nosnippet>424</a></span><span class="kw">static </span>SHARED_BODY_STATE: Innate&lt;Inhibition&lt;BodyState&gt;&gt; = Innate::new();
+<a href=#424 id=424 data-nosnippet>424</a></span><span class="kw">static </span>SHARED_BODY_STATE: Free&lt;Shared&lt;BodyState&gt;&gt; = Free::new();
 <a href=#425 id=425 data-nosnippet>425</a>
-<a href=#426 id=426 data-nosnippet>426</a><span class="kw">fn </span>shared_body() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span>Inhibition&lt;BodyState&gt; {
-<a href=#427 id=427 data-nosnippet>427</a>    SHARED_BODY_STATE.get_or_init(|| Inhibition::new(BodyState::default()))
+<a href=#426 id=426 data-nosnippet>426</a><span class="kw">fn </span>shared_body() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span>Shared&lt;BodyState&gt; {
+<a href=#427 id=427 data-nosnippet>427</a>    SHARED_BODY_STATE.get_or_init(|| Shared::new(BodyState::default()))
 <a href=#428 id=428 data-nosnippet>428</a>}
 <a href=#429 id=429 data-nosnippet>429</a>
-<a href=#430 id=430 data-nosnippet>430</a><span class="kw">static </span>SHARED_LOBE_TELEMETRY: Innate&lt;Inhibition&lt;(Vec&lt;SubsystemTelemetry&gt;, u64)&gt;&gt; = Innate::new();
+<a href=#430 id=430 data-nosnippet>430</a><span class="kw">static </span>SHARED_LOBE_TELEMETRY: Free&lt;Shared&lt;(Vec&lt;SubsystemTelemetry&gt;, u64)&gt;&gt; = Free::new();
 <a href=#431 id=431 data-nosnippet>431</a>
-<a href=#432 id=432 data-nosnippet>432</a><span class="kw">fn </span>shared_subsystems() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span>Inhibition&lt;(Vec&lt;SubsystemTelemetry&gt;, u64)&gt; {
-<a href=#433 id=433 data-nosnippet>433</a>    SHARED_LOBE_TELEMETRY.get_or_init(|| Inhibition::new((Vec::new(), <span class="number">0</span>)))
+<a href=#432 id=432 data-nosnippet>432</a><span class="kw">fn </span>shared_subsystems() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span>Shared&lt;(Vec&lt;SubsystemTelemetry&gt;, u64)&gt; {
+<a href=#433 id=433 data-nosnippet>433</a>    SHARED_LOBE_TELEMETRY.get_or_init(|| Shared::new((Vec::new(), <span class="number">0</span>)))
 <a href=#434 id=434 data-nosnippet>434</a>}
 <a href=#435 id=435 data-nosnippet>435</a>
 <a href=#436 id=436 data-nosnippet>436</a><span class="doccomment">/// Publish the latest per-subsystem telemetry so the IPC handler can
@@ -4938,139 +4938,138 @@
 <a href=#4938 id=4938 data-nosnippet>4938</a></span><span class="attr">#[cfg(test)]
 <a href=#4939 id=4939 data-nosnippet>4939</a></span><span class="kw">mod </span>sensor_presence_tests {
 <a href=#4940 id=4940 data-nosnippet>4940</a>    <span class="kw">use super</span>::{SENSOR_BITS, read_sensor_presence, report_missing_sensors, sensor};
-<a href=#4941 id=4941 data-nosnippet>4941</a>    <span class="kw">use </span><span class="kw">crate</span>::inhibition::{Inhibition, Innate};
+<a href=#4941 id=4941 data-nosnippet>4941</a>    <span class="kw">use </span><span class="kw">crate</span>::shared::{Free, Shared};
 <a href=#4942 id=4942 data-nosnippet>4942</a>
 <a href=#4943 id=4943 data-nosnippet>4943</a>    <span class="comment">// The mask is process-global (it bridges the interoception thread
-<a href=#4944 id=4944 data-nosnippet>4944</a>    // and the IPC handler), so the tests that touch it share one lock
-<a href=#4945 id=4945 data-nosnippet>4945</a>    // rather than racing.
-<a href=#4946 id=4946 data-nosnippet>4946</a>    </span><span class="kw">fn </span>guard() -&gt; <span class="kw">crate</span>::inhibition::InhibitionGuard&lt;<span class="lifetime">'static</span>, ()&gt; {
-<a href=#4947 id=4947 data-nosnippet>4947</a>        <span class="kw">static </span>LOCK: Innate&lt;Inhibition&lt;()&gt;&gt; = Innate::new();
-<a href=#4948 id=4948 data-nosnippet>4948</a>        LOCK.get_or_init(|| Inhibition::new(()))
-<a href=#4949 id=4949 data-nosnippet>4949</a>            .lock()
-<a href=#4950 id=4950 data-nosnippet>4950</a>            .unwrap_or_else(|e| e.into_inner())
-<a href=#4951 id=4951 data-nosnippet>4951</a>    }
-<a href=#4952 id=4952 data-nosnippet>4952</a>
-<a href=#4953 id=4953 data-nosnippet>4953</a>    <span class="attr">#[test]
-<a href=#4954 id=4954 data-nosnippet>4954</a>    </span><span class="kw">fn </span>test_presence_defaults_to_nothing_confirmed() {
-<a href=#4955 id=4955 data-nosnippet>4955</a>        <span class="comment">// Before any read completes, nothing is claimed to be measured.
-<a href=#4956 id=4956 data-nosnippet>4956</a>        // Zero is the safe direction: it says "unknown", not "fine".
-<a href=#4957 id=4957 data-nosnippet>4957</a>        </span><span class="kw">let </span>_g = guard();
-<a href=#4958 id=4958 data-nosnippet>4958</a>        <span class="macro">assert_eq!</span>(read_sensor_presence(), <span class="number">0</span>);
-<a href=#4959 id=4959 data-nosnippet>4959</a>    }
-<a href=#4960 id=4960 data-nosnippet>4960</a>
-<a href=#4961 id=4961 data-nosnippet>4961</a>    <span class="attr">#[test]
-<a href=#4962 id=4962 data-nosnippet>4962</a>    </span><span class="kw">fn </span>test_presence_bit_positions_are_distinct() {
-<a href=#4963 id=4963 data-nosnippet>4963</a>        <span class="comment">// Each sensor needs its own bit or they could not be
-<a href=#4964 id=4964 data-nosnippet>4964</a>        // distinguished, and a collision would silently merge two
-<a href=#4965 id=4965 data-nosnippet>4965</a>        // channels' validity.
-<a href=#4966 id=4966 data-nosnippet>4966</a>        </span><span class="kw">let </span>bits = [
-<a href=#4967 id=4967 data-nosnippet>4967</a>            sensor::TEMPERATURE,
-<a href=#4968 id=4968 data-nosnippet>4968</a>            sensor::FREQUENCY,
-<a href=#4969 id=4969 data-nosnippet>4969</a>            sensor::MAX_FREQUENCY,
-<a href=#4970 id=4970 data-nosnippet>4970</a>            sensor::BATTERY,
-<a href=#4971 id=4971 data-nosnippet>4971</a>            sensor::AC_ADAPTER,
-<a href=#4972 id=4972 data-nosnippet>4972</a>            sensor::FAN,
-<a href=#4973 id=4973 data-nosnippet>4973</a>            sensor::POWER,
-<a href=#4974 id=4974 data-nosnippet>4974</a>            sensor::CORE_VOLTAGE,
-<a href=#4975 id=4975 data-nosnippet>4975</a>            sensor::SUPPLY_VOLTAGE,
-<a href=#4976 id=4976 data-nosnippet>4976</a>            sensor::RAPL,
-<a href=#4977 id=4977 data-nosnippet>4977</a>            sensor::PERF_COUNTERS,
-<a href=#4978 id=4978 data-nosnippet>4978</a>            sensor::GPE,
-<a href=#4979 id=4979 data-nosnippet>4979</a>            sensor::LOCAL_TIMER,
-<a href=#4980 id=4980 data-nosnippet>4980</a>            sensor::MEMORY,
-<a href=#4981 id=4981 data-nosnippet>4981</a>            sensor::PSI,
-<a href=#4982 id=4982 data-nosnippet>4982</a>            sensor::BATTERY_CYCLES,
-<a href=#4983 id=4983 data-nosnippet>4983</a>            sensor::CPUIDLE,
-<a href=#4984 id=4984 data-nosnippet>4984</a>        ];
-<a href=#4985 id=4985 data-nosnippet>4985</a>        <span class="kw">for </span>(i, a) <span class="kw">in </span>bits.iter().enumerate() {
-<a href=#4986 id=4986 data-nosnippet>4986</a>            <span class="kw">for </span>b <span class="kw">in </span><span class="kw-2">&amp;</span>bits[i + <span class="number">1</span>..] {
-<a href=#4987 id=4987 data-nosnippet>4987</a>                <span class="macro">assert_ne!</span>(a, b, <span class="string">"sensor bits must be distinct"</span>);
-<a href=#4988 id=4988 data-nosnippet>4988</a>                <span class="macro">assert_eq!</span>(a &amp; b, <span class="number">0</span>, <span class="string">"sensor bits must not overlap"</span>);
-<a href=#4989 id=4989 data-nosnippet>4989</a>            }
-<a href=#4990 id=4990 data-nosnippet>4990</a>        }
-<a href=#4991 id=4991 data-nosnippet>4991</a>        <span class="macro">assert_eq!</span>(bits.len(), <span class="number">17</span>, <span class="string">"17 declared channels"</span>);
-<a href=#4992 id=4992 data-nosnippet>4992</a>    }
-<a href=#4993 id=4993 data-nosnippet>4993</a>
-<a href=#4994 id=4994 data-nosnippet>4994</a>    <span class="attr">#[test]
-<a href=#4995 id=4995 data-nosnippet>4995</a>    </span><span class="kw">fn </span>test_presence_reports_missing_channels() {
-<a href=#4996 id=4996 data-nosnippet>4996</a>        <span class="comment">// Only temperature present: the other 15 should be named.
-<a href=#4997 id=4997 data-nosnippet>4997</a>        </span>report_missing_sensors(sensor::TEMPERATURE);
-<a href=#4998 id=4998 data-nosnippet>4998</a>        <span class="comment">// Reporting twice must not panic (it is called on every
-<a href=#4999 id=4999 data-nosnippet>4999</a>        // Interoceptor::new, which tests construct freely).
-<a href=#5000 id=5000 data-nosnippet>5000</a>        </span>report_missing_sensors(sensor::TEMPERATURE);
-<a href=#5001 id=5001 data-nosnippet>5001</a>        report_missing_sensors(<span class="number">0xFFFF</span>);
-<a href=#5002 id=5002 data-nosnippet>5002</a>    }
-<a href=#5003 id=5003 data-nosnippet>5003</a>
-<a href=#5004 id=5004 data-nosnippet>5004</a>    <span class="attr">#[test]
-<a href=#5005 id=5005 data-nosnippet>5005</a>    </span><span class="kw">fn </span>test_interoceptor_presence_matches_this_machine() {
-<a href=#5006 id=5006 data-nosnippet>5006</a>        <span class="comment">// The mask must be derived from real discovery, not constant.
-<a href=#5007 id=5007 data-nosnippet>5007</a>        // Every machine has memory, so that bit is always set once a
-<a href=#5008 id=5008 data-nosnippet>5008</a>        // read has run; a laptop here may or may not have a battery.
-<a href=#5009 id=5009 data-nosnippet>5009</a>        </span><span class="kw">let </span>intero = <span class="kw">super</span>::Interoceptor::new();
-<a href=#5010 id=5010 data-nosnippet>5010</a>        <span class="kw">let </span>mask = intero.sensor_presence();
-<a href=#5011 id=5011 data-nosnippet>5011</a>        <span class="macro">assert_ne!</span>(
-<a href=#5012 id=5012 data-nosnippet>5012</a>            mask, <span class="number">0</span>,
-<a href=#5013 id=5013 data-nosnippet>5013</a>            <span class="string">"at least the always-available channels should be discovered"
-<a href=#5014 id=5014 data-nosnippet>5014</a>        </span>);
-<a href=#5015 id=5015 data-nosnippet>5015</a>        <span class="macro">assert_eq!</span>(
-<a href=#5016 id=5016 data-nosnippet>5016</a>            mask &amp; sensor::MEMORY,
-<a href=#5017 id=5017 data-nosnippet>5017</a>            sensor::MEMORY,
-<a href=#5018 id=5018 data-nosnippet>5018</a>            <span class="string">"total memory is readable on any Linux host"
-<a href=#5019 id=5019 data-nosnippet>5019</a>        </span>);
-<a href=#5020 id=5020 data-nosnippet>5020</a>    }
-<a href=#5021 id=5021 data-nosnippet>5021</a>
-<a href=#5022 id=5022 data-nosnippet>5022</a>    <span class="attr">#[test]
-<a href=#5023 id=5023 data-nosnippet>5023</a>    </span><span class="kw">fn </span>test_memory_detail_reports_both_scales() {
-<a href=#5024 id=5024 data-nosnippet>5024</a>        <span class="comment">// The manifest's memory fields had no producer, so
-<a href=#5025 id=5025 data-nosnippet>5025</a>        // `total_mem_mb` was structurally 0.0 while `cognitive_load`
-<a href=#5026 id=5026 data-nosnippet>5026</a>        // said the tree was using memory. Both scales now come from one
-<a href=#5027 id=5027 data-nosnippet>5027</a>        // traversal of the process tree.
-<a href=#5028 id=5028 data-nosnippet>5028</a>        </span><span class="kw">let </span>intero = <span class="kw">super</span>::Interoceptor::new();
-<a href=#5029 id=5029 data-nosnippet>5029</a>        <span class="kw">let </span>pids = intero.genesis_pids();
-<a href=#5030 id=5030 data-nosnippet>5030</a>        <span class="kw">let </span>(fraction, mb) = intero.read_self_memory_detail(<span class="kw-2">&amp;</span>pids);
-<a href=#5031 id=5031 data-nosnippet>5031</a>        <span class="macro">assert!</span>(fraction &gt; <span class="number">0.0</span>, <span class="string">"self RSS as a fraction should be &gt; 0"</span>);
-<a href=#5032 id=5032 data-nosnippet>5032</a>        <span class="macro">assert!</span>(mb &gt; <span class="number">1.0</span>, <span class="string">"a running process tree holds MBs, got {mb}"</span>);
-<a href=#5033 id=5033 data-nosnippet>5033</a>    }
-<a href=#5034 id=5034 data-nosnippet>5034</a>
-<a href=#5035 id=5035 data-nosnippet>5035</a>    <span class="attr">#[test]
-<a href=#5036 id=5036 data-nosnippet>5036</a>    </span><span class="kw">fn </span>test_presence_bitmask_fits_the_wire_type() {
-<a href=#5037 id=5037 data-nosnippet>5037</a>        <span class="comment">// GET_SENSOR_PRESENCE serialises as a u32, so no bit may
-<a href=#5038 id=5038 data-nosnippet>5038</a>        // exceed the type. Asserting one constant against `u32::MAX`
-<a href=#5039 id=5039 data-nosnippet>5039</a>        // proves nothing (it is a u32 by construction); the real
-<a href=#5040 id=5040 data-nosnippet>5040</a>        // invariant is that folding every declared bit into a single
-<a href=#5041 id=5041 data-nosnippet>5041</a>        // u32 neither overflows nor leaves a gap below the cpuidle
-<a href=#5042 id=5042 data-nosnippet>5042</a>        // bit (all 17 channels occupy contiguous low bits).
-<a href=#5043 id=5043 data-nosnippet>5043</a>        </span><span class="macro">assert_eq!</span>(std::mem::size_of::&lt;u32&gt;(), <span class="number">4</span>);
-<a href=#5044 id=5044 data-nosnippet>5044</a>        <span class="kw">let </span>combined = SENSOR_BITS.iter().fold(<span class="number">0u32</span>, |acc, (bit, <span class="kw">_</span>)| acc | bit);
-<a href=#5045 id=5045 data-nosnippet>5045</a>        <span class="macro">assert_eq!</span>(
-<a href=#5046 id=5046 data-nosnippet>5046</a>            combined,
-<a href=#5047 id=5047 data-nosnippet>5047</a>            (<span class="number">1u32 </span>&lt;&lt; <span class="number">17</span>) - <span class="number">1</span>,
-<a href=#5048 id=5048 data-nosnippet>5048</a>            <span class="string">"the 17 declared sensor bits must be exactly the low 17 bits of the wire type"
-<a href=#5049 id=5049 data-nosnippet>5049</a>        </span>);
-<a href=#5050 id=5050 data-nosnippet>5050</a>        <span class="comment">// And the names must be unique, so no bit is described twice.
-<a href=#5051 id=5051 data-nosnippet>5051</a>        </span><span class="kw">let </span><span class="kw-2">mut </span>names: Vec&lt;<span class="kw-2">&amp;</span>str&gt; = SENSOR_BITS.iter().map(|(<span class="kw">_</span>, name)| <span class="kw-2">*</span>name).collect();
-<a href=#5052 id=5052 data-nosnippet>5052</a>        names.sort_unstable();
-<a href=#5053 id=5053 data-nosnippet>5053</a>        <span class="kw">let </span>before = names.len();
-<a href=#5054 id=5054 data-nosnippet>5054</a>        names.dedup();
-<a href=#5055 id=5055 data-nosnippet>5055</a>        <span class="macro">assert_eq!</span>(names.len(), before, <span class="string">"duplicate sensor name in SENSOR_BITS"</span>);
-<a href=#5056 id=5056 data-nosnippet>5056</a>    }
-<a href=#5057 id=5057 data-nosnippet>5057</a>
-<a href=#5058 id=5058 data-nosnippet>5058</a>    <span class="attr">#[test]
-<a href=#5059 id=5059 data-nosnippet>5059</a>    </span><span class="kw">fn </span>test_unreadable_memtotal_does_not_claim_memory() {
-<a href=#5060 id=5060 data-nosnippet>5060</a>        <span class="comment">// Regression: Interoceptor::new fell back to 8 GB when
-<a href=#5061 id=5061 data-nosnippet>5061</a>        // /proc/meminfo was unreadable, then fed that fallback into
-<a href=#5062 id=5062 data-nosnippet>5062</a>        // build_sensor_mask — claiming MEMORY present when nothing was
-<a href=#5063 id=5063 data-nosnippet>5063</a>        // measured. The mask must reflect the real probe (0 → absent).
-<a href=#5064 id=5064 data-nosnippet>5064</a>        </span><span class="kw">let </span>probe = <span class="kw">super</span>::SensorProbe {
-<a href=#5065 id=5065 data-nosnippet>5065</a>            total_memory_kb: <span class="number">0</span>,
-<a href=#5066 id=5066 data-nosnippet>5066</a>            ..Default::default()
-<a href=#5067 id=5067 data-nosnippet>5067</a>        };
-<a href=#5068 id=5068 data-nosnippet>5068</a>        <span class="kw">let </span>mask = <span class="kw">super</span>::Interoceptor::build_sensor_mask(<span class="kw-2">&amp;</span>probe);
-<a href=#5069 id=5069 data-nosnippet>5069</a>        <span class="macro">assert_eq!</span>(
-<a href=#5070 id=5070 data-nosnippet>5070</a>            mask &amp; sensor::MEMORY,
-<a href=#5071 id=5071 data-nosnippet>5071</a>            <span class="number">0</span>,
-<a href=#5072 id=5072 data-nosnippet>5072</a>            <span class="string">"unreadable MemTotal must not claim MEMORY present"
-<a href=#5073 id=5073 data-nosnippet>5073</a>        </span>);
-<a href=#5074 id=5074 data-nosnippet>5074</a>    }
-<a href=#5075 id=5075 data-nosnippet>5075</a>}
+<a href=#4944 id=4944 data-nosnippet>4944</a>    // and the IPC handler); the tests that touch it share one cell.
+<a href=#4945 id=4945 data-nosnippet>4945</a>    </span><span class="kw">fn </span>guard() -&gt; <span class="kw">crate</span>::shared::Hold&lt;<span class="lifetime">'static</span>, ()&gt; {
+<a href=#4946 id=4946 data-nosnippet>4946</a>        <span class="kw">static </span>LOCK: Free&lt;Shared&lt;()&gt;&gt; = Free::new();
+<a href=#4947 id=4947 data-nosnippet>4947</a>        LOCK.get_or_init(|| Shared::new(()))
+<a href=#4948 id=4948 data-nosnippet>4948</a>            .lock()
+<a href=#4949 id=4949 data-nosnippet>4949</a>            .unwrap_or_else(|e| e.into_inner())
+<a href=#4950 id=4950 data-nosnippet>4950</a>    }
+<a href=#4951 id=4951 data-nosnippet>4951</a>
+<a href=#4952 id=4952 data-nosnippet>4952</a>    <span class="attr">#[test]
+<a href=#4953 id=4953 data-nosnippet>4953</a>    </span><span class="kw">fn </span>test_presence_defaults_to_nothing_confirmed() {
+<a href=#4954 id=4954 data-nosnippet>4954</a>        <span class="comment">// Before any read completes, nothing is claimed to be measured.
+<a href=#4955 id=4955 data-nosnippet>4955</a>        // Zero is the safe direction: it says "unknown", not "fine".
+<a href=#4956 id=4956 data-nosnippet>4956</a>        </span><span class="kw">let </span>_g = guard();
+<a href=#4957 id=4957 data-nosnippet>4957</a>        <span class="macro">assert_eq!</span>(read_sensor_presence(), <span class="number">0</span>);
+<a href=#4958 id=4958 data-nosnippet>4958</a>    }
+<a href=#4959 id=4959 data-nosnippet>4959</a>
+<a href=#4960 id=4960 data-nosnippet>4960</a>    <span class="attr">#[test]
+<a href=#4961 id=4961 data-nosnippet>4961</a>    </span><span class="kw">fn </span>test_presence_bit_positions_are_distinct() {
+<a href=#4962 id=4962 data-nosnippet>4962</a>        <span class="comment">// Each sensor needs its own bit or they could not be
+<a href=#4963 id=4963 data-nosnippet>4963</a>        // distinguished, and a collision would silently merge two
+<a href=#4964 id=4964 data-nosnippet>4964</a>        // channels' validity.
+<a href=#4965 id=4965 data-nosnippet>4965</a>        </span><span class="kw">let </span>bits = [
+<a href=#4966 id=4966 data-nosnippet>4966</a>            sensor::TEMPERATURE,
+<a href=#4967 id=4967 data-nosnippet>4967</a>            sensor::FREQUENCY,
+<a href=#4968 id=4968 data-nosnippet>4968</a>            sensor::MAX_FREQUENCY,
+<a href=#4969 id=4969 data-nosnippet>4969</a>            sensor::BATTERY,
+<a href=#4970 id=4970 data-nosnippet>4970</a>            sensor::AC_ADAPTER,
+<a href=#4971 id=4971 data-nosnippet>4971</a>            sensor::FAN,
+<a href=#4972 id=4972 data-nosnippet>4972</a>            sensor::POWER,
+<a href=#4973 id=4973 data-nosnippet>4973</a>            sensor::CORE_VOLTAGE,
+<a href=#4974 id=4974 data-nosnippet>4974</a>            sensor::SUPPLY_VOLTAGE,
+<a href=#4975 id=4975 data-nosnippet>4975</a>            sensor::RAPL,
+<a href=#4976 id=4976 data-nosnippet>4976</a>            sensor::PERF_COUNTERS,
+<a href=#4977 id=4977 data-nosnippet>4977</a>            sensor::GPE,
+<a href=#4978 id=4978 data-nosnippet>4978</a>            sensor::LOCAL_TIMER,
+<a href=#4979 id=4979 data-nosnippet>4979</a>            sensor::MEMORY,
+<a href=#4980 id=4980 data-nosnippet>4980</a>            sensor::PSI,
+<a href=#4981 id=4981 data-nosnippet>4981</a>            sensor::BATTERY_CYCLES,
+<a href=#4982 id=4982 data-nosnippet>4982</a>            sensor::CPUIDLE,
+<a href=#4983 id=4983 data-nosnippet>4983</a>        ];
+<a href=#4984 id=4984 data-nosnippet>4984</a>        <span class="kw">for </span>(i, a) <span class="kw">in </span>bits.iter().enumerate() {
+<a href=#4985 id=4985 data-nosnippet>4985</a>            <span class="kw">for </span>b <span class="kw">in </span><span class="kw-2">&amp;</span>bits[i + <span class="number">1</span>..] {
+<a href=#4986 id=4986 data-nosnippet>4986</a>                <span class="macro">assert_ne!</span>(a, b, <span class="string">"sensor bits must be distinct"</span>);
+<a href=#4987 id=4987 data-nosnippet>4987</a>                <span class="macro">assert_eq!</span>(a &amp; b, <span class="number">0</span>, <span class="string">"sensor bits must not overlap"</span>);
+<a href=#4988 id=4988 data-nosnippet>4988</a>            }
+<a href=#4989 id=4989 data-nosnippet>4989</a>        }
+<a href=#4990 id=4990 data-nosnippet>4990</a>        <span class="macro">assert_eq!</span>(bits.len(), <span class="number">17</span>, <span class="string">"17 declared channels"</span>);
+<a href=#4991 id=4991 data-nosnippet>4991</a>    }
+<a href=#4992 id=4992 data-nosnippet>4992</a>
+<a href=#4993 id=4993 data-nosnippet>4993</a>    <span class="attr">#[test]
+<a href=#4994 id=4994 data-nosnippet>4994</a>    </span><span class="kw">fn </span>test_presence_reports_missing_channels() {
+<a href=#4995 id=4995 data-nosnippet>4995</a>        <span class="comment">// Only temperature present: the other 15 should be named.
+<a href=#4996 id=4996 data-nosnippet>4996</a>        </span>report_missing_sensors(sensor::TEMPERATURE);
+<a href=#4997 id=4997 data-nosnippet>4997</a>        <span class="comment">// Reporting twice must not panic (it is called on every
+<a href=#4998 id=4998 data-nosnippet>4998</a>        // Interoceptor::new, which tests construct freely).
+<a href=#4999 id=4999 data-nosnippet>4999</a>        </span>report_missing_sensors(sensor::TEMPERATURE);
+<a href=#5000 id=5000 data-nosnippet>5000</a>        report_missing_sensors(<span class="number">0xFFFF</span>);
+<a href=#5001 id=5001 data-nosnippet>5001</a>    }
+<a href=#5002 id=5002 data-nosnippet>5002</a>
+<a href=#5003 id=5003 data-nosnippet>5003</a>    <span class="attr">#[test]
+<a href=#5004 id=5004 data-nosnippet>5004</a>    </span><span class="kw">fn </span>test_interoceptor_presence_matches_this_machine() {
+<a href=#5005 id=5005 data-nosnippet>5005</a>        <span class="comment">// The mask must be derived from real discovery, not constant.
+<a href=#5006 id=5006 data-nosnippet>5006</a>        // Every machine has memory, so that bit is always set once a
+<a href=#5007 id=5007 data-nosnippet>5007</a>        // read has run; a laptop here may or may not have a battery.
+<a href=#5008 id=5008 data-nosnippet>5008</a>        </span><span class="kw">let </span>intero = <span class="kw">super</span>::Interoceptor::new();
+<a href=#5009 id=5009 data-nosnippet>5009</a>        <span class="kw">let </span>mask = intero.sensor_presence();
+<a href=#5010 id=5010 data-nosnippet>5010</a>        <span class="macro">assert_ne!</span>(
+<a href=#5011 id=5011 data-nosnippet>5011</a>            mask, <span class="number">0</span>,
+<a href=#5012 id=5012 data-nosnippet>5012</a>            <span class="string">"at least the always-available channels should be discovered"
+<a href=#5013 id=5013 data-nosnippet>5013</a>        </span>);
+<a href=#5014 id=5014 data-nosnippet>5014</a>        <span class="macro">assert_eq!</span>(
+<a href=#5015 id=5015 data-nosnippet>5015</a>            mask &amp; sensor::MEMORY,
+<a href=#5016 id=5016 data-nosnippet>5016</a>            sensor::MEMORY,
+<a href=#5017 id=5017 data-nosnippet>5017</a>            <span class="string">"total memory is readable on any Linux host"
+<a href=#5018 id=5018 data-nosnippet>5018</a>        </span>);
+<a href=#5019 id=5019 data-nosnippet>5019</a>    }
+<a href=#5020 id=5020 data-nosnippet>5020</a>
+<a href=#5021 id=5021 data-nosnippet>5021</a>    <span class="attr">#[test]
+<a href=#5022 id=5022 data-nosnippet>5022</a>    </span><span class="kw">fn </span>test_memory_detail_reports_both_scales() {
+<a href=#5023 id=5023 data-nosnippet>5023</a>        <span class="comment">// The manifest's memory fields had no producer, so
+<a href=#5024 id=5024 data-nosnippet>5024</a>        // `total_mem_mb` was structurally 0.0 while `cognitive_load`
+<a href=#5025 id=5025 data-nosnippet>5025</a>        // said the tree was using memory. Both scales now come from one
+<a href=#5026 id=5026 data-nosnippet>5026</a>        // traversal of the process tree.
+<a href=#5027 id=5027 data-nosnippet>5027</a>        </span><span class="kw">let </span>intero = <span class="kw">super</span>::Interoceptor::new();
+<a href=#5028 id=5028 data-nosnippet>5028</a>        <span class="kw">let </span>pids = intero.genesis_pids();
+<a href=#5029 id=5029 data-nosnippet>5029</a>        <span class="kw">let </span>(fraction, mb) = intero.read_self_memory_detail(<span class="kw-2">&amp;</span>pids);
+<a href=#5030 id=5030 data-nosnippet>5030</a>        <span class="macro">assert!</span>(fraction &gt; <span class="number">0.0</span>, <span class="string">"self RSS as a fraction should be &gt; 0"</span>);
+<a href=#5031 id=5031 data-nosnippet>5031</a>        <span class="macro">assert!</span>(mb &gt; <span class="number">1.0</span>, <span class="string">"a running process tree holds MBs, got {mb}"</span>);
+<a href=#5032 id=5032 data-nosnippet>5032</a>    }
+<a href=#5033 id=5033 data-nosnippet>5033</a>
+<a href=#5034 id=5034 data-nosnippet>5034</a>    <span class="attr">#[test]
+<a href=#5035 id=5035 data-nosnippet>5035</a>    </span><span class="kw">fn </span>test_presence_bitmask_fits_the_wire_type() {
+<a href=#5036 id=5036 data-nosnippet>5036</a>        <span class="comment">// GET_SENSOR_PRESENCE serialises as a u32, so no bit may
+<a href=#5037 id=5037 data-nosnippet>5037</a>        // exceed the type. Asserting one constant against `u32::MAX`
+<a href=#5038 id=5038 data-nosnippet>5038</a>        // proves nothing (it is a u32 by construction); the real
+<a href=#5039 id=5039 data-nosnippet>5039</a>        // invariant is that folding every declared bit into a single
+<a href=#5040 id=5040 data-nosnippet>5040</a>        // u32 neither overflows nor leaves a gap below the cpuidle
+<a href=#5041 id=5041 data-nosnippet>5041</a>        // bit (all 17 channels occupy contiguous low bits).
+<a href=#5042 id=5042 data-nosnippet>5042</a>        </span><span class="macro">assert_eq!</span>(std::mem::size_of::&lt;u32&gt;(), <span class="number">4</span>);
+<a href=#5043 id=5043 data-nosnippet>5043</a>        <span class="kw">let </span>combined = SENSOR_BITS.iter().fold(<span class="number">0u32</span>, |acc, (bit, <span class="kw">_</span>)| acc | bit);
+<a href=#5044 id=5044 data-nosnippet>5044</a>        <span class="macro">assert_eq!</span>(
+<a href=#5045 id=5045 data-nosnippet>5045</a>            combined,
+<a href=#5046 id=5046 data-nosnippet>5046</a>            (<span class="number">1u32 </span>&lt;&lt; <span class="number">17</span>) - <span class="number">1</span>,
+<a href=#5047 id=5047 data-nosnippet>5047</a>            <span class="string">"the 17 declared sensor bits must be exactly the low 17 bits of the wire type"
+<a href=#5048 id=5048 data-nosnippet>5048</a>        </span>);
+<a href=#5049 id=5049 data-nosnippet>5049</a>        <span class="comment">// And the names must be unique, so no bit is described twice.
+<a href=#5050 id=5050 data-nosnippet>5050</a>        </span><span class="kw">let </span><span class="kw-2">mut </span>names: Vec&lt;<span class="kw-2">&amp;</span>str&gt; = SENSOR_BITS.iter().map(|(<span class="kw">_</span>, name)| <span class="kw-2">*</span>name).collect();
+<a href=#5051 id=5051 data-nosnippet>5051</a>        names.sort_unstable();
+<a href=#5052 id=5052 data-nosnippet>5052</a>        <span class="kw">let </span>before = names.len();
+<a href=#5053 id=5053 data-nosnippet>5053</a>        names.dedup();
+<a href=#5054 id=5054 data-nosnippet>5054</a>        <span class="macro">assert_eq!</span>(names.len(), before, <span class="string">"duplicate sensor name in SENSOR_BITS"</span>);
+<a href=#5055 id=5055 data-nosnippet>5055</a>    }
+<a href=#5056 id=5056 data-nosnippet>5056</a>
+<a href=#5057 id=5057 data-nosnippet>5057</a>    <span class="attr">#[test]
+<a href=#5058 id=5058 data-nosnippet>5058</a>    </span><span class="kw">fn </span>test_unreadable_memtotal_does_not_claim_memory() {
+<a href=#5059 id=5059 data-nosnippet>5059</a>        <span class="comment">// Regression: Interoceptor::new fell back to 8 GB when
+<a href=#5060 id=5060 data-nosnippet>5060</a>        // /proc/meminfo was unreadable, then fed that fallback into
+<a href=#5061 id=5061 data-nosnippet>5061</a>        // build_sensor_mask — claiming MEMORY present when nothing was
+<a href=#5062 id=5062 data-nosnippet>5062</a>        // measured. The mask must reflect the real probe (0 → absent).
+<a href=#5063 id=5063 data-nosnippet>5063</a>        </span><span class="kw">let </span>probe = <span class="kw">super</span>::SensorProbe {
+<a href=#5064 id=5064 data-nosnippet>5064</a>            total_memory_kb: <span class="number">0</span>,
+<a href=#5065 id=5065 data-nosnippet>5065</a>            ..Default::default()
+<a href=#5066 id=5066 data-nosnippet>5066</a>        };
+<a href=#5067 id=5067 data-nosnippet>5067</a>        <span class="kw">let </span>mask = <span class="kw">super</span>::Interoceptor::build_sensor_mask(<span class="kw-2">&amp;</span>probe);
+<a href=#5068 id=5068 data-nosnippet>5068</a>        <span class="macro">assert_eq!</span>(
+<a href=#5069 id=5069 data-nosnippet>5069</a>            mask &amp; sensor::MEMORY,
+<a href=#5070 id=5070 data-nosnippet>5070</a>            <span class="number">0</span>,
+<a href=#5071 id=5071 data-nosnippet>5071</a>            <span class="string">"unreadable MemTotal must not claim MEMORY present"
+<a href=#5072 id=5072 data-nosnippet>5072</a>        </span>);
+<a href=#5073 id=5073 data-nosnippet>5073</a>    }
+<a href=#5074 id=5074 data-nosnippet>5074</a>}
 </code></pre></div></section></main></body></html>

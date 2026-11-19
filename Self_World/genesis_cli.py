@@ -2325,6 +2325,10 @@ def _stdin_ready(timeout: float) -> bool:
     fails, so callers degrade to a plain blocking input().
     """
     try:
+        # Do not probe sys.stdin.buffer here. peek() fills Python's io
+        # buffer with everything pending on the fd, but on a tty
+        # input() reads the C-level stdin FILE* — it cannot see those
+        # bytes. A peek before input() swallows the user's whole line.
         if not sys.stdin.isatty():
             return True
         ready, _, _ = select.select([sys.stdin], [], [], timeout)
@@ -2368,7 +2372,9 @@ def _parse_cli_args() -> argparse.Namespace:
         "--self-directed",
         action="store_true",
         help="Keep volition, synchronous capabilities, and inner life "
-        "live; the learner and regulator loops stay closed.",
+        "live; the learner and regulator loops stay closed — she "
+        "still learns (reactively, and bounded steps her chosen "
+        "actions invoke directly), nothing runs autonomously.",
     )
     parser.add_argument(
         "--stop",
@@ -3187,14 +3193,20 @@ def _run_interactive_loop(
                 logger.info("")
                 if not self_directed:
                     break
-                # Self-directed: a closed or finished console is not a
-                # command to die — she directs herself, the prompt was
-                # optional. Wait on the shutdown flag the way resident
-                # mode does; the thought ticker keeps printing and
-                # external stops still tear down.
-                while not shutting_down.is_set():
-                    shutting_down.wait(5.0)
-                break
+                if not sys.stdin.isatty():
+                    # Self-directed: a closed or finished console is not a
+                    # command to die — she directs herself, the prompt was
+                    # optional. Wait on the shutdown flag the way resident
+                    # mode does; the thought ticker keeps printing and
+                    # external stops still tear down.
+                    while not shutting_down.is_set():
+                        shutting_down.wait(5.0)
+                    break
+                # A tty EOF is one stray keystroke (Ctrl-D), not a lost
+                # console — the prompt is hers to keep. Loop back and
+                # take input again rather than going deaf for the rest
+                # of the session.
+                continue
             if not user_input:
                 continue
 

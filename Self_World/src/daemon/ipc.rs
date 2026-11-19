@@ -1416,7 +1416,7 @@ fn serialize_body_state(body: &super::interoception::BodyState) -> Vec<u8> {
 /// interoception read was published — which older parsers ignore.
 ///
 /// 1 + count × 21 + 1 + module_count × 18 + 8 bytes.
-/// An empty report serializes as [0][0][published_ms].
+/// An empty report serializes as `[0][0][published_ms]`.
 fn serialize_subsystem_telemetry(
     subsystems: &[super::interoception::SubsystemTelemetry],
     modules: &[(u8, u8, f32, u64, u32)],
@@ -1567,12 +1567,12 @@ pub trait LtmAccess {
 
 impl LtmAccess for std::sync::Arc<crate::shared::Shared<LtmStore>> {
     type Guard<'a>
-        = &'a mut LtmStore
+        = crate::shared::Hold<'a, LtmStore>
     where
         Self: 'a;
 
     fn access(&mut self) -> Self::Guard<'_> {
-        self.get()
+        self.lock().unwrap_or_else(|e| e.into_inner())
     }
 }
 
@@ -4434,7 +4434,7 @@ where
                 // dead. A future protocol revision can drop it.
                 let _requested_dt =
                     f32::from_le_bytes(payload[0..4].try_into().unwrap_or_default());
-                let tl = match tick_loop.lock() {
+                let mut tl = match tick_loop.lock() {
                     Ok(tl) => tl,
                     Err(e) => {
                         eprintln!("[ipc] ADVANCE_NEURO: tick_loop poisoned: {e}");
@@ -4512,7 +4512,7 @@ where
                     f32::from_le_bytes(payload[0..4].try_into().unwrap_or_default()),
                     0.0,
                 );
-                let tl = match tick_loop.lock() {
+                let mut tl = match tick_loop.lock() {
                     Ok(tl) => tl,
                     Err(e) => {
                         eprintln!("[ipc] ADVANCE_PHYSICS: tick_loop poisoned: {e}");
@@ -4553,7 +4553,11 @@ where
             }
 
             cmd::CONSOLIDATE => {
-                let tl = match tick_loop.lock() {
+                // Claim order is LTM then TickLoop — the same order
+                // the autonomous memory phase takes, so neither side
+                // can hold one membrane while waiting on the other.
+                let mut ltm_guard = ltm.access();
+                let mut tl = match tick_loop.lock() {
                     Ok(tl) => tl,
                     Err(e) => {
                         eprintln!("[ipc] CONSOLIDATE: tick_loop poisoned: {e}");
@@ -4561,14 +4565,18 @@ where
                     }
                 };
                 tl.note_mind_drive();
-                let count = tl.consolidate(mmap, stm, &mut ltm.access());
+                let count = tl.consolidate(mmap, stm, &mut ltm_guard);
                 let mut resp = vec![1u8];
                 resp.extend_from_slice(&count.to_le_bytes());
                 resp
             }
 
             cmd::ASSOCIATE => {
-                let tl = match tick_loop.lock() {
+                // Claim order is LTM then TickLoop — the same order
+                // the autonomous memory phase takes, so neither side
+                // can hold one membrane while waiting on the other.
+                let mut ltm_guard = ltm.access();
+                let mut tl = match tick_loop.lock() {
                     Ok(tl) => tl,
                     Err(e) => {
                         eprintln!("[ipc] ASSOCIATE: tick_loop poisoned: {e}");
@@ -4576,14 +4584,18 @@ where
                     }
                 };
                 tl.note_mind_drive();
-                let count = tl.associate(mmap, &mut ltm.access());
+                let count = tl.associate(mmap, &mut ltm_guard);
                 let mut resp = vec![1u8];
                 resp.extend_from_slice(&count.to_le_bytes());
                 resp
             }
 
             cmd::DREAM => {
-                let tl = match tick_loop.lock() {
+                // Claim order is LTM then TickLoop — the same order
+                // the autonomous memory phase takes, so neither side
+                // can hold one membrane while waiting on the other.
+                let mut ltm_guard = ltm.access();
+                let mut tl = match tick_loop.lock() {
                     Ok(tl) => tl,
                     Err(e) => {
                         eprintln!("[ipc] DREAM: tick_loop poisoned: {e}");
@@ -4591,14 +4603,14 @@ where
                     }
                 };
                 tl.note_mind_drive();
-                let insights = tl.dream(mmap, &mut ltm.access());
+                let insights = tl.dream(mmap, &mut ltm_guard);
                 let mut resp = vec![1u8];
                 resp.extend_from_slice(&insights.to_le_bytes());
                 resp
             }
 
             cmd::READ_SENSORS => {
-                let tl = match tick_loop.lock() {
+                let mut tl = match tick_loop.lock() {
                     Ok(tl) => tl,
                     Err(e) => {
                         eprintln!("[ipc] READ_SENSORS: tick_loop poisoned: {e}");
@@ -4615,7 +4627,7 @@ where
             }
 
             cmd::APPLY_BODY_CONTROL => {
-                let tl = match tick_loop.lock() {
+                let mut tl = match tick_loop.lock() {
                     Ok(tl) => tl,
                     Err(e) => {
                         eprintln!("[ipc] APPLY_BODY_CONTROL: tick_loop poisoned: {e}");
@@ -4675,7 +4687,7 @@ where
             }
 
             cmd::SAVE_INFERENCE => {
-                let tl = match tick_loop.lock() {
+                let mut tl = match tick_loop.lock() {
                     Ok(tl) => tl,
                     Err(e) => {
                         eprintln!("[ipc] SAVE_INFERENCE: tick_loop poisoned: {e}");
@@ -4742,7 +4754,7 @@ where
                 }
                 let gain = f32::from_le_bytes(payload[0..4].try_into().unwrap_or_default());
                 match tick_loop.lock() {
-                    Ok(tl) => {
+                    Ok(mut tl) => {
                         tl.set_optic_gain(gain);
                         vec![1u8]
                     }
@@ -4762,7 +4774,7 @@ where
                 }
                 let meters = f32::from_le_bytes(payload[0..4].try_into().unwrap_or_default());
                 match tick_loop.lock() {
-                    Ok(tl) => {
+                    Ok(mut tl) => {
                         tl.set_focus(meters);
                         vec![1u8]
                     }
@@ -4784,7 +4796,7 @@ where
                 }
                 let openness = f32::from_le_bytes(payload[0..4].try_into().unwrap_or_default());
                 match tick_loop.lock() {
-                    Ok(tl) => {
+                    Ok(mut tl) => {
                         tl.set_lid(openness);
                         vec![1u8]
                     }
@@ -4837,7 +4849,7 @@ where
                     return vec![error::INVALID_VALUE];
                 };
                 match tick_loop.lock() {
-                    Ok(tl) => {
+                    Ok(mut tl) => {
                         tl.place_inner(pose.clone());
                         // The body keeps its place: write it where the
                         // boot path will hand it back to the cord —

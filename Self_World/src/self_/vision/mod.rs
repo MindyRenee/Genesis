@@ -7,21 +7,21 @@
 //! cortical activity with no sensor required. Every stage is the
 //! biology's own equation, not an image-processing recipe:
 //!
-//! - [`optics`] — the dioptric front end: pupil aperture (pretectal
+//! - `optics` — the dioptric front end: pupil aperture (pretectal
 //!   light reflex on log-compressed luminance), ciliary accommodation
 //!   (defocus blur), and the voluntary lid — all transmission
 //!   scalars on the radiance field before a single photoreceptor
 //!   absorbs anything.
-//! - [`retina`] — the neural retina: LMS cone absorption
+//! - `retina` — the neural retina: LMS cone absorption
 //!   (Stockman–Sharpe fundamentals on an RGB→LMS basis), Naka–Rushton
 //!   adaptation (the photoreceptor's compressive nonlinearity), the
 //!   cGMP/membrane-potential phototransduction PDE, and ON/OFF
 //!   ganglion channels through a center-surround difference of
 //!   Gaussians — the lateral inhibition horizontal cells impose.
-//! - [`cortex`] — V1: quadrature Gabor energy in orientation
+//! - `cortex` — V1: quadrature Gabor energy in orientation
 //!   hypercolumns, retinotopically arranged; the population map is
 //!   what the oculomotor stage reads salience from.
-//! - [`oculomotor`] — the gaze plant: a critically damped spring
+//! - `oculomotor` — the gaze plant: a critically damped spring
 //!   driven toward the cortical activity centroid. Seeing *is*
 //!   moving the eye; fixation is a motor act, not a camera address.
 //!

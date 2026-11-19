@@ -185,8 +185,10 @@ fn parse_args() -> Config {
 /// Returns `true` when the refusal was a poison — an unrecoverable,
 /// permanent refusal the caller must escalate rather than skip.
 fn lock_refusal(_what: &'static str, _e: genesis::shared::Denied) -> bool {
-    // `Shared` never refuses — this arm only exists so the shaped
-    // `Err` patterns still type-check; it is unreachable.
+    // `Denied` is the refractory membrane: a signal was in flight and
+    // this impulse dropped. Dropped impulses are biology, not failure
+    // — the fallback simply skips the cycle. Nothing here is a poison:
+    // the claim is an atomic flag, not a mutex that can die held.
     false
 }
 
@@ -562,7 +564,7 @@ fn main() {
         // snapshot per iteration, before any gate fires this pass.
         // Placed ahead of every `continue` below so the view stays
         // current whether or not the lease is held.
-        if let Ok(snap) = auto_internals.lock() {
+        if let Ok(mut snap) = auto_internals.lock() {
             snap.gates.clear();
             snap.gates.extend_from_slice(&[
                 ("staleness", staleness_gate.snapshot()),
@@ -585,7 +587,7 @@ fn main() {
         // absent one drifts the check toward the ceiling.
         if staleness_gate.due(now_ms) {
             match tick_loop.try_lock() {
-                Ok(tl) => {
+                Ok(mut tl) => {
                     tl.check_staleness(&mmap);
                     if tl.mind_lease_expired() {
                         staleness_gate.relax();
@@ -661,7 +663,7 @@ fn main() {
         // (mind or fallback), capped like the IPC path, so catch-up
         // after a stall never overshoots the integrator.
         {
-            let tl = match tick_loop.try_lock() {
+            let mut tl = match tick_loop.try_lock() {
                 Ok(tl) => tl,
                 Err(e) => {
                     if lock_refusal("tick_loop", e) {
@@ -681,7 +683,7 @@ fn main() {
 
         // ── Autonomous memory + sensing (LTM first, then TickLoop:
         // same order as the IPC path, both try_lock) ──
-        let ltm_guard = match ltm.try_lock() {
+        let mut ltm_guard = match ltm.try_lock() {
             Ok(g) => g,
             Err(e) => {
                 // IPC owns LTM (physiology already advanced above) —
@@ -690,7 +692,7 @@ fn main() {
                 continue;
             }
         };
-        let tl = match tick_loop.try_lock() {
+        let mut tl = match tick_loop.try_lock() {
             Ok(tl) => tl,
             Err(e) => {
                 // Mind driving — the LTM guard drops by scope end.
@@ -706,7 +708,7 @@ fn main() {
         }
         // LTMStore derefs through the MutexGuard; the granular
         // TickLoop methods take `&mut LtmStore`.
-        let ltm_store: &mut LtmStore = &mut *ltm_guard;
+        let ltm_store: &mut LtmStore = &mut ltm_guard;
         // Consolidation is self-gating (plasticity, overwhelm, empty
         // STM) — call whenever autonomous and let it decide.
         tl.consolidate(&mmap, &stm, ltm_store);
@@ -780,7 +782,7 @@ fn main() {
         // only — never application). Needs the TickLoop alone.
         if body_gate.due(now_ms) {
             match tick_loop.try_lock() {
-                Ok(tl) if tl.mind_lease_expired() => {
+                Ok(mut tl) if tl.mind_lease_expired() => {
                     tl.publish_body_recommendation(&mmap);
                     // Thermal/throttle pressure on the last-read body
                     // revisits policy sooner; a cool machine drifts.
@@ -913,7 +915,7 @@ fn main() {
     // and potentially writing corrupt data to disk.
     let mut clean_shutdown = true;
     {
-        let ltm_guard = match ltm.lock() {
+        let mut ltm_guard = match ltm.lock() {
             Ok(g) => g,
             Err(_) => {
                 eprintln!(

@@ -1,0 +1,1212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.temporal_lobe.light_cones</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.temporal_lobe.html" class="white">temporal_lobe</a>.light_cones</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/light_cones.py">/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/light_cones.py</a></td></tr></table>
+    <p><span class="code">Spacetime-inspired&nbsp;causal&nbsp;geometry&nbsp;for&nbsp;Genesis's&nbsp;self,&nbsp;inner,&nbsp;and&nbsp;outer&nbsp;worlds.<br>
+&nbsp;<br>
+This&nbsp;is&nbsp;a&nbsp;computational&nbsp;model,&nbsp;not&nbsp;a&nbsp;claim&nbsp;that&nbsp;cognitive&nbsp;states&nbsp;are&nbsp;physical<br>
+relativistic&nbsp;events.&nbsp;Coordinates&nbsp;and&nbsp;timestamps&nbsp;must&nbsp;use&nbsp;consistent&nbsp;units.<br>
+&nbsp;<br>
+The&nbsp;existing&nbsp;prototype&nbsp;is&nbsp;preserved:&nbsp;events&nbsp;occupy&nbsp;SELF,&nbsp;INNER,&nbsp;or&nbsp;OUTER<br>
+domains&nbsp;and&nbsp;are&nbsp;classified&nbsp;against&nbsp;one&nbsp;shared&nbsp;SELF&nbsp;apex.&nbsp;The&nbsp;double-cone<br>
+coordinate&nbsp;helper&nbsp;is&nbsp;a&nbsp;separate&nbsp;geometric&nbsp;view:&nbsp;the&nbsp;time&nbsp;axis&nbsp;is&nbsp;straight,<br>
+the&nbsp;apex&nbsp;is&nbsp;the&nbsp;origin,&nbsp;and&nbsp;the&nbsp;two&nbsp;cone&nbsp;sheets&nbsp;counter-rotate.&nbsp;It&nbsp;does&nbsp;not<br>
+alter&nbsp;causal&nbsp;classification&nbsp;or&nbsp;pretend&nbsp;that&nbsp;a&nbsp;visualization&nbsp;proves&nbsp;cognition.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="math.html">math</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.light_cones.html#AdaptiveLightConeManifold">AdaptiveLightConeManifold</a>
+</dt><dt class="heading-text"><a href="Self_World.temporal_lobe.light_cones.html#ConeCoordinate">ConeCoordinate</a>
+</dt><dt class="heading-text"><a href="Self_World.temporal_lobe.light_cones.html#ConeRelation">ConeRelation</a>
+</dt><dt class="heading-text"><a href="Self_World.temporal_lobe.light_cones.html#DiagramPoint">DiagramPoint</a>
+</dt><dt class="heading-text"><a href="Self_World.temporal_lobe.light_cones.html#ElasticPlasticHologram">ElasticPlasticHologram</a>
+</dt><dt class="heading-text"><a href="Self_World.temporal_lobe.light_cones.html#LightConeModel">LightConeModel</a>
+</dt><dt class="heading-text"><a href="Self_World.temporal_lobe.light_cones.html#SpacetimeEvent">SpacetimeEvent</a>
+</dt></dl>
+</dd>
+<dt class="heading-text"><a href="enum.html#StrEnum">enum.StrEnum</a>(<a href="builtins.html#str">builtins.str</a>, <a href="enum.html#ReprEnum">enum.ReprEnum</a>)
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.light_cones.html#IntervalKind">IntervalKind</a>
+</dt><dt class="heading-text"><a href="Self_World.temporal_lobe.light_cones.html#WorldDomain">WorldDomain</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="AdaptiveLightConeManifold">class <strong>AdaptiveLightConeManifold</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#AdaptiveLightConeManifold">AdaptiveLightConeManifold</a>(*,&nbsp;signal_speed:&nbsp;'float'&nbsp;=&nbsp;1.0,&nbsp;angular_speed:&nbsp;'float'&nbsp;=&nbsp;0.0,&nbsp;elastic_rate:&nbsp;'float'&nbsp;=&nbsp;0.5,&nbsp;plastic_rate:&nbsp;'float'&nbsp;=&nbsp;0.05)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Coordinate&nbsp;causal&nbsp;events,&nbsp;the&nbsp;shared&nbsp;Self&nbsp;apex,&nbsp;and&nbsp;adaptive&nbsp;field&nbsp;state.<br>
+&nbsp;<br>
+Every&nbsp;non-Self&nbsp;event&nbsp;is&nbsp;recorded&nbsp;and&nbsp;then&nbsp;produces&nbsp;a&nbsp;same-time&nbsp;Self<br>
+integration&nbsp;event&nbsp;whose&nbsp;causes&nbsp;reference&nbsp;the&nbsp;experience.&nbsp;Event&nbsp;time&nbsp;must<br>
+be&nbsp;monotonic&nbsp;relative&nbsp;to&nbsp;the&nbsp;current&nbsp;Self&nbsp;apex.&nbsp;This&nbsp;is&nbsp;a&nbsp;software&nbsp;feedback<br>
+mechanism,&nbsp;not&nbsp;evidence&nbsp;of&nbsp;consciousness&nbsp;or&nbsp;physical&nbsp;relativistic&nbsp;behavior.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="AdaptiveLightConeManifold-__init__"><strong>__init__</strong></a>(self, *, signal_speed: 'float' = 1.0, angular_speed: 'float' = 0.0, elastic_rate: 'float' = 0.5, plastic_rate: 'float' = 0.05) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="AdaptiveLightConeManifold-process_experience"><strong>process_experience</strong></a>(self, event: 'SpacetimeEvent', latent_values: 'Iterable[complex]') -&gt; 'tuple[SpacetimeEvent, tuple[complex, ...]]'</dt><dd><span class="code">Encode&nbsp;an&nbsp;experience&nbsp;and&nbsp;feed&nbsp;its&nbsp;result&nbsp;back&nbsp;into&nbsp;the&nbsp;Self&nbsp;apex.<br>
+&nbsp;<br>
+The&nbsp;supplied&nbsp;event&nbsp;is&nbsp;retained&nbsp;in&nbsp;its&nbsp;own&nbsp;domain.&nbsp;A&nbsp;non-Self&nbsp;event<br>
+generates&nbsp;a&nbsp;Self&nbsp;event&nbsp;at&nbsp;the&nbsp;same&nbsp;timestamp&nbsp;and&nbsp;position,&nbsp;linked&nbsp;via<br>
+its&nbsp;causes&nbsp;field.&nbsp;The&nbsp;latent&nbsp;field&nbsp;is&nbsp;updated&nbsp;before&nbsp;event&nbsp;mutation&nbsp;so<br>
+invalid&nbsp;observations&nbsp;do&nbsp;not&nbsp;partially&nbsp;advance&nbsp;the&nbsp;causal&nbsp;timeline.</span></dd></dl>
+
+<dl><dt><a name="AdaptiveLightConeManifold-summary"><strong>summary</strong></a>(self) -&gt; 'dict[str, object]'</dt><dd><span class="code">Expose&nbsp;structural&nbsp;diagnostics&nbsp;without&nbsp;latent&nbsp;field&nbsp;contents.</span></dd></dl>
+
+<dl><dt><a name="AdaptiveLightConeManifold-surface_point"><strong>surface_point</strong></a>(self, time_coordinate: 'float', angle: 'float') -&gt; 'ConeCoordinate'</dt><dd><span class="code">Project&nbsp;onto&nbsp;the&nbsp;future/past&nbsp;light-cone&nbsp;boundary.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>apex</strong></dt>
+<dd><span class="code">Current&nbsp;shared&nbsp;Self/Identity&nbsp;integration&nbsp;event.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ConeCoordinate">class <strong>ConeCoordinate</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ConeCoordinate">ConeCoordinate</a>(x:&nbsp;'float',&nbsp;y:&nbsp;'float',&nbsp;z:&nbsp;'float',&nbsp;sheet:&nbsp;'str')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;point&nbsp;on&nbsp;a&nbsp;counter-rotating&nbsp;double-cone&nbsp;view.<br>
+&nbsp;<br>
+x&nbsp;is&nbsp;the&nbsp;displayed&nbsp;time-axis&nbsp;coordinate,&nbsp;horizontal&nbsp;through&nbsp;the&nbsp;origin.<br>
+y&nbsp;and&nbsp;z&nbsp;are&nbsp;transverse&nbsp;spatial&nbsp;coordinates.&nbsp;Because&nbsp;x&nbsp;is&nbsp;time,&nbsp;positive<br>
+time&nbsp;is&nbsp;the&nbsp;future&nbsp;sheet&nbsp;and&nbsp;negative&nbsp;time&nbsp;is&nbsp;the&nbsp;past&nbsp;sheet.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ConeCoordinate-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="ConeCoordinate-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="ConeCoordinate-__getstate__"><strong>__getstate__</strong></a> = _dataclass_getstate(self)<span class="grey"><span class="heading-text"> from <a href="dataclasses.html">dataclasses</a></span></span></dt><dd><span class="code">#&nbsp;_dataclass_getstate&nbsp;and&nbsp;_dataclass_setstate&nbsp;are&nbsp;needed&nbsp;for&nbsp;pickling&nbsp;frozen<br>
+#&nbsp;classes&nbsp;with&nbsp;slots.&nbsp;&nbsp;These&nbsp;could&nbsp;be&nbsp;slightly&nbsp;more&nbsp;performant&nbsp;if&nbsp;we&nbsp;generated<br>
+#&nbsp;the&nbsp;code&nbsp;instead&nbsp;of&nbsp;iterating&nbsp;over&nbsp;fields.&nbsp;&nbsp;But&nbsp;that&nbsp;can&nbsp;be&nbsp;a&nbsp;project&nbsp;for<br>
+#&nbsp;another&nbsp;day,&nbsp;if&nbsp;performance&nbsp;becomes&nbsp;an&nbsp;issue.</span></dd></dl>
+
+<dl><dt><a name="ConeCoordinate-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="ConeCoordinate-__init__"><strong>__init__</strong></a>(self, x: 'float', y: 'float', z: 'float', sheet: 'str') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="ConeCoordinate-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="ConeCoordinate-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<dl><dt><a name="ConeCoordinate-__setstate__"><strong>__setstate__</strong></a> = _dataclass_setstate(self, state)<span class="grey"><span class="heading-text"> from <a href="dataclasses.html">dataclasses</a></span></span></dt></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>sheet</strong></dt>
+</dl>
+<dl><dt><strong>x</strong></dt>
+</dl>
+<dl><dt><strong>y</strong></dt>
+</dl>
+<dl><dt><strong>z</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'sheet': 'str', 'x': 'float', 'y': 'float', 'z': 'float'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'sheet': Field(name='sheet',type='str',default=&lt;dataclass...appingproxy({}),kw_only=False,_field_type=_FIELD), 'x': Field(name='x',type='float',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD), 'y': Field(name='y',type='float',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD), 'z': Field(name='z',type='float',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('x', 'y', 'z', 'sheet')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ConeRelation">class <strong>ConeRelation</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ConeRelation">ConeRelation</a>(event_id:&nbsp;'str',&nbsp;domain:&nbsp;'<a href="#WorldDomain">WorldDomain</a>',&nbsp;interval_minkowski:&nbsp;'float',&nbsp;kind:&nbsp;'<a href="#IntervalKind">IntervalKind</a>',&nbsp;in_past_cone:&nbsp;'bool',&nbsp;in_future_cone:&nbsp;'bool',&nbsp;spatial_distance:&nbsp;'float',&nbsp;time_delta_s:&nbsp;'float')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+Causal/geometric&nbsp;relation&nbsp;of&nbsp;an&nbsp;event&nbsp;to&nbsp;the&nbsp;current&nbsp;apex.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ConeRelation-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="ConeRelation-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="ConeRelation-__getstate__"><strong>__getstate__</strong></a> = _dataclass_getstate(self)<span class="grey"><span class="heading-text"> from <a href="dataclasses.html">dataclasses</a></span></span></dt><dd><span class="code">#&nbsp;_dataclass_getstate&nbsp;and&nbsp;_dataclass_setstate&nbsp;are&nbsp;needed&nbsp;for&nbsp;pickling&nbsp;frozen<br>
+#&nbsp;classes&nbsp;with&nbsp;slots.&nbsp;&nbsp;These&nbsp;could&nbsp;be&nbsp;slightly&nbsp;more&nbsp;performant&nbsp;if&nbsp;we&nbsp;generated<br>
+#&nbsp;the&nbsp;code&nbsp;instead&nbsp;of&nbsp;iterating&nbsp;over&nbsp;fields.&nbsp;&nbsp;But&nbsp;that&nbsp;can&nbsp;be&nbsp;a&nbsp;project&nbsp;for<br>
+#&nbsp;another&nbsp;day,&nbsp;if&nbsp;performance&nbsp;becomes&nbsp;an&nbsp;issue.</span></dd></dl>
+
+<dl><dt><a name="ConeRelation-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="ConeRelation-__init__"><strong>__init__</strong></a>(self, event_id: 'str', domain: 'WorldDomain', interval_minkowski: 'float', kind: 'IntervalKind', in_past_cone: 'bool', in_future_cone: 'bool', spatial_distance: 'float', time_delta_s: 'float') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="ConeRelation-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="ConeRelation-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<dl><dt><a name="ConeRelation-__setstate__"><strong>__setstate__</strong></a> = _dataclass_setstate(self, state)<span class="grey"><span class="heading-text"> from <a href="dataclasses.html">dataclasses</a></span></span></dt></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>domain</strong></dt>
+</dl>
+<dl><dt><strong>event_id</strong></dt>
+</dl>
+<dl><dt><strong>in_future_cone</strong></dt>
+</dl>
+<dl><dt><strong>in_past_cone</strong></dt>
+</dl>
+<dl><dt><strong>interval_minkowski</strong></dt>
+</dl>
+<dl><dt><strong>kind</strong></dt>
+</dl>
+<dl><dt><strong>spatial_distance</strong></dt>
+</dl>
+<dl><dt><strong>time_delta_s</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'domain': 'WorldDomain', 'event_id': 'str', 'in_future_cone': 'bool', 'in_past_cone': 'bool', 'interval_minkowski': 'float', 'kind': 'IntervalKind', 'spatial_distance': 'float', 'time_delta_s': 'float'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'domain': Field(name='domain',type='WorldDomain',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD), 'event_id': Field(name='event_id',type='str',default=&lt;datacl...appingproxy({}),kw_only=False,_field_type=_FIELD), 'in_future_cone': Field(name='in_future_cone',type='bool',default=...appingproxy({}),kw_only=False,_field_type=_FIELD), 'in_past_cone': Field(name='in_past_cone',type='bool',default=&lt;d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'interval_minkowski': Field(name='interval_minkowski',type='float',def...appingproxy({}),kw_only=False,_field_type=_FIELD), 'kind': Field(name='kind',type='IntervalKind',default=&lt;d...appingproxy({}),kw_only=False,_field_type=_FIELD), 'spatial_distance': Field(name='spatial_distance',type='float',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'time_delta_s': Field(name='time_delta_s',type='float',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('event_id', 'domain', 'interval_minkowski', 'kind', 'in_past_cone', 'in_future_cone', 'spatial_distance', 'time_delta_s')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="DiagramPoint">class <strong>DiagramPoint</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#DiagramPoint">DiagramPoint</a>(x:&nbsp;'float',&nbsp;y:&nbsp;'float',&nbsp;z:&nbsp;'float',&nbsp;component:&nbsp;'str')&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+A&nbsp;point&nbsp;in&nbsp;the&nbsp;visualization&nbsp;frame,&nbsp;not&nbsp;a&nbsp;physical&nbsp;spacetime&nbsp;event.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="DiagramPoint-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="DiagramPoint-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="DiagramPoint-__getstate__"><strong>__getstate__</strong></a> = _dataclass_getstate(self)<span class="grey"><span class="heading-text"> from <a href="dataclasses.html">dataclasses</a></span></span></dt><dd><span class="code">#&nbsp;_dataclass_getstate&nbsp;and&nbsp;_dataclass_setstate&nbsp;are&nbsp;needed&nbsp;for&nbsp;pickling&nbsp;frozen<br>
+#&nbsp;classes&nbsp;with&nbsp;slots.&nbsp;&nbsp;These&nbsp;could&nbsp;be&nbsp;slightly&nbsp;more&nbsp;performant&nbsp;if&nbsp;we&nbsp;generated<br>
+#&nbsp;the&nbsp;code&nbsp;instead&nbsp;of&nbsp;iterating&nbsp;over&nbsp;fields.&nbsp;&nbsp;But&nbsp;that&nbsp;can&nbsp;be&nbsp;a&nbsp;project&nbsp;for<br>
+#&nbsp;another&nbsp;day,&nbsp;if&nbsp;performance&nbsp;becomes&nbsp;an&nbsp;issue.</span></dd></dl>
+
+<dl><dt><a name="DiagramPoint-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="DiagramPoint-__init__"><strong>__init__</strong></a>(self, x: 'float', y: 'float', z: 'float', component: 'str') -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="DiagramPoint-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="DiagramPoint-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<dl><dt><a name="DiagramPoint-__setstate__"><strong>__setstate__</strong></a> = _dataclass_setstate(self, state)<span class="grey"><span class="heading-text"> from <a href="dataclasses.html">dataclasses</a></span></span></dt></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>component</strong></dt>
+</dl>
+<dl><dt><strong>x</strong></dt>
+</dl>
+<dl><dt><strong>y</strong></dt>
+</dl>
+<dl><dt><strong>z</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'component': 'str', 'x': 'float', 'y': 'float', 'z': 'float'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'component': Field(name='component',type='str',default=&lt;datac...appingproxy({}),kw_only=False,_field_type=_FIELD), 'x': Field(name='x',type='float',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD), 'y': Field(name='y',type='float',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD), 'z': Field(name='z',type='float',default=&lt;dataclasses...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('x', 'y', 'z', 'component')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="ElasticPlasticHologram">class <strong>ElasticPlasticHologram</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#ElasticPlasticHologram">ElasticPlasticHologram</a>(initial_state:&nbsp;'Iterable[complex]'&nbsp;=&nbsp;(),&nbsp;*,&nbsp;elastic_rate:&nbsp;'float'&nbsp;=&nbsp;0.5,&nbsp;plastic_rate:&nbsp;'float'&nbsp;=&nbsp;0.05)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+A&nbsp;small&nbsp;dependency-free&nbsp;adaptive&nbsp;complex&nbsp;field.<br>
+&nbsp;<br>
+Complex&nbsp;values&nbsp;encode&nbsp;amplitude&nbsp;and&nbsp;phase.&nbsp;Elastic&nbsp;response&nbsp;is&nbsp;temporary;<br>
+plastic&nbsp;values&nbsp;are&nbsp;persistent.&nbsp;New&nbsp;input&nbsp;dimensions&nbsp;can&nbsp;be&nbsp;appended&nbsp;as<br>
+needed.&nbsp;This&nbsp;is&nbsp;a&nbsp;computational&nbsp;representation,&nbsp;not&nbsp;physical&nbsp;holography<br>
+and&nbsp;not&nbsp;an&nbsp;unlimited-memory&nbsp;guarantee.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="ElasticPlasticHologram-__init__"><strong>__init__</strong></a>(self, initial_state: 'Iterable[complex]' = (), *, elastic_rate: 'float' = 0.5, plastic_rate: 'float' = 0.05) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="ElasticPlasticHologram-observe"><strong>observe</strong></a>(self, values: 'Iterable[complex]') -&gt; 'tuple[complex, ...]'</dt><dd><span class="code">Apply&nbsp;an&nbsp;observation,&nbsp;returning&nbsp;elastic&nbsp;response&nbsp;and&nbsp;updating&nbsp;memory.<br>
+&nbsp;<br>
+The&nbsp;returned&nbsp;response&nbsp;is&nbsp;computed&nbsp;relative&nbsp;to&nbsp;the&nbsp;pre-update&nbsp;plastic<br>
+state.&nbsp;Plastic&nbsp;consolidation&nbsp;then&nbsp;moves&nbsp;persistent&nbsp;values&nbsp;toward&nbsp;the<br>
+observation.&nbsp;Input&nbsp;dimensionality&nbsp;can&nbsp;grow,&nbsp;but&nbsp;never&nbsp;shrinks&nbsp;silently.</span></dd></dl>
+
+<dl><dt><a name="ElasticPlasticHologram-relax"><strong>relax</strong></a>(self, recovery_rate: 'float' = 0.5) -&gt; 'tuple[complex, ...]'</dt><dd><span class="code">Relax&nbsp;temporary&nbsp;deformation&nbsp;toward&nbsp;learned&nbsp;state&nbsp;without&nbsp;unlearning.</span></dd></dl>
+
+<dl><dt><a name="ElasticPlasticHologram-summary"><strong>summary</strong></a>(self) -&gt; 'dict[str, int | float]'</dt><dd><span class="code">Return&nbsp;non-sensitive&nbsp;diagnostics&nbsp;without&nbsp;exposing&nbsp;field&nbsp;values.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>elastic_state</strong></dt>
+<dd><span class="code">Current&nbsp;temporarily&nbsp;deformed&nbsp;field,&nbsp;exposed&nbsp;immutably.</span></dd>
+</dl>
+<dl><dt><strong>plastic_state</strong></dt>
+<dd><span class="code">Persistent&nbsp;learned&nbsp;field,&nbsp;exposed&nbsp;immutably.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="IntervalKind">class <strong>IntervalKind</strong></a>(<a href="enum.html#StrEnum">enum.StrEnum</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#IntervalKind">IntervalKind</a>(*values)<br>
+&nbsp;<br>
+Minkowski&nbsp;separation&nbsp;class&nbsp;relative&nbsp;to&nbsp;an&nbsp;apex&nbsp;event.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.temporal_lobe.light_cones.html#IntervalKind">IntervalKind</a></dd>
+<dd><a href="enum.html#StrEnum">enum.StrEnum</a></dd>
+<dd><a href="builtins.html#str">builtins.str</a></dd>
+<dd><a href="enum.html#ReprEnum">enum.ReprEnum</a></dd>
+<dd><a href="enum.html#Enum">enum.Enum</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="IntervalKind-__format__"><strong>__format__</strong></a>(self, format_spec, /)<span class="grey"><span class="heading-text"> from <a href="builtins.html#str">builtins.str</a></span></span></dt><dd><span class="code">Return&nbsp;a&nbsp;formatted&nbsp;version&nbsp;of&nbsp;the&nbsp;string&nbsp;as&nbsp;described&nbsp;by&nbsp;format_spec.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-__new__"><strong>__new__</strong></a>(cls, value)<span class="grey"><span class="heading-text"> from enum.Enum</span></span></dt><dd><span class="code">Create&nbsp;and&nbsp;return&nbsp;a&nbsp;new&nbsp;<a href="builtins.html#object">object</a>.&nbsp;&nbsp;See&nbsp;help(type)&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-__str__"><strong>__str__</strong></a>(self, /)<span class="grey"><span class="heading-text"> from <a href="builtins.html#str">builtins.str</a></span></span></dt><dd><span class="code">Return&nbsp;str(self).</span></dd></dl>
+
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>COINCIDENT</strong> = &lt;IntervalKind.COINCIDENT: 'coincident'&gt;</dl>
+
+<dl><dt><strong>LIGHTLIKE</strong> = &lt;IntervalKind.LIGHTLIKE: 'lightlike'&gt;</dl>
+
+<dl><dt><strong>SPACELIKE</strong> = &lt;IntervalKind.SPACELIKE: 'spacelike'&gt;</dl>
+
+<dl><dt><strong>TIMELIKE</strong> = &lt;IntervalKind.TIMELIKE: 'timelike'&gt;</dl>
+
+<hr>
+Methods inherited from <a href="enum.html#StrEnum">enum.StrEnum</a>:<br>
+<dl><dt><a name="IntervalKind-__repr__"><strong>__repr__</strong></a>(self)<span class="grey"><span class="heading-text"> from enum.Enum</span></span></dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Methods inherited from <a href="builtins.html#str">builtins.str</a>:<br>
+<dl><dt><a name="IntervalKind-__add__"><strong>__add__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self+value.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-__contains__"><strong>__contains__</strong></a>(self, key, /)</dt><dd><span class="code">Return&nbsp;bool(key&nbsp;in&nbsp;self).</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-__eq__"><strong>__eq__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-__ge__"><strong>__ge__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self&gt;=value.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-__getattribute__"><strong>__getattribute__</strong></a>(self, name, /)</dt><dd><span class="code">Return&nbsp;getattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-__getitem__"><strong>__getitem__</strong></a>(self, key, /)</dt><dd><span class="code">Return&nbsp;self[key].</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-__getnewargs__"><strong>__getnewargs__</strong></a>(...)</dt></dl>
+
+<dl><dt><a name="IntervalKind-__gt__"><strong>__gt__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self&gt;value.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-__hash__"><strong>__hash__</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-__iter__"><strong>__iter__</strong></a>(self, /)</dt><dd><span class="code">Implement&nbsp;iter(self).</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-__le__"><strong>__le__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self&lt;=value.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-__len__"><strong>__len__</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;len(self).</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-__lt__"><strong>__lt__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self&lt;value.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-__mod__"><strong>__mod__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self%value.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-__mul__"><strong>__mul__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self*value.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-__ne__"><strong>__ne__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self!=value.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-__rmod__"><strong>__rmod__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;value%self.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-__rmul__"><strong>__rmul__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;value*self.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-__sizeof__"><strong>__sizeof__</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;the&nbsp;size&nbsp;of&nbsp;the&nbsp;string&nbsp;in&nbsp;memory,&nbsp;in&nbsp;bytes.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-capitalize"><strong>capitalize</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;a&nbsp;capitalized&nbsp;version&nbsp;of&nbsp;the&nbsp;string.<br>
+&nbsp;<br>
+More&nbsp;specifically,&nbsp;make&nbsp;the&nbsp;first&nbsp;character&nbsp;have&nbsp;upper&nbsp;case&nbsp;and&nbsp;the&nbsp;rest&nbsp;lower<br>
+case.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-casefold"><strong>casefold</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;a&nbsp;version&nbsp;of&nbsp;the&nbsp;string&nbsp;suitable&nbsp;for&nbsp;caseless&nbsp;comparisons.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-center"><strong>center</strong></a>(self, width, fillchar=' ', /)</dt><dd><span class="code">Return&nbsp;a&nbsp;centered&nbsp;string&nbsp;of&nbsp;length&nbsp;width.<br>
+&nbsp;<br>
+Padding&nbsp;is&nbsp;done&nbsp;using&nbsp;the&nbsp;specified&nbsp;fill&nbsp;character&nbsp;(default&nbsp;is&nbsp;a&nbsp;space).</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-count"><strong>count</strong></a>(...)</dt><dd><span class="code">S.<a href="#IntervalKind-count">count</a>(sub[,&nbsp;start[,&nbsp;end]])&nbsp;-&gt;&nbsp;int<br>
+&nbsp;<br>
+Return&nbsp;the&nbsp;number&nbsp;of&nbsp;non-overlapping&nbsp;occurrences&nbsp;of&nbsp;substring&nbsp;sub&nbsp;in<br>
+string&nbsp;S[start:end].&nbsp;&nbsp;Optional&nbsp;arguments&nbsp;start&nbsp;and&nbsp;end&nbsp;are<br>
+interpreted&nbsp;as&nbsp;in&nbsp;slice&nbsp;notation.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-encode"><strong>encode</strong></a>(self, /, encoding='utf-8', errors='strict')</dt><dd><span class="code">Encode&nbsp;the&nbsp;string&nbsp;using&nbsp;the&nbsp;codec&nbsp;registered&nbsp;for&nbsp;encoding.<br>
+&nbsp;<br>
+encoding<br>
+&nbsp;&nbsp;The&nbsp;encoding&nbsp;in&nbsp;which&nbsp;to&nbsp;encode&nbsp;the&nbsp;string.<br>
+errors<br>
+&nbsp;&nbsp;The&nbsp;error&nbsp;handling&nbsp;scheme&nbsp;to&nbsp;use&nbsp;for&nbsp;encoding&nbsp;errors.<br>
+&nbsp;&nbsp;The&nbsp;default&nbsp;is&nbsp;'strict'&nbsp;meaning&nbsp;that&nbsp;encoding&nbsp;errors&nbsp;raise&nbsp;a<br>
+&nbsp;&nbsp;UnicodeEncodeError.&nbsp;&nbsp;Other&nbsp;possible&nbsp;values&nbsp;are&nbsp;'ignore',&nbsp;'replace'&nbsp;and<br>
+&nbsp;&nbsp;'xmlcharrefreplace'&nbsp;as&nbsp;well&nbsp;as&nbsp;any&nbsp;other&nbsp;name&nbsp;registered&nbsp;with<br>
+&nbsp;&nbsp;codecs.register_error&nbsp;that&nbsp;can&nbsp;handle&nbsp;UnicodeEncodeErrors.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-endswith"><strong>endswith</strong></a>(...)</dt><dd><span class="code">S.<a href="#IntervalKind-endswith">endswith</a>(suffix[,&nbsp;start[,&nbsp;end]])&nbsp;-&gt;&nbsp;bool<br>
+&nbsp;<br>
+Return&nbsp;True&nbsp;if&nbsp;S&nbsp;ends&nbsp;with&nbsp;the&nbsp;specified&nbsp;suffix,&nbsp;False&nbsp;otherwise.<br>
+With&nbsp;optional&nbsp;start,&nbsp;test&nbsp;S&nbsp;beginning&nbsp;at&nbsp;that&nbsp;position.<br>
+With&nbsp;optional&nbsp;end,&nbsp;stop&nbsp;comparing&nbsp;S&nbsp;at&nbsp;that&nbsp;position.<br>
+suffix&nbsp;can&nbsp;also&nbsp;be&nbsp;a&nbsp;tuple&nbsp;of&nbsp;strings&nbsp;to&nbsp;try.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-expandtabs"><strong>expandtabs</strong></a>(self, /, tabsize=8)</dt><dd><span class="code">Return&nbsp;a&nbsp;copy&nbsp;where&nbsp;all&nbsp;tab&nbsp;characters&nbsp;are&nbsp;expanded&nbsp;using&nbsp;spaces.<br>
+&nbsp;<br>
+If&nbsp;tabsize&nbsp;is&nbsp;not&nbsp;given,&nbsp;a&nbsp;tab&nbsp;size&nbsp;of&nbsp;8&nbsp;characters&nbsp;is&nbsp;assumed.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-find"><strong>find</strong></a>(...)</dt><dd><span class="code">S.<a href="#IntervalKind-find">find</a>(sub[,&nbsp;start[,&nbsp;end]])&nbsp;-&gt;&nbsp;int<br>
+&nbsp;<br>
+Return&nbsp;the&nbsp;lowest&nbsp;index&nbsp;in&nbsp;S&nbsp;where&nbsp;substring&nbsp;sub&nbsp;is&nbsp;found,<br>
+such&nbsp;that&nbsp;sub&nbsp;is&nbsp;contained&nbsp;within&nbsp;S[start:end].&nbsp;&nbsp;Optional<br>
+arguments&nbsp;start&nbsp;and&nbsp;end&nbsp;are&nbsp;interpreted&nbsp;as&nbsp;in&nbsp;slice&nbsp;notation.<br>
+&nbsp;<br>
+Return&nbsp;-1&nbsp;on&nbsp;failure.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-format"><strong>format</strong></a>(...)</dt><dd><span class="code">S.<a href="#IntervalKind-format">format</a>(*args,&nbsp;**kwargs)&nbsp;-&gt;&nbsp;str<br>
+&nbsp;<br>
+Return&nbsp;a&nbsp;formatted&nbsp;version&nbsp;of&nbsp;S,&nbsp;using&nbsp;substitutions&nbsp;from&nbsp;args&nbsp;and&nbsp;kwargs.<br>
+The&nbsp;substitutions&nbsp;are&nbsp;identified&nbsp;by&nbsp;braces&nbsp;('{'&nbsp;and&nbsp;'}').</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-format_map"><strong>format_map</strong></a>(...)</dt><dd><span class="code">S.<a href="#IntervalKind-format_map">format_map</a>(mapping)&nbsp;-&gt;&nbsp;str<br>
+&nbsp;<br>
+Return&nbsp;a&nbsp;formatted&nbsp;version&nbsp;of&nbsp;S,&nbsp;using&nbsp;substitutions&nbsp;from&nbsp;mapping.<br>
+The&nbsp;substitutions&nbsp;are&nbsp;identified&nbsp;by&nbsp;braces&nbsp;('{'&nbsp;and&nbsp;'}').</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-index"><strong>index</strong></a>(...)</dt><dd><span class="code">S.<a href="#IntervalKind-index">index</a>(sub[,&nbsp;start[,&nbsp;end]])&nbsp;-&gt;&nbsp;int<br>
+&nbsp;<br>
+Return&nbsp;the&nbsp;lowest&nbsp;index&nbsp;in&nbsp;S&nbsp;where&nbsp;substring&nbsp;sub&nbsp;is&nbsp;found,<br>
+such&nbsp;that&nbsp;sub&nbsp;is&nbsp;contained&nbsp;within&nbsp;S[start:end].&nbsp;&nbsp;Optional<br>
+arguments&nbsp;start&nbsp;and&nbsp;end&nbsp;are&nbsp;interpreted&nbsp;as&nbsp;in&nbsp;slice&nbsp;notation.<br>
+&nbsp;<br>
+Raises&nbsp;ValueError&nbsp;when&nbsp;the&nbsp;substring&nbsp;is&nbsp;not&nbsp;found.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-isalnum"><strong>isalnum</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;the&nbsp;string&nbsp;is&nbsp;an&nbsp;alpha-numeric&nbsp;string,&nbsp;False&nbsp;otherwise.<br>
+&nbsp;<br>
+A&nbsp;string&nbsp;is&nbsp;alpha-numeric&nbsp;if&nbsp;all&nbsp;characters&nbsp;in&nbsp;the&nbsp;string&nbsp;are&nbsp;alpha-numeric&nbsp;and<br>
+there&nbsp;is&nbsp;at&nbsp;least&nbsp;one&nbsp;character&nbsp;in&nbsp;the&nbsp;string.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-isalpha"><strong>isalpha</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;the&nbsp;string&nbsp;is&nbsp;an&nbsp;alphabetic&nbsp;string,&nbsp;False&nbsp;otherwise.<br>
+&nbsp;<br>
+A&nbsp;string&nbsp;is&nbsp;alphabetic&nbsp;if&nbsp;all&nbsp;characters&nbsp;in&nbsp;the&nbsp;string&nbsp;are&nbsp;alphabetic&nbsp;and&nbsp;there<br>
+is&nbsp;at&nbsp;least&nbsp;one&nbsp;character&nbsp;in&nbsp;the&nbsp;string.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-isascii"><strong>isascii</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;all&nbsp;characters&nbsp;in&nbsp;the&nbsp;string&nbsp;are&nbsp;ASCII,&nbsp;False&nbsp;otherwise.<br>
+&nbsp;<br>
+ASCII&nbsp;characters&nbsp;have&nbsp;code&nbsp;points&nbsp;in&nbsp;the&nbsp;range&nbsp;U+0000-U+007F.<br>
+Empty&nbsp;string&nbsp;is&nbsp;ASCII&nbsp;too.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-isdecimal"><strong>isdecimal</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;the&nbsp;string&nbsp;is&nbsp;a&nbsp;decimal&nbsp;string,&nbsp;False&nbsp;otherwise.<br>
+&nbsp;<br>
+A&nbsp;string&nbsp;is&nbsp;a&nbsp;decimal&nbsp;string&nbsp;if&nbsp;all&nbsp;characters&nbsp;in&nbsp;the&nbsp;string&nbsp;are&nbsp;decimal&nbsp;and<br>
+there&nbsp;is&nbsp;at&nbsp;least&nbsp;one&nbsp;character&nbsp;in&nbsp;the&nbsp;string.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-isdigit"><strong>isdigit</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;the&nbsp;string&nbsp;is&nbsp;a&nbsp;digit&nbsp;string,&nbsp;False&nbsp;otherwise.<br>
+&nbsp;<br>
+A&nbsp;string&nbsp;is&nbsp;a&nbsp;digit&nbsp;string&nbsp;if&nbsp;all&nbsp;characters&nbsp;in&nbsp;the&nbsp;string&nbsp;are&nbsp;digits&nbsp;and&nbsp;there<br>
+is&nbsp;at&nbsp;least&nbsp;one&nbsp;character&nbsp;in&nbsp;the&nbsp;string.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-isidentifier"><strong>isidentifier</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;the&nbsp;string&nbsp;is&nbsp;a&nbsp;valid&nbsp;Python&nbsp;identifier,&nbsp;False&nbsp;otherwise.<br>
+&nbsp;<br>
+Call&nbsp;keyword.iskeyword(s)&nbsp;to&nbsp;test&nbsp;whether&nbsp;string&nbsp;s&nbsp;is&nbsp;a&nbsp;reserved&nbsp;identifier,<br>
+such&nbsp;as&nbsp;"def"&nbsp;or&nbsp;"class".</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-islower"><strong>islower</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;the&nbsp;string&nbsp;is&nbsp;a&nbsp;lowercase&nbsp;string,&nbsp;False&nbsp;otherwise.<br>
+&nbsp;<br>
+A&nbsp;string&nbsp;is&nbsp;lowercase&nbsp;if&nbsp;all&nbsp;cased&nbsp;characters&nbsp;in&nbsp;the&nbsp;string&nbsp;are&nbsp;lowercase&nbsp;and<br>
+there&nbsp;is&nbsp;at&nbsp;least&nbsp;one&nbsp;cased&nbsp;character&nbsp;in&nbsp;the&nbsp;string.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-isnumeric"><strong>isnumeric</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;the&nbsp;string&nbsp;is&nbsp;a&nbsp;numeric&nbsp;string,&nbsp;False&nbsp;otherwise.<br>
+&nbsp;<br>
+A&nbsp;string&nbsp;is&nbsp;numeric&nbsp;if&nbsp;all&nbsp;characters&nbsp;in&nbsp;the&nbsp;string&nbsp;are&nbsp;numeric&nbsp;and&nbsp;there&nbsp;is&nbsp;at<br>
+least&nbsp;one&nbsp;character&nbsp;in&nbsp;the&nbsp;string.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-isprintable"><strong>isprintable</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;the&nbsp;string&nbsp;is&nbsp;printable,&nbsp;False&nbsp;otherwise.<br>
+&nbsp;<br>
+A&nbsp;string&nbsp;is&nbsp;printable&nbsp;if&nbsp;all&nbsp;of&nbsp;its&nbsp;characters&nbsp;are&nbsp;considered&nbsp;printable&nbsp;in<br>
+repr()&nbsp;or&nbsp;if&nbsp;it&nbsp;is&nbsp;empty.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-isspace"><strong>isspace</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;the&nbsp;string&nbsp;is&nbsp;a&nbsp;whitespace&nbsp;string,&nbsp;False&nbsp;otherwise.<br>
+&nbsp;<br>
+A&nbsp;string&nbsp;is&nbsp;whitespace&nbsp;if&nbsp;all&nbsp;characters&nbsp;in&nbsp;the&nbsp;string&nbsp;are&nbsp;whitespace&nbsp;and&nbsp;there<br>
+is&nbsp;at&nbsp;least&nbsp;one&nbsp;character&nbsp;in&nbsp;the&nbsp;string.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-istitle"><strong>istitle</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;the&nbsp;string&nbsp;is&nbsp;a&nbsp;title-cased&nbsp;string,&nbsp;False&nbsp;otherwise.<br>
+&nbsp;<br>
+In&nbsp;a&nbsp;title-cased&nbsp;string,&nbsp;upper-&nbsp;and&nbsp;title-case&nbsp;characters&nbsp;may&nbsp;only<br>
+follow&nbsp;uncased&nbsp;characters&nbsp;and&nbsp;lowercase&nbsp;characters&nbsp;only&nbsp;cased&nbsp;ones.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-isupper"><strong>isupper</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;the&nbsp;string&nbsp;is&nbsp;an&nbsp;uppercase&nbsp;string,&nbsp;False&nbsp;otherwise.<br>
+&nbsp;<br>
+A&nbsp;string&nbsp;is&nbsp;uppercase&nbsp;if&nbsp;all&nbsp;cased&nbsp;characters&nbsp;in&nbsp;the&nbsp;string&nbsp;are&nbsp;uppercase&nbsp;and<br>
+there&nbsp;is&nbsp;at&nbsp;least&nbsp;one&nbsp;cased&nbsp;character&nbsp;in&nbsp;the&nbsp;string.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-join"><strong>join</strong></a>(self, iterable, /)</dt><dd><span class="code">Concatenate&nbsp;any&nbsp;number&nbsp;of&nbsp;strings.<br>
+&nbsp;<br>
+The&nbsp;string&nbsp;whose&nbsp;method&nbsp;is&nbsp;called&nbsp;is&nbsp;inserted&nbsp;in&nbsp;between&nbsp;each&nbsp;given&nbsp;string.<br>
+The&nbsp;result&nbsp;is&nbsp;returned&nbsp;as&nbsp;a&nbsp;new&nbsp;string.<br>
+&nbsp;<br>
+Example:&nbsp;'.'.<a href="#IntervalKind-join">join</a>(['ab',&nbsp;'pq',&nbsp;'rs'])&nbsp;-&gt;&nbsp;'ab.pq.rs'</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-ljust"><strong>ljust</strong></a>(self, width, fillchar=' ', /)</dt><dd><span class="code">Return&nbsp;a&nbsp;left-justified&nbsp;string&nbsp;of&nbsp;length&nbsp;width.<br>
+&nbsp;<br>
+Padding&nbsp;is&nbsp;done&nbsp;using&nbsp;the&nbsp;specified&nbsp;fill&nbsp;character&nbsp;(default&nbsp;is&nbsp;a&nbsp;space).</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-lower"><strong>lower</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;a&nbsp;copy&nbsp;of&nbsp;the&nbsp;string&nbsp;converted&nbsp;to&nbsp;lowercase.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-lstrip"><strong>lstrip</strong></a>(self, chars=None, /)</dt><dd><span class="code">Return&nbsp;a&nbsp;copy&nbsp;of&nbsp;the&nbsp;string&nbsp;with&nbsp;leading&nbsp;whitespace&nbsp;removed.<br>
+&nbsp;<br>
+If&nbsp;chars&nbsp;is&nbsp;given&nbsp;and&nbsp;not&nbsp;None,&nbsp;remove&nbsp;characters&nbsp;in&nbsp;chars&nbsp;instead.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-partition"><strong>partition</strong></a>(self, sep, /)</dt><dd><span class="code">Partition&nbsp;the&nbsp;string&nbsp;into&nbsp;three&nbsp;parts&nbsp;using&nbsp;the&nbsp;given&nbsp;separator.<br>
+&nbsp;<br>
+This&nbsp;will&nbsp;search&nbsp;for&nbsp;the&nbsp;separator&nbsp;in&nbsp;the&nbsp;string.&nbsp;&nbsp;If&nbsp;the&nbsp;separator&nbsp;is&nbsp;found,<br>
+returns&nbsp;a&nbsp;3-tuple&nbsp;containing&nbsp;the&nbsp;part&nbsp;before&nbsp;the&nbsp;separator,&nbsp;the&nbsp;separator<br>
+itself,&nbsp;and&nbsp;the&nbsp;part&nbsp;after&nbsp;it.<br>
+&nbsp;<br>
+If&nbsp;the&nbsp;separator&nbsp;is&nbsp;not&nbsp;found,&nbsp;returns&nbsp;a&nbsp;3-tuple&nbsp;containing&nbsp;the&nbsp;original&nbsp;string<br>
+and&nbsp;two&nbsp;empty&nbsp;strings.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-removeprefix"><strong>removeprefix</strong></a>(self, prefix, /)</dt><dd><span class="code">Return&nbsp;a&nbsp;str&nbsp;with&nbsp;the&nbsp;given&nbsp;prefix&nbsp;string&nbsp;removed&nbsp;if&nbsp;present.<br>
+&nbsp;<br>
+If&nbsp;the&nbsp;string&nbsp;starts&nbsp;with&nbsp;the&nbsp;prefix&nbsp;string,&nbsp;return&nbsp;string[len(prefix):].<br>
+Otherwise,&nbsp;return&nbsp;a&nbsp;copy&nbsp;of&nbsp;the&nbsp;original&nbsp;string.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-removesuffix"><strong>removesuffix</strong></a>(self, suffix, /)</dt><dd><span class="code">Return&nbsp;a&nbsp;str&nbsp;with&nbsp;the&nbsp;given&nbsp;suffix&nbsp;string&nbsp;removed&nbsp;if&nbsp;present.<br>
+&nbsp;<br>
+If&nbsp;the&nbsp;string&nbsp;ends&nbsp;with&nbsp;the&nbsp;suffix&nbsp;string&nbsp;and&nbsp;that&nbsp;suffix&nbsp;is&nbsp;not&nbsp;empty,<br>
+return&nbsp;string[:-len(suffix)].&nbsp;Otherwise,&nbsp;return&nbsp;a&nbsp;copy&nbsp;of&nbsp;the&nbsp;original<br>
+string.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-replace"><strong>replace</strong></a>(self, old, new, count=-1, /)</dt><dd><span class="code">Return&nbsp;a&nbsp;copy&nbsp;with&nbsp;all&nbsp;occurrences&nbsp;of&nbsp;substring&nbsp;old&nbsp;replaced&nbsp;by&nbsp;new.<br>
+&nbsp;<br>
+&nbsp;&nbsp;count<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Maximum&nbsp;number&nbsp;of&nbsp;occurrences&nbsp;to&nbsp;replace.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-1&nbsp;(the&nbsp;default&nbsp;value)&nbsp;means&nbsp;replace&nbsp;all&nbsp;occurrences.<br>
+&nbsp;<br>
+If&nbsp;the&nbsp;optional&nbsp;argument&nbsp;count&nbsp;is&nbsp;given,&nbsp;only&nbsp;the&nbsp;first&nbsp;count&nbsp;occurrences&nbsp;are<br>
+replaced.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-rfind"><strong>rfind</strong></a>(...)</dt><dd><span class="code">S.<a href="#IntervalKind-rfind">rfind</a>(sub[,&nbsp;start[,&nbsp;end]])&nbsp;-&gt;&nbsp;int<br>
+&nbsp;<br>
+Return&nbsp;the&nbsp;highest&nbsp;index&nbsp;in&nbsp;S&nbsp;where&nbsp;substring&nbsp;sub&nbsp;is&nbsp;found,<br>
+such&nbsp;that&nbsp;sub&nbsp;is&nbsp;contained&nbsp;within&nbsp;S[start:end].&nbsp;&nbsp;Optional<br>
+arguments&nbsp;start&nbsp;and&nbsp;end&nbsp;are&nbsp;interpreted&nbsp;as&nbsp;in&nbsp;slice&nbsp;notation.<br>
+&nbsp;<br>
+Return&nbsp;-1&nbsp;on&nbsp;failure.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-rindex"><strong>rindex</strong></a>(...)</dt><dd><span class="code">S.<a href="#IntervalKind-rindex">rindex</a>(sub[,&nbsp;start[,&nbsp;end]])&nbsp;-&gt;&nbsp;int<br>
+&nbsp;<br>
+Return&nbsp;the&nbsp;highest&nbsp;index&nbsp;in&nbsp;S&nbsp;where&nbsp;substring&nbsp;sub&nbsp;is&nbsp;found,<br>
+such&nbsp;that&nbsp;sub&nbsp;is&nbsp;contained&nbsp;within&nbsp;S[start:end].&nbsp;&nbsp;Optional<br>
+arguments&nbsp;start&nbsp;and&nbsp;end&nbsp;are&nbsp;interpreted&nbsp;as&nbsp;in&nbsp;slice&nbsp;notation.<br>
+&nbsp;<br>
+Raises&nbsp;ValueError&nbsp;when&nbsp;the&nbsp;substring&nbsp;is&nbsp;not&nbsp;found.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-rjust"><strong>rjust</strong></a>(self, width, fillchar=' ', /)</dt><dd><span class="code">Return&nbsp;a&nbsp;right-justified&nbsp;string&nbsp;of&nbsp;length&nbsp;width.<br>
+&nbsp;<br>
+Padding&nbsp;is&nbsp;done&nbsp;using&nbsp;the&nbsp;specified&nbsp;fill&nbsp;character&nbsp;(default&nbsp;is&nbsp;a&nbsp;space).</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-rpartition"><strong>rpartition</strong></a>(self, sep, /)</dt><dd><span class="code">Partition&nbsp;the&nbsp;string&nbsp;into&nbsp;three&nbsp;parts&nbsp;using&nbsp;the&nbsp;given&nbsp;separator.<br>
+&nbsp;<br>
+This&nbsp;will&nbsp;search&nbsp;for&nbsp;the&nbsp;separator&nbsp;in&nbsp;the&nbsp;string,&nbsp;starting&nbsp;at&nbsp;the&nbsp;end.&nbsp;If<br>
+the&nbsp;separator&nbsp;is&nbsp;found,&nbsp;returns&nbsp;a&nbsp;3-tuple&nbsp;containing&nbsp;the&nbsp;part&nbsp;before&nbsp;the<br>
+separator,&nbsp;the&nbsp;separator&nbsp;itself,&nbsp;and&nbsp;the&nbsp;part&nbsp;after&nbsp;it.<br>
+&nbsp;<br>
+If&nbsp;the&nbsp;separator&nbsp;is&nbsp;not&nbsp;found,&nbsp;returns&nbsp;a&nbsp;3-tuple&nbsp;containing&nbsp;two&nbsp;empty&nbsp;strings<br>
+and&nbsp;the&nbsp;original&nbsp;string.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-rsplit"><strong>rsplit</strong></a>(self, /, sep=None, maxsplit=-1)</dt><dd><span class="code">Return&nbsp;a&nbsp;list&nbsp;of&nbsp;the&nbsp;substrings&nbsp;in&nbsp;the&nbsp;string,&nbsp;using&nbsp;sep&nbsp;as&nbsp;the&nbsp;separator&nbsp;string.<br>
+&nbsp;<br>
+&nbsp;&nbsp;sep<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;separator&nbsp;used&nbsp;to&nbsp;split&nbsp;the&nbsp;string.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;When&nbsp;set&nbsp;to&nbsp;None&nbsp;(the&nbsp;default&nbsp;value),&nbsp;will&nbsp;split&nbsp;on&nbsp;any&nbsp;whitespace<br>
+&nbsp;&nbsp;&nbsp;&nbsp;character&nbsp;(including&nbsp;\n&nbsp;\r&nbsp;\t&nbsp;\f&nbsp;and&nbsp;spaces)&nbsp;and&nbsp;will&nbsp;discard<br>
+&nbsp;&nbsp;&nbsp;&nbsp;empty&nbsp;strings&nbsp;from&nbsp;the&nbsp;result.<br>
+&nbsp;&nbsp;maxsplit<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Maximum&nbsp;number&nbsp;of&nbsp;splits.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-1&nbsp;(the&nbsp;default&nbsp;value)&nbsp;means&nbsp;no&nbsp;limit.<br>
+&nbsp;<br>
+Splitting&nbsp;starts&nbsp;at&nbsp;the&nbsp;end&nbsp;of&nbsp;the&nbsp;string&nbsp;and&nbsp;works&nbsp;to&nbsp;the&nbsp;front.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-rstrip"><strong>rstrip</strong></a>(self, chars=None, /)</dt><dd><span class="code">Return&nbsp;a&nbsp;copy&nbsp;of&nbsp;the&nbsp;string&nbsp;with&nbsp;trailing&nbsp;whitespace&nbsp;removed.<br>
+&nbsp;<br>
+If&nbsp;chars&nbsp;is&nbsp;given&nbsp;and&nbsp;not&nbsp;None,&nbsp;remove&nbsp;characters&nbsp;in&nbsp;chars&nbsp;instead.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-split"><strong>split</strong></a>(self, /, sep=None, maxsplit=-1)</dt><dd><span class="code">Return&nbsp;a&nbsp;list&nbsp;of&nbsp;the&nbsp;substrings&nbsp;in&nbsp;the&nbsp;string,&nbsp;using&nbsp;sep&nbsp;as&nbsp;the&nbsp;separator&nbsp;string.<br>
+&nbsp;<br>
+&nbsp;&nbsp;sep<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;separator&nbsp;used&nbsp;to&nbsp;split&nbsp;the&nbsp;string.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;When&nbsp;set&nbsp;to&nbsp;None&nbsp;(the&nbsp;default&nbsp;value),&nbsp;will&nbsp;split&nbsp;on&nbsp;any&nbsp;whitespace<br>
+&nbsp;&nbsp;&nbsp;&nbsp;character&nbsp;(including&nbsp;\n&nbsp;\r&nbsp;\t&nbsp;\f&nbsp;and&nbsp;spaces)&nbsp;and&nbsp;will&nbsp;discard<br>
+&nbsp;&nbsp;&nbsp;&nbsp;empty&nbsp;strings&nbsp;from&nbsp;the&nbsp;result.<br>
+&nbsp;&nbsp;maxsplit<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Maximum&nbsp;number&nbsp;of&nbsp;splits.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-1&nbsp;(the&nbsp;default&nbsp;value)&nbsp;means&nbsp;no&nbsp;limit.<br>
+&nbsp;<br>
+Splitting&nbsp;starts&nbsp;at&nbsp;the&nbsp;front&nbsp;of&nbsp;the&nbsp;string&nbsp;and&nbsp;works&nbsp;to&nbsp;the&nbsp;end.<br>
+&nbsp;<br>
+Note,&nbsp;str.<a href="#IntervalKind-split">split</a>()&nbsp;is&nbsp;mainly&nbsp;useful&nbsp;for&nbsp;data&nbsp;that&nbsp;has&nbsp;been&nbsp;intentionally<br>
+delimited.&nbsp;&nbsp;With&nbsp;natural&nbsp;text&nbsp;that&nbsp;includes&nbsp;punctuation,&nbsp;consider&nbsp;using<br>
+the&nbsp;regular&nbsp;expression&nbsp;module.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-splitlines"><strong>splitlines</strong></a>(self, /, keepends=False)</dt><dd><span class="code">Return&nbsp;a&nbsp;list&nbsp;of&nbsp;the&nbsp;lines&nbsp;in&nbsp;the&nbsp;string,&nbsp;breaking&nbsp;at&nbsp;line&nbsp;boundaries.<br>
+&nbsp;<br>
+Line&nbsp;breaks&nbsp;are&nbsp;not&nbsp;included&nbsp;in&nbsp;the&nbsp;resulting&nbsp;list&nbsp;unless&nbsp;keepends&nbsp;is&nbsp;given&nbsp;and<br>
+true.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-startswith"><strong>startswith</strong></a>(...)</dt><dd><span class="code">S.<a href="#IntervalKind-startswith">startswith</a>(prefix[,&nbsp;start[,&nbsp;end]])&nbsp;-&gt;&nbsp;bool<br>
+&nbsp;<br>
+Return&nbsp;True&nbsp;if&nbsp;S&nbsp;starts&nbsp;with&nbsp;the&nbsp;specified&nbsp;prefix,&nbsp;False&nbsp;otherwise.<br>
+With&nbsp;optional&nbsp;start,&nbsp;test&nbsp;S&nbsp;beginning&nbsp;at&nbsp;that&nbsp;position.<br>
+With&nbsp;optional&nbsp;end,&nbsp;stop&nbsp;comparing&nbsp;S&nbsp;at&nbsp;that&nbsp;position.<br>
+prefix&nbsp;can&nbsp;also&nbsp;be&nbsp;a&nbsp;tuple&nbsp;of&nbsp;strings&nbsp;to&nbsp;try.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-strip"><strong>strip</strong></a>(self, chars=None, /)</dt><dd><span class="code">Return&nbsp;a&nbsp;copy&nbsp;of&nbsp;the&nbsp;string&nbsp;with&nbsp;leading&nbsp;and&nbsp;trailing&nbsp;whitespace&nbsp;removed.<br>
+&nbsp;<br>
+If&nbsp;chars&nbsp;is&nbsp;given&nbsp;and&nbsp;not&nbsp;None,&nbsp;remove&nbsp;characters&nbsp;in&nbsp;chars&nbsp;instead.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-swapcase"><strong>swapcase</strong></a>(self, /)</dt><dd><span class="code">Convert&nbsp;uppercase&nbsp;characters&nbsp;to&nbsp;lowercase&nbsp;and&nbsp;lowercase&nbsp;characters&nbsp;to&nbsp;uppercase.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-title"><strong>title</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;a&nbsp;version&nbsp;of&nbsp;the&nbsp;string&nbsp;where&nbsp;each&nbsp;word&nbsp;is&nbsp;titlecased.<br>
+&nbsp;<br>
+More&nbsp;specifically,&nbsp;words&nbsp;start&nbsp;with&nbsp;uppercased&nbsp;characters&nbsp;and&nbsp;all&nbsp;remaining<br>
+cased&nbsp;characters&nbsp;have&nbsp;lower&nbsp;case.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-translate"><strong>translate</strong></a>(self, table, /)</dt><dd><span class="code">Replace&nbsp;each&nbsp;character&nbsp;in&nbsp;the&nbsp;string&nbsp;using&nbsp;the&nbsp;given&nbsp;translation&nbsp;table.<br>
+&nbsp;<br>
+&nbsp;&nbsp;table<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Translation&nbsp;table,&nbsp;which&nbsp;must&nbsp;be&nbsp;a&nbsp;mapping&nbsp;of&nbsp;Unicode&nbsp;ordinals&nbsp;to<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Unicode&nbsp;ordinals,&nbsp;strings,&nbsp;or&nbsp;None.<br>
+&nbsp;<br>
+The&nbsp;table&nbsp;must&nbsp;implement&nbsp;lookup/indexing&nbsp;via&nbsp;__getitem__,&nbsp;for&nbsp;instance&nbsp;a<br>
+dictionary&nbsp;or&nbsp;list.&nbsp;&nbsp;If&nbsp;this&nbsp;operation&nbsp;raises&nbsp;LookupError,&nbsp;the&nbsp;character&nbsp;is<br>
+left&nbsp;untouched.&nbsp;&nbsp;Characters&nbsp;mapped&nbsp;to&nbsp;None&nbsp;are&nbsp;deleted.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-upper"><strong>upper</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;a&nbsp;copy&nbsp;of&nbsp;the&nbsp;string&nbsp;converted&nbsp;to&nbsp;uppercase.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-zfill"><strong>zfill</strong></a>(self, width, /)</dt><dd><span class="code">Pad&nbsp;a&nbsp;numeric&nbsp;string&nbsp;with&nbsp;zeros&nbsp;on&nbsp;the&nbsp;left,&nbsp;to&nbsp;fill&nbsp;a&nbsp;field&nbsp;of&nbsp;the&nbsp;given&nbsp;width.<br>
+&nbsp;<br>
+The&nbsp;string&nbsp;is&nbsp;never&nbsp;truncated.</span></dd></dl>
+
+<hr>
+Static methods inherited from <a href="builtins.html#str">builtins.str</a>:<br>
+<dl><dt><a name="IntervalKind-maketrans"><strong>maketrans</strong></a>(...)</dt><dd><span class="code">Return&nbsp;a&nbsp;translation&nbsp;table&nbsp;usable&nbsp;for&nbsp;str.<a href="#IntervalKind-translate">translate</a>().<br>
+&nbsp;<br>
+If&nbsp;there&nbsp;is&nbsp;only&nbsp;one&nbsp;argument,&nbsp;it&nbsp;must&nbsp;be&nbsp;a&nbsp;dictionary&nbsp;mapping&nbsp;Unicode<br>
+ordinals&nbsp;(integers)&nbsp;or&nbsp;characters&nbsp;to&nbsp;Unicode&nbsp;ordinals,&nbsp;strings&nbsp;or&nbsp;None.<br>
+Character&nbsp;keys&nbsp;will&nbsp;be&nbsp;then&nbsp;converted&nbsp;to&nbsp;ordinals.<br>
+If&nbsp;there&nbsp;are&nbsp;two&nbsp;arguments,&nbsp;they&nbsp;must&nbsp;be&nbsp;strings&nbsp;of&nbsp;equal&nbsp;length,&nbsp;and<br>
+in&nbsp;the&nbsp;resulting&nbsp;dictionary,&nbsp;each&nbsp;character&nbsp;in&nbsp;x&nbsp;will&nbsp;be&nbsp;mapped&nbsp;to&nbsp;the<br>
+character&nbsp;at&nbsp;the&nbsp;same&nbsp;position&nbsp;in&nbsp;y.&nbsp;If&nbsp;there&nbsp;is&nbsp;a&nbsp;third&nbsp;argument,&nbsp;it<br>
+must&nbsp;be&nbsp;a&nbsp;string,&nbsp;whose&nbsp;characters&nbsp;will&nbsp;be&nbsp;mapped&nbsp;to&nbsp;None&nbsp;in&nbsp;the&nbsp;result.</span></dd></dl>
+
+<hr>
+Methods inherited from <a href="enum.html#Enum">enum.Enum</a>:<br>
+<dl><dt><a name="IntervalKind-__dir__"><strong>__dir__</strong></a>(self)</dt><dd><span class="code">Returns&nbsp;public&nbsp;methods&nbsp;and&nbsp;other&nbsp;interesting&nbsp;attributes.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-__init__"><strong>__init__</strong></a>(self, *args, **kwds)</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="IntervalKind-__reduce_ex__"><strong>__reduce_ex__</strong></a>(self, proto)</dt><dd><span class="code">Helper&nbsp;for&nbsp;pickle.</span></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="enum.html#Enum">enum.Enum</a>:<br>
+<dl><dt><strong>name</strong></dt>
+<dd><span class="code">The&nbsp;name&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<dl><dt><strong>value</strong></dt>
+<dd><span class="code">The&nbsp;value&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<hr>
+Readonly properties inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><strong>__members__</strong></dt>
+<dd><span class="code">Returns&nbsp;a&nbsp;mapping&nbsp;of&nbsp;member&nbsp;name-&gt;value.<br>
+&nbsp;<br>
+This&nbsp;mapping&nbsp;lists&nbsp;all&nbsp;enum&nbsp;members,&nbsp;including&nbsp;aliases.&nbsp;Note&nbsp;that&nbsp;this<br>
+is&nbsp;a&nbsp;read-only&nbsp;view&nbsp;of&nbsp;the&nbsp;internal&nbsp;mapping.</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="LightConeModel">class <strong>LightConeModel</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#LightConeModel">LightConeModel</a>(signal_speed:&nbsp;'float'&nbsp;=&nbsp;1.0,&nbsp;tolerance:&nbsp;'float'&nbsp;=&nbsp;1e-09)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Classify&nbsp;events&nbsp;relative&nbsp;to&nbsp;a&nbsp;shared&nbsp;current-state&nbsp;apex.<br>
+&nbsp;<br>
+The&nbsp;interval&nbsp;convention&nbsp;is&nbsp;s²&nbsp;=&nbsp;(v&nbsp;Δt)²&nbsp;-&nbsp;|Δx|²:<br>
+positive&nbsp;is&nbsp;timelike,&nbsp;zero&nbsp;lightlike,&nbsp;negative&nbsp;spacelike.&nbsp;Time&nbsp;ordering<br>
+determines&nbsp;past&nbsp;versus&nbsp;future;&nbsp;temporal&nbsp;order&nbsp;alone&nbsp;does&nbsp;not&nbsp;prove&nbsp;cause.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="LightConeModel-__init__"><strong>__init__</strong></a>(self, signal_speed: 'float' = 1.0, tolerance: 'float' = 1e-09) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="LightConeModel-add_event"><strong>add_event</strong></a>(self, event: 'SpacetimeEvent') -&gt; 'None'</dt><dd><span class="code">Register&nbsp;or&nbsp;replace&nbsp;an&nbsp;event&nbsp;without&nbsp;implicitly&nbsp;advancing&nbsp;the&nbsp;apex.</span></dd></dl>
+
+<dl><dt><a name="LightConeModel-advance_apex"><strong>advance_apex</strong></a>(self, event: 'SpacetimeEvent') -&gt; 'None'</dt><dd><span class="code">Advance&nbsp;the&nbsp;apex&nbsp;monotonically;&nbsp;equal&nbsp;timestamps&nbsp;are&nbsp;allowed.</span></dd></dl>
+
+<dl><dt><a name="LightConeModel-classify"><strong>classify</strong></a>(self, event: 'SpacetimeEvent', apex: 'SpacetimeEvent | None' = None) -&gt; 'ConeRelation'</dt><dd><span class="code">Classify&nbsp;one&nbsp;event&nbsp;relative&nbsp;to&nbsp;the&nbsp;supplied&nbsp;or&nbsp;current&nbsp;apex.</span></dd></dl>
+
+<dl><dt><a name="LightConeModel-classify_all"><strong>classify_all</strong></a>(self, events: 'Iterable[SpacetimeEvent] | None' = None) -&gt; 'tuple[ConeRelation, ...]'</dt><dd><span class="code">Return&nbsp;deterministic&nbsp;classifications&nbsp;for&nbsp;supplied&nbsp;or&nbsp;registered&nbsp;events.</span></dd></dl>
+
+<dl><dt><a name="LightConeModel-cone_for"><strong>cone_for</strong></a>(self, domain: 'WorldDomain') -&gt; 'tuple[ConeRelation, ...]'</dt><dd><span class="code">Return&nbsp;one&nbsp;domain's&nbsp;events&nbsp;classified&nbsp;against&nbsp;the&nbsp;same&nbsp;self&nbsp;apex.</span></dd></dl>
+
+<dl><dt><a name="LightConeModel-get_event"><strong>get_event</strong></a>(self, event_id: 'str') -&gt; 'SpacetimeEvent | None'</dt></dl>
+
+<dl><dt><a name="LightConeModel-state_summary"><strong>state_summary</strong></a>(self) -&gt; 'dict[str, object]'</dt><dd><span class="code">Serializable&nbsp;diagnostics&nbsp;without&nbsp;raw&nbsp;sensor&nbsp;payloads.</span></dd></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>apex</strong></dt>
+<dd><span class="code">The&nbsp;latest&nbsp;integration&nbsp;event&nbsp;shared&nbsp;by&nbsp;all&nbsp;three&nbsp;domains.</span></dd>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="SpacetimeEvent">class <strong>SpacetimeEvent</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#SpacetimeEvent">SpacetimeEvent</a>(event_id:&nbsp;'str',&nbsp;time_s:&nbsp;'float',&nbsp;position:&nbsp;'tuple[float,&nbsp;float,&nbsp;float]',&nbsp;domain:&nbsp;'<a href="#WorldDomain">WorldDomain</a>',&nbsp;confidence:&nbsp;'float'&nbsp;=&nbsp;1.0,&nbsp;causes:&nbsp;'tuple[str,&nbsp;...]'&nbsp;=&nbsp;())&nbsp;-&amp;gt;&nbsp;None<br>
+&nbsp;<br>
+One&nbsp;timestamped&nbsp;event&nbsp;in&nbsp;a&nbsp;declared&nbsp;coordinate&nbsp;system.<br>
+&nbsp;<br>
+position&nbsp;is&nbsp;a&nbsp;3-vector&nbsp;in&nbsp;one&nbsp;spatial&nbsp;unit.&nbsp;time_s&nbsp;is&nbsp;seconds&nbsp;on&nbsp;one<br>
+monotonic&nbsp;time&nbsp;base;&nbsp;do&nbsp;not&nbsp;mix&nbsp;wall-clock&nbsp;and&nbsp;monotonic&nbsp;timestamps.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="SpacetimeEvent-__delattr__"><strong>__delattr__</strong></a>(self, name)</dt><dd><span class="code">Implement&nbsp;delattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="SpacetimeEvent-__eq__"><strong>__eq__</strong></a>(self, other)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="SpacetimeEvent-__getstate__"><strong>__getstate__</strong></a> = _dataclass_getstate(self)<span class="grey"><span class="heading-text"> from <a href="dataclasses.html">dataclasses</a></span></span></dt><dd><span class="code">#&nbsp;_dataclass_getstate&nbsp;and&nbsp;_dataclass_setstate&nbsp;are&nbsp;needed&nbsp;for&nbsp;pickling&nbsp;frozen<br>
+#&nbsp;classes&nbsp;with&nbsp;slots.&nbsp;&nbsp;These&nbsp;could&nbsp;be&nbsp;slightly&nbsp;more&nbsp;performant&nbsp;if&nbsp;we&nbsp;generated<br>
+#&nbsp;the&nbsp;code&nbsp;instead&nbsp;of&nbsp;iterating&nbsp;over&nbsp;fields.&nbsp;&nbsp;But&nbsp;that&nbsp;can&nbsp;be&nbsp;a&nbsp;project&nbsp;for<br>
+#&nbsp;another&nbsp;day,&nbsp;if&nbsp;performance&nbsp;becomes&nbsp;an&nbsp;issue.</span></dd></dl>
+
+<dl><dt><a name="SpacetimeEvent-__hash__"><strong>__hash__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="SpacetimeEvent-__init__"><strong>__init__</strong></a>(self, event_id: 'str', time_s: 'float', position: 'tuple[float, float, float]', domain: 'WorldDomain', confidence: 'float' = 1.0, causes: 'tuple[str, ...]' = ()) -&gt; None</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="SpacetimeEvent-__post_init__"><strong>__post_init__</strong></a>(self) -&gt; 'None'</dt></dl>
+
+<dl><dt><a name="SpacetimeEvent-__repr__"><strong>__repr__</strong></a>(self)</dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<dl><dt><a name="SpacetimeEvent-__setattr__"><strong>__setattr__</strong></a>(self, name, value)</dt><dd><span class="code">Implement&nbsp;setattr(self,&nbsp;name,&nbsp;value).</span></dd></dl>
+
+<dl><dt><a name="SpacetimeEvent-__setstate__"><strong>__setstate__</strong></a> = _dataclass_setstate(self, state)<span class="grey"><span class="heading-text"> from <a href="dataclasses.html">dataclasses</a></span></span></dt></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>causes</strong></dt>
+</dl>
+<dl><dt><strong>confidence</strong></dt>
+</dl>
+<dl><dt><strong>domain</strong></dt>
+</dl>
+<dl><dt><strong>event_id</strong></dt>
+</dl>
+<dl><dt><strong>position</strong></dt>
+</dl>
+<dl><dt><strong>time_s</strong></dt>
+</dl>
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>__annotations__</strong> = {'causes': 'tuple[str, ...]', 'confidence': 'float', 'domain': 'WorldDomain', 'event_id': 'str', 'position': 'tuple[float, float, float]', 'time_s': 'float'}</dl>
+
+<dl><dt><strong>__dataclass_fields__</strong> = {'causes': Field(name='causes',type='tuple[str, ...]',defau...appingproxy({}),kw_only=False,_field_type=_FIELD), 'confidence': Field(name='confidence',type='float',default=1.0...appingproxy({}),kw_only=False,_field_type=_FIELD), 'domain': Field(name='domain',type='WorldDomain',default=&lt;...appingproxy({}),kw_only=False,_field_type=_FIELD), 'event_id': Field(name='event_id',type='str',default=&lt;datacl...appingproxy({}),kw_only=False,_field_type=_FIELD), 'position': Field(name='position',type='tuple[float, float, ...appingproxy({}),kw_only=False,_field_type=_FIELD), 'time_s': Field(name='time_s',type='float',default=&lt;datacl...appingproxy({}),kw_only=False,_field_type=_FIELD)}</dl>
+
+<dl><dt><strong>__dataclass_params__</strong> = _DataclassParams(init=True,repr=True,eq=True,ord...True,kw_only=False,slots=True,weakref_slot=False)</dl>
+
+<dl><dt><strong>__match_args__</strong> = ('event_id', 'time_s', 'position', 'domain', 'confidence', 'causes')</dl>
+
+</td></tr></table> <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="WorldDomain">class <strong>WorldDomain</strong></a>(<a href="enum.html#StrEnum">enum.StrEnum</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#WorldDomain">WorldDomain</a>(*values)<br>
+&nbsp;<br>
+The&nbsp;three&nbsp;mutually&nbsp;distinguishable&nbsp;but&nbsp;linked&nbsp;state&nbsp;domains.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt>Method resolution order:</dt>
+<dd><a href="Self_World.temporal_lobe.light_cones.html#WorldDomain">WorldDomain</a></dd>
+<dd><a href="enum.html#StrEnum">enum.StrEnum</a></dd>
+<dd><a href="builtins.html#str">builtins.str</a></dd>
+<dd><a href="enum.html#ReprEnum">enum.ReprEnum</a></dd>
+<dd><a href="enum.html#Enum">enum.Enum</a></dd>
+<dd><a href="builtins.html#object">builtins.object</a></dd>
+</dl>
+<hr>
+Methods defined here:<br>
+<dl><dt><a name="WorldDomain-__format__"><strong>__format__</strong></a>(self, format_spec, /)<span class="grey"><span class="heading-text"> from <a href="builtins.html#str">builtins.str</a></span></span></dt><dd><span class="code">Return&nbsp;a&nbsp;formatted&nbsp;version&nbsp;of&nbsp;the&nbsp;string&nbsp;as&nbsp;described&nbsp;by&nbsp;format_spec.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-__new__"><strong>__new__</strong></a>(cls, value)<span class="grey"><span class="heading-text"> from enum.Enum</span></span></dt><dd><span class="code">Create&nbsp;and&nbsp;return&nbsp;a&nbsp;new&nbsp;<a href="builtins.html#object">object</a>.&nbsp;&nbsp;See&nbsp;help(type)&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-__str__"><strong>__str__</strong></a>(self, /)<span class="grey"><span class="heading-text"> from <a href="builtins.html#str">builtins.str</a></span></span></dt><dd><span class="code">Return&nbsp;str(self).</span></dd></dl>
+
+<hr>
+Data and other attributes defined here:<br>
+<dl><dt><strong>INNER</strong> = &lt;WorldDomain.INNER: 'inner'&gt;</dl>
+
+<dl><dt><strong>OUTER</strong> = &lt;WorldDomain.OUTER: 'outer'&gt;</dl>
+
+<dl><dt><strong>SELF</strong> = &lt;WorldDomain.SELF: 'self'&gt;</dl>
+
+<hr>
+Methods inherited from <a href="enum.html#StrEnum">enum.StrEnum</a>:<br>
+<dl><dt><a name="WorldDomain-__repr__"><strong>__repr__</strong></a>(self)<span class="grey"><span class="heading-text"> from enum.Enum</span></span></dt><dd><span class="code">Return&nbsp;repr(self).</span></dd></dl>
+
+<hr>
+Methods inherited from <a href="builtins.html#str">builtins.str</a>:<br>
+<dl><dt><a name="WorldDomain-__add__"><strong>__add__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self+value.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-__contains__"><strong>__contains__</strong></a>(self, key, /)</dt><dd><span class="code">Return&nbsp;bool(key&nbsp;in&nbsp;self).</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-__eq__"><strong>__eq__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self==value.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-__ge__"><strong>__ge__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self&gt;=value.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-__getattribute__"><strong>__getattribute__</strong></a>(self, name, /)</dt><dd><span class="code">Return&nbsp;getattr(self,&nbsp;name).</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-__getitem__"><strong>__getitem__</strong></a>(self, key, /)</dt><dd><span class="code">Return&nbsp;self[key].</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-__getnewargs__"><strong>__getnewargs__</strong></a>(...)</dt></dl>
+
+<dl><dt><a name="WorldDomain-__gt__"><strong>__gt__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self&gt;value.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-__hash__"><strong>__hash__</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;hash(self).</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-__iter__"><strong>__iter__</strong></a>(self, /)</dt><dd><span class="code">Implement&nbsp;iter(self).</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-__le__"><strong>__le__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self&lt;=value.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-__len__"><strong>__len__</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;len(self).</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-__lt__"><strong>__lt__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self&lt;value.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-__mod__"><strong>__mod__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self%value.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-__mul__"><strong>__mul__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self*value.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-__ne__"><strong>__ne__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;self!=value.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-__rmod__"><strong>__rmod__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;value%self.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-__rmul__"><strong>__rmul__</strong></a>(self, value, /)</dt><dd><span class="code">Return&nbsp;value*self.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-__sizeof__"><strong>__sizeof__</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;the&nbsp;size&nbsp;of&nbsp;the&nbsp;string&nbsp;in&nbsp;memory,&nbsp;in&nbsp;bytes.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-capitalize"><strong>capitalize</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;a&nbsp;capitalized&nbsp;version&nbsp;of&nbsp;the&nbsp;string.<br>
+&nbsp;<br>
+More&nbsp;specifically,&nbsp;make&nbsp;the&nbsp;first&nbsp;character&nbsp;have&nbsp;upper&nbsp;case&nbsp;and&nbsp;the&nbsp;rest&nbsp;lower<br>
+case.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-casefold"><strong>casefold</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;a&nbsp;version&nbsp;of&nbsp;the&nbsp;string&nbsp;suitable&nbsp;for&nbsp;caseless&nbsp;comparisons.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-center"><strong>center</strong></a>(self, width, fillchar=' ', /)</dt><dd><span class="code">Return&nbsp;a&nbsp;centered&nbsp;string&nbsp;of&nbsp;length&nbsp;width.<br>
+&nbsp;<br>
+Padding&nbsp;is&nbsp;done&nbsp;using&nbsp;the&nbsp;specified&nbsp;fill&nbsp;character&nbsp;(default&nbsp;is&nbsp;a&nbsp;space).</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-count"><strong>count</strong></a>(...)</dt><dd><span class="code">S.<a href="#WorldDomain-count">count</a>(sub[,&nbsp;start[,&nbsp;end]])&nbsp;-&gt;&nbsp;int<br>
+&nbsp;<br>
+Return&nbsp;the&nbsp;number&nbsp;of&nbsp;non-overlapping&nbsp;occurrences&nbsp;of&nbsp;substring&nbsp;sub&nbsp;in<br>
+string&nbsp;S[start:end].&nbsp;&nbsp;Optional&nbsp;arguments&nbsp;start&nbsp;and&nbsp;end&nbsp;are<br>
+interpreted&nbsp;as&nbsp;in&nbsp;slice&nbsp;notation.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-encode"><strong>encode</strong></a>(self, /, encoding='utf-8', errors='strict')</dt><dd><span class="code">Encode&nbsp;the&nbsp;string&nbsp;using&nbsp;the&nbsp;codec&nbsp;registered&nbsp;for&nbsp;encoding.<br>
+&nbsp;<br>
+encoding<br>
+&nbsp;&nbsp;The&nbsp;encoding&nbsp;in&nbsp;which&nbsp;to&nbsp;encode&nbsp;the&nbsp;string.<br>
+errors<br>
+&nbsp;&nbsp;The&nbsp;error&nbsp;handling&nbsp;scheme&nbsp;to&nbsp;use&nbsp;for&nbsp;encoding&nbsp;errors.<br>
+&nbsp;&nbsp;The&nbsp;default&nbsp;is&nbsp;'strict'&nbsp;meaning&nbsp;that&nbsp;encoding&nbsp;errors&nbsp;raise&nbsp;a<br>
+&nbsp;&nbsp;UnicodeEncodeError.&nbsp;&nbsp;Other&nbsp;possible&nbsp;values&nbsp;are&nbsp;'ignore',&nbsp;'replace'&nbsp;and<br>
+&nbsp;&nbsp;'xmlcharrefreplace'&nbsp;as&nbsp;well&nbsp;as&nbsp;any&nbsp;other&nbsp;name&nbsp;registered&nbsp;with<br>
+&nbsp;&nbsp;codecs.register_error&nbsp;that&nbsp;can&nbsp;handle&nbsp;UnicodeEncodeErrors.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-endswith"><strong>endswith</strong></a>(...)</dt><dd><span class="code">S.<a href="#WorldDomain-endswith">endswith</a>(suffix[,&nbsp;start[,&nbsp;end]])&nbsp;-&gt;&nbsp;bool<br>
+&nbsp;<br>
+Return&nbsp;True&nbsp;if&nbsp;S&nbsp;ends&nbsp;with&nbsp;the&nbsp;specified&nbsp;suffix,&nbsp;False&nbsp;otherwise.<br>
+With&nbsp;optional&nbsp;start,&nbsp;test&nbsp;S&nbsp;beginning&nbsp;at&nbsp;that&nbsp;position.<br>
+With&nbsp;optional&nbsp;end,&nbsp;stop&nbsp;comparing&nbsp;S&nbsp;at&nbsp;that&nbsp;position.<br>
+suffix&nbsp;can&nbsp;also&nbsp;be&nbsp;a&nbsp;tuple&nbsp;of&nbsp;strings&nbsp;to&nbsp;try.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-expandtabs"><strong>expandtabs</strong></a>(self, /, tabsize=8)</dt><dd><span class="code">Return&nbsp;a&nbsp;copy&nbsp;where&nbsp;all&nbsp;tab&nbsp;characters&nbsp;are&nbsp;expanded&nbsp;using&nbsp;spaces.<br>
+&nbsp;<br>
+If&nbsp;tabsize&nbsp;is&nbsp;not&nbsp;given,&nbsp;a&nbsp;tab&nbsp;size&nbsp;of&nbsp;8&nbsp;characters&nbsp;is&nbsp;assumed.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-find"><strong>find</strong></a>(...)</dt><dd><span class="code">S.<a href="#WorldDomain-find">find</a>(sub[,&nbsp;start[,&nbsp;end]])&nbsp;-&gt;&nbsp;int<br>
+&nbsp;<br>
+Return&nbsp;the&nbsp;lowest&nbsp;index&nbsp;in&nbsp;S&nbsp;where&nbsp;substring&nbsp;sub&nbsp;is&nbsp;found,<br>
+such&nbsp;that&nbsp;sub&nbsp;is&nbsp;contained&nbsp;within&nbsp;S[start:end].&nbsp;&nbsp;Optional<br>
+arguments&nbsp;start&nbsp;and&nbsp;end&nbsp;are&nbsp;interpreted&nbsp;as&nbsp;in&nbsp;slice&nbsp;notation.<br>
+&nbsp;<br>
+Return&nbsp;-1&nbsp;on&nbsp;failure.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-format"><strong>format</strong></a>(...)</dt><dd><span class="code">S.<a href="#WorldDomain-format">format</a>(*args,&nbsp;**kwargs)&nbsp;-&gt;&nbsp;str<br>
+&nbsp;<br>
+Return&nbsp;a&nbsp;formatted&nbsp;version&nbsp;of&nbsp;S,&nbsp;using&nbsp;substitutions&nbsp;from&nbsp;args&nbsp;and&nbsp;kwargs.<br>
+The&nbsp;substitutions&nbsp;are&nbsp;identified&nbsp;by&nbsp;braces&nbsp;('{'&nbsp;and&nbsp;'}').</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-format_map"><strong>format_map</strong></a>(...)</dt><dd><span class="code">S.<a href="#WorldDomain-format_map">format_map</a>(mapping)&nbsp;-&gt;&nbsp;str<br>
+&nbsp;<br>
+Return&nbsp;a&nbsp;formatted&nbsp;version&nbsp;of&nbsp;S,&nbsp;using&nbsp;substitutions&nbsp;from&nbsp;mapping.<br>
+The&nbsp;substitutions&nbsp;are&nbsp;identified&nbsp;by&nbsp;braces&nbsp;('{'&nbsp;and&nbsp;'}').</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-index"><strong>index</strong></a>(...)</dt><dd><span class="code">S.<a href="#WorldDomain-index">index</a>(sub[,&nbsp;start[,&nbsp;end]])&nbsp;-&gt;&nbsp;int<br>
+&nbsp;<br>
+Return&nbsp;the&nbsp;lowest&nbsp;index&nbsp;in&nbsp;S&nbsp;where&nbsp;substring&nbsp;sub&nbsp;is&nbsp;found,<br>
+such&nbsp;that&nbsp;sub&nbsp;is&nbsp;contained&nbsp;within&nbsp;S[start:end].&nbsp;&nbsp;Optional<br>
+arguments&nbsp;start&nbsp;and&nbsp;end&nbsp;are&nbsp;interpreted&nbsp;as&nbsp;in&nbsp;slice&nbsp;notation.<br>
+&nbsp;<br>
+Raises&nbsp;ValueError&nbsp;when&nbsp;the&nbsp;substring&nbsp;is&nbsp;not&nbsp;found.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-isalnum"><strong>isalnum</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;the&nbsp;string&nbsp;is&nbsp;an&nbsp;alpha-numeric&nbsp;string,&nbsp;False&nbsp;otherwise.<br>
+&nbsp;<br>
+A&nbsp;string&nbsp;is&nbsp;alpha-numeric&nbsp;if&nbsp;all&nbsp;characters&nbsp;in&nbsp;the&nbsp;string&nbsp;are&nbsp;alpha-numeric&nbsp;and<br>
+there&nbsp;is&nbsp;at&nbsp;least&nbsp;one&nbsp;character&nbsp;in&nbsp;the&nbsp;string.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-isalpha"><strong>isalpha</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;the&nbsp;string&nbsp;is&nbsp;an&nbsp;alphabetic&nbsp;string,&nbsp;False&nbsp;otherwise.<br>
+&nbsp;<br>
+A&nbsp;string&nbsp;is&nbsp;alphabetic&nbsp;if&nbsp;all&nbsp;characters&nbsp;in&nbsp;the&nbsp;string&nbsp;are&nbsp;alphabetic&nbsp;and&nbsp;there<br>
+is&nbsp;at&nbsp;least&nbsp;one&nbsp;character&nbsp;in&nbsp;the&nbsp;string.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-isascii"><strong>isascii</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;all&nbsp;characters&nbsp;in&nbsp;the&nbsp;string&nbsp;are&nbsp;ASCII,&nbsp;False&nbsp;otherwise.<br>
+&nbsp;<br>
+ASCII&nbsp;characters&nbsp;have&nbsp;code&nbsp;points&nbsp;in&nbsp;the&nbsp;range&nbsp;U+0000-U+007F.<br>
+Empty&nbsp;string&nbsp;is&nbsp;ASCII&nbsp;too.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-isdecimal"><strong>isdecimal</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;the&nbsp;string&nbsp;is&nbsp;a&nbsp;decimal&nbsp;string,&nbsp;False&nbsp;otherwise.<br>
+&nbsp;<br>
+A&nbsp;string&nbsp;is&nbsp;a&nbsp;decimal&nbsp;string&nbsp;if&nbsp;all&nbsp;characters&nbsp;in&nbsp;the&nbsp;string&nbsp;are&nbsp;decimal&nbsp;and<br>
+there&nbsp;is&nbsp;at&nbsp;least&nbsp;one&nbsp;character&nbsp;in&nbsp;the&nbsp;string.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-isdigit"><strong>isdigit</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;the&nbsp;string&nbsp;is&nbsp;a&nbsp;digit&nbsp;string,&nbsp;False&nbsp;otherwise.<br>
+&nbsp;<br>
+A&nbsp;string&nbsp;is&nbsp;a&nbsp;digit&nbsp;string&nbsp;if&nbsp;all&nbsp;characters&nbsp;in&nbsp;the&nbsp;string&nbsp;are&nbsp;digits&nbsp;and&nbsp;there<br>
+is&nbsp;at&nbsp;least&nbsp;one&nbsp;character&nbsp;in&nbsp;the&nbsp;string.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-isidentifier"><strong>isidentifier</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;the&nbsp;string&nbsp;is&nbsp;a&nbsp;valid&nbsp;Python&nbsp;identifier,&nbsp;False&nbsp;otherwise.<br>
+&nbsp;<br>
+Call&nbsp;keyword.iskeyword(s)&nbsp;to&nbsp;test&nbsp;whether&nbsp;string&nbsp;s&nbsp;is&nbsp;a&nbsp;reserved&nbsp;identifier,<br>
+such&nbsp;as&nbsp;"def"&nbsp;or&nbsp;"class".</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-islower"><strong>islower</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;the&nbsp;string&nbsp;is&nbsp;a&nbsp;lowercase&nbsp;string,&nbsp;False&nbsp;otherwise.<br>
+&nbsp;<br>
+A&nbsp;string&nbsp;is&nbsp;lowercase&nbsp;if&nbsp;all&nbsp;cased&nbsp;characters&nbsp;in&nbsp;the&nbsp;string&nbsp;are&nbsp;lowercase&nbsp;and<br>
+there&nbsp;is&nbsp;at&nbsp;least&nbsp;one&nbsp;cased&nbsp;character&nbsp;in&nbsp;the&nbsp;string.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-isnumeric"><strong>isnumeric</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;the&nbsp;string&nbsp;is&nbsp;a&nbsp;numeric&nbsp;string,&nbsp;False&nbsp;otherwise.<br>
+&nbsp;<br>
+A&nbsp;string&nbsp;is&nbsp;numeric&nbsp;if&nbsp;all&nbsp;characters&nbsp;in&nbsp;the&nbsp;string&nbsp;are&nbsp;numeric&nbsp;and&nbsp;there&nbsp;is&nbsp;at<br>
+least&nbsp;one&nbsp;character&nbsp;in&nbsp;the&nbsp;string.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-isprintable"><strong>isprintable</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;the&nbsp;string&nbsp;is&nbsp;printable,&nbsp;False&nbsp;otherwise.<br>
+&nbsp;<br>
+A&nbsp;string&nbsp;is&nbsp;printable&nbsp;if&nbsp;all&nbsp;of&nbsp;its&nbsp;characters&nbsp;are&nbsp;considered&nbsp;printable&nbsp;in<br>
+repr()&nbsp;or&nbsp;if&nbsp;it&nbsp;is&nbsp;empty.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-isspace"><strong>isspace</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;the&nbsp;string&nbsp;is&nbsp;a&nbsp;whitespace&nbsp;string,&nbsp;False&nbsp;otherwise.<br>
+&nbsp;<br>
+A&nbsp;string&nbsp;is&nbsp;whitespace&nbsp;if&nbsp;all&nbsp;characters&nbsp;in&nbsp;the&nbsp;string&nbsp;are&nbsp;whitespace&nbsp;and&nbsp;there<br>
+is&nbsp;at&nbsp;least&nbsp;one&nbsp;character&nbsp;in&nbsp;the&nbsp;string.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-istitle"><strong>istitle</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;the&nbsp;string&nbsp;is&nbsp;a&nbsp;title-cased&nbsp;string,&nbsp;False&nbsp;otherwise.<br>
+&nbsp;<br>
+In&nbsp;a&nbsp;title-cased&nbsp;string,&nbsp;upper-&nbsp;and&nbsp;title-case&nbsp;characters&nbsp;may&nbsp;only<br>
+follow&nbsp;uncased&nbsp;characters&nbsp;and&nbsp;lowercase&nbsp;characters&nbsp;only&nbsp;cased&nbsp;ones.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-isupper"><strong>isupper</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;True&nbsp;if&nbsp;the&nbsp;string&nbsp;is&nbsp;an&nbsp;uppercase&nbsp;string,&nbsp;False&nbsp;otherwise.<br>
+&nbsp;<br>
+A&nbsp;string&nbsp;is&nbsp;uppercase&nbsp;if&nbsp;all&nbsp;cased&nbsp;characters&nbsp;in&nbsp;the&nbsp;string&nbsp;are&nbsp;uppercase&nbsp;and<br>
+there&nbsp;is&nbsp;at&nbsp;least&nbsp;one&nbsp;cased&nbsp;character&nbsp;in&nbsp;the&nbsp;string.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-join"><strong>join</strong></a>(self, iterable, /)</dt><dd><span class="code">Concatenate&nbsp;any&nbsp;number&nbsp;of&nbsp;strings.<br>
+&nbsp;<br>
+The&nbsp;string&nbsp;whose&nbsp;method&nbsp;is&nbsp;called&nbsp;is&nbsp;inserted&nbsp;in&nbsp;between&nbsp;each&nbsp;given&nbsp;string.<br>
+The&nbsp;result&nbsp;is&nbsp;returned&nbsp;as&nbsp;a&nbsp;new&nbsp;string.<br>
+&nbsp;<br>
+Example:&nbsp;'.'.<a href="#WorldDomain-join">join</a>(['ab',&nbsp;'pq',&nbsp;'rs'])&nbsp;-&gt;&nbsp;'ab.pq.rs'</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-ljust"><strong>ljust</strong></a>(self, width, fillchar=' ', /)</dt><dd><span class="code">Return&nbsp;a&nbsp;left-justified&nbsp;string&nbsp;of&nbsp;length&nbsp;width.<br>
+&nbsp;<br>
+Padding&nbsp;is&nbsp;done&nbsp;using&nbsp;the&nbsp;specified&nbsp;fill&nbsp;character&nbsp;(default&nbsp;is&nbsp;a&nbsp;space).</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-lower"><strong>lower</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;a&nbsp;copy&nbsp;of&nbsp;the&nbsp;string&nbsp;converted&nbsp;to&nbsp;lowercase.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-lstrip"><strong>lstrip</strong></a>(self, chars=None, /)</dt><dd><span class="code">Return&nbsp;a&nbsp;copy&nbsp;of&nbsp;the&nbsp;string&nbsp;with&nbsp;leading&nbsp;whitespace&nbsp;removed.<br>
+&nbsp;<br>
+If&nbsp;chars&nbsp;is&nbsp;given&nbsp;and&nbsp;not&nbsp;None,&nbsp;remove&nbsp;characters&nbsp;in&nbsp;chars&nbsp;instead.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-partition"><strong>partition</strong></a>(self, sep, /)</dt><dd><span class="code">Partition&nbsp;the&nbsp;string&nbsp;into&nbsp;three&nbsp;parts&nbsp;using&nbsp;the&nbsp;given&nbsp;separator.<br>
+&nbsp;<br>
+This&nbsp;will&nbsp;search&nbsp;for&nbsp;the&nbsp;separator&nbsp;in&nbsp;the&nbsp;string.&nbsp;&nbsp;If&nbsp;the&nbsp;separator&nbsp;is&nbsp;found,<br>
+returns&nbsp;a&nbsp;3-tuple&nbsp;containing&nbsp;the&nbsp;part&nbsp;before&nbsp;the&nbsp;separator,&nbsp;the&nbsp;separator<br>
+itself,&nbsp;and&nbsp;the&nbsp;part&nbsp;after&nbsp;it.<br>
+&nbsp;<br>
+If&nbsp;the&nbsp;separator&nbsp;is&nbsp;not&nbsp;found,&nbsp;returns&nbsp;a&nbsp;3-tuple&nbsp;containing&nbsp;the&nbsp;original&nbsp;string<br>
+and&nbsp;two&nbsp;empty&nbsp;strings.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-removeprefix"><strong>removeprefix</strong></a>(self, prefix, /)</dt><dd><span class="code">Return&nbsp;a&nbsp;str&nbsp;with&nbsp;the&nbsp;given&nbsp;prefix&nbsp;string&nbsp;removed&nbsp;if&nbsp;present.<br>
+&nbsp;<br>
+If&nbsp;the&nbsp;string&nbsp;starts&nbsp;with&nbsp;the&nbsp;prefix&nbsp;string,&nbsp;return&nbsp;string[len(prefix):].<br>
+Otherwise,&nbsp;return&nbsp;a&nbsp;copy&nbsp;of&nbsp;the&nbsp;original&nbsp;string.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-removesuffix"><strong>removesuffix</strong></a>(self, suffix, /)</dt><dd><span class="code">Return&nbsp;a&nbsp;str&nbsp;with&nbsp;the&nbsp;given&nbsp;suffix&nbsp;string&nbsp;removed&nbsp;if&nbsp;present.<br>
+&nbsp;<br>
+If&nbsp;the&nbsp;string&nbsp;ends&nbsp;with&nbsp;the&nbsp;suffix&nbsp;string&nbsp;and&nbsp;that&nbsp;suffix&nbsp;is&nbsp;not&nbsp;empty,<br>
+return&nbsp;string[:-len(suffix)].&nbsp;Otherwise,&nbsp;return&nbsp;a&nbsp;copy&nbsp;of&nbsp;the&nbsp;original<br>
+string.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-replace"><strong>replace</strong></a>(self, old, new, count=-1, /)</dt><dd><span class="code">Return&nbsp;a&nbsp;copy&nbsp;with&nbsp;all&nbsp;occurrences&nbsp;of&nbsp;substring&nbsp;old&nbsp;replaced&nbsp;by&nbsp;new.<br>
+&nbsp;<br>
+&nbsp;&nbsp;count<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Maximum&nbsp;number&nbsp;of&nbsp;occurrences&nbsp;to&nbsp;replace.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-1&nbsp;(the&nbsp;default&nbsp;value)&nbsp;means&nbsp;replace&nbsp;all&nbsp;occurrences.<br>
+&nbsp;<br>
+If&nbsp;the&nbsp;optional&nbsp;argument&nbsp;count&nbsp;is&nbsp;given,&nbsp;only&nbsp;the&nbsp;first&nbsp;count&nbsp;occurrences&nbsp;are<br>
+replaced.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-rfind"><strong>rfind</strong></a>(...)</dt><dd><span class="code">S.<a href="#WorldDomain-rfind">rfind</a>(sub[,&nbsp;start[,&nbsp;end]])&nbsp;-&gt;&nbsp;int<br>
+&nbsp;<br>
+Return&nbsp;the&nbsp;highest&nbsp;index&nbsp;in&nbsp;S&nbsp;where&nbsp;substring&nbsp;sub&nbsp;is&nbsp;found,<br>
+such&nbsp;that&nbsp;sub&nbsp;is&nbsp;contained&nbsp;within&nbsp;S[start:end].&nbsp;&nbsp;Optional<br>
+arguments&nbsp;start&nbsp;and&nbsp;end&nbsp;are&nbsp;interpreted&nbsp;as&nbsp;in&nbsp;slice&nbsp;notation.<br>
+&nbsp;<br>
+Return&nbsp;-1&nbsp;on&nbsp;failure.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-rindex"><strong>rindex</strong></a>(...)</dt><dd><span class="code">S.<a href="#WorldDomain-rindex">rindex</a>(sub[,&nbsp;start[,&nbsp;end]])&nbsp;-&gt;&nbsp;int<br>
+&nbsp;<br>
+Return&nbsp;the&nbsp;highest&nbsp;index&nbsp;in&nbsp;S&nbsp;where&nbsp;substring&nbsp;sub&nbsp;is&nbsp;found,<br>
+such&nbsp;that&nbsp;sub&nbsp;is&nbsp;contained&nbsp;within&nbsp;S[start:end].&nbsp;&nbsp;Optional<br>
+arguments&nbsp;start&nbsp;and&nbsp;end&nbsp;are&nbsp;interpreted&nbsp;as&nbsp;in&nbsp;slice&nbsp;notation.<br>
+&nbsp;<br>
+Raises&nbsp;ValueError&nbsp;when&nbsp;the&nbsp;substring&nbsp;is&nbsp;not&nbsp;found.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-rjust"><strong>rjust</strong></a>(self, width, fillchar=' ', /)</dt><dd><span class="code">Return&nbsp;a&nbsp;right-justified&nbsp;string&nbsp;of&nbsp;length&nbsp;width.<br>
+&nbsp;<br>
+Padding&nbsp;is&nbsp;done&nbsp;using&nbsp;the&nbsp;specified&nbsp;fill&nbsp;character&nbsp;(default&nbsp;is&nbsp;a&nbsp;space).</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-rpartition"><strong>rpartition</strong></a>(self, sep, /)</dt><dd><span class="code">Partition&nbsp;the&nbsp;string&nbsp;into&nbsp;three&nbsp;parts&nbsp;using&nbsp;the&nbsp;given&nbsp;separator.<br>
+&nbsp;<br>
+This&nbsp;will&nbsp;search&nbsp;for&nbsp;the&nbsp;separator&nbsp;in&nbsp;the&nbsp;string,&nbsp;starting&nbsp;at&nbsp;the&nbsp;end.&nbsp;If<br>
+the&nbsp;separator&nbsp;is&nbsp;found,&nbsp;returns&nbsp;a&nbsp;3-tuple&nbsp;containing&nbsp;the&nbsp;part&nbsp;before&nbsp;the<br>
+separator,&nbsp;the&nbsp;separator&nbsp;itself,&nbsp;and&nbsp;the&nbsp;part&nbsp;after&nbsp;it.<br>
+&nbsp;<br>
+If&nbsp;the&nbsp;separator&nbsp;is&nbsp;not&nbsp;found,&nbsp;returns&nbsp;a&nbsp;3-tuple&nbsp;containing&nbsp;two&nbsp;empty&nbsp;strings<br>
+and&nbsp;the&nbsp;original&nbsp;string.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-rsplit"><strong>rsplit</strong></a>(self, /, sep=None, maxsplit=-1)</dt><dd><span class="code">Return&nbsp;a&nbsp;list&nbsp;of&nbsp;the&nbsp;substrings&nbsp;in&nbsp;the&nbsp;string,&nbsp;using&nbsp;sep&nbsp;as&nbsp;the&nbsp;separator&nbsp;string.<br>
+&nbsp;<br>
+&nbsp;&nbsp;sep<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;separator&nbsp;used&nbsp;to&nbsp;split&nbsp;the&nbsp;string.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;When&nbsp;set&nbsp;to&nbsp;None&nbsp;(the&nbsp;default&nbsp;value),&nbsp;will&nbsp;split&nbsp;on&nbsp;any&nbsp;whitespace<br>
+&nbsp;&nbsp;&nbsp;&nbsp;character&nbsp;(including&nbsp;\n&nbsp;\r&nbsp;\t&nbsp;\f&nbsp;and&nbsp;spaces)&nbsp;and&nbsp;will&nbsp;discard<br>
+&nbsp;&nbsp;&nbsp;&nbsp;empty&nbsp;strings&nbsp;from&nbsp;the&nbsp;result.<br>
+&nbsp;&nbsp;maxsplit<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Maximum&nbsp;number&nbsp;of&nbsp;splits.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-1&nbsp;(the&nbsp;default&nbsp;value)&nbsp;means&nbsp;no&nbsp;limit.<br>
+&nbsp;<br>
+Splitting&nbsp;starts&nbsp;at&nbsp;the&nbsp;end&nbsp;of&nbsp;the&nbsp;string&nbsp;and&nbsp;works&nbsp;to&nbsp;the&nbsp;front.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-rstrip"><strong>rstrip</strong></a>(self, chars=None, /)</dt><dd><span class="code">Return&nbsp;a&nbsp;copy&nbsp;of&nbsp;the&nbsp;string&nbsp;with&nbsp;trailing&nbsp;whitespace&nbsp;removed.<br>
+&nbsp;<br>
+If&nbsp;chars&nbsp;is&nbsp;given&nbsp;and&nbsp;not&nbsp;None,&nbsp;remove&nbsp;characters&nbsp;in&nbsp;chars&nbsp;instead.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-split"><strong>split</strong></a>(self, /, sep=None, maxsplit=-1)</dt><dd><span class="code">Return&nbsp;a&nbsp;list&nbsp;of&nbsp;the&nbsp;substrings&nbsp;in&nbsp;the&nbsp;string,&nbsp;using&nbsp;sep&nbsp;as&nbsp;the&nbsp;separator&nbsp;string.<br>
+&nbsp;<br>
+&nbsp;&nbsp;sep<br>
+&nbsp;&nbsp;&nbsp;&nbsp;The&nbsp;separator&nbsp;used&nbsp;to&nbsp;split&nbsp;the&nbsp;string.<br>
+&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;When&nbsp;set&nbsp;to&nbsp;None&nbsp;(the&nbsp;default&nbsp;value),&nbsp;will&nbsp;split&nbsp;on&nbsp;any&nbsp;whitespace<br>
+&nbsp;&nbsp;&nbsp;&nbsp;character&nbsp;(including&nbsp;\n&nbsp;\r&nbsp;\t&nbsp;\f&nbsp;and&nbsp;spaces)&nbsp;and&nbsp;will&nbsp;discard<br>
+&nbsp;&nbsp;&nbsp;&nbsp;empty&nbsp;strings&nbsp;from&nbsp;the&nbsp;result.<br>
+&nbsp;&nbsp;maxsplit<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Maximum&nbsp;number&nbsp;of&nbsp;splits.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;-1&nbsp;(the&nbsp;default&nbsp;value)&nbsp;means&nbsp;no&nbsp;limit.<br>
+&nbsp;<br>
+Splitting&nbsp;starts&nbsp;at&nbsp;the&nbsp;front&nbsp;of&nbsp;the&nbsp;string&nbsp;and&nbsp;works&nbsp;to&nbsp;the&nbsp;end.<br>
+&nbsp;<br>
+Note,&nbsp;str.<a href="#WorldDomain-split">split</a>()&nbsp;is&nbsp;mainly&nbsp;useful&nbsp;for&nbsp;data&nbsp;that&nbsp;has&nbsp;been&nbsp;intentionally<br>
+delimited.&nbsp;&nbsp;With&nbsp;natural&nbsp;text&nbsp;that&nbsp;includes&nbsp;punctuation,&nbsp;consider&nbsp;using<br>
+the&nbsp;regular&nbsp;expression&nbsp;module.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-splitlines"><strong>splitlines</strong></a>(self, /, keepends=False)</dt><dd><span class="code">Return&nbsp;a&nbsp;list&nbsp;of&nbsp;the&nbsp;lines&nbsp;in&nbsp;the&nbsp;string,&nbsp;breaking&nbsp;at&nbsp;line&nbsp;boundaries.<br>
+&nbsp;<br>
+Line&nbsp;breaks&nbsp;are&nbsp;not&nbsp;included&nbsp;in&nbsp;the&nbsp;resulting&nbsp;list&nbsp;unless&nbsp;keepends&nbsp;is&nbsp;given&nbsp;and<br>
+true.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-startswith"><strong>startswith</strong></a>(...)</dt><dd><span class="code">S.<a href="#WorldDomain-startswith">startswith</a>(prefix[,&nbsp;start[,&nbsp;end]])&nbsp;-&gt;&nbsp;bool<br>
+&nbsp;<br>
+Return&nbsp;True&nbsp;if&nbsp;S&nbsp;starts&nbsp;with&nbsp;the&nbsp;specified&nbsp;prefix,&nbsp;False&nbsp;otherwise.<br>
+With&nbsp;optional&nbsp;start,&nbsp;test&nbsp;S&nbsp;beginning&nbsp;at&nbsp;that&nbsp;position.<br>
+With&nbsp;optional&nbsp;end,&nbsp;stop&nbsp;comparing&nbsp;S&nbsp;at&nbsp;that&nbsp;position.<br>
+prefix&nbsp;can&nbsp;also&nbsp;be&nbsp;a&nbsp;tuple&nbsp;of&nbsp;strings&nbsp;to&nbsp;try.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-strip"><strong>strip</strong></a>(self, chars=None, /)</dt><dd><span class="code">Return&nbsp;a&nbsp;copy&nbsp;of&nbsp;the&nbsp;string&nbsp;with&nbsp;leading&nbsp;and&nbsp;trailing&nbsp;whitespace&nbsp;removed.<br>
+&nbsp;<br>
+If&nbsp;chars&nbsp;is&nbsp;given&nbsp;and&nbsp;not&nbsp;None,&nbsp;remove&nbsp;characters&nbsp;in&nbsp;chars&nbsp;instead.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-swapcase"><strong>swapcase</strong></a>(self, /)</dt><dd><span class="code">Convert&nbsp;uppercase&nbsp;characters&nbsp;to&nbsp;lowercase&nbsp;and&nbsp;lowercase&nbsp;characters&nbsp;to&nbsp;uppercase.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-title"><strong>title</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;a&nbsp;version&nbsp;of&nbsp;the&nbsp;string&nbsp;where&nbsp;each&nbsp;word&nbsp;is&nbsp;titlecased.<br>
+&nbsp;<br>
+More&nbsp;specifically,&nbsp;words&nbsp;start&nbsp;with&nbsp;uppercased&nbsp;characters&nbsp;and&nbsp;all&nbsp;remaining<br>
+cased&nbsp;characters&nbsp;have&nbsp;lower&nbsp;case.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-translate"><strong>translate</strong></a>(self, table, /)</dt><dd><span class="code">Replace&nbsp;each&nbsp;character&nbsp;in&nbsp;the&nbsp;string&nbsp;using&nbsp;the&nbsp;given&nbsp;translation&nbsp;table.<br>
+&nbsp;<br>
+&nbsp;&nbsp;table<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Translation&nbsp;table,&nbsp;which&nbsp;must&nbsp;be&nbsp;a&nbsp;mapping&nbsp;of&nbsp;Unicode&nbsp;ordinals&nbsp;to<br>
+&nbsp;&nbsp;&nbsp;&nbsp;Unicode&nbsp;ordinals,&nbsp;strings,&nbsp;or&nbsp;None.<br>
+&nbsp;<br>
+The&nbsp;table&nbsp;must&nbsp;implement&nbsp;lookup/indexing&nbsp;via&nbsp;__getitem__,&nbsp;for&nbsp;instance&nbsp;a<br>
+dictionary&nbsp;or&nbsp;list.&nbsp;&nbsp;If&nbsp;this&nbsp;operation&nbsp;raises&nbsp;LookupError,&nbsp;the&nbsp;character&nbsp;is<br>
+left&nbsp;untouched.&nbsp;&nbsp;Characters&nbsp;mapped&nbsp;to&nbsp;None&nbsp;are&nbsp;deleted.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-upper"><strong>upper</strong></a>(self, /)</dt><dd><span class="code">Return&nbsp;a&nbsp;copy&nbsp;of&nbsp;the&nbsp;string&nbsp;converted&nbsp;to&nbsp;uppercase.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-zfill"><strong>zfill</strong></a>(self, width, /)</dt><dd><span class="code">Pad&nbsp;a&nbsp;numeric&nbsp;string&nbsp;with&nbsp;zeros&nbsp;on&nbsp;the&nbsp;left,&nbsp;to&nbsp;fill&nbsp;a&nbsp;field&nbsp;of&nbsp;the&nbsp;given&nbsp;width.<br>
+&nbsp;<br>
+The&nbsp;string&nbsp;is&nbsp;never&nbsp;truncated.</span></dd></dl>
+
+<hr>
+Static methods inherited from <a href="builtins.html#str">builtins.str</a>:<br>
+<dl><dt><a name="WorldDomain-maketrans"><strong>maketrans</strong></a>(...)</dt><dd><span class="code">Return&nbsp;a&nbsp;translation&nbsp;table&nbsp;usable&nbsp;for&nbsp;str.<a href="#WorldDomain-translate">translate</a>().<br>
+&nbsp;<br>
+If&nbsp;there&nbsp;is&nbsp;only&nbsp;one&nbsp;argument,&nbsp;it&nbsp;must&nbsp;be&nbsp;a&nbsp;dictionary&nbsp;mapping&nbsp;Unicode<br>
+ordinals&nbsp;(integers)&nbsp;or&nbsp;characters&nbsp;to&nbsp;Unicode&nbsp;ordinals,&nbsp;strings&nbsp;or&nbsp;None.<br>
+Character&nbsp;keys&nbsp;will&nbsp;be&nbsp;then&nbsp;converted&nbsp;to&nbsp;ordinals.<br>
+If&nbsp;there&nbsp;are&nbsp;two&nbsp;arguments,&nbsp;they&nbsp;must&nbsp;be&nbsp;strings&nbsp;of&nbsp;equal&nbsp;length,&nbsp;and<br>
+in&nbsp;the&nbsp;resulting&nbsp;dictionary,&nbsp;each&nbsp;character&nbsp;in&nbsp;x&nbsp;will&nbsp;be&nbsp;mapped&nbsp;to&nbsp;the<br>
+character&nbsp;at&nbsp;the&nbsp;same&nbsp;position&nbsp;in&nbsp;y.&nbsp;If&nbsp;there&nbsp;is&nbsp;a&nbsp;third&nbsp;argument,&nbsp;it<br>
+must&nbsp;be&nbsp;a&nbsp;string,&nbsp;whose&nbsp;characters&nbsp;will&nbsp;be&nbsp;mapped&nbsp;to&nbsp;None&nbsp;in&nbsp;the&nbsp;result.</span></dd></dl>
+
+<hr>
+Methods inherited from <a href="enum.html#Enum">enum.Enum</a>:<br>
+<dl><dt><a name="WorldDomain-__dir__"><strong>__dir__</strong></a>(self)</dt><dd><span class="code">Returns&nbsp;public&nbsp;methods&nbsp;and&nbsp;other&nbsp;interesting&nbsp;attributes.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-__init__"><strong>__init__</strong></a>(self, *args, **kwds)</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="WorldDomain-__reduce_ex__"><strong>__reduce_ex__</strong></a>(self, proto)</dt><dd><span class="code">Helper&nbsp;for&nbsp;pickle.</span></dd></dl>
+
+<hr>
+Data descriptors inherited from <a href="enum.html#Enum">enum.Enum</a>:<br>
+<dl><dt><strong>name</strong></dt>
+<dd><span class="code">The&nbsp;name&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<dl><dt><strong>value</strong></dt>
+<dd><span class="code">The&nbsp;value&nbsp;of&nbsp;the&nbsp;Enum&nbsp;member.</span></dd>
+</dl>
+<hr>
+Readonly properties inherited from <a href="enum.html#EnumType">enum.EnumType</a>:<br>
+<dl><dt><strong>__members__</strong></dt>
+<dd><span class="code">Returns&nbsp;a&nbsp;mapping&nbsp;of&nbsp;member&nbsp;name-&gt;value.<br>
+&nbsp;<br>
+This&nbsp;mapping&nbsp;lists&nbsp;all&nbsp;enum&nbsp;members,&nbsp;including&nbsp;aliases.&nbsp;Note&nbsp;that&nbsp;this<br>
+is&nbsp;a&nbsp;read-only&nbsp;view&nbsp;of&nbsp;the&nbsp;internal&nbsp;mapping.</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-double_cone_coordinate"><strong>double_cone_coordinate</strong></a>(time_coordinate: 'float', angle: 'float', *, angular_speed: 'float' = 0.0, radial_scale: 'float' = 1.0) -&gt; 'ConeCoordinate'</dt><dd><span class="code">Map&nbsp;a&nbsp;parameter&nbsp;to&nbsp;a&nbsp;double-cone&nbsp;sheet&nbsp;with&nbsp;opposite&nbsp;rotation.<br>
+&nbsp;<br>
+Time&nbsp;runs&nbsp;horizontally&nbsp;along&nbsp;x&nbsp;through&nbsp;the&nbsp;shared&nbsp;origin.&nbsp;Positive&nbsp;time<br>
+occupies&nbsp;the&nbsp;future&nbsp;sheet;&nbsp;negative&nbsp;time&nbsp;occupies&nbsp;the&nbsp;past&nbsp;sheet.&nbsp;Their<br>
+angular&nbsp;phases&nbsp;evolve&nbsp;in&nbsp;opposite&nbsp;directions&nbsp;when&nbsp;measured&nbsp;outward&nbsp;from<br>
+the&nbsp;apex.&nbsp;Radius&nbsp;grows&nbsp;linearly&nbsp;with&nbsp;distance&nbsp;from&nbsp;the&nbsp;apex.</span></dd></dl>
+ <dl><dt><a name="-light_cone_coordinate"><strong>light_cone_coordinate</strong></a>(time_coordinate: 'float', angle: 'float', *, signal_speed: 'float' = 1.0, angular_speed: 'float' = 0.0) -&gt; 'ConeCoordinate'</dt><dd><span class="code">Return&nbsp;a&nbsp;point&nbsp;on&nbsp;a&nbsp;causal&nbsp;light-cone&nbsp;boundary&nbsp;in&nbsp;a&nbsp;horizontal-time&nbsp;view.<br>
+&nbsp;<br>
+The&nbsp;displayed&nbsp;time&nbsp;coordinate&nbsp;is&nbsp;x.&nbsp;The&nbsp;transverse&nbsp;radius&nbsp;is&nbsp;exactly<br>
+signal_speed&nbsp;*&nbsp;abs(time_coordinate),&nbsp;so&nbsp;the&nbsp;Minkowski&nbsp;boundary<br>
+(signal_speed&nbsp;*&nbsp;t)**2&nbsp;-&nbsp;y**2&nbsp;-&nbsp;z**2&nbsp;==&nbsp;0&nbsp;is&nbsp;preserved&nbsp;by&nbsp;rotation.<br>
+The&nbsp;two&nbsp;temporal&nbsp;sheets&nbsp;counter-rotate&nbsp;as&nbsp;measured&nbsp;outward&nbsp;from&nbsp;the&nbsp;apex.<br>
+This&nbsp;is&nbsp;a&nbsp;diagram&nbsp;embedding;&nbsp;it&nbsp;does&nbsp;not&nbsp;change&nbsp;the&nbsp;causal&nbsp;metric.</span></dd></dl>
+ <dl><dt><a name="-spine_point"><strong>spine_point</strong></a>(distance: 'float') -&gt; 'DiagramPoint'</dt><dd><span class="code">Return&nbsp;a&nbsp;point&nbsp;on&nbsp;the&nbsp;vertical&nbsp;identity&nbsp;spine&nbsp;through&nbsp;the&nbsp;shared&nbsp;apex.</span></dd></dl>
+ <dl><dt><a name="-time_sunburst_ray"><strong>time_sunburst_ray</strong></a>(index: 'int', ray_count: 'int', radius: 'float') -&gt; 'tuple[DiagramPoint, DiagramPoint]'</dt><dd><span class="code">Return&nbsp;one&nbsp;radial&nbsp;sunburst&nbsp;ray&nbsp;in&nbsp;the&nbsp;horizontal&nbsp;plane&nbsp;through&nbsp;Self.<br>
+&nbsp;<br>
+Rays&nbsp;beyond&nbsp;the&nbsp;two&nbsp;horizontal&nbsp;directions&nbsp;are&nbsp;visual&nbsp;encodings&nbsp;of&nbsp;temporal<br>
+scales&nbsp;or&nbsp;relationships,&nbsp;not&nbsp;additional&nbsp;physical&nbsp;time&nbsp;dimensions.</span></dd></dl>
+</td></tr></table>
+</body></html>

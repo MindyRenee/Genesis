@@ -1335,8 +1335,8 @@ def test_field_state_absent_is_none() -> None:
 
 
 def test_field_state_holographic_keys() -> None:
-    """The metatron readout — the center's image on the S⁵ screen, its
-    depth into the vesica cell, the field's coupling — parses when the
+    """The tesseract readout — the center's image on the S⁵ screen, its
+    depth into the superposition cell, the field's coupling — parses when the
     daemon publishes it and defaults to None on older internals maps."""
     from genesis_client.types import FieldState
 

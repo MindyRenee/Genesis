@@ -8,7 +8,7 @@ reported once.</p>
 <p>Reporting is deliberately <em>not</em> re-armed by a later success.
 Every capability gate in this module (<code>SUDO_AVAILABLE</code>,
 <code>HELPER_PATH</code>, <code>EPP_AVAILABLE</code>, <code>BOOST_AVAILABLE</code>) is a
-<code>Innate</code> — capability state is fixed for the process lifetime,
+<code>OnceLock</code> — capability state is fixed for the process lifetime,
 so a transient success (e.g. an unprivileged <code>renice</code> lowering
 priority, which always works) is not a repair. The previous
 clear-on-success behaviour oscillated report → clear → report on

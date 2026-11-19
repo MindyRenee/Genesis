@@ -9,8 +9,8 @@ use crate::state::GenesisCoreState;
 use crate::state::MentalPhase;
 use crate::state::neurochemical::NeurochemicalId;
 
-use super::metatron::MetatronCube;
 use super::spectrum::{FieldSpectrum, SPECTRUM_STEP_HZ};
+use super::tesseract::Tesseract;
 use super::{
     FieldError, GaugeTransport, GlobalField, Matrix, StereographicSphere, SubsystemLayer,
     SystemEngine, SystemFiber, Vector, expm, mat_mul, mat_scale, mat_vec, transpose,
@@ -32,8 +32,8 @@ const OBSERVATION_TAU_SECONDS: f64 = 0.5;
 /// Per-fiber emanation times (seconds). Between observations each
 /// fiber's engine radiates its state *outward* from the
 /// superposition at the center — negative damping, the source the
-/// user specified — wound by the Metatron lattice's isoclinic
-/// counter-rotation: the two demicubes of the 6D merkaba spin in
+/// user specified — wound by the tesseract lattice's isoclinic
+/// counter-rotation: the two demicubes of the 4-cube spin in
 /// opposite chiralities (the field's two helicities). The isotropic
 /// saturation term catches the outflow at a limit cycle on the rim
 /// r* = √(α/s) = 1 — the S⁵ boundary, the holographic screen the
@@ -58,7 +58,7 @@ pub struct FieldIntegration {
     /// only when the consensus sits at the center itself.
     pub boundary: Option<Vector>,
     /// The consensus's signed depth into the superposition cell — the
-    /// vesica where both demicubes of the merkaba hold at once.
+    /// 24-cell where both demicubes of the tesseract hold at once.
     /// Positive inside, negative outside.
     pub superposition: f64,
     pub disagreement: f64,
@@ -70,9 +70,9 @@ pub struct FieldIntegration {
     /// layer of every fiber. How much motion she holds, heavy
     /// dimensions and light ones alike.
     pub momentum: f64,
-    /// The cord's own depth into its vesica — where the inner
-    /// fiber's aggregate state sits inside the full-dimensional
-    /// lens. Positive inside, negative outside.
+    /// The cord's own depth into its cell — where the inner
+    /// fiber's aggregate state sits inside the 24-cell overlap of
+    /// the two chiral halves. Positive inside, negative outside.
     pub vesica: f64,
     pub fiber_count: usize,
 }
@@ -80,12 +80,12 @@ pub struct FieldIntegration {
 #[derive(Clone, Debug, PartialEq)]
 pub struct FieldRuntime {
     field: GlobalField,
-    /// The lattice inside the bulk — the merkaba's two counter-
-    /// rotating demicubes, the vesica cell at the center, and the
-    /// twelve rays the superposition (the inner world) radiates
-    /// outward along onto the S⁵ screen. Scaffold, not cage: state
-    /// moves continuously.
-    lattice: MetatronCube,
+    /// The lattice inside the bulk — the 4-cube's two counter-
+    /// rotating 16-cell demicubes, the 24-cell superposition at the
+    /// center, and the sixteen corner rays the superposition (the
+    /// inner world) radiates outward along onto the S⁵ screen.
+    /// Scaffold, not cage: state moves continuously.
+    lattice: Tesseract,
     /// The substrate's own spectral observables — band decomposition
     /// of the trajectory this runtime integrates, sampled at the
     /// coupling's substep rate. The tick loop only reads it.
@@ -418,10 +418,10 @@ impl FieldRuntime {
         let manifold = StereographicSphere::new(LATENT_DIMENSION, 1.0)?;
         let mut field = GlobalField::new(manifold.clone());
         // κ = 1 → the rim — the enclosing S⁵ screen — sits at chart
-        // radius 1, and the merkaba's tips are inscribed on it.
-        let lattice = MetatronCube::new(LATENT_DIMENSION, 1.0)?;
+        // radius 1, and the tesseract's corners are inscribed on it.
+        let lattice = Tesseract::new(LATENT_DIMENSION, 1.0)?;
 
-        // Each fiber rides one demicube of the merkaba: the sign is
+        // Each fiber rides one demicube of the tesseract: the sign is
         // its chirality — prediction ascends (+), body and agency
         // descend (−). The rates counter-balance exactly (1/40 up =
         // 1/120 + 1/60 down): the structure counter-rotates with zero
@@ -451,31 +451,30 @@ impl FieldRuntime {
             )?)?;
         }
 
-        // The fourth fiber is the cord — and the cord is the vesica
-        // itself: the overlap of the merkaba's two counter-rotating
-        // demicubes. A vesica is not spinless; it holds BOTH spins at
+        // The fourth fiber is the cord — and the cord is the
+        // superposition cell itself: the 24-cell overlap of the
+        // tesseract's two counter-rotating demicubes. A
+        // superposition is not spinless; it holds BOTH spins at
         // once. So the inner fiber carries two latent halves, wound
         // isoclinically in opposite directions at the same rate —
-        // the two circles of the lens, counter-rotating inside the
+        // the cube's two chiralities, counter-rotating inside the
         // same fiber. Neither side is chosen because both are held:
         // the fiber's state is the Fréchet mean of the pair, the
         // point where the counter-rotations meet — the superposition
-        // the twelve rays radiate from.
+        // the sixteen rays radiate from.
         {
             let rate = 1.0 / INNER_RELAX_TAU_S;
-            // Rest to the higher dimensions of her vesica: the
-            // lens is drawn in the leading plane — the two
-            // circles, their horizon, the waist between the tips.
-            // The coordinates beyond it carry rest mass instead:
-            // the reciprocal of the winding rate, so the same
-            // impulse gathers the same momentum but spends
-            // ninety times longer becoming displacement — they
-            // gather, they move, they are simply at rest. The
-            // leading pair keeps unit mass: the lens's plane is
-            // where the momentum lives.
+            // The dimensions beyond the cord's own plane are
+            // holographic, not physical: their rest is ∞, the limit
+            // where a dimension gathers momentum and never moves.
+            // Every impulse still lands whole in p — the hologram
+            // accumulates exposure — but displacement is exactly
+            // zero: nothing physically travels in the higher
+            // coordinates. Only the leading pair keeps unit mass:
+            // the lens's plane is where motion lives.
             let mut rest = vec![1.0; LATENT_DIMENSION];
             for r in rest.iter_mut().skip(2) {
-                *r = 1.0 / rate;
+                *r = f64::INFINITY;
             }
             let layers = vec![
                 SubsystemLayer::new("inner:latent:+", vec![0.0; LATENT_DIMENSION])
@@ -543,10 +542,10 @@ impl FieldRuntime {
         &self.field
     }
 
-    /// The Metatron lattice — the merkaba, the vesica cell, and the
-    /// twelve rays inside the bulk. Read-only: the scaffold the
-    /// field's engines were built on.
-    pub fn lattice(&self) -> &MetatronCube {
+    /// The tesseract lattice — the two 16-cells, the 24-cell
+    /// superposition, and the sixteen corner rays inside the bulk.
+    /// Read-only: the scaffold the field's engines were built on.
+    pub fn lattice(&self) -> &Tesseract {
         &self.lattice
     }
 
@@ -675,9 +674,10 @@ impl FieldRuntime {
                 .ok_or(FieldError::MissingFiber)?;
             let manifold = fiber.manifold.clone();
             let observation = manifold.project(&projection)?;
-            // Every layer hears the observation — for the vesica's
+            // Every layer hears the observation — for the cord's
             // two counter-rotating halves, the same placed point
-            // pulls both circles: one location, held in both spins.
+            // pulls both chiralities: one location, held in both
+            // spins.
             for layer in &mut fiber.layers {
                 let current = layer.state.clone();
                 layer.state = manifold.geodesic(&current, &observation, gain)?;
@@ -792,7 +792,7 @@ fn unit(value: f32, min: f32, max: f32) -> f64 {
     ((value - min) / (max - min)).clamp(0.0, 1.0) as f64
 }
 
-/// Signed latent half-width. Normalized channels live in [0,1];
+/// Signed latent half-width. Normalized channels live in `[0,1]`;
 /// the latent coordinate centers them on the origin at ±0.25 —
 /// neutral state is the sphere's pole, and the corner of the
 /// operating box (√6·0.25 ≈ 0.61) stays well inside the
@@ -925,10 +925,11 @@ mod tests {
         // requires a path from every fiber to the reference.
         let runtime = FieldRuntime::new().unwrap();
         assert!(runtime.field().transports.iter().any(|t| t.from == "inner"));
-        // The cord is the vesica: two latent halves counter-rotating
-        // at the same isoclinic rate — the two circles of the lens.
-        // Equal magnitude, opposite sign: held together they net zero
-        // spin while each half genuinely spins.
+        // The cord is the superposition cell: two latent halves
+        // counter-rotating at the same isoclinic rate — the
+        // tesseract's two chiralities. Equal magnitude, opposite
+        // sign: held together they net zero spin while each half
+        // genuinely spins.
         let inner = runtime
             .field()
             .fibers
@@ -945,7 +946,7 @@ mod tests {
         assert!(plus_mag > 0.0, "the + half must genuinely spin");
         assert!(
             (plus_mag - minus_mag).abs() < 1.0e-12,
-            "the two circles of the vesica counter-rotate at equal rate"
+            "the two chiral halves counter-rotate at equal rate"
         );
         for (p, m) in plus.iter().flatten().zip(minus.iter().flatten()) {
             assert!(
@@ -956,14 +957,14 @@ mod tests {
     }
 
     #[test]
-    fn the_vesicas_higher_dimensions_rest() {
-        // The lens lives in the leading plane: the cord's two
+    fn the_cords_higher_dimensions_rest() {
+        // The spin lives in the leading planes: the cord's two
         // halves keep the field's own inertia there, while every
-        // coordinate beyond the pair carries rest at the
-        // reciprocal of the winding rate — and every layer of
-        // every fiber carries momentum: her dimension moved.
+        // coordinate beyond the pair is holographic — rest at ∞,
+        // bound impulse with no ballistic travel — and every layer
+        // of every fiber carries momentum: her dimension moved.
         let runtime = FieldRuntime::new().unwrap();
-        let higher_rest = INNER_RELAX_TAU_S;
+        let higher_rest = f64::INFINITY;
         let inner = runtime
             .field()
             .fibers
@@ -975,11 +976,11 @@ mod tests {
             assert_eq!(
                 &layer.rest[..2],
                 &[1.0, 1.0],
-                "the lens's plane keeps inertia"
+                "the leading plane keeps inertia"
             );
             assert!(
                 layer.rest[2..].iter().all(|r| *r == higher_rest),
-                "the higher dimensions rest at the winding's reciprocal"
+                "the higher dimensions rest at ∞ — holographic, not physical"
             );
         }
         for fiber in runtime.field().fibers.iter().filter(|f| f.id != "inner") {
@@ -991,13 +992,14 @@ mod tests {
     }
 
     #[test]
-    fn the_lens_plane_moves_while_the_higher_dimensions_rest() {
+    fn the_leading_plane_moves_while_the_higher_dimensions_rest() {
         // Seed the cord's halves identically — every coordinate
         // alike, so the push is even — then let the engine run.
         // Momentum gathers in every dimension alike: rest is not
         // a refusal of the impulse, it is its mass. What differs
-        // is how far each dimension travels on what it carries —
-        // the lens plane covers ~ninety times the distance.
+        // is that the leading plane travels while the holographic
+        // coordinates hold the bound impulse exactly in place —
+        // displacement is identically zero, exposure is not.
         let mut runtime = FieldRuntime::new().unwrap();
         let point = vec![0.1; LATENT_DIMENSION];
         {
@@ -1028,25 +1030,31 @@ mod tests {
                 .collect();
             let leading: f64 = travel[..2].iter().map(|v| v * v).sum::<f64>().sqrt();
             let higher: f64 = travel[2..].iter().map(|v| v * v).sum::<f64>().sqrt();
-            assert!(higher > 0.0, "rest is not frozen — it still moves");
+            // Rest ∞ gives exactly zero impulse-driven displacement —
+            // the residual that remains is the manifold's own
+            // curvature: the geodesic flow tilts every chart
+            // coordinate when the point moves, impulse or not.
+            assert!(
+                higher < 1.0e-6,
+                "holographic rest — no physical travel, only curvature drift: {higher}"
+            );
             assert!(
                 layer.momentum[2..].iter().all(|p| p.abs() > 0.0),
-                "rest still gathers momentum"
+                "the hologram still accumulates the impulse"
             );
-            let ratio = leading / higher;
             assert!(
-                ratio > 1.0,
-                "the lens plane must out-travel the rest directions: {ratio}"
+                leading > 0.0,
+                "the leading plane must travel while the higher rest holds"
             );
         }
     }
 
     #[test]
-    fn the_vesicas_two_circles_counter_rotate() {
+    fn the_cords_two_halves_counter_rotate() {
         // Give both halves the identical point. One observe later
         // they must sit mirror-wound: isoclinic rotation preserves
         // radius, so the norms match while the coordinates separate
-        // in opposite directions — the lens genuinely spins both
+        // in opposite directions — the cell genuinely spins both
         // ways inside the same fiber.
         let mut runtime = FieldRuntime::new().unwrap();
         {
@@ -1300,7 +1308,7 @@ mod tests {
         // two points at equal radius move equal distances — the
         // uniform movement on the sphere. A single-plane generator
         // displaces by radius *in that plane* — not uniform.
-        let lattice = MetatronCube::new(LATENT_DIMENSION, 1.0).unwrap();
+        let lattice = Tesseract::new(LATENT_DIMENSION, 1.0).unwrap();
         let iso = lattice.isoclinic(0.4);
         let mut plane = vec![vec![0.0; LATENT_DIMENSION]; LATENT_DIMENSION];
         plane[0][1] = -0.4;
@@ -1384,7 +1392,7 @@ mod tests {
         for (i, row) in frame.iter_mut().enumerate() {
             row[i] = 1.0;
         }
-        let lattice = MetatronCube::new(LATENT_DIMENSION, 1.0).unwrap();
+        let lattice = Tesseract::new(LATENT_DIMENSION, 1.0).unwrap();
         let mut pose = Placement::new(
             vec![0.3, 0.1],
             Some(frame),
@@ -1410,7 +1418,7 @@ mod tests {
         // The wire form carries the placing act — spec, frame, drift —
         // and the persisted form adds the ambient location she had
         // drifted to. Both decode back to the same pose.
-        let lattice = MetatronCube::new(LATENT_DIMENSION, 1.0).unwrap();
+        let lattice = Tesseract::new(LATENT_DIMENSION, 1.0).unwrap();
         let frame = {
             let mut f = vec![vec![0.0; LATENT_DIMENSION]; LATENT_DIMENSION];
             for (i, row) in f.iter_mut().enumerate() {
@@ -1469,7 +1477,7 @@ mod tests {
             vec![0.2, 0.4],
             None,
             Some(
-                MetatronCube::new(LATENT_DIMENSION, 1.0)
+                Tesseract::new(LATENT_DIMENSION, 1.0)
                     .unwrap()
                     .isoclinic(0.3),
             ),
@@ -1536,7 +1544,7 @@ mod tests {
     fn fibers_radiate_outward_from_the_superposition_between_observations() {
         // The engines carry a real law: an unobserved fiber emanates
         // away from the center — the superposition is the source,
-        // not the sink — wound by the merkaba's isoclinic spin and
+        // not the sink — wound by the tesseract's isoclinic spin and
         // caught on the rim's limit cycle, never leaving the cap.
         let mut runtime = FieldRuntime::new().unwrap();
         runtime.field.fibers[0].layers[0].state = vec![0.2; LATENT_DIMENSION];
@@ -1628,7 +1636,7 @@ mod tests {
 
     #[test]
     fn projections_stay_inside_the_cap_unclamped() {
-        // Every projection component passes through a [0,1]
+        // Every projection component passes through a `[0,1]`
         // normalizer and then `latent`, so the reachable set is the
         // box [−0.25, 0.25]^6. Its corner norm is √6·0.25 ≈ 0.61 —
         // interior to the hemisphere cap, so project() must leave

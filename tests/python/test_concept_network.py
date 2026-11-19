@@ -2321,8 +2321,7 @@ def test_autonomous_learner_add_topic_rejects_garbage() -> None:
     learner.add_topic("neural activity")
 
     # Check the topic queue (it's a list)
-    with learner._queue_lock:
-        queue = learner._topic_queue
+    queue = learner._topic_queue
     assert "python:mind.deny_site" not in queue
     assert "and" not in queue
     assert "it" not in queue

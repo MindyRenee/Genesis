@@ -1480,6 +1480,26 @@ class AutonomousLearner:
         return self._running and not self._paused
 
     @property
+    def running(self) -> bool:
+        """Whether the learner's loop is open — metronome ticks advance it.
+
+        In self-directed mode the loop stays closed: queued topics
+        wait, and the bounded pipeline is invoked directly by chosen
+        actions via ``lookup_topic_sync`` instead.
+        """
+        return self._running
+
+    def pop_urgent_topic(self) -> str | None:
+        """Take the next urgent topic off the queue, or None if empty.
+
+        The synchronous drain: with the loop closed the urgent queue
+        is the record of what conversation left unlearned — a chosen
+        action that invokes the bounded step directly pops from here
+        so the gaps are not a dead letter.
+        """
+        return self._urgent_queue.popleft() if self._urgent_queue else None
+
+    @property
     def learning_log(self) -> list[LearningResult]:
         """A copy of the recent learning results log."""
         return list(self._learning_log)

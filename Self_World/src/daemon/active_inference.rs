@@ -112,7 +112,7 @@
 //! The model is a linear state-space predictor:
 //!
 //! ```text
-//! predicted_next[i] = sum_j (A[i][j] * current[j]) + bias[i]
+//! predicted_next[i] = sum_j (`A[i][j]` * current[j]) + `bias[i]`
 //! ```
 //!
 //! - `A` is an 18×18 weight matrix (the learned transition model)
@@ -122,8 +122,8 @@
 //! The model is updated via the delta rule:
 //!
 //! ```text
-//! A[i][j] += lr * precision * error[i] * current[j]
-//! bias[i] += lr * precision * error[i] * 0.1
+//! `A[i][j]` += lr * precision * error[i] * current[j]
+//! `bias[i]` += lr * precision * error[i] * 0.1
 //! ```
 //!
 //! where `error[i] = actual[i] - predicted[i]`, `lr` is the learning
@@ -1036,13 +1036,13 @@ pub struct InferenceResult {
 /// matrix, bias, precision, variational posterior) between ticks. It
 /// persists to disk so the model survives daemon restarts.
 pub struct ActiveInferenceEngine {
-    /// The learned transition matrix: A[i][j] = how chemical j
+    /// The learned transition matrix: `A[i][j]` = how chemical j
     /// predicts the next value of chemical i. Initialized as identity
     /// (predict "no change"). This captures the **endogenous
     /// dynamics** — how the neurochemical state evolves on its own,
     /// without the engine's own interventions.
     transition_matrix: [[f32; DIM]; DIM],
-    /// The learned action matrix: B[i][j] = how an impulse on
+    /// The learned action matrix: `B[i][j]` = how an impulse on
     /// chemical j affects the next value of chemical i. This
     /// captures the **action effects** — the engine's own
     /// interventions, separate from the endogenous dynamics.
@@ -1068,7 +1068,7 @@ pub struct ActiveInferenceEngine {
     /// action-conditioned prediction. Updated at the end of each
     /// `_generate_feedback` call from the generated impulse list.
     last_action: [f32; DIM],
-    /// The learned bias vector: bias[i] = additive offset for
+    /// The learned bias vector: `bias[i]` = additive offset for
     /// chemical i's prediction. Initialized as zero.
     bias: [f32; DIM],
     /// The current precision of the model [0, 1]. Starts at 0.5.
@@ -1130,11 +1130,11 @@ pub struct ActiveInferenceEngine {
     /// uniformity — it was a hash, not a random source).
     rng_state: u32,
     // ─── Variational posterior (diagonal Gaussian) ─────────────
-    /// Posterior mean: q(s)_mean[i] = the model's best estimate of
+    /// Posterior mean: `q(s)_mean[i]` = the model's best estimate of
     /// chemical i's true level after combining the prediction and
     /// the observation via Kalman update.
     belief_mean: [f32; DIM],
-    /// Posterior variance: q(s)_var[i] = the model's uncertainty
+    /// Posterior variance: `q(s)_var[i]` = the model's uncertainty
     /// about chemical i's level. Updated via Kalman filter:
     /// belief_var = (1 - K) * prior_var, where K is the Kalman gain.
     /// Lower variance = higher confidence.
@@ -1247,7 +1247,7 @@ impl ActiveInferenceEngine {
     ///
     /// This is the **action-conditioned generative prediction**:
     /// ```text
-    /// predicted[i] = Σ_j A[i][j] * current[j] + Σ_j B[i][j] * action[j] + bias[i]
+    /// predicted[i] = Σ_j `A[i][j]` * current[j] + Σ_j `B[i][j]` * action[j] + `bias[i]`
     /// ```
     /// where A is the endogenous transition matrix and B is the action
     /// matrix. This separates the system's own dynamics (A) from the
@@ -1256,7 +1256,7 @@ impl ActiveInferenceEngine {
     /// estimate.
     ///
     /// Dopamine predictions are unclamped; other channels retain the
-    /// effective-level range (see [`predict`] for rationale).
+    /// effective-level range (see [`Self::predict`] for rationale).
     fn predict_with_action(&self, current: &[f32; DIM], action: &[f32; DIM]) -> [f32; DIM] {
         let mut predicted = [0.0f32; DIM];
         for (i, pred) in predicted.iter_mut().enumerate() {
@@ -3476,7 +3476,7 @@ impl ActiveInferenceEngine {
         self.transition_matrix[i][j]
     }
 
-    /// Set an action matrix entry B[i][j] (test only). This lets
+    /// Set an action matrix entry `B[i][j]` (test only). This lets
     /// tests install a known action model — "this intervention has
     /// this effect" — without running the learning loop to acquire
     /// it, isolating policy *selection* from model *learning*.

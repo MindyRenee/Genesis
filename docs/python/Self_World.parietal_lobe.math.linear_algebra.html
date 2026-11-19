@@ -93,18 +93,34 @@ Data and other attributes defined here:<br>
 <tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
 <td class="singlecolumn"><dl><dt><a name="-determinant"><strong>determinant</strong></a>(m: 'Matrix') -&gt; 'Fraction | None'</dt></dl>
  <dl><dt><a name="-determinant_text"><strong>determinant_text</strong></a>(text: 'str') -&gt; 'LinearResult'</dt><dd><span class="code">"determinant&nbsp;of&nbsp;[[1,2],[3,4]]"&nbsp;-&gt;&nbsp;-2.</span></dd></dl>
+ <dl><dt><a name="-inverse"><strong>inverse</strong></a>(m: 'Matrix') -&gt; 'Matrix | None'</dt><dd><span class="code">Invert&nbsp;a&nbsp;nonsingular&nbsp;square&nbsp;matrix&nbsp;by&nbsp;exact&nbsp;Gauss–Jordan&nbsp;elimination.</span></dd></dl>
+ <dl><dt><a name="-inverse_text"><strong>inverse_text</strong></a>(text: 'str') -&gt; 'LinearResult'</dt><dd><span class="code">Invert&nbsp;a&nbsp;nonsingular&nbsp;square&nbsp;matrix&nbsp;using&nbsp;exact&nbsp;fractions.</span></dd></dl>
  <dl><dt><a name="-looks_like_linear_algebra"><strong>looks_like_linear_algebra</strong></a>(text: 'str') -&gt; 'bool'</dt><dd><span class="code">Whether&nbsp;the&nbsp;text&nbsp;asks&nbsp;a&nbsp;matrix&nbsp;question.<br>
 &nbsp;<br>
 True&nbsp;for&nbsp;"determinant&nbsp;of&nbsp;[[1,2],[3,4]]",&nbsp;"rank&nbsp;of&nbsp;that<br>
 matrix",&nbsp;"solve&nbsp;the&nbsp;system"&nbsp;—&nbsp;the&nbsp;vocabulary&nbsp;of&nbsp;maps.</span></dd></dl>
  <dl><dt><a name="-matmul"><strong>matmul</strong></a>(a: 'Matrix', b: 'Matrix') -&gt; 'Matrix | None'</dt></dl>
  <dl><dt><a name="-matmul_text"><strong>matmul_text</strong></a>(a_text: 'str', b_text: 'str') -&gt; 'LinearResult'</dt><dd><span class="code">"[[1,0],[0,1]]&nbsp;times&nbsp;[[1,2],[3,4]]"&nbsp;—&nbsp;the&nbsp;product.</span></dd></dl>
+ <dl><dt><a name="-matrix_add"><strong>matrix_add</strong></a>(a: 'Matrix', b: 'Matrix', sign: 'int' = 1) -&gt; 'Matrix | None'</dt><dd><span class="code">Add&nbsp;or&nbsp;subtract&nbsp;matrices&nbsp;with&nbsp;identical&nbsp;dimensions.</span></dd></dl>
+ <dl><dt><a name="-matrix_add_text"><strong>matrix_add_text</strong></a>(a_text: 'str', b_text: 'str', subtract: 'bool' = False) -&gt; 'LinearResult'</dt><dd><span class="code">Add&nbsp;or&nbsp;subtract&nbsp;matrices&nbsp;with&nbsp;matching&nbsp;dimensions.</span></dd></dl>
+ <dl><dt><a name="-matrix_scale"><strong>matrix_scale</strong></a>(m: 'Matrix', scalar: 'Fraction') -&gt; 'Matrix'</dt><dd><span class="code">Multiply&nbsp;every&nbsp;matrix&nbsp;entry&nbsp;by&nbsp;an&nbsp;exact&nbsp;scalar.</span></dd></dl>
+ <dl><dt><a name="-matrix_scale_text"><strong>matrix_scale_text</strong></a>(matrix_text: 'str', scalar_text: 'str') -&gt; 'LinearResult'</dt><dd><span class="code">Multiply&nbsp;a&nbsp;matrix&nbsp;by&nbsp;an&nbsp;exact&nbsp;rational&nbsp;scalar.</span></dd></dl>
  <dl><dt><a name="-parse_matrix"><strong>parse_matrix</strong></a>(text: 'str') -&gt; 'Matrix'</dt><dd><span class="code">Parse&nbsp;"[[1,&nbsp;2],&nbsp;[3,&nbsp;4]]"&nbsp;(or&nbsp;((1,2),(3,4)))&nbsp;into&nbsp;Fractions.</span></dd></dl>
  <dl><dt><a name="-rank"><strong>rank</strong></a>(m: 'Matrix') -&gt; 'int'</dt></dl>
  <dl><dt><a name="-rank_text"><strong>rank_text</strong></a>(text: 'str') -&gt; 'LinearResult'</dt><dd><span class="code">"rank&nbsp;of&nbsp;[[1,2],[2,4]]"&nbsp;-&gt;&nbsp;1.</span></dd></dl>
  <dl><dt><a name="-render_matrix"><strong>render_matrix</strong></a>(m: 'Matrix') -&gt; 'str'</dt></dl>
  <dl><dt><a name="-solve"><strong>solve</strong></a>(a: 'Matrix', b: 'list[Fraction]') -&gt; 'list[Fraction] | None'</dt><dd><span class="code">Solve&nbsp;Ax&nbsp;=&nbsp;b&nbsp;by&nbsp;Gauss–Jordan&nbsp;—&nbsp;exact&nbsp;fractions.</span></dd></dl>
  <dl><dt><a name="-solve_text"><strong>solve_text</strong></a>(a_text: 'str', b_text: 'str') -&gt; 'LinearResult'</dt><dd><span class="code">"solve&nbsp;[[2,1],[1,-1]]&nbsp;x&nbsp;=&nbsp;[5,&nbsp;1]"&nbsp;-&gt;&nbsp;x&nbsp;=&nbsp;(2,&nbsp;1).</span></dd></dl>
+ <dl><dt><a name="-trace"><strong>trace</strong></a>(m: 'Matrix') -&gt; 'Fraction | None'</dt><dd><span class="code">Return&nbsp;the&nbsp;exact&nbsp;trace&nbsp;of&nbsp;a&nbsp;square&nbsp;matrix.</span></dd></dl>
+ <dl><dt><a name="-trace_text"><strong>trace_text</strong></a>(text: 'str') -&gt; 'LinearResult'</dt><dd><span class="code">Compute&nbsp;the&nbsp;trace&nbsp;of&nbsp;a&nbsp;square&nbsp;matrix.</span></dd></dl>
+ <dl><dt><a name="-transpose"><strong>transpose</strong></a>(m: 'Matrix') -&gt; 'Matrix'</dt><dd><span class="code">Transpose&nbsp;a&nbsp;rectangular&nbsp;matrix.</span></dd></dl>
+ <dl><dt><a name="-transpose_text"><strong>transpose_text</strong></a>(text: 'str') -&gt; 'LinearResult'</dt><dd><span class="code">Transpose&nbsp;a&nbsp;matrix&nbsp;literal.</span></dd></dl>
+ <dl><dt><a name="-vector_add"><strong>vector_add</strong></a>(a: 'list[Fraction]', b: 'list[Fraction]', sign: 'int' = 1) -&gt; 'list[Fraction] | None'</dt><dd><span class="code">Add&nbsp;vectors,&nbsp;or&nbsp;subtract&nbsp;when&nbsp;sign&nbsp;is&nbsp;-1.</span></dd></dl>
+ <dl><dt><a name="-vector_add_text"><strong>vector_add_text</strong></a>(a_text: 'str', b_text: 'str', subtract: 'bool' = False) -&gt; 'LinearResult'</dt><dd><span class="code">Add&nbsp;or&nbsp;subtract&nbsp;two&nbsp;explicit&nbsp;vector&nbsp;literals.</span></dd></dl>
+ <dl><dt><a name="-vector_cross"><strong>vector_cross</strong></a>(a: 'list[Fraction]', b: 'list[Fraction]') -&gt; 'list[Fraction] | None'</dt><dd><span class="code">Return&nbsp;the&nbsp;three-dimensional&nbsp;cross&nbsp;product.</span></dd></dl>
+ <dl><dt><a name="-vector_cross_text"><strong>vector_cross_text</strong></a>(a_text: 'str', b_text: 'str') -&gt; 'LinearResult'</dt><dd><span class="code">Compute&nbsp;the&nbsp;exact&nbsp;cross&nbsp;product&nbsp;of&nbsp;two&nbsp;3D&nbsp;vectors.</span></dd></dl>
+ <dl><dt><a name="-vector_dot"><strong>vector_dot</strong></a>(a: 'list[Fraction]', b: 'list[Fraction]') -&gt; 'Fraction | None'</dt><dd><span class="code">Return&nbsp;the&nbsp;exact&nbsp;dot&nbsp;product&nbsp;when&nbsp;vector&nbsp;dimensions&nbsp;agree.</span></dd></dl>
+ <dl><dt><a name="-vector_dot_text"><strong>vector_dot_text</strong></a>(a_text: 'str', b_text: 'str') -&gt; 'LinearResult'</dt><dd><span class="code">Compute&nbsp;the&nbsp;dot&nbsp;product&nbsp;of&nbsp;two&nbsp;explicit&nbsp;vector&nbsp;literals.</span></dd></dl>
 </td></tr></table><p>
 <table class="section">
 <tr class="decor data-decor heading-text">

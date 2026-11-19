@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"struct":["Inhibition","InhibitoryStats"],"type":["InhibitionGuard","Innate"]};

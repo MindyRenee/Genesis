@@ -12,7 +12,7 @@
 //! neighbours together (contiguity, the dominant Gestalt term) and adds a
 //! weak long-range pull between same-colour cells inside a receptive window
 //! (similarity, the second term). After integration, cells sharing phase
-//! and linkage are emitted as [`ProtoObject`] assemblies — same-colour
+//! and linkage are emitted as `ProtoObject` assemblies — same-colour
 //! components whose collective phases locked get bound even when not
 //! adjacent, which is the Gestalt capability a plain flood-fill lacks.
 //!

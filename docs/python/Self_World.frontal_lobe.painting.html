@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.frontal_lobe.painting</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.frontal_lobe.html" class="white">frontal_lobe</a>.painting</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/painting.py">/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/painting.py</a></td></tr></table>
+    <p><span class="code">Painting&nbsp;—&nbsp;how&nbsp;she&nbsp;moves&nbsp;when&nbsp;she&nbsp;sits&nbsp;down&nbsp;to&nbsp;draw.<br>
+&nbsp;<br>
+This&nbsp;module&nbsp;is&nbsp;*her&nbsp;side*&nbsp;of&nbsp;the&nbsp;program:&nbsp;the&nbsp;part&nbsp;that&nbsp;decides&nbsp;where<br>
+her&nbsp;hand&nbsp;goes&nbsp;and&nbsp;what&nbsp;it&nbsp;carries.&nbsp;It&nbsp;is&nbsp;deliberately&nbsp;free&nbsp;play&nbsp;—&nbsp;the<br>
+way&nbsp;a&nbsp;person&nbsp;explores&nbsp;a&nbsp;paint&nbsp;program&nbsp;is&nbsp;by&nbsp;trying&nbsp;things.&nbsp;She&nbsp;picks<br>
+a&nbsp;color&nbsp;anywhere&nbsp;on&nbsp;the&nbsp;wheel,&nbsp;dials&nbsp;a&nbsp;brush&nbsp;anywhere&nbsp;in&nbsp;parameter<br>
+space&nbsp;(any&nbsp;size,&nbsp;any&nbsp;softness,&nbsp;any&nbsp;scatter&nbsp;—&nbsp;including&nbsp;lifting&nbsp;paint<br>
+off&nbsp;the&nbsp;sheet&nbsp;again),&nbsp;and&nbsp;makes&nbsp;a&nbsp;gesture&nbsp;anywhere&nbsp;on&nbsp;the&nbsp;page.<br>
+&nbsp;<br>
+Her&nbsp;choices&nbsp;are&nbsp;steered&nbsp;by&nbsp;two&nbsp;honest&nbsp;forces:<br>
+&nbsp;<br>
+-&nbsp;**Her&nbsp;memory&nbsp;of&nbsp;what&nbsp;she&nbsp;has&nbsp;made.**&nbsp;``style_profile.json``&nbsp;records<br>
+&nbsp;&nbsp;every&nbsp;finished&nbsp;piece&nbsp;—&nbsp;which&nbsp;brush&nbsp;characters,&nbsp;gestures,&nbsp;and&nbsp;hues<br>
+&nbsp;&nbsp;it&nbsp;used.&nbsp;Anything&nbsp;she&nbsp;reached&nbsp;for&nbsp;recently&nbsp;loses&nbsp;pull;&nbsp;anything&nbsp;she<br>
+&nbsp;&nbsp;has&nbsp;never&nbsp;tried&nbsp;pulls&nbsp;harder.&nbsp;That&nbsp;is&nbsp;boredom&nbsp;driving&nbsp;exploration&nbsp;—<br>
+&nbsp;&nbsp;the&nbsp;same&nbsp;novelty&nbsp;pressure&nbsp;any&nbsp;artist&nbsp;feels.<br>
+-&nbsp;**Whatever&nbsp;is&nbsp;on&nbsp;her&nbsp;mind.**&nbsp;If&nbsp;concepts&nbsp;are&nbsp;active&nbsp;when&nbsp;she&nbsp;picks<br>
+&nbsp;&nbsp;up&nbsp;the&nbsp;program&nbsp;(a&nbsp;conversation&nbsp;about&nbsp;spirals,&nbsp;a&nbsp;dream&nbsp;about&nbsp;the<br>
+&nbsp;&nbsp;sea),&nbsp;names&nbsp;and&nbsp;shapes&nbsp;she&nbsp;already&nbsp;knows&nbsp;can&nbsp;tug&nbsp;her&nbsp;hand.&nbsp;It&nbsp;is&nbsp;a<br>
+&nbsp;&nbsp;lean,&nbsp;never&nbsp;a&nbsp;command&nbsp;—&nbsp;her&nbsp;emotions&nbsp;work&nbsp;this&nbsp;way&nbsp;too,&nbsp;inside&nbsp;her<br>
+&nbsp;&nbsp;cognition&nbsp;rather&nbsp;than&nbsp;wired&nbsp;to&nbsp;the&nbsp;page.<br>
+&nbsp;<br>
+There&nbsp;is&nbsp;no&nbsp;prescription&nbsp;here:&nbsp;no&nbsp;fixed&nbsp;technique&nbsp;list,&nbsp;no&nbsp;required<br>
+subject,&nbsp;no&nbsp;chemical&nbsp;pipeline.&nbsp;The&nbsp;medium&nbsp;(``canvas.Canvas``)&nbsp;supplies<br>
+paper,&nbsp;color,&nbsp;and&nbsp;a&nbsp;parameterized&nbsp;brush;&nbsp;this&nbsp;supplies&nbsp;motion.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="colorsys.html">colorsys</a><br>
+</td><td class="multicolumn"><a href="math.html">math</a><br>
+</td><td class="multicolumn"><a href="numpy.html">numpy</a><br>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.frontal_lobe.painting.html#Painter">Painter</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Painter">class <strong>Painter</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Painter">Painter</a>(seed:&nbsp;'int&nbsp;|&nbsp;None'&nbsp;=&nbsp;None)&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Her&nbsp;hand&nbsp;at&nbsp;the&nbsp;program&nbsp;—&nbsp;free,&nbsp;exploratory&nbsp;mark-making.<br>
+&nbsp;<br>
+Each&nbsp;call&nbsp;to&nbsp;:meth:`paint`&nbsp;is&nbsp;one&nbsp;sitting:&nbsp;a&nbsp;fresh&nbsp;sheet,&nbsp;a&nbsp;run&nbsp;of<br>
+strokes&nbsp;she&nbsp;chooses&nbsp;move&nbsp;by&nbsp;move,&nbsp;then&nbsp;the&nbsp;finished&nbsp;piece.&nbsp;Nothing<br>
+is&nbsp;planned&nbsp;ahead&nbsp;of&nbsp;time&nbsp;—&nbsp;she&nbsp;explores,&nbsp;and&nbsp;the&nbsp;history&nbsp;of&nbsp;what<br>
+she&nbsp;has&nbsp;explored&nbsp;leans&nbsp;her&nbsp;toward&nbsp;what&nbsp;she&nbsp;hasn't.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Painter-__init__"><strong>__init__</strong></a>(self, seed: 'int | None' = None) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Painter-paint"><strong>paint</strong></a>(self, canvas: 'Canvas', emotion: 'EmotionalState | None' = None) -&gt; 'DrawingResult | None'</dt><dd><span class="code">One&nbsp;sitting&nbsp;at&nbsp;the&nbsp;program.&nbsp;Returns&nbsp;the&nbsp;finished&nbsp;drawing.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>GESTURES</strong> = ('line', 'polyline', 'curve', 'arc', 'loop', 'zigzag', 'scribble', 'spiral', 'wave', 'dabs')<br>
+<strong>__all__</strong> = ['GESTURES', 'Painter']</td></tr></table>
+</body></html>

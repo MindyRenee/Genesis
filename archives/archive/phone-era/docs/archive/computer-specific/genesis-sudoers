@@ -1,0 +1,20 @@
+# Genesis sudoers rules — allows the current user to control CPU
+# frequency without a password, restricted to the cpufreq_helper.sh
+# script.
+#
+# This is a TEMPLATE. The actual path must match where the helper
+# script lives on your system. Use the install script to generate
+# the correct rule:
+#
+#   sudo bash scripts/install_sudoers.sh
+#
+# Or install manually:
+#   1. Edit the path below to match your checkout
+#   2. sudo cp genesis-sudoers /etc/sudoers.d/genesis
+#   3. sudo chmod 440 /etc/sudoers.d/genesis
+#   4. sudo visudo -c   (verify syntax)
+#
+# The wildcard allows the helper to be called with any arguments
+# (the helper script itself validates its inputs).
+
+REPLACE_WITH_USERNAME ALL=(root) NOPASSWD: REPLACE_WITH_PATH/scripts/cpufreq_helper.sh *

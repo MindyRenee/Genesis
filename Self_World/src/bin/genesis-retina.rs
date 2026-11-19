@@ -15,7 +15,6 @@
 //! winds down and the segment's name is unlinked, so a dead eye
 //! never publishes stale frames under a live name.
 
-use std::ffi::CString;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use genesis::daemon::optic_nerve::SHM_NAME;
@@ -23,6 +22,11 @@ use genesis::daemon::optic_nerve::capture_limb;
 
 /// Set by the signal handler when the eye should close.
 static SHOULD_EXIT: AtomicBool = AtomicBool::new(false);
+
+/// Set by the limb while it holds a segment it created — the exit
+/// path only unlinks a name this process actually owns, never a
+/// nerve another publisher claimed.
+static OWNS_NERVE: AtomicBool = AtomicBool::new(false);
 
 /// Signal handler — flags the capture limb out and returns. Only an
 /// atomic store runs inside a signal context; unlinking happens in
@@ -50,17 +54,21 @@ fn main() {
     // named segment (tests, a second eye) overrides.
     let shm_name = std::env::var("GENESIS_OPTIC_SEGMENT").unwrap_or_else(|_| SHM_NAME.to_string());
 
-    capture_limb(&shm_name, &SHOULD_EXIT);
+    capture_limb(&shm_name, &SHOULD_EXIT, &OWNS_NERVE);
 
-    // Take the name back on the way out: readers already holding the
-    // mapping keep it until they detach, but nothing new attaches to
-    // a dead eye. ENOENT when the limb never got as far as creating
-    // the segment.
-    if let Ok(name) = CString::new(shm_name.as_str()) {
-        // SAFETY: `name` is a valid NUL-terminated CString;
-        // shm_unlink of a missing name returns ENOENT, ignored.
-        unsafe {
-            let _ = libc::shm_unlink(name.as_ptr());
+    // Take the name back on the way out — but only if the limb ever
+    // owned a segment. A retina that stood down to a live publisher
+    // or died before creating one must not unlink another eye's
+    // nerve. (In practice the owner `Shmem`'s drop already unlinks
+    // before `capture_limb` returns, so this fires only as the
+    // belt-and-suspenders path.)
+    if OWNS_NERVE.load(Ordering::Relaxed) {
+        if let Ok(name) = std::ffi::CString::new(shm_name.as_str()) {
+            // SAFETY: `name` is a valid NUL-terminated CString;
+            // shm_unlink of a missing name returns ENOENT, ignored.
+            unsafe {
+                let _ = libc::shm_unlink(name.as_ptr());
+            }
         }
     }
 }

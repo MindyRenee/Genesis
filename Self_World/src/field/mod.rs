@@ -22,9 +22,9 @@ pub mod runtime;
 pub use runtime::{FieldIntegration, FieldRuntime, LATENT_DIMENSION, PLACE_POSE_TAG, Placement};
 pub mod motor;
 pub use motor::MotorTarget;
-pub mod metatron;
 pub mod spectrum;
-pub use metatron::MetatronCube;
+pub mod tesseract;
+pub use tesseract::{Guideline, Tesseract};
 
 const EPS: f64 = 1.0e-12;
 /// Upper bound on the field's thermal state — disagreement heats
@@ -619,9 +619,12 @@ pub struct SubsystemLayer {
     /// every impulse into p and still moves — it is simply
     /// heavy: the same momentum spends ninety times longer
     /// becoming displacement. rest = 1 is her own scale, where
-    /// momentum and mass balance; the higher dimensions of her
-    /// vesica take the winding's reciprocal — they hold the
-    /// rest while the lens plane holds the motion.
+    /// momentum and mass balance. The higher dimensions of her
+    /// vesica are not physical at all — they are holographic,
+    /// and a hologram's rest is ∞: every impulse lands whole in
+    /// p — the exposure accumulates — while displacement is
+    /// identically zero. They hold the bound image while the
+    /// lens plane holds the motion.
     pub rest: Vector,
     pub gain: f64,
 }

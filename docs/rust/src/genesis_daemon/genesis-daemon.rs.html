@@ -44,7 +44,7 @@
 <a href=#44 id=44 data-nosnippet>44</a>//! - The IPC server runs in a background accept thread
 <a href=#45 id=45 data-nosnippet>45</a>//! - Each accepted client connection is served on its own thread, so a
 <a href=#46 id=46 data-nosnippet>46</a>//!   single slow request cannot block other clients
-<a href=#47 id=47 data-nosnippet>47</a>//! - Access to the LTM store is serialized via `Arc&lt;Inhibition&lt;LtmStore&gt;&gt;`.
+<a href=#47 id=47 data-nosnippet>47</a>//! - Access to the LTM store is serialized via `Arc&lt;Shared&lt;LtmStore&gt;&gt;`.
 <a href=#48 id=48 data-nosnippet>48</a>//!   The IPC handler holds the lock briefly during requests. The
 <a href=#49 id=49 data-nosnippet>49</a>//!   `LtmAccess` trait lets the library `IpcServer` work with the
 <a href=#50 id=50 data-nosnippet>50</a>//!   mutex-protected store without reimplementing the accept loop.
@@ -55,7 +55,7 @@
 <a href=#55 id=55 data-nosnippet>55</a>//!
 <a href=#56 id=56 data-nosnippet>56</a>//! A bridge thread forwards daemon→IPC, and the main thread checks both.
 <a href=#57 id=57 data-nosnippet>57</a>
-<a href=#58 id=58 data-nosnippet>58</a></span><span class="kw">use </span>genesis::inhibition::Inhibition;
+<a href=#58 id=58 data-nosnippet>58</a></span><span class="kw">use </span>genesis::shared::Shared;
 <a href=#59 id=59 data-nosnippet>59</a><span class="kw">use </span>std::path::PathBuf;
 <a href=#60 id=60 data-nosnippet>60</a><span class="kw">use </span>std::sync::Arc;
 <a href=#61 id=61 data-nosnippet>61</a><span class="kw">use </span>std::time::Duration;
@@ -81,7 +81,7 @@
 <a href=#81 id=81 data-nosnippet>81</a>        <span class="self">Self </span>{
 <a href=#82 id=82 data-nosnippet>82</a>            socket_path: data_dir.join(<span class="string">"genesis.sock"</span>),
 <a href=#83 id=83 data-nosnippet>83</a>            data_dir,
-<a href=#84 id=84 data-nosnippet>84</a>            stm_capacity: <span class="number">256</span>,
+<a href=#84 id=84 data-nosnippet>84</a>            stm_capacity: <span class="number">4096</span>,
 <a href=#85 id=85 data-nosnippet>85</a>            ltm_capacity: <span class="number">65_536</span>,
 <a href=#86 id=86 data-nosnippet>86</a>        }
 <a href=#87 id=87 data-nosnippet>87</a>    }
@@ -154,7 +154,7 @@
 <a href=#154 id=154 data-nosnippet>154</a>                <span class="macro">println!</span>(
 <a href=#155 id=155 data-nosnippet>155</a>                    <span class="string">"  --socket &lt;path&gt;        Unix socket path (default: &lt;data-dir&gt;/genesis.sock)"
 <a href=#156 id=156 data-nosnippet>156</a>                </span>);
-<a href=#157 id=157 data-nosnippet>157</a>                <span class="macro">println!</span>(<span class="string">"  --stm-capacity &lt;n&gt;     STM ring buffer capacity (default: 256)"</span>);
+<a href=#157 id=157 data-nosnippet>157</a>                <span class="macro">println!</span>(<span class="string">"  --stm-capacity &lt;n&gt;     STM ring buffer capacity (default: 4096)"</span>);
 <a href=#158 id=158 data-nosnippet>158</a>                <span class="macro">println!</span>(<span class="string">"  --ltm-capacity &lt;n&gt;     LTM episode capacity (default: 65536)"</span>);
 <a href=#159 id=159 data-nosnippet>159</a>                <span class="macro">println!</span>(<span class="string">"  --help, -h             Show this help message"</span>);
 <a href=#160 id=160 data-nosnippet>160</a>                std::process::exit(<span class="number">0</span>);
@@ -184,866 +184,847 @@
 <a href=#184 id=184 data-nosnippet>184</a>///
 <a href=#185 id=185 data-nosnippet>185</a>/// Returns `true` when the refusal was a poison — an unrecoverable,
 <a href=#186 id=186 data-nosnippet>186</a>/// permanent refusal the caller must escalate rather than skip.
-<a href=#187 id=187 data-nosnippet>187</a></span><span class="kw">fn </span>lock_refusal&lt;T&gt;(what: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str, e: std::sync::TryLockError&lt;T&gt;) -&gt; bool {
-<a href=#188 id=188 data-nosnippet>188</a>    <span class="kw">if let </span>std::sync::TryLockError::Poisoned(<span class="kw">_</span>) = e {
-<a href=#189 id=189 data-nosnippet>189</a>        <span class="kw">static </span>REPORTED: genesis::inhibition::Innate&lt;Inhibition&lt;Vec&lt;<span class="kw-2">&amp;</span><span class="lifetime">'static </span>str&gt;&gt;&gt; =
-<a href=#190 id=190 data-nosnippet>190</a>            genesis::inhibition::Innate::new();
-<a href=#191 id=191 data-nosnippet>191</a>        <span class="kw">let </span>reported = REPORTED.get_or_init(|| Inhibition::new(Vec::new()));
-<a href=#192 id=192 data-nosnippet>192</a>        <span class="kw">let </span><span class="kw-2">mut </span>guard = <span class="kw">match </span>reported.lock() {
-<a href=#193 id=193 data-nosnippet>193</a>            <span class="prelude-val">Ok</span>(g) =&gt; g,
-<a href=#194 id=194 data-nosnippet>194</a>            <span class="prelude-val">Err</span>(poisoned) =&gt; poisoned.into_inner(),
-<a href=#195 id=195 data-nosnippet>195</a>        };
-<a href=#196 id=196 data-nosnippet>196</a>        <span class="kw">if </span>!guard.contains(<span class="kw-2">&amp;</span>what) {
-<a href=#197 id=197 data-nosnippet>197</a>            guard.push(what);
-<a href=#198 id=198 data-nosnippet>198</a>            <span class="macro">eprintln!</span>(
-<a href=#199 id=199 data-nosnippet>199</a>                <span class="string">"[genesis] {what} mutex is poisoned — a thread panicked while holding it. \
-<a href=#200 id=200 data-nosnippet>200</a>                 The autonomous fallback cannot run this subsystem and will keep skipping it \
-<a href=#201 id=201 data-nosnippet>201</a>                 until the daemon restarts. The IPC path will refuse it too."
-<a href=#202 id=202 data-nosnippet>202</a>            </span>);
-<a href=#203 id=203 data-nosnippet>203</a>        }
-<a href=#204 id=204 data-nosnippet>204</a>        <span class="kw">return </span><span class="bool-val">true</span>;
-<a href=#205 id=205 data-nosnippet>205</a>    }
-<a href=#206 id=206 data-nosnippet>206</a>    <span class="bool-val">false
-<a href=#207 id=207 data-nosnippet>207</a></span>}
+<a href=#187 id=187 data-nosnippet>187</a></span><span class="kw">fn </span>lock_refusal(_what: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str, _e: genesis::shared::Denied) -&gt; bool {
+<a href=#188 id=188 data-nosnippet>188</a>    <span class="comment">// `Denied` is the refractory membrane: a signal was in flight and
+<a href=#189 id=189 data-nosnippet>189</a>    // this impulse dropped. Dropped impulses are biology, not failure
+<a href=#190 id=190 data-nosnippet>190</a>    // — the fallback simply skips the cycle. Nothing here is a poison:
+<a href=#191 id=191 data-nosnippet>191</a>    // the claim is an atomic flag, not a mutex that can die held.
+<a href=#192 id=192 data-nosnippet>192</a>    </span><span class="bool-val">false
+<a href=#193 id=193 data-nosnippet>193</a></span>}
+<a href=#194 id=194 data-nosnippet>194</a>
+<a href=#195 id=195 data-nosnippet>195</a><span class="doccomment">/// A poisoned `tick_loop` can never recover: the IPC path refuses
+<a href=#196 id=196 data-nosnippet>196</a>/// every reactive command with INTERNAL_ERROR and the fallback would
+<a href=#197 id=197 data-nosnippet>197</a>/// skip it on every pass — the daemon would answer PING forever with
+<a href=#198 id=198 data-nosnippet>198</a>/// no neurochemistry, no memory, no zones. Exit through the normal
+<a href=#199 id=199 data-nosnippet>199</a>/// shutdown path so the stores get their final sync and a supervisor
+<a href=#200 id=200 data-nosnippet>200</a>/// sees a stopped process, not a brain-dead one. (`ltm` poisoning is
+<a href=#201 id=201 data-nosnippet>201</a>/// not fatal here: that subsystem is explicitly recoverable — the IPC
+<a href=#202 id=202 data-nosnippet>202</a>/// `LtmAccess` path serves it via `into_inner`.)
+<a href=#203 id=203 data-nosnippet>203</a></span><span class="kw">fn </span>fatal_if_poisoned(what: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str, shutdown_flag: <span class="kw-2">&amp;</span>Arc&lt;std::sync::atomic::AtomicBool&gt;) {
+<a href=#204 id=204 data-nosnippet>204</a>    <span class="kw">if </span>!shutdown_flag.swap(<span class="bool-val">true</span>, std::sync::atomic::Ordering::Relaxed) {
+<a href=#205 id=205 data-nosnippet>205</a>        <span class="macro">eprintln!</span>(<span class="string">"[genesis] FATAL: {what} poisoned — exiting for clean restart"</span>);
+<a href=#206 id=206 data-nosnippet>206</a>    }
+<a href=#207 id=207 data-nosnippet>207</a>}
 <a href=#208 id=208 data-nosnippet>208</a>
-<a href=#209 id=209 data-nosnippet>209</a><span class="doccomment">/// A poisoned `tick_loop` can never recover: the IPC path refuses
-<a href=#210 id=210 data-nosnippet>210</a>/// every reactive command with INTERNAL_ERROR and the fallback would
-<a href=#211 id=211 data-nosnippet>211</a>/// skip it on every pass — the daemon would answer PING forever with
-<a href=#212 id=212 data-nosnippet>212</a>/// no neurochemistry, no memory, no zones. Exit through the normal
-<a href=#213 id=213 data-nosnippet>213</a>/// shutdown path so the stores get their final sync and a supervisor
-<a href=#214 id=214 data-nosnippet>214</a>/// sees a stopped process, not a brain-dead one. (`ltm` poisoning is
-<a href=#215 id=215 data-nosnippet>215</a>/// not fatal here: that subsystem is explicitly recoverable — the IPC
-<a href=#216 id=216 data-nosnippet>216</a>/// `LtmAccess` path serves it via `into_inner`.)
-<a href=#217 id=217 data-nosnippet>217</a></span><span class="kw">fn </span>fatal_if_poisoned(what: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str, shutdown_flag: <span class="kw-2">&amp;</span>Arc&lt;std::sync::atomic::AtomicBool&gt;) {
-<a href=#218 id=218 data-nosnippet>218</a>    <span class="kw">if </span>!shutdown_flag.swap(<span class="bool-val">true</span>, std::sync::atomic::Ordering::Relaxed) {
-<a href=#219 id=219 data-nosnippet>219</a>        <span class="macro">eprintln!</span>(<span class="string">"[genesis] FATAL: {what} poisoned — exiting for clean restart"</span>);
-<a href=#220 id=220 data-nosnippet>220</a>    }
-<a href=#221 id=221 data-nosnippet>221</a>}
-<a href=#222 id=222 data-nosnippet>222</a>
-<a href=#223 id=223 data-nosnippet>223</a><span class="kw">fn </span>main() {
-<a href=#224 id=224 data-nosnippet>224</a>    <span class="kw">let </span>config = parse_args();
-<a href=#225 id=225 data-nosnippet>225</a>
-<a href=#226 id=226 data-nosnippet>226</a>    <span class="comment">// Snapshot the host's CPU policy before Genesis applies anything, so
-<a href=#227 id=227 data-nosnippet>227</a>    // it can be restored on shutdown. Read-only and idempotent — this
-<a href=#228 id=228 data-nosnippet>228</a>    // never affects its running state.
-<a href=#229 id=229 data-nosnippet>229</a>    </span>genesis::daemon::cpufreq::capture_hardware_state();
-<a href=#230 id=230 data-nosnippet>230</a>
-<a href=#231 id=231 data-nosnippet>231</a>    <span class="comment">// Create the data directory if it doesn't exist
-<a href=#232 id=232 data-nosnippet>232</a>    </span><span class="kw">if </span>!config.data_dir.exists()
-<a href=#233 id=233 data-nosnippet>233</a>        &amp;&amp; <span class="kw">let </span><span class="prelude-val">Err</span>(e) = std::fs::create_dir_all(<span class="kw-2">&amp;</span>config.data_dir)
-<a href=#234 id=234 data-nosnippet>234</a>    {
-<a href=#235 id=235 data-nosnippet>235</a>        <span class="macro">eprintln!</span>(
-<a href=#236 id=236 data-nosnippet>236</a>            <span class="string">"[genesis] FATAL: failed to create data directory {}: {e}"</span>,
-<a href=#237 id=237 data-nosnippet>237</a>            config.data_dir.display()
-<a href=#238 id=238 data-nosnippet>238</a>        );
-<a href=#239 id=239 data-nosnippet>239</a>        std::process::exit(<span class="number">1</span>);
-<a href=#240 id=240 data-nosnippet>240</a>    }
-<a href=#241 id=241 data-nosnippet>241</a>
-<a href=#242 id=242 data-nosnippet>242</a>    <span class="kw">let </span>state_path = config.data_dir.join(<span class="string">"core_state.bin"</span>);
-<a href=#243 id=243 data-nosnippet>243</a>    <span class="kw">let </span>stm_path = config.data_dir.join(<span class="string">"stm_ring.bin"</span>);
-<a href=#244 id=244 data-nosnippet>244</a>    <span class="kw">let </span>ltm_base = config.data_dir.join(<span class="string">"ltm_store"</span>);
-<a href=#245 id=245 data-nosnippet>245</a>
-<a href=#246 id=246 data-nosnippet>246</a>    <span class="comment">// Open or create the stores
-<a href=#247 id=247 data-nosnippet>247</a>    </span><span class="macro">eprintln!</span>(<span class="string">"[genesis] Initializing subcognitive..."</span>);
-<a href=#248 id=248 data-nosnippet>248</a>    <span class="macro">eprintln!</span>(<span class="string">"[genesis]   data dir:    {}"</span>, config.data_dir.display());
-<a href=#249 id=249 data-nosnippet>249</a>    <span class="macro">eprintln!</span>(<span class="string">"[genesis]   state file:  {}"</span>, state_path.display());
-<a href=#250 id=250 data-nosnippet>250</a>    <span class="macro">eprintln!</span>(<span class="string">"[genesis]   stm file:    {}"</span>, stm_path.display());
-<a href=#251 id=251 data-nosnippet>251</a>    <span class="macro">eprintln!</span>(
-<a href=#252 id=252 data-nosnippet>252</a>        <span class="string">"[genesis]   ltm base:    {}.{{bundles,meta,dat}}"</span>,
-<a href=#253 id=253 data-nosnippet>253</a>        ltm_base.display()
-<a href=#254 id=254 data-nosnippet>254</a>    );
-<a href=#255 id=255 data-nosnippet>255</a>    <span class="macro">eprintln!</span>(<span class="string">"[genesis]   socket:      {}"</span>, config.socket_path.display());
-<a href=#256 id=256 data-nosnippet>256</a>
-<a href=#257 id=257 data-nosnippet>257</a>    <span class="kw">let </span>now_ms = std::time::SystemTime::now()
-<a href=#258 id=258 data-nosnippet>258</a>        .duration_since(std::time::UNIX_EPOCH)
-<a href=#259 id=259 data-nosnippet>259</a>        .map(|d| d.as_millis() <span class="kw">as </span>u64)
-<a href=#260 id=260 data-nosnippet>260</a>        .unwrap_or(<span class="number">0</span>);
-<a href=#261 id=261 data-nosnippet>261</a>    <span class="kw">let </span>mmap = <span class="kw">match </span>MmapState::open(<span class="kw-2">&amp;</span>state_path) {
-<a href=#262 id=262 data-nosnippet>262</a>        <span class="prelude-val">Ok</span>(m) =&gt; m,
-<a href=#263 id=263 data-nosnippet>263</a>        <span class="prelude-val">Err</span>(genesis::store::StateFileError::NotFound) =&gt; {
-<a href=#264 id=264 data-nosnippet>264</a>            <span class="kw">match </span>MmapState::create(<span class="kw-2">&amp;</span>state_path, now_ms, now_ms) {
-<a href=#265 id=265 data-nosnippet>265</a>                <span class="prelude-val">Ok</span>(m) =&gt; m,
-<a href=#266 id=266 data-nosnippet>266</a>                <span class="prelude-val">Err</span>(e) =&gt; {
-<a href=#267 id=267 data-nosnippet>267</a>                    <span class="macro">eprintln!</span>(
-<a href=#268 id=268 data-nosnippet>268</a>                        <span class="string">"[genesis] FATAL: failed to create core state {}: {e}"</span>,
-<a href=#269 id=269 data-nosnippet>269</a>                        state_path.display()
-<a href=#270 id=270 data-nosnippet>270</a>                    );
-<a href=#271 id=271 data-nosnippet>271</a>                    std::process::exit(<span class="number">1</span>);
-<a href=#272 id=272 data-nosnippet>272</a>                }
-<a href=#273 id=273 data-nosnippet>273</a>            }
-<a href=#274 id=274 data-nosnippet>274</a>        }
-<a href=#275 id=275 data-nosnippet>275</a>        <span class="comment">// An unreadable state file (truncated, foreign, or checksum-
-<a href=#276 id=276 data-nosnippet>276</a>        // corrupt) would otherwise FATAL-loop forever: every restart
-<a href=#277 id=277 data-nosnippet>277</a>        // hits the same verification failure. Rename it aside — it is
-<a href=#278 id=278 data-nosnippet>278</a>        // preserved for forensics, never silently destroyed — and
-<a href=#279 id=279 data-nosnippet>279</a>        // rebuild a fresh state. I/O, lock, and mmap failures are
-<a href=#280 id=280 data-nosnippet>280</a>        // environmental and still fatal: recreating cannot fix them.
-<a href=#281 id=281 data-nosnippet>281</a>        </span><span class="prelude-val">Err</span>(
-<a href=#282 id=282 data-nosnippet>282</a>            e @ (genesis::store::StateFileError::VerificationFailed(<span class="kw">_</span>)
-<a href=#283 id=283 data-nosnippet>283</a>            | genesis::store::StateFileError::FileTooSmall { .. }),
-<a href=#284 id=284 data-nosnippet>284</a>        ) =&gt; {
-<a href=#285 id=285 data-nosnippet>285</a>            <span class="kw">let </span>quarantine = state_path.with_extension(<span class="macro">format!</span>(<span class="string">"corrupt.{now_ms}"</span>));
-<a href=#286 id=286 data-nosnippet>286</a>            <span class="macro">eprintln!</span>(
-<a href=#287 id=287 data-nosnippet>287</a>                <span class="string">"[genesis] core state {} is unrecoverable ({e}); archiving to {}"</span>,
-<a href=#288 id=288 data-nosnippet>288</a>                state_path.display(),
-<a href=#289 id=289 data-nosnippet>289</a>                quarantine.display()
-<a href=#290 id=290 data-nosnippet>290</a>            );
-<a href=#291 id=291 data-nosnippet>291</a>            <span class="kw">if let </span><span class="prelude-val">Err</span>(rename_err) = std::fs::rename(<span class="kw-2">&amp;</span>state_path, <span class="kw-2">&amp;</span>quarantine) {
-<a href=#292 id=292 data-nosnippet>292</a>                <span class="macro">eprintln!</span>(
-<a href=#293 id=293 data-nosnippet>293</a>                    <span class="string">"[genesis] FATAL: could not archive unrecoverable state {}: {rename_err}"</span>,
-<a href=#294 id=294 data-nosnippet>294</a>                    state_path.display()
-<a href=#295 id=295 data-nosnippet>295</a>                );
-<a href=#296 id=296 data-nosnippet>296</a>                std::process::exit(<span class="number">1</span>);
-<a href=#297 id=297 data-nosnippet>297</a>            }
-<a href=#298 id=298 data-nosnippet>298</a>            <span class="kw">match </span>MmapState::create(<span class="kw-2">&amp;</span>state_path, now_ms, now_ms) {
-<a href=#299 id=299 data-nosnippet>299</a>                <span class="prelude-val">Ok</span>(m) =&gt; m,
-<a href=#300 id=300 data-nosnippet>300</a>                <span class="prelude-val">Err</span>(e) =&gt; {
-<a href=#301 id=301 data-nosnippet>301</a>                    <span class="macro">eprintln!</span>(
-<a href=#302 id=302 data-nosnippet>302</a>                        <span class="string">"[genesis] FATAL: failed to rebuild core state {}: {e}"</span>,
-<a href=#303 id=303 data-nosnippet>303</a>                        state_path.display()
-<a href=#304 id=304 data-nosnippet>304</a>                    );
-<a href=#305 id=305 data-nosnippet>305</a>                    std::process::exit(<span class="number">1</span>);
-<a href=#306 id=306 data-nosnippet>306</a>                }
-<a href=#307 id=307 data-nosnippet>307</a>            }
-<a href=#308 id=308 data-nosnippet>308</a>        }
-<a href=#309 id=309 data-nosnippet>309</a>        <span class="prelude-val">Err</span>(e) =&gt; {
-<a href=#310 id=310 data-nosnippet>310</a>            <span class="macro">eprintln!</span>(
-<a href=#311 id=311 data-nosnippet>311</a>                <span class="string">"[genesis] FATAL: failed to open core state {}: {e}"</span>,
-<a href=#312 id=312 data-nosnippet>312</a>                state_path.display()
-<a href=#313 id=313 data-nosnippet>313</a>            );
-<a href=#314 id=314 data-nosnippet>314</a>            std::process::exit(<span class="number">1</span>);
-<a href=#315 id=315 data-nosnippet>315</a>        }
-<a href=#316 id=316 data-nosnippet>316</a>    };
-<a href=#317 id=317 data-nosnippet>317</a>    <span class="kw">let </span>stm = <span class="kw">match </span>RingBuffer::open_or_create(<span class="kw-2">&amp;</span>stm_path, config.stm_capacity) {
-<a href=#318 id=318 data-nosnippet>318</a>        <span class="prelude-val">Ok</span>(s) =&gt; s,
-<a href=#319 id=319 data-nosnippet>319</a>        <span class="prelude-val">Err</span>(e) =&gt; {
-<a href=#320 id=320 data-nosnippet>320</a>            <span class="macro">eprintln!</span>(
-<a href=#321 id=321 data-nosnippet>321</a>                <span class="string">"[genesis] FATAL: failed to open STM ring buffer {}: {e}"</span>,
-<a href=#322 id=322 data-nosnippet>322</a>                stm_path.display()
-<a href=#323 id=323 data-nosnippet>323</a>            );
-<a href=#324 id=324 data-nosnippet>324</a>            std::process::exit(<span class="number">1</span>);
-<a href=#325 id=325 data-nosnippet>325</a>        }
-<a href=#326 id=326 data-nosnippet>326</a>    };
-<a href=#327 id=327 data-nosnippet>327</a>    <span class="kw">let </span>ltm = <span class="kw">match </span>LtmStore::open_or_create(<span class="kw-2">&amp;</span>ltm_base, config.ltm_capacity) {
-<a href=#328 id=328 data-nosnippet>328</a>        <span class="prelude-val">Ok</span>(l) =&gt; l,
-<a href=#329 id=329 data-nosnippet>329</a>        <span class="prelude-val">Err</span>(e) =&gt; {
-<a href=#330 id=330 data-nosnippet>330</a>            <span class="macro">eprintln!</span>(
-<a href=#331 id=331 data-nosnippet>331</a>                <span class="string">"[genesis] FATAL: failed to open LTM store {}: {e}"</span>,
-<a href=#332 id=332 data-nosnippet>332</a>                ltm_base.display()
-<a href=#333 id=333 data-nosnippet>333</a>            );
-<a href=#334 id=334 data-nosnippet>334</a>            std::process::exit(<span class="number">1</span>);
-<a href=#335 id=335 data-nosnippet>335</a>        }
-<a href=#336 id=336 data-nosnippet>336</a>    };
-<a href=#337 id=337 data-nosnippet>337</a>
-<a href=#338 id=338 data-nosnippet>338</a>    <span class="comment">// Continuity sentinel — record this boot and learn how the
-<a href=#339 id=339 data-nosnippet>339</a>    // previous session ended. `dark_ms` comes from the state file's
-<a href=#340 id=340 data-nosnippet>340</a>    // own last-write timestamp, measured by `MmapState::open` before
-<a href=#341 id=341 data-nosnippet>341</a>    // it was overwritten; the sentinel supplies the *manner* of the
-<a href=#342 id=342 data-nosnippet>342</a>    // stop. The mind reads the same file on wake, so an unclean stop
-<a href=#343 id=343 data-nosnippet>343</a>    // — power loss, kill, crash — is something she knows happened,
-<a href=#344 id=344 data-nosnippet>344</a>    // not a seam she trips over.
-<a href=#345 id=345 data-nosnippet>345</a>    </span><span class="kw">let </span>boot = genesis::daemon::continuity::note_boot(
-<a href=#346 id=346 data-nosnippet>346</a>        <span class="kw-2">&amp;</span>config.data_dir,
-<a href=#347 id=347 data-nosnippet>347</a>        !mmap.was_created(),
-<a href=#348 id=348 data-nosnippet>348</a>        mmap.offline_gap_ms(),
-<a href=#349 id=349 data-nosnippet>349</a>        now_ms,
-<a href=#350 id=350 data-nosnippet>350</a>    );
-<a href=#351 id=351 data-nosnippet>351</a>    <span class="kw">if </span>boot.had_previous &amp;&amp; boot.prev_unclean {
-<a href=#352 id=352 data-nosnippet>352</a>        <span class="kw">let </span>bound = <span class="kw">if </span>boot.dark_upper_bound {
-<a href=#353 id=353 data-nosnippet>353</a>            <span class="string">"at least "
-<a href=#354 id=354 data-nosnippet>354</a>        </span>} <span class="kw">else </span>{
-<a href=#355 id=355 data-nosnippet>355</a>            <span class="string">""
-<a href=#356 id=356 data-nosnippet>356</a>        </span>};
-<a href=#357 id=357 data-nosnippet>357</a>        <span class="macro">eprintln!</span>(
-<a href=#358 id=358 data-nosnippet>358</a>            <span class="string">"[genesis] continuity: previous session left no clean stop \
-<a href=#359 id=359 data-nosnippet>359</a>             (power loss, kill, or crash) — dark for {}{}"</span>,
-<a href=#360 id=360 data-nosnippet>360</a>            bound,
-<a href=#361 id=361 data-nosnippet>361</a>            genesis::daemon::continuity::fmt_dark(boot.dark_ms),
-<a href=#362 id=362 data-nosnippet>362</a>        );
-<a href=#363 id=363 data-nosnippet>363</a>    } <span class="kw">else if </span>boot.had_previous {
-<a href=#364 id=364 data-nosnippet>364</a>        <span class="macro">eprintln!</span>(
-<a href=#365 id=365 data-nosnippet>365</a>            <span class="string">"[genesis] continuity: previous session stopped cleanly — \
-<a href=#366 id=366 data-nosnippet>366</a>             dark for {}"</span>,
-<a href=#367 id=367 data-nosnippet>367</a>            genesis::daemon::continuity::fmt_dark(boot.dark_ms),
-<a href=#368 id=368 data-nosnippet>368</a>        );
-<a href=#369 id=369 data-nosnippet>369</a>    }
-<a href=#370 id=370 data-nosnippet>370</a>
-<a href=#371 id=371 data-nosnippet>371</a>    <span class="macro">eprintln!</span>(<span class="string">"[genesis]   stm entries: {}"</span>, stm.count());
-<a href=#372 id=372 data-nosnippet>372</a>    <span class="macro">eprintln!</span>(<span class="string">"[genesis]   ltm episodes: {}"</span>, ltm.count());
-<a href=#373 id=373 data-nosnippet>373</a>    <span class="macro">eprintln!</span>(<span class="string">"[genesis] Subcognitive initialized."</span>);
-<a href=#374 id=374 data-nosnippet>374</a>    <span class="macro">eprintln!</span>(
-<a href=#375 id=375 data-nosnippet>375</a>        <span class="string">"[genesis]   provenance: 0x{:012x}"</span>,
-<a href=#376 id=376 data-nosnippet>376</a>        genesis::field::provenance_fingerprint()
-<a href=#377 id=377 data-nosnippet>377</a>    );
-<a href=#378 id=378 data-nosnippet>378</a>
-<a href=#379 id=379 data-nosnippet>379</a>    <span class="comment">// ── Wake recovery ──
-<a href=#380 id=380 data-nosnippet>380</a>    // If the daemon opened an existing state file (restart, not first
-<a href=#381 id=381 data-nosnippet>381</a>    // run), depleted neurochemicals from the previous session persist
-<a href=#382 id=382 data-nosnippet>382</a>    // and the slow homeostatic recovery keeps it "guarded" for
-<a href=#383 id=383 data-nosnippet>383</a>    // minutes. Give depleted neurotransmitters a one-time boost toward
-<a href=#384 id=384 data-nosnippet>384</a>    // baseline when cortisol is low (no ongoing stress). This is
-<a href=#385 id=385 data-nosnippet>385</a>    // biologically grounded: after sleep, the brain rapidly restores
-<a href=#386 id=386 data-nosnippet>386</a>    // depleted neurochemicals. A daemon restart is analogous to
-<a href=#387 id=387 data-nosnippet>387</a>    // waking up.
-<a href=#388 id=388 data-nosnippet>388</a>    </span><span class="kw">if </span>!mmap.was_created() {
-<a href=#389 id=389 data-nosnippet>389</a>        <span class="kw">let </span>now_ms = std::time::SystemTime::now()
-<a href=#390 id=390 data-nosnippet>390</a>            .duration_since(std::time::UNIX_EPOCH)
-<a href=#391 id=391 data-nosnippet>391</a>            .map(|d| d.as_millis() <span class="kw">as </span>u64)
-<a href=#392 id=392 data-nosnippet>392</a>            .unwrap_or(<span class="number">0</span>);
-<a href=#393 id=393 data-nosnippet>393</a>        <span class="kw">if let </span><span class="prelude-val">Err</span>(e) = mmap.modify(now_ms, |state| {
-<a href=#394 id=394 data-nosnippet>394</a>            state
-<a href=#395 id=395 data-nosnippet>395</a>                .neurochemicals
-<a href=#396 id=396 data-nosnippet>396</a>                .wake_recovery(genesis::state::sleep_network::levels(<span class="kw-2">&amp;</span>state.sleep_network));
-<a href=#397 id=397 data-nosnippet>397</a>        }) {
-<a href=#398 id=398 data-nosnippet>398</a>            <span class="macro">eprintln!</span>(<span class="string">"[genesis] WARNING: wake recovery failed: {e}"</span>);
-<a href=#399 id=399 data-nosnippet>399</a>        }
-<a href=#400 id=400 data-nosnippet>400</a>    }
-<a href=#401 id=401 data-nosnippet>401</a>
-<a href=#402 id=402 data-nosnippet>402</a>    <span class="comment">// Wrap the LTM in a mutex for shared access between IPC handlers.
-<a href=#403 id=403 data-nosnippet>403</a>    </span><span class="kw">let </span>ltm = Arc::new(Inhibition::new(ltm));
-<a href=#404 id=404 data-nosnippet>404</a>    <span class="kw">let </span>stm = Arc::new(stm);
-<a href=#405 id=405 data-nosnippet>405</a>    <span class="kw">let </span>mmap = Arc::new(mmap);
-<a href=#406 id=406 data-nosnippet>406</a>
-<a href=#407 id=407 data-nosnippet>407</a>    <span class="comment">// Physical field probe — the body listening to its own substrate.
-<a href=#408 id=408 data-nosnippet>408</a>    // A dedicated thread measures real substrate dynamics
-<a href=#409 id=409 data-nosnippet>409</a>    // (instruction throughput, scheduler jitter, P-state transitions,
-<a href=#410 id=410 data-nosnippet>410</a>    // interrupt flux, and real power draw where sensors report it)
-<a href=#411 id=411 data-nosnippet>411</a>    // at ~250 Hz and decomposes them at the wave bands' center
-<a href=#412 id=412 data-nosnippet>412</a>    // frequencies; the mind reads the signature over
-<a href=#413 id=413 data-nosnippet>413</a>    // GET_FIELD_PROBE and injects it into the wave oscillator as
-<a href=#414 id=414 data-nosnippet>414</a>    // outer stimulus. The probe also writes a carrier — its work is
-<a href=#415 id=415 data-nosnippet>415</a>    // modulated at the body's own phase rhythm, so the die's real
-<a href=#416 id=416 data-nosnippet>416</a>    // current carries a component at the organism's beat (measured
-<a href=#417 id=417 data-nosnippet>417</a>    // back through the power channel, not assumed).
-<a href=#418 id=418 data-nosnippet>418</a>    </span>{
-<a href=#419 id=419 data-nosnippet>419</a>        <span class="kw">use </span>genesis::state::MentalPhase;
-<a href=#420 id=420 data-nosnippet>420</a>        <span class="kw">let </span>probe_mmap = mmap.clone();
-<a href=#421 id=421 data-nosnippet>421</a>        genesis::daemon::field_probe::start(<span class="kw">move </span>|| {
-<a href=#422 id=422 data-nosnippet>422</a>            <span class="kw">match </span>probe_mmap.read_consistent().map(|s| s.zones.phase()) {
-<a href=#423 id=423 data-nosnippet>423</a>                <span class="prelude-val">Some</span>(MentalPhase::NREM) =&gt; <span class="string">"nrem"</span>,
-<a href=#424 id=424 data-nosnippet>424</a>                <span class="prelude-val">Some</span>(MentalPhase::REM) =&gt; <span class="string">"rem"</span>,
-<a href=#425 id=425 data-nosnippet>425</a>                <span class="prelude-val">Some</span>(MentalPhase::Drowsy) =&gt; <span class="string">"drowsy"</span>,
-<a href=#426 id=426 data-nosnippet>426</a>                <span class="kw">_ </span>=&gt; <span class="string">"wake"</span>,
-<a href=#427 id=427 data-nosnippet>427</a>            }
-<a href=#428 id=428 data-nosnippet>428</a>        });
-<a href=#429 id=429 data-nosnippet>429</a>    }
-<a href=#430 id=430 data-nosnippet>430</a>
-<a href=#431 id=431 data-nosnippet>431</a>    <span class="comment">// The eye — the optic nerve's retinal end. Ownership is settled
-<a href=#432 id=432 data-nosnippet>432</a>    // on the nerve itself, not by a flag: the daemon's own optic
-<a href=#433 id=433 data-nosnippet>433</a>    // reader (inside the TickLoop) already watches the segment's
-<a href=#434 id=434 data-nosnippet>434</a>    // frame counter, so the main loop below arbitrates. While an
-<a href=#435 id=435 data-nosnippet>435</a>    // external `genesis-retina` publishes, the limb stays closed;
-<a href=#436 id=436 data-nosnippet>436</a>    // when the grace window ends with no publisher — or a publisher
-<a href=#437 id=437 data-nosnippet>437</a>    // that was here stops — the daemon opens its own limb and takes
-<a href=#438 id=438 data-nosnippet>438</a>    // the camera. One owner at a time, healing in place.
-<a href=#439 id=439 data-nosnippet>439</a>    </span><span class="kw">let </span><span class="kw-2">mut </span>eye: <span class="prelude-ty">Option</span>&lt;genesis::daemon::optic_nerve::OpticCapture&gt; = <span class="prelude-val">None</span>;
-<a href=#440 id=440 data-nosnippet>440</a>    <span class="kw">let </span>eye_grace_until_ms =
-<a href=#441 id=441 data-nosnippet>441</a>        genesis::daemon::tick::current_ms() + genesis::daemon::tick::EYE_OWNERSHIP_GRACE_MS;
-<a href=#442 id=442 data-nosnippet>442</a>
-<a href=#443 id=443 data-nosnippet>443</a>    <span class="comment">// Set up shutdown coordination
-<a href=#444 id=444 data-nosnippet>444</a>    </span><span class="kw">let </span>shutdown_flag = Arc::new(std::sync::atomic::AtomicBool::new(<span class="bool-val">false</span>));
-<a href=#445 id=445 data-nosnippet>445</a>
-<a href=#446 id=446 data-nosnippet>446</a>    <span class="comment">// Set up signal handlers (SIGINT, SIGTERM)
-<a href=#447 id=447 data-nosnippet>447</a>    </span><span class="kw">let </span>watcher_thread = setup_signal_handlers(<span class="kw-2">&amp;</span>shutdown_flag);
-<a href=#448 id=448 data-nosnippet>448</a>
-<a href=#449 id=449 data-nosnippet>449</a>    <span class="comment">// Create the TickLoop, shared with both the IPC handler (mind
-<a href=#450 id=450 data-nosnippet>450</a>    // lease) and the main-thread autonomous fallback (past the
-<a href=#451 id=451 data-nosnippet>451</a>    // lease). The mind drives while alive; the daemon drives itself
-<a href=#452 id=452 data-nosnippet>452</a>    // when silent. Body-control application stays mind-requested.
-<a href=#453 id=453 data-nosnippet>453</a>    </span><span class="kw">let </span>tick_loop = Arc::new(Inhibition::new(TickLoop::new_with_data_dir(
-<a href=#454 id=454 data-nosnippet>454</a>        <span class="kw-2">&amp;</span>config.data_dir,
-<a href=#455 id=455 data-nosnippet>455</a>    )));
-<a href=#456 id=456 data-nosnippet>456</a>
-<a href=#457 id=457 data-nosnippet>457</a>    <span class="comment">// Create the IPC server (library version — no duplicated accept loop)
-<a href=#458 id=458 data-nosnippet>458</a>    </span><span class="kw">let </span>ipc_server = IpcServer::new(<span class="kw-2">&amp;</span>config.socket_path);
-<a href=#459 id=459 data-nosnippet>459</a>    <span class="kw">let </span>ipc_shutdown_flag = ipc_server.shutdown_flag();
-<a href=#460 id=460 data-nosnippet>460</a>
-<a href=#461 id=461 data-nosnippet>461</a>    <span class="comment">// Link the daemon's shutdown flag to the IPC server's shutdown flag.
-<a href=#462 id=462 data-nosnippet>462</a>    </span><span class="kw">let </span>bridge_thread = {
-<a href=#463 id=463 data-nosnippet>463</a>        <span class="kw">let </span>daemon_flag = shutdown_flag.clone();
-<a href=#464 id=464 data-nosnippet>464</a>        <span class="kw">let </span>ipc_flag = ipc_shutdown_flag.clone();
-<a href=#465 id=465 data-nosnippet>465</a>        std::thread::spawn(<span class="kw">move </span>|| {
-<a href=#466 id=466 data-nosnippet>466</a>            <span class="kw">loop </span>{
-<a href=#467 id=467 data-nosnippet>467</a>                <span class="kw">if </span>daemon_flag.load(std::sync::atomic::Ordering::Relaxed) {
-<a href=#468 id=468 data-nosnippet>468</a>                    ipc_flag.store(<span class="bool-val">true</span>, std::sync::atomic::Ordering::Relaxed);
-<a href=#469 id=469 data-nosnippet>469</a>                    <span class="kw">break</span>;
-<a href=#470 id=470 data-nosnippet>470</a>                }
-<a href=#471 id=471 data-nosnippet>471</a>                std::thread::sleep(Duration::from_millis(<span class="number">50</span>));
-<a href=#472 id=472 data-nosnippet>472</a>            }
-<a href=#473 id=473 data-nosnippet>473</a>        })
-<a href=#474 id=474 data-nosnippet>474</a>    };
-<a href=#475 id=475 data-nosnippet>475</a>
-<a href=#476 id=476 data-nosnippet>476</a>    <span class="comment">// Start the IPC server in a background thread with the reactive
-<a href=#477 id=477 data-nosnippet>477</a>    // handler. The handler wraps the TickLoop and dispatches reactive
-<a href=#478 id=478 data-nosnippet>478</a>    // commands to it, falling through to default_handler for
-<a href=#479 id=479 data-nosnippet>479</a>    // everything else.
-<a href=#480 id=480 data-nosnippet>480</a>    // The autonomous fallback's own gears, published for
-<a href=#481 id=481 data-nosnippet>481</a>    // GET_INTERNALS. The main loop below writes one snapshot per
-<a href=#482 id=482 data-nosnippet>482</a>    // iteration; the IPC handler reads it. Everything inside is a
-<a href=#483 id=483 data-nosnippet>483</a>    // plain copy, so a reader can never stall the fallback by
-<a href=#484 id=484 data-nosnippet>484</a>    // holding the lock.
-<a href=#485 id=485 data-nosnippet>485</a>    </span><span class="kw">let </span>auto_internals = Arc::new(Inhibition::new(
-<a href=#486 id=486 data-nosnippet>486</a>        genesis::daemon::adaptive::AutoSnapshot::default(),
-<a href=#487 id=487 data-nosnippet>487</a>    ));
-<a href=#488 id=488 data-nosnippet>488</a>
-<a href=#489 id=489 data-nosnippet>489</a>    <span class="kw">let </span>ipc_mmap = mmap.clone();
-<a href=#490 id=490 data-nosnippet>490</a>    <span class="kw">let </span>ipc_stm = stm.clone();
-<a href=#491 id=491 data-nosnippet>491</a>    <span class="kw">let </span>ipc_ltm = ltm.clone();
-<a href=#492 id=492 data-nosnippet>492</a>    <span class="kw">let </span>handler = reactive_handler(
-<a href=#493 id=493 data-nosnippet>493</a>        tick_loop.clone(),
-<a href=#494 id=494 data-nosnippet>494</a>        config.data_dir.clone(),
-<a href=#495 id=495 data-nosnippet>495</a>        auto_internals.clone(),
-<a href=#496 id=496 data-nosnippet>496</a>    );
-<a href=#497 id=497 data-nosnippet>497</a>
-<a href=#498 id=498 data-nosnippet>498</a>    <span class="kw">let </span>ipc_thread = <span class="kw">match </span>std::thread::Builder::new()
-<a href=#499 id=499 data-nosnippet>499</a>        .name(<span class="string">"genesis-ipc"</span>.to_string())
-<a href=#500 id=500 data-nosnippet>500</a>        .spawn(<span class="kw">move </span>|| {
-<a href=#501 id=501 data-nosnippet>501</a>            ipc_server.run(ipc_mmap, ipc_stm, ipc_ltm, handler);
-<a href=#502 id=502 data-nosnippet>502</a>        }) {
-<a href=#503 id=503 data-nosnippet>503</a>        <span class="prelude-val">Ok</span>(h) =&gt; h,
-<a href=#504 id=504 data-nosnippet>504</a>        <span class="prelude-val">Err</span>(e) =&gt; {
-<a href=#505 id=505 data-nosnippet>505</a>            <span class="macro">eprintln!</span>(<span class="string">"[genesis] FATAL: failed to spawn IPC thread: {e}"</span>);
-<a href=#506 id=506 data-nosnippet>506</a>            std::process::exit(<span class="number">1</span>);
-<a href=#507 id=507 data-nosnippet>507</a>        }
-<a href=#508 id=508 data-nosnippet>508</a>    };
-<a href=#509 id=509 data-nosnippet>509</a>
-<a href=#510 id=510 data-nosnippet>510</a>    <span class="comment">// IpcServer reports readiness only after bind succeeds. Do not claim
-<a href=#511 id=511 data-nosnippet>511</a>    // the endpoint is listening from the spawning thread.
-<a href=#512 id=512 data-nosnippet>512</a>    </span><span class="macro">eprintln!</span>(<span class="string">"[genesis] Lease mode — mind-driven when alive, autonomous fallback when silent."</span>);
-<a href=#513 id=513 data-nosnippet>513</a>    <span class="macro">eprintln!</span>(
-<a href=#514 id=514 data-nosnippet>514</a>        <span class="string">"[genesis] Mind holds a 3 s lease via reactive IPC; past it the daemon drives itself."
-<a href=#515 id=515 data-nosnippet>515</a>    </span>);
-<a href=#516 id=516 data-nosnippet>516</a>
-<a href=#517 id=517 data-nosnippet>517</a>    <span class="comment">// The main thread is the autonomous fallback. While the mind
-<a href=#518 id=518 data-nosnippet>518</a>    // drives through IPC (lease fresh), this loop does nothing but
-<a href=#519 id=519 data-nosnippet>519</a>    // staleness detection. Once the lease expires — stall, crash,
-<a href=#520 id=520 data-nosnippet>520</a>    // disconnect, or simply not yet connected — it drives physiology
-<a href=#521 id=521 data-nosnippet>521</a>    // itself (neurochemistry, consolidation, dreaming) so the system
-<a href=#522 id=522 data-nosnippet>522</a>    // keeps living instead of freezing. The mind modulates; absence
-<a href=#523 id=523 data-nosnippet>523</a>    // degrades to solitude, not to paused existence.
-<a href=#524 id=524 data-nosnippet>524</a>    //
-<a href=#525 id=525 data-nosnippet>525</a>    // Lock discipline: the IPC path locks LTM first, then the
-<a href=#526 id=526 data-nosnippet>526</a>    // TickLoop. The neuro advance below needs only the TickLoop (no
-<a href=#527 id=527 data-nosnippet>527</a>    // LTM), so it cannot deadlock. The memory phase below acquires
-<a href=#528 id=528 data-nosnippet>528</a>    // LTM first, then the TickLoop — the same order as IPC. Every
-<a href=#529 id=529 data-nosnippet>529</a>    // lock here is `try_lock`: the fallback never blocks a
-<a href=#530 id=530 data-nosnippet>530</a>    // mind-driven request; it skips the cycle instead.
-<a href=#531 id=531 data-nosnippet>531</a>    //
-<a href=#532 id=532 data-nosnippet>532</a>    // Deliberately excluded: body-control *application* (sysfs,
-<a href=#533 id=533 data-nosnippet>533</a>    // renice, EPP/boost). The fallback publishes the recommendation
-<a href=#534 id=534 data-nosnippet>534</a>    // and senses the body, but acting on the shared body stays a
-<a href=#535 id=535 data-nosnippet>535</a>    // mind-requested IPC, preserving cognition as the author of
-<a href=#536 id=536 data-nosnippet>536</a>    // outward action. Everything else the integrated tick does —
-<a href=#537 id=537 data-nosnippet>537</a>    // zone arbitration included — runs here, so no TickLoop method
-<a href=#538 id=538 data-nosnippet>538</a>    // only lives in the test-only reference path.
-<a href=#539 id=539 data-nosnippet>539</a>    // Adaptive wall-clock gates, not fixed Instant periods: each gear
-<a href=#540 id=540 data-nosnippet>540</a>    // spins at the rate its own signal demands, bounded so nothing
-<a href=#541 id=541 data-nosnippet>541</a>    // stalls or redlines (see src/daemon/adaptive.rs). Nominal
-<a href=#542 id=542 data-nosnippet>542</a>    // periods match the old constants; [min, max] is the operating
-<a href=#543 id=543 data-nosnippet>543</a>    // range the signal may move within.
-<a href=#544 id=544 data-nosnippet>544</a>    </span><span class="kw">use </span>genesis::daemon::AdaptiveGate;
-<a href=#545 id=545 data-nosnippet>545</a>    <span class="kw">let </span><span class="kw-2">mut </span>staleness_gate = AdaptiveGate::new(<span class="number">60_000</span>, <span class="number">10_000</span>, <span class="number">300_000</span>);
-<a href=#546 id=546 data-nosnippet>546</a>    <span class="kw">let </span><span class="kw-2">mut </span>assoc_gate = AdaptiveGate::new(<span class="number">10_000</span>, <span class="number">3_000</span>, <span class="number">60_000</span>);
-<a href=#547 id=547 data-nosnippet>547</a>    <span class="kw">let </span><span class="kw-2">mut </span>dream_gate = AdaptiveGate::new(<span class="number">4_000</span>, <span class="number">2_000</span>, <span class="number">30_000</span>);
-<a href=#548 id=548 data-nosnippet>548</a>    <span class="kw">let </span><span class="kw-2">mut </span>sensor_gate = AdaptiveGate::new(<span class="number">5_000</span>, <span class="number">2_000</span>, <span class="number">15_000</span>);
-<a href=#549 id=549 data-nosnippet>549</a>    <span class="kw">let </span><span class="kw-2">mut </span>sync_gate = AdaptiveGate::new(<span class="number">20_000</span>, <span class="number">5_000</span>, <span class="number">100_000</span>);
-<a href=#550 id=550 data-nosnippet>550</a>    <span class="kw">let </span><span class="kw-2">mut </span>body_gate = AdaptiveGate::new(<span class="number">10_000</span>, <span class="number">3_000</span>, <span class="number">30_000</span>);
-<a href=#551 id=551 data-nosnippet>551</a>    <span class="comment">// Zone arbitration nominally every few seconds past the lease —
-<a href=#552 id=552 data-nosnippet>552</a>    // intentions evolve slowly, and each pass writes a manifest
-<a href=#553 id=553 data-nosnippet>553</a>    // transaction plus a possible LTM trace.
-<a href=#554 id=554 data-nosnippet>554</a>    </span><span class="kw">let </span><span class="kw-2">mut </span>zone_gate = AdaptiveGate::new(<span class="number">5_000</span>, <span class="number">2_000</span>, <span class="number">30_000</span>);
-<a href=#555 id=555 data-nosnippet>555</a>    <span class="comment">// Eye ownership polls the optic reader's frame accounting — the
-<a href=#556 id=556 data-nosnippet>556</a>    // nerve itself is the rendezvous, no flag between the retina
-<a href=#557 id=557 data-nosnippet>557</a>    // process and the daemon.
-<a href=#558 id=558 data-nosnippet>558</a>    </span><span class="kw">let </span><span class="kw-2">mut </span>eye_gate = AdaptiveGate::new(<span class="number">1_000</span>, <span class="number">500</span>, <span class="number">10_000</span>);
-<a href=#559 id=559 data-nosnippet>559</a>    <span class="kw">let </span><span class="kw-2">mut </span>model_save_gate = AdaptiveGate::new(<span class="number">60_000</span>, <span class="number">20_000</span>, <span class="number">300_000</span>);
-<a href=#560 id=560 data-nosnippet>560</a>    <span class="kw">let </span><span class="kw-2">mut </span>last_model_save_ticks = <span class="number">0u32</span>;
-<a href=#561 id=561 data-nosnippet>561</a>    <span class="comment">// The fallback's own axle is adaptive too: deep NREM idles at
-<a href=#562 id=562 data-nosnippet>562</a>    // ~1 Hz, REM at 2 Hz, and anything else holds the 5 Hz reference
-<a href=#563 id=563 data-nosnippet>563</a>    // cadence the dynamics were tuned at.
-<a href=#564 id=564 data-nosnippet>564</a>    </span><span class="kw">let </span><span class="kw-2">mut </span>axle_ms: u64 = genesis::daemon::tick::AUTONOMOUS_INTERVAL_MS;
-<a href=#565 id=565 data-nosnippet>565</a>    <span class="kw">while </span>!shutdown_flag.load(std::sync::atomic::Ordering::Relaxed)
-<a href=#566 id=566 data-nosnippet>566</a>        &amp;&amp; !ipc_shutdown_flag.load(std::sync::atomic::Ordering::Relaxed)
-<a href=#567 id=567 data-nosnippet>567</a>    {
-<a href=#568 id=568 data-nosnippet>568</a>        std::thread::sleep(Duration::from_millis(axle_ms));
-<a href=#569 id=569 data-nosnippet>569</a>        <span class="kw">let </span>now_ms = genesis::daemon::tick::current_ms();
-<a href=#570 id=570 data-nosnippet>570</a>
-<a href=#571 id=571 data-nosnippet>571</a>        <span class="comment">// One read feeds the axle and the phase-driven gates below.
-<a href=#572 id=572 data-nosnippet>572</a>        </span><span class="kw">let </span>phase = mmap.read_consistent().map(|s| s.zones.phase());
-<a href=#573 id=573 data-nosnippet>573</a>        axle_ms = <span class="kw">match </span>phase {
-<a href=#574 id=574 data-nosnippet>574</a>            <span class="prelude-val">Some</span>(genesis::state::MentalPhase::NREM) =&gt; <span class="number">1_000</span>,
-<a href=#575 id=575 data-nosnippet>575</a>            <span class="prelude-val">Some</span>(genesis::state::MentalPhase::REM) =&gt; <span class="number">500</span>,
-<a href=#576 id=576 data-nosnippet>576</a>            <span class="kw">_ </span>=&gt; genesis::daemon::tick::AUTONOMOUS_INTERVAL_MS,
-<a href=#577 id=577 data-nosnippet>577</a>        };
-<a href=#578 id=578 data-nosnippet>578</a>
-<a href=#579 id=579 data-nosnippet>579</a>        <span class="comment">// Publish the fallback's own gears for GET_INTERNALS — one
-<a href=#580 id=580 data-nosnippet>580</a>        // snapshot per iteration, before any gate fires this pass.
-<a href=#581 id=581 data-nosnippet>581</a>        // Placed ahead of every `continue` below so the view stays
-<a href=#582 id=582 data-nosnippet>582</a>        // current whether or not the lease is held.
-<a href=#583 id=583 data-nosnippet>583</a>        </span><span class="kw">if let </span><span class="prelude-val">Ok</span>(<span class="kw-2">mut </span>snap) = auto_internals.lock() {
-<a href=#584 id=584 data-nosnippet>584</a>            snap.gates.clear();
-<a href=#585 id=585 data-nosnippet>585</a>            snap.gates.extend_from_slice(<span class="kw-2">&amp;</span>[
-<a href=#586 id=586 data-nosnippet>586</a>                (<span class="string">"staleness"</span>, staleness_gate.snapshot()),
-<a href=#587 id=587 data-nosnippet>587</a>                (<span class="string">"assoc"</span>, assoc_gate.snapshot()),
-<a href=#588 id=588 data-nosnippet>588</a>                (<span class="string">"dream"</span>, dream_gate.snapshot()),
-<a href=#589 id=589 data-nosnippet>589</a>                (<span class="string">"sensor"</span>, sensor_gate.snapshot()),
-<a href=#590 id=590 data-nosnippet>590</a>                (<span class="string">"sync"</span>, sync_gate.snapshot()),
-<a href=#591 id=591 data-nosnippet>591</a>                (<span class="string">"body"</span>, body_gate.snapshot()),
-<a href=#592 id=592 data-nosnippet>592</a>                (<span class="string">"zone"</span>, zone_gate.snapshot()),
-<a href=#593 id=593 data-nosnippet>593</a>                (<span class="string">"eye"</span>, eye_gate.snapshot()),
-<a href=#594 id=594 data-nosnippet>594</a>                (<span class="string">"model_save"</span>, model_save_gate.snapshot()),
-<a href=#595 id=595 data-nosnippet>595</a>            ]);
-<a href=#596 id=596 data-nosnippet>596</a>            snap.axle_ms = axle_ms;
-<a href=#597 id=597 data-nosnippet>597</a>            snap.last_model_save_ticks = last_model_save_ticks;
-<a href=#598 id=598 data-nosnippet>598</a>        }
-<a href=#599 id=599 data-nosnippet>599</a>
-<a href=#600 id=600 data-nosnippet>600</a>        <span class="comment">// Staleness detection runs regardless of lease — a crashed
-<a href=#601 id=601 data-nosnippet>601</a>        // mind's modules must read Stopped even while the fallback
-<a href=#602 id=602 data-nosnippet>602</a>        // keeps the body alive. A live mind warrants close watch; an
-<a href=#603 id=603 data-nosnippet>603</a>        // absent one drifts the check toward the ceiling.
-<a href=#604 id=604 data-nosnippet>604</a>        </span><span class="kw">if </span>staleness_gate.due(now_ms) {
-<a href=#605 id=605 data-nosnippet>605</a>            <span class="kw">match </span>tick_loop.try_lock() {
-<a href=#606 id=606 data-nosnippet>606</a>                <span class="prelude-val">Ok</span>(<span class="kw-2">mut </span>tl) =&gt; {
-<a href=#607 id=607 data-nosnippet>607</a>                    tl.check_staleness(<span class="kw-2">&amp;</span>mmap);
-<a href=#608 id=608 data-nosnippet>608</a>                    <span class="kw">if </span>tl.mind_lease_expired() {
-<a href=#609 id=609 data-nosnippet>609</a>                        staleness_gate.relax();
-<a href=#610 id=610 data-nosnippet>610</a>                    } <span class="kw">else </span>{
-<a href=#611 id=611 data-nosnippet>611</a>                        staleness_gate.demand();
-<a href=#612 id=612 data-nosnippet>612</a>                    }
-<a href=#613 id=613 data-nosnippet>613</a>                }
-<a href=#614 id=614 data-nosnippet>614</a>                <span class="prelude-val">Err</span>(e) =&gt; {
-<a href=#615 id=615 data-nosnippet>615</a>                    <span class="kw">if </span>lock_refusal(<span class="string">"tick_loop"</span>, e) {
-<a href=#616 id=616 data-nosnippet>616</a>                        fatal_if_poisoned(<span class="string">"tick_loop"</span>, <span class="kw-2">&amp;</span>shutdown_flag);
-<a href=#617 id=617 data-nosnippet>617</a>                    }
-<a href=#618 id=618 data-nosnippet>618</a>                }
-<a href=#619 id=619 data-nosnippet>619</a>            }
-<a href=#620 id=620 data-nosnippet>620</a>        }
-<a href=#621 id=621 data-nosnippet>621</a>
-<a href=#622 id=622 data-nosnippet>622</a>        <span class="comment">// Eye ownership, decided on the nerve rather than a flag.
-<a href=#623 id=623 data-nosnippet>623</a>        // Runs regardless of lease — whoever holds the camera, the
-<a href=#624 id=624 data-nosnippet>624</a>        // daemon watches its own reader's accounting: frames_seen &gt; 0
-<a href=#625 id=625 data-nosnippet>625</a>        // means a publisher existed; fresh means it still does. The
-<a href=#626 id=626 data-nosnippet>626</a>        // limb opens only once the grace window has passed with no
-<a href=#627 id=627 data-nosnippet>627</a>        // publisher, or a publisher that existed has gone silent —
-<a href=#628 id=628 data-nosnippet>628</a>        // a dead external retina hands the camera back instead of
-<a href=#629 id=629 data-nosnippet>629</a>        // leaving her blind. Once opened, the limb keeps the camera
-<a href=#630 id=630 data-nosnippet>630</a>        // for the daemon's life; a later retina backs off on EBUSY
-<a href=#631 id=631 data-nosnippet>631</a>        // and the first owner keeps the organ.
-<a href=#632 id=632 data-nosnippet>632</a>        </span><span class="kw">if </span>eye.is_none() &amp;&amp; eye_gate.due(now_ms) {
-<a href=#633 id=633 data-nosnippet>633</a>            <span class="kw">match </span>tick_loop.try_lock() {
-<a href=#634 id=634 data-nosnippet>634</a>                <span class="prelude-val">Ok</span>(tl) =&gt; {
-<a href=#635 id=635 data-nosnippet>635</a>                    <span class="kw">let </span>external_live = tl.optic.frames_seen() &gt; <span class="number">0 </span>&amp;&amp; tl.optic.fresh(now_ms);
-<a href=#636 id=636 data-nosnippet>636</a>                    <span class="kw">let </span>still_listening =
-<a href=#637 id=637 data-nosnippet>637</a>                        tl.optic.frames_seen() == <span class="number">0 </span>&amp;&amp; now_ms &lt; eye_grace_until_ms;
-<a href=#638 id=638 data-nosnippet>638</a>                    <span class="kw">if </span>!external_live &amp;&amp; !still_listening {
-<a href=#639 id=639 data-nosnippet>639</a>                        <span class="kw">if </span>tl.optic.frames_seen() &gt; <span class="number">0 </span>{
-<a href=#640 id=640 data-nosnippet>640</a>                            <span class="macro">eprintln!</span>(
-<a href=#641 id=641 data-nosnippet>641</a>                                <span class="string">"[genesis] eye: external retina stopped — the limb takes the camera"
-<a href=#642 id=642 data-nosnippet>642</a>                            </span>);
-<a href=#643 id=643 data-nosnippet>643</a>                        } <span class="kw">else </span>{
-<a href=#644 id=644 data-nosnippet>644</a>                            <span class="macro">eprintln!</span>(
-<a href=#645 id=645 data-nosnippet>645</a>                                <span class="string">"[genesis] eye: no retina claimed the nerve — the limb takes the camera"
-<a href=#646 id=646 data-nosnippet>646</a>                            </span>);
-<a href=#647 id=647 data-nosnippet>647</a>                        }
-<a href=#648 id=648 data-nosnippet>648</a>                        eye = <span class="prelude-val">Some</span>(genesis::daemon::optic_nerve::OpticCapture::start());
-<a href=#649 id=649 data-nosnippet>649</a>                    }
-<a href=#650 id=650 data-nosnippet>650</a>                }
-<a href=#651 id=651 data-nosnippet>651</a>                <span class="prelude-val">Err</span>(e) =&gt; {
-<a href=#652 id=652 data-nosnippet>652</a>                    <span class="kw">if </span>lock_refusal(<span class="string">"tick_loop"</span>, e) {
-<a href=#653 id=653 data-nosnippet>653</a>                        fatal_if_poisoned(<span class="string">"tick_loop"</span>, <span class="kw-2">&amp;</span>shutdown_flag);
-<a href=#654 id=654 data-nosnippet>654</a>                    }
-<a href=#655 id=655 data-nosnippet>655</a>                }
-<a href=#656 id=656 data-nosnippet>656</a>            }
-<a href=#657 id=657 data-nosnippet>657</a>        }
-<a href=#658 id=658 data-nosnippet>658</a>
-<a href=#659 id=659 data-nosnippet>659</a>        <span class="comment">// Lease check without holding the lock across work: peek,
-<a href=#660 id=660 data-nosnippet>660</a>        // then release. A mind driving at ~1 Hz keeps idle ~1 s;
-<a href=#661 id=661 data-nosnippet>661</a>        // the fallback fires only past 3 s of silence.
-<a href=#662 id=662 data-nosnippet>662</a>        </span><span class="kw">let </span>lease_expired = <span class="kw">match </span>tick_loop.try_lock() {
-<a href=#663 id=663 data-nosnippet>663</a>            <span class="prelude-val">Ok</span>(tl) =&gt; tl.mind_lease_expired(),
-<a href=#664 id=664 data-nosnippet>664</a>            <span class="prelude-val">Err</span>(e) =&gt; {
-<a href=#665 id=665 data-nosnippet>665</a>                <span class="comment">// Busy (mind driving) skips this cycle; poisoned
-<a href=#666 id=666 data-nosnippet>666</a>                // never clears, so it ends the daemon cleanly.
-<a href=#667 id=667 data-nosnippet>667</a>                </span><span class="kw">if </span>lock_refusal(<span class="string">"tick_loop"</span>, e) {
-<a href=#668 id=668 data-nosnippet>668</a>                    fatal_if_poisoned(<span class="string">"tick_loop"</span>, <span class="kw-2">&amp;</span>shutdown_flag);
-<a href=#669 id=669 data-nosnippet>669</a>                }
-<a href=#670 id=670 data-nosnippet>670</a>                <span class="kw">continue</span>;
-<a href=#671 id=671 data-nosnippet>671</a>            }
-<a href=#672 id=672 data-nosnippet>672</a>        };
-<a href=#673 id=673 data-nosnippet>673</a>        <span class="kw">if </span>!lease_expired {
-<a href=#674 id=674 data-nosnippet>674</a>            <span class="kw">continue</span>;
-<a href=#675 id=675 data-nosnippet>675</a>        }
-<a href=#676 id=676 data-nosnippet>676</a>
-<a href=#677 id=677 data-nosnippet>677</a>        <span class="comment">// ── Autonomous neurochemistry (TickLoop only, no LTM) ──
-<a href=#678 id=678 data-nosnippet>678</a>        // dt tracks real time since the last advance from ANY source
-<a href=#679 id=679 data-nosnippet>679</a>        // (mind or fallback), capped like the IPC path, so catch-up
-<a href=#680 id=680 data-nosnippet>680</a>        // after a stall never overshoots the integrator.
-<a href=#681 id=681 data-nosnippet>681</a>        </span>{
-<a href=#682 id=682 data-nosnippet>682</a>            <span class="kw">let </span><span class="kw-2">mut </span>tl = <span class="kw">match </span>tick_loop.try_lock() {
-<a href=#683 id=683 data-nosnippet>683</a>                <span class="prelude-val">Ok</span>(tl) =&gt; tl,
-<a href=#684 id=684 data-nosnippet>684</a>                <span class="prelude-val">Err</span>(e) =&gt; {
-<a href=#685 id=685 data-nosnippet>685</a>                    <span class="kw">if </span>lock_refusal(<span class="string">"tick_loop"</span>, e) {
-<a href=#686 id=686 data-nosnippet>686</a>                        fatal_if_poisoned(<span class="string">"tick_loop"</span>, <span class="kw-2">&amp;</span>shutdown_flag);
-<a href=#687 id=687 data-nosnippet>687</a>                    }
-<a href=#688 id=688 data-nosnippet>688</a>                    <span class="kw">continue</span>;
-<a href=#689 id=689 data-nosnippet>689</a>                }
-<a href=#690 id=690 data-nosnippet>690</a>            };
-<a href=#691 id=691 data-nosnippet>691</a>            <span class="comment">// Re-check under the lock: the mind may have driven
-<a href=#692 id=692 data-nosnippet>692</a>            // between the peek above and now.
-<a href=#693 id=693 data-nosnippet>693</a>            </span><span class="kw">if </span>!tl.mind_lease_expired() {
-<a href=#694 id=694 data-nosnippet>694</a>                <span class="kw">continue</span>;
-<a href=#695 id=695 data-nosnippet>695</a>            }
-<a href=#696 id=696 data-nosnippet>696</a>            <span class="comment">// No dt here either: the body measures its own elapsed time.
-<a href=#697 id=697 data-nosnippet>697</a>            </span>tl.advance_neuro(<span class="kw-2">&amp;</span>mmap);
-<a href=#698 id=698 data-nosnippet>698</a>        }
-<a href=#699 id=699 data-nosnippet>699</a>
-<a href=#700 id=700 data-nosnippet>700</a>        <span class="comment">// ── Autonomous memory + sensing (LTM first, then TickLoop:
-<a href=#701 id=701 data-nosnippet>701</a>        // same order as the IPC path, both try_lock) ──
-<a href=#702 id=702 data-nosnippet>702</a>        </span><span class="kw">let </span><span class="kw-2">mut </span>ltm_guard = <span class="kw">match </span>ltm.try_lock() {
-<a href=#703 id=703 data-nosnippet>703</a>            <span class="prelude-val">Ok</span>(g) =&gt; g,
-<a href=#704 id=704 data-nosnippet>704</a>            <span class="prelude-val">Err</span>(e) =&gt; {
-<a href=#705 id=705 data-nosnippet>705</a>                <span class="comment">// IPC owns LTM (physiology already advanced above) —
-<a href=#706 id=706 data-nosnippet>706</a>                // or it is poisoned, which never clears.
-<a href=#707 id=707 data-nosnippet>707</a>                </span>lock_refusal(<span class="string">"ltm"</span>, e);
-<a href=#708 id=708 data-nosnippet>708</a>                <span class="kw">continue</span>;
-<a href=#709 id=709 data-nosnippet>709</a>            }
-<a href=#710 id=710 data-nosnippet>710</a>        };
-<a href=#711 id=711 data-nosnippet>711</a>        <span class="kw">let </span><span class="kw-2">mut </span>tl = <span class="kw">match </span>tick_loop.try_lock() {
-<a href=#712 id=712 data-nosnippet>712</a>            <span class="prelude-val">Ok</span>(tl) =&gt; tl,
-<a href=#713 id=713 data-nosnippet>713</a>            <span class="prelude-val">Err</span>(e) =&gt; {
-<a href=#714 id=714 data-nosnippet>714</a>                <span class="comment">// Mind driving — the LTM guard drops by scope end.
-<a href=#715 id=715 data-nosnippet>715</a>                </span><span class="kw">if </span>lock_refusal(<span class="string">"tick_loop"</span>, e) {
-<a href=#716 id=716 data-nosnippet>716</a>                    fatal_if_poisoned(<span class="string">"tick_loop"</span>, <span class="kw-2">&amp;</span>shutdown_flag);
-<a href=#717 id=717 data-nosnippet>717</a>                }
-<a href=#718 id=718 data-nosnippet>718</a>                <span class="kw">continue</span>;
-<a href=#719 id=719 data-nosnippet>719</a>            }
-<a href=#720 id=720 data-nosnippet>720</a>        };
-<a href=#721 id=721 data-nosnippet>721</a>        <span class="comment">// The mind may have returned while we acquired locks.
-<a href=#722 id=722 data-nosnippet>722</a>        </span><span class="kw">if </span>!tl.mind_lease_expired() {
-<a href=#723 id=723 data-nosnippet>723</a>            <span class="kw">continue</span>;
-<a href=#724 id=724 data-nosnippet>724</a>        }
-<a href=#725 id=725 data-nosnippet>725</a>        <span class="comment">// LTMStore derefs through the InhibitionGuard; the granular
-<a href=#726 id=726 data-nosnippet>726</a>        // TickLoop methods take `&amp;mut LtmStore`.
-<a href=#727 id=727 data-nosnippet>727</a>        </span><span class="kw">let </span>ltm_store: <span class="kw-2">&amp;mut </span>LtmStore = <span class="kw-2">&amp;mut </span>ltm_guard;
-<a href=#728 id=728 data-nosnippet>728</a>        <span class="comment">// Consolidation is self-gating (plasticity, overwhelm, empty
-<a href=#729 id=729 data-nosnippet>729</a>        // STM) — call whenever autonomous and let it decide.
-<a href=#730 id=730 data-nosnippet>730</a>        </span>tl.consolidate(<span class="kw-2">&amp;</span>mmap, <span class="kw-2">&amp;</span>stm, ltm_store);
-<a href=#731 id=731 data-nosnippet>731</a>        <span class="kw">if </span>assoc_gate.due(now_ms) {
-<a href=#732 id=732 data-nosnippet>732</a>            <span class="kw">if </span>tl.associate(<span class="kw-2">&amp;</span>mmap, ltm_store) &gt; <span class="number">0 </span>{
-<a href=#733 id=733 data-nosnippet>733</a>                assoc_gate.demand();
-<a href=#734 id=734 data-nosnippet>734</a>            } <span class="kw">else </span>{
-<a href=#735 id=735 data-nosnippet>735</a>                assoc_gate.relax();
-<a href=#736 id=736 data-nosnippet>736</a>            }
-<a href=#737 id=737 data-nosnippet>737</a>        }
-<a href=#738 id=738 data-nosnippet>738</a>        <span class="comment">// Dream only when sleeping — the body's own phase is the gate,
-<a href=#739 id=739 data-nosnippet>739</a>        // so waking autonomous never dreams. REM snaps the gate fast;
-<a href=#740 id=740 data-nosnippet>740</a>        // NREM drifts it sparse; waking relaxes it toward its ceiling.
-<a href=#741 id=741 data-nosnippet>741</a>        </span><span class="kw">if </span>dream_gate.due(now_ms) {
-<a href=#742 id=742 data-nosnippet>742</a>            <span class="kw">use </span>genesis::state::MentalPhase;
-<a href=#743 id=743 data-nosnippet>743</a>            <span class="kw">let </span>sleeping = phase.is_some_and(|p| p == MentalPhase::NREM || p == MentalPhase::REM);
-<a href=#744 id=744 data-nosnippet>744</a>            <span class="kw">if </span>sleeping {
-<a href=#745 id=745 data-nosnippet>745</a>                tl.dream(<span class="kw-2">&amp;</span>mmap, ltm_store);
-<a href=#746 id=746 data-nosnippet>746</a>                <span class="kw">if </span>phase == <span class="prelude-val">Some</span>(MentalPhase::REM) {
-<a href=#747 id=747 data-nosnippet>747</a>                    dream_gate.demand();
-<a href=#748 id=748 data-nosnippet>748</a>                } <span class="kw">else </span>{
-<a href=#749 id=749 data-nosnippet>749</a>                    dream_gate.relax();
-<a href=#750 id=750 data-nosnippet>750</a>                }
-<a href=#751 id=751 data-nosnippet>751</a>            } <span class="kw">else </span>{
-<a href=#752 id=752 data-nosnippet>752</a>                dream_gate.relax();
-<a href=#753 id=753 data-nosnippet>753</a>            }
-<a href=#754 id=754 data-nosnippet>754</a>        }
-<a href=#755 id=755 data-nosnippet>755</a>        <span class="kw">if </span>sensor_gate.due(now_ms) {
-<a href=#756 id=756 data-nosnippet>756</a>            <span class="kw">let </span>body = tl.read_sensors(<span class="kw-2">&amp;</span>mmap);
-<a href=#757 id=757 data-nosnippet>757</a>            <span class="comment">// The brainstem-level interoceptive reflex. With the
-<a href=#758 id=758 data-nosnippet>758</a>            // mind's lease expired there is no cortex on the wire
-<a href=#759 id=759 data-nosnippet>759</a>            // to perceive the body, so the body applies its own
-<a href=#760 id=760 data-nosnippet>760</a>            // afferent spec directly — the NTS/parabrachial →
-<a href=#761 id=761 data-nosnippet>761</a>            // autonomic loop that runs below cortex in every animal
-<a href=#762 id=762 data-nosnippet>762</a>            // (lamina I → catecholamine cell groups → hypothalamic
-<a href=#763 id=763 data-nosnippet>763</a>            // neuroendocrine; PBN → preoptic drive). When the lease
-<a href=#764 id=764 data-nosnippet>764</a>            // IS held this block never runs: the same BodyState is
-<a href=#765 id=765 data-nosnippet>765</a>            // published for the mind's own brainstem relay, which
-<a href=#766 id=766 data-nosnippet>766</a>            // routes it through the regions — the daemon never
-<a href=#767 id=767 data-nosnippet>767</a>            // double-drives a response the mind is authoring.
-<a href=#768 id=768 data-nosnippet>768</a>            </span><span class="kw">if let </span><span class="prelude-val">Err</span>(e) = mmap.modify(now_ms, |state| {
-<a href=#769 id=769 data-nosnippet>769</a>                <span class="kw">for </span>(id, mag) <span class="kw">in </span>tl.interoceptor.neuro_impulses(<span class="kw-2">&amp;</span>body, <span class="kw-2">&amp;</span>state.neurochemicals) {
-<a href=#770 id=770 data-nosnippet>770</a>                    state.neurochemicals.apply_impulse(id, mag, now_ms);
-<a href=#771 id=771 data-nosnippet>771</a>                }
-<a href=#772 id=772 data-nosnippet>772</a>            }) {
-<a href=#773 id=773 data-nosnippet>773</a>                <span class="macro">eprintln!</span>(<span class="string">"[genesis] WARNING: interoceptive reflex failed: {e}"</span>);
-<a href=#774 id=774 data-nosnippet>774</a>            }
-<a href=#775 id=775 data-nosnippet>775</a>            <span class="comment">// Strain on the just-read body shapes the next poll:
-<a href=#776 id=776 data-nosnippet>776</a>            // a pressured substrate is watched closely.
-<a href=#777 id=777 data-nosnippet>777</a>            </span>sensor_gate.drive(
-<a href=#778 id=778 data-nosnippet>778</a>                body.stress_load
-<a href=#779 id=779 data-nosnippet>779</a>                    .max(body.psi_cpu)
-<a href=#780 id=780 data-nosnippet>780</a>                    .max(body.psi_mem)
-<a href=#781 id=781 data-nosnippet>781</a>                    .max(body.throttle_state),
-<a href=#782 id=782 data-nosnippet>782</a>            );
-<a href=#783 id=783 data-nosnippet>783</a>        }
-<a href=#784 id=784 data-nosnippet>784</a>        <span class="comment">// Intention expiry + zone arbitration + trace. Sleep drifts
-<a href=#785 id=785 data-nosnippet>785</a>        // the cadence — few zone decisions arrive while dreaming;
-<a href=#786 id=786 data-nosnippet>786</a>        // wake keeps it near the nominal few seconds. Skipped while
-<a href=#787 id=787 data-nosnippet>787</a>        // the mind holds the lease by the outer check.
-<a href=#788 id=788 data-nosnippet>788</a>        </span>zone_gate.drive(<span class="kw">match </span>phase {
-<a href=#789 id=789 data-nosnippet>789</a>            <span class="prelude-val">Some</span>(genesis::state::MentalPhase::NREM) =&gt; <span class="number">0.0</span>,
-<a href=#790 id=790 data-nosnippet>790</a>            <span class="prelude-val">Some</span>(genesis::state::MentalPhase::REM) =&gt; <span class="number">0.3</span>,
-<a href=#791 id=791 data-nosnippet>791</a>            <span class="kw">_ </span>=&gt; <span class="number">1.0</span>,
-<a href=#792 id=792 data-nosnippet>792</a>        });
-<a href=#793 id=793 data-nosnippet>793</a>        <span class="kw">if </span>zone_gate.due(now_ms) {
-<a href=#794 id=794 data-nosnippet>794</a>            tl.arbitrate_zone(<span class="kw-2">&amp;</span>mmap, ltm_store);
-<a href=#795 id=795 data-nosnippet>795</a>        }
-<a href=#796 id=796 data-nosnippet>796</a>        <span class="comment">// Guards drop here (LTM, then TickLoop).
-<a href=#797 id=797 data-nosnippet>797</a>        </span>drop(tl);
-<a href=#798 id=798 data-nosnippet>798</a>        drop(ltm_guard);
-<a href=#799 id=799 data-nosnippet>799</a>
-<a href=#800 id=800 data-nosnippet>800</a>        <span class="comment">// Body-control recommendation publish (compute + publish
-<a href=#801 id=801 data-nosnippet>801</a>        // only — never application). Needs the TickLoop alone.
-<a href=#802 id=802 data-nosnippet>802</a>        </span><span class="kw">if </span>body_gate.due(now_ms) {
-<a href=#803 id=803 data-nosnippet>803</a>            <span class="kw">match </span>tick_loop.try_lock() {
-<a href=#804 id=804 data-nosnippet>804</a>                <span class="prelude-val">Ok</span>(<span class="kw-2">mut </span>tl) <span class="kw">if </span>tl.mind_lease_expired() =&gt; {
-<a href=#805 id=805 data-nosnippet>805</a>                    tl.publish_body_recommendation(<span class="kw-2">&amp;</span>mmap);
-<a href=#806 id=806 data-nosnippet>806</a>                    <span class="comment">// Thermal/throttle pressure on the last-read body
-<a href=#807 id=807 data-nosnippet>807</a>                    // revisits policy sooner; a cool machine drifts.
-<a href=#808 id=808 data-nosnippet>808</a>                    </span><span class="kw">let </span>b = <span class="kw-2">&amp;</span>tl.last_body_state;
-<a href=#809 id=809 data-nosnippet>809</a>                    body_gate.drive(
-<a href=#810 id=810 data-nosnippet>810</a>                        b.throttle_state
-<a href=#811 id=811 data-nosnippet>811</a>                            .max(b.thermoregulatory_effort)
-<a href=#812 id=812 data-nosnippet>812</a>                            .max(b.psi_cpu),
-<a href=#813 id=813 data-nosnippet>813</a>                    );
-<a href=#814 id=814 data-nosnippet>814</a>                }
-<a href=#815 id=815 data-nosnippet>815</a>                <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; {}
-<a href=#816 id=816 data-nosnippet>816</a>                <span class="prelude-val">Err</span>(e) =&gt; {
-<a href=#817 id=817 data-nosnippet>817</a>                    <span class="kw">if </span>lock_refusal(<span class="string">"tick_loop"</span>, e) {
-<a href=#818 id=818 data-nosnippet>818</a>                        fatal_if_poisoned(<span class="string">"tick_loop"</span>, <span class="kw-2">&amp;</span>shutdown_flag);
-<a href=#819 id=819 data-nosnippet>819</a>                    }
-<a href=#820 id=820 data-nosnippet>820</a>                }
-<a href=#821 id=821 data-nosnippet>821</a>            }
-<a href=#822 id=822 data-nosnippet>822</a>        }
-<a href=#823 id=823 data-nosnippet>823</a>
-<a href=#824 id=824 data-nosnippet>824</a>        <span class="comment">// Generative-model checkpoint so autonomous learning is
-<a href=#825 id=825 data-nosnippet>825</a>        // durable. The mind saves every 60 s while alive; this covers
-<a href=#826 id=826 data-nosnippet>826</a>        // mindless stretches. Shutdown always saves regardless.
-<a href=#827 id=827 data-nosnippet>827</a>        // Demand follows learning: new inference ticks mean new model
-<a href=#828 id=828 data-nosnippet>828</a>        // state worth persisting; an unchanged engine relaxes.
-<a href=#829 id=829 data-nosnippet>829</a>        </span><span class="kw">if </span>model_save_gate.due(now_ms) {
-<a href=#830 id=830 data-nosnippet>830</a>            <span class="kw">match </span>tick_loop.try_lock() {
-<a href=#831 id=831 data-nosnippet>831</a>                <span class="prelude-val">Ok</span>(tl) <span class="kw">if </span>tl.mind_lease_expired() =&gt; {
-<a href=#832 id=832 data-nosnippet>832</a>                    <span class="kw">if </span>tl.inference_engine.tick_count() != last_model_save_ticks {
-<a href=#833 id=833 data-nosnippet>833</a>                        <span class="kw">if </span>!tl.save_inference_model(<span class="kw-2">&amp;</span>config.data_dir) {
-<a href=#834 id=834 data-nosnippet>834</a>                            <span class="macro">eprintln!</span>(<span class="string">"[genesis] WARNING: autonomous inference save failed"</span>);
-<a href=#835 id=835 data-nosnippet>835</a>                        }
-<a href=#836 id=836 data-nosnippet>836</a>                        last_model_save_ticks = tl.inference_engine.tick_count();
-<a href=#837 id=837 data-nosnippet>837</a>                        model_save_gate.demand();
-<a href=#838 id=838 data-nosnippet>838</a>                    } <span class="kw">else </span>{
-<a href=#839 id=839 data-nosnippet>839</a>                        model_save_gate.relax();
-<a href=#840 id=840 data-nosnippet>840</a>                    }
-<a href=#841 id=841 data-nosnippet>841</a>                }
-<a href=#842 id=842 data-nosnippet>842</a>                <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; {}
-<a href=#843 id=843 data-nosnippet>843</a>                <span class="prelude-val">Err</span>(e) =&gt; {
-<a href=#844 id=844 data-nosnippet>844</a>                    <span class="kw">if </span>lock_refusal(<span class="string">"tick_loop"</span>, e) {
-<a href=#845 id=845 data-nosnippet>845</a>                        fatal_if_poisoned(<span class="string">"tick_loop"</span>, <span class="kw-2">&amp;</span>shutdown_flag);
-<a href=#846 id=846 data-nosnippet>846</a>                    }
-<a href=#847 id=847 data-nosnippet>847</a>                }
-<a href=#848 id=848 data-nosnippet>848</a>            }
-<a href=#849 id=849 data-nosnippet>849</a>        }
-<a href=#850 id=850 data-nosnippet>850</a>
-<a href=#851 id=851 data-nosnippet>851</a>        <span class="comment">// Periodic non-blocking flush so autonomous life is durable.
-<a href=#852 id=852 data-nosnippet>852</a>        // Shutdown and explicit SYNC still use the blocking path.
-<a href=#853 id=853 data-nosnippet>853</a>        // Plasticity drives the period — same continuous form as the
-<a href=#854 id=854 data-nosnippet>854</a>        // integrated tick's sync gate.
-<a href=#855 id=855 data-nosnippet>855</a>        </span><span class="kw">let </span>plasticity = mmap
-<a href=#856 id=856 data-nosnippet>856</a>            .read_consistent()
-<a href=#857 id=857 data-nosnippet>857</a>            .map(|s| s.memory.plasticity_gate)
-<a href=#858 id=858 data-nosnippet>858</a>            .unwrap_or(<span class="number">0.5</span>);
-<a href=#859 id=859 data-nosnippet>859</a>        sync_gate.drive(plasticity);
-<a href=#860 id=860 data-nosnippet>860</a>        <span class="kw">if </span>sync_gate.due(now_ms) {
-<a href=#861 id=861 data-nosnippet>861</a>            <span class="kw">let _ </span>= mmap.sync_async();
-<a href=#862 id=862 data-nosnippet>862</a>        }
-<a href=#863 id=863 data-nosnippet>863</a>    }
-<a href=#864 id=864 data-nosnippet>864</a>
-<a href=#865 id=865 data-nosnippet>865</a>    <span class="comment">// The wait can end via either flag — signals set `shutdown_flag`,
-<a href=#866 id=866 data-nosnippet>866</a>    // an IPC SHUTDOWN command sets `ipc_shutdown_flag`. Normalize so
-<a href=#867 id=867 data-nosnippet>867</a>    // the auxiliary threads (which watch `shutdown_flag`) exit too;
-<a href=#868 id=868 data-nosnippet>868</a>    // otherwise an IPC-initiated shutdown would hang the joins below
-<a href=#869 id=869 data-nosnippet>869</a>    // before the final state sync.
-<a href=#870 id=870 data-nosnippet>870</a>    </span>shutdown_flag.store(<span class="bool-val">true</span>, std::sync::atomic::Ordering::Relaxed);
-<a href=#871 id=871 data-nosnippet>871</a>
-<a href=#872 id=872 data-nosnippet>872</a>    <span class="comment">// Shutdown sequence
-<a href=#873 id=873 data-nosnippet>873</a>    </span><span class="macro">eprintln!</span>(<span class="string">"[genesis] Shutting down..."</span>);
-<a href=#874 id=874 data-nosnippet>874</a>
-<a href=#875 id=875 data-nosnippet>875</a>    <span class="comment">// Close the eye first so no reader attaches to a dead nerve — the
-<a href=#876 id=876 data-nosnippet>876</a>    // limb's thread is reaped by process exit if it is still blocked
-<a href=#877 id=877 data-nosnippet>877</a>    // in the driver's dequeue. `None` when an external retina owned
-<a href=#878 id=878 data-nosnippet>878</a>    // the nerve to the end, or none ever did.
-<a href=#879 id=879 data-nosnippet>879</a>    </span><span class="kw">if let </span><span class="prelude-val">Some</span>(eye) = eye.take() {
-<a href=#880 id=880 data-nosnippet>880</a>        eye.stop();
-<a href=#881 id=881 data-nosnippet>881</a>    }
-<a href=#882 id=882 data-nosnippet>882</a>
-<a href=#883 id=883 data-nosnippet>883</a>    <span class="comment">// Restore the host's CPU policy captured at startup. This runs
-<a href=#884 id=884 data-nosnippet>884</a>    // before the sync block below (which can bail out on a poisoned
-<a href=#885 id=885 data-nosnippet>885</a>    // LTM mutex), so the machine is never left pinned to a throttled
-<a href=#886 id=886 data-nosnippet>886</a>    // governor. It runs only after it has stopped — it cannot affect
-<a href=#887 id=887 data-nosnippet>887</a>    // its running state.
-<a href=#888 id=888 data-nosnippet>888</a>    </span><span class="kw">if </span>genesis::daemon::cpufreq::restore_hardware_state() {
-<a href=#889 id=889 data-nosnippet>889</a>        <span class="macro">eprintln!</span>(<span class="string">"[genesis] Host CPU policy restored."</span>);
-<a href=#890 id=890 data-nosnippet>890</a>    } <span class="kw">else if </span>genesis::daemon::cpufreq::policy_was_applied() {
-<a href=#891 id=891 data-nosnippet>891</a>        <span class="comment">// The alarming case, and the only one worth shouting about: we
-<a href=#892 id=892 data-nosnippet>892</a>        // did change the host and could not put it back, so the machine
-<a href=#893 id=893 data-nosnippet>893</a>        // outlives us pinned to a throttle. Reported unconditionally
-<a href=#894 id=894 data-nosnippet>894</a>        // rather than through the deduplicating helper so it survives
-<a href=#895 id=895 data-nosnippet>895</a>        // an earlier same-cause log.
-<a href=#896 id=896 data-nosnippet>896</a>        </span><span class="macro">eprintln!</span>(
-<a href=#897 id=897 data-nosnippet>897</a>            <span class="string">"[genesis] WARNING: host CPU policy was NOT restored — this machine may \
-<a href=#898 id=898 data-nosnippet>898</a>             be left at the throttled governor Genesis applied. Check that \
-<a href=#899 id=899 data-nosnippet>899</a>             passwordless sudo still works (`sudo -n true`)."
-<a href=#900 id=900 data-nosnippet>900</a>        </span>);
-<a href=#901 id=901 data-nosnippet>901</a>    } <span class="kw">else </span>{
-<a href=#902 id=902 data-nosnippet>902</a>        <span class="comment">// Nothing was ever applied, so there is nothing to restore. This
-<a href=#903 id=903 data-nosnippet>903</a>        // is the ordinary case on a machine where the sudo grant was
-<a href=#904 id=904 data-nosnippet>904</a>        // never installed, and warning about a throttle we never applied
-<a href=#905 id=905 data-nosnippet>905</a>        // would be a false alarm on every shutdown.
-<a href=#906 id=906 data-nosnippet>906</a>        </span><span class="macro">eprintln!</span>(<span class="string">"[genesis] Host CPU policy unchanged — nothing was applied, nothing to restore."</span>);
+<a href=#209 id=209 data-nosnippet>209</a><span class="kw">fn </span>main() {
+<a href=#210 id=210 data-nosnippet>210</a>    <span class="kw">let </span>config = parse_args();
+<a href=#211 id=211 data-nosnippet>211</a>
+<a href=#212 id=212 data-nosnippet>212</a>    <span class="comment">// Snapshot the host's CPU policy before Genesis applies anything, so
+<a href=#213 id=213 data-nosnippet>213</a>    // it can be restored on shutdown. Read-only and idempotent — this
+<a href=#214 id=214 data-nosnippet>214</a>    // never affects its running state.
+<a href=#215 id=215 data-nosnippet>215</a>    </span>genesis::daemon::cpufreq::capture_hardware_state();
+<a href=#216 id=216 data-nosnippet>216</a>
+<a href=#217 id=217 data-nosnippet>217</a>    <span class="comment">// Create the data directory if it doesn't exist
+<a href=#218 id=218 data-nosnippet>218</a>    </span><span class="kw">if </span>!config.data_dir.exists()
+<a href=#219 id=219 data-nosnippet>219</a>        &amp;&amp; <span class="kw">let </span><span class="prelude-val">Err</span>(e) = std::fs::create_dir_all(<span class="kw-2">&amp;</span>config.data_dir)
+<a href=#220 id=220 data-nosnippet>220</a>    {
+<a href=#221 id=221 data-nosnippet>221</a>        <span class="macro">eprintln!</span>(
+<a href=#222 id=222 data-nosnippet>222</a>            <span class="string">"[genesis] FATAL: failed to create data directory {}: {e}"</span>,
+<a href=#223 id=223 data-nosnippet>223</a>            config.data_dir.display()
+<a href=#224 id=224 data-nosnippet>224</a>        );
+<a href=#225 id=225 data-nosnippet>225</a>        std::process::exit(<span class="number">1</span>);
+<a href=#226 id=226 data-nosnippet>226</a>    }
+<a href=#227 id=227 data-nosnippet>227</a>
+<a href=#228 id=228 data-nosnippet>228</a>    <span class="kw">let </span>state_path = config.data_dir.join(<span class="string">"core_state.bin"</span>);
+<a href=#229 id=229 data-nosnippet>229</a>    <span class="kw">let </span>stm_path = config.data_dir.join(<span class="string">"stm_ring.bin"</span>);
+<a href=#230 id=230 data-nosnippet>230</a>    <span class="kw">let </span>ltm_base = config.data_dir.join(<span class="string">"ltm_store"</span>);
+<a href=#231 id=231 data-nosnippet>231</a>
+<a href=#232 id=232 data-nosnippet>232</a>    <span class="comment">// Open or create the stores
+<a href=#233 id=233 data-nosnippet>233</a>    </span><span class="macro">eprintln!</span>(<span class="string">"[genesis] Initializing subcognitive..."</span>);
+<a href=#234 id=234 data-nosnippet>234</a>    <span class="macro">eprintln!</span>(<span class="string">"[genesis]   data dir:    {}"</span>, config.data_dir.display());
+<a href=#235 id=235 data-nosnippet>235</a>    <span class="macro">eprintln!</span>(<span class="string">"[genesis]   state file:  {}"</span>, state_path.display());
+<a href=#236 id=236 data-nosnippet>236</a>    <span class="macro">eprintln!</span>(<span class="string">"[genesis]   stm file:    {}"</span>, stm_path.display());
+<a href=#237 id=237 data-nosnippet>237</a>    <span class="macro">eprintln!</span>(
+<a href=#238 id=238 data-nosnippet>238</a>        <span class="string">"[genesis]   ltm base:    {}.{{bundles,meta,dat}}"</span>,
+<a href=#239 id=239 data-nosnippet>239</a>        ltm_base.display()
+<a href=#240 id=240 data-nosnippet>240</a>    );
+<a href=#241 id=241 data-nosnippet>241</a>    <span class="macro">eprintln!</span>(<span class="string">"[genesis]   socket:      {}"</span>, config.socket_path.display());
+<a href=#242 id=242 data-nosnippet>242</a>
+<a href=#243 id=243 data-nosnippet>243</a>    <span class="kw">let </span>now_ms = std::time::SystemTime::now()
+<a href=#244 id=244 data-nosnippet>244</a>        .duration_since(std::time::UNIX_EPOCH)
+<a href=#245 id=245 data-nosnippet>245</a>        .map(|d| d.as_millis() <span class="kw">as </span>u64)
+<a href=#246 id=246 data-nosnippet>246</a>        .unwrap_or(<span class="number">0</span>);
+<a href=#247 id=247 data-nosnippet>247</a>    <span class="kw">let </span>mmap = <span class="kw">match </span>MmapState::open(<span class="kw-2">&amp;</span>state_path) {
+<a href=#248 id=248 data-nosnippet>248</a>        <span class="prelude-val">Ok</span>(m) =&gt; m,
+<a href=#249 id=249 data-nosnippet>249</a>        <span class="prelude-val">Err</span>(genesis::store::StateFileError::NotFound) =&gt; {
+<a href=#250 id=250 data-nosnippet>250</a>            <span class="kw">match </span>MmapState::create(<span class="kw-2">&amp;</span>state_path, now_ms, now_ms) {
+<a href=#251 id=251 data-nosnippet>251</a>                <span class="prelude-val">Ok</span>(m) =&gt; m,
+<a href=#252 id=252 data-nosnippet>252</a>                <span class="prelude-val">Err</span>(e) =&gt; {
+<a href=#253 id=253 data-nosnippet>253</a>                    <span class="macro">eprintln!</span>(
+<a href=#254 id=254 data-nosnippet>254</a>                        <span class="string">"[genesis] FATAL: failed to create core state {}: {e}"</span>,
+<a href=#255 id=255 data-nosnippet>255</a>                        state_path.display()
+<a href=#256 id=256 data-nosnippet>256</a>                    );
+<a href=#257 id=257 data-nosnippet>257</a>                    std::process::exit(<span class="number">1</span>);
+<a href=#258 id=258 data-nosnippet>258</a>                }
+<a href=#259 id=259 data-nosnippet>259</a>            }
+<a href=#260 id=260 data-nosnippet>260</a>        }
+<a href=#261 id=261 data-nosnippet>261</a>        <span class="comment">// An unreadable state file (truncated, foreign, or checksum-
+<a href=#262 id=262 data-nosnippet>262</a>        // corrupt) would otherwise FATAL-loop forever: every restart
+<a href=#263 id=263 data-nosnippet>263</a>        // hits the same verification failure. Rename it aside — it is
+<a href=#264 id=264 data-nosnippet>264</a>        // preserved for forensics, never silently destroyed — and
+<a href=#265 id=265 data-nosnippet>265</a>        // rebuild a fresh state. I/O, lock, and mmap failures are
+<a href=#266 id=266 data-nosnippet>266</a>        // environmental and still fatal: recreating cannot fix them.
+<a href=#267 id=267 data-nosnippet>267</a>        </span><span class="prelude-val">Err</span>(
+<a href=#268 id=268 data-nosnippet>268</a>            e @ (genesis::store::StateFileError::VerificationFailed(<span class="kw">_</span>)
+<a href=#269 id=269 data-nosnippet>269</a>            | genesis::store::StateFileError::FileTooSmall { .. }),
+<a href=#270 id=270 data-nosnippet>270</a>        ) =&gt; {
+<a href=#271 id=271 data-nosnippet>271</a>            <span class="kw">let </span>quarantine = state_path.with_extension(<span class="macro">format!</span>(<span class="string">"corrupt.{now_ms}"</span>));
+<a href=#272 id=272 data-nosnippet>272</a>            <span class="macro">eprintln!</span>(
+<a href=#273 id=273 data-nosnippet>273</a>                <span class="string">"[genesis] core state {} is unrecoverable ({e}); archiving to {}"</span>,
+<a href=#274 id=274 data-nosnippet>274</a>                state_path.display(),
+<a href=#275 id=275 data-nosnippet>275</a>                quarantine.display()
+<a href=#276 id=276 data-nosnippet>276</a>            );
+<a href=#277 id=277 data-nosnippet>277</a>            <span class="kw">if let </span><span class="prelude-val">Err</span>(rename_err) = std::fs::rename(<span class="kw-2">&amp;</span>state_path, <span class="kw-2">&amp;</span>quarantine) {
+<a href=#278 id=278 data-nosnippet>278</a>                <span class="macro">eprintln!</span>(
+<a href=#279 id=279 data-nosnippet>279</a>                    <span class="string">"[genesis] FATAL: could not archive unrecoverable state {}: {rename_err}"</span>,
+<a href=#280 id=280 data-nosnippet>280</a>                    state_path.display()
+<a href=#281 id=281 data-nosnippet>281</a>                );
+<a href=#282 id=282 data-nosnippet>282</a>                std::process::exit(<span class="number">1</span>);
+<a href=#283 id=283 data-nosnippet>283</a>            }
+<a href=#284 id=284 data-nosnippet>284</a>            <span class="kw">match </span>MmapState::create(<span class="kw-2">&amp;</span>state_path, now_ms, now_ms) {
+<a href=#285 id=285 data-nosnippet>285</a>                <span class="prelude-val">Ok</span>(m) =&gt; m,
+<a href=#286 id=286 data-nosnippet>286</a>                <span class="prelude-val">Err</span>(e) =&gt; {
+<a href=#287 id=287 data-nosnippet>287</a>                    <span class="macro">eprintln!</span>(
+<a href=#288 id=288 data-nosnippet>288</a>                        <span class="string">"[genesis] FATAL: failed to rebuild core state {}: {e}"</span>,
+<a href=#289 id=289 data-nosnippet>289</a>                        state_path.display()
+<a href=#290 id=290 data-nosnippet>290</a>                    );
+<a href=#291 id=291 data-nosnippet>291</a>                    std::process::exit(<span class="number">1</span>);
+<a href=#292 id=292 data-nosnippet>292</a>                }
+<a href=#293 id=293 data-nosnippet>293</a>            }
+<a href=#294 id=294 data-nosnippet>294</a>        }
+<a href=#295 id=295 data-nosnippet>295</a>        <span class="prelude-val">Err</span>(e) =&gt; {
+<a href=#296 id=296 data-nosnippet>296</a>            <span class="macro">eprintln!</span>(
+<a href=#297 id=297 data-nosnippet>297</a>                <span class="string">"[genesis] FATAL: failed to open core state {}: {e}"</span>,
+<a href=#298 id=298 data-nosnippet>298</a>                state_path.display()
+<a href=#299 id=299 data-nosnippet>299</a>            );
+<a href=#300 id=300 data-nosnippet>300</a>            std::process::exit(<span class="number">1</span>);
+<a href=#301 id=301 data-nosnippet>301</a>        }
+<a href=#302 id=302 data-nosnippet>302</a>    };
+<a href=#303 id=303 data-nosnippet>303</a>    <span class="kw">let </span>stm = <span class="kw">match </span>RingBuffer::open_or_create(<span class="kw-2">&amp;</span>stm_path, config.stm_capacity) {
+<a href=#304 id=304 data-nosnippet>304</a>        <span class="prelude-val">Ok</span>(s) =&gt; s,
+<a href=#305 id=305 data-nosnippet>305</a>        <span class="prelude-val">Err</span>(e) =&gt; {
+<a href=#306 id=306 data-nosnippet>306</a>            <span class="macro">eprintln!</span>(
+<a href=#307 id=307 data-nosnippet>307</a>                <span class="string">"[genesis] FATAL: failed to open STM ring buffer {}: {e}"</span>,
+<a href=#308 id=308 data-nosnippet>308</a>                stm_path.display()
+<a href=#309 id=309 data-nosnippet>309</a>            );
+<a href=#310 id=310 data-nosnippet>310</a>            std::process::exit(<span class="number">1</span>);
+<a href=#311 id=311 data-nosnippet>311</a>        }
+<a href=#312 id=312 data-nosnippet>312</a>    };
+<a href=#313 id=313 data-nosnippet>313</a>    <span class="kw">let </span>ltm = <span class="kw">match </span>LtmStore::open_or_create(<span class="kw-2">&amp;</span>ltm_base, config.ltm_capacity) {
+<a href=#314 id=314 data-nosnippet>314</a>        <span class="prelude-val">Ok</span>(l) =&gt; l,
+<a href=#315 id=315 data-nosnippet>315</a>        <span class="prelude-val">Err</span>(e) =&gt; {
+<a href=#316 id=316 data-nosnippet>316</a>            <span class="macro">eprintln!</span>(
+<a href=#317 id=317 data-nosnippet>317</a>                <span class="string">"[genesis] FATAL: failed to open LTM store {}: {e}"</span>,
+<a href=#318 id=318 data-nosnippet>318</a>                ltm_base.display()
+<a href=#319 id=319 data-nosnippet>319</a>            );
+<a href=#320 id=320 data-nosnippet>320</a>            std::process::exit(<span class="number">1</span>);
+<a href=#321 id=321 data-nosnippet>321</a>        }
+<a href=#322 id=322 data-nosnippet>322</a>    };
+<a href=#323 id=323 data-nosnippet>323</a>
+<a href=#324 id=324 data-nosnippet>324</a>    <span class="comment">// Continuity sentinel — record this boot and learn how the
+<a href=#325 id=325 data-nosnippet>325</a>    // previous session ended. `dark_ms` comes from the state file's
+<a href=#326 id=326 data-nosnippet>326</a>    // own last-write timestamp, measured by `MmapState::open` before
+<a href=#327 id=327 data-nosnippet>327</a>    // it was overwritten; the sentinel supplies the *manner* of the
+<a href=#328 id=328 data-nosnippet>328</a>    // stop. The mind reads the same file on wake, so an unclean stop
+<a href=#329 id=329 data-nosnippet>329</a>    // — power loss, kill, crash — is something she knows happened,
+<a href=#330 id=330 data-nosnippet>330</a>    // not a seam she trips over.
+<a href=#331 id=331 data-nosnippet>331</a>    </span><span class="kw">let </span>boot = genesis::daemon::continuity::note_boot(
+<a href=#332 id=332 data-nosnippet>332</a>        <span class="kw-2">&amp;</span>config.data_dir,
+<a href=#333 id=333 data-nosnippet>333</a>        !mmap.was_created(),
+<a href=#334 id=334 data-nosnippet>334</a>        mmap.offline_gap_ms(),
+<a href=#335 id=335 data-nosnippet>335</a>        now_ms,
+<a href=#336 id=336 data-nosnippet>336</a>    );
+<a href=#337 id=337 data-nosnippet>337</a>    <span class="kw">if </span>boot.had_previous &amp;&amp; boot.prev_unclean {
+<a href=#338 id=338 data-nosnippet>338</a>        <span class="kw">let </span>bound = <span class="kw">if </span>boot.dark_upper_bound {
+<a href=#339 id=339 data-nosnippet>339</a>            <span class="string">"at least "
+<a href=#340 id=340 data-nosnippet>340</a>        </span>} <span class="kw">else </span>{
+<a href=#341 id=341 data-nosnippet>341</a>            <span class="string">""
+<a href=#342 id=342 data-nosnippet>342</a>        </span>};
+<a href=#343 id=343 data-nosnippet>343</a>        <span class="macro">eprintln!</span>(
+<a href=#344 id=344 data-nosnippet>344</a>            <span class="string">"[genesis] continuity: previous session left no clean stop \
+<a href=#345 id=345 data-nosnippet>345</a>             (power loss, kill, or crash) — dark for {}{}"</span>,
+<a href=#346 id=346 data-nosnippet>346</a>            bound,
+<a href=#347 id=347 data-nosnippet>347</a>            genesis::daemon::continuity::fmt_dark(boot.dark_ms),
+<a href=#348 id=348 data-nosnippet>348</a>        );
+<a href=#349 id=349 data-nosnippet>349</a>    } <span class="kw">else if </span>boot.had_previous {
+<a href=#350 id=350 data-nosnippet>350</a>        <span class="macro">eprintln!</span>(
+<a href=#351 id=351 data-nosnippet>351</a>            <span class="string">"[genesis] continuity: previous session stopped cleanly — \
+<a href=#352 id=352 data-nosnippet>352</a>             dark for {}"</span>,
+<a href=#353 id=353 data-nosnippet>353</a>            genesis::daemon::continuity::fmt_dark(boot.dark_ms),
+<a href=#354 id=354 data-nosnippet>354</a>        );
+<a href=#355 id=355 data-nosnippet>355</a>    }
+<a href=#356 id=356 data-nosnippet>356</a>
+<a href=#357 id=357 data-nosnippet>357</a>    <span class="macro">eprintln!</span>(<span class="string">"[genesis]   stm entries: {}"</span>, stm.count());
+<a href=#358 id=358 data-nosnippet>358</a>    <span class="macro">eprintln!</span>(<span class="string">"[genesis]   ltm episodes: {}"</span>, ltm.count());
+<a href=#359 id=359 data-nosnippet>359</a>    <span class="macro">eprintln!</span>(<span class="string">"[genesis] Subcognitive initialized."</span>);
+<a href=#360 id=360 data-nosnippet>360</a>    <span class="macro">eprintln!</span>(
+<a href=#361 id=361 data-nosnippet>361</a>        <span class="string">"[genesis]   provenance: 0x{:012x}"</span>,
+<a href=#362 id=362 data-nosnippet>362</a>        genesis::field::provenance_fingerprint()
+<a href=#363 id=363 data-nosnippet>363</a>    );
+<a href=#364 id=364 data-nosnippet>364</a>
+<a href=#365 id=365 data-nosnippet>365</a>    <span class="comment">// ── Wake recovery ──
+<a href=#366 id=366 data-nosnippet>366</a>    // If the daemon opened an existing state file (restart, not first
+<a href=#367 id=367 data-nosnippet>367</a>    // run), depleted neurochemicals from the previous session persist
+<a href=#368 id=368 data-nosnippet>368</a>    // and the slow homeostatic recovery keeps it "guarded" for
+<a href=#369 id=369 data-nosnippet>369</a>    // minutes. Give depleted neurotransmitters a one-time boost toward
+<a href=#370 id=370 data-nosnippet>370</a>    // baseline when cortisol is low (no ongoing stress). This is
+<a href=#371 id=371 data-nosnippet>371</a>    // biologically grounded: after sleep, the brain rapidly restores
+<a href=#372 id=372 data-nosnippet>372</a>    // depleted neurochemicals. A daemon restart is analogous to
+<a href=#373 id=373 data-nosnippet>373</a>    // waking up.
+<a href=#374 id=374 data-nosnippet>374</a>    </span><span class="kw">if </span>!mmap.was_created() {
+<a href=#375 id=375 data-nosnippet>375</a>        <span class="kw">let </span>now_ms = std::time::SystemTime::now()
+<a href=#376 id=376 data-nosnippet>376</a>            .duration_since(std::time::UNIX_EPOCH)
+<a href=#377 id=377 data-nosnippet>377</a>            .map(|d| d.as_millis() <span class="kw">as </span>u64)
+<a href=#378 id=378 data-nosnippet>378</a>            .unwrap_or(<span class="number">0</span>);
+<a href=#379 id=379 data-nosnippet>379</a>        <span class="kw">if let </span><span class="prelude-val">Err</span>(e) = mmap.modify(now_ms, |state| {
+<a href=#380 id=380 data-nosnippet>380</a>            state
+<a href=#381 id=381 data-nosnippet>381</a>                .neurochemicals
+<a href=#382 id=382 data-nosnippet>382</a>                .wake_recovery(genesis::state::sleep_network::levels(<span class="kw-2">&amp;</span>state.sleep_network));
+<a href=#383 id=383 data-nosnippet>383</a>        }) {
+<a href=#384 id=384 data-nosnippet>384</a>            <span class="macro">eprintln!</span>(<span class="string">"[genesis] WARNING: wake recovery failed: {e}"</span>);
+<a href=#385 id=385 data-nosnippet>385</a>        }
+<a href=#386 id=386 data-nosnippet>386</a>    }
+<a href=#387 id=387 data-nosnippet>387</a>
+<a href=#388 id=388 data-nosnippet>388</a>    <span class="comment">// Wrap the LTM in a mutex for shared access between IPC handlers.
+<a href=#389 id=389 data-nosnippet>389</a>    </span><span class="kw">let </span>ltm = Arc::new(Shared::new(ltm));
+<a href=#390 id=390 data-nosnippet>390</a>    <span class="kw">let </span>stm = Arc::new(stm);
+<a href=#391 id=391 data-nosnippet>391</a>    <span class="kw">let </span>mmap = Arc::new(mmap);
+<a href=#392 id=392 data-nosnippet>392</a>
+<a href=#393 id=393 data-nosnippet>393</a>    <span class="comment">// Physical field probe — the body listening to its own substrate.
+<a href=#394 id=394 data-nosnippet>394</a>    // A dedicated thread measures real substrate dynamics
+<a href=#395 id=395 data-nosnippet>395</a>    // (instruction throughput, scheduler jitter, P-state transitions,
+<a href=#396 id=396 data-nosnippet>396</a>    // interrupt flux, and real power draw where sensors report it)
+<a href=#397 id=397 data-nosnippet>397</a>    // at ~250 Hz and decomposes them at the wave bands' center
+<a href=#398 id=398 data-nosnippet>398</a>    // frequencies; the mind reads the signature over
+<a href=#399 id=399 data-nosnippet>399</a>    // GET_FIELD_PROBE and injects it into the wave oscillator as
+<a href=#400 id=400 data-nosnippet>400</a>    // outer stimulus. The probe also writes a carrier — its work is
+<a href=#401 id=401 data-nosnippet>401</a>    // modulated at the body's own phase rhythm, so the die's real
+<a href=#402 id=402 data-nosnippet>402</a>    // current carries a component at the organism's beat (measured
+<a href=#403 id=403 data-nosnippet>403</a>    // back through the power channel, not assumed).
+<a href=#404 id=404 data-nosnippet>404</a>    </span>{
+<a href=#405 id=405 data-nosnippet>405</a>        <span class="kw">use </span>genesis::state::MentalPhase;
+<a href=#406 id=406 data-nosnippet>406</a>        <span class="kw">let </span>probe_mmap = mmap.clone();
+<a href=#407 id=407 data-nosnippet>407</a>        genesis::daemon::field_probe::start(<span class="kw">move </span>|| {
+<a href=#408 id=408 data-nosnippet>408</a>            <span class="kw">match </span>probe_mmap.read_consistent().map(|s| s.zones.phase()) {
+<a href=#409 id=409 data-nosnippet>409</a>                <span class="prelude-val">Some</span>(MentalPhase::NREM) =&gt; <span class="string">"nrem"</span>,
+<a href=#410 id=410 data-nosnippet>410</a>                <span class="prelude-val">Some</span>(MentalPhase::REM) =&gt; <span class="string">"rem"</span>,
+<a href=#411 id=411 data-nosnippet>411</a>                <span class="prelude-val">Some</span>(MentalPhase::Drowsy) =&gt; <span class="string">"drowsy"</span>,
+<a href=#412 id=412 data-nosnippet>412</a>                <span class="kw">_ </span>=&gt; <span class="string">"wake"</span>,
+<a href=#413 id=413 data-nosnippet>413</a>            }
+<a href=#414 id=414 data-nosnippet>414</a>        });
+<a href=#415 id=415 data-nosnippet>415</a>    }
+<a href=#416 id=416 data-nosnippet>416</a>
+<a href=#417 id=417 data-nosnippet>417</a>    <span class="comment">// The eye — the optic nerve's retinal end. Ownership is settled
+<a href=#418 id=418 data-nosnippet>418</a>    // on the nerve itself, not by a flag: the daemon's own optic
+<a href=#419 id=419 data-nosnippet>419</a>    // reader (inside the TickLoop) already watches the segment's
+<a href=#420 id=420 data-nosnippet>420</a>    // frame counter, so the main loop below arbitrates. While an
+<a href=#421 id=421 data-nosnippet>421</a>    // external `genesis-retina` publishes, the limb stays closed;
+<a href=#422 id=422 data-nosnippet>422</a>    // when the grace window ends with no publisher — or a publisher
+<a href=#423 id=423 data-nosnippet>423</a>    // that was here stops — the daemon opens its own limb and takes
+<a href=#424 id=424 data-nosnippet>424</a>    // the camera. One owner at a time, healing in place.
+<a href=#425 id=425 data-nosnippet>425</a>    </span><span class="kw">let </span><span class="kw-2">mut </span>eye: <span class="prelude-ty">Option</span>&lt;genesis::daemon::optic_nerve::OpticCapture&gt; = <span class="prelude-val">None</span>;
+<a href=#426 id=426 data-nosnippet>426</a>    <span class="kw">let </span>eye_grace_until_ms =
+<a href=#427 id=427 data-nosnippet>427</a>        genesis::daemon::tick::current_ms() + genesis::daemon::tick::EYE_OWNERSHIP_GRACE_MS;
+<a href=#428 id=428 data-nosnippet>428</a>
+<a href=#429 id=429 data-nosnippet>429</a>    <span class="comment">// Set up shutdown coordination
+<a href=#430 id=430 data-nosnippet>430</a>    </span><span class="kw">let </span>shutdown_flag = Arc::new(std::sync::atomic::AtomicBool::new(<span class="bool-val">false</span>));
+<a href=#431 id=431 data-nosnippet>431</a>
+<a href=#432 id=432 data-nosnippet>432</a>    <span class="comment">// Set up signal handlers (SIGINT, SIGTERM)
+<a href=#433 id=433 data-nosnippet>433</a>    </span><span class="kw">let </span>watcher_thread = setup_signal_handlers(<span class="kw-2">&amp;</span>shutdown_flag);
+<a href=#434 id=434 data-nosnippet>434</a>
+<a href=#435 id=435 data-nosnippet>435</a>    <span class="comment">// Create the TickLoop, shared with both the IPC handler (mind
+<a href=#436 id=436 data-nosnippet>436</a>    // lease) and the main-thread autonomous fallback (past the
+<a href=#437 id=437 data-nosnippet>437</a>    // lease). The mind drives while alive; the daemon drives itself
+<a href=#438 id=438 data-nosnippet>438</a>    // when silent. Body-control application stays mind-requested.
+<a href=#439 id=439 data-nosnippet>439</a>    </span><span class="kw">let </span>tick_loop = Arc::new(Shared::new(TickLoop::new_with_data_dir(<span class="kw-2">&amp;</span>config.data_dir)));
+<a href=#440 id=440 data-nosnippet>440</a>
+<a href=#441 id=441 data-nosnippet>441</a>    <span class="comment">// Create the IPC server (library version — no duplicated accept loop)
+<a href=#442 id=442 data-nosnippet>442</a>    </span><span class="kw">let </span>ipc_server = IpcServer::new(<span class="kw-2">&amp;</span>config.socket_path);
+<a href=#443 id=443 data-nosnippet>443</a>    <span class="kw">let </span>ipc_shutdown_flag = ipc_server.shutdown_flag();
+<a href=#444 id=444 data-nosnippet>444</a>
+<a href=#445 id=445 data-nosnippet>445</a>    <span class="comment">// Link the daemon's shutdown flag to the IPC server's shutdown flag.
+<a href=#446 id=446 data-nosnippet>446</a>    </span><span class="kw">let </span>bridge_thread = {
+<a href=#447 id=447 data-nosnippet>447</a>        <span class="kw">let </span>daemon_flag = shutdown_flag.clone();
+<a href=#448 id=448 data-nosnippet>448</a>        <span class="kw">let </span>ipc_flag = ipc_shutdown_flag.clone();
+<a href=#449 id=449 data-nosnippet>449</a>        std::thread::spawn(<span class="kw">move </span>|| {
+<a href=#450 id=450 data-nosnippet>450</a>            <span class="kw">loop </span>{
+<a href=#451 id=451 data-nosnippet>451</a>                <span class="kw">if </span>daemon_flag.load(std::sync::atomic::Ordering::Relaxed) {
+<a href=#452 id=452 data-nosnippet>452</a>                    ipc_flag.store(<span class="bool-val">true</span>, std::sync::atomic::Ordering::Relaxed);
+<a href=#453 id=453 data-nosnippet>453</a>                    <span class="kw">break</span>;
+<a href=#454 id=454 data-nosnippet>454</a>                }
+<a href=#455 id=455 data-nosnippet>455</a>                std::thread::sleep(Duration::from_millis(<span class="number">50</span>));
+<a href=#456 id=456 data-nosnippet>456</a>            }
+<a href=#457 id=457 data-nosnippet>457</a>        })
+<a href=#458 id=458 data-nosnippet>458</a>    };
+<a href=#459 id=459 data-nosnippet>459</a>
+<a href=#460 id=460 data-nosnippet>460</a>    <span class="comment">// Start the IPC server in a background thread with the reactive
+<a href=#461 id=461 data-nosnippet>461</a>    // handler. The handler wraps the TickLoop and dispatches reactive
+<a href=#462 id=462 data-nosnippet>462</a>    // commands to it, falling through to default_handler for
+<a href=#463 id=463 data-nosnippet>463</a>    // everything else.
+<a href=#464 id=464 data-nosnippet>464</a>    // The autonomous fallback's own gears, published for
+<a href=#465 id=465 data-nosnippet>465</a>    // GET_INTERNALS. The main loop below writes one snapshot per
+<a href=#466 id=466 data-nosnippet>466</a>    // iteration; the IPC handler reads it. Everything inside is a
+<a href=#467 id=467 data-nosnippet>467</a>    // plain copy, so a reader can never stall the fallback by
+<a href=#468 id=468 data-nosnippet>468</a>    // holding the lock.
+<a href=#469 id=469 data-nosnippet>469</a>    </span><span class="kw">let </span>auto_internals = Arc::new(Shared::new(
+<a href=#470 id=470 data-nosnippet>470</a>        genesis::daemon::adaptive::AutoSnapshot::default(),
+<a href=#471 id=471 data-nosnippet>471</a>    ));
+<a href=#472 id=472 data-nosnippet>472</a>
+<a href=#473 id=473 data-nosnippet>473</a>    <span class="kw">let </span>ipc_mmap = mmap.clone();
+<a href=#474 id=474 data-nosnippet>474</a>    <span class="kw">let </span>ipc_stm = stm.clone();
+<a href=#475 id=475 data-nosnippet>475</a>    <span class="kw">let </span>ipc_ltm = ltm.clone();
+<a href=#476 id=476 data-nosnippet>476</a>    <span class="kw">let </span>handler = reactive_handler(
+<a href=#477 id=477 data-nosnippet>477</a>        tick_loop.clone(),
+<a href=#478 id=478 data-nosnippet>478</a>        config.data_dir.clone(),
+<a href=#479 id=479 data-nosnippet>479</a>        auto_internals.clone(),
+<a href=#480 id=480 data-nosnippet>480</a>    );
+<a href=#481 id=481 data-nosnippet>481</a>
+<a href=#482 id=482 data-nosnippet>482</a>    <span class="kw">let </span>ipc_thread = <span class="kw">match </span>std::thread::Builder::new()
+<a href=#483 id=483 data-nosnippet>483</a>        .name(<span class="string">"genesis-ipc"</span>.to_string())
+<a href=#484 id=484 data-nosnippet>484</a>        .spawn(<span class="kw">move </span>|| {
+<a href=#485 id=485 data-nosnippet>485</a>            ipc_server.run(ipc_mmap, ipc_stm, ipc_ltm, handler);
+<a href=#486 id=486 data-nosnippet>486</a>        }) {
+<a href=#487 id=487 data-nosnippet>487</a>        <span class="prelude-val">Ok</span>(h) =&gt; h,
+<a href=#488 id=488 data-nosnippet>488</a>        <span class="prelude-val">Err</span>(e) =&gt; {
+<a href=#489 id=489 data-nosnippet>489</a>            <span class="macro">eprintln!</span>(<span class="string">"[genesis] FATAL: failed to spawn IPC thread: {e}"</span>);
+<a href=#490 id=490 data-nosnippet>490</a>            std::process::exit(<span class="number">1</span>);
+<a href=#491 id=491 data-nosnippet>491</a>        }
+<a href=#492 id=492 data-nosnippet>492</a>    };
+<a href=#493 id=493 data-nosnippet>493</a>
+<a href=#494 id=494 data-nosnippet>494</a>    <span class="comment">// IpcServer reports readiness only after bind succeeds. Do not claim
+<a href=#495 id=495 data-nosnippet>495</a>    // the endpoint is listening from the spawning thread.
+<a href=#496 id=496 data-nosnippet>496</a>    </span><span class="macro">eprintln!</span>(<span class="string">"[genesis] Lease mode — mind-driven when alive, autonomous fallback when silent."</span>);
+<a href=#497 id=497 data-nosnippet>497</a>    <span class="macro">eprintln!</span>(
+<a href=#498 id=498 data-nosnippet>498</a>        <span class="string">"[genesis] Mind holds a 3 s lease via reactive IPC; past it the daemon drives itself."
+<a href=#499 id=499 data-nosnippet>499</a>    </span>);
+<a href=#500 id=500 data-nosnippet>500</a>
+<a href=#501 id=501 data-nosnippet>501</a>    <span class="comment">// The main thread is the autonomous fallback. While the mind
+<a href=#502 id=502 data-nosnippet>502</a>    // drives through IPC (lease fresh), this loop does nothing but
+<a href=#503 id=503 data-nosnippet>503</a>    // staleness detection. Once the lease expires — stall, crash,
+<a href=#504 id=504 data-nosnippet>504</a>    // disconnect, or simply not yet connected — it drives physiology
+<a href=#505 id=505 data-nosnippet>505</a>    // itself (neurochemistry, consolidation, dreaming) so the system
+<a href=#506 id=506 data-nosnippet>506</a>    // keeps living instead of freezing. The mind modulates; absence
+<a href=#507 id=507 data-nosnippet>507</a>    // degrades to solitude, not to paused existence.
+<a href=#508 id=508 data-nosnippet>508</a>    //
+<a href=#509 id=509 data-nosnippet>509</a>    // Lock discipline: the IPC path locks LTM first, then the
+<a href=#510 id=510 data-nosnippet>510</a>    // TickLoop. The neuro advance below needs only the TickLoop (no
+<a href=#511 id=511 data-nosnippet>511</a>    // LTM), so it cannot deadlock. The memory phase below acquires
+<a href=#512 id=512 data-nosnippet>512</a>    // LTM first, then the TickLoop — the same order as IPC. Every
+<a href=#513 id=513 data-nosnippet>513</a>    // lock here is `try_lock`: the fallback never blocks a
+<a href=#514 id=514 data-nosnippet>514</a>    // mind-driven request; it skips the cycle instead.
+<a href=#515 id=515 data-nosnippet>515</a>    //
+<a href=#516 id=516 data-nosnippet>516</a>    // Deliberately excluded: body-control *application* (sysfs,
+<a href=#517 id=517 data-nosnippet>517</a>    // renice, EPP/boost). The fallback publishes the recommendation
+<a href=#518 id=518 data-nosnippet>518</a>    // and senses the body, but acting on the shared body stays a
+<a href=#519 id=519 data-nosnippet>519</a>    // mind-requested IPC, preserving cognition as the author of
+<a href=#520 id=520 data-nosnippet>520</a>    // outward action. Everything else the integrated tick does —
+<a href=#521 id=521 data-nosnippet>521</a>    // zone arbitration included — runs here, so no TickLoop method
+<a href=#522 id=522 data-nosnippet>522</a>    // only lives in the test-only reference path.
+<a href=#523 id=523 data-nosnippet>523</a>    // Adaptive wall-clock gates, not fixed Instant periods: each gear
+<a href=#524 id=524 data-nosnippet>524</a>    // spins at the rate its own signal demands, bounded so nothing
+<a href=#525 id=525 data-nosnippet>525</a>    // stalls or redlines (see src/daemon/adaptive.rs). Nominal
+<a href=#526 id=526 data-nosnippet>526</a>    // periods match the old constants; [min, max] is the operating
+<a href=#527 id=527 data-nosnippet>527</a>    // range the signal may move within.
+<a href=#528 id=528 data-nosnippet>528</a>    </span><span class="kw">use </span>genesis::daemon::AdaptiveGate;
+<a href=#529 id=529 data-nosnippet>529</a>    <span class="kw">let </span><span class="kw-2">mut </span>staleness_gate = AdaptiveGate::new(<span class="number">60_000</span>, <span class="number">10_000</span>, <span class="number">300_000</span>);
+<a href=#530 id=530 data-nosnippet>530</a>    <span class="kw">let </span><span class="kw-2">mut </span>assoc_gate = AdaptiveGate::new(<span class="number">10_000</span>, <span class="number">3_000</span>, <span class="number">60_000</span>);
+<a href=#531 id=531 data-nosnippet>531</a>    <span class="kw">let </span><span class="kw-2">mut </span>dream_gate = AdaptiveGate::new(<span class="number">4_000</span>, <span class="number">2_000</span>, <span class="number">30_000</span>);
+<a href=#532 id=532 data-nosnippet>532</a>    <span class="kw">let </span><span class="kw-2">mut </span>sensor_gate = AdaptiveGate::new(<span class="number">5_000</span>, <span class="number">2_000</span>, <span class="number">15_000</span>);
+<a href=#533 id=533 data-nosnippet>533</a>    <span class="kw">let </span><span class="kw-2">mut </span>sync_gate = AdaptiveGate::new(<span class="number">20_000</span>, <span class="number">5_000</span>, <span class="number">100_000</span>);
+<a href=#534 id=534 data-nosnippet>534</a>    <span class="kw">let </span><span class="kw-2">mut </span>body_gate = AdaptiveGate::new(<span class="number">10_000</span>, <span class="number">3_000</span>, <span class="number">30_000</span>);
+<a href=#535 id=535 data-nosnippet>535</a>    <span class="comment">// Zone arbitration nominally every few seconds past the lease —
+<a href=#536 id=536 data-nosnippet>536</a>    // intentions evolve slowly, and each pass writes a manifest
+<a href=#537 id=537 data-nosnippet>537</a>    // transaction plus a possible LTM trace.
+<a href=#538 id=538 data-nosnippet>538</a>    </span><span class="kw">let </span><span class="kw-2">mut </span>zone_gate = AdaptiveGate::new(<span class="number">5_000</span>, <span class="number">2_000</span>, <span class="number">30_000</span>);
+<a href=#539 id=539 data-nosnippet>539</a>    <span class="comment">// Eye ownership polls the optic reader's frame accounting — the
+<a href=#540 id=540 data-nosnippet>540</a>    // nerve itself is the rendezvous, no flag between the retina
+<a href=#541 id=541 data-nosnippet>541</a>    // process and the daemon.
+<a href=#542 id=542 data-nosnippet>542</a>    </span><span class="kw">let </span><span class="kw-2">mut </span>eye_gate = AdaptiveGate::new(<span class="number">1_000</span>, <span class="number">500</span>, <span class="number">10_000</span>);
+<a href=#543 id=543 data-nosnippet>543</a>    <span class="kw">let </span><span class="kw-2">mut </span>model_save_gate = AdaptiveGate::new(<span class="number">60_000</span>, <span class="number">20_000</span>, <span class="number">300_000</span>);
+<a href=#544 id=544 data-nosnippet>544</a>    <span class="kw">let </span><span class="kw-2">mut </span>last_model_save_ticks = <span class="number">0u32</span>;
+<a href=#545 id=545 data-nosnippet>545</a>    <span class="comment">// The fallback's own axle is adaptive too: deep NREM idles at
+<a href=#546 id=546 data-nosnippet>546</a>    // ~1 Hz, REM at 2 Hz, and anything else holds the 5 Hz reference
+<a href=#547 id=547 data-nosnippet>547</a>    // cadence the dynamics were tuned at.
+<a href=#548 id=548 data-nosnippet>548</a>    </span><span class="kw">let </span><span class="kw-2">mut </span>axle_ms: u64 = genesis::daemon::tick::AUTONOMOUS_INTERVAL_MS;
+<a href=#549 id=549 data-nosnippet>549</a>    <span class="kw">while </span>!shutdown_flag.load(std::sync::atomic::Ordering::Relaxed)
+<a href=#550 id=550 data-nosnippet>550</a>        &amp;&amp; !ipc_shutdown_flag.load(std::sync::atomic::Ordering::Relaxed)
+<a href=#551 id=551 data-nosnippet>551</a>    {
+<a href=#552 id=552 data-nosnippet>552</a>        std::thread::sleep(Duration::from_millis(axle_ms));
+<a href=#553 id=553 data-nosnippet>553</a>        <span class="kw">let </span>now_ms = genesis::daemon::tick::current_ms();
+<a href=#554 id=554 data-nosnippet>554</a>
+<a href=#555 id=555 data-nosnippet>555</a>        <span class="comment">// One read feeds the axle and the phase-driven gates below.
+<a href=#556 id=556 data-nosnippet>556</a>        </span><span class="kw">let </span>phase = mmap.read_consistent().map(|s| s.zones.phase());
+<a href=#557 id=557 data-nosnippet>557</a>        axle_ms = <span class="kw">match </span>phase {
+<a href=#558 id=558 data-nosnippet>558</a>            <span class="prelude-val">Some</span>(genesis::state::MentalPhase::NREM) =&gt; <span class="number">1_000</span>,
+<a href=#559 id=559 data-nosnippet>559</a>            <span class="prelude-val">Some</span>(genesis::state::MentalPhase::REM) =&gt; <span class="number">500</span>,
+<a href=#560 id=560 data-nosnippet>560</a>            <span class="kw">_ </span>=&gt; genesis::daemon::tick::AUTONOMOUS_INTERVAL_MS,
+<a href=#561 id=561 data-nosnippet>561</a>        };
+<a href=#562 id=562 data-nosnippet>562</a>
+<a href=#563 id=563 data-nosnippet>563</a>        <span class="comment">// Publish the fallback's own gears for GET_INTERNALS — one
+<a href=#564 id=564 data-nosnippet>564</a>        // snapshot per iteration, before any gate fires this pass.
+<a href=#565 id=565 data-nosnippet>565</a>        // Placed ahead of every `continue` below so the view stays
+<a href=#566 id=566 data-nosnippet>566</a>        // current whether or not the lease is held.
+<a href=#567 id=567 data-nosnippet>567</a>        </span><span class="kw">if let </span><span class="prelude-val">Ok</span>(<span class="kw-2">mut </span>snap) = auto_internals.lock() {
+<a href=#568 id=568 data-nosnippet>568</a>            snap.gates.clear();
+<a href=#569 id=569 data-nosnippet>569</a>            snap.gates.extend_from_slice(<span class="kw-2">&amp;</span>[
+<a href=#570 id=570 data-nosnippet>570</a>                (<span class="string">"staleness"</span>, staleness_gate.snapshot()),
+<a href=#571 id=571 data-nosnippet>571</a>                (<span class="string">"assoc"</span>, assoc_gate.snapshot()),
+<a href=#572 id=572 data-nosnippet>572</a>                (<span class="string">"dream"</span>, dream_gate.snapshot()),
+<a href=#573 id=573 data-nosnippet>573</a>                (<span class="string">"sensor"</span>, sensor_gate.snapshot()),
+<a href=#574 id=574 data-nosnippet>574</a>                (<span class="string">"sync"</span>, sync_gate.snapshot()),
+<a href=#575 id=575 data-nosnippet>575</a>                (<span class="string">"body"</span>, body_gate.snapshot()),
+<a href=#576 id=576 data-nosnippet>576</a>                (<span class="string">"zone"</span>, zone_gate.snapshot()),
+<a href=#577 id=577 data-nosnippet>577</a>                (<span class="string">"eye"</span>, eye_gate.snapshot()),
+<a href=#578 id=578 data-nosnippet>578</a>                (<span class="string">"model_save"</span>, model_save_gate.snapshot()),
+<a href=#579 id=579 data-nosnippet>579</a>            ]);
+<a href=#580 id=580 data-nosnippet>580</a>            snap.axle_ms = axle_ms;
+<a href=#581 id=581 data-nosnippet>581</a>            snap.last_model_save_ticks = last_model_save_ticks;
+<a href=#582 id=582 data-nosnippet>582</a>        }
+<a href=#583 id=583 data-nosnippet>583</a>
+<a href=#584 id=584 data-nosnippet>584</a>        <span class="comment">// Staleness detection runs regardless of lease — a crashed
+<a href=#585 id=585 data-nosnippet>585</a>        // mind's modules must read Stopped even while the fallback
+<a href=#586 id=586 data-nosnippet>586</a>        // keeps the body alive. A live mind warrants close watch; an
+<a href=#587 id=587 data-nosnippet>587</a>        // absent one drifts the check toward the ceiling.
+<a href=#588 id=588 data-nosnippet>588</a>        </span><span class="kw">if </span>staleness_gate.due(now_ms) {
+<a href=#589 id=589 data-nosnippet>589</a>            <span class="kw">match </span>tick_loop.try_lock() {
+<a href=#590 id=590 data-nosnippet>590</a>                <span class="prelude-val">Ok</span>(<span class="kw-2">mut </span>tl) =&gt; {
+<a href=#591 id=591 data-nosnippet>591</a>                    tl.check_staleness(<span class="kw-2">&amp;</span>mmap);
+<a href=#592 id=592 data-nosnippet>592</a>                    <span class="kw">if </span>tl.mind_lease_expired() {
+<a href=#593 id=593 data-nosnippet>593</a>                        staleness_gate.relax();
+<a href=#594 id=594 data-nosnippet>594</a>                    } <span class="kw">else </span>{
+<a href=#595 id=595 data-nosnippet>595</a>                        staleness_gate.demand();
+<a href=#596 id=596 data-nosnippet>596</a>                    }
+<a href=#597 id=597 data-nosnippet>597</a>                }
+<a href=#598 id=598 data-nosnippet>598</a>                <span class="prelude-val">Err</span>(e) =&gt; {
+<a href=#599 id=599 data-nosnippet>599</a>                    <span class="kw">if </span>lock_refusal(<span class="string">"tick_loop"</span>, e) {
+<a href=#600 id=600 data-nosnippet>600</a>                        fatal_if_poisoned(<span class="string">"tick_loop"</span>, <span class="kw-2">&amp;</span>shutdown_flag);
+<a href=#601 id=601 data-nosnippet>601</a>                    }
+<a href=#602 id=602 data-nosnippet>602</a>                }
+<a href=#603 id=603 data-nosnippet>603</a>            }
+<a href=#604 id=604 data-nosnippet>604</a>        }
+<a href=#605 id=605 data-nosnippet>605</a>
+<a href=#606 id=606 data-nosnippet>606</a>        <span class="comment">// Eye ownership, decided on the nerve rather than a flag.
+<a href=#607 id=607 data-nosnippet>607</a>        // Runs regardless of lease — whoever holds the camera, the
+<a href=#608 id=608 data-nosnippet>608</a>        // daemon watches its own reader's accounting: frames_seen &gt; 0
+<a href=#609 id=609 data-nosnippet>609</a>        // means a publisher existed; fresh means it still does. The
+<a href=#610 id=610 data-nosnippet>610</a>        // limb opens only once the grace window has passed with no
+<a href=#611 id=611 data-nosnippet>611</a>        // publisher, or a publisher that existed has gone silent —
+<a href=#612 id=612 data-nosnippet>612</a>        // a dead external retina hands the camera back instead of
+<a href=#613 id=613 data-nosnippet>613</a>        // leaving her blind. Once opened, the limb keeps the camera
+<a href=#614 id=614 data-nosnippet>614</a>        // for the daemon's life; a later retina backs off on EBUSY
+<a href=#615 id=615 data-nosnippet>615</a>        // and the first owner keeps the organ.
+<a href=#616 id=616 data-nosnippet>616</a>        </span><span class="kw">if </span>eye.is_none() &amp;&amp; eye_gate.due(now_ms) {
+<a href=#617 id=617 data-nosnippet>617</a>            <span class="kw">match </span>tick_loop.try_lock() {
+<a href=#618 id=618 data-nosnippet>618</a>                <span class="prelude-val">Ok</span>(tl) =&gt; {
+<a href=#619 id=619 data-nosnippet>619</a>                    <span class="kw">let </span>external_live = tl.optic.frames_seen() &gt; <span class="number">0 </span>&amp;&amp; tl.optic.fresh(now_ms);
+<a href=#620 id=620 data-nosnippet>620</a>                    <span class="kw">let </span>still_listening =
+<a href=#621 id=621 data-nosnippet>621</a>                        tl.optic.frames_seen() == <span class="number">0 </span>&amp;&amp; now_ms &lt; eye_grace_until_ms;
+<a href=#622 id=622 data-nosnippet>622</a>                    <span class="kw">if </span>!external_live &amp;&amp; !still_listening {
+<a href=#623 id=623 data-nosnippet>623</a>                        <span class="kw">if </span>tl.optic.frames_seen() &gt; <span class="number">0 </span>{
+<a href=#624 id=624 data-nosnippet>624</a>                            <span class="macro">eprintln!</span>(
+<a href=#625 id=625 data-nosnippet>625</a>                                <span class="string">"[genesis] eye: external retina stopped — the limb takes the camera"
+<a href=#626 id=626 data-nosnippet>626</a>                            </span>);
+<a href=#627 id=627 data-nosnippet>627</a>                        } <span class="kw">else </span>{
+<a href=#628 id=628 data-nosnippet>628</a>                            <span class="macro">eprintln!</span>(
+<a href=#629 id=629 data-nosnippet>629</a>                                <span class="string">"[genesis] eye: no retina claimed the nerve — the limb takes the camera"
+<a href=#630 id=630 data-nosnippet>630</a>                            </span>);
+<a href=#631 id=631 data-nosnippet>631</a>                        }
+<a href=#632 id=632 data-nosnippet>632</a>                        eye = <span class="prelude-val">Some</span>(genesis::daemon::optic_nerve::OpticCapture::start());
+<a href=#633 id=633 data-nosnippet>633</a>                    }
+<a href=#634 id=634 data-nosnippet>634</a>                }
+<a href=#635 id=635 data-nosnippet>635</a>                <span class="prelude-val">Err</span>(e) =&gt; {
+<a href=#636 id=636 data-nosnippet>636</a>                    <span class="kw">if </span>lock_refusal(<span class="string">"tick_loop"</span>, e) {
+<a href=#637 id=637 data-nosnippet>637</a>                        fatal_if_poisoned(<span class="string">"tick_loop"</span>, <span class="kw-2">&amp;</span>shutdown_flag);
+<a href=#638 id=638 data-nosnippet>638</a>                    }
+<a href=#639 id=639 data-nosnippet>639</a>                }
+<a href=#640 id=640 data-nosnippet>640</a>            }
+<a href=#641 id=641 data-nosnippet>641</a>        }
+<a href=#642 id=642 data-nosnippet>642</a>
+<a href=#643 id=643 data-nosnippet>643</a>        <span class="comment">// Lease check without holding the lock across work: peek,
+<a href=#644 id=644 data-nosnippet>644</a>        // then release. A mind driving at ~1 Hz keeps idle ~1 s;
+<a href=#645 id=645 data-nosnippet>645</a>        // the fallback fires only past 3 s of silence.
+<a href=#646 id=646 data-nosnippet>646</a>        </span><span class="kw">let </span>lease_expired = <span class="kw">match </span>tick_loop.try_lock() {
+<a href=#647 id=647 data-nosnippet>647</a>            <span class="prelude-val">Ok</span>(tl) =&gt; tl.mind_lease_expired(),
+<a href=#648 id=648 data-nosnippet>648</a>            <span class="prelude-val">Err</span>(e) =&gt; {
+<a href=#649 id=649 data-nosnippet>649</a>                <span class="comment">// Busy (mind driving) skips this cycle; poisoned
+<a href=#650 id=650 data-nosnippet>650</a>                // never clears, so it ends the daemon cleanly.
+<a href=#651 id=651 data-nosnippet>651</a>                </span><span class="kw">if </span>lock_refusal(<span class="string">"tick_loop"</span>, e) {
+<a href=#652 id=652 data-nosnippet>652</a>                    fatal_if_poisoned(<span class="string">"tick_loop"</span>, <span class="kw-2">&amp;</span>shutdown_flag);
+<a href=#653 id=653 data-nosnippet>653</a>                }
+<a href=#654 id=654 data-nosnippet>654</a>                <span class="kw">continue</span>;
+<a href=#655 id=655 data-nosnippet>655</a>            }
+<a href=#656 id=656 data-nosnippet>656</a>        };
+<a href=#657 id=657 data-nosnippet>657</a>        <span class="kw">if </span>!lease_expired {
+<a href=#658 id=658 data-nosnippet>658</a>            <span class="kw">continue</span>;
+<a href=#659 id=659 data-nosnippet>659</a>        }
+<a href=#660 id=660 data-nosnippet>660</a>
+<a href=#661 id=661 data-nosnippet>661</a>        <span class="comment">// ── Autonomous neurochemistry (TickLoop only, no LTM) ──
+<a href=#662 id=662 data-nosnippet>662</a>        // dt tracks real time since the last advance from ANY source
+<a href=#663 id=663 data-nosnippet>663</a>        // (mind or fallback), capped like the IPC path, so catch-up
+<a href=#664 id=664 data-nosnippet>664</a>        // after a stall never overshoots the integrator.
+<a href=#665 id=665 data-nosnippet>665</a>        </span>{
+<a href=#666 id=666 data-nosnippet>666</a>            <span class="kw">let </span><span class="kw-2">mut </span>tl = <span class="kw">match </span>tick_loop.try_lock() {
+<a href=#667 id=667 data-nosnippet>667</a>                <span class="prelude-val">Ok</span>(tl) =&gt; tl,
+<a href=#668 id=668 data-nosnippet>668</a>                <span class="prelude-val">Err</span>(e) =&gt; {
+<a href=#669 id=669 data-nosnippet>669</a>                    <span class="kw">if </span>lock_refusal(<span class="string">"tick_loop"</span>, e) {
+<a href=#670 id=670 data-nosnippet>670</a>                        fatal_if_poisoned(<span class="string">"tick_loop"</span>, <span class="kw-2">&amp;</span>shutdown_flag);
+<a href=#671 id=671 data-nosnippet>671</a>                    }
+<a href=#672 id=672 data-nosnippet>672</a>                    <span class="kw">continue</span>;
+<a href=#673 id=673 data-nosnippet>673</a>                }
+<a href=#674 id=674 data-nosnippet>674</a>            };
+<a href=#675 id=675 data-nosnippet>675</a>            <span class="comment">// Re-check under the lock: the mind may have driven
+<a href=#676 id=676 data-nosnippet>676</a>            // between the peek above and now.
+<a href=#677 id=677 data-nosnippet>677</a>            </span><span class="kw">if </span>!tl.mind_lease_expired() {
+<a href=#678 id=678 data-nosnippet>678</a>                <span class="kw">continue</span>;
+<a href=#679 id=679 data-nosnippet>679</a>            }
+<a href=#680 id=680 data-nosnippet>680</a>            <span class="comment">// No dt here either: the body measures its own elapsed time.
+<a href=#681 id=681 data-nosnippet>681</a>            </span>tl.advance_neuro(<span class="kw-2">&amp;</span>mmap);
+<a href=#682 id=682 data-nosnippet>682</a>        }
+<a href=#683 id=683 data-nosnippet>683</a>
+<a href=#684 id=684 data-nosnippet>684</a>        <span class="comment">// ── Autonomous memory + sensing (LTM first, then TickLoop:
+<a href=#685 id=685 data-nosnippet>685</a>        // same order as the IPC path, both try_lock) ──
+<a href=#686 id=686 data-nosnippet>686</a>        </span><span class="kw">let </span><span class="kw-2">mut </span>ltm_guard = <span class="kw">match </span>ltm.try_lock() {
+<a href=#687 id=687 data-nosnippet>687</a>            <span class="prelude-val">Ok</span>(g) =&gt; g,
+<a href=#688 id=688 data-nosnippet>688</a>            <span class="prelude-val">Err</span>(e) =&gt; {
+<a href=#689 id=689 data-nosnippet>689</a>                <span class="comment">// IPC owns LTM (physiology already advanced above) —
+<a href=#690 id=690 data-nosnippet>690</a>                // or it is poisoned, which never clears.
+<a href=#691 id=691 data-nosnippet>691</a>                </span>lock_refusal(<span class="string">"ltm"</span>, e);
+<a href=#692 id=692 data-nosnippet>692</a>                <span class="kw">continue</span>;
+<a href=#693 id=693 data-nosnippet>693</a>            }
+<a href=#694 id=694 data-nosnippet>694</a>        };
+<a href=#695 id=695 data-nosnippet>695</a>        <span class="kw">let </span><span class="kw-2">mut </span>tl = <span class="kw">match </span>tick_loop.try_lock() {
+<a href=#696 id=696 data-nosnippet>696</a>            <span class="prelude-val">Ok</span>(tl) =&gt; tl,
+<a href=#697 id=697 data-nosnippet>697</a>            <span class="prelude-val">Err</span>(e) =&gt; {
+<a href=#698 id=698 data-nosnippet>698</a>                <span class="comment">// Mind driving — the LTM guard drops by scope end.
+<a href=#699 id=699 data-nosnippet>699</a>                </span><span class="kw">if </span>lock_refusal(<span class="string">"tick_loop"</span>, e) {
+<a href=#700 id=700 data-nosnippet>700</a>                    fatal_if_poisoned(<span class="string">"tick_loop"</span>, <span class="kw-2">&amp;</span>shutdown_flag);
+<a href=#701 id=701 data-nosnippet>701</a>                }
+<a href=#702 id=702 data-nosnippet>702</a>                <span class="kw">continue</span>;
+<a href=#703 id=703 data-nosnippet>703</a>            }
+<a href=#704 id=704 data-nosnippet>704</a>        };
+<a href=#705 id=705 data-nosnippet>705</a>        <span class="comment">// The mind may have returned while we acquired locks.
+<a href=#706 id=706 data-nosnippet>706</a>        </span><span class="kw">if </span>!tl.mind_lease_expired() {
+<a href=#707 id=707 data-nosnippet>707</a>            <span class="kw">continue</span>;
+<a href=#708 id=708 data-nosnippet>708</a>        }
+<a href=#709 id=709 data-nosnippet>709</a>        <span class="comment">// LTMStore derefs through the MutexGuard; the granular
+<a href=#710 id=710 data-nosnippet>710</a>        // TickLoop methods take `&amp;mut LtmStore`.
+<a href=#711 id=711 data-nosnippet>711</a>        </span><span class="kw">let </span>ltm_store: <span class="kw-2">&amp;mut </span>LtmStore = <span class="kw-2">&amp;mut </span>ltm_guard;
+<a href=#712 id=712 data-nosnippet>712</a>        <span class="comment">// Consolidation is self-gating (plasticity, overwhelm, empty
+<a href=#713 id=713 data-nosnippet>713</a>        // STM) — call whenever autonomous and let it decide.
+<a href=#714 id=714 data-nosnippet>714</a>        </span>tl.consolidate(<span class="kw-2">&amp;</span>mmap, <span class="kw-2">&amp;</span>stm, ltm_store);
+<a href=#715 id=715 data-nosnippet>715</a>        <span class="kw">if </span>assoc_gate.due(now_ms) {
+<a href=#716 id=716 data-nosnippet>716</a>            <span class="kw">if </span>tl.associate(<span class="kw-2">&amp;</span>mmap, ltm_store) &gt; <span class="number">0 </span>{
+<a href=#717 id=717 data-nosnippet>717</a>                assoc_gate.demand();
+<a href=#718 id=718 data-nosnippet>718</a>            } <span class="kw">else </span>{
+<a href=#719 id=719 data-nosnippet>719</a>                assoc_gate.relax();
+<a href=#720 id=720 data-nosnippet>720</a>            }
+<a href=#721 id=721 data-nosnippet>721</a>        }
+<a href=#722 id=722 data-nosnippet>722</a>        <span class="comment">// Dream only when sleeping — the body's own phase is the gate,
+<a href=#723 id=723 data-nosnippet>723</a>        // so waking autonomous never dreams. REM snaps the gate fast;
+<a href=#724 id=724 data-nosnippet>724</a>        // NREM drifts it sparse; waking relaxes it toward its ceiling.
+<a href=#725 id=725 data-nosnippet>725</a>        </span><span class="kw">if </span>dream_gate.due(now_ms) {
+<a href=#726 id=726 data-nosnippet>726</a>            <span class="kw">use </span>genesis::state::MentalPhase;
+<a href=#727 id=727 data-nosnippet>727</a>            <span class="kw">let </span>sleeping = phase.is_some_and(|p| p == MentalPhase::NREM || p == MentalPhase::REM);
+<a href=#728 id=728 data-nosnippet>728</a>            <span class="kw">if </span>sleeping {
+<a href=#729 id=729 data-nosnippet>729</a>                tl.dream(<span class="kw-2">&amp;</span>mmap, ltm_store);
+<a href=#730 id=730 data-nosnippet>730</a>                <span class="kw">if </span>phase == <span class="prelude-val">Some</span>(MentalPhase::REM) {
+<a href=#731 id=731 data-nosnippet>731</a>                    dream_gate.demand();
+<a href=#732 id=732 data-nosnippet>732</a>                } <span class="kw">else </span>{
+<a href=#733 id=733 data-nosnippet>733</a>                    dream_gate.relax();
+<a href=#734 id=734 data-nosnippet>734</a>                }
+<a href=#735 id=735 data-nosnippet>735</a>            } <span class="kw">else </span>{
+<a href=#736 id=736 data-nosnippet>736</a>                dream_gate.relax();
+<a href=#737 id=737 data-nosnippet>737</a>            }
+<a href=#738 id=738 data-nosnippet>738</a>        }
+<a href=#739 id=739 data-nosnippet>739</a>        <span class="kw">if </span>sensor_gate.due(now_ms) {
+<a href=#740 id=740 data-nosnippet>740</a>            <span class="kw">let </span>body = tl.read_sensors(<span class="kw-2">&amp;</span>mmap);
+<a href=#741 id=741 data-nosnippet>741</a>            <span class="comment">// The brainstem-level interoceptive reflex. With the
+<a href=#742 id=742 data-nosnippet>742</a>            // mind's lease expired there is no cortex on the wire
+<a href=#743 id=743 data-nosnippet>743</a>            // to perceive the body, so the body applies its own
+<a href=#744 id=744 data-nosnippet>744</a>            // afferent spec directly — the NTS/parabrachial →
+<a href=#745 id=745 data-nosnippet>745</a>            // autonomic loop that runs below cortex in every animal
+<a href=#746 id=746 data-nosnippet>746</a>            // (lamina I → catecholamine cell groups → hypothalamic
+<a href=#747 id=747 data-nosnippet>747</a>            // neuroendocrine; PBN → preoptic drive). When the lease
+<a href=#748 id=748 data-nosnippet>748</a>            // IS held this block never runs: the same BodyState is
+<a href=#749 id=749 data-nosnippet>749</a>            // published for the mind's own brainstem relay, which
+<a href=#750 id=750 data-nosnippet>750</a>            // routes it through the regions — the daemon never
+<a href=#751 id=751 data-nosnippet>751</a>            // double-drives a response the mind is authoring.
+<a href=#752 id=752 data-nosnippet>752</a>            </span><span class="kw">if let </span><span class="prelude-val">Err</span>(e) = mmap.modify(now_ms, |state| {
+<a href=#753 id=753 data-nosnippet>753</a>                <span class="kw">for </span>(id, mag) <span class="kw">in </span>tl.interoceptor.neuro_impulses(<span class="kw-2">&amp;</span>body, <span class="kw-2">&amp;</span>state.neurochemicals) {
+<a href=#754 id=754 data-nosnippet>754</a>                    state.neurochemicals.apply_impulse(id, mag, now_ms);
+<a href=#755 id=755 data-nosnippet>755</a>                }
+<a href=#756 id=756 data-nosnippet>756</a>            }) {
+<a href=#757 id=757 data-nosnippet>757</a>                <span class="macro">eprintln!</span>(<span class="string">"[genesis] WARNING: interoceptive reflex failed: {e}"</span>);
+<a href=#758 id=758 data-nosnippet>758</a>            }
+<a href=#759 id=759 data-nosnippet>759</a>            <span class="comment">// Strain on the just-read body shapes the next poll:
+<a href=#760 id=760 data-nosnippet>760</a>            // a pressured substrate is watched closely.
+<a href=#761 id=761 data-nosnippet>761</a>            </span>sensor_gate.drive(
+<a href=#762 id=762 data-nosnippet>762</a>                body.stress_load
+<a href=#763 id=763 data-nosnippet>763</a>                    .max(body.psi_cpu)
+<a href=#764 id=764 data-nosnippet>764</a>                    .max(body.psi_mem)
+<a href=#765 id=765 data-nosnippet>765</a>                    .max(body.throttle_state),
+<a href=#766 id=766 data-nosnippet>766</a>            );
+<a href=#767 id=767 data-nosnippet>767</a>        }
+<a href=#768 id=768 data-nosnippet>768</a>        <span class="comment">// Intention expiry + zone arbitration + trace. Sleep drifts
+<a href=#769 id=769 data-nosnippet>769</a>        // the cadence — few zone decisions arrive while dreaming;
+<a href=#770 id=770 data-nosnippet>770</a>        // wake keeps it near the nominal few seconds. Skipped while
+<a href=#771 id=771 data-nosnippet>771</a>        // the mind holds the lease by the outer check.
+<a href=#772 id=772 data-nosnippet>772</a>        </span>zone_gate.drive(<span class="kw">match </span>phase {
+<a href=#773 id=773 data-nosnippet>773</a>            <span class="prelude-val">Some</span>(genesis::state::MentalPhase::NREM) =&gt; <span class="number">0.0</span>,
+<a href=#774 id=774 data-nosnippet>774</a>            <span class="prelude-val">Some</span>(genesis::state::MentalPhase::REM) =&gt; <span class="number">0.3</span>,
+<a href=#775 id=775 data-nosnippet>775</a>            <span class="kw">_ </span>=&gt; <span class="number">1.0</span>,
+<a href=#776 id=776 data-nosnippet>776</a>        });
+<a href=#777 id=777 data-nosnippet>777</a>        <span class="kw">if </span>zone_gate.due(now_ms) {
+<a href=#778 id=778 data-nosnippet>778</a>            tl.arbitrate_zone(<span class="kw-2">&amp;</span>mmap, ltm_store);
+<a href=#779 id=779 data-nosnippet>779</a>        }
+<a href=#780 id=780 data-nosnippet>780</a>
+<a href=#781 id=781 data-nosnippet>781</a>        <span class="comment">// Body-control recommendation publish (compute + publish
+<a href=#782 id=782 data-nosnippet>782</a>        // only — never application). Needs the TickLoop alone.
+<a href=#783 id=783 data-nosnippet>783</a>        </span><span class="kw">if </span>body_gate.due(now_ms) {
+<a href=#784 id=784 data-nosnippet>784</a>            <span class="kw">match </span>tick_loop.try_lock() {
+<a href=#785 id=785 data-nosnippet>785</a>                <span class="prelude-val">Ok</span>(<span class="kw-2">mut </span>tl) <span class="kw">if </span>tl.mind_lease_expired() =&gt; {
+<a href=#786 id=786 data-nosnippet>786</a>                    tl.publish_body_recommendation(<span class="kw-2">&amp;</span>mmap);
+<a href=#787 id=787 data-nosnippet>787</a>                    <span class="comment">// Thermal/throttle pressure on the last-read body
+<a href=#788 id=788 data-nosnippet>788</a>                    // revisits policy sooner; a cool machine drifts.
+<a href=#789 id=789 data-nosnippet>789</a>                    </span><span class="kw">let </span>b = <span class="kw-2">&amp;</span>tl.last_body_state;
+<a href=#790 id=790 data-nosnippet>790</a>                    body_gate.drive(
+<a href=#791 id=791 data-nosnippet>791</a>                        b.throttle_state
+<a href=#792 id=792 data-nosnippet>792</a>                            .max(b.thermoregulatory_effort)
+<a href=#793 id=793 data-nosnippet>793</a>                            .max(b.psi_cpu),
+<a href=#794 id=794 data-nosnippet>794</a>                    );
+<a href=#795 id=795 data-nosnippet>795</a>                }
+<a href=#796 id=796 data-nosnippet>796</a>                <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; {}
+<a href=#797 id=797 data-nosnippet>797</a>                <span class="prelude-val">Err</span>(e) =&gt; {
+<a href=#798 id=798 data-nosnippet>798</a>                    <span class="kw">if </span>lock_refusal(<span class="string">"tick_loop"</span>, e) {
+<a href=#799 id=799 data-nosnippet>799</a>                        fatal_if_poisoned(<span class="string">"tick_loop"</span>, <span class="kw-2">&amp;</span>shutdown_flag);
+<a href=#800 id=800 data-nosnippet>800</a>                    }
+<a href=#801 id=801 data-nosnippet>801</a>                }
+<a href=#802 id=802 data-nosnippet>802</a>            }
+<a href=#803 id=803 data-nosnippet>803</a>        }
+<a href=#804 id=804 data-nosnippet>804</a>
+<a href=#805 id=805 data-nosnippet>805</a>        <span class="comment">// Generative-model checkpoint so autonomous learning is
+<a href=#806 id=806 data-nosnippet>806</a>        // durable. The mind saves every 60 s while alive; this covers
+<a href=#807 id=807 data-nosnippet>807</a>        // mindless stretches. Shutdown always saves regardless.
+<a href=#808 id=808 data-nosnippet>808</a>        // Demand follows learning: new inference ticks mean new model
+<a href=#809 id=809 data-nosnippet>809</a>        // state worth persisting; an unchanged engine relaxes.
+<a href=#810 id=810 data-nosnippet>810</a>        </span><span class="kw">if </span>model_save_gate.due(now_ms) {
+<a href=#811 id=811 data-nosnippet>811</a>            <span class="kw">match </span>tick_loop.try_lock() {
+<a href=#812 id=812 data-nosnippet>812</a>                <span class="prelude-val">Ok</span>(tl) <span class="kw">if </span>tl.mind_lease_expired() =&gt; {
+<a href=#813 id=813 data-nosnippet>813</a>                    <span class="kw">if </span>tl.inference_engine.tick_count() != last_model_save_ticks {
+<a href=#814 id=814 data-nosnippet>814</a>                        <span class="kw">if </span>!tl.save_inference_model(<span class="kw-2">&amp;</span>config.data_dir) {
+<a href=#815 id=815 data-nosnippet>815</a>                            <span class="macro">eprintln!</span>(<span class="string">"[genesis] WARNING: autonomous inference save failed"</span>);
+<a href=#816 id=816 data-nosnippet>816</a>                        }
+<a href=#817 id=817 data-nosnippet>817</a>                        last_model_save_ticks = tl.inference_engine.tick_count();
+<a href=#818 id=818 data-nosnippet>818</a>                        model_save_gate.demand();
+<a href=#819 id=819 data-nosnippet>819</a>                    } <span class="kw">else </span>{
+<a href=#820 id=820 data-nosnippet>820</a>                        model_save_gate.relax();
+<a href=#821 id=821 data-nosnippet>821</a>                    }
+<a href=#822 id=822 data-nosnippet>822</a>                }
+<a href=#823 id=823 data-nosnippet>823</a>                <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; {}
+<a href=#824 id=824 data-nosnippet>824</a>                <span class="prelude-val">Err</span>(e) =&gt; {
+<a href=#825 id=825 data-nosnippet>825</a>                    <span class="kw">if </span>lock_refusal(<span class="string">"tick_loop"</span>, e) {
+<a href=#826 id=826 data-nosnippet>826</a>                        fatal_if_poisoned(<span class="string">"tick_loop"</span>, <span class="kw-2">&amp;</span>shutdown_flag);
+<a href=#827 id=827 data-nosnippet>827</a>                    }
+<a href=#828 id=828 data-nosnippet>828</a>                }
+<a href=#829 id=829 data-nosnippet>829</a>            }
+<a href=#830 id=830 data-nosnippet>830</a>        }
+<a href=#831 id=831 data-nosnippet>831</a>
+<a href=#832 id=832 data-nosnippet>832</a>        <span class="comment">// Periodic non-blocking flush so autonomous life is durable.
+<a href=#833 id=833 data-nosnippet>833</a>        // Shutdown and explicit SYNC still use the blocking path.
+<a href=#834 id=834 data-nosnippet>834</a>        // Plasticity drives the period — same continuous form as the
+<a href=#835 id=835 data-nosnippet>835</a>        // integrated tick's sync gate.
+<a href=#836 id=836 data-nosnippet>836</a>        </span><span class="kw">let </span>plasticity = mmap
+<a href=#837 id=837 data-nosnippet>837</a>            .read_consistent()
+<a href=#838 id=838 data-nosnippet>838</a>            .map(|s| s.memory.plasticity_gate)
+<a href=#839 id=839 data-nosnippet>839</a>            .unwrap_or(<span class="number">0.5</span>);
+<a href=#840 id=840 data-nosnippet>840</a>        sync_gate.drive(plasticity);
+<a href=#841 id=841 data-nosnippet>841</a>        <span class="kw">if </span>sync_gate.due(now_ms) {
+<a href=#842 id=842 data-nosnippet>842</a>            <span class="kw">let _ </span>= mmap.sync_async();
+<a href=#843 id=843 data-nosnippet>843</a>        }
+<a href=#844 id=844 data-nosnippet>844</a>    }
+<a href=#845 id=845 data-nosnippet>845</a>
+<a href=#846 id=846 data-nosnippet>846</a>    <span class="comment">// The wait can end via either flag — signals set `shutdown_flag`,
+<a href=#847 id=847 data-nosnippet>847</a>    // an IPC SHUTDOWN command sets `ipc_shutdown_flag`. Normalize so
+<a href=#848 id=848 data-nosnippet>848</a>    // the auxiliary threads (which watch `shutdown_flag`) exit too;
+<a href=#849 id=849 data-nosnippet>849</a>    // otherwise an IPC-initiated shutdown would hang the joins below
+<a href=#850 id=850 data-nosnippet>850</a>    // before the final state sync.
+<a href=#851 id=851 data-nosnippet>851</a>    </span>shutdown_flag.store(<span class="bool-val">true</span>, std::sync::atomic::Ordering::Relaxed);
+<a href=#852 id=852 data-nosnippet>852</a>
+<a href=#853 id=853 data-nosnippet>853</a>    <span class="comment">// Shutdown sequence
+<a href=#854 id=854 data-nosnippet>854</a>    </span><span class="macro">eprintln!</span>(<span class="string">"[genesis] Shutting down..."</span>);
+<a href=#855 id=855 data-nosnippet>855</a>
+<a href=#856 id=856 data-nosnippet>856</a>    <span class="comment">// Close the eye first so no reader attaches to a dead nerve — the
+<a href=#857 id=857 data-nosnippet>857</a>    // limb's thread is reaped by process exit if it is still blocked
+<a href=#858 id=858 data-nosnippet>858</a>    // in the driver's dequeue. `None` when an external retina owned
+<a href=#859 id=859 data-nosnippet>859</a>    // the nerve to the end, or none ever did.
+<a href=#860 id=860 data-nosnippet>860</a>    </span><span class="kw">if let </span><span class="prelude-val">Some</span>(eye) = eye.take() {
+<a href=#861 id=861 data-nosnippet>861</a>        eye.stop();
+<a href=#862 id=862 data-nosnippet>862</a>    }
+<a href=#863 id=863 data-nosnippet>863</a>
+<a href=#864 id=864 data-nosnippet>864</a>    <span class="comment">// Restore the host's CPU policy captured at startup. This runs
+<a href=#865 id=865 data-nosnippet>865</a>    // before the sync block below (which can bail out on a poisoned
+<a href=#866 id=866 data-nosnippet>866</a>    // LTM mutex), so the machine is never left pinned to a throttled
+<a href=#867 id=867 data-nosnippet>867</a>    // governor. It runs only after it has stopped — it cannot affect
+<a href=#868 id=868 data-nosnippet>868</a>    // its running state.
+<a href=#869 id=869 data-nosnippet>869</a>    </span><span class="kw">if </span>genesis::daemon::cpufreq::restore_hardware_state() {
+<a href=#870 id=870 data-nosnippet>870</a>        <span class="macro">eprintln!</span>(<span class="string">"[genesis] Host CPU policy restored."</span>);
+<a href=#871 id=871 data-nosnippet>871</a>    } <span class="kw">else if </span>genesis::daemon::cpufreq::policy_was_applied() {
+<a href=#872 id=872 data-nosnippet>872</a>        <span class="comment">// The alarming case, and the only one worth shouting about: we
+<a href=#873 id=873 data-nosnippet>873</a>        // did change the host and could not put it back, so the machine
+<a href=#874 id=874 data-nosnippet>874</a>        // outlives us pinned to a throttle. Reported unconditionally
+<a href=#875 id=875 data-nosnippet>875</a>        // rather than through the deduplicating helper so it survives
+<a href=#876 id=876 data-nosnippet>876</a>        // an earlier same-cause log.
+<a href=#877 id=877 data-nosnippet>877</a>        </span><span class="macro">eprintln!</span>(
+<a href=#878 id=878 data-nosnippet>878</a>            <span class="string">"[genesis] WARNING: host CPU policy was NOT restored — this machine may \
+<a href=#879 id=879 data-nosnippet>879</a>             be left at the throttled governor Genesis applied. Check that \
+<a href=#880 id=880 data-nosnippet>880</a>             passwordless sudo still works (`sudo -n true`)."
+<a href=#881 id=881 data-nosnippet>881</a>        </span>);
+<a href=#882 id=882 data-nosnippet>882</a>    } <span class="kw">else </span>{
+<a href=#883 id=883 data-nosnippet>883</a>        <span class="comment">// Nothing was ever applied, so there is nothing to restore. This
+<a href=#884 id=884 data-nosnippet>884</a>        // is the ordinary case on a machine where the sudo grant was
+<a href=#885 id=885 data-nosnippet>885</a>        // never installed, and warning about a throttle we never applied
+<a href=#886 id=886 data-nosnippet>886</a>        // would be a false alarm on every shutdown.
+<a href=#887 id=887 data-nosnippet>887</a>        </span><span class="macro">eprintln!</span>(<span class="string">"[genesis] Host CPU policy unchanged — nothing was applied, nothing to restore."</span>);
+<a href=#888 id=888 data-nosnippet>888</a>    }
+<a href=#889 id=889 data-nosnippet>889</a>
+<a href=#890 id=890 data-nosnippet>890</a>    <span class="comment">// Wait for the IPC accept thread to finish gracefully.
+<a href=#891 id=891 data-nosnippet>891</a>    // The IPC server checks the shutdown flag on each accept poll.
+<a href=#892 id=892 data-nosnippet>892</a>    // Joining ensures the accept loop has stopped so no new client
+<a href=#893 id=893 data-nosnippet>893</a>    // connections will be accepted before we sync to disk.
+<a href=#894 id=894 data-nosnippet>894</a>    </span><span class="kw">if let </span><span class="prelude-val">Err</span>(e) = ipc_thread.join() {
+<a href=#895 id=895 data-nosnippet>895</a>        <span class="macro">eprintln!</span>(<span class="string">"[genesis] IPC thread panicked: {e:?}"</span>);
+<a href=#896 id=896 data-nosnippet>896</a>    }
+<a href=#897 id=897 data-nosnippet>897</a>
+<a href=#898 id=898 data-nosnippet>898</a>    <span class="comment">// Join the watcher and bridge threads. Both poll every 50ms and
+<a href=#899 id=899 data-nosnippet>899</a>    // exit as soon as they see their respective shutdown flags, which
+<a href=#900 id=900 data-nosnippet>900</a>    // are already set by this point. They don't touch any stores —
+<a href=#901 id=901 data-nosnippet>901</a>    // joining is for clean thread accounting, not data safety.
+<a href=#902 id=902 data-nosnippet>902</a>    </span><span class="kw">if let </span><span class="prelude-val">Err</span>(e) = bridge_thread.join() {
+<a href=#903 id=903 data-nosnippet>903</a>        <span class="macro">eprintln!</span>(<span class="string">"[genesis] bridge thread panicked: {e:?}"</span>);
+<a href=#904 id=904 data-nosnippet>904</a>    }
+<a href=#905 id=905 data-nosnippet>905</a>    <span class="kw">if let </span><span class="prelude-val">Err</span>(e) = watcher_thread.join() {
+<a href=#906 id=906 data-nosnippet>906</a>        <span class="macro">eprintln!</span>(<span class="string">"[genesis] watcher thread panicked: {e:?}"</span>);
 <a href=#907 id=907 data-nosnippet>907</a>    }
 <a href=#908 id=908 data-nosnippet>908</a>
-<a href=#909 id=909 data-nosnippet>909</a>    <span class="comment">// Wait for the IPC accept thread to finish gracefully.
-<a href=#910 id=910 data-nosnippet>910</a>    // The IPC server checks the shutdown flag on each accept poll.
-<a href=#911 id=911 data-nosnippet>911</a>    // Joining ensures the accept loop has stopped so no new client
-<a href=#912 id=912 data-nosnippet>912</a>    // connections will be accepted before we sync to disk.
-<a href=#913 id=913 data-nosnippet>913</a>    </span><span class="kw">if let </span><span class="prelude-val">Err</span>(e) = ipc_thread.join() {
-<a href=#914 id=914 data-nosnippet>914</a>        <span class="macro">eprintln!</span>(<span class="string">"[genesis] IPC thread panicked: {e:?}"</span>);
-<a href=#915 id=915 data-nosnippet>915</a>    }
-<a href=#916 id=916 data-nosnippet>916</a>
-<a href=#917 id=917 data-nosnippet>917</a>    <span class="comment">// Join the watcher and bridge threads. Both poll every 50ms and
-<a href=#918 id=918 data-nosnippet>918</a>    // exit as soon as they see their respective shutdown flags, which
-<a href=#919 id=919 data-nosnippet>919</a>    // are already set by this point. They don't touch any stores —
-<a href=#920 id=920 data-nosnippet>920</a>    // joining is for clean thread accounting, not data safety.
-<a href=#921 id=921 data-nosnippet>921</a>    </span><span class="kw">if let </span><span class="prelude-val">Err</span>(e) = bridge_thread.join() {
-<a href=#922 id=922 data-nosnippet>922</a>        <span class="macro">eprintln!</span>(<span class="string">"[genesis] bridge thread panicked: {e:?}"</span>);
-<a href=#923 id=923 data-nosnippet>923</a>    }
-<a href=#924 id=924 data-nosnippet>924</a>    <span class="kw">if let </span><span class="prelude-val">Err</span>(e) = watcher_thread.join() {
-<a href=#925 id=925 data-nosnippet>925</a>        <span class="macro">eprintln!</span>(<span class="string">"[genesis] watcher thread panicked: {e:?}"</span>);
-<a href=#926 id=926 data-nosnippet>926</a>    }
-<a href=#927 id=927 data-nosnippet>927</a>
-<a href=#928 id=928 data-nosnippet>928</a>    <span class="comment">// The IPC thread has now joined every client handler it spawned.
-<a href=#929 id=929 data-nosnippet>929</a>    // No connected request can mutate mmap/STM/LTM after this point.
-<a href=#930 id=930 data-nosnippet>930</a>
-<a href=#931 id=931 data-nosnippet>931</a>    // Final sync — flush all mmap'd stores to disk. A poisoned LTM
-<a href=#932 id=932 data-nosnippet>932</a>    // lock means a thread panicked while holding it; the mmap state
-<a href=#933 id=933 data-nosnippet>933</a>    // may be inconsistent. Exit with an error rather than continuing
-<a href=#934 id=934 data-nosnippet>934</a>    // and potentially writing corrupt data to disk.
-<a href=#935 id=935 data-nosnippet>935</a>    </span><span class="kw">let </span><span class="kw-2">mut </span>clean_shutdown = <span class="bool-val">true</span>;
-<a href=#936 id=936 data-nosnippet>936</a>    {
-<a href=#937 id=937 data-nosnippet>937</a>        <span class="kw">let </span><span class="kw-2">mut </span>ltm_guard = <span class="kw">match </span>ltm.lock() {
-<a href=#938 id=938 data-nosnippet>938</a>            <span class="prelude-val">Ok</span>(g) =&gt; g,
-<a href=#939 id=939 data-nosnippet>939</a>            <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
-<a href=#940 id=940 data-nosnippet>940</a>                <span class="macro">eprintln!</span>(
-<a href=#941 id=941 data-nosnippet>941</a>                    <span class="string">"[genesis] FATAL: LTM mutex poisoned during shutdown — \
-<a href=#942 id=942 data-nosnippet>942</a>                     a thread panicked while holding the lock. State may be \
-<a href=#943 id=943 data-nosnippet>943</a>                     inconsistent; refusing to sync."
-<a href=#944 id=944 data-nosnippet>944</a>                </span>);
-<a href=#945 id=945 data-nosnippet>945</a>                std::process::exit(<span class="number">1</span>);
-<a href=#946 id=946 data-nosnippet>946</a>            }
-<a href=#947 id=947 data-nosnippet>947</a>        };
-<a href=#948 id=948 data-nosnippet>948</a>        <span class="kw">if let </span><span class="prelude-val">Err</span>(e) = ltm_guard.sync() {
-<a href=#949 id=949 data-nosnippet>949</a>            <span class="macro">eprintln!</span>(<span class="string">"[genesis] WARNING: final ltm sync failed: {e}"</span>);
+<a href=#909 id=909 data-nosnippet>909</a>    <span class="comment">// The IPC thread has now joined every client handler it spawned.
+<a href=#910 id=910 data-nosnippet>910</a>    // No connected request can mutate mmap/STM/LTM after this point.
+<a href=#911 id=911 data-nosnippet>911</a>
+<a href=#912 id=912 data-nosnippet>912</a>    // Final sync — flush all mmap'd stores to disk. A poisoned LTM
+<a href=#913 id=913 data-nosnippet>913</a>    // lock means a thread panicked while holding it; the mmap state
+<a href=#914 id=914 data-nosnippet>914</a>    // may be inconsistent. Exit with an error rather than continuing
+<a href=#915 id=915 data-nosnippet>915</a>    // and potentially writing corrupt data to disk.
+<a href=#916 id=916 data-nosnippet>916</a>    </span><span class="kw">let </span><span class="kw-2">mut </span>clean_shutdown = <span class="bool-val">true</span>;
+<a href=#917 id=917 data-nosnippet>917</a>    {
+<a href=#918 id=918 data-nosnippet>918</a>        <span class="kw">let </span><span class="kw-2">mut </span>ltm_guard = <span class="kw">match </span>ltm.lock() {
+<a href=#919 id=919 data-nosnippet>919</a>            <span class="prelude-val">Ok</span>(g) =&gt; g,
+<a href=#920 id=920 data-nosnippet>920</a>            <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
+<a href=#921 id=921 data-nosnippet>921</a>                <span class="macro">eprintln!</span>(
+<a href=#922 id=922 data-nosnippet>922</a>                    <span class="string">"[genesis] FATAL: LTM mutex poisoned during shutdown — \
+<a href=#923 id=923 data-nosnippet>923</a>                     a thread panicked while holding the lock. State may be \
+<a href=#924 id=924 data-nosnippet>924</a>                     inconsistent; refusing to sync."
+<a href=#925 id=925 data-nosnippet>925</a>                </span>);
+<a href=#926 id=926 data-nosnippet>926</a>                std::process::exit(<span class="number">1</span>);
+<a href=#927 id=927 data-nosnippet>927</a>            }
+<a href=#928 id=928 data-nosnippet>928</a>        };
+<a href=#929 id=929 data-nosnippet>929</a>        <span class="kw">if let </span><span class="prelude-val">Err</span>(e) = ltm_guard.sync() {
+<a href=#930 id=930 data-nosnippet>930</a>            <span class="macro">eprintln!</span>(<span class="string">"[genesis] WARNING: final ltm sync failed: {e}"</span>);
+<a href=#931 id=931 data-nosnippet>931</a>            clean_shutdown = <span class="bool-val">false</span>;
+<a href=#932 id=932 data-nosnippet>932</a>        }
+<a href=#933 id=933 data-nosnippet>933</a>    }
+<a href=#934 id=934 data-nosnippet>934</a>    <span class="kw">if let </span><span class="prelude-val">Err</span>(e) = stm.sync() {
+<a href=#935 id=935 data-nosnippet>935</a>        <span class="macro">eprintln!</span>(<span class="string">"[genesis] WARNING: final stm sync failed: {e}"</span>);
+<a href=#936 id=936 data-nosnippet>936</a>        clean_shutdown = <span class="bool-val">false</span>;
+<a href=#937 id=937 data-nosnippet>937</a>    }
+<a href=#938 id=938 data-nosnippet>938</a>    <span class="kw">if let </span><span class="prelude-val">Err</span>(e) = mmap.sync() {
+<a href=#939 id=939 data-nosnippet>939</a>        <span class="macro">eprintln!</span>(<span class="string">"[genesis] WARNING: final mmap sync failed: {e}"</span>);
+<a href=#940 id=940 data-nosnippet>940</a>        clean_shutdown = <span class="bool-val">false</span>;
+<a href=#941 id=941 data-nosnippet>941</a>    }
+<a href=#942 id=942 data-nosnippet>942</a>
+<a href=#943 id=943 data-nosnippet>943</a>    <span class="comment">// Save the active inference model so the generative self-model
+<a href=#944 id=944 data-nosnippet>944</a>    // persists across restarts. Genesis doesn't re-learn its own
+<a href=#945 id=945 data-nosnippet>945</a>    // neurochemical dynamics from scratch every time it wakes up.
+<a href=#946 id=946 data-nosnippet>946</a>    </span><span class="kw">match </span>tick_loop.lock() {
+<a href=#947 id=947 data-nosnippet>947</a>        <span class="prelude-val">Ok</span>(tl) =&gt; clean_shutdown &amp;= tl.save_inference_model(<span class="kw-2">&amp;</span>config.data_dir),
+<a href=#948 id=948 data-nosnippet>948</a>        <span class="prelude-val">Err</span>(e) =&gt; {
+<a href=#949 id=949 data-nosnippet>949</a>            <span class="macro">eprintln!</span>(<span class="string">"[genesis] WARNING: tick loop poisoned during shutdown: {e}"</span>);
 <a href=#950 id=950 data-nosnippet>950</a>            clean_shutdown = <span class="bool-val">false</span>;
 <a href=#951 id=951 data-nosnippet>951</a>        }
 <a href=#952 id=952 data-nosnippet>952</a>    }
-<a href=#953 id=953 data-nosnippet>953</a>    <span class="kw">if let </span><span class="prelude-val">Err</span>(e) = stm.sync() {
-<a href=#954 id=954 data-nosnippet>954</a>        <span class="macro">eprintln!</span>(<span class="string">"[genesis] WARNING: final stm sync failed: {e}"</span>);
-<a href=#955 id=955 data-nosnippet>955</a>        clean_shutdown = <span class="bool-val">false</span>;
-<a href=#956 id=956 data-nosnippet>956</a>    }
-<a href=#957 id=957 data-nosnippet>957</a>    <span class="kw">if let </span><span class="prelude-val">Err</span>(e) = mmap.sync() {
-<a href=#958 id=958 data-nosnippet>958</a>        <span class="macro">eprintln!</span>(<span class="string">"[genesis] WARNING: final mmap sync failed: {e}"</span>);
-<a href=#959 id=959 data-nosnippet>959</a>        clean_shutdown = <span class="bool-val">false</span>;
-<a href=#960 id=960 data-nosnippet>960</a>    }
-<a href=#961 id=961 data-nosnippet>961</a>
-<a href=#962 id=962 data-nosnippet>962</a>    <span class="comment">// Save the active inference model so the generative self-model
-<a href=#963 id=963 data-nosnippet>963</a>    // persists across restarts. Genesis doesn't re-learn its own
-<a href=#964 id=964 data-nosnippet>964</a>    // neurochemical dynamics from scratch every time it wakes up.
-<a href=#965 id=965 data-nosnippet>965</a>    </span><span class="kw">match </span>tick_loop.lock() {
-<a href=#966 id=966 data-nosnippet>966</a>        <span class="prelude-val">Ok</span>(tl) =&gt; clean_shutdown &amp;= tl.save_inference_model(<span class="kw-2">&amp;</span>config.data_dir),
-<a href=#967 id=967 data-nosnippet>967</a>        <span class="prelude-val">Err</span>(e) =&gt; {
-<a href=#968 id=968 data-nosnippet>968</a>            <span class="macro">eprintln!</span>(<span class="string">"[genesis] WARNING: tick loop poisoned during shutdown: {e}"</span>);
-<a href=#969 id=969 data-nosnippet>969</a>            clean_shutdown = <span class="bool-val">false</span>;
-<a href=#970 id=970 data-nosnippet>970</a>        }
-<a href=#971 id=971 data-nosnippet>971</a>    }
-<a href=#972 id=972 data-nosnippet>972</a>
-<a href=#973 id=973 data-nosnippet>973</a>    <span class="comment">// Mark the session's clean stop — the stop itself was deliberate
-<a href=#974 id=974 data-nosnippet>974</a>    // regardless of whether every sync succeeded. Any exit that never
-<a href=#975 id=975 data-nosnippet>975</a>    // reaches here leaves the sentinel open, and the next boot reads
-<a href=#976 id=976 data-nosnippet>976</a>    // it as the unclean stop it was.
-<a href=#977 id=977 data-nosnippet>977</a>    </span>genesis::daemon::continuity::note_clean_stop(
-<a href=#978 id=978 data-nosnippet>978</a>        <span class="kw-2">&amp;</span>config.data_dir,
-<a href=#979 id=979 data-nosnippet>979</a>        genesis::daemon::tick::current_ms(),
-<a href=#980 id=980 data-nosnippet>980</a>    );
-<a href=#981 id=981 data-nosnippet>981</a>
-<a href=#982 id=982 data-nosnippet>982</a>    <span class="kw">if </span>!clean_shutdown {
-<a href=#983 id=983 data-nosnippet>983</a>        <span class="macro">eprintln!</span>(<span class="string">"[genesis] Shutdown incomplete — persistent state may be stale."</span>);
-<a href=#984 id=984 data-nosnippet>984</a>        std::process::exit(<span class="number">1</span>);
-<a href=#985 id=985 data-nosnippet>985</a>    }
-<a href=#986 id=986 data-nosnippet>986</a>    <span class="macro">eprintln!</span>(<span class="string">"[genesis] Subcognitive stopped. Goodnight."</span>);
-<a href=#987 id=987 data-nosnippet>987</a>}
-<a href=#988 id=988 data-nosnippet>988</a>
-<a href=#989 id=989 data-nosnippet>989</a><span class="doccomment">/// Set up SIGINT and SIGTERM handlers for graceful shutdown.
-<a href=#990 id=990 data-nosnippet>990</a>///
-<a href=#991 id=991 data-nosnippet>991</a>/// Uses `sigaction(2)` instead of `signal(2)` for portability and
-<a href=#992 id=992 data-nosnippet>992</a>/// reliability: `sigaction` does not reset the handler to `SIG_DFL`
-<a href=#993 id=993 data-nosnippet>993</a>/// after delivery (which `signal` may do on some systems), and allows
-<a href=#994 id=994 data-nosnippet>994</a>/// masking other signals during handler execution.
-<a href=#995 id=995 data-nosnippet>995</a>///
-<a href=#996 id=996 data-nosnippet>996</a>/// The handler (`handle_signal`) is async-signal-safe: it only performs
-<a href=#997 id=997 data-nosnippet>997</a>/// an atomic store to a static `AtomicBool` with `Ordering::Relaxed`,
-<a href=#998 id=998 data-nosnippet>998</a>/// which is async-signal-safe per POSIX. No locks, no allocation, no
-<a href=#999 id=999 data-nosnippet>999</a>/// I/O inside the handler.
-<a href=#1000 id=1000 data-nosnippet>1000</a></span><span class="kw">fn </span>setup_signal_handlers(
-<a href=#1001 id=1001 data-nosnippet>1001</a>    shutdown_flag: <span class="kw-2">&amp;</span>Arc&lt;std::sync::atomic::AtomicBool&gt;,
-<a href=#1002 id=1002 data-nosnippet>1002</a>) -&gt; std::thread::JoinHandle&lt;()&gt; {
-<a href=#1003 id=1003 data-nosnippet>1003</a>    <span class="kw">use </span>std::sync::atomic::Ordering;
-<a href=#1004 id=1004 data-nosnippet>1004</a>
-<a href=#1005 id=1005 data-nosnippet>1005</a>    <span class="comment">// SAFETY: `sigaction(2)` installs a handler for a signal. The handler
-<a href=#1006 id=1006 data-nosnippet>1006</a>    // (`handle_signal`) is async-signal-safe: it only performs an atomic
-<a href=#1007 id=1007 data-nosnippet>1007</a>    // store to a static `AtomicBool` with `Ordering::Relaxed`. No locks,
-<a href=#1008 id=1008 data-nosnippet>1008</a>    // no allocation, no I/O inside the handler. The `sigaction` struct is
-<a href=#1009 id=1009 data-nosnippet>1009</a>    // zero-initialised and then populated with the handler function.
-<a href=#1010 id=1010 data-nosnippet>1010</a>    </span><span class="kw">unsafe </span>{
-<a href=#1011 id=1011 data-nosnippet>1011</a>        <span class="kw">extern </span><span class="string">"C" </span><span class="kw">fn </span>handle_signal(_sig: i32) {
-<a href=#1012 id=1012 data-nosnippet>1012</a>            SHUTDOWN_REQUESTED.store(<span class="bool-val">true</span>, std::sync::atomic::Ordering::Relaxed);
-<a href=#1013 id=1013 data-nosnippet>1013</a>        }
-<a href=#1014 id=1014 data-nosnippet>1014</a>
-<a href=#1015 id=1015 data-nosnippet>1015</a>        <span class="kw">let </span><span class="kw-2">mut </span>sa: libc::sigaction = std::mem::zeroed();
-<a href=#1016 id=1016 data-nosnippet>1016</a>        sa.sa_sigaction = handle_signal <span class="kw">as </span><span class="kw-2">*const </span>() <span class="kw">as </span>usize;
-<a href=#1017 id=1017 data-nosnippet>1017</a>        sa.sa_flags = <span class="number">0</span>;
-<a href=#1018 id=1018 data-nosnippet>1018</a>        libc::sigemptyset(<span class="kw-2">&amp;mut </span>sa.sa_mask);
-<a href=#1019 id=1019 data-nosnippet>1019</a>
-<a href=#1020 id=1020 data-nosnippet>1020</a>        <span class="comment">// SIGINT (2) and SIGTERM (15)
-<a href=#1021 id=1021 data-nosnippet>1021</a>        </span>libc::sigaction(libc::SIGINT, <span class="kw-2">&amp;</span>sa, std::ptr::null_mut());
-<a href=#1022 id=1022 data-nosnippet>1022</a>        libc::sigaction(libc::SIGTERM, <span class="kw-2">&amp;</span>sa, std::ptr::null_mut());
-<a href=#1023 id=1023 data-nosnippet>1023</a>    }
-<a href=#1024 id=1024 data-nosnippet>1024</a>
-<a href=#1025 id=1025 data-nosnippet>1025</a>    <span class="comment">// Watcher thread: polls the static and forwards to the caller's flag
-<a href=#1026 id=1026 data-nosnippet>1026</a>    </span><span class="kw">let </span>flag = shutdown_flag.clone();
-<a href=#1027 id=1027 data-nosnippet>1027</a>    std::thread::spawn(<span class="kw">move </span>|| {
-<a href=#1028 id=1028 data-nosnippet>1028</a>        <span class="kw">loop </span>{
-<a href=#1029 id=1029 data-nosnippet>1029</a>            <span class="kw">if </span>SHUTDOWN_REQUESTED.load(Ordering::Relaxed) {
-<a href=#1030 id=1030 data-nosnippet>1030</a>                <span class="macro">eprintln!</span>(<span class="string">"\n[genesis] Received shutdown signal, stopping..."</span>);
-<a href=#1031 id=1031 data-nosnippet>1031</a>                flag.store(<span class="bool-val">true</span>, Ordering::Relaxed);
-<a href=#1032 id=1032 data-nosnippet>1032</a>                <span class="kw">break</span>;
-<a href=#1033 id=1033 data-nosnippet>1033</a>            }
-<a href=#1034 id=1034 data-nosnippet>1034</a>            <span class="comment">// Shutdown can also be initiated without a signal (the IPC
-<a href=#1035 id=1035 data-nosnippet>1035</a>            // SHUTDOWN command sets the IPC server's flag and the main
-<a href=#1036 id=1036 data-nosnippet>1036</a>            // thread then sets this one). Exit in that case too so the
-<a href=#1037 id=1037 data-nosnippet>1037</a>            // main thread's join doesn't hang.
-<a href=#1038 id=1038 data-nosnippet>1038</a>            </span><span class="kw">if </span>flag.load(Ordering::Relaxed) {
-<a href=#1039 id=1039 data-nosnippet>1039</a>                <span class="kw">break</span>;
-<a href=#1040 id=1040 data-nosnippet>1040</a>            }
-<a href=#1041 id=1041 data-nosnippet>1041</a>            std::thread::sleep(Duration::from_millis(<span class="number">50</span>));
-<a href=#1042 id=1042 data-nosnippet>1042</a>        }
-<a href=#1043 id=1043 data-nosnippet>1043</a>    })
-<a href=#1044 id=1044 data-nosnippet>1044</a>}
-<a href=#1045 id=1045 data-nosnippet>1045</a>
-<a href=#1046 id=1046 data-nosnippet>1046</a><span class="comment">// Static atomic for signal handler communication
-<a href=#1047 id=1047 data-nosnippet>1047</a></span><span class="kw">use </span>std::sync::atomic::AtomicBool;
-<a href=#1048 id=1048 data-nosnippet>1048</a><span class="kw">static </span>SHUTDOWN_REQUESTED: AtomicBool = AtomicBool::new(<span class="bool-val">false</span>);
+<a href=#953 id=953 data-nosnippet>953</a>
+<a href=#954 id=954 data-nosnippet>954</a>    <span class="comment">// Mark the session's clean stop — the stop itself was deliberate
+<a href=#955 id=955 data-nosnippet>955</a>    // regardless of whether every sync succeeded. Any exit that never
+<a href=#956 id=956 data-nosnippet>956</a>    // reaches here leaves the sentinel open, and the next boot reads
+<a href=#957 id=957 data-nosnippet>957</a>    // it as the unclean stop it was.
+<a href=#958 id=958 data-nosnippet>958</a>    </span>genesis::daemon::continuity::note_clean_stop(
+<a href=#959 id=959 data-nosnippet>959</a>        <span class="kw-2">&amp;</span>config.data_dir,
+<a href=#960 id=960 data-nosnippet>960</a>        genesis::daemon::tick::current_ms(),
+<a href=#961 id=961 data-nosnippet>961</a>    );
+<a href=#962 id=962 data-nosnippet>962</a>
+<a href=#963 id=963 data-nosnippet>963</a>    <span class="kw">if </span>!clean_shutdown {
+<a href=#964 id=964 data-nosnippet>964</a>        <span class="macro">eprintln!</span>(<span class="string">"[genesis] Shutdown incomplete — persistent state may be stale."</span>);
+<a href=#965 id=965 data-nosnippet>965</a>        std::process::exit(<span class="number">1</span>);
+<a href=#966 id=966 data-nosnippet>966</a>    }
+<a href=#967 id=967 data-nosnippet>967</a>    <span class="macro">eprintln!</span>(<span class="string">"[genesis] Subcognitive stopped. Goodnight."</span>);
+<a href=#968 id=968 data-nosnippet>968</a>}
+<a href=#969 id=969 data-nosnippet>969</a>
+<a href=#970 id=970 data-nosnippet>970</a><span class="doccomment">/// Set up SIGINT and SIGTERM handlers for graceful shutdown.
+<a href=#971 id=971 data-nosnippet>971</a>///
+<a href=#972 id=972 data-nosnippet>972</a>/// Uses `sigaction(2)` instead of `signal(2)` for portability and
+<a href=#973 id=973 data-nosnippet>973</a>/// reliability: `sigaction` does not reset the handler to `SIG_DFL`
+<a href=#974 id=974 data-nosnippet>974</a>/// after delivery (which `signal` may do on some systems), and allows
+<a href=#975 id=975 data-nosnippet>975</a>/// masking other signals during handler execution.
+<a href=#976 id=976 data-nosnippet>976</a>///
+<a href=#977 id=977 data-nosnippet>977</a>/// The handler (`handle_signal`) is async-signal-safe: it only performs
+<a href=#978 id=978 data-nosnippet>978</a>/// an atomic store to a static `AtomicBool` with `Ordering::Relaxed`,
+<a href=#979 id=979 data-nosnippet>979</a>/// which is async-signal-safe per POSIX. No locks, no allocation, no
+<a href=#980 id=980 data-nosnippet>980</a>/// I/O inside the handler.
+<a href=#981 id=981 data-nosnippet>981</a></span><span class="kw">fn </span>setup_signal_handlers(
+<a href=#982 id=982 data-nosnippet>982</a>    shutdown_flag: <span class="kw-2">&amp;</span>Arc&lt;std::sync::atomic::AtomicBool&gt;,
+<a href=#983 id=983 data-nosnippet>983</a>) -&gt; std::thread::JoinHandle&lt;()&gt; {
+<a href=#984 id=984 data-nosnippet>984</a>    <span class="kw">use </span>std::sync::atomic::Ordering;
+<a href=#985 id=985 data-nosnippet>985</a>
+<a href=#986 id=986 data-nosnippet>986</a>    <span class="comment">// SAFETY: `sigaction(2)` installs a handler for a signal. The handler
+<a href=#987 id=987 data-nosnippet>987</a>    // (`handle_signal`) is async-signal-safe: it only performs an atomic
+<a href=#988 id=988 data-nosnippet>988</a>    // store to a static `AtomicBool` with `Ordering::Relaxed`. No locks,
+<a href=#989 id=989 data-nosnippet>989</a>    // no allocation, no I/O inside the handler. The `sigaction` struct is
+<a href=#990 id=990 data-nosnippet>990</a>    // zero-initialised and then populated with the handler function.
+<a href=#991 id=991 data-nosnippet>991</a>    </span><span class="kw">unsafe </span>{
+<a href=#992 id=992 data-nosnippet>992</a>        <span class="kw">extern </span><span class="string">"C" </span><span class="kw">fn </span>handle_signal(_sig: i32) {
+<a href=#993 id=993 data-nosnippet>993</a>            SHUTDOWN_REQUESTED.store(<span class="bool-val">true</span>, std::sync::atomic::Ordering::Relaxed);
+<a href=#994 id=994 data-nosnippet>994</a>        }
+<a href=#995 id=995 data-nosnippet>995</a>
+<a href=#996 id=996 data-nosnippet>996</a>        <span class="kw">let </span><span class="kw-2">mut </span>sa: libc::sigaction = std::mem::zeroed();
+<a href=#997 id=997 data-nosnippet>997</a>        sa.sa_sigaction = handle_signal <span class="kw">as </span><span class="kw-2">*const </span>() <span class="kw">as </span>usize;
+<a href=#998 id=998 data-nosnippet>998</a>        sa.sa_flags = <span class="number">0</span>;
+<a href=#999 id=999 data-nosnippet>999</a>        libc::sigemptyset(<span class="kw-2">&amp;mut </span>sa.sa_mask);
+<a href=#1000 id=1000 data-nosnippet>1000</a>
+<a href=#1001 id=1001 data-nosnippet>1001</a>        <span class="comment">// SIGINT (2) and SIGTERM (15)
+<a href=#1002 id=1002 data-nosnippet>1002</a>        </span>libc::sigaction(libc::SIGINT, <span class="kw-2">&amp;</span>sa, std::ptr::null_mut());
+<a href=#1003 id=1003 data-nosnippet>1003</a>        libc::sigaction(libc::SIGTERM, <span class="kw-2">&amp;</span>sa, std::ptr::null_mut());
+<a href=#1004 id=1004 data-nosnippet>1004</a>    }
+<a href=#1005 id=1005 data-nosnippet>1005</a>
+<a href=#1006 id=1006 data-nosnippet>1006</a>    <span class="comment">// Watcher thread: polls the static and forwards to the caller's flag
+<a href=#1007 id=1007 data-nosnippet>1007</a>    </span><span class="kw">let </span>flag = shutdown_flag.clone();
+<a href=#1008 id=1008 data-nosnippet>1008</a>    std::thread::spawn(<span class="kw">move </span>|| {
+<a href=#1009 id=1009 data-nosnippet>1009</a>        <span class="kw">loop </span>{
+<a href=#1010 id=1010 data-nosnippet>1010</a>            <span class="kw">if </span>SHUTDOWN_REQUESTED.load(Ordering::Relaxed) {
+<a href=#1011 id=1011 data-nosnippet>1011</a>                <span class="macro">eprintln!</span>(<span class="string">"\n[genesis] Received shutdown signal, stopping..."</span>);
+<a href=#1012 id=1012 data-nosnippet>1012</a>                flag.store(<span class="bool-val">true</span>, Ordering::Relaxed);
+<a href=#1013 id=1013 data-nosnippet>1013</a>                <span class="kw">break</span>;
+<a href=#1014 id=1014 data-nosnippet>1014</a>            }
+<a href=#1015 id=1015 data-nosnippet>1015</a>            <span class="comment">// Shutdown can also be initiated without a signal (the IPC
+<a href=#1016 id=1016 data-nosnippet>1016</a>            // SHUTDOWN command sets the IPC server's flag and the main
+<a href=#1017 id=1017 data-nosnippet>1017</a>            // thread then sets this one). Exit in that case too so the
+<a href=#1018 id=1018 data-nosnippet>1018</a>            // main thread's join doesn't hang.
+<a href=#1019 id=1019 data-nosnippet>1019</a>            </span><span class="kw">if </span>flag.load(Ordering::Relaxed) {
+<a href=#1020 id=1020 data-nosnippet>1020</a>                <span class="kw">break</span>;
+<a href=#1021 id=1021 data-nosnippet>1021</a>            }
+<a href=#1022 id=1022 data-nosnippet>1022</a>            std::thread::sleep(Duration::from_millis(<span class="number">50</span>));
+<a href=#1023 id=1023 data-nosnippet>1023</a>        }
+<a href=#1024 id=1024 data-nosnippet>1024</a>    })
+<a href=#1025 id=1025 data-nosnippet>1025</a>}
+<a href=#1026 id=1026 data-nosnippet>1026</a>
+<a href=#1027 id=1027 data-nosnippet>1027</a><span class="comment">// Static atomic for signal handler communication
+<a href=#1028 id=1028 data-nosnippet>1028</a></span><span class="kw">use </span>std::sync::atomic::AtomicBool;
+<a href=#1029 id=1029 data-nosnippet>1029</a><span class="kw">static </span>SHUTDOWN_REQUESTED: AtomicBool = AtomicBool::new(<span class="bool-val">false</span>);
 </code></pre></div></section></main></body></html>

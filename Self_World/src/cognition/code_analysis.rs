@@ -45,7 +45,7 @@ use syn::{
     ItemEnum, ItemFn, ItemImpl, ItemStruct, ItemTrait, ReturnType, Safety, Visibility, visit::Visit,
 };
 
-/// Extend a Vec<String> with deduplication — O(|existing| + |new|) per call
+/// Extend a `Vec<String>` with deduplication — O(|existing| + |new|) per call
 /// instead of O(|existing| * |new|). Uses a HashSet for O(1) lookup and
 /// avoids cloning duplicate items via a `contains` check before `insert`.
 fn extend_dedup(existing: &mut Vec<String>, new: Vec<String>) {

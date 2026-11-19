@@ -496,7 +496,7 @@ impl TickLoop {
                 let _ = writeln!(out, "field.consensus={}", consensus_csv.join(","));
                 // The holographic readout: where the center's state
                 // lands on the S⁵ screen, and how deep inside the
-                // vesica cell it sits.
+                // superposition cell it sits.
                 if let Some(boundary) = &integration.boundary {
                     let boundary_csv: Vec<String> =
                         boundary.iter().map(|v| format!("{v:.6}")).collect();

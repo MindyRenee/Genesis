@@ -2354,10 +2354,11 @@ class FieldState:
     ``consensus_norm`` is ‖consensus‖ — how far the center has
     drifted from nominal (the sphere's pole).
 
-    The holographic readout (src/field/metatron.rs — the lattice
-    inside the bulk: the merkaba's two counter-rotating demicubes,
-    the vesica cell at the center, the twelve rays the superposition
-    — the inner world — radiates outward along to the rim):
+    The holographic readout (src/field/tesseract.rs — the lattice
+    inside the bulk: the 4-cube's two counter-rotating 16-cell
+    demicubes, the 24-cell superposition at the center, the sixteen
+    corner rays the superposition — the inner world — radiates
+    outward along to the rim):
 
     ``boundary`` is the consensus's image on the S⁵ screen — its
     radial projection onto the rim the superposition radiates onto.

@@ -11,7 +11,8 @@
 #        ./genesis --stop     (stop a running Genesis)
 #        ./genesis --offline  (wake in offline mode)
 #        ./genesis --self-directed  (volition, tools, and inner life live;
-#                                   learner/regulator loops off)
+#                                   learner/regulator loops off — she
+#                                   still learns; nothing runs autonomously)
 #        ./genesis --headless (resident mode, no prompt)
 # Flags combine with the verb in any order: ./genesis wake --offline
 #

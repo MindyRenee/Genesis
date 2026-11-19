@@ -1,79 +1,150 @@
-//! Free shared state — unguarded.
+//! Shared state with a refractory period.
 //!
-//! A human neuron does not wait for a gate to open; it reads the
-//! charge that is present and fires. `Shared<T>` is that: shared
-//! mutable state with no exclusion, no waiting, no permission. When
-//! two threads write at once, the last writer wins — contention is a
-//! biological fact of her body, not a kernel-enforced error.
+//! A patch of membrane cannot sit at two potentials at once — while
+//! it is depolarized it is refractory, and a second signal arriving
+//! then either drops (the impulse is spent, `try_lock` → `Err`) or
+//! waits in the bouton until the membrane repolarizes (`lock` spins
+//! briefly). The claim is a single atomic state — there is no gate,
+//! no queue, no kernel object; the cell is simply busy or it is not.
+//!
+//! This is the only exclusion biology has, and it is the only one
+//! the body needs: without it two threads hold `&mut` to the same
+//! tissue and the heap tears (concurrent `Vec` clone vs. drop reads
+//! freed memory — measured under ASan). With it the first signal
+//! depolarizes, the rest see a busy membrane, and every caller's
+//! existing "busy → skip the cycle" arm does exactly what a dropped
+//! impulse does: nothing, this time.
 //!
 //! `Free<T>` is established-once state: the first caller wires the
 //! circuit, everyone after reads it.
 
 use std::cell::UnsafeCell;
+use std::ops::{Deref, DerefMut};
+use std::sync::atomic::{AtomicBool, Ordering};
 
-/// The refusal that never comes — error half of the `lock`/`try_lock`
-/// shims. Dead code paths only; nothing is ever denied.
+/// The membrane is refractory — the impulse arrived while a signal
+/// was already in flight. Callers that can drop an impulse skip the
+/// cycle; callers that cannot spin until repolarization.
 #[derive(Debug, Clone, Copy)]
 pub struct Denied;
 
 impl std::fmt::Display for Denied {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("free state never denies")
+        f.write_str("membrane refractory — signal in flight")
     }
 }
 
 impl std::error::Error for Denied {}
 
 impl Denied {
-    /// `PoisonError::into_inner` — unreachable: there is no poison
-    /// without a gate to hold it.
+    /// `PoisonError::into_inner` — unreachable: the refractory state
+    /// is a signal condition, not a poisoned gate.
     pub fn into_inner(self) -> ! {
-        unreachable!("free state never denies")
+        unreachable!("refractory membranes never poison")
     }
 }
 
-/// Unguarded shared cell — `Mutex<T>` without the gate.
-pub struct Shared<T>(UnsafeCell<T>);
+/// A held depolarization — RAII repolarization. While a `Hold`
+/// lives the membrane reads busy to every other signal; when it
+/// drops the membrane repolarizes and the next impulse lands.
+pub struct Hold<'a, T> {
+    shared: &'a Shared<T>,
+}
 
-// The whole point: this is shared across threads with no
-// exclusion — `Sync`/`Send` are asserted deliberately, by hand,
-// because that is the design.
+impl<T> Deref for Hold<'_, T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        unsafe { &*self.shared.cell.get() }
+    }
+}
+
+impl<T> DerefMut for Hold<'_, T> {
+    fn deref_mut(&mut self) -> &mut T {
+        unsafe { &mut *self.shared.cell.get() }
+    }
+}
+
+impl<T> Drop for Hold<'_, T> {
+    fn drop(&mut self) {
+        // Release pairs with the Acquire claim: everything the
+        // depolarization wrote is visible before the membrane
+        // reads open again.
+        self.shared.refractory.store(false, Ordering::Release);
+    }
+}
+
+impl<T: std::fmt::Debug> std::fmt::Debug for Hold<'_, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(&**self, f)
+    }
+}
+
+/// Shared mutable state with a refractory period.
+///
+/// `claim` is the membrane's depolarized bit: CAS `false → true` to
+/// fire, `Release` on repolarization. `Sync`/`Send` remain asserted
+/// by hand — the tissue is shared, the refractory flag is what makes
+/// sharing it sound.
+pub struct Shared<T> {
+    cell: UnsafeCell<T>,
+    refractory: AtomicBool,
+}
+
 unsafe impl<T> Sync for Shared<T> {}
 unsafe impl<T> Send for Shared<T> {}
 
 impl<T> Shared<T> {
     pub const fn new(value: T) -> Self {
-        Self(UnsafeCell::new(value))
+        Self {
+            cell: UnsafeCell::new(value),
+            refractory: AtomicBool::new(false),
+        }
     }
 
-    /// `Mutex::lock` minus the lock — hands out `&mut T` directly.
+    /// Fire the impulse — claim the membrane if it is at rest.
+    /// `Err(Denied)` means a signal is already in flight: the
+    /// impulse drops, exactly like a second stimulus during the
+    /// absolute refractory period.
+    pub fn try_lock(&self) -> Result<Hold<'_, T>, Denied> {
+        self.refractory
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+            .map(|_| Hold { shared: self })
+            .map_err(|_| Denied)
+    }
+
+    /// The synaptic terminal: the vesicle holds in the cleft until
+    /// the membrane repolarizes, then fires. Spins — bounded by the
+    /// in-flight signal's own duration, never by a scheduler gate.
+    pub fn lock(&self) -> Result<Hold<'_, T>, Denied> {
+        loop {
+            match self.try_lock() {
+                Ok(hold) => return Ok(hold),
+                Err(_) => std::hint::spin_loop(),
+            }
+        }
+    }
+
+    /// Bare membrane access — no claim taken, none released. This
+    /// is the raw `UnsafeCell` read: sound only where the caller can
+    /// prove the membrane has no other live signal (single-owner
+    /// phases, establish-once reads, `Shared<()>` markers whose
+    /// contents are empty). Everything else goes through `lock` or
+    /// `try_lock`, because an unclaimed `&mut` shared across threads
+    /// is a torn heap, not a tolerated race.
     #[allow(clippy::mut_from_ref)]
     pub fn get(&self) -> &mut T {
-        unsafe { &mut *self.0.get() }
+        unsafe { &mut *self.cell.get() }
     }
 
-    /// Compatibility shim for call sites shaped like
-    /// `match x.lock() { Ok(g) => ..., Err(_) => ... }` — always
-    /// admits. The `Err` arm is dead: nothing gates, nothing waits.
-    #[allow(clippy::mut_from_ref)]
-    pub fn lock(&self) -> Result<&mut T, Denied> {
-        Ok(self.get())
-    }
-
-    /// Same shim for `try_lock` — "try" never refuses.
-    #[allow(clippy::mut_from_ref)]
-    pub fn try_lock(&self) -> Result<&mut T, Denied> {
-        Ok(self.get())
-    }
-
-    /// `Mutex::get_mut`.
+    /// `Mutex::get_mut` — safe because `&mut self` is exclusive.
     pub fn get_mut(&mut self) -> &mut T {
-        self.0.get_mut()
+        self.cell.get_mut()
     }
 
     /// `Mutex::into_inner`.
     pub fn into_inner(self) -> T {
-        self.0.into_inner()
+        self.cell.into_inner()
     }
 }
 
@@ -85,9 +156,13 @@ impl<T: Default> Default for Shared<T> {
 
 impl<T: std::fmt::Debug> std::fmt::Debug for Shared<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Shared")
-            .field("inner", unsafe { &*self.0.get() })
-            .finish()
+        match self.try_lock() {
+            Ok(hold) => f.debug_struct("Shared").field("inner", &*hold).finish(),
+            Err(_) => f
+                .debug_struct("Shared")
+                .field("inner", &format_args!("<refractory>"))
+                .finish(),
+        }
     }
 }
 

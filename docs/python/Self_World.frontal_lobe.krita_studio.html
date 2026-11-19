@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.frontal_lobe.krita_studio</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.frontal_lobe.html" class="white">frontal_lobe</a>.krita_studio</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/krita_studio.py">/home/mindyrenee/GenAnd/Genesis/Self_World/frontal_lobe/krita_studio.py</a></td></tr></table>
+    <p><span class="code">Krita&nbsp;bridge&nbsp;—&nbsp;the&nbsp;connection&nbsp;between&nbsp;her&nbsp;and&nbsp;the&nbsp;real&nbsp;program.<br>
+&nbsp;<br>
+Krita&nbsp;is&nbsp;a&nbsp;drawing&nbsp;application&nbsp;on&nbsp;the&nbsp;machine&nbsp;(flatpak<br>
+``org.kde.krita``).&nbsp;This&nbsp;module&nbsp;installs&nbsp;a&nbsp;small&nbsp;PyKrita&nbsp;extension,<br>
+``genesis_studio``,&nbsp;which&nbsp;watches&nbsp;a&nbsp;command&nbsp;queue&nbsp;on&nbsp;disk&nbsp;and&nbsp;executes<br>
+painting&nbsp;operations&nbsp;inside&nbsp;a&nbsp;live&nbsp;Krita&nbsp;document&nbsp;with&nbsp;Krita's&nbsp;own<br>
+brushes,&nbsp;colors,&nbsp;and&nbsp;paper&nbsp;—&nbsp;the&nbsp;same&nbsp;way&nbsp;a&nbsp;human&nbsp;uses&nbsp;the&nbsp;program.<br>
+&nbsp;<br>
+The&nbsp;channel&nbsp;is&nbsp;plain&nbsp;files&nbsp;under&nbsp;Krita's&nbsp;own&nbsp;data&nbsp;directory,&nbsp;so&nbsp;it<br>
+works&nbsp;regardless&nbsp;of&nbsp;what&nbsp;Qt&nbsp;modules&nbsp;the&nbsp;flatpak&nbsp;bundles:<br>
+&nbsp;<br>
+-&nbsp;``~/.var/app/org.kde.krita/data/genesis_studio/queue/op_&lt;seq&gt;.json``<br>
+&nbsp;&nbsp;—&nbsp;operations&nbsp;written&nbsp;by&nbsp;Genesis,<br>
+-&nbsp;``ack_&lt;seq&gt;.json``&nbsp;—&nbsp;results&nbsp;written&nbsp;back&nbsp;by&nbsp;the&nbsp;plugin,<br>
+-&nbsp;``heartbeat``&nbsp;—&nbsp;refreshed&nbsp;every&nbsp;second&nbsp;while&nbsp;the&nbsp;studio&nbsp;is&nbsp;alive.<br>
+&nbsp;<br>
+Everything&nbsp;here&nbsp;is&nbsp;best-effort:&nbsp;if&nbsp;Krita&nbsp;is&nbsp;absent&nbsp;or&nbsp;unreachable,<br>
+the&nbsp;canvas's&nbsp;built-in&nbsp;rasterizer&nbsp;still&nbsp;lets&nbsp;her&nbsp;paint.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="json.html">json</a><br>
+<a href="logging.html">logging</a><br>
+</td><td class="multicolumn"><a href="shutil.html">shutil</a><br>
+<a href="subprocess.html">subprocess</a><br>
+</td><td class="multicolumn"><a href="time.html">time</a><br>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.frontal_lobe.krita_studio.html#KritaStudio">KritaStudio</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="KritaStudio">class <strong>KritaStudio</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#KritaStudio">KritaStudio</a>()&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Client&nbsp;for&nbsp;the&nbsp;Genesis&nbsp;Studio&nbsp;extension&nbsp;inside&nbsp;Krita.<br>
+&nbsp;<br>
+The&nbsp;connection&nbsp;is&nbsp;a&nbsp;command&nbsp;queue&nbsp;on&nbsp;disk.&nbsp;``connect``&nbsp;reports<br>
+whether&nbsp;a&nbsp;live&nbsp;studio&nbsp;answered&nbsp;recently;&nbsp;``send``&nbsp;queues&nbsp;one&nbsp;op;<br>
+``export``&nbsp;asks&nbsp;the&nbsp;studio&nbsp;to&nbsp;write&nbsp;out&nbsp;the&nbsp;working&nbsp;document.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="KritaStudio-__init__"><strong>__init__</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="KritaStudio-connect"><strong>connect</strong></a>(self, timeout: 'float' = 2.0, launch: 'bool' = False) -&gt; 'bool'</dt><dd><span class="code">True&nbsp;when&nbsp;a&nbsp;live&nbsp;studio&nbsp;answered&nbsp;inside&nbsp;``timeout``.</span></dd></dl>
+
+<dl><dt><a name="KritaStudio-ensure_plugin"><strong>ensure_plugin</strong></a>(self) -&gt; 'bool'</dt><dd><span class="code">Install&nbsp;the&nbsp;extension&nbsp;into&nbsp;Krita's&nbsp;pykrita&nbsp;dir&nbsp;+&nbsp;enable&nbsp;it.</span></dd></dl>
+
+<dl><dt><a name="KritaStudio-export"><strong>export</strong></a>(self, path: 'str', timeout: 'float' = 10.0) -&gt; 'bool'</dt><dd><span class="code">Ask&nbsp;the&nbsp;studio&nbsp;to&nbsp;write&nbsp;the&nbsp;document&nbsp;out&nbsp;to&nbsp;``path``.</span></dd></dl>
+
+<dl><dt><a name="KritaStudio-send"><strong>send</strong></a>(self, op: 'str', **args) -&gt; 'bool'</dt><dd><span class="code">Queue&nbsp;one&nbsp;op;&nbsp;True&nbsp;when&nbsp;the&nbsp;queue&nbsp;accepted&nbsp;it.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor data-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
+    
+<tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><strong>__all__</strong> = ['KritaStudio']</td></tr></table>
+</body></html>

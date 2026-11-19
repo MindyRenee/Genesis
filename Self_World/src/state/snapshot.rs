@@ -67,7 +67,7 @@
 //!  208    encoding_weight           f32      ┐
 //!  212    consolidation_weight      f32      │  MemoryPointers
 //!  216    retrieval_weight          f32      ┘  gating weights
-//!  220    sleep_pressure            f32      h / H_MAX ∈ [0,1]
+//!  220    sleep_pressure            f32      h / H_MAX ∈ `[0,1]`
 //!  224    stm_count                 u32
 //!  228    cognitive_zone            u8       CognitiveZone
 //!  229    emergent_phase            u8       MentalPhase
@@ -124,33 +124,33 @@ pub struct CoreStateSnapshot {
     pub effective_levels: [f32; NEUROCHEMICAL_COUNT],
     /// Affective tone — weighted mean of effective levels.
     pub global_tone: f32,
-    /// Arousal axis [0,1].
+    /// Arousal axis `[0,1]`.
     pub arousal: f32,
     /// Valence axis [-1,+1].
     pub valence: f32,
-    /// Plasticity gate [0,1] — neurochemical memory-forming capacity.
+    /// Plasticity gate `[0,1]` — neurochemical memory-forming capacity.
     pub plasticity_gate: f32,
     /// ─── Active-inference projection ────────────────────────────
-    /// Exponential moving average of total surprise. [0,1]
+    /// Exponential moving average of total surprise. `[0,1]`
     pub surprise_ema: f32,
-    /// Current estimated free energy. [0,1]
+    /// Current estimated free energy. `[0,1]`
     pub free_energy: f32,
-    /// Expected future free energy — anticipatory demand. [0,1]
+    /// Expected future free energy — anticipatory demand. `[0,1]`
     pub expected_free_energy: f32,
     /// Accumulated allostatic load — persistent regulatory burden.
-    /// [0,1]
+    /// `[0,1]`
     pub allostasis_load: f32,
-    /// Precision of the generative model. [0,1]
+    /// Precision of the generative model. `[0,1]`
     pub precision: f32,
-    /// Oxytocin-mediated attunement to the user's affect. [0,1]
+    /// Oxytocin-mediated attunement to the user's affect. `[0,1]`
     pub attunement: f32,
     /// Rolling valence correlation with the user. [-1,1]
     pub dyadic_synchrony: f32,
     /// Inferred user valence. [-1,1]
     pub user_valence: f32,
-    /// Inferred user arousal. [0,1]
+    /// Inferred user arousal. `[0,1]`
     pub user_arousal: f32,
-    /// Inferred user engagement. [0,1]
+    /// Inferred user engagement. `[0,1]`
     pub user_engagement: f32,
     /// Dopamine prediction error. Finite and unbounded.
     pub prediction_error_dopamine: f32,
@@ -159,9 +159,9 @@ pub struct CoreStateSnapshot {
     /// Serotonin prediction error. [-2,2]
     pub prediction_error_serotonin: f32,
     /// Evidence the generative model is predictive and constrained.
-    /// [0,1]
+    /// `[0,1]`
     pub model_maturity: f32,
-    /// Delegated policy authority. [0,1]
+    /// Delegated policy authority. `[0,1]`
     pub policy_authority: f32,
     /// Inference cycles run.
     pub inference_tick_count: u32,

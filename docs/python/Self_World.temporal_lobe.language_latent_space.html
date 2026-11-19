@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.temporal_lobe.language_latent_space</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.temporal_lobe.html" class="white">temporal_lobe</a>.language_latent_space</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/language_latent_space.py">/home/mindyrenee/GenAnd/Genesis/Self_World/temporal_lobe/language_latent_space.py</a></td></tr></table>
+    <p><span class="code">Machine-native&nbsp;language&nbsp;latent&nbsp;geometry&nbsp;using&nbsp;reversible&nbsp;7-bit&nbsp;ASCII&nbsp;notation.<br>
+&nbsp;<br>
+Text&nbsp;is&nbsp;represented&nbsp;as&nbsp;ASCII&nbsp;character&nbsp;codes&nbsp;(0..127);&nbsp;non-ASCII&nbsp;input&nbsp;is<br>
+escaped&nbsp;reversibly&nbsp;rather&nbsp;than&nbsp;transliterated&nbsp;or&nbsp;UTF-8&nbsp;encoded.&nbsp;The&nbsp;latent<br>
+vector&nbsp;combines&nbsp;parsed&nbsp;structure&nbsp;with&nbsp;deterministic&nbsp;hashed&nbsp;lexical&nbsp;features.<br>
+A&nbsp;Sinkhorn&nbsp;coupling&nbsp;compares&nbsp;the&nbsp;observed&nbsp;ASCII-code&nbsp;distribution&nbsp;with&nbsp;an<br>
+explicit&nbsp;latent-feature&nbsp;codebook&nbsp;using&nbsp;normalized&nbsp;7-bit&nbsp;Hamming&nbsp;cost.&nbsp;This&nbsp;is<br>
+an&nbsp;optimal-transport&nbsp;summary,&nbsp;not&nbsp;a&nbsp;learned&nbsp;semantic&nbsp;map&nbsp;or&nbsp;isometry.<br>
+&nbsp;<br>
+NumPy&nbsp;only;&nbsp;no&nbsp;LLM,&nbsp;Torch,&nbsp;pretrained&nbsp;weights,&nbsp;or&nbsp;network&nbsp;access.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="hashlib.html">hashlib</a><br>
+</td><td class="multicolumn"><a href="math.html">math</a><br>
+</td><td class="multicolumn"><a href="numpy.html">numpy</a><br>
+</td><td class="multicolumn"><a href="re.html">re</a><br>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.temporal_lobe.language_latent_space.html#LanguageLatentSpace">LanguageLatentSpace</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="LanguageLatentSpace">class <strong>LanguageLatentSpace</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#LanguageLatentSpace">LanguageLatentSpace</a>()&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+Online&nbsp;language&nbsp;state&nbsp;coupled&nbsp;to&nbsp;parsed&nbsp;structure&nbsp;and&nbsp;ASCII&nbsp;character&nbsp;codes.<br>
+&nbsp;<br>
+Geometry&nbsp;is&nbsp;empirical&nbsp;and&nbsp;interpretable:&nbsp;online&nbsp;feature&nbsp;covariance,<br>
+transition&nbsp;residuals,&nbsp;categorical&nbsp;Fisher&nbsp;information&nbsp;over&nbsp;a&nbsp;softmax<br>
+distribution,&nbsp;and&nbsp;entropy-regularized&nbsp;OT&nbsp;between&nbsp;observed&nbsp;cell&nbsp;mass&nbsp;and<br>
+latent-feature&nbsp;mass.&nbsp;The&nbsp;Fisher&nbsp;matrix&nbsp;is&nbsp;for&nbsp;the&nbsp;categorical-logit&nbsp;model;<br>
+it&nbsp;is&nbsp;not&nbsp;asserted&nbsp;to&nbsp;be&nbsp;invariant&nbsp;under&nbsp;the&nbsp;discrete&nbsp;transcoding.<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="LanguageLatentSpace-__init__"><strong>__init__</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="LanguageLatentSpace-observe"><strong>observe</strong></a>(self, text: 'str', comprehension: 'Any', *, direction: 'str' = 'inbound') -&gt; 'dict[str, Any]'</dt><dd><span class="code">Update&nbsp;geometry&nbsp;from&nbsp;one&nbsp;parsed&nbsp;utterance.<br>
+&nbsp;<br>
+Direction&nbsp;separates&nbsp;received&nbsp;language&nbsp;from&nbsp;Genesis's&nbsp;generated&nbsp;output<br>
+without&nbsp;treating&nbsp;either&nbsp;direction&nbsp;as&nbsp;evidence&nbsp;of&nbsp;semantic&nbsp;correctness.</span></dd></dl>
+
+<dl><dt><a name="LanguageLatentSpace-restore"><strong>restore</strong></a>(self, data: 'dict[str, Any]') -&gt; 'None'</dt><dd><span class="code">Validate&nbsp;the&nbsp;entire&nbsp;checkpoint&nbsp;before&nbsp;mutating&nbsp;the&nbsp;live&nbsp;space.</span></dd></dl>
+
+<dl><dt><a name="LanguageLatentSpace-snapshot"><strong>snapshot</strong></a>(self) -&gt; 'dict[str, Any]'</dt></dl>
+
+<dl><dt><a name="LanguageLatentSpace-to_dict"><strong>to_dict</strong></a>(self) -&gt; 'dict[str, Any]'</dt></dl>
+
+<hr>
+Readonly properties defined here:<br>
+<dl><dt><strong>dimension</strong></dt>
+</dl>
+<dl><dt><strong>observations</strong></dt>
+</dl>
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>__dict__</strong></dt>
+<dd><span class="code">dictionary&nbsp;for&nbsp;instance&nbsp;variables</span></dd>
+</dl>
+<dl><dt><strong>__weakref__</strong></dt>
+<dd><span class="code">list&nbsp;of&nbsp;weak&nbsp;references&nbsp;to&nbsp;the&nbsp;object</span></dd>
+</dl>
+</td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-decode_ascii"><strong>decode_ascii</strong></a>(codes: 'tuple[int, ...]', bit_length: 'int') -&gt; 'str'</dt><dd><span class="code">Decode&nbsp;reversible&nbsp;ASCII&nbsp;notation&nbsp;after&nbsp;validating&nbsp;its&nbsp;exact&nbsp;bit&nbsp;length.</span></dd></dl>
+ <dl><dt><a name="-encode_ascii"><strong>encode_ascii</strong></a>(text: 'str') -&gt; 'tuple[tuple[int, ...], int]'</dt><dd><span class="code">Encode&nbsp;arbitrary&nbsp;Unicode&nbsp;text&nbsp;as&nbsp;reversible&nbsp;7-bit&nbsp;ASCII&nbsp;notation.<br>
+&nbsp;<br>
+Printable&nbsp;ASCII&nbsp;is&nbsp;preserved.&nbsp;A&nbsp;literal&nbsp;backslash&nbsp;is&nbsp;doubled;&nbsp;each<br>
+non-ASCII&nbsp;code&nbsp;point&nbsp;becomes&nbsp;the&nbsp;ASCII&nbsp;sequence&nbsp;\u{HEX};.</span></dd></dl>
+</td></tr></table>
+</body></html>

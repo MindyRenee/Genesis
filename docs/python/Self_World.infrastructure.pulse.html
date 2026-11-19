@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module Self_World.infrastructure.pulse</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="Self_World.html" class="white">Self_World</a>.<a href="Self_World.infrastructure.html" class="white">infrastructure</a>.pulse</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:/home/mindyrenee/GenAnd/Genesis/Self_World/infrastructure/pulse.py">/home/mindyrenee/GenAnd/Genesis/Self_World/infrastructure/pulse.py</a></td></tr></table>
+    <p><span class="code"><a href="#Pulse">Pulse</a>&nbsp;—&nbsp;a&nbsp;charge&nbsp;flag.&nbsp;Signals&nbsp;without&nbsp;gates.<br>
+&nbsp;<br>
+A&nbsp;neuron&nbsp;does&nbsp;not&nbsp;lock&nbsp;to&nbsp;hear&nbsp;its&nbsp;input;&nbsp;it&nbsp;integrates&nbsp;charge&nbsp;and<br>
+fires.&nbsp;This&nbsp;is&nbsp;the&nbsp;smallest&nbsp;signaling&nbsp;primitive&nbsp;that&nbsp;still&nbsp;lets&nbsp;a<br>
+sleeping&nbsp;thread&nbsp;wake&nbsp;early:&nbsp;a&nbsp;mutable&nbsp;flag&nbsp;plus&nbsp;a&nbsp;short-sleep&nbsp;wait.<br>
+No&nbsp;mutex,&nbsp;no&nbsp;condition&nbsp;variable&nbsp;—&nbsp;the&nbsp;GIL&nbsp;makes&nbsp;the&nbsp;flag&nbsp;read&nbsp;atomic;<br>
+a&nbsp;set&nbsp;lands&nbsp;within&nbsp;~50&nbsp;ms&nbsp;of&nbsp;the&nbsp;sleeper&nbsp;noticing.<br>
+&nbsp;<br>
+Same&nbsp;surface&nbsp;as&nbsp;Event/Condition&nbsp;minus&nbsp;the&nbsp;gate:<br>
+&nbsp;<br>
+-&nbsp;set/clear/is_set:&nbsp;latching&nbsp;flag&nbsp;semantics&nbsp;(Event).<br>
+-&nbsp;wait:&nbsp;returns&nbsp;when&nbsp;the&nbsp;flag&nbsp;is&nbsp;set,&nbsp;or&nbsp;when&nbsp;a&nbsp;notify&nbsp;edge&nbsp;lands.<br>
+-&nbsp;notify/notify_all:&nbsp;a&nbsp;generation&nbsp;bump,&nbsp;not&nbsp;a&nbsp;latch&nbsp;—&nbsp;wakes&nbsp;only<br>
+&nbsp;&nbsp;threads&nbsp;already&nbsp;asleep;&nbsp;it&nbsp;does&nbsp;not&nbsp;leak&nbsp;into&nbsp;the&nbsp;next&nbsp;wait.<br>
+-&nbsp;wait_for:&nbsp;polls&nbsp;a&nbsp;predicate,&nbsp;waking&nbsp;early&nbsp;on&nbsp;notify&nbsp;edges.</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="time.html">time</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor index-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Classes</strong></td></tr>
+    
+<tr><td class="decor index-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl>
+<dt class="heading-text"><a href="builtins.html#object">builtins.object</a>
+</dt><dd>
+<dl>
+<dt class="heading-text"><a href="Self_World.infrastructure.pulse.html#Pulse">Pulse</a>
+</dt></dl>
+</dd>
+</dl>
+ <p>
+<table class="section">
+<tr class="decor title-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><a name="Pulse">class <strong>Pulse</strong></a>(<a href="builtins.html#object">builtins.object</a>)</td></tr>
+    
+<tr><td class="decor title-decor" rowspan=2><span class="code">&nbsp;&nbsp;&nbsp;</span></td>
+<td class="decor title-decor" colspan=2><span class="code"><a href="#Pulse">Pulse</a>()&nbsp;-&amp;gt;&nbsp;'None'<br>
+&nbsp;<br>
+<br>&nbsp;</span></td></tr>
+<tr><td>&nbsp;</td>
+<td class="singlecolumn">Methods defined here:<br>
+<dl><dt><a name="Pulse-__init__"><strong>__init__</strong></a>(self) -&gt; 'None'</dt><dd><span class="code">Initialize&nbsp;self.&nbsp;&nbsp;See&nbsp;help(type(self))&nbsp;for&nbsp;accurate&nbsp;signature.</span></dd></dl>
+
+<dl><dt><a name="Pulse-clear"><strong>clear</strong></a>(self) -&gt; 'None'</dt></dl>
+
+<dl><dt><a name="Pulse-is_set"><strong>is_set</strong></a>(self) -&gt; 'bool'</dt></dl>
+
+<dl><dt><a name="Pulse-notify"><strong>notify</strong></a>(self, n: 'int' = 1) -&gt; 'None'</dt></dl>
+
+<dl><dt><a name="Pulse-notify_all"><strong>notify_all</strong></a>(self) -&gt; 'None'</dt></dl>
+
+<dl><dt><a name="Pulse-set"><strong>set</strong></a>(self) -&gt; 'None'</dt></dl>
+
+<dl><dt><a name="Pulse-wait"><strong>wait</strong></a>(self, timeout: 'float | None' = None) -&gt; 'bool'</dt><dd><span class="code">Wait.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;timeout:&nbsp;The&nbsp;timeout&nbsp;in&nbsp;seconds.</span></dd></dl>
+
+<dl><dt><a name="Pulse-wait_for"><strong>wait_for</strong></a>(self, predicate: 'Callable[[], bool]', timeout: 'float | None' = None) -&gt; 'bool'</dt><dd><span class="code">Wait&nbsp;for.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;predicate:&nbsp;The&nbsp;predicate.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;timeout:&nbsp;The&nbsp;timeout&nbsp;in&nbsp;seconds.</span></dd></dl>
+
+<hr>
+Data descriptors defined here:<br>
+<dl><dt><strong>seq</strong></dt>
+</dl>
+<dl><dt><strong>value</strong></dt>
+</dl>
+</td></tr></table></td></tr></table>
+</body></html>

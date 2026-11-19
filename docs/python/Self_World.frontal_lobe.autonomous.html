@@ -17,9 +17,6 @@ its&nbsp;source&nbsp;registry&nbsp;(local&nbsp;man&nbsp;pages&nbsp;and&nbsp;Word
 API&nbsp;with&nbsp;a&nbsp;web-search&nbsp;fallback&nbsp;through&nbsp;her&nbsp;browser),&nbsp;reads&nbsp;the&nbsp;content,&nbsp;extracts<br>
 concepts&nbsp;and&nbsp;relationships,&nbsp;and&nbsp;stores&nbsp;what&nbsp;it&nbsp;learned&nbsp;as&nbsp;memories.<br>
 &nbsp;<br>
-This&nbsp;is&nbsp;not&nbsp;a&nbsp;web&nbsp;crawler.&nbsp;It&nbsp;doesn't&nbsp;index&nbsp;the&nbsp;internet.&nbsp;It&nbsp;reads<br>
-a&nbsp;source,&nbsp;thinks&nbsp;about&nbsp;it,&nbsp;and&nbsp;moves&nbsp;on.&nbsp;Like&nbsp;a&nbsp;person&nbsp;browsing&nbsp;a&nbsp;library.<br>
-&nbsp;<br>
 The&nbsp;learner&nbsp;is&nbsp;curiosity-driven:<br>
 -&nbsp;It&nbsp;picks&nbsp;topics&nbsp;from&nbsp;its&nbsp;curiosity&nbsp;queue&nbsp;(gaps&nbsp;in&nbsp;its&nbsp;understanding)<br>
 -&nbsp;It&nbsp;queries&nbsp;its&nbsp;source&nbsp;registry&nbsp;for&nbsp;content&nbsp;on&nbsp;those&nbsp;topics<br>
@@ -30,8 +27,8 @@ The&nbsp;learner&nbsp;is&nbsp;curiosity-driven:<br>
 -&nbsp;It&nbsp;pauses&nbsp;when&nbsp;someone&nbsp;starts&nbsp;talking&nbsp;to&nbsp;it<br>
 &nbsp;<br>
 Safety:<br>
--&nbsp;Wikipedia&nbsp;API&nbsp;returns&nbsp;structured&nbsp;content&nbsp;(no&nbsp;HTML&nbsp;scraping)<br>
--&nbsp;HTML&nbsp;pages&nbsp;are&nbsp;text-extracted&nbsp;(no&nbsp;scripts,&nbsp;styles,&nbsp;or&nbsp;forms)<br>
+-&nbsp;Wikipedia&nbsp;API&nbsp;returns&nbsp;structured&nbsp;content<br>
+-&nbsp;HTML&nbsp;pages&nbsp;are&nbsp;text-extracted<br>
 -&nbsp;Rate-limited&nbsp;(one&nbsp;request&nbsp;every&nbsp;few&nbsp;seconds)<br>
 -&nbsp;Timeout&nbsp;on&nbsp;every&nbsp;request<br>
 -&nbsp;Bounded&nbsp;response&nbsp;reads&nbsp;and&nbsp;total&nbsp;page&nbsp;count&nbsp;per&nbsp;session<br>

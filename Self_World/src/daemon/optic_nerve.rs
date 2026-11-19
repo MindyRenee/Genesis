@@ -210,7 +210,7 @@ pub struct OpticNerve {
     /// channel.
     illuminance: f32,
     /// Blue-weighted irradiance EMA in [0, 1] — the ipRGC/melanopsin
-    /// proxy (~480 nm peak → blue-weighted; achromatic under YUYV).
+    /// proxy (~480 nm peak → blue-weighted).
     melanopic: f32,
     /// Motion energy EMA in [0, 1] — pooled frame-to-frame luma
     /// change, the tectal channel's slow trace.
@@ -468,6 +468,9 @@ impl OpticNerve {
             b"YUYV" => (2usize, false),
             _ => (1usize, false),
         };
+        // Wire contract is V4L2-canonical: the fourcc names memory
+        // order — BGR3-tagged frames carry B,G,R bytes, RGB3-tagged
+        // frames carry R,G,B.
         let bgr = &fourcc == b"BGR3";
         let row_bytes = (width as usize).saturating_mul(bpp);
         let stride = (stride as usize).max(row_bytes).max(1);
@@ -806,6 +809,19 @@ const EYE_STABLE_S: f64 = 60.0;
 /// the limb counts it a life ended and re-opens.
 const EYE_ERR_LIMIT: u32 = 30;
 
+/// How long `nerve_is_live` watches an existing segment's frame
+/// counter before deciding the nerve is already owned. A live eye
+/// publishes ~30 FPS; the window spans ~9 frames — enough to see
+/// the counter move, short enough to bound every contested probe.
+const LIVE_NERVE_PROBE_MS: u64 = 300;
+
+/// Interval between name-liveness checks inside the publish loop.
+/// The mapping survives an unlink, but new readers attach by name —
+/// so a segment unlinked out from under its publisher blinds every
+/// fresh reader while the eye still sees. The limb returns so the
+/// next life re-creates the nerve under the same name.
+const NERVE_NAME_CHECK_MS: u64 = 2_000;
+
 /// The socket the eye opens absent a `GENESIS_CAMERA` override —
 /// and the fallback when an exhausted override names another
 /// device: a working eye beats the preferred dead one.
@@ -822,13 +838,15 @@ fn camera_candidates(configured: &str) -> Vec<String> {
 }
 
 /// The eye's handle: a stop flag, the segment's POSIX name for
-/// unlinking, and the capture thread. `stop()` flags the limb out
-/// and takes the name back; a thread still blocked in the driver's
-/// dequeue is reaped by the daemon's own exit — the same bound the
-/// process tree had.
+/// unlinking, an ownership flag for the segment the limb created,
+/// and the capture thread. `stop()` flags the limb out and — only
+/// when the limb actually owns a segment — takes the name back; a
+/// thread still blocked in the driver's dequeue is reaped by the
+/// daemon's own exit — the same bound the process tree had.
 pub struct OpticCapture {
     stop: Arc<AtomicBool>,
     shm_name: String,
+    owns_nerve: Arc<AtomicBool>,
     _limb: JoinHandle<()>,
 }
 
@@ -843,34 +861,43 @@ impl OpticCapture {
     /// Same, on a named segment (tests use private names).
     pub fn with_segment(shm_name: &str) -> Self {
         let stop = Arc::new(AtomicBool::new(false));
+        let owns_nerve = Arc::new(AtomicBool::new(false));
         let shm_name = shm_name.to_string();
         let limb = {
             let stop = stop.clone();
+            let owns = owns_nerve.clone();
             let name = shm_name.clone();
             thread::Builder::new()
                 .name("genesis-eye".to_string())
-                .spawn(move || capture_limb(&name, &stop))
+                .spawn(move || capture_limb(&name, &stop, &owns))
                 .expect("spawn optic capture limb")
         };
         Self {
             stop,
             shm_name,
+            owns_nerve,
             _limb: limb,
         }
     }
 
     /// Close the eye: flag the limb out and unlink the segment's
-    /// name. Readers already holding the mapping keep it until they
+    /// name — but only a limb that actually owns a segment may take
+    /// the name back. A limb stillborn on a busy camera, or one that
+    /// stood down to a live publisher, must not unlink another eye's
+    /// nerve. Readers already holding the mapping keep it until they
     /// detach; the name is gone, so nothing new attaches to a dead
-    /// eye — and a stillborn life (segment never created) unlinks
-    /// harmlessly, ENOENT.
+    /// eye.
     pub fn stop(&self) {
         self.stop.store(true, Ordering::Relaxed);
-        if let Ok(name) = CString::new(self.shm_name.as_str()) {
-            // SAFETY: `name` is a valid NUL-terminated CString;
-            // shm_unlink of a missing name returns ENOENT, ignored.
-            unsafe {
-                let _ = libc::shm_unlink(name.as_ptr());
+        if self.owns_nerve.load(Ordering::Relaxed) {
+            if let Ok(name) = CString::new(self.shm_name.as_str()) {
+                // SAFETY: `name` is a valid NUL-terminated CString;
+                // shm_unlink of a missing name returns ENOENT,
+                // ignored — the owner `Shmem`'s own drop may already
+                // have released it.
+                unsafe {
+                    let _ = libc::shm_unlink(name.as_ptr());
+                }
             }
         }
     }
@@ -894,7 +921,11 @@ impl Drop for OpticCapture {
 /// `pub` for `genesis-retina`: when the eye is its own process again
 /// the binary runs this same limb on the main thread — one
 /// implementation, two carriers.
-pub fn capture_limb(shm_name: &str, stop: &AtomicBool) {
+///
+/// `owns_nerve` is set only while a life actually holds a segment it
+/// created, so a stopping caller can tell its own name from a nerve
+/// owned by another publisher.
+pub fn capture_limb(shm_name: &str, stop: &AtomicBool, owns_nerve: &AtomicBool) {
     let configured =
         std::env::var("GENESIS_CAMERA").unwrap_or_else(|_| DEFAULT_CAMERA_PATH.to_string());
     let candidates = camera_candidates(&configured);
@@ -920,7 +951,7 @@ pub fn capture_limb(shm_name: &str, stop: &AtomicBool) {
                 if deaths >= EYE_BACKOFF_S.len() {
                     break;
                 }
-                let lived = eye_life(shm_name, camera_index, camera_path, stop);
+                let lived = eye_life(shm_name, camera_index, camera_path, stop, owns_nerve);
                 if stop.load(Ordering::Relaxed) {
                     return;
                 }
@@ -956,12 +987,121 @@ pub fn capture_limb(shm_name: &str, stop: &AtomicBool) {
     }
 }
 
+/// YUYV 4:2:2 → packed RGB24, BT.601 studio-swing — the same
+/// constants the mind's `_yuyv_to_rgb` used when the nerve carried
+/// raw sensor bytes. `src_stride` is the driver's row pitch: padding
+/// past `width * 2` bytes is skipped. `dst` is exactly
+/// `width * height * 3` bytes of wire frame — R,G,B per pixel, rows
+/// packed. Truncated or short rows leave their destination span
+/// zeroed, never stale.
+fn yuyv_to_rgb(src: &[u8], width: u32, src_stride: u32, dst: &mut [u8]) {
+    let w = width as usize;
+    let stride = (src_stride as usize).max(w * 2);
+    let dst_row = w * 3;
+    let rows = dst.len() / dst_row.max(1);
+    for row in 0..rows {
+        let src_end = (row * stride + w * 2).min(src.len());
+        let srow = &src[(row * stride).min(src.len())..src_end];
+        let drow = &mut dst[row * dst_row..(row + 1) * dst_row];
+        for mp in 0..w.div_ceil(2) {
+            let bi = mp * 4;
+            if bi + 3 >= srow.len() {
+                break;
+            }
+            let (y0, u, y1, v) = (
+                i32::from(srow[bi]) - 16,
+                i32::from(srow[bi + 1]) - 128,
+                i32::from(srow[bi + 2]) - 16,
+                i32::from(srow[bi + 3]) - 128,
+            );
+            let px = |y: i32| -> [u8; 3] {
+                [
+                    ((298 * y + 409 * v + 128) >> 8).clamp(0, 255) as u8,
+                    ((298 * y - 100 * u - 208 * v + 128) >> 8).clamp(0, 255) as u8,
+                    ((298 * y + 516 * u + 128) >> 8).clamp(0, 255) as u8,
+                ]
+            };
+            drow[mp * 6..mp * 6 + 3].copy_from_slice(&px(y0));
+            if mp * 2 + 1 < w {
+                drow[mp * 6 + 3..mp * 6 + 6].copy_from_slice(&px(y1));
+            }
+        }
+    }
+}
+
+/// Marks `owns` false on drop — the flag is true only while this
+/// life actually holds a segment it created, so a stopping or dying
+/// caller never unlinks a nerve owned by another publisher.
+struct OwnerFlag<'a>(&'a AtomicBool);
+
+impl Drop for OwnerFlag<'_> {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::Relaxed);
+    }
+}
+
+/// True while the named nerve has a live publisher: the segment
+/// opens and its frame counter moves across one probe window. A
+/// nerve that exists but cannot be opened, or whose counter is
+/// frozen, is stale — safe to reclaim.
+fn nerve_is_live(shm_name: &str) -> bool {
+    let existing = match shared_memory::ShmemConf::new().os_id(shm_name).open() {
+        Ok(s) => s,
+        Err(_) => return false,
+    };
+    if existing.len() < HEADER_SIZE {
+        return false;
+    }
+    // SAFETY: the mapping is at least HEADER_SIZE bytes; offset 0 is
+    // the publisher's AtomicU64 frame counter by the wire contract.
+    let counter = unsafe { &*(existing.as_ptr() as *const AtomicU64) };
+    let first = counter.load(Ordering::Acquire);
+    thread::sleep(Duration::from_millis(LIVE_NERVE_PROBE_MS));
+    counter.load(Ordering::Acquire) != first
+}
+
+/// The inode of the segment the name currently resolves to — `None`
+/// when the name is gone or cannot be stated. POSIX shm objects are
+/// files; inode identity distinguishes "our name still resolves" from
+/// a name deleted outright or recreated over another publisher's
+/// segment. The mapping survives an unlink — existing readers keep
+/// their views — but new readers attach by name, so a name that no
+/// longer resolves to this segment blinds every fresh attachment.
+fn nerve_ino(shm_name: &str) -> Option<u64> {
+    let cname = CString::new(shm_name).ok()?;
+    // SAFETY: `cname` is a valid NUL-terminated CString; O_RDONLY
+    // resolves the name without creating it.
+    let fd = unsafe { libc::shm_open(cname.as_ptr(), libc::O_RDONLY, 0) };
+    if fd < 0 {
+        return None;
+    }
+    // SAFETY: `fd` is a valid descriptor returned by shm_open;
+    // `stat` is a plain out-struct, fully initialized by fstat.
+    let ino = unsafe {
+        let mut st: libc::stat = core::mem::zeroed();
+        if libc::fstat(fd, &mut st) == 0 {
+            Some(st.st_ino as u64)
+        } else {
+            None
+        }
+    };
+    // SAFETY: `fd` is a valid descriptor returned by shm_open.
+    unsafe { libc::close(fd) };
+    ino
+}
+
 /// One life of the eye: device open → format negotiate → segment
 /// create → frame loop, until the hardware fails or `stop` lands.
 /// Returns the seconds the eye stayed open — `EYE_STABLE_S` is the
 /// refund threshold. Every failure inside is quiet logging, never a
 /// panic: this thread dying must never cost the body.
-fn eye_life(shm_name: &str, camera_index: usize, camera_path: &str, stop: &AtomicBool) -> f64 {
+fn eye_life(
+    shm_name: &str,
+    camera_index: usize,
+    camera_path: &str,
+    stop: &AtomicBool,
+    owns_nerve: &AtomicBool,
+) -> f64 {
     let born = Instant::now();
 
     // Open the V4L2 capture device. EBUSY is transient — a previous
@@ -1035,13 +1175,38 @@ fn eye_life(shm_name: &str, camera_index: usize, camera_path: &str, stop: &Atomi
         return born.elapsed().as_secs_f64();
     };
 
+    // What the nerve carries. The sensor's own YUYV is unpacked in
+    // the limb so every downstream reader — the mind's RGB path, the
+    // melanopic channel, the screen nerve's readers — sees one wire
+    // format: real RGB24, tagged RGB3 (R,G,B bytes in memory, the
+    // V4L2-canonical convention). A sensor that can emit native RGB24
+    // publishes untouched.
+    let decode_yuyv = fmt.fourcc == FourCC::new(b"YUYV");
+    let wire_fourcc: &[u8; 4] = if decode_yuyv {
+        b"RGB3"
+    } else {
+        &fmt.fourcc.repr
+    };
+    let wire_size = if decode_yuyv {
+        fmt.width as usize * fmt.height as usize * 3
+    } else {
+        fmt.size as usize
+    };
+    let wire_stride = if decode_yuyv {
+        fmt.width * 3
+    } else {
+        fmt.stride
+    };
+
     eprintln!(
-        "[genesis] eye: {}x{} fourcc={:?} size={} stride={}",
+        "[genesis] eye: {}x{} fourcc={:?} size={} stride={} -> nerve {:?} {}",
         fmt.width,
         fmt.height,
         fmt.fourcc.str().unwrap_or("????"),
         fmt.size,
-        fmt.stride
+        fmt.stride,
+        core::str::from_utf8(wire_fourcc).unwrap_or("????"),
+        wire_size
     );
 
     // Create a memory-mapped, zero-copy V4L2 stream.
@@ -1053,6 +1218,16 @@ fn eye_life(shm_name: &str, camera_index: usize, camera_path: &str, stop: &Atomi
         }
     };
 
+    // The nerve is the rendezvous, not a birthright: never unlink a
+    // segment another eye is still publishing into. A live counter
+    // means the organ is already owned — stand down and let
+    // capture_limb's retry watch for the owner's death instead of
+    // blinding a working eye.
+    if nerve_is_live(shm_name) {
+        eprintln!("[genesis] eye: optic nerve {shm_name} already live — standing down");
+        return born.elapsed().as_secs_f64();
+    }
+
     // Drop any stale segment so the create below succeeds. One life,
     // one segment — the handle stays the owner, so its drop unlinks
     // the name and the next life starts fresh.
@@ -1063,7 +1238,7 @@ fn eye_life(shm_name: &str, camera_index: usize, camera_path: &str, stop: &Atomi
             let _ = libc::shm_unlink(cname.as_ptr());
         }
     }
-    let shm_size = HEADER_SIZE + fmt.size as usize;
+    let shm_size = HEADER_SIZE + wire_size;
     let shmem = match shared_memory::ShmemConf::new()
         .os_id(shm_name)
         .size(shm_size)
@@ -1093,18 +1268,45 @@ fn eye_life(shm_name: &str, camera_index: usize, camera_path: &str, stop: &Atomi
             counter.store(0, Ordering::Relaxed);
             core::ptr::write_volatile(base.add(8) as *mut u32, fmt.width);
             core::ptr::write_volatile(base.add(12) as *mut u32, fmt.height);
-            core::ptr::copy_nonoverlapping(fmt.fourcc.repr.as_ptr(), base.add(16), 4);
-            core::ptr::write_volatile(base.add(20) as *mut u32, fmt.size);
-            core::ptr::write_volatile(base.add(24) as *mut u32, fmt.stride);
+            core::ptr::copy_nonoverlapping(wire_fourcc.as_ptr(), base.add(16), 4);
+            core::ptr::write_volatile(base.add(20) as *mut u32, wire_size as u32);
+            core::ptr::write_volatile(base.add(24) as *mut u32, wire_stride);
         }
     }
 
     eprintln!("[genesis] eye: optic nerve {shm_name} live, {shm_size} bytes");
 
+    // The ownership flag lives exactly as long as the segment does —
+    // `stop()` and the retina's exit path only unlink a name they
+    // know is theirs. And record which segment this name resolves to:
+    // the publish loop re-checks identity, not mere existence, so a
+    // name deleted outright or recreated over another publisher's
+    // segment both count as lost.
+    owns_nerve.store(true, Ordering::Relaxed);
+    let _owned = OwnerFlag(owns_nerve);
+    let our_ino = nerve_ino(shm_name);
+
     let mut errors = 0u32;
+    let mut name_check = Instant::now();
     loop {
         if stop.load(Ordering::Relaxed) {
             break;
+        }
+        // Re-assert the name: if something unlinks the segment while
+        // the eye publishes (a racing second eye, a stale cleanup),
+        // the mapping survives but new readers can no longer attach —
+        // the mind goes blind while the eye still sees. End this life
+        // so the next one re-creates the nerve under the same name —
+        // or, when the name now belongs to a different live segment,
+        // stands down to the eye that claimed it.
+        if name_check.elapsed() >= Duration::from_millis(NERVE_NAME_CHECK_MS) {
+            name_check = Instant::now();
+            if let Some(ours) = our_ino {
+                if nerve_ino(shm_name) != Some(ours) {
+                    eprintln!("[genesis] eye: optic nerve {shm_name} lost its name — re-asserting");
+                    break;
+                }
+            }
         }
         let base = shmem.as_ptr();
 
@@ -1161,14 +1363,22 @@ fn eye_life(shm_name: &str, camera_index: usize, camera_path: &str, stop: &Atomi
         // region obtained from `Shmem`, mapped with `shm_size` bytes.
         // The frame counter at offset 0 is an `AtomicU64` initialized
         // once during setup and only accessed via atomic operations.
-        // The frame data copy (`base.add(HEADER_SIZE)`) stays within
-        // bounds because `frame_size` was checked against `fmt.size`
-        // above, and `shm_size = HEADER_SIZE + fmt.size`.
+        // Frame writes (`base.add(HEADER_SIZE)`) stay within bounds:
+        // `frame_size` was checked against `fmt.size` above, and the
+        // decoded path writes exactly `wire_size` = `shm_size -
+        // HEADER_SIZE` bytes.
         unsafe {
             let counter = &*(base as *const AtomicU64);
 
-            // Copy the raw frame into the shared buffer after the header.
-            core::ptr::copy_nonoverlapping(buf.as_ptr(), base.add(HEADER_SIZE), frame_size);
+            if decode_yuyv {
+                // Unpack the sensor's 4:2:2 macropixels straight into
+                // the nerve — the wire carries R,G,B bytes per pixel.
+                let dst = core::slice::from_raw_parts_mut(base.add(HEADER_SIZE), wire_size);
+                yuyv_to_rgb(&buf[..frame_size], fmt.width, fmt.stride, dst);
+            } else {
+                // Copy the raw frame into the shared buffer after the header.
+                core::ptr::copy_nonoverlapping(buf.as_ptr(), base.add(HEADER_SIZE), frame_size);
+            }
 
             // Publish: bump the frame counter. Release ordering so the
             // frame bytes land before the new sequence number is seen.
@@ -1596,6 +1806,46 @@ mod tests {
             "a voluntary close attenuates the RHT drive: {shut} vs {open}"
         );
         drop(seg);
+    }
+
+    #[test]
+    fn yuyv_decode_writes_rgb_wire_bytes() {
+        // Two macropixels: Y0=235/Y1=90 at neutral chroma (bright and
+        // mid-gray), then Y=16 with high Cb — saturated blue, the
+        // melanopsin band. YUYV packs [Y0 U Y1 V] per pair.
+        let src = [235u8, 128, 90, 128, 16, 200, 16, 128];
+        let mut dst = [0u8; 4 * 3];
+        yuyv_to_rgb(&src, 4, 8, &mut dst);
+        // Pixel 0: near-white within quantisation.
+        let px = &dst[0..3];
+        assert!(px[0] > 225 && px[1] > 225 && px[2] > 225, "{px:?}");
+        // Pixel 1: mid-gray, channels balanced (neutral U/V).
+        let px = &dst[3..6];
+        assert!(
+            (70..=105).contains(&px[0])
+                && (px[0] as i32 - px[1] as i32).abs() < 12
+                && (px[1] as i32 - px[2] as i32).abs() < 12,
+            "{px:?}"
+        );
+        // Blue pair: the B byte of each wire pixel dominates.
+        for px in [&dst[6..9], &dst[9..12]] {
+            assert!(px[2] > px[0] && px[2] > px[1], "blue leads: {px:?}");
+        }
+    }
+
+    #[test]
+    fn yuyv_decode_honours_source_stride() {
+        // Padded rows: stride 12 for a 2-pixel-wide frame — 8 bytes
+        // of row padding between the two macropixel rows.
+        let src = [
+            235u8, 128, 235, 128, 0, 0, 0, 0, 0, 0, 0, 0, // row 0 + pad
+            90, 128, 90, 128, 0, 0, 0, 0, 0, 0, 0, 0, // row 1 + pad
+        ];
+        let mut dst = [0u8; 2 * 3 * 2];
+        yuyv_to_rgb(&src, 2, 12, &mut dst);
+        // Row 0 decodes bright; row 1 (offset 12) decodes dark.
+        assert!(dst[0] > 200, "{dst:?}");
+        assert!(dst[6] < 100 && dst[7] < 100 && dst[8] < 100, "{dst:?}");
     }
 
     #[test]

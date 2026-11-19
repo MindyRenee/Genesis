@@ -81,7 +81,7 @@ static SHARED_USER_AFFECT: Shared<Option<UserAffectObservation>> = Shared::new(N
 /// the IPC handler when the conscious mind sends an
 /// `UpdateUserAffect` command.
 pub fn publish_user_affect(obs: UserAffectObservation) {
-    if let Ok(slot) = SHARED_USER_AFFECT.lock() {
+    if let Ok(mut slot) = SHARED_USER_AFFECT.lock() {
         *slot = Some(obs);
     }
 }
@@ -90,7 +90,7 @@ pub fn publish_user_affect(obs: UserAffectObservation) {
 /// `advance_neuro` each cycle. Returns `None` if no new observation has
 /// been received since the last read.
 pub fn take_user_affect() -> Option<UserAffectObservation> {
-    if let Ok(slot) = SHARED_USER_AFFECT.lock() {
+    if let Ok(mut slot) = SHARED_USER_AFFECT.lock() {
         slot.take()
     } else {
         None

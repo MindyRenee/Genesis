@@ -1504,7 +1504,7 @@ impl LtmStore {
     /// Retrieval is rehearsal — the opposite of forgetting. Every
     /// episode the mind actually reaches for adds a trace, pushing its
     /// accessibility boundary outward. Maintenance reads (unbundling,
-    /// bundle rebuilds) go through [`Self::retrieve_raw`] so the
+    /// bundle rebuilds) go through `Self::retrieve_raw` so the
     /// janitor's broom never counts as a rehearsal.
     pub fn retrieve(&mut self, episode_id: u64) -> Result<Episode, LtmError> {
         let episode = self.retrieve_raw(episode_id)?;

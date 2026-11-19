@@ -1,0 +1,53 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="The tesseract lattice — the 4-cube skeleton inside the latent bulk."><title>genesis::field::tesseract - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-203241e4.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="genesis" data-themes="" data-resource-suffix="" data-rustdoc-version="1.100.0 (0ef1bc386 2026-11-09)" data-channel="1.100.0" data-search-js="search-b167f383.js" data-stringdex-js="stringdex-b5109af9.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../../static.files/main-1814ead3.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-9f56287d.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module tesseract</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../genesis/index.html">genesis</a><span class="version">0.2.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module tesseract</a></h2><h3><a href="#structs">Module Items</a></h3><ul class="block"><li><a href="#structs" title="Structs">Structs</a></li><li><a href="#constants" title="Constants">Constants</a></li></ul></section><div id="rustdoc-modnav"><h2><a href="../index.html">In genesis::<wbr>field</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../index.html">genesis</a>::<wbr><a href="../index.html">field</a></div><h1>Module <span>tesseract</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/genesis/field/tesseract.rs.html#1-413">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>The tesseract lattice — the 4-cube skeleton inside the latent bulk.</p>
+<p>The κ-stereographic cap is the bulk: a d-ball whose boundary — the
+equator rim at ‖x‖ = R — is the (d−1)-sphere, the holographic
+screen every interior point projects onto along its radial ray.
+Inside the bulk the lattice is the four-dimensional cube and its
+figures, all sharing the same center — the origin, the
+superposition point:</p>
+<ul>
+<li>
+<p><strong>The sixteen vertices</strong> — {±a}⁴ in the leading 4D subspace,
+with a = R/2 so every corner rests on the rim: ‖v‖ = a·√4 = R.
+The skeleton’s extremities touch the screen — the tips are the
+rays.</p>
+</li>
+<li>
+<p><strong>The two demicubes</strong> — the sixteen vertices split by sign
+parity into two 16-cells: the even-parity and odd-parity
+demitesseracts, the field’s two chiralities. Each is bounded by
+the cube itself and by the facet planes s·x ≤ 2a facing the
+opposite parity’s vertices.</p>
+</li>
+<li>
+<p><strong>The superposition cell</strong> — their intersection, the region
+where both chiralities hold at once: {Σ|xᵢ| ≤ 2a, |xᵢ| ≤ a}.
+Its twenty-four vertices are the permutations of
+(±a,±a,0,0) — the 24-cell, the self-dual regular polytope that
+exists only in four dimensions. It is its own opposite.</p>
+</li>
+<li>
+<p><strong>The sixteen rays</strong> — the vertices themselves. In the 4-cube
+the directions the superposition radiates toward are its own
+corners: sixteen antipodal pairs of tips resting on the rim.
+Motion stays continuous — the rays are a scaffold, not a cage.</p>
+</li>
+<li>
+<p><strong>The spin</strong> — the isoclinic bivector J = ω·(J₀₁ + J₂₃): in the
+cube’s own 4D space equal-angle multi-plane rotation is exact —
+SO(4) decomposes into left and right isoclinic rotations, and
+the two signs of J are the field’s two helicities, the
+demicubes’ counter-rotation.</p>
+</li>
+</ul>
+<p>The center is the inner world. Every ray radiates outward from it:
+the source has no image on the screen — it is everywhere on it at
+once.</p>
+</div></details><h2 id="structs" class="section-header">Structs<a href="#structs" class="anchor">§</a></h2><dl class="item-table"><dt><a class="struct" href="struct.Tesseract.html" title="struct genesis::field::tesseract::Tesseract">Tesseract</a></dt><dd>The 4-cube lattice embedded in the leading subspace of the latent
+bulk. <code>dimension</code> is the bulk’s width (≥ 4); the cube’s figures —
+vertices, demicubes, the superposition cell — live in the first
+four coordinates; any further dimensions are rest directions the
+figures do not constrain.</dd></dl><h2 id="constants" class="section-header">Constants<a href="#constants" class="anchor">§</a></h2><dl class="item-table"><dt><a class="constant" href="constant.CUBE_DIM.html" title="constant genesis::field::tesseract::CUBE_DIM">CUBE_<wbr>DIM</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>The cube’s own dimension — four. The figures are exact only in
+this subspace: the demicube pair are 16-cells and their
+intersection is the 24-cell, a regular polytope with no analog in
+any other dimension.</dd></dl></section></div></main></body></html>

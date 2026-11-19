@@ -180,8 +180,8 @@
 //!
 //! The fix: CPU load, memory, and I/O are now measured from
 //! Genesis's own process tree (daemon PID + cognitive mind PID —
-//! the eye rides inside the daemon) via `/proc/<pid>/stat`,
-//! `/proc/<pid>/statm`, and `/proc/<pid>/io`.
+//! the eye rides inside the daemon) via `/proc/\<pid\>/stat`,
+//! `/proc/\<pid\>/statm`, and `/proc/\<pid\>/io`.
 //!
 //! # How it feeds into neurochemistry
 //!
@@ -324,7 +324,7 @@ fn shared_presence() -> &'static Shared<u32> {
 
 /// Publish the discovered sensor-presence mask alongside the body state.
 pub fn publish_sensor_presence(mask: u32) {
-    if let Ok(guard) = shared_presence().lock() {
+    if let Ok(mut guard) = shared_presence().lock() {
         *guard = mask;
     }
 }
@@ -381,7 +381,7 @@ fn shared_health() -> &'static Shared<ProcessHealth> {
 
 /// Publish the current process health.
 pub fn publish_process_health(health: ProcessHealth) {
-    if let Ok(guard) = shared_health().lock() {
+    if let Ok(mut guard) = shared_health().lock() {
         *guard = health;
     }
 }
@@ -436,7 +436,7 @@ fn shared_subsystems() -> &'static Shared<(Vec<SubsystemTelemetry>, u64)> {
 /// Publish the latest per-subsystem telemetry so the IPC handler can
 /// serve GET_SUBSYSTEM_TELEMETRY. Called at the end of each read().
 pub fn publish_subsystem_telemetry(subsystems: &[SubsystemTelemetry]) {
-    if let Ok(guard) = shared_subsystems().lock() {
+    if let Ok(mut guard) = shared_subsystems().lock() {
         let published_ms = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_millis() as u64)
@@ -517,7 +517,7 @@ pub struct SubsystemTelemetry {
 /// Publish the latest body state so the IPC handler can read it.
 /// Called after each reactive hardware read.
 pub fn publish_body_state(state: &BodyState) {
-    if let Ok(guard) = shared_body().lock() {
+    if let Ok(mut guard) = shared_body().lock() {
         *guard = state.clone();
     }
 }
@@ -977,7 +977,7 @@ fn rss_kb(pid: u32) -> u64 {
     let Ok(content) = fs::read_to_string(format!("/proc/{pid}/statm")) else {
         return 0;
     };
-    // /proc/<pid>/statm fields: size resident shared text lib data dt
+    // /proc/\<pid\>/statm fields: size resident shared text lib data dt
     // Field 2 (resident) is RSS in pages.
     let rss_pages: u64 = content
         .split_whitespace()
@@ -987,7 +987,7 @@ fn rss_kb(pid: u32) -> u64 {
     rss_pages.saturating_mul(page_size_kb())
 }
 
-/// Parsed /proc/<pid>/stat for CPU time computation.
+/// Parsed /proc/\<pid\>/stat for CPU time computation.
 #[derive(Clone, Copy, Default, Debug)]
 struct ProcStat {
     /// User-mode CPU time (clock ticks).
@@ -1002,7 +1002,7 @@ impl ProcStat {
         self.utime + self.stime
     }
 
-    /// Parse /proc/<pid>/stat. The fields are space-separated, but
+    /// Parse /proc/\<pid\>/stat. The fields are space-separated, but
     /// the comm field (field 2) is in parentheses and may contain
     /// spaces, so we find the last ')' and parse from there.
     fn parse(content: &str) -> Option<Self> {
@@ -1021,7 +1021,7 @@ impl ProcStat {
     }
 }
 
-/// Parsed /proc/<pid>/io for I/O throughput computation.
+/// Parsed /proc/\<pid\>/io for I/O throughput computation.
 #[derive(Clone, Copy, Default, Debug)]
 struct ProcIo {
     /// Bytes read (rchar — includes cached reads, not just disk).
@@ -1036,7 +1036,7 @@ impl ProcIo {
         self.rchar + self.wchar
     }
 
-    /// Parse /proc/<pid>/io.
+    /// Parse /proc/\<pid\>/io.
     fn parse(content: &str) -> Option<Self> {
         let mut rchar: Option<u64> = None;
         let mut wchar: Option<u64> = None;
@@ -2044,7 +2044,7 @@ impl Interoceptor {
     /// this way keeps one traversal for both consumers.
     /// Publish this process tree's absolute resident memory.
     fn publish_memory_mb(&self, mb: f32) {
-        if let Ok(guard) = shared_memory_mb().lock() {
+        if let Ok(mut guard) = shared_memory_mb().lock() {
             *guard = mb;
         }
     }
@@ -2157,7 +2157,7 @@ impl Interoceptor {
         for &pid in pids {
             let path = format!("/proc/{pid}/io");
             let Ok(content) = fs::read_to_string(&path) else {
-                // /proc/<pid>/io requires read permission; if we can't
+                // /proc/\<pid\>/io requires read permission; if we can't
                 // read it (e.g. the cognitive mind runs as a different
                 // user), skip it silently.
                 continue;
@@ -3275,7 +3275,7 @@ fn read_gpe_count() -> u64 {
 ///
 /// This is *not* `sysconf(_SC_CLK_TCK)`. The two are different
 /// quantities: `_SC_CLK_TCK` is USER_HZ, the reporting granularity of
-/// `/proc/<pid>/stat` (used separately, via `sysconf_clk_tck()`), and
+/// `/proc/\<pid\>/stat` (used separately, via `sysconf_clk_tck()`), and
 /// is always 100 on Linux. The `LOC` counter in `/proc/interrupts`
 /// counts real local-APIC timer expirations, which fire at CONFIG_HZ —
 /// an event rate, not a jiffies-reporting rate. Using 100 there would
@@ -3639,7 +3639,7 @@ fn page_size_kb() -> u64 {
     }
 }
 
-/// Get the clock ticks per second (for /proc/<pid>/stat CPU times).
+/// Get the clock ticks per second (for /proc/\<pid\>/stat CPU times).
 fn sysconf_clk_tck() -> u64 {
     // SAFETY: sysconf(_SC_CLK_TCK) is a read-only query.
     let ticks = unsafe { libc::sysconf(libc::_SC_CLK_TCK) };
@@ -3932,7 +3932,7 @@ mod tests {
 
     #[test]
     fn test_proc_stat_parse() {
-        // A realistic /proc/<pid>/stat line. The comm field can
+        // A realistic /proc/\<pid\>/stat line. The comm field can
         // contain spaces (in parentheses), so the parser must find
         // the last ')'.
         let content = "1234 (genesis-daemon) S 1 1234 1234 0 -1 4194560 12345 0 0 0 \
@@ -4942,9 +4942,11 @@ mod sensor_presence_tests {
 
     // The mask is process-global (it bridges the interoception thread
     // and the IPC handler); the tests that touch it share one cell.
-    fn guard() -> &'static mut () {
+    fn guard() -> crate::shared::Hold<'static, ()> {
         static LOCK: Free<Shared<()>> = Free::new();
-        LOCK.get_or_init(|| Shared::new(())).get()
+        LOCK.get_or_init(|| Shared::new(()))
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
     }
 
     #[test]

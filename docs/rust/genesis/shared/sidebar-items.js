@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["Denied","Free","Hold","Shared"]};

@@ -80,7 +80,7 @@ fn reported_failures() -> &'static Shared<std::collections::HashSet<String>> {
 /// clear-on-success behaviour oscillated report → clear → report on
 /// exactly that pattern and was itself the spam.
 fn report_failure(cause: &str, detail: &str) {
-    let guard = match reported_failures().lock() {
+    let mut guard = match reported_failures().lock() {
         Ok(g) => g,
         Err(poisoned) => poisoned.into_inner(),
     };
@@ -106,7 +106,7 @@ fn shared_control() -> &'static Shared<BodyControlState> {
 /// Publish the latest body control state so the IPC handler can read it.
 /// Called after each reactive body-control application.
 pub fn publish_control_state(state: &BodyControlState) {
-    if let Ok(guard) = shared_control().lock() {
+    if let Ok(mut guard) = shared_control().lock() {
         *guard = state.clone();
     }
 }
@@ -873,7 +873,7 @@ fn cognitive_pid_override() -> &'static Shared<Option<u32>> {
 
 /// Store the PID a re-inhabiting mind pushed over IPC.
 pub fn set_cognitive_pid(pid: u32) {
-    if let Ok(guard) = cognitive_pid_override().lock() {
+    if let Ok(mut guard) = cognitive_pid_override().lock() {
         *guard = Some(pid);
     }
 }
@@ -882,7 +882,7 @@ pub fn set_cognitive_pid(pid: u32) {
 /// un-written in production, matching every other capability gate).
 #[cfg(test)]
 pub fn reset_cognitive_pid() {
-    if let Ok(guard) = cognitive_pid_override().lock() {
+    if let Ok(mut guard) = cognitive_pid_override().lock() {
         *guard = None;
     }
 }

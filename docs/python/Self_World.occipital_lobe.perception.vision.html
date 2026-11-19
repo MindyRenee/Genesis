@@ -176,7 +176,7 @@ Returns&nbsp;``(names,&nbsp;unknown_count)``,&nbsp;exactly&nbsp;as&nbsp;the&nbsp
 consumes&nbsp;it,&nbsp;and&nbsp;records&nbsp;the&nbsp;names&nbsp;so<br>
 :meth:`last_faces_seen`&nbsp;reports&nbsp;them.</span></dd></dl>
 
-<dl><dt><a name="Vision-see"><strong>see</strong></a>(self, client=None, emotion: 'EmotionalState | None' = None, network=None, mirror: 'bool | None' = None, nerve: 'str' = 'optic') -&gt; 'VisionScene'</dt><dd><span class="code">Look&nbsp;through&nbsp;an&nbsp;afferent&nbsp;nerve&nbsp;and&nbsp;return&nbsp;the&nbsp;structured&nbsp;scene.<br>
+<dl><dt><a name="Vision-see"><strong>see</strong></a>(self, client=None, emotion: 'EmotionalState | None' = None, network=None, mirror: 'bool | None' = None, nerve: 'str' = 'optic', facing: 'str | None' = None) -&gt; 'VisionScene'</dt><dd><span class="code">Look&nbsp;through&nbsp;an&nbsp;afferent&nbsp;nerve&nbsp;and&nbsp;return&nbsp;the&nbsp;structured&nbsp;scene.<br>
 &nbsp;<br>
 This&nbsp;runs&nbsp;the&nbsp;full&nbsp;visual&nbsp;pipeline:<br>
 1.&nbsp;Capture&nbsp;a&nbsp;frame&nbsp;from&nbsp;the&nbsp;nerve&nbsp;(shared&nbsp;memory)<br>
@@ -188,9 +188,11 @@ This&nbsp;runs&nbsp;the&nbsp;full&nbsp;visual&nbsp;pipeline:<br>
 7.&nbsp;Package&nbsp;the&nbsp;percept&nbsp;as&nbsp;a&nbsp;<a href="#VisionScene">VisionScene</a><br>
 8.&nbsp;Wire&nbsp;into&nbsp;memory,&nbsp;concept&nbsp;network,&nbsp;neurochemistry,&nbsp;brain&nbsp;waves<br>
 &nbsp;<br>
-``mirror``&nbsp;selects&nbsp;the&nbsp;facing&nbsp;orientation&nbsp;for&nbsp;this&nbsp;look&nbsp;—<br>
-``None``&nbsp;(default)&nbsp;follows&nbsp;``self.<strong>mirror</strong>``;&nbsp;``False``&nbsp;looks<br>
-out&nbsp;at&nbsp;the&nbsp;world,&nbsp;``True``&nbsp;takes&nbsp;the&nbsp;facing&nbsp;(mirror)&nbsp;view.<br>
+``facing``&nbsp;selects&nbsp;the&nbsp;orientation&nbsp;this&nbsp;look&nbsp;reports&nbsp;through&nbsp;—<br>
+``None``&nbsp;(default)&nbsp;follows&nbsp;``self.<strong>facing</strong>``;&nbsp;``"without"``&nbsp;looks<br>
+out&nbsp;at&nbsp;the&nbsp;world,&nbsp;``"within"``&nbsp;takes&nbsp;the&nbsp;facing&nbsp;(mirror)&nbsp;view,<br>
+``"up"``/``"down"``&nbsp;tip&nbsp;the&nbsp;optical&nbsp;axis&nbsp;to&nbsp;a&nbsp;pole.&nbsp;``mirror``<br>
+is&nbsp;the&nbsp;legacy&nbsp;switch&nbsp;—&nbsp;``True``&nbsp;means&nbsp;``"within"``.<br>
 &nbsp;<br>
 ``nerve``&nbsp;selects&nbsp;the&nbsp;afferent&nbsp;—&nbsp;``"optic"``&nbsp;is&nbsp;the&nbsp;body's<br>
 camera&nbsp;eye,&nbsp;``"screen"``&nbsp;the&nbsp;screen-capture&nbsp;nerve&nbsp;a&nbsp;relay<br>
@@ -214,6 +216,8 @@ thalamic&nbsp;relay&nbsp;gain&nbsp;the&nbsp;body&nbsp;reported&nbsp;for&nbsp;tha
 the&nbsp;gamma&nbsp;feed&nbsp;(which&nbsp;needs&nbsp;V1&nbsp;features),&nbsp;this&nbsp;fires&nbsp;whenever<br>
 light&nbsp;reached&nbsp;cortex:&nbsp;alpha&nbsp;dropout&nbsp;needs&nbsp;only&nbsp;that&nbsp;input<br>
 arrived.</span></dd></dl>
+
+<dl><dt><a name="Vision-set_visual_spacetime_bridge"><strong>set_visual_spacetime_bridge</strong></a>(self, bridge) -&gt; 'None'</dt><dd><span class="code">Connect&nbsp;a&nbsp;calibrated&nbsp;VisualSpacetimeBridge&nbsp;to&nbsp;this&nbsp;visual&nbsp;cortex.</span></dd></dl>
 
 <hr>
 Data descriptors defined here:<br>

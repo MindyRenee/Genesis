@@ -60,11 +60,22 @@ class _FakeCuriosity:
 
 
 class _FakeLearner:
-    def __init__(self) -> None:
+    """Stand-in learner with a switchable loop state."""
+
+    def __init__(self, running: bool = True) -> None:
+        self.running = running
         self.topics: list[str] = []
+        self.synced: list[str] = []
+        self.urgent: list[str] = []
 
     def add_topic(self, topic: str) -> None:
         self.topics.append(topic)
+
+    def lookup_topic_sync(self, topic: str) -> None:
+        self.synced.append(topic)
+
+    def pop_urgent_topic(self) -> str | None:
+        return self.urgent.pop(0) if self.urgent else None
 
 
 # ─── Intention formation ─────────────────────────────────────────────
@@ -113,6 +124,32 @@ def test_no_state_falls_back_to_wandering_probe() -> None:
         assert intention is not None
         assert intention.origin == "wander"
         assert intention.kind in ("observe", "explore", "measure")
+
+
+def test_running_learner_queues_the_topic() -> None:
+    """Loop open: a learn intention queues the topic for the metronome step."""
+    with tempfile.TemporaryDirectory() as tmp:
+        learner = _FakeLearner(running=True)
+        loop = _make_loop(tmp, learner=learner, offline=True)
+        result = ActingResult(intention=Intention("learn", "photosynthesis", "agency"))
+        loop._execute_learn(result.intention, result)
+        assert learner.topics == ["photosynthesis"]
+        assert learner.synced == []
+
+
+def test_self_directed_learn_invokes_the_step_directly() -> None:
+    """Loop closed: the chosen learn urge invokes the bounded step —
+    the topic synchronously, then the urgent gaps conversation left
+    queued — instead of queueing into a loop that never ticks."""
+    with tempfile.TemporaryDirectory() as tmp:
+        learner = _FakeLearner(running=False)
+        learner.urgent = ["mitosis", "entropy"]
+        loop = _make_loop(tmp, learner=learner, offline=True)
+        result = ActingResult(intention=Intention("learn", "photosynthesis", "agency"))
+        loop._execute_learn(result.intention, result)
+        assert learner.topics == []
+        assert learner.synced == ["photosynthesis", "mitosis", "entropy"]
+        assert learner.urgent == []
 
 
 # ─── Capability policy ───────────────────────────────────────────────

@@ -111,7 +111,7 @@ impl Pupil {
     }
 
     /// Steady-state diameter for a mean luminance `lum` (≥0) and
-    /// sympathetic drive `ne` ∈ [0,1]. Log-compressive:
+    /// sympathetic drive `ne` ∈ `[0,1]`. Log-compressive:
     /// `d* = clamp(d_dark − k·log10(1+L), min, max)`, then the
     /// dilator adds up to its own millimetre at full drive.
     fn target(&self, lum: f64, ne: f64) -> f64 {
@@ -145,7 +145,7 @@ impl Default for Pupil {
 /// pupil diameter, and the defocus the ciliary body dialed in.
 #[derive(Clone, Copy, Debug)]
 pub struct OcularState {
-    /// Lid transmission scalar ∈ [0,1].
+    /// Lid transmission scalar ∈ `[0,1]`.
     pub lid: f64,
     /// Pupil diameter, mm.
     pub pupil_mm: f64,
