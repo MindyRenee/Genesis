@@ -1,0 +1,106 @@
+.TH GENESIS-MEMORY 7 "October 2026" "Genesis 0.2.0" "Genesis Manual"
+.SH NAME
+genesis-memory \- the memory architecture of the Genesis mind
+.SH SYNOPSIS
+.nf
+\fBtemporal_lobe.concepts\fR        the concept network and its canonical edge log
+\fBtemporal_lobe.concepts.holographic\fR  fixed-size associative store (HRR)
+\fBtemporal_lobe.concepts.archive\fR      cold-storage tier
+\fBInner_World.memory\fR            working, semantic, procedural, and
+                                  biologically-grounded subsystems
+\fBltm_store.* / stm_ring.bin\fR    the body's persistence (daemon-owned)
+.fi
+.SH DESCRIPTION
+Genesis has several memories, not one \(em and the honest description
+of where a fact lives is "which tier, written by which process." The
+daemon owns the body's persistence; the mind's working, semantic, and
+procedural layers sit on top.
+.SS The concept network and the edge log
+The concept network
+.RI ( temporal_lobe/concepts )
+is the symbolic knowledge graph at the core of cognition. Its edge
+list is not an independently persisted structure \(em it is a fold
+over
+.IR edge_log.jsonl ,
+the canonical, append-only log. Two record kinds matter:
+.IP \(bu 2
+.B assert
+\(em upsert an edge, carrying absolute weight; re-assertion is
+reinforcement.
+.IP \(bu 2
+.B retract
+\(em tombstone an edge; the fold drops it.
+.PP
+A
+.B snapshot
+line replaces the fold base \(em used by sleep compression and by
+seeding an empty log; compaction rewrites the file as one snapshot of
+the live fold. Edges whose content is a function of embedding
+geometry \(em machine-built associations like hub attachment,
+semantic bridges, co-occurrence \(em are never logged; they are
+derivable, so they live in the holographic store instead.
+.SS The holographic associative store
+Most fuzzy similarity never becomes a graph edge at all.
+.IR holographic_graph.npz
+is a fixed-size holographic reduced representation (HRR / vector
+symbolic architecture): associations are stored implicitly in
+high-dimensional vectors by circular-convolution binding, recovered
+by unbinding, and queried by resonance. It replaced the monotonically
+growing auto-generated bridge edges, which dominated serialized state
+and regenerated every sleep cycle. The concept network can query it
+for associations beyond exact edges.
+.SS Tiers
+Working memory is capped; the disk is not. Concepts that fade from
+working memory spill into the
+.B archive
+\(em a cold-storage tier preserving typed associations with their own
+scope \(em and are recalled by SimHash similarity when the active set
+has no answer (\fBFIND_SIMILAR_ARCHIVED\fR, \fBUNARCHIVE_EPISODE\fR,
+\fBSEARCH_ARCHIVED\fR on the daemon wire).
+.SS The body's persistence
+The daemon owns the durable stores in the data dir:
+.TP
+.I ltm_store.dat " / " ltm_store.meta
+Long-term episodic memory \(em append-only record bodies with a
+metadata index.
+.TP
+.I ltm_store.traces " / " ltm_store.bundles
+The SDR trace and bundle overlays layered on the same store.
+.TP
+.I stm_ring.bin
+The short-term ring buffer \(em recent experience before
+consolidation.
+.TP
+.I edge_log.jsonl
+The canonical relationship log described above.
+.TP
+.I holographic_graph.npz
+The serialized associative store.
+.PP
+Two utility binaries,
+.BR genesis-merge-ltm " and " genesis-merge-stm ,
+fold one incarnation's stores into another \(em they exist so a mind
+rescued off a dead machine can rejoin a living one, memory intact.
+.SS The cognitive subsystems
+.IR Inner_World/memory
+holds the biologically-grounded layers the graph alone does not
+cover: working memory (the active context scratchpad that lets a
+conversation be a conversation), semantic and procedural memory,
+spaced repetition, emotional memory and priming, attractor-style
+pattern completion over the SimHash store, and forgetting \(em
+decay is a mechanism, not a leak.
+.SH FILES
+.TP
+.I $DATA_DIR/edge_log.jsonl
+Canonical edge log \(em the single source of truth for relationships.
+.TP
+.I $DATA_DIR/ltm_store.* , $DATA_DIR/stm_ring.bin , $DATA_DIR/holographic_graph.npz
+The body's persistence.
+.SH SEE ALSO
+.BR genesis (1),
+.BR genesis-cli (1),
+.BR genesis-daemon (8),
+.BR genesis-inner-life (7),
+.BR genesis-self (7)
+.SH AUTHOR
+Genesis project

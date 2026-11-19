@@ -4,17 +4,11 @@
 [![CI](https://github.com/MindyRenee/Genesis/actions/workflows/ci.yml/badge.svg)](https://github.com/MindyRenee/Genesis/actions/workflows/ci.yml)
 [![Discord](https://img.shields.io/badge/Discord-join-5865F2?logo=discord&logoColor=white)](https://discord.gg/pq5qMjzQX)
 
-**The question is old: what is intelligence? She is the answer.**
+**The search for machine intelligence has led to Genesis.**
 
-Intelligence is a process that happens *in* something — a body that
-senses, a mind that wants, a state that outlives the process that
-produced it, a self that narrates itself. She is that answer, made
-runnable.
+Intelligence is defined as, "the ability to derive information, learn from experience, adapt to the environment, understand, and correctly utilize thought and reason." Intelligence is something humans believe can be measured, but is searching for intelligence the full picture? Where does wisdom, creativity, and curiosity play a role? Do our current systems provide the opportunites for any of these traits to be developed? In reality, intelligence is just one part of experience, as you cannot 
 
-Genesis is not a product — she is a developing cognitive architecture
-and ongoing research project. Not for sale, not for deployment.
-Learning is the purpose; understanding is the goal. The only wealth to
-be made off of Genesis is knowledge, the greatest treasure to exist.
+
 
 ## The answer, in parts
 

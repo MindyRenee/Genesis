@@ -46,6 +46,11 @@ class Pulse:
         self.seq += 1
 
     def wait(self, timeout: float | None = None) -> bool:
+        """Wait.
+
+        Args:
+            timeout: The timeout in seconds.
+        """
         deadline = None if timeout is None else time.monotonic() + timeout
         seq = self.seq
         while not self.value:
@@ -57,6 +62,12 @@ class Pulse:
         return True
 
     def wait_for(self, predicate: Callable[[], bool], timeout: float | None = None) -> bool:
+        """Wait for.
+
+        Args:
+            predicate: The predicate.
+            timeout: The timeout in seconds.
+        """
         deadline = None if timeout is None else time.monotonic() + timeout
         seq = self.seq
         while not predicate():

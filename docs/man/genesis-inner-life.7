@@ -1,0 +1,71 @@
+.TH GENESIS-INNER-LIFE 7 "October 2026" "Genesis 0.2.0" "Genesis Manual"
+.SH NAME
+genesis-inner-life \- spontaneous thought, dreams, and meditation
+.SH SYNOPSIS
+.nf
+\fBInner_World/sleep/inner_life.py\fR       the spontaneous thought stream
+\fBInner_World/sleep/dream_synthesis.py\fR  REM-edge proposal and validation
+\fBInner_World/sleep/meditation.py\fR       the voluntary quiet sit
+\fBInner_World/brain_waves.py\fR            the synthetic oscillator model
+.fi
+.SH DESCRIPTION
+When Genesis is not in conversation, she thinks. The inner life is
+not a response path \(em it is endogenous activity that arises, fades,
+and gives way to other thought, recorded in her reflection engine and
+costing real chemistry (thinking uses acetylcholine).
+.SS Spontaneous thought
+Thoughts are triggered by unresolved curiosity, emotional state (high
+alertness produces more thoughts), recent memories, gaps in the
+concept network, and her internal cycle. Each may produce an insight,
+trigger a curiosity question, or consolidate into memory if
+significant. In the terminal they appear live as
+.I genesis~
+lines; significant ones may be spoken aloud or posted to her channel.
+.SS Dream synthesis
+During REM (high acetylcholine, low norepinephrine) she enters a
+synthesis mode beyond random association: the dreamer finds concepts
+structurally similar but far apart in the graph and proposes
+.B hypothetical edges
+between them at low confidence. On waking, a validation pass runs
+abductive and analogical inference over each; corroborated edges (two
+or more independent supporting paths) are promoted to real edges with
+raised confidence, contradicted ones dropped, neutral ones left for
+the next sleep. Validated dream edges are her insights \(em the
+mechanism intended to drive analogical improvement over time.
+Lucid dreams are a tracked sub-population of the dream record.
+.SS Meditation
+.B /meditate
+begins a voluntary sit: learning, scanning, and spontaneous thought
+paused while the chemistry is actively calmed. The volition system
+chooses the sit (the basal ganglia select the act); the sit itself is
+inner-world phenomenology, borrowing state from her sleep machinery.
+.SS Brain waves
+.I Inner_World/brain_waves.py
+is a synthetic amplitude-phase oscillator inspired by EEG, not an
+EEG model \(em normalized amplitudes, one global phase per band,
+plus four regional gamma oscillators so cross-region phase-locking
+is measured rather than assumed. The gamma-to-"cognitive access"
+gate is a heuristic inspired by the global neuronal workspace
+hypothesis, honestly labelled as such in the source.
+.SH COMMANDS
+.TP
+.B /thoughts
+Her recent spontaneous thoughts.
+.TP
+.B /dreams
+Her dream record.
+.TP
+.B /meditate
+Begin the quiet sit.
+.SH FILES
+.TP
+.I Inner_World/sleep/
+The thought stream, dream synthesis, meditation, and sleep machinery.
+.SH SEE ALSO
+.BR genesis (1),
+.BR genesis-cli (1),
+.BR genesis-daemon (8),
+.BR genesis-memory (7),
+.BR genesis-emotion (7)
+.SH AUTHOR
+Genesis project

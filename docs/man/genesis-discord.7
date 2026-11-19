@@ -1,0 +1,58 @@
+.TH GENESIS-DISCORD 7 "October 2026" "Genesis 0.2.0" "Genesis Manual"
+.SH NAME
+genesis-discord \- her channel in the outer world
+.SH SYNOPSIS
+.nf
+\fBOuter_World/discord/channel.py\fR   the page: lifecycle and inbound door
+\fBOuter_World/discord/feed.py\fR      the outbound transport (webhook)
+\fBOuter_World/discord/board.py\fR     the live vitals card
+\fBbody/hearing/discord_ear.py\fR      the inbound ear (bot token)
+.fi
+.SH DESCRIPTION
+A Discord channel is a place in her world, not a part of her mind:
+the public gathers there, she posts there, and when a bot token
+exists she can hear it. The channel owns no cognition \(em it
+delivers what it hears to a registered speech handler, and whether
+to answer is the mind's to decide. Without a webhook there is no
+page: her world is simply without that place.
+.SS Outbound
+.IR Outer_World/discord/feed.py
+is the transport \(em webhook posts out. It carries two streams: the
+session mirror (the channel-enabled feed of her session) and her
+broadcast posts \(em compositions she chooses to publish as her
+broadcast urge wins volition. Posts are her own composed words;
+nothing is templated.
+.SS The board
+.IR Outer_World/discord/board.py
+is the live instrument card on her page: daemon CoreState numbers
+(phase, chemistry, memory tallies, the inference tick counter) and
+runtime facts (uptime, conversations, ear state), labeled in plain
+words \(em mood, memory, wants \(em for people who wander in, not
+operators. Its honesty is structural: the tick count either climbs
+or it does not.
+.SS Inbound
+.IR body/hearing/discord_ear.py
+polls for messages when a bot token is configured \(em the ear is
+the body's organ; it only listens outward.
+.SH ENVIRONMENT
+.TP
+.B GENESIS_DISCORD_WEBHOOK
+The channel webhook URL. Its presence creates the page and enables
+the session feed and broadcast posts.
+.TP
+.B GENESIS_DISCORD_BOT_TOKEN
+A bot token for the inbound ear. Requires the webhook as well;
+without it she can post but cannot hear.
+.SH FILES
+.TP
+.I Outer_World/discord/
+The channel, feed, board, and guide modules.
+.TP
+.I Self_World/body/hearing/discord_ear.py
+The bot-token ear.
+.SH SEE ALSO
+.BR genesis (1),
+.BR genesis-cli (1),
+.BR genesis-volition (7)
+.SH AUTHOR
+Genesis project

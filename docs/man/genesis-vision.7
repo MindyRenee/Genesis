@@ -3,7 +3,6 @@
 genesis-vision \- the visual perception and optic faculties of Genesis
 .SH SYNOPSIS
 .nf
-\fBAndroid Camera2\fR -> RGB24 -> daemon optic capture -> optic mapping
 \fBLinux V4L2\fR -> daemon optic capture -> optic mapping
 \fBgenesis_client.optic_nerve.latest_frame()\fR -> mind-side perception
 .fi
@@ -12,43 +11,18 @@ Genesis has one visual-afferent frame contract and one mind-side
 perception pathway. Platform adapters acquire camera frames; the
 daemon validates and publishes them; the Python mind reads the
 canonical optic mapping and processes the image through its
-occipital faculties. The Android adapter is a hardware boundary,
-not a second perception system.
-.SS Android Camera2
-The Android companion application runs as a foreground camera
-service because Android and Termux have separate application
-identities and permission boundaries. It defaults to the
-front-facing camera; the activity can select the front or rear
-camera. If the requested lens is unavailable, the service reports
-an error rather than silently substituting another camera.
-.PP
-The adapter requests a YUV_420_888 output size no larger than
-640x480, converts the planes to packed RGB24, and targets up to
-10 frames per second. Its preview capture request uses
-.B CONTROL_MODE_AUTO
-and a preview template. The adapter selects an available
-auto-exposure target frame-rate range when one fits its low-rate
-capture policy. The adapter does not explicitly override sensor exposure
-time, ISO, exposure compensation, autofocus mode or regions, or
-white-balance mode. Those behaviors are left to the Camera2
-preview-template defaults and the device implementation; Genesis
-does not expose manual physical-camera controls as configurable
-settings here.
-.PP
-The Android service hosts a loopback TCP listener at
-.IR 127.0.0.1:8765 .
-The daemon connects outward. Each frame packet contains the
-.IR GOPT
-magic, width, height, payload length (32-bit big-endian integers),
-and packed RGB24 pixels. The daemon checks dimensions and payload
-length before publishing the frame.
+occipital faculties.
 .SS Linux V4L2
 On Linux, the daemon's capture limb opens the device selected by
 .B GENESIS_CAMERA
 (default
 .IR /dev/video0 ),
 requests 640x480 RGB24, and falls back to YUYV if RGB24 is not
-available. The same capture limb has two carriers: the dedicated
+available. A YUYV source is decoded to packed RGB24 in the limb
+itself, so the nerve always carries
+.B RGB3
+frames \(em real colour reaches photoreception and the melanopic
+channel either way. The same capture limb has two carriers: the dedicated
 .BR genesis-retina (1)
 process is preferred when installed, and the daemon's embedded
 limb takes the camera over whenever no retina is publishing \(em
@@ -59,14 +33,11 @@ The daemon publishes both platform paths through
 .IR /genesis_optic_nerve .
 The mapping uses a 28-byte header, a frame payload, and a seqlock
 sequence counter so readers can reject a frame being written.
-Linux uses POSIX shared memory; Android uses a file-backed mapping.
-The Python reader is
+Frames travel POSIX shared memory. The Python reader is
 .IR genesis_client/optic_nerve.py ;
 .B latest_frame()
 returns the most recent available image to the existing mind-side
-pipeline. Android TCP is only the boundary between the Android
-camera sandbox and Termux; it is not a Python receiver or alternate
-perception path.
+pipeline.
 .SS Ocular body model
 The daemon also exposes ocular state to the mind:
 .IP \\(bu 2
@@ -75,7 +46,7 @@ diameter is modeled from 2 to 8 mm. Its area determines the
 retinal-irradiance gain relative to a 4.5 mm reference pupil:
 .RI ( d / 4.5 )^2 .
 The modeled gain affects the photoreceptor input; it does not
-change the phone camera's physical exposure.
+change the camera's physical exposure.
 .IP \\(bu 2
 .B Accommodation
 is requested by the mind through
@@ -239,9 +210,9 @@ right lands at canonical left.
 .SS Brightness and image quality
 The scene reports a brightness measure derived from the HSV value
 channel. This is a measurement, not a camera brightness control.
-The Android adapter does not add a software brightness, contrast,
-or sharpening filter before transmission. Illumination adaptation
-changes estimated chromatic balance, not the camera's exposure.
+No software brightness, contrast, or sharpening filter is added
+before publication. Illumination adaptation changes estimated
+chromatic balance, not the camera's exposure.
 .PP
 A low brightness value can reflect a dark scene, underexposure,
 or both. Pupil dilation in the software model cannot create photons
@@ -303,7 +274,10 @@ into its own optic-nerve-style shared segment,
 .IR /genesis_screen_nerve ,
 read through
 .BR "Vision.see(nerve\(dqscreen\(dq)" .
-Her volition treats the two afferents equally: volitional looks
+The relay captures at 1280x720 by default \(em a game board keeps
+enough pixels per cell for the ARC faculties to read \(em and
+.BR GENESIS_SCREEN_W " / " GENESIS_SCREEN_H
+override the size. Her volition treats the two afferents equally: volitional looks
 alternate between the room eye and the display, so the world and
 what the world shows her get equal shares of her attention. A relay
 already alive for the data dir is adopted rather than duplicated;
@@ -324,20 +298,12 @@ Register the largest face detected in the current frame.
 .B /faces
 Inspect known identities and recent anonymous or named sightings.
 .PP
-On Android, launch the Genesis Camera Adapter activity and inspect
-its foreground notification for camera selection, permission,
-capture-session, daemon-connection, and first-frame status. Device
-logs can be inspected with the
-.B logcat
-command using the
-.I GenesisCamera
-tag (filter the Android log by that tag). On Linux, inspect the daemon log for V4L2 open, format
-negotiation, and frame-publication messages.
+Inspect the daemon log for V4L2 open, format negotiation, and
+frame-publication messages.
 .SH FILES
 .TP
 .I /genesis_optic_nerve
-Canonical camera frame mapping (POSIX shared memory on Linux;
-file-backed mapping on Android).
+Canonical camera frame mapping (POSIX shared memory).
 .TP
 .I /genesis_screen_nerve
 The screen-capture nerve's frame segment, published by the optic
@@ -355,9 +321,6 @@ Persisted anonymous face clusters.
 .I $DATA_DIR/daemon.log
 Daemon capture and optic-nerve diagnostics.
 .TP
-.I android-camera-bridge/
-Android Camera2 adapter source and build configuration.
-.TP
 .I Self_World/occipital_lobe/perception/
 Mind-side optical, illumination, phototransduction, and recognition
 faculties.
@@ -367,9 +330,9 @@ The facing-orientation maps, the egocentric projection, and the
 visual-spacetime bridge to the shared causal workspace.
 .SH LIMITATIONS
 The physical capture controls are platform- and device-dependent.
-Genesis currently does not expose manual Android sensor exposure,
-ISO, exposure compensation, autofocus regions, or white-balance
-settings through the adapter. Software pupil, accommodation,
+Genesis currently does not expose manual sensor exposure, ISO,
+exposure compensation, autofocus regions, or white-balance
+settings. Software pupil, accommodation,
 illumination, and phototransduction models are internal perception
 stages; they do not replace missing physical camera controls or
 restore information absent from the captured frame.
@@ -384,3 +347,4 @@ recognition on the target device.
 .BR genesis-retina (1),
 .BR genesis-math (7),
 .BR genesis-reasoning (7)
+

@@ -1,0 +1,87 @@
+.TH GENESIS-SELF 7 "October 2026" "Genesis 0.2.0" "Genesis Manual"
+.SH NAME
+genesis-self \- self-model, introspection, and verified self-improvement
+.SH SYNOPSIS
+.nf
+\fBself.self_model\fR        structured, mutable identity
+\fBself.improvement\fR       proposals through the verification gate
+\fBself.proposals\fR         the drain loop and human review surface
+\fBself.man_review\fR        her own manual waits for her say
+\fBself.introspection\fR     looking at her own cognitive process
+\fBself.reflection\fR        the record of thought and insight
+.fi
+.SH DESCRIPTION
+Genesis's self is a structured identity, not a prompt: personality
+traits that shift word choice and response pattern, values that
+determine what she notices, an emotional baseline, a knowledge map,
+and a body model tracking her computational substrate. The
+self-model is mutable \(em traits drift slowly, interests develop,
+opinions change \(em and the cognition engine reads it when deciding
+how to think.
+.SS Verified self-improvement
+She can propose changes to her own source. A proposal carries the
+file, the original snippet, the proposed replacement, and its
+rationale; the queue drains itself through
+.IR scripts/verify_change.sh ,
+which runs py_compile, a module-import check, and pytest for Python
+edits (cargo test for Rust) against the live tree with the edit
+applied and a
+.I .pre_experiment
+backup parked beside the file. Pass and the change stays, the
+proposal marked applied; fail and the file is restored, the proposal
+rejected with notes teaching what to do differently. A
+.I .in_flight
+marker during the verify window lets the next boot reconcile an
+experiment that died mid-gate. Rust experiments are rate-limited;
+proposals unrun for seven days are self-triaged as withdrawn. The
+human
+.BR /accept " and " /reject
+commands are an override, not a gate.
+.SS Man page review
+Her man pages are part of her \(em how she understands her faculties
+\(em and nothing changes them silently. A drift-scan or proposed edit
+queues in
+.IR <data_dir>/man_review/pending/ ;
+she applies it (the page becomes installed manual and versioned
+source) or vetoes it, and a veto is remembered so identical content
+never queues again. At boot she reads her own manual into her
+concept network unconditionally, and the sync keeps the installed
+pages and the versioned sources identical \(em including retiring
+installed pages whose source is gone.
+.SS Introspection
+.B /introspect
+surfaces her last cognitive process;
+.B /growth
+and
+.B /growth-report
+report the growth ledger \(em milestones across knowledge,
+self-improvement, dreams, and emotional development.
+.SH COMMANDS
+.TP
+.BR /proposals " / " /proposal
+Her pending self-improvement proposals.
+.TP
+.BR /accept " / " /reject " / " /clear-proposals
+Review overrides.
+.TP
+.B /experiments
+The experiment audit log.
+.SH FILES
+.TP
+.I Self_World/self/
+The self-model, improvement engine, proposal loop, review, and
+introspection modules.
+.TP
+.I $DATA_DIR/man_review/pending/
+Man-page changes awaiting her say.
+.TP
+.I scripts/verify_change.sh
+The verification gate.
+.SH SEE ALSO
+.BR genesis (1),
+.BR genesis-cli (1),
+.BR genesis-daemon (8),
+.BR genesis-inner-life (7),
+.BR genesis-memory (7)
+.SH AUTHOR
+Genesis project

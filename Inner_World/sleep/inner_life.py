@@ -5115,6 +5115,14 @@ class InnerLife:
         """Map measured affect and this thought into the inner-world state."""
 
         def bounded(name: str, default: float, low: float = -1.0, high: float = 1.0) -> float:
+            """Bounded.
+
+            Args:
+                name: The name to identify the target.
+                default: The default.
+                low: The low.
+                high: The high.
+            """
             try:
                 value = float(getattr(emotion, name, default))
             except (TypeError, ValueError):

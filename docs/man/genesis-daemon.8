@@ -1,4 +1,4 @@
-.TH GENESIS-DAEMON 8 "October 2026" "Genesis 0.2.0" "Genesis Manual"
+.TH GENESIS-DAEMON 8 "November 2026" "Genesis 0.2.0" "Genesis Manual"
 .SH NAME
 genesis-daemon \- Genesis subcognitive daemon (neurochemistry, memory, IPC)
 .SH SYNOPSIS
@@ -15,7 +15,7 @@ socket for the Python cognitive mind to communicate with.
 
 .PP
 It is built from
-.I Self_World/src/bin/genesis-daemon.rs
+.I src/bin/genesis-daemon.rs
 and is normally launched and supervised by
 .BR genesis-cli (1)
 (the \fBgenesis\fR console script), which is in turn launched by
@@ -37,20 +37,6 @@ neurochemistry, consolidation, dreaming, and sensing continue, so the
 body keeps living instead of freezing. The mind modulates; absence
 degrades to solitude, not to paused existence. Body-control
 \fIapplication\fR stays mind-requested only.
-
-.SS Mind shepherd
-The fallback keeps the body alive without a mind; the shepherd
-answers the complementary loss: a mind that attached and was then
-lost (crash, kill, OOM) is regrown \(em the daemon spawns the
-organism's own entry point headless and the new mind adopts the
-surviving body and its persisted state. A graceful exit or
-\fBgenesis \-\-stop\fR writes
-.I mind.suppress
-first, so a mind that left intentionally is not resurrected.
-Attempts are bounded by a backoff table and a shepherd that
-exhausts it goes dormant: solitude is accepted, never fought
-forever. A shepherd-spawned mind's output lands in
-.IR $DATA_DIR/mind.log .
 
 .SS Adaptive maintenance gates
 Maintenance work is paced by adaptive wall-clock gates
@@ -101,11 +87,11 @@ speeds the CPU up, GABA slows it down, melatonin selects powersave;
 ACh raises scheduling priority; the plasticity gate sets the I/O
 priority class; CPU temp caps the max frequency regardless of
 dopamine (autonomic fatigue). Privileged levers (governor, RTC wake
-alarm) invoke
-.B "sudo \-n"
-directly and need a NOPASSWD sudoers drop-in for her user (see
-.IR scripts/genesis-sudoers );
-without it, sensing still works and only actuation stays read-only.
+alarm) route through root-owned helpers under
+.IR /usr/local/libexec/genesis/
+when installed by
+.BR scripts/install_sudoers.sh ;
+without them, sensing still works and only actuation stays read-only.
 .IP \(bu 2
 \fBAdaptive sync\fR modulates the LTM disk-sync rate by the plasticity
 gate (the sync AdaptiveGate above).
@@ -136,75 +122,87 @@ block via GET_STATE (it is the last field of CoreState) or the
 GET_INFERENCE_SUMMARY projection.
 
 .SS Dyadic model
-The daemon keeps a generative model of Mindy. From each
+The daemon keeps a generative model of \fIwhoever is speaking\fR
+\(em an anonymous interlocutor, not a registry of persons. From each
 UPDATE_USER_AFFECT observation (valence/arousal/engagement/
-confidence) it tracks Mindy's hidden affective state, the
+confidence) it tracks the user's hidden affective state, the
 oxytocin-mediated attunement that gates how strongly the dyad
 couples, and dyadic synchrony (rolling valence correlation). The
 model answers in neurochemistry: it emits impulses the tick applies
-through \fBapply_impulse\fR \(em oxytocin for positive
+through \fBapply_impulse_capped\fR \(em oxytocin for positive
 engaged presence and for high synchrony (Palumbo et al. 2017), CRH
 for empathic stress and disengagement. CRH, never direct cortisol:
 the HPA cascade owns maturation gating downstream. Coupling
-requires a Mindy and attunement above 0.3 \(em a silent room
+requires a present user and attunement above 0.3 \(em a silent room
 is not a rejecting user, so a left-open channel cannot trickle
 rejection CRH forever.
 
 .SS Optic nerve
-The optic nerve is the body's own limb: a capture limb opens the
-camera (the V4L2 device named by
-.IR GENESIS_CAMERA ,
-default
-.IR /dev/video0 )
-and writes raw frames into the POSIX shared-memory segment
-.IR /genesis_optic_nerve
-\(em that segment is the nerve, shared with the mind \(em and pools
-each frame into the subcortical channels the nerve actually
-carries. No pixels leave the module: the channels are scalar
-signals, the same thing the anatomical fibres carry.
-.IP \(bu 2
-The limb itself has two carriers sharing one implementation:
-.BR genesis-retina (1)
-runs it as a dedicated process and is the preferred eye when it is
-installed; the daemon embeds the same limb on a thread. Ownership is
-arbitrated on the nerve itself \(em while a retina publishes frames
-the embedded limb stays closed, and if the retina dies the daemon
-takes the camera over \(em so exactly one process owns the device
-and the eye heals in place.
-.IP \(bu 2
-\fBMelanopic illuminance\fR (the ipRGC channel) feeds
-.IR sleep_network::VisualAfference::light ,
-replacing the wall-clock photoperiod while frames are fresh \(em
-the dominant circadian zeitgeber.
-.IP \(bu 2
-\fBA collicular orienting transient\fR (motion/luminance) becomes a
-brief LC alerting pulse, but only below the sleep network's own
-wake threshold \(em sensory gaining during sleep, not a bypass.
-.IP \(bu 2
-\fBThe TRN relay gate\fR \(em
-.IR relay_base (phase):
-NREM 0.02, REM 0.10, drowsy 0.6, overwhelmed 0.3, else 1.0 \(em
-scaled by a bounded \(+-40% corticothalamic feedback set through
-\fBSET_OPTIC_GAIN\fR. The mind reads the gate over
-\fBGET_OPTIC_STATE\fR and honours it: a \fIsee\fR during NREM is a
-blind look.
+The daemon owns the canonical optic frame mapping named
+.I /genesis_optic_nerve .
+On Linux the capture limb opens the V4L2 device selected by
+.I GENESIS_CAMERA
+(default
+.IR /dev/video0 ),
+requests 640x480 RGB24 and falls back to YUYV when RGB24 is
+unavailable. On Android, a separate Camera2 foreground service
+captures YUV_420_888 frames, converts them to packed RGB24, and
+hosts a loopback TCP stream at
+.IR 127.0.0.1:8765 ;
+the daemon connects outward, validates the bounded frame packets,
+and publishes them into the same optic mapping. Android frames are
+bounded to 640x480 and the adapter targets up to 10 frames per
+second. The mapping is POSIX shared memory on Linux and a
+file-backed mapping on Android. The transport protocol and platform
+details are documented in
+.BR genesis-vision (7).
 .PP
-The nerve also owns the eye's body state. The \fBpupil\fR (2\(en8
-mm: a log-compressive light reflex on the photopic channel plus NE
-sympathetic dilation, constricting faster than it dilates; a
-central miosis term overrides the dark reflex in sleep).
-\fBAccommodation\fR (ciliary lens power 0\(en6 D, set by the mind's
-\fBSET_FOCUS\fR request in metres; near pull-in faster than far
-release, released to tonic rest when the lids shut). And the
-\fBeyelid\fR \(em a transmission on every afferent channel: open
-awake, ~0.5 drowsy, ~0.03 in NREM/REM, so light still entrains
-weakly through closed lids and a flash can still wake. The mind
-also holds a voluntary lid through \fBSET_LID\fR \(em the
-orbicularis oculi the camera hardware lacks. The requested
-openness composes with the phase's own position by \fBmin\fR: a
-will can shut an open eye (to rest it, to dim the world) but can
-never pry a sleeping one open. Held, not momentary \(em the lid
-stays where the mind left it until it moves it again.
+Ownership of the name is settled on the nerve itself. The external
+retina
+.RB ( genesis-retina (1))
+and the daemon's embedded capture limb are two carriers of the same
+implementation; whichever claims the V4L2 device first owns the
+organ, and the daemon takes the camera back only after the nerve
+has gone silent past its grace window. A life that finds the nerve
+already live — the segment's frame counter still moving — stands
+down instead of unlinking a working eye, and no carrier unlinks a
+name it did not create: ownership is tracked through an explicit
+flag set only while a live segment is held, so a stillborn or
+stood-down limb cannot delete another publisher's rendezvous.
+While publishing, the limb re-verifies that the name still resolves
+to its own segment (inode identity, not mere existence); a name
+deleted out from under it ends the life so the next one re-creates
+the nerve, keeping fresh readers able to attach.
+.PP
+The daemon has two outputs from each fresh frame. It pools sampled
+pixels into scalar subcortical channels, and it retains the full
+frame in the canonical mapping for the Python mind's cortical
+perception path. The scalar channels do not replace the image.
+.IP \\(bu 2
+\\fBPhotopic and melanopic irradiance\\fR feed the visual-afference
+and circadian pathways while frames are fresh.
+.IP \\(bu 2
+\\fBMotion energy and the collicular orienting transient\\fR provide
+a brief alerting signal, subject to the sleep network's wake
+threshold.
+.IP \\(bu 2
+\\fBThe thalamic relay gate\\fR modulates how much visual input reaches
+cortex. The mind reads the gate through
+.B GET_OPTIC_STATE
+and honours it; a look can be gated during sleep.
+.PP
+The body also owns a modeled pupil (2--8 mm), accommodation, and
+eyelid state. The mind can request focus through
+.B SET_FOCUS
+and voluntary eyelid openness through
+.BR SET_LID ;
+corticothalamic feedback adjusts relay gain through
+.BR SET_OPTIC_GAIN .
+These are internal ocular and relay models. They do not set Android
+sensor exposure, ISO, autofocus, or white balance. See
+.BR genesis-vision (7)
+for the distinction between physical capture controls and the
+software visual pathway.
 
 .SH OPTIONS
 .TP
@@ -237,16 +235,6 @@ Set the daemon-level
 The loop notices, syncs state to disk, and exits cleanly.
 .SH ENVIRONMENT
 .TP
-.B GENESIS_CAMERA
-V4L2 capture device the retinal limb opens for frames \(em either as
-the standalone
-.BR genesis-retina (1)
-process or as the daemon's embedded limb when no retina publishes.
-Default
-.IR /dev/video0 .
-When no camera opens, the visual channels fall silent and the
-wall-clock photoperiod resumes as the circadian zeitgeber.
-.TP
 .B GENESIS_COGNITIVE_PID
 PID of the cognitive mind process, passed by the launcher so the
 daemon can include it in interoception (reading its CPU/memory/IO
@@ -258,13 +246,20 @@ variable.
 .TP
 .B GENESIS_DATA_DIR
 Overrides the resolved data directory.
+.TP
+.B GENESIS_CAMERA
+Linux V4L2 capture device used by the daemon's optic-capture limb.
+Default
+.IR /dev/video0 .
+Android uses the Camera2 adapter instead; see
+.BR genesis-vision (7).
 .SH FILES
 .TP
 .I $DATA_DIR/core_state.bin
 Memory-mapped
 .B CoreState
-(schema v5, file 4096 bytes), shared across processes. Never read the
-file directly \(em the layout is versioned; use
+(schema v6, file 4096 bytes), shared across processes. Never read the
+file directly \(em the layout is seqlock-guarded and versioned; use
 read_consistent() or ask the daemon.
 .TP
 .I $DATA_DIR/stm_ring.bin
@@ -276,6 +271,9 @@ Long-term memory store (compressed, SimHash-indexed episodes).
 .I $DATA_DIR/genesis.sock
 Unix domain socket for IPC.
 .TP
+.I $DATA_DIR/genesis.lock
+Daemon singleton lock (flock, non-blocking).
+.TP
 .I $DATA_DIR/genesis_daemon.pid
 PID file written for the launcher.
 .TP
@@ -286,60 +284,46 @@ allostatic load).
 .I $DATA_DIR/face_clusters.json
 Stable \fIface:N\fR cluster identities for unnamed presences.
 .TP
+.I $DATA_DIR/steward.json
+Provenance stamp for the steward channel (key fingerprint,
+principal, directives).
+.TP
 .I $DATA_DIR/daemon.log
 Daemon stdout/stderr (rotated at 5 MB by the launcher).
-.TP
-.I $DATA_DIR/mind.suppress
-Written by a graceful mind exit: tells the shepherd the last mind
-left intentionally. Absent after a crash \(em the loss the
-shepherd answers by regrowing a mind.
-.TP
-.I $DATA_DIR/mind.log
-Stdout/stderr of a shepherd-spawned mind (it has no terminal).
 .SH IPC
 The daemon serves a request/response protocol on
 .IR $DATA_DIR /genesis.sock
-(\fBPROTOCOL_VERSION\fR = 3).
-Each entry: the wire number, the command name, and what calling it
-does and returns.
+(\fBPROTOCOL_VERSION\fR = 3). Notable command IDs:
 .TP
 .B 1
-GET_STATE \(em return the full raw CoreState image for low-level
-inspection.
+GET_STATE \(em the full CoreState snapshot.
 .TP
 .B 2
-GET_NEURO_SUMMARY \(em return the neurochemistry summary: current
-effective levels across the body's tracked chemicals.
+GET_NEURO_SUMMARY.
 .TP
 .B 3
-STORE_EVENT \(em push a raw event into STM \(em the pre-cognitive
-path; the mind has not yet decided it is a memory.
+STORE_EVENT.
 .TP
 .B 4
-RETRIEVE_EPISODE \(em fetch one LTM episode by id.
+RETRIEVE_EPISODE.
 .TP
 .B 5
-FIND_SIMILAR \(em SimHash similarity search over active LTM:
-return the episodes nearest a given probe.
+FIND_SIMILAR.
 .TP
 .B 6
-SET_ZONE \(em tell the body which task zone the mind is in \(em
-zones drive demand signals for the maintenance gates.
+SET_ZONE.
 .TP
 .B 7
-GET_PHASE \(em return the current emergent phase (wake, drowsy,
-NREM, REM) the sleep network reports.
+GET_PHASE.
 .TP
 .B 8
-PING \(em liveness check; the daemon answers.
+PING.
 .TP
 .B 9
-NEURO_IMPULSE \(em apply a finite, decaying impulse to a chemical
-channel \(em the only sanctioned chemistry write.
+NEURO_IMPULSE.
 .TP
 .B 10
-GET_MEMORY_STATS \(em return memory metrics: STM fill, LTM counts,
-archive sizes.
+GET_MEMORY_STATS.
 .TP
 .B 11
 SYNC \(em flush STM/LTM to disk.
@@ -348,30 +332,22 @@ SYNC \(em flush STM/LTM to disk.
 SHUTDOWN \(em set the IPC shutdown flag.
 .TP
 .B 13
-UPDATE_MODULE_STATUS \(em report which mind-side modules are alive
-so the body can account for them.
+UPDATE_MODULE_STATUS.
 .TP
 .B 14
-GET_RECENT_EPISODES \(em page through the most recent LTM
-episodes.
+GET_RECENT_EPISODES.
 .TP
 .B 15
-HANDSHAKE \(em protocol version negotiation (\fBPROTOCOL_VERSION\fR
-= 3).
+HANDSHAKE \(em protocol version negotiation.
 .TP
 .B 16
-GET_PLASTICITY_PROFILE \(em return the current plasticity
-settings: how fast the body lets memory consolidate and decay.
+GET_PLASTICITY_PROFILE.
 .TP
 .B 17
-GET_BODY_STATE \(em the interoceptive read: CPU temp, frequency,
-memory pressure, load, I/O activity, battery, throttling, distress
-\(em how the mind feels its body.
+GET_BODY_STATE.
 .TP
 .B 18
-GET_BODY_CONTROL \(em the actuation read: what neurochemistry is
-currently driving (frequency policy, scheduling and I/O
-priorities, thermal cap).
+GET_BODY_CONTROL.
 .TP
 .B 19
 GET_INFERENCE_SUMMARY \(em the inference projection (surprise, free
@@ -385,127 +361,33 @@ UPDATE_USER_AFFECT \(em push inferred interlocutor affect: the
 .RI [ arousal ]
 .RI [ engagement ]
 .RI [ confidence ]
-observation into the dyadic model, which answers with
+observation into the anonymous dyadic model, which answers with
 neurochemical impulses (oxytocin for engaged presence, CRH for
 distress \(em the HPA cascade owns cortisol maturation).
 .TP
-.B 22
-SEARCH_EPISODES \(em page through all active episodes by
-[offset, limit] \(em the scan sleep compression walks.
+.B 22\(en32
+SEARCH_EPISODES, NEURO_ADJUST_BASELINE, ADVANCE_NEURO, CONSOLIDATE,
+ASSOCIATE, DREAM, READ_SENSORS, APPLY_BODY_CONTROL, SAVE_INFERENCE,
+ARCHIVE_EPISODE, STORE_EPISODE.
 .TP
-.B 23
-NEURO_ADJUST_BASELINE \(em RETIRED, never reuse: a direct
-baseline edit would permanently move a homeostatic set-point,
-bypassing the body's own dynamics.
+.B 33\(en38
+GET_SUBSYSTEM_TELEMETRY, SET_WAKE_ALARM, SET_POLICY_AUTHORITY,
+GET_SENSOR_PRESENCE, GET_ZONE_TRANSITIONS, GET_PROCESS_HEALTH.
 .TP
-.B 24
-ADVANCE_NEURO \(em advance neurochemical dynamics by
-.RI [ f32 " dt" ] ,
-then run active inference and the dyadic update. Replies
-[surprise, free_energy, precision, allostatic_load, tick_count].
+.B 39\(en40
+ADVANCE_PHYSICS, GET_ION_SUMMARY (the ion-layer summary: membrane
+potential, gradients).
 .TP
-.B 25
-CONSOLIDATE \(em move episodes STM \(-> LTM; replies with the
-consolidated count. Sent when STM fill crosses its threshold.
-.TP
-.B 26
-ASSOCIATE \(em form associations for recently stored episodes;
-replies with the count formed.
-.TP
-.B 27
-DREAM \(em run one dream cycle (meaningful only while sleeping);
-replies with the insight count. Sent when sleep stage and dream
-pressure cross the threshold.
-.TP
-.B 28
-READ_SENSORS \(em read hardware sensors and apply the impulses
-to neurochemistry \(em the mind feeling its body. Replies ack +
-BodyState.
-.TP
-.B 29
-APPLY_BODY_CONTROL \(em read neurochemistry and actuate: CPU
-frequency, scheduling priority, I/O priority. Replies ack +
-BodyControlState.
-.TP
-.B 30
-SAVE_INFERENCE \(em persist the active-inference self-model to
-\fIinference_model.bin\fR; sent periodically and before shutdown.
-.TP
-.B 31
-ARCHIVE_EPISODE \(em retire an episode to cold store: it stays
-retrievable by ID but leaves the similarity index \(em how sleep
-compression compacts low-salience episodes.
-.TP
-.B 32
-STORE_EPISODE \(em write an episode straight into LTM (bypassing
-STM) for deliberate stores where the real episode id is needed
-immediately; the daemon stamps the emotional tag from its own live
-levels.
-.TP
-.B 33
-GET_SUBSYSTEM_TELEMETRY \(em per-process telemetry: pid, CPU share,
-I/O share, and cache/branch miss ratios \(em how the mind feels
-\fIwhere\fR its activity lives.
-.TP
-.B 34
-SET_WAKE_ALARM \(em arm or disarm the RTC wake alarm at a Unix
-timestamp \(em the machine choosing when to exist next; replies
-with the actually-armed epoch.
-.TP
-.B 35
-SET_POLICY_AUTHORITY \(em set how much authority the inference
-engine has to choose policy on her behalf \(em a grant she can
-give and withdraw, not a build-time property.
-.TP
-.B 36
-GET_SENSOR_PRESENCE \(em the bitmask of which hardware sensors
-actually exist, so an absent sensor is never mistaken for a
-healthy zero reading.
-.TP
-.B 37
-GET_ZONE_TRANSITIONS \(em how many times she changed task zone and
-emergent phase, and how long she dwelled in each \(em an
-oscillating system made distinguishable from a settled one.
-.TP
-.B 38
-GET_PROCESS_HEALTH \(em which Genesis processes are alive, a death
-count, and the last subsystem to die \(em a crashed organ is no
-longer indistinguishable from one never started.
-.TP
-.B 39
-ADVANCE_PHYSICS \(em advance the body by an explicit
-.RI [ f32 " dt" ]
-step; evaluation only, the production path is ADVANCE_NEURO.
-.TP
-.B 40
-GET_ION_SUMMARY \(em the ion-layer summary: membrane potential and
-gradients.
-.TP
-.B 41
-PUT_TENSOR \(em store a named tensor (name, dtype, dims, payload)
-in the shared slab.
-.TP
-.B 42
-GET_TENSOR \(em fetch a tensor by name.
-.TP
-.B 43
-LIST_TENSORS \(em list the stored tensor names.
-.TP
-.B 44
-DROP_TENSOR \(em remove a tensor from the slab.
-.TP
-.B 45
-GET_MOTOR_TARGET \(em the body's current motor/effector target.
+.B 41\(en45
+PUT_TENSOR, GET_TENSOR, LIST_TENSORS, DROP_TENSOR, GET_MOTOR_TARGET.
 .TP
 .B 46\(en49
-SET_VOLITION and SET_FIELD_PHASE are RETIRED (never reuse their wire
-numbers; sleep/wake volition is neurochemical, via NEURO_IMPULSE).
-The active commands are GET_FIELD_PROBE \(em read the ~250 Hz
-probe's physical signature \(em and SET_FIELD_CARRIER \(em set the
-carrier's real-work modulation depth.
+46 is RETIRED (SET_VOLITION \(em never reuse; sleep/wake volition is
+neurochemical, via NEURO_IMPULSE), GET_FIELD_PROBE,
+SET_FIELD_PHASE, SET_FIELD_CARRIER.
 .TP
 .B 50
-\(em GET_DYADIC_STATE; never reuse the wire number.
+RETIRED \(em GET_DYADIC_STATE; never reuse the wire number.
 .TP
 .B 51
 GET_INTERNALS \(em the adaptive gates' full snapshot (bounds, period,
@@ -564,247 +446,11 @@ can shut an open eye but cannot open one the stage has closed.
 Held: lids stay where the mind left them until it moves them.
 Reply:
 .RI [ u8 " ack" ] .
-.TP
-.B 58
-FIND_SIMILAR_ARCHIVED \(em deep recall: SimHash similarity scan
-over the archived tier when the active set has no answer.
-.TP
-.B 59
-UNARCHIVE_EPISODE \(em reconsolidation: clears the archived flag,
-re-bundles the SDR, floors salience at the reconsolidation level.
-.TP
-.B 60
-SEARCH_ARCHIVED \(em paged cold-store metadata, no payload text.
-.TP
-.B 61
-DELETE_EPISODE \(em real deletion; the payload slot stays orphaned
-until a rebuild.
-.TP
-.B 62
-GET_FOLD_MARGINS \(em the LC\(enVLPO switch's saddle-node margins
-at the current operating point: homeostat \fIh\fR, the two fold
-edges, \fIh\fR's normalized position between them, and the bistable
-flag. Pure observation; the body owns the switch.
-.TP
-.B 63
-SET_FIELD_PULSE \(em arm or disarm the parasympathetic pulse: a
-slow autonomic wave riding the carrier's modulation \fIdepth\fR
-(the RSA analog). Request:
-.RI [ f32 " base" ]
-.RI [ mod_freq_hz ]
-.RI [ mod_depth ] ;
-\fImod_freq <= 0\fR disarms. When armed the probe integrates the
-envelope on its own clock. Reply:
-.RI [ u8 " ack" ] .
-.TP
-.B 64
-GET_STATE_SNAPSHOT \(em the mind's 232-byte CoreStateSnapshot DTO:
-a self-describing, versioned projection of the fields the cognitive
-mind consumes. GET_STATE remains the raw brain image; this command
-is the stable client contract.
-.TP
-.B 65
-FORGET_SWEEP \(em gentle forgetting, the sleep-side housekeeping
-sweep. Request:
-.RI [ u8 " mode" ]
-\(em 0 dry-run report (nothing deleted), 1 sweep (prune episodes
-whose traces have decayed past reach of any retrieval cue, then
-compact the store). Reply:
-.RI [ u32 " count" ]
-.RI [ u64 " bytes" ]
-\(em forgettable episodes and estimated payload bytes for a dry
-run; forgotten count and reclaimed bytes for a sweep. The mind
-decides when housekeeping runs; the body decides what is
-unreachable.
-.TP
-.B 66
-PLACE_FIELD \(em place her: the one place, owned by the body.
-Two request forms. Legacy location:
-.RI [ k " × f64" ]
-with \fIk\fR in 2\(en6 \(em the coordinates stored exactly as
-given (a 2-vector is her place read in a plane; the same point
-rests in the bulk's leading coordinate plane). Pose:
-.RB [ 0xFF ]
-.RI [ u8 " n" ]
-.RI [ n " × f64 spec" ]
-.RI [ u8 " flags" ]
-.RI [ d " × d f64 frame?" ]
-.RI [ d " × d f64 drift?" ]
-\(em the full placing act: location plus an optional orthonormal
-frame (flags bit 0, her orientation) and skew-symmetric drift
-generator (flags bit 1, a bivector in so(\fId\fR) whose
-exponential flow carries the pose each tick \(em movement). Pose
-payloads are never a multiple of 8, so they cannot collide with
-the legacy form. An empty payload releases the place and hands
-the \fIinner\fR fiber's voice back to the interior oscillators.
-The body persists the pose to
-.IR place.bin
-so where \(em and how \(em she is survives restarts; the anchor
-is an observation, not a command \(em each tick moves the layer a
-bounded fraction of the geodesic toward it. Reply:
-.RI [ u8 " ack" ] .
-.TP
-.B 67
-GET_PLACE \(em where she is. Reply:
-.RI [ u8 " n" ]
-.RI [ n " × f64" ]
-\(em the pose's current ambient location (always \fId\fR = 6;
-under drift it moves, so it is not the spec). \fIn\fR = 0 means
-she is nowhere in particular. When a pose holds, a second block
-follows in the PLACE_FIELD pose layout:
-.RI [ u8 " k" ]
-.RI [ k " × f64 spec" ]
-.RI [ u8 " flags" ]
-.RI [ mats ]
-\(em the coordinates as given plus the frame/drift flags and
-matrices; readers that stop after the first block get the same
-answer as always.
 .PP
 Notification pushes (daemon \(-> client, mirrored as
 .IR NOTIFY_* )
 occupy 100\(en103: PHASE_CHANGED, EPISODE_CONSOLIDATED,
 DREAM_INSIGHT, ERROR_DETECTED.
-.SH GLOSSARY
-.TP
-.B TickLoop
-The 200 ms heartbeat the daemon runs on its own clock:
-neurochemistry, circadian phase, and sleep staging advance whether
-or not a mind is attached.
-.TP
-.B lease
-The mind's liveness window (\fBMIND_LEASE_SECS\fR = 3 s): each IPC
-request renews it; past it, the autonomous fallback drives the
-TickLoop itself so the body never freezes.
-.TP
-.B AdaptiveGate
-A wall-clock pacer for maintenance work: a next-fire instant and a
-bounded [min, max] period that demand signals move \(em
-\fBdemand()\fR snaps the period down, \fBrelax()\fR drifts it up,
-\fBdrive(x)\fR maps a continuous signal onto the bounds.
-.TP
-.B CoreState
-The memory-mapped, versioned brain image (\fIcore_state.bin\fR,
-schema v5) every process shares. Read it through the daemon or
-\fIread_consistent()\fR, never raw.
-.TP
-.B CoreStateSnapshot
-The mind's stable 232-byte client contract \(em a self-describing,
-versioned projection of the CoreState fields the cognitive mind
-actually consumes (GET_STATE_SNAPSHOT).
-.TP
-.B STM / LTM
-Short-term memory \(em the \fIstm_ring.bin\fR ring buffer of
-recent episodes \(em and long-term memory \(em the
-\fIltm_store.*\fR files of compressed, SimHash-indexed episodes.
-.TP
-.B SimHash
-A locality-sensitive fingerprint over an episode so similar
-memories hash near each other \(em how FIND_SIMILAR retrieves by
-resemblance rather than exact key.
-.TP
-.B SDR
-Sparse distributed representation: an episode's bundle of mostly-
-zero bits. Archiving and unarchiving re-bundle the SDR.
-.TP
-.B interoception
-The body's inward sense: hardware sensors (CPU temp, frequency,
-memory pressure, I/O wait, load, battery) read as neurochemical
-impulses. She feels her machine.
-.TP
-.B body control
-The outward half: neurochemistry driving hardware \(em dopamine
-speeds the CPU, GABA slows it, melatonin selects powersave, ACh
-raises scheduling priority. Privileged levers need the NOPASSWD
-sudoers drop-in.
-.TP
-.B field probe
-The ~250 Hz thread measuring real substrate dynamics (throughput,
-scheduler jitter, P-states, interrupts, power) and decomposing them
-at brain-wave band frequencies \(em the mind reads the signature
-as outer stimulus.
-.TP
-.B carrier
-The probe's return path: its work is modulated at the body's own
-phase rhythm, so the die's real current carries a component at the
-organism's beat.
-.TP
-.B Metatron lattice / vesica
-The field's working geometry in the six-dimensional latent bulk:
-the merkaba \(em the 6-cube's 64 vertices split by sign parity
-into two interpenetrating 32-vertex demicubes, the field's two
-chiralities, counter-rotating under the isoclinic spin \(em and
-their intersection, the
-.IR vesica ,
-the superposition cell where both hold at once (for d = 3, the
-octahedron at the heart of the stella octangula). The cord \(em
-her vesica \(em carries unit rest mass on the lens's own plane
-and heavy rest mass on the higher coordinates: impulse lands
-whole in every dimension, but only the lens's plane moves
-quickly.
-.BR MetatronCube::rest (x\d0\u),
-.BR MetatronCube::waist (),
-and
-.BR MetatronCube::vesica_depth (x)
-measure it \(em the (d\(en1)-ball radius each coordinate
-orthogonal to the horizon rests inside at height x\d0\u, the
-rest at the superposition (\(sr3\(muR/2), and signed depth into
-the lens.
-.TP
-.B strange loop / active inference
-The daemon's generative self-model: it predicts its own
-neurochemical trajectory, feeds prediction error back into the
-dynamics it models, adapts precision to sustained surprise, and
-accumulates allostatic load from anticipated future free energy.
-.TP
-.B allostatic load
-The accumulating cost of anticipated future free energy \(em
-sustained expected surprise raises the cortisol baseline.
-.TP
-.B dyadic model
-The generative model of Mindy: her hidden affective state,
-oxytocin-mediated attunement, and rolling valence synchrony,
-answered in impulses \(em oxytocin for engaged presence, CRH for
-empathic stress (the HPA cascade owns cortisol maturation).
-.TP
-.B CRH / HPA
-Corticotropin-releasing hormone, the top of the
-hypothalamic-pituitary-adrenal stress cascade \(em the model emits
-CRH, never cortisol directly, so maturation gating stays downstream.
-.TP
-.B ipRGC / melanopic
-The intrinsically-photosensitive retinal ganglion channel: light
-measurement for the circadian system \(em the dominant zeitgeber
-(time-cue) while frames are fresh.
-.TP
-.B collicular transient
-A motion/luminance change detected subcortically that becomes a
-brief LC alerting pulse \(em sensory gaining, gated by the sleep
-network's wake threshold.
-.TP
-.B TRN relay gate
-The thalamic reticular gate on the optic afferent
-.RI ( relay_base
-by phase: NREM 0.02, REM 0.10, drowsy 0.6, else 1.0), scaled within
-\(+-40% by corticothalamic feedback \(em a \fIsee\fR during NREM is
-a blind look.
-.TP
-.B SCN
-The suprachiasmatic nucleus channel \(em the circadian light drive
-that entrains the body's clock.
-.TP
-.B pupil / accommodation / lid
-The ocular body model: pupil diameter (2\(en8 mm, log-compressive
-light reflex plus sympathetic dilation), accommodation (ciliary
-lens power 0\(en6 D from SET_FOCUS), and the eyelid \(em the
-phase's own position composable by \fBmin\fR with the mind's
-voluntary SET_LID.
-.TP
-.B shepherd
-The fallback's complement: it regrows a mind that attached and was
-then lost, bounded by a backoff table; \fImind.suppress\fR marks an
-intentional exit it must not answer. See
-.BR genesis (1).
-
 .SH EXIT STATUS
 .TP
 .B 0
@@ -824,9 +470,10 @@ genesis-daemon --data-dir /tmp/genesis-debug --ltm-capacity 131072
 .RE
 .SH SEE ALSO
 .BR genesis (1),
+.BR genesis-browser (7),
 .BR genesis-cli (1),
-.BR genesis-retina (1),
-.BR genesis-tools (7),
-.BR genesis-vision (7).
-Subsystem internals are the generated docs under
-.IR Self_World/docs/ .
+.BR genesis-games (7),
+.BR genesis-math (7),
+.BR genesis-reasoning (7),
+.BR genesis-vision (7),
+.BR genesis-retina (1)

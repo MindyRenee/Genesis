@@ -128,11 +128,10 @@ class OpticNerve:
             else:
                 frame = frame[: stride * height].reshape((height, stride))
                 frame = frame[:, :row_bytes].reshape((height, width, bpp))
-            if fourcc == b"RGB3":
-                # V4L2's RGB3 stores B,G,R in memory (the fourcc
-                # names word order, not byte order); BGR3 is the
-                # one already in R,G,B byte order. Flip RGB3's
-                # memory order so downstream sees RGB.
+            if fourcc == b"BGR3":
+                # V4L2 names the memory order: BGR3 stores B,G,R
+                # bytes; RGB3 is already R,G,B. Flip BGR3's memory
+                # order so downstream sees RGB.
                 frame = frame[..., ::-1]
         elif fourcc == b"YUYV":
             # YUYV is 2 bytes per pixel, uncompressed.

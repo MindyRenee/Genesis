@@ -11,7 +11,8 @@ is Genesis's eye. It opens the V4L2 capture device named by
 .IR /dev/video0 ),
 requests an uncompressed RGB24 640x480 format (falling back to the
 camera's native uncompressed format, typically YUYV, if RGB3 is
-unavailable), and streams captured frames into a POSIX shared memory
+unavailable), converts a YUYV source to packed RGB24 itself, and
+streams captured frames into a POSIX shared memory
 object named
 .IR /genesis_retina
 (visible at
@@ -20,7 +21,7 @@ for the cognitive mind to read.
 
 .PP
 The binary is built from
-.I src/bin/retina.rs
+.I src/bin/genesis-retina.rs
 and is normally launched and supervised by
 .BR genesis-cli (1),
 which is in turn launched by
@@ -49,15 +50,20 @@ process that maps the object).
 The shared memory object is
 .IR shm_unlink 'd
 on the next run's pre-creation step so a fresh object is always
-published, and on clean shutdown (SIGINT/SIGTERM) the retina unlinks
-it before exiting so a stale
-.I /dev/shm/genesis_retina
-does not linger after the eye closes.
+published — unless the nerve is already live, in which case this
+eye stands down rather than delete a working publisher's
+rendezvous. On clean shutdown (SIGINT/SIGTERM) the retina unlinks
+the name it owns before exiting so a stale
+.I /dev/shm/genesis_optic_nerve
+does not linger after the eye closes; a retina that never created
+the segment unlinks nothing. While publishing, the retina
+re-verifies that the name still resolves to its own segment and
+re-incarnates the nerve if the name is lost.
 .SH SIGNALS
 .TP
 .B SIGINT ", " SIGTERM
 Set the exit flag; the capture loop notices, unlinks the shared
-memory object, and exits cleanly.
+memory object it owns, and exits cleanly.
 .SH ENVIRONMENT
 .TP
 .B GENESIS_CAMERA
@@ -84,5 +90,4 @@ can target this exact process.
 .BR genesis-daemon (8),
 .BR genesis-games (7),
 .BR genesis-math (7),
-.BR genesis-reasoning (7),
-.BR genesis-vision (7)
+.BR genesis-reasoning (7)

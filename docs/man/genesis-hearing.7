@@ -1,0 +1,51 @@
+.TH GENESIS-HEARING 7 "October 2026" "Genesis 0.2.0" "Genesis Manual"
+.SH NAME
+genesis-hearing \- the auditory faculties: ambient listening and the auditory cortex
+.SH SYNOPSIS
+.nf
+\fBoccipital_lobe.perception.ambient\fR  the streaming listener (Vosk STT)
+\fBtemporal_lobe.auditory\fR            the auditory cortex for non-speech sound
+\fBtemporal_lobe.speech\fR              VoiceInput single-utterance STT
+.fi
+.SH DESCRIPTION
+Genesis has two ears. One listens for words: the ambient listener
+captures microphone audio continuously, transcribes with Vosk
+(offline), and emits complete utterances \(em it does not decide
+whether to respond; wake-word detection ("genesis" addresses her)
+and the choice to chime in on a topic she has context on are the
+caller's. The other ear hears everything else.
+.SS The auditory cortex
+.I temporal_lobe/auditory.py
+captures audio on a background thread, computes spectral features in
+real time, and classifies sound events \(em silence below the energy
+floor, music (tonal, sustained, regular rhythm), impacts (sudden
+onset, high energy, short duration \(em door slam, clap, bark), and
+ambient noise \(em so the room's non-speech texture reaches her:
+depth, loudness, tonality, and brevity in the reports that surface
+in conversation.
+.SS Voice input
+.IR temporal_lobe/speech.py 's
+.I VoiceInput
+is the blocking single-utterance path behind
+.BR /voice ,
+for an addressed exchange rather than the always-on stream.
+.B /voice-mode
+holds continuous voice conversation.
+.SS The other ear
+A separate afferent listens outward rather than into the room:
+.BR genesis-discord (7)
+documents the bot-token ear that hears her channel.
+.SH COMMANDS
+.TP
+.B /voice
+Speak to Genesis (one utterance).
+.TP
+.B /voice-mode
+Continuous voice conversation.
+.SH SEE ALSO
+.BR genesis (1),
+.BR genesis-cli (1),
+.BR genesis-discord (7),
+.BR genesis-language (7)
+.SH AUTHOR
+Genesis project

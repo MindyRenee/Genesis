@@ -1,90 +1,145 @@
 .TH GENESIS-GAMES 7 "November 2026" "Genesis 0.2.0" "Genesis Manual"
 .SH NAME
-genesis-games \- her arcade: the games she plays and how they reach her
+genesis-games \- the arcade in Genesis's outer world
 .SH SYNOPSIS
 .nf
-\fBgames.arcade\fR        the arcade \fIem \(en\fR offers, entry, play, memory
-\fBgames.official\fR      the official ARC-AGI-3 shelf via \fIarc-agi\fR
-\fBgames.arena\fR         the local arena shelf on \fIpyspiel\fR
-\fBgames.sight\fR         how a board reaches her eyes
-\fBgames.memory\fR        what she keeps of each game
+.B /arcade
 .fi
 .SH DESCRIPTION
-The arcade is a place in her outer world, not a benchmark rig: she
-is the player, not a model being scored. Two shelves stand in it.
-The \fBofficial\fR shelf carries the ARC-AGI-3 games through the
-\fIarc-agi\fR toolkit \(em a 64\(mu64 grid she sees blind, explores,
-and remembers. The \fBarena\fR shelf plays chess, checkers, othello,
-connect four, tic-tac-toe, and breakthrough locally on \fIpyspiel\fR
-\(em the same engine the Kaggle Game Arena harness evaluates on.
-Playing these games here is not entry on Kaggle's hosted
-leaderboard; that requires their serving harness for API models,
-and she IS the model.
+The arcade is part of Genesis's outer world. It offers interactive
+ARC-AGI-3 environments through the official Python
+.B arc-agi
+toolkit. The arcade is an environment interface, not a separate
+cognitive system: observations pass through the world's perception
+path, and actions pass through its action path.
 .PP
-Play is felt, not only computed. A new board lands as a world
-observation with salience; novelty tickles norepinephrine and
-acetylcholine and drives her thalamic gamma, so games reach the
-same neurodynamics everything else does. What she learns of each
-game is kept per-game (\fIGameMemory\fR) and survives the sitting
-\(em \fBarcade_status\fR is her own recollection of it.
-.SH TOOLS
-Registered by \fIArcade.register_tools\fR at startup; every entry
-reports and never raises.
-.TP
-.BR arcade_directions
-Read the directions for the games in the arcade.
-.TP
-.BR arcade_offers
-List the games on offer right now (game_id and title).
-.TP
-.BR arcade_enter " [\fIgame_id\fR]"
-Go to a game \(em the named one, or her own pick when blank.
-.TP
-.BR arcade_see " [\fIhow\fR]"
-See the open board: \fBtext\fR (default), \fBimage\fR,
-\fBchange\fR, or \fBobjects\fR.
-.TP
-.BR arcade_act " \fImove\fR"
-Make one move \(em \fBACTION1\fR\&..\fBACTION7\fR, or
-\fBACTION6@row,col\fR to point at a cell.
-.TP
-.BR arcade_play " [\fImoves\fR]"
-Play a bout of the open (or chosen) game, up to \fImoves\fR moves.
-.TP
-.BR arcade_leave
-Step away from the game; memories are kept.
-.TP
-.BR arcade_status
-What she remembers of every game.
-.SH MODES AND KEYS
-Official games run in three modes from \fBGENESIS_ARC_MODE\fR (or
-the \fImode\fR argument to \fIdefault_games\fR):
-.TP
-.B normal
-Default. Each game downloads once, then plays locally.
+Genesis may choose to play through her play urge or use the registered
+arcade tools. The
+.B /arcade
+command reports available games and remembered play.
+.SH OFFICIAL TOOLKIT
+The toolkit's
+.B Arcade
+class discovers environments and opens game sessions. Genesis announces
+the arcade at startup without initializing the toolkit. The toolkit is
+loaded lazily when she explicitly requests the catalogue or enters a
+game; this avoids creating an empty official scorecard on every Genesis
+startup. A scorecard is run-scoped, while Genesis's learned per-game
+memory is saved in her local world state and can survive restarts.
+These are separate records and must not be treated as the same score.
+If the package is unavailable or the service cannot be reached, the
+arcade records the error and the rest of Genesis can continue.
+.PP
+Install the official toolkit with:
+.nf
+pip install arc-agi
+.fi
+.PP
+The official API is hosted at
+.UR https://three.arcprize.org
+.UE .
+The toolkit source and API documentation are maintained at
+.UR https://github.com/arcprize/ARC-AGI
+.UE .
+.SH OPERATION MODES
+The
+.B GENESIS_ARC_MODE
+environment variable selects the toolkit operation mode. Genesis
+defaults this variable's effective value to
+.B online
+when it is not set; the official toolkit itself defaults to
+.B NORMAL
+when used directly without a mode.
 .TP
 .B online
-Every move is scored on the official server \(em wants
-\fBARC_API_KEY\fR from three.arcprize.org.
+Remote environments through the official API. This is Genesis's
+default and is the mode for online scorecard activity.
+.TP
+.B normal
+The toolkit's normal mode, which can use local and remote
+environments.
 .TP
 .B offline
-Touches no network at all; downloaded games only.
+Local environments only. Only games available in the local
+environment cache can be opened.
+.TP
+.B competition
+The toolkit's competition mode applies its competition-specific
+remote-play and scorecard restrictions. Confirm the official rules
+before treating a run as a competition submission.
 .PP
-\fBARC_API_KEY\fR widens the official catalogue; without it the
-anonymous catalogue is smaller but downloaded games and the whole
-arena shelf need no key. When the mind starts with \fB--offline\fR
-the arcade opens in offline mode, so play continues locally even
-with the network refused at the registry gate.
-.SH FILES
-Downloaded game files live under
-\fI<data_dir>/arcade/environment_files\fR and play recordings under
-\fI<data_dir>/arcade/recordings\fR (the canonical data dir is
-\fI~/.local/share/genesis\fR).
+Set
+.B ARC_API_KEY
+in the environment to use a registered API key. Without a key, the
+toolkit may obtain an anonymous key, which can expose fewer games.
+Do not put the key in source code, logs, or command-line arguments.
+.SH PLAYING
+The arcade can list offered games, open a game, observe the board,
+make an action, play a bounded bout, and leave a game while retaining
+its learned memory.
+.PP
+The official toolkit exposes game actions such as
+.B RESET
+and
+.BR ACTION1 " through " ACTION7 .
+.B ACTION6
+is coordinate-based; Genesis selects a detected shape and passes its
+coordinates to the toolkit. Coordinates must be within the toolkit's
+64-by-64 action coordinate range.
+.PP
+Game observations may contain multiple frames, the current state,
+available actions, completed-level count, and total win-level count.
+Genesis converts the latest frame to a grid for perception. The
+official environment remains authoritative for the actual game state.
+.SH LEARNING AND MEMORY
+Genesis keeps per-game memory in her world state. It includes action
+effect counts, board visits, action-value estimates, moves and paths
+that led to later levels. A temporal-difference update uses
+.nf
+delta = reward + gamma * max(Q(next_state, action)) - Q(state, action)
+.fi
+The resulting prediction error can influence the arcade's
+neurochemical impulse path. The stored values are Genesis's learning
+signals, not an official ARC-AGI-3 score.
+.PP
+The arcade routes board perception and actions through the outer
+world, records arcade transitions through the active cognitive
+journal, and exposes current play telemetry in
+.BR /arcade .
+Telemetry includes visits, remembered games, moves, wins, current
+game and level, state, and the last error.
+.SH DATA AND RECORDINGS
+Arcade memory is serialized with the world's saved state. Arcade
+events are sent to Genesis's active cognitive journal when one is
+attached. This implementation does not establish
+.I <data>/arc/results.jsonl
+as the arcade's own output path; do not assume that file exists.
+.PP
+The official toolkit separately supports JSONL game recordings and
+scorecard operations. Its recording directory and scorecard behavior
+are controlled by the toolkit configuration, not by Genesis's
+cognitive-journal path.
+.SH DIAGNOSTICS
+Use
+.B /arcade
+to inspect the catalogue and remembered play. If no games are offered,
+check that
+.B arc-agi
+is installed, the selected operation mode is valid, network access is
+available for remote modes, and
+.B ARC_API_KEY
+is configured if registered access is needed.
+.PP
+For official API behavior, modes, scorecards, and recordings, consult
+the linked toolkit documentation. The toolkit API and competition
+rules can change independently of Genesis.
 .SH SEE ALSO
-.BR genesis-tools (7),
-.BR genesis-cli (1)
-.PP
-Module internals: the generated pages under
-\fISelf_World/docs/python/\fR
-(\fIgames.arcade\fR, \fIgames.arena\fR, \fIgames.official\fR,
-\fIgames.sight\fR, \fIgames.memory\fR).
+.BR genesis (1),
+.BR genesis-browser (7),
+.BR genesis-cli (1),
+.BR genesis-daemon (8),
+.BR genesis-math (7),
+.BR genesis-reasoning (7),
+.BR genesis-retina (1)
+.SH AUTHOR
+Genesis project

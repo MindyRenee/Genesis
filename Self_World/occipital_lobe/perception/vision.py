@@ -79,6 +79,7 @@ from genesis_client.protocol import (
     EMOTIONAL_TAG_SIZE,
 )
 from genesis_client.swallow import note_swallowed
+from infrastructure.config import default_data_dir
 from temporal_lobe import DetectedObject, ObjectRecognizer
 from temporal_lobe.concepts import RelationType
 
@@ -412,7 +413,7 @@ class Vision:
         Returns None if face recognition models aren't available.
         """
         if self._face_recognizer is None:
-            self._face_recognizer = FaceRecognizer()
+            self._face_recognizer = FaceRecognizer(data_dir=default_data_dir())
         if not self._face_recognizer.is_available():
             return None
         return self._face_recognizer

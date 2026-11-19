@@ -39,7 +39,12 @@ import sys
 import time
 from pathlib import Path
 
-WIDTH, HEIGHT = 640, 480
+# The nerve frame. 1280x720 keeps a widescreen desktop's aspect
+# exactly, so nothing is letterboxed away — a game window (ARC's
+# grids live in one) keeps real pixels per cell instead of shrinking
+# into a 640x480 postage stamp. GENESIS_SCREEN_W/H override both.
+WIDTH = int(os.environ.get("GENESIS_SCREEN_W", "1280"))
+HEIGHT = int(os.environ.get("GENESIS_SCREEN_H", "720"))
 BPP = 3
 STRIDE = WIDTH * BPP
 FRAME_SIZE = STRIDE * HEIGHT
@@ -48,11 +53,10 @@ SEG_SIZE = HEADER_SIZE + FRAME_SIZE
 
 HEADER_FMT = "<QII4sII"  # seq, width, height, fourcc, size, stride
 
-# ffmpeg's rgb24 writes R,G,B bytes in memory. The nerve header uses
-# V4L2 fourcc names, which are word-order: bytes already in R,G,B
-# order are BGR3, and RGB3 would mean B,G,R bytes (the reader flips
-# those). Tag honestly or every downstream channel is swapped.
-_WIRE_FOURCC = b"BGR3"
+# ffmpeg's rgb24 writes R,G,B bytes in memory — that is V4L2's RGB3:
+# the fourcc names the memory order, and BGR3 would mean B,G,R bytes.
+# Tag honestly or every downstream channel is swapped.
+_WIRE_FOURCC = b"RGB3"
 
 
 def _screen_size() -> str:
@@ -80,7 +84,7 @@ def _ffmpeg_cmd(source: str) -> list[str]:
     """Build the ffmpeg pipeline for the given source.
 
     ``x11:WxH+X+Y`` is a screen region captured like a camera
-    pointed at the monitor, scaled to fit 640x480 with padding;
+    pointed at the monitor, scaled to fit the nerve frame with padding;
     ``://`` sources are HTTP MJPEG streams; anything else is a V4L2
     device opened in MJPEG mode.
     """
@@ -117,7 +121,7 @@ def _ffmpeg_cmd(source: str) -> list[str]:
     if source == "x11" or source.startswith("x11:"):
         # x11 or x11:WxH+X+Y — the display (or a rect of it), captured
         # like a camera pointed at the monitor. Aspect is preserved
-        # into the 640x480 frame with black padding so readers can map
+        # into the nerve frame with black padding so readers can map
         # the region back deterministically. Bare ``x11`` takes the
         # whole root window.
         if source == "x11":
@@ -179,7 +183,7 @@ def _ffmpeg_cmd(source: str) -> list[str]:
 
 
 def _out() -> list[str]:
-    """The shared output tail: scale to 640x480, emit packed RGB24."""
+    """The shared output tail: scale to the nerve frame, emit packed RGB24."""
     return [
         "-vf",
         f"scale={WIDTH}:{HEIGHT}",

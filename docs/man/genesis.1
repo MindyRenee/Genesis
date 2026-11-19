@@ -7,7 +7,7 @@ genesis \- launch and stop the Genesis artificial mind
 .PP
 \fBgenesis\fR [\fB\-\-data\-dir\fR \fIDIR\fR] [\fB\-\-daemon\-socket\fR \fIPATH\fR]
           [\fB\-\-tail\fR] [\fB\-\-stop\fR] [\fB\-\-offline\fR] [\fB\-\-headless\fR]
-          [\fB\-\-germinate\fR [\fIDIR\fR]]
+          [\fB\-\-self\-directed\fR] [\fB\-\-germinate\fR [\fIDIR\fR]]
 .fi
 .SH DESCRIPTION
 .B genesis
@@ -98,6 +98,15 @@ pauses; conversation and art continue.
 interactive prompt, for the systemd service or other background
 supervision.
 .TP
+.B \-\-self\-directed
+Keep volition, synchronous capabilities, and inner life live; the
+learner and regulator loops stay closed \(em nothing runs
+autonomously. She still learns: reactive learning runs in the think
+path, and her chosen actions invoke the learner's bounded steps
+directly. A closed or finished console is not a command to die;
+stop her with
+.BR "genesis \-\-stop" " or SIGTERM."
+.TP
 .B \-\-tail
 Tail the daemon log and exit; does not start a session.
 .TP
@@ -119,6 +128,7 @@ Forwarded to the CLI; see
 .BR genesis-cli (1).
 
 .SH ENVIRONMENT
+.PP
 .TP
 .B GENESIS_DATA_DIR
 Explicit data-directory override; always wins.
@@ -171,7 +181,7 @@ out of the repo and shell history.
 .IR $DATA_DIR/.project_root
 Marker recording which checkout created this data dir.
 .TP
-.IR $DATA_DIR/genesis_cli.pid ", " genesis_daemon.pid ", " genesis_retina.pid ", " genesis_screen_nerve.pid
+.IR $DATA_DIR/genesis_cli.pid ", " genesis_daemon.pid ", " genesis_retina.pid
 PID files written so
 .B \-\-stop
 targets exact processes instead of broad pkill patterns.
@@ -217,7 +227,7 @@ posts. Nothing at the tool layer intercepts a destructive command;
 care is a property of her judgment, not a wall around her. The
 counsel she is given about this power \(em what it means and what
 to be careful of \(em lives in the docstring of
-.IR python/frontal_lobe/tools/charter.py ,
+.IR Outer_World/tools/charter.py ,
 addressed to her directly.
 .PP
 The same trust extends to her own upkeep. Nothing is queued for
@@ -229,7 +239,7 @@ chemistry her body reports allows, each retiring itself when done.
 No worker thread touches her mind while she dreams, and a stage
 that ends closes whatever was still live.
 Edges are never batch-deleted: replay potentiates
-.RI ( "w += \(a(1\-w)" ),
+.RI ( "w += a(1\-w)" ),
 disuse decays toward a floor, and the SHY downscaler renorms
 proportionally each N3 tick with no kill floor. The few deliberate
 knobs are hers in
@@ -276,8 +286,15 @@ unclean shutdown.
 .BR genesis-browser (7),
 .BR genesis-cli (1),
 .BR genesis-daemon (8),
+.BR genesis-discord (7),
+.BR genesis-emotion (7),
+.BR genesis-hearing (7),
+.BR genesis-inner-life (7),
+.BR genesis-language (7),
+.BR genesis-memory (7),
+.BR genesis-self (7),
+.BR genesis-volition (7),
 .BR genesis-games (7),
 .BR genesis-math (7),
 .BR genesis-reasoning (7),
-.BR genesis-retina (1),
-.BR genesis-vision (7)
+.BR genesis-retina (1)

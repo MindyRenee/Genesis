@@ -1,0 +1,79 @@
+.TH GENESIS-LANGUAGE 7 "October 2026" "Genesis 0.2.0" "Genesis Manual"
+.SH NAME
+genesis-language \- the language faculties of the Genesis mind
+.SH SYNOPSIS
+.nf
+\fBtemporal_lobe.comprehension\fR    receptive language (the Wernicke side)
+\fBfrontal_lobe.generator\fR         productive language (the Broca side)
+\fBtemporal_lobe.morphology\fR       shared English inflection engine
+\fBtemporal_lobe.semantics\fR        compositional meaning synthesis
+\fBtemporal_lobe.vocabulary\fR       context-sensitive word selection
+\fBtemporal_lobe.figurative\fR       metaphor and non-literal meaning
+\fBtemporal_lobe.speech\fR           Piper TTS / Vosk STT
+\fBtemporal_lobe.language_latent_space\fR  machine-native text geometry
+.fi
+.SH DESCRIPTION
+Genesis contains no language model and never will. Everything she
+understands or says is composed endogenously: comprehension parses
+speech into meaning, the generator composes meaning into speech, and
+a single morphosyntax engine keeps the two sides agreeing about
+English.
+.SS Comprehension \(em the receptive side
+.I temporal_lobe/comprehension.py
+performs basic semantic parsing: speech-act identification
+(question, statement, command, exclamation \(em Searle), proposition
+extraction into subject-predicate-object triples, and reference
+resolution (Hobbs; centering theory). Propositions feed the
+discourse situation model so a "Where is Mary?" mid-story is
+answered from what she just heard, not from the web.
+.SS Semantics
+.I temporal_lobe/semantics.py
+composes the constituents comprehension supplies \(em a proposition's
+subject, predicate, roles, embeddings \(em into the sense they
+collectively express, on Frege's principle of compositionality. The
+anterior temporal semantic-hub role: convergence of distributed
+features into one coherent meaning.
+.SS Generation \(em the productive side
+.I frontal_lobe/generator.py
+takes a Thought (semantic content + intent + emotion + metadata) and
+composes it into language: grammar selects the sentence structure
+for the intent, vocabulary fills the slots, voice applies rhythm,
+connectors, hedging, and register. The result is composed, not
+retrieved \(em never a template with slots filled.
+.SS Vocabulary and morphology
+.I temporal_lobe/vocabulary.py
+selects words grounded in the concept network, emotional state
+(cortisol shortens, dopamine enlivens), and personality (openness
+abstracts, conscientiousness measures). It is context-sensitive
+selection, not a thesaurus.
+.I temporal_lobe/morphology.py
+is the shared inflectional engine \(em comprehension deconjugates
+("runs" \(-> "run"), production conjugates ("it runs"), and because
+both read the same module they can never disagree about English.
+.SS The machine-native latent space
+.I temporal_lobe/language_latent_space.py
+is her own text geometry: reversible 7-bit ASCII notation, a
+deterministic hashed feature codebook, and a Sinkhorn
+optimal-transport coupling between observed code distributions and
+the codebook. NumPy only \(em an optimal-transport summary, not a
+learned semantic map, and no pretrained anything.
+.SS Voice
+.I temporal_lobe/speech.py
+provides Piper neural TTS (espeak-ng fallback) and Vosk speech-to-
+text. Hearing itself is documented in
+.BR genesis-hearing (7).
+.SH FILES
+.TP
+.I Self_World/temporal_lobe/
+The language faculties and the concept network they ground in.
+.TP
+.I Self_World/frontal_lobe/generator.py
+The productive engine.
+.SH SEE ALSO
+.BR genesis (1),
+.BR genesis-cli (1),
+.BR genesis-hearing (7),
+.BR genesis-memory (7),
+.BR genesis-reasoning (7)
+.SH AUTHOR
+Genesis project

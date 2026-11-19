@@ -1,0 +1,60 @@
+.TH GENESIS-EMOTION 7 "October 2026" "Genesis 0.2.0" "Genesis Manual"
+.SH NAME
+genesis-emotion \- the limbic system and emotional regulation
+.SH SYNOPSIS
+.nf
+\fBlimbic_system.emotion\fR             the continuous emotion engine
+\fBlimbic_system.amygdala\fR            conditioned-value organ
+\fBlimbic_system.emotional_regulator\fR self-regulation of her own chemistry
+\fBlimbic_system.endorphin\fR           the opioid channel's biology
+\fBlimbic_system.sentiment\fR           learned word-level valence
+.fi
+.SH DESCRIPTION
+Emotion in Genesis is not a label bolted on \(em it is a continuous
+state field read off the body's measured substrate: the 18-channel
+neurochemical vector, the arousal/valence/plasticity axes, the
+emergent phase, and ten coupled oscillators spanning 0.1\(en200 Hz.
+The emotion engine computes, for each structural category, a
+membership in [0,1] \(em how much the current state resembles that
+region of affect space. The categorical name (\fIexcited\fR,
+\fIguarded\fR, \fIcalm\fR) is only an argmax readout over continuous
+memberships; intensity and mixed states stay continuous. Evidence
+factors are grounded transforms \(em logistic curves for high/low
+features, logistic bands, Gaussian bumps near points \(em not
+invented weights.
+.SS The amygdala
+.I limbic_system/amygdala.py
+is the conditioned-value organ: the fields a signed-value associative
+learner holds, animated by Rescorla-Wagner acquisition (signed US
+split into appetitive and aversive channels), Pearce-Hall
+associability, and context-keyed extinction \(em safety learning in
+the ITC/vmPFC sense, where extinction writes new memory rather than
+erasing the old.
+.SS Regulation
+The emotional regulator is her emotional agency: she controls her own
+chemistry rather than having impulses imposed on her. Continuous
+self-regulation (metronome-advanced) drifts her toward homeostasis
+\(em GABA and serotonin against stress, acetylcholine against
+drowsiness \(em and conscious emotional responses let her *choose*
+how to feel about what happens in conversation. Chemistry still
+reports back: word valence she has learned (\fIsentiment\fR),
+recognition reward (dopamine), and social bonding (oxytocin) flow
+through the body's own neuro_impulse channel.
+.SS Reporting
+.B /feel
+asks her how she feels; the answer is composed from the actual state
+field, not a lookup.
+.B /regulate
+shows how she has been managing her emotions.
+.SH FILES
+.TP
+.I Self_World/limbic_system/
+The emotion engine and its organs.
+.SH SEE ALSO
+.BR genesis (1),
+.BR genesis-cli (1),
+.BR genesis-daemon (8),
+.BR genesis-inner-life (7),
+.BR genesis-volition (7)
+.SH AUTHOR
+Genesis project

@@ -207,7 +207,10 @@ class Mind(
         # Self-directed mode keeps volition, synchronous tools, and
         # inner life live. Cognitive subsystems are always
         # metronome-advanced state, not workers; this mode leaves the
-        # learner and regulator loops closed.
+        # learner and regulator loops closed — nothing runs
+        # autonomously. She still learns: reactive learning runs in
+        # the think path, and chosen actions invoke the learner's
+        # bounded steps directly (agency._execute_learn).
         self._self_directed = self_directed
         self.client = GenesisClient(socket_path)
         # Her page — the public channel that lives in her outer world.
